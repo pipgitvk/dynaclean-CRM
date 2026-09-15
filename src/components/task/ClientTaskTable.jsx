@@ -13,6 +13,7 @@ import {
 import { Repeat } from "lucide-react";
 import ReassignModal from "@/components/models/ReassignModal";
 import AutoTaskBadge, { isAutoTask } from "@/components/task/AutoTaskBadge";
+import AutomatedTasksList from "@/components/task/AutomatedTasksList";
 
 dayjs.extend(isSameOrBefore);
 dayjs.extend(isSameOrAfter);
@@ -29,6 +30,7 @@ export default function ClientTaskTable({ initialTasks, currentUser = "" }) {
   const [sortBy, setSortBy] = useState("task_id");
   const [sortOrder, setSortOrder] = useState("desc");
   const [filteredTasks, setFilteredTasks] = useState(initialTasks);
+  const [taskView, setTaskView] = useState("tasks");
 
   useEffect(() => {
     const statusFromCard = searchParams.get("status");
@@ -213,6 +215,35 @@ export default function ClientTaskTable({ initialTasks, currentUser = "" }) {
 
   return (
     <>
+      <div className="mb-4 flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => setTaskView("tasks")}
+          className={`px-4 py-2 rounded-md text-sm font-medium ${
+            taskView === "tasks"
+              ? "bg-blue-600 text-white"
+              : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+          }`}
+        >
+          Tasks
+        </button>
+        <button
+          type="button"
+          onClick={() => setTaskView("automated")}
+          className={`px-4 py-2 rounded-md text-sm font-medium ${
+            taskView === "automated"
+              ? "bg-blue-600 text-white"
+              : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+          }`}
+        >
+          Automated Tasks
+        </button>
+      </div>
+
+      {taskView === "automated" ? (
+        <AutomatedTasksList />
+      ) : (
+        <>
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
         <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded">
@@ -519,6 +550,8 @@ export default function ClientTaskTable({ initialTasks, currentUser = "" }) {
           )}
         </div>
       </div>
+        </>
+      )}
       <ReassignModal
         open={reassignOpen}
         onClose={() => {

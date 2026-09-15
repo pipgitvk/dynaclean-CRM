@@ -1,30 +1,71 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Save, X } from "lucide-react";
 import toast from "react-hot-toast";
 import WeeklySelector from "./WeeklySelector";
 import MonthlySelector from "./MonthlySelector";
 import YearlySelector from "./YearlySelector";
+import SearchableSelect from "@/components/ui/SearchableSelect";
+
+function parseWeeklyDays(value) {
+  if (!value) return [];
+  if (Array.isArray(value)) return value;
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+function toDatetimeLocal(value) {
+  if (!value) return "";
+  const s = String(value).trim();
+  if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}/.test(s)) {
+    return s.replace(" ", "T").slice(0, 16);
+  }
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
 
 export default function RecurringTaskForm({ onSuccess, initialData = null }) {
   const [isLoading, setIsLoading] = useState(false);
+  const [employees, setEmployees] = useState([]);
   const [formData, setFormData] = useState({
     task_title: initialData?.task_title || "",
     description: initialData?.description || "",
-    assigned_user_id: initialData?.assigned_user_id || "",
+    assigned_user_id: initialData?.assigned_user_id ? String(initialData.assigned_user_id) : "",
     recurrence_type: initialData?.recurrence_type || "daily",
     repeat_interval: initialData?.repeat_interval || 1,
-    weekly_days: initialData?.weekly_days ? JSON.parse(initialData.weekly_days) : [],
+    weekly_days: parseWeeklyDays(initialData?.weekly_days),
     monthly_date: initialData?.monthly_date || 1,
     yearly_month: initialData?.yearly_month || 1,
     yearly_date: initialData?.yearly_date || 1,
-    start_date: initialData?.start_date || "",
-    end_date: initialData?.end_date || "",
-    due_date: initialData?.due_date || "",
+    start_date: toDatetimeLocal(initialData?.start_date),
+    end_date: toDatetimeLocal(initialData?.end_date),
+    due_date: toDatetimeLocal(initialData?.due_date),
     status: initialData?.status || "active",
-    is_active: initialData?.is_active !== undefined ? initialData.is_active : true,
+    is_active: initialData?.is_active !== undefined ? !!initialData.is_active : true,
   });
+
+  useEffect(() => {
+    const loadEmployees = async () => {
+      try {
+        const res = await fetch("/api/employees/active");
+        const data = await res.json();
+        if (data?.success) setEmployees(data.data || []);
+      } catch (e) {
+        console.error("Error loading employees:", e);
+      }
+    };
+    loadEmployees();
+  }, []);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -36,6 +77,10 @@ export default function RecurringTaskForm({ onSuccess, initialData = null }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!formData.assigned_user_id) {
+      toast.error("Please select an assignee");
+      return;
+    }
     setIsLoading(true);
 
     try {
@@ -47,7 +92,13 @@ export default function RecurringTaskForm({ onSuccess, initialData = null }) {
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...formData,
+          assigned_user_id: formData.assigned_user_id
+            ? Number(formData.assigned_user_id)
+            : null,
+          end_date: formData.end_date || null,
+        }),
       });
 
       const result = await res.json();
@@ -218,16 +269,22 @@ export default function RecurringTaskForm({ onSuccess, initialData = null }) {
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Assigned User ID *
+            Assigned to *
           </label>
-          <input
-            type="number"
-            name="assigned_user_id"
-            value={formData.assigned_user_id}
-            onChange={handleChange}
-            required
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            placeholder="Enter user ID"
+          <SearchableSelect
+            options={[
+              { value: "", label: "Select employee" },
+              ...employees.map((emp) => ({
+                value: String(emp.empId),
+                label: emp.username || emp.name || String(emp.empId),
+              })),
+            ]}
+            value={String(formData.assigned_user_id || "")}
+            onChange={(val) =>
+              setFormData((prev) => ({ ...prev, assigned_user_id: val }))
+            }
+            placeholder="Select employee"
+            searchPlaceholder="Search employee..."
           />
         </div>
 
