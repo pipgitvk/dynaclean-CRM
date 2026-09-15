@@ -38,6 +38,7 @@ export const MODULE_TREE = [
       { key: "view-customers", label: "View Customers" },
       { key: "quotations", label: "Quotations" },
       { key: "invoices", label: "Invoices" },
+      { key: "performa-invoices", label: "Performa Invoices" },
       { key: "ads-management", label: "Ads Management" },
     ],
   },
@@ -283,6 +284,7 @@ export const SUPERADMIN_MODULE_UI_NODES = [
     children: [
       { kind: "leaf", key: "quotations", label: "Quotation" },
       { kind: "leaf", key: "invoices", label: "Invoices" },
+      { kind: "leaf", key: "performa-invoices", label: "Performa Invoices" },
       { kind: "leaf", key: "orders-process", label: "Order Process" },
       { kind: "leaf", key: "orders-delay", label: "Delay Delivery" },
       { kind: "leaf", key: "estimate-delivery", label: "Estimate Delivery" },

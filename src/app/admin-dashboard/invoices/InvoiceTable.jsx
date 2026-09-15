@@ -435,6 +435,7 @@ export default function InvoiceTable({ onSummaryUpdate }) {
               <th className="px-4 py-2">Buyer</th>
               <th className="px-4 py-2">Consignee GSTIN</th>
               <th className="px-4 py-2">Employee</th>
+              <th className="px-4 py-2">Created By</th>
               <th
                 onClick={() => handleSort("invoice_date")}
                 className="px-4 py-2 cursor-pointer"
@@ -458,13 +459,13 @@ export default function InvoiceTable({ onSummaryUpdate }) {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan="15" className="text-center py-4">
+                <td colSpan="16" className="text-center py-4">
                   Loading...
                 </td>
               </tr>
             ) : fetchError ? (
               <tr>
-                <td colSpan="15" className="text-center py-6 text-red-600">
+                <td colSpan="16" className="text-center py-6 text-red-600">
                   {fetchError}
                 </td>
               </tr>
@@ -512,6 +513,7 @@ export default function InvoiceTable({ onSummaryUpdate }) {
                     <td className={`px-4 py-2 ${i.parent_id ? 'pl-8' : ''}`}>{i.buyer_name}</td>
                     <td className={`px-4 py-2 text-sm font-mono ${i.parent_id ? 'pl-8' : ''}`}>{i.gst_consignee || "-"}</td>
                     <td className={`px-4 py-2 ${i.parent_id ? 'pl-8' : ''}`}>{i.employee_name || "-"}</td>
+                    <td className={`px-4 py-2 ${i.parent_id ? 'pl-8' : ''}`}>{i.created_by || "-"}</td>
                     <td className="px-4 py-2">
                       {new Date(i.order_date).toLocaleDateString("en-IN")}
                     </td>
@@ -606,7 +608,7 @@ export default function InvoiceTable({ onSummaryUpdate }) {
                   </tr>
                   {expandedInvoiceId === i.id && i.linkedStatements && i.linkedStatements.length > 0 && (
                     <tr>
-                      <td colSpan="15" className="px-8 py-4 bg-gray-50">
+                      <td colSpan="16" className="px-8 py-4 bg-gray-50">
                         <div className="flex justify-between items-center mb-3">
                           <h4 className="font-semibold text-gray-700">Linked Payments:</h4>
                           <div className="text-right">
@@ -665,7 +667,7 @@ export default function InvoiceTable({ onSummaryUpdate }) {
               ))
             ) : (
               <tr>
-                <td colSpan="15" className="text-center py-6 text-gray-500">
+                <td colSpan="16" className="text-center py-6 text-gray-500">
                   No invoices found
                 </td>
               </tr>

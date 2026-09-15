@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import InvoiceItemsTable from "./invoice-table";
 import TaxAndSummary from "./Tax-invoice";
 import { useRouter } from "next/navigation";
@@ -9,15 +9,16 @@ import toast from "react-hot-toast";
 import AddSpecialPriceModal from "@/components/specialPrice/AddSpecialPriceModal";
 import dynacleanLogo from "@/components/logo1.jpg";
 
-export default function InvoiceForm({ invoiceNumber, invoiceDate, invoiceType = "tax", onBack }) {
+export default function InvoiceForm({ invoiceNumber, invoiceDate, invoiceType = "tax", onBack, onSuccessRedirect, initialQuotationNumber = "" }) {
   const router = useRouter();
+  const autoFilledQuoteRef = useRef(false);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Determine the display label based on invoice type
   const invoiceTypeLabel = invoiceType === "performa" ? "Performa Invoice" : "Invoice";
   const [ showQuotationModal, setShowQuotationModal]= useState(false)
-  const [quotationNumber, setQuotationNumber] = useState("")
+  const [quotationNumber, setQuotationNumber] = useState(String(initialQuotationNumber || "").trim());
   const [isFromQuotation, setIsFromQuotation] = useState(false);
 
 
@@ -339,7 +340,13 @@ Thanks for doing business with us!`,
       const data = await res.json();
       if (data.success) {
         toast.success("Invoice created successfully");
-        router.push("/admin-dashboard/invoices");
+        if (onSuccessRedirect) {
+          router.push(onSuccessRedirect);
+        } else if (invoiceType === "performa") {
+          router.push("/admin-dashboard/performa-invoices");
+        } else {
+          router.push("/admin-dashboard/invoices");
+        }
       } else {
         alert("Error: " + data.error);
       }
@@ -361,15 +368,16 @@ Thanks for doing business with us!`,
 
 
   // fetch data with quotation number 
-const fetchQuotationAndFill = async () => {
-  if (!quotationNumber) {
+const fetchQuotationAndFill = async (quoteNoArg) => {
+  const qn = String(quoteNoArg ?? quotationNumber ?? "").trim();
+  if (!qn) {
     toast.error("Enter quotation number");
     return;
   }
 
   try {
     const res = await fetch(
-      `/api/get-quotation?quotation_number=${quotationNumber}`
+      `/api/get-quotation?quotation_number=${encodeURIComponent(qn)}`
     );
     const data = await res.json();
     console.log("check what data :", data);
@@ -456,15 +464,20 @@ const fetchQuotationAndFill = async () => {
 
     toast.success("Quotation loaded successfully");
     setShowQuotationModal(false);
-    // Clear the input field but keep isFromQuotation flag for rate logic
-    setTimeout(() => setQuotationNumber(""), 500);
+    setQuotationNumber(qn);
   } catch (err) {
     console.error(err);
     toast.error("Failed to load quotation");
   }
 };
 
-
+  useEffect(() => {
+    const qn = String(initialQuotationNumber || "").trim();
+    if (!qn || autoFilledQuoteRef.current) return;
+    autoFilledQuoteRef.current = true;
+    void fetchQuotationAndFill(qn);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-time autofill from URL/customer page
+  }, [initialQuotationNumber]);
 
   return (
     <>

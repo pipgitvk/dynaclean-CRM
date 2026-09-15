@@ -1,6 +1,7 @@
 import { getDbConnection } from "@/lib/db";
 import { NextResponse } from "next/server";
 import { getSessionPayload } from "@/lib/auth";
+import { canAccessPerformaInvoice } from "@/lib/performaInvoiceAccess";
 import {
   loadInvoiceWithItemsForPdf,
   sendInvoicePaymentNoticeEmail,
@@ -27,6 +28,10 @@ export async function GET(_req, context) {
     );
 
     if (!inv) {
+      return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+    }
+
+    if (!canAccessPerformaInvoice(payload, inv)) {
       return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
     }
 
@@ -245,10 +250,13 @@ export async function PATCH(req, context) {
     }
 
     const [[existing]] = await conn.execute(
-      `SELECT id FROM invoices WHERE id = ? LIMIT 1`,
+      `SELECT id, type, created_by, employee_name FROM invoices WHERE id = ? LIMIT 1`,
       [invoiceId],
     );
     if (!existing) {
+      return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+    }
+    if (!canAccessPerformaInvoice(payload, existing)) {
       return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
     }
 

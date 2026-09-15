@@ -100,7 +100,7 @@ export default function InvoiceTable() {
         { header: "ID", key: "id", width: 10 },
         { header: "Invoice Number", key: "invoice_number", width: 25 },
         { header: "GSTIN No", key: "gst_number", width: 20 },
-        { header: "Employee Name", key: "employee_name", width: 20 },
+        { header: "Created By", key: "employee_name", width: 20 },
         { header: "Buyer Name", key: "buyer_name", width: 30 },
         { header: "Order Date", key: "order_date", width: 15 },
         { header: "Tax Amount", key: "tax_amount", width: 15 },

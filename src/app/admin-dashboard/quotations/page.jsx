@@ -1,7 +1,9 @@
 // src/app/admin-dashboard/quotations/page.jsx
+import Link from "next/link";
 import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 import QuotationTableClient from "./QuotationClientTable";
+import { userHasModuleKey } from "@/lib/userModuleAccessServer";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +24,7 @@ export default async function QuotationPage({ searchParams }) {
 
   const sp = await searchParams;
   const customerId = sp?.customer_id ? String(sp.customer_id).trim() : "";
+  const canPerformaInvoice = await userHasModuleKey(username, role, "performa-invoices");
 
   return (
     <div className="w-full p-6">
@@ -40,12 +43,14 @@ export default async function QuotationPage({ searchParams }) {
           >
             New Quotation
           </a>
-          <a
-            href="/admin-dashboard/invoices/performa"
-            className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
-          >
-            Performa Invoice
-          </a>
+          {canPerformaInvoice ? (
+            <Link
+              href="/admin-dashboard/invoices/performa"
+              className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
+            >
+              Performa Invoice
+            </Link>
+          ) : null}
         </div>
       </div>
 

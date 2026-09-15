@@ -368,7 +368,7 @@ export default function InvoiceTable({ onSummaryUpdate }) {
                 Invoice No <SortIcon column="invoice_number" />
               </th>
               <th className="px-4 py-2">Buyer</th>
-              <th className="px-4 py-2">Employee</th>
+              <th className="px-4 py-2">Created By</th>
               <th
                 onClick={() => handleSort("order_date")}
                 className="px-4 py-2 cursor-pointer"

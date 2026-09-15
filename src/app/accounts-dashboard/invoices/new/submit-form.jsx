@@ -9,7 +9,7 @@ import toast from "react-hot-toast";
 import AddSpecialPriceModal from "@/components/specialPrice/AddSpecialPriceModal";
 import dynacleanLogo from "@/components/logo1.jpg";
 
-export default function InvoiceForm({ invoiceNumber, invoiceDate, invoiceType = "tax", onBack }) {
+export default function InvoiceForm({ invoiceNumber, invoiceDate, invoiceType = "tax", onBack, onSuccessRedirect }) {
   const router = useRouter();
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -263,7 +263,13 @@ Thanks for doing business with us!`,
       const data = await res.json();
       if (data.success) {
         toast.success("Invoice created successfully");
-        router.push("/accounts-dashboard/invoices");
+        if (onSuccessRedirect) {
+          router.push(onSuccessRedirect);
+        } else if (invoiceType === "performa") {
+          router.push("/accounts-dashboard/performa-invoices");
+        } else {
+          router.push("/accounts-dashboard/invoices");
+        }
       } else {
         alert("Error: " + data.error);
       }

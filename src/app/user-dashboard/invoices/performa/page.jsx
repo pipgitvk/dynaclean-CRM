@@ -14,7 +14,7 @@ export default async function PerformaInvoicePage({ searchParams }) {
       <PerformaInvoiceClient
         invoiceNumber={invoiceNumber}
         invoiceDate={today}
-        onSuccessRedirect="/admin-dashboard/performa-invoices"
+        onSuccessRedirect="/user-dashboard/performa-invoices"
         initialQuotationNumber={initialQuotationNumber}
       />
     </div>

@@ -361,6 +361,13 @@ const allMenuItems = [
         icon: "FileText",
       },
       {
+        path: "/user-dashboard/performa-invoices",
+        name: "Performa Invoices",
+        moduleKey: "performa-invoices",
+        roles: ["ALL"],
+        icon: "FileText",
+      },
+      {
         path: "/user-dashboard/order",
         name: "Order Process",
         moduleKey: "orders-process",

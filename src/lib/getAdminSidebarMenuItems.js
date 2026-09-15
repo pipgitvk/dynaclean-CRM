@@ -410,6 +410,13 @@ const allMenuItems = [
         icon: "FileText",
       },
       {
+        path: "/admin-dashboard/performa-invoices",
+        name: "Performa Invoices",
+        accessKey: "performa-invoices",
+        roles: ["ALL"],
+        icon: "FileText",
+      },
+      {
         path: "/admin-dashboard/order",
         name: "Order Process",
         roles: ["SUPERADMIN"],

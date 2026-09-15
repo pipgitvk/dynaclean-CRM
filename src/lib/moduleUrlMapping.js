@@ -35,6 +35,7 @@ export const MODULE_KEY_TO_URL = {
   // Sales
   "quotations": "/admin-dashboard/quotations",
   "invoices": "/admin-dashboard/invoices/list",
+  "performa-invoices": "/admin-dashboard/performa-invoices",
   "orders-process": "/admin-dashboard/order",
   "orders-delay": "/admin-dashboard/order/delivery-status",
   "estimate-delivery": "/admin-dashboard/estimate-delivery",

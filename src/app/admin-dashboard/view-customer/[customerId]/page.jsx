@@ -5,8 +5,10 @@ import dayjs from "dayjs";
 import FollowUpHistory from "@/components/Leads/FollowUpHistory";
 import CustomerContactsModal from "@/components/Customers/CustomerContactsModal";
 import ViewCustomerQuotationsLink from "@/components/Customers/ViewCustomerQuotationsLink";
+import CustomerPerformaInvoiceButton from "@/components/invoice/CustomerPerformaInvoiceButton";
 import ScheduleVisitModal from "@/components/scheduleVisit/ScheduleVisitModal";
 import { canShowScheduleVisitOnCustomerProfile } from "@/lib/scheduleVisitScope";
+import { userHasModuleKey } from "@/lib/userModuleAccessServer";
 import Link from "next/link";
 import axios from "axios";
 import { notFound } from "next/navigation";
@@ -67,6 +69,28 @@ export default async function CustomerPage({ params }) {
     : `SELECT COUNT(*) AS orderCount FROM neworder WHERE customer_id = ? AND created_by = ?`;
   const orderCountParams = canSeeAllOrders ? [customerId] : [customerId, username];
   const [[{ orderCount }]] = await conn.execute(orderCountQuery, orderCountParams);
+
+  let latestQuoteNumber = "";
+  try {
+    const [quoteRows] = await conn.execute(
+      `SELECT quote_number
+       FROM quotations_records
+       WHERE customer_id = ?
+       ORDER BY quote_date DESC, quote_number DESC
+       LIMIT 1`,
+      [customerId],
+    );
+    latestQuoteNumber = quoteRows[0]?.quote_number
+      ? String(quoteRows[0].quote_number).trim()
+      : "";
+  } catch {
+    latestQuoteNumber = "";
+  }
+  const canCreatePerformaInvoice = await userHasModuleKey(
+    username,
+    userRole,
+    "performa-invoices",
+  );
 
   let cust_analysis_external = {};
   const phone = customer.phone != null ? String(customer.phone).trim() : "";
@@ -309,6 +333,13 @@ export default async function CustomerPage({ params }) {
               >
                 add Quotation
               </Link>
+              {canCreatePerformaInvoice && (
+                <CustomerPerformaInvoiceButton
+                  quotationNumber={latestQuoteNumber}
+                  href={`/admin-dashboard/invoices/performa?quotation_number=${encodeURIComponent(latestQuoteNumber)}`}
+                  className="btn w-full md:w-auto md:flex-shrink-0 whitespace-nowrap text-white bg-violet-700 hover:bg-violet-800 py-2 px-4 rounded-md text-center transition duration-300"
+                />
+              )}
               <Link
                 href={`/admin-dashboard/special-pricing/${customerId}`}
                 className="btn w-full md:w-auto md:flex-shrink-0 whitespace-nowrap text-white bg-pink-600 hover:bg-pink-700 py-2 px-4 rounded-md text-center transition duration-300"

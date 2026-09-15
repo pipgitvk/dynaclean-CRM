@@ -1,6 +1,8 @@
 import { getDbConnection } from "@/lib/db";
 import { NextResponse } from "next/server";
 import { getSessionPayload } from "@/lib/auth";
+import { OWN_INVOICE_CREATOR_SQL } from "@/lib/performaInvoiceAccess";
+
 // import { cookies } from "next/headers";
 
 /** Parse linked_trans_ids JSON or plain string → array of strings */
@@ -127,6 +129,7 @@ function buildInvoiceSelectSql(derivedStatusSql, latestOrderIdSql) {
     gst_number,
     gst_consignee,
     employee_name,
+    created_by,
     parent_id,
     invoice_date,
     invoice_date AS order_date,
@@ -151,6 +154,7 @@ function buildSimpleInvoiceSelectSql() {
     gst_number,
     gst_consignee,
     employee_name,
+    created_by,
     parent_id,
     invoice_date,
     invoice_date AS order_date,
@@ -696,6 +700,48 @@ export async function GET(req) {
       values.push(invoiceType);
     }
 
+    const employeeNameFilter = searchParams.get("employeeName");
+    if (employeeNameFilter) {
+      where += " AND employee_name = ?";
+      values.push(employeeNameFilter);
+    }
+
+    // Role-based access: non-privileged users can only see invoices they created
+    const userRole = String(payload?.role || "").toUpperCase().trim();
+    const sessionUsername = payload?.username || null;
+    const PRIVILEGED_ROLES = [
+      "SUPERADMIN",
+      "ADMIN",
+      "EA",
+      "DIRECTOR",
+      "SERVICE HEAD",
+      "TEAM LEADER",
+      "SALES HEAD",
+      "HR HEAD",
+      "HR MANAGER",
+    ];
+    const hasAccountant = /ACCOUNTANT/.test(userRole);
+    const isPrivileged = PRIVILEGED_ROLES.includes(userRole) || hasAccountant;
+    const isSuperadmin = userRole === "SUPERADMIN";
+    const isPerformaOnly =
+      String(invoiceType || "").trim().toLowerCase() === "performa";
+
+    if (isPerformaOnly) {
+      // Performa: SUPERADMIN sees all; ADMIN and every other role see only own
+      if (!isSuperadmin && sessionUsername) {
+        where += ` AND ${OWN_INVOICE_CREATOR_SQL}`;
+        values.push(sessionUsername, sessionUsername);
+      }
+    } else if (!isPrivileged && sessionUsername) {
+      // Tax / mixed list: non-privileged users only see invoices they created
+      where += ` AND ${OWN_INVOICE_CREATOR_SQL}`;
+      values.push(sessionUsername, sessionUsername);
+    } else if (isPrivileged && !isSuperadmin && sessionUsername) {
+      // Privileged roles still see all tax invoices, but only their own performa
+      where += ` AND ((type IS NULL OR LOWER(TRIM(type)) <> 'performa') OR ${OWN_INVOICE_CREATOR_SQL})`;
+      values.push(sessionUsername, sessionUsername);
+    }
+
     let total = null;
     let totalPages = null;
     let rows;
@@ -830,6 +876,8 @@ export async function POST(req) {
 
     const pool = await getDbConnection();
     conn = await pool.getConnection();
+
+    const createdBy = payload?.username || null;
 
     // Fetch employee name from quotation if quotation_id is provided
     let employeeName = payload?.username || null;
@@ -985,150 +1033,88 @@ export async function POST(req) {
           } catch (__) {}
         }
 
-        // Conditionally build INSERT statement based on whether employee_name column exists
-        let insertQuery, insertValues;
-        if (employeeNameColumnExists && statusColumnExists) {
-          insertQuery = `INSERT INTO invoices 
-           (quotation_id, invoice_number, invoice_date, order_date, due_date, customer_name, customer_email, 
-            customer_phone, billing_address, shipping_address, Consignee, Consignee_Contact, gst_number, employee_name, state, state_code, 
-            subtotal, cgst, sgst, igst, total_tax, round_off, grand_total, amount_paid, balance_amount, 
-            payment_status, notes, terms_conditions, buyers_order_no, eway_bill_no, delivery_challan_no,
-            customer_id, linked_trans_ids, cgst_rate, sgst_rate, igst_rate, type, status, created_at) 
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`;
-          insertValues = [
-            quotation_id,
-            finalInvoiceNumber,
-            serverInvoiceDate,
-            serverOrderDate,
-            due_date,
-            customer_name,
-            customer_email,
-            customer_phone,
-            billing_address,
-            shipping_address,
-            Consignee,
-            Consignee_Contact,
-            gst_number,
-            employeeName,
-            state,
-            state_code,
-            subtotal,
-            cgst,
-            sgst,
-            igst,
-            total_tax,
-            round_off || 0,
-            grand_total,
-            amount_paid,
-            balance_amount,
-            payment_status,
-            notes,
-            terms_conditions,
-            buyers_order_no,
-            eway_bill_no,
-            delivery_challan_no,
-            customerIdSql,
-            linkedTransIdsJson,
-            bodyCgstRate,
-            bodySgstRate,
-            bodyIgstRate,
-            invoice_type,
-            bodyStatus,
-          ];
-        } else if (employeeNameColumnExists) {
-          insertQuery = `INSERT INTO invoices 
-           (quotation_id, invoice_number, invoice_date, order_date, due_date, customer_name, customer_email, 
-            customer_phone, billing_address, shipping_address, Consignee, Consignee_Contact, gst_number, employee_name, state, state_code, 
-            subtotal, cgst, sgst, igst, total_tax, round_off, grand_total, amount_paid, balance_amount, 
-            payment_status, notes, terms_conditions, buyers_order_no, eway_bill_no, delivery_challan_no,
-            customer_id, linked_trans_ids, cgst_rate, sgst_rate, igst_rate, type, created_at) 
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`;
-          insertValues = [
-            quotation_id,
-            finalInvoiceNumber,
-            serverInvoiceDate,
-            serverOrderDate,
-            due_date,
-            customer_name,
-            customer_email,
-            customer_phone,
-            billing_address,
-            shipping_address,
-            Consignee,
-            Consignee_Contact,
-            gst_number,
-            employeeName,
-            state,
-            state_code,
-            subtotal,
-            cgst,
-            sgst,
-            igst,
-            total_tax,
-            round_off || 0,
-            grand_total,
-            amount_paid,
-            balance_amount,
-            payment_status,
-            notes,
-            terms_conditions,
-            buyers_order_no,
-            eway_bill_no,
-            delivery_challan_no,
-            customerIdSql,
-            linkedTransIdsJson,
-            bodyCgstRate,
-            bodySgstRate,
-            bodyIgstRate,
-            invoice_type,
-          ];
-        } else {
-          insertQuery = `INSERT INTO invoices 
-           (quotation_id, invoice_number, invoice_date, order_date, due_date, customer_name, customer_email, 
-            customer_phone, billing_address, shipping_address, Consignee, Consignee_Contact, gst_number, state, state_code, 
-            subtotal, cgst, sgst, igst, total_tax, round_off, grand_total, amount_paid, balance_amount, 
-            payment_status, notes, terms_conditions, buyers_order_no, eway_bill_no, delivery_challan_no,
-            customer_id, linked_trans_ids, cgst_rate, sgst_rate, igst_rate, type, created_at) 
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`;
-          insertValues = [
-            quotation_id,
-            finalInvoiceNumber,
-            serverInvoiceDate,
-            serverOrderDate,
-            due_date,
-            customer_name,
-            customer_email,
-            customer_phone,
-            billing_address,
-            shipping_address,
-            Consignee,
-            Consignee_Contact,
-            gst_number,
-            state,
-            state_code,
-            subtotal,
-            cgst,
-            sgst,
-            igst,
-            total_tax,
-            round_off || 0,
-            grand_total,
-            amount_paid,
-            balance_amount,
-            payment_status,
-            notes,
-            terms_conditions,
-            buyers_order_no,
-            eway_bill_no,
-            delivery_challan_no,
-            customerIdSql,
-            linkedTransIdsJson,
-            bodyCgstRate,
-            bodySgstRate,
-            bodyIgstRate,
-            invoice_type,
-          ];
+        // Ensure created_by column exists
+        let createdByColumnExists = false;
+        try {
+          await conn.execute("SELECT created_by FROM invoices LIMIT 1");
+          createdByColumnExists = true;
+        } catch (_) {
+          try {
+            await conn.execute("ALTER TABLE invoices ADD COLUMN created_by VARCHAR(255) NULL DEFAULT NULL AFTER employee_name");
+            try {
+              await conn.execute("CREATE INDEX idx_invoice_created_by ON invoices(created_by)");
+            } catch (___) {}
+            createdByColumnExists = true;
+          } catch (__) {
+            console.error("Failed to add created_by column to invoices table (POST)");
+          }
         }
+
+        // Dynamically build INSERT so columns, placeholders, and values always match
+        const columns = [];
+        const values = [];
+        const placeholders = [];
+
+        const pushCol = (name, val) => {
+          columns.push(name);
+          placeholders.push("?");
+          values.push(val);
+        };
+
+        pushCol("quotation_id", quotation_id);
+        pushCol("invoice_number", finalInvoiceNumber);
+        pushCol("invoice_date", serverInvoiceDate);
+        pushCol("order_date", serverOrderDate);
+        pushCol("due_date", due_date);
+        pushCol("customer_name", customer_name);
+        pushCol("customer_email", customer_email);
+        pushCol("customer_phone", customer_phone);
+        pushCol("billing_address", billing_address);
+        pushCol("shipping_address", shipping_address);
+        pushCol("Consignee", Consignee);
+        pushCol("Consignee_Contact", Consignee_Contact);
+        pushCol("gst_number", gst_number);
+
+        if (employeeNameColumnExists) {
+          pushCol("employee_name", employeeName);
+        }
+        if (createdByColumnExists) {
+          pushCol("created_by", createdBy);
+        }
+
+        pushCol("state", state);
+        pushCol("state_code", state_code);
+        pushCol("subtotal", subtotal);
+        pushCol("cgst", cgst);
+        pushCol("sgst", sgst);
+        pushCol("igst", igst);
+        pushCol("total_tax", total_tax);
+        pushCol("round_off", round_off || 0);
+        pushCol("grand_total", grand_total);
+        pushCol("amount_paid", amount_paid);
+        pushCol("balance_amount", balance_amount);
+        pushCol("payment_status", payment_status);
+        pushCol("notes", notes);
+        pushCol("terms_conditions", terms_conditions);
+        pushCol("buyers_order_no", buyers_order_no);
+        pushCol("eway_bill_no", eway_bill_no);
+        pushCol("delivery_challan_no", delivery_challan_no);
+        pushCol("customer_id", customerIdSql);
+        pushCol("linked_trans_ids", linkedTransIdsJson);
+        pushCol("cgst_rate", bodyCgstRate);
+        pushCol("sgst_rate", bodySgstRate);
+        pushCol("igst_rate", bodyIgstRate);
+        pushCol("type", invoice_type);
+
+        if (statusColumnExists) {
+          pushCol("status", bodyStatus);
+        }
+
+        columns.push("created_at");
+        placeholders.push("NOW()");
+
+        const insertQuery = `INSERT INTO invoices (${columns.join(", ")}) VALUES (${placeholders.join(", ")})`;
+        const insertValues = values;
 
         const [result] = await conn.execute(insertQuery, insertValues);
 
