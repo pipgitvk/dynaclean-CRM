@@ -3,8 +3,6 @@ import { NextResponse } from "next/server";
 import { getSessionPayload } from "@/lib/auth";
 import { OWN_INVOICE_CREATOR_SQL } from "@/lib/performaInvoiceAccess";
 
-http://localhost:3000/user-dashboard/warranty/products// import { cookies } from "next/headers";
-
 /** Parse linked_trans_ids JSON or plain string → array of strings */
 function parseTransIds(raw) {
   if (!raw) return [];

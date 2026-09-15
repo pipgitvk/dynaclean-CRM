@@ -6,12 +6,15 @@ import { canViewAllOrders } from "@/lib/dataScope";
 // Secret for verifying JWT
 const JWT_SECRET = process.env.JWT_SECRET;
 
-export default async function OrdersPage() {
+export default async function OrdersPage({ searchParams }) {
   const payload = await getSessionPayload();
   if (!payload) {
     // You can handle unauthorized access here, e.g., redirect or return an error
     return null;
   }
+
+  const sp = await searchParams;
+  const serviceSupportOnly = String(sp?.ss || "") === "1";
 
   const username = payload.username;
   if (!username) {
@@ -127,10 +130,24 @@ export default async function OrdersPage() {
                 credit_notes cn ON CAST(cn.order_id AS CHAR) COLLATE utf8mb4_unicode_ci = CAST(no.order_id AS CHAR) COLLATE utf8mb4_unicode_ci AND cn.is_saved = 1`;
 
   const params = [];
+  const where = [];
 
   if (!canViewAllOrders(userRole)) {
-    sql += " WHERE no.created_by = ?";
+    where.push("no.created_by = ?");
     params.push(username);
+  }
+
+  if (serviceSupportOnly) {
+    where.push(
+      `no.created_by COLLATE utf8mb4_unicode_ci IN (
+        SELECT username COLLATE utf8mb4_unicode_ci FROM rep_list
+        WHERE userRole = 'SERVICE SUPPORT' AND status = 1
+      )`,
+    );
+  }
+
+  if (where.length) {
+    sql += " WHERE " + where.join(" AND ");
   }
 
   sql += " GROUP BY no.order_id ORDER BY no.created_at DESC";
@@ -144,7 +161,9 @@ export default async function OrdersPage() {
   return (
     <div className="mx-auto p-6">
       <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-4">
-        <h3 className="text-xl font-bold">Your Orders</h3>
+        <h3 className="text-xl font-bold">
+          {serviceSupportOnly ? "Service Support Orders" : "Your Orders"}
+        </h3>
 
         <div className="flex flex-wrap gap-2">
           <a

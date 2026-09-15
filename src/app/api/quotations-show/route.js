@@ -66,6 +66,9 @@ export async function GET(req) {
   const toDate = searchParams.get("to_date");
   const customerName = searchParams.get("customer_name");
   const customerId = searchParams.get("customer_id");
+  const serviceSupportOnly =
+    searchParams.get("ss") === "1" ||
+    searchParams.get("service_support") === "1";
 
   const conn = await getDbConnection();
 
@@ -110,8 +113,17 @@ export async function GET(req) {
 
   // ✅ Date filter
   if (fromDate && toDate) {
-    conditions.push(`qr.quote_date BETWEEN ? AND ?`);
+    conditions.push(`DATE(qr.quote_date) BETWEEN ? AND ?`);
     values.push(fromDate, toDate);
+  }
+
+  if (serviceSupportOnly) {
+    conditions.push(
+      `qr.emp_name COLLATE utf8mb4_unicode_ci IN (
+        SELECT username COLLATE utf8mb4_unicode_ci FROM rep_list
+        WHERE userRole = 'SERVICE SUPPORT' AND status = 1
+      )`,
+    );
   }
 
   // Build WHERE clause

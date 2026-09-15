@@ -3,15 +3,26 @@
 import { useEffect, useMemo, useState } from "react";
 import QuotationViewModal from "@/components/Quotation/QuotationViewModal";
 
-export default function QuotationTableClient({ username, customerId, role }) {
+function currentMonthRange() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = now.getMonth();
+  const from = `${y}-${String(m + 1).padStart(2, "0")}-01`;
+  const lastDay = new Date(y, m + 1, 0).getDate();
+  const to = `${y}-${String(m + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+  return { from, to };
+}
+
+export default function QuotationTableClient({ username, customerId, role, serviceSupportOnly = false }) {
   const isSuperAdmin = role === "SUPERADMIN";
+  const monthRange = useMemo(() => currentMonthRange(), []);
   const [quotations, setQuotations] = useState([]);
   const [filtered, setFiltered] = useState([]);
   const [modalQuote, setModalQuote] = useState(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [fromDate, setFromDate] = useState("");
-  const [toDate, setToDate] = useState("");
+  const [fromDate, setFromDate] = useState(monthRange.from);
+  const [toDate, setToDate] = useState(monthRange.to);
   const [employeeFilter, setEmployeeFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -39,6 +50,7 @@ export default function QuotationTableClient({ username, customerId, role }) {
     if (employeeFilter) url += `&emp_name=${encodeURIComponent(employeeFilter)}`;
     if (customerId)
       url += `&customer_id=${encodeURIComponent(String(customerId))}`;
+    if (serviceSupportOnly) url += `&ss=1`;
 
     try {
       const res = await fetch(url);
@@ -59,7 +71,7 @@ export default function QuotationTableClient({ username, customerId, role }) {
 
   useEffect(() => {
     fetchData(); // Load data initially
-  }, [username, fromDate, toDate, employeeFilter, customerId]);
+  }, [username, fromDate, toDate, employeeFilter, customerId, serviceSupportOnly]);
 
   useEffect(() => {
     const keyword = search.trim().toLowerCase();
@@ -95,8 +107,8 @@ export default function QuotationTableClient({ username, customerId, role }) {
   }, [search, quotations, employeeFilter, statusFilter]);
 
   const handleReset = () => {
-    setFromDate("");
-    setToDate("");
+    setFromDate(monthRange.from);
+    setToDate(monthRange.to);
     setSearch("");
     setEmployeeFilter("");
     setStatusFilter("");

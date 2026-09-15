@@ -200,6 +200,7 @@ import OverduePaymentCard from "@/components/OverduePaymentCard";
 import KeywordPerformanceQuickCard from "@/components/keywords/KeywordPerformanceQuickCard";
 import { Package, BarChart3, Upload, DollarSign, Calendar, Plane, FileText, ClipboardList } from "lucide-react";
 import ServiceTeamReportCard from "@/components/service/ServiceTeamReportCard";
+import ServiceSupportQuotesOrdersCard from "@/components/service/ServiceSupportQuotesOrdersCard";
 
 // import UpcomingLeads from "@/components/Leads/UpcommingLeads";
 
@@ -292,6 +293,7 @@ export default async function UserDashboardPage() {
     }
 
     let todayServiceTeamRows = [];
+    let todayServiceQuoteOrderRows = [];
     try {
       const todayIst = new Date().toLocaleDateString("en-CA", {
         timeZone: "Asia/Kolkata",
@@ -323,6 +325,28 @@ export default async function UserDashboardPage() {
           username: name,
           machine: mfMap[name] || 0,
           customer: cfMap[name] || 0,
+        }));
+
+        const [qtRows] = await connection.execute(
+          `SELECT emp_name AS username, COUNT(*) AS c FROM quotations_records
+           WHERE emp_name IN (${placeholders})
+             AND DATE(created_at) = ?
+           GROUP BY emp_name`,
+          [...employees, todayIst],
+        );
+        const [opRows] = await connection.execute(
+          `SELECT created_by AS username, COUNT(*) AS c FROM neworder
+           WHERE created_by IN (${placeholders})
+             AND DATE(created_at) = ?
+           GROUP BY created_by`,
+          [...employees, todayIst],
+        );
+        const qtMap = Object.fromEntries(qtRows.map((r) => [r.username, Number(r.c)]));
+        const opMap = Object.fromEntries(opRows.map((r) => [r.username, Number(r.c)]));
+        todayServiceQuoteOrderRows = employees.map((name) => ({
+          username: name,
+          quotes: qtMap[name] || 0,
+          orders: opMap[name] || 0,
         }));
       }
     } catch (e) {
@@ -462,6 +486,7 @@ export default async function UserDashboardPage() {
 
           {/* Service Team Report */}
           <ServiceTeamReportCard rows={todayServiceTeamRows} />
+          <ServiceSupportQuotesOrdersCard rows={todayServiceQuoteOrderRows} />
         </div>
 
         {/* System Performance Dashboard - Featured Card */}

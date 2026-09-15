@@ -24,13 +24,14 @@ export default async function QuotationPage({ searchParams }) {
 
   const sp = await searchParams;
   const customerId = sp?.customer_id ? String(sp.customer_id).trim() : "";
+  const serviceSupportOnly = String(sp?.ss || "") === "1";
   const canPerformaInvoice = await userHasModuleKey(username, role, "performa-invoices");
 
   return (
     <div className="w-full p-6">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-800">
-          Quotation Management
+          Quotation Management{serviceSupportOnly ? " · Service Support" : ""}
         </h1>
         <div className="flex items-center gap-3">
           <a
@@ -55,7 +56,7 @@ export default async function QuotationPage({ searchParams }) {
       </div>
 
       {/* Send username to client component */}
-      <QuotationTableClient username={username} customerId={customerId} role={role} />
+      <QuotationTableClient username={username} customerId={customerId} role={role} serviceSupportOnly={serviceSupportOnly} />
     </div>
   );
 }
