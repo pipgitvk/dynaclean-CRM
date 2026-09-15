@@ -23,6 +23,9 @@ export default function AdminLeaveManagement() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
+  const [usernameFilter, setUsernameFilter] = useState("");
+  const [fromDateFilter, setFromDateFilter] = useState("");
+  const [toDateFilter, setToDateFilter] = useState("");
   const [selectedLeave, setSelectedLeave] = useState(null);
   const [showApprovalModal, setShowApprovalModal] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
@@ -84,7 +87,7 @@ export default function AdminLeaveManagement() {
 
   useEffect(() => {
     applyFilters();
-  }, [leaves, statusFilter, searchTerm, isSuperAdmin]);
+  }, [leaves, statusFilter, searchTerm, usernameFilter, fromDateFilter, toDateFilter, isSuperAdmin]);
 
   const fetchLeaves = async () => {
     try {
@@ -177,6 +180,11 @@ export default function AdminLeaveManagement() {
       filtered = filtered.filter(leave => leave.status === statusFilter);
     }
 
+    // Username / employee filter
+    if (usernameFilter) {
+      filtered = filtered.filter(leave => leave.username === usernameFilter);
+    }
+
     // Search filter
     if (searchTerm) {
       filtered = filtered.filter(leave =>
@@ -184,6 +192,18 @@ export default function AdminLeaveManagement() {
         leave.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         leave.empId?.toString().includes(searchTerm)
       );
+    }
+
+    // Date range: include leaves that overlap the selected period
+    if (fromDateFilter || toDateFilter) {
+      filtered = filtered.filter((leave) => {
+        const leaveStart = dateOnly(leave.from_date);
+        const leaveEnd = dateOnly(leave.to_date) || leaveStart;
+        if (!leaveStart) return false;
+        if (fromDateFilter && leaveEnd < fromDateFilter) return false;
+        if (toDateFilter && leaveStart > toDateFilter) return false;
+        return true;
+      });
     }
 
     setFilteredLeaves(filtered);
@@ -378,16 +398,51 @@ export default function AdminLeaveManagement() {
     return colors[type] || "bg-gray-100 text-gray-800";
   };
 
+  const dateOnly = (value) => {
+    if (!value) return "";
+    const s = String(value);
+    const match = s.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (match) return match[1];
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return "";
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  };
+
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('en-IN', {
       day: '2-digit',
       month: 'short',
       year: 'numeric'
     });
-  };{isSuperAdmin 
-            ? "View and approve leave applications. As SUPERADMIN, you can approve any leave."
-            : ""
-          }
+  };
+
+  const employeeFilterOptions = (() => {
+    const placeholder = { value: "", label: "All employees" };
+    const seen = new Set();
+    const opts = employees
+      .filter((emp) => emp?.username)
+      .map((emp) => {
+        if (seen.has(emp.username)) return null;
+        seen.add(emp.username);
+        return {
+          value: emp.username,
+          label: `${emp.full_name ? `${emp.full_name} — ` : ""}${emp.username}`,
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.label.localeCompare(b.label));
+    return [placeholder, ...opts];
+  })();
+
+  const hasActiveFilters =
+    statusFilter !== "all" ||
+    !!searchTerm ||
+    !!usernameFilter ||
+    !!fromDateFilter ||
+    !!toDateFilter;
 
   const pendingCount = leaves.filter(l => l.status === "pending" && !l.acknowledged_at).length;
   const approvedCount = leaves.filter(l => l.status === "approved").length;
@@ -465,8 +520,9 @@ export default function AdminLeaveManagement() {
 
       {/* Filters */}
       <div className="bg-white rounded-lg shadow-md p-4 mb-6">
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="flex-1">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
+          <div className="lg:col-span-2">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Search</label>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
@@ -479,6 +535,40 @@ export default function AdminLeaveManagement() {
             </div>
           </div>
 
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Employee</label>
+            <SearchableSelect
+              options={employeeFilterOptions}
+              value={usernameFilter}
+              onChange={(val) => setUsernameFilter(val)}
+              placeholder="All employees"
+              searchPlaceholder="Search employee..."
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">From date</label>
+            <input
+              type="date"
+              value={fromDateFilter}
+              onChange={(e) => setFromDateFilter(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">To date</label>
+            <input
+              type="date"
+              value={toDateFilter}
+              min={fromDateFilter || undefined}
+              onChange={(e) => setToDateFilter(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2">
             <Filter className="w-4 h-4 text-gray-600" />
             <select
@@ -492,6 +582,24 @@ export default function AdminLeaveManagement() {
               <option value="rejected">Rejected</option>
             </select>
           </div>
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearchTerm("");
+                setUsernameFilter("");
+                setFromDateFilter("");
+                setToDateFilter("");
+                setStatusFilter("all");
+              }}
+              className="text-sm text-blue-600 hover:text-blue-800"
+            >
+              Clear filters
+            </button>
+          )}
+          <span className="text-sm text-gray-500">
+            Showing {filteredLeaves.length} of {leaves.length} applications
+          </span>
         </div>
       </div>
 
