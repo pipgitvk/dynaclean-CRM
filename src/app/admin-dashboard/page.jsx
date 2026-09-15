@@ -198,7 +198,8 @@ import ProfileApprovalsCard from "@/components/ProfileApprovalsCard";
 import ScheduleVisitCard from "@/components/scheduleVisit/ScheduleVisitCard";
 import OverduePaymentCard from "@/components/OverduePaymentCard";
 import KeywordPerformanceQuickCard from "@/components/keywords/KeywordPerformanceQuickCard";
-import { Package, BarChart3, Upload, DollarSign, Calendar, Plane, FileText, ClipboardList, Wrench } from "lucide-react";
+import { Package, BarChart3, Upload, DollarSign, Calendar, Plane, FileText, ClipboardList } from "lucide-react";
+import ServiceTeamReportCard from "@/components/service/ServiceTeamReportCard";
 
 // import UpcomingLeads from "@/components/Leads/UpcommingLeads";
 
@@ -288,6 +289,44 @@ export default async function UserDashboardPage() {
       pendingAmcCmcCount = Number(pendingAmcCmcRows[0]?.c ?? 0);
     } catch (e) {
       console.warn("pending AMC/CMC count:", e.message);
+    }
+
+    let todayServiceTeamRows = [];
+    try {
+      const todayIst = new Date().toLocaleDateString("en-CA", {
+        timeZone: "Asia/Kolkata",
+      });
+      const [empRows] = await connection.execute(
+        `SELECT username FROM rep_list WHERE userRole = 'SERVICE SUPPORT' AND status = 1 ORDER BY username ASC`,
+      );
+      const employees = empRows.map((r) => r.username).filter(Boolean);
+      if (employees.length > 0) {
+        const placeholders = employees.map(() => "?").join(",");
+        const [mfRows] = await connection.execute(
+          `SELECT added_by AS username, COUNT(*) AS c FROM machines_followup
+           WHERE added_by IN (${placeholders})
+             AND DATE(followed_at) = ?
+           GROUP BY added_by`,
+          [...employees, todayIst],
+        );
+        const [cfRows] = await connection.execute(
+          `SELECT followed_by AS username, COUNT(*) AS c FROM customers_followup
+           WHERE followed_by IN (${placeholders})
+             AND followed_by IS NOT NULL AND followed_by != ''
+             AND DATE(followed_date) = ?
+           GROUP BY followed_by`,
+          [...employees, todayIst],
+        );
+        const mfMap = Object.fromEntries(mfRows.map((r) => [r.username, Number(r.c)]));
+        const cfMap = Object.fromEntries(cfRows.map((r) => [r.username, Number(r.c)]));
+        todayServiceTeamRows = employees.map((name) => ({
+          username: name,
+          machine: mfMap[name] || 0,
+          customer: cfMap[name] || 0,
+        }));
+      }
+    } catch (e) {
+      console.warn("today service support followup counts:", e.message);
     }
 
     if (!user) {
@@ -395,7 +434,7 @@ export default async function UserDashboardPage() {
 
           {/* Profile Approvals - Dynamic Card Component */}
           <ProfileApprovalsCard />
-          <ScheduleVisitCard href="/admin-dashboard/schedule-visits" />
+          <ScheduleVisitCard href="/admin-dashboard/schedule-visits" alwaysShow />
           <OverduePaymentCard />
           <KeywordPerformanceQuickCard />
           <a href="/admin-dashboard/stats" className="bg-white rounded-lg shadow-md p-4 text-black hover:shadow-lg transition-shadow h-full cursor-pointer block border-l-4 border-purple-500 min-h-[140px]">
@@ -422,16 +461,7 @@ export default async function UserDashboardPage() {
           </a>
 
           {/* Service Team Report */}
-          <a href="/admin-dashboard/today-reports?tab=service" className="bg-white rounded-lg shadow-md p-4 text-black hover:shadow-lg transition-shadow h-full cursor-pointer block border-l-4 border-teal-500 min-h-[140px]">
-            <div className="flex flex-col h-full justify-between">
-              <div className="flex items-center gap-2 mb-2">
-                <Wrench className="w-5 h-5 text-teal-500 shrink-0" />
-                <h2 className="text-sm font-bold text-black leading-tight">
-                  Service Team Report
-                </h2>
-              </div>
-            </div>
-          </a>
+          <ServiceTeamReportCard rows={todayServiceTeamRows} />
         </div>
 
         {/* System Performance Dashboard - Featured Card */}

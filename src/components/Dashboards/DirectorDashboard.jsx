@@ -306,6 +306,8 @@ export default function DirectorDashboard({ user, reportingManager, regTotal = 0
           subtext={`${regTotal} Total`}
           onClick={() => router.push("/director-dashboard/attendance-regularization")}
         />
+
+        <ScheduleVisitCard href="/director-dashboard/schedule-visits" alwaysShow />
       </div>
     </div>
   );

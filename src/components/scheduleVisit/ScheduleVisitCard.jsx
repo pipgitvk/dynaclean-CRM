@@ -6,36 +6,43 @@ import { MapPin } from "lucide-react";
 import SummaryStatCard from "@/components/sales/SummaryStatCard";
 import { isModuleKeyAllowed } from "@/lib/moduleAccess";
 
-export default function ScheduleVisitCard({ variant = "default", href }) {
+export default function ScheduleVisitCard({ variant = "default", href, alwaysShow = false }) {
   const [total, setTotal] = useState(0);
   const [pending, setPending] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [allowed, setAllowed] = useState(false);
+  const [allowed, setAllowed] = useState(alwaysShow);
 
   const linkHref = href || "/user-dashboard/schedule-visits";
 
   useEffect(() => {
     const init = async () => {
       try {
-        const [modulesRes, countRes] = await Promise.all([
-          fetch("/api/my-modules", { credentials: "include", cache: "no-store" }),
-          fetch("/api/schedule-visit/count", { credentials: "include", cache: "no-store" }),
-        ]);
+        const countPromise = fetch("/api/schedule-visit/count", {
+          credentials: "include",
+          cache: "no-store",
+        });
 
-        if (modulesRes.ok) {
-          const { allowedModules } = await modulesRes.json();
-          if (!isModuleKeyAllowed("schedule-visits", allowedModules)) {
+        if (!alwaysShow) {
+          const modulesRes = await fetch("/api/my-modules", {
+            credentials: "include",
+            cache: "no-store",
+          });
+          if (modulesRes.ok) {
+            const { allowedModules } = await modulesRes.json();
+            if (!isModuleKeyAllowed("schedule-visits", allowedModules)) {
+              setAllowed(false);
+              setLoading(false);
+              return;
+            }
+          } else {
             setAllowed(false);
             setLoading(false);
             return;
           }
-        } else {
-          setAllowed(false);
-          setLoading(false);
-          return;
         }
 
         setAllowed(true);
+        const countRes = await countPromise;
 
         if (countRes.ok) {
           const data = await countRes.json();
@@ -45,14 +52,14 @@ export default function ScheduleVisitCard({ variant = "default", href }) {
           }
         }
       } catch {
-        setAllowed(false);
+        if (!alwaysShow) setAllowed(false);
       } finally {
         setLoading(false);
       }
     };
 
     init();
-  }, []);
+  }, [alwaysShow]);
 
   if (!loading && !allowed) return null;
 
