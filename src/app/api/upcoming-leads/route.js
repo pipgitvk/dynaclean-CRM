@@ -42,7 +42,7 @@ export async function GET(request) {
             FROM customers_followup cf
             INNER JOIN customers c ON cf.customer_id = c.customer_id
             WHERE c.service_lead_source = ?
-              AND c.status NOT IN ('DENIED', 'Invalid', 'Disqualified')
+              AND c.status NOT IN ('Invalid', 'Disqualified')
               AND (c.stage IS NULL OR c.stage != 'Disqualified / Invalid Lead')
           ) AS T
           WHERE T.rn = 1
@@ -68,7 +68,7 @@ export async function GET(request) {
             FROM customers_followup cf
             INNER JOIN customers c ON cf.customer_id = c.customer_id
             WHERE c.service_lead_source = ?
-              AND c.status NOT IN ('DENIED', 'Invalid', 'Disqualified')
+              AND c.status NOT IN ('Invalid', 'Disqualified')
               AND (c.stage IS NULL OR c.stage != 'Disqualified / Invalid Lead')
           ) AS T
           WHERE T.rn = 1

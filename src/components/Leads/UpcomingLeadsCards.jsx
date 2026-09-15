@@ -100,7 +100,9 @@ export default function UpcomingLeadsCards({
     let filtered = [...leads];
 
     // Exclude invalid statuses (like 'Invalid', 'Disqualified', 'Denied')
-    const invalidStatuses = ["invalid", "disqualified", "denied"];
+    const invalidStatuses = isServiceSupport
+      ? ["invalid", "disqualified"]
+      : ["invalid", "disqualified", "denied"];
     filtered = filtered.filter((c) => {
       const statusLower = (c.status || "").trim().toLowerCase();
       return !invalidStatuses.includes(statusLower);

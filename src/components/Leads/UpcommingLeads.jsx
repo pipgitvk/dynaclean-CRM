@@ -44,7 +44,6 @@ export default async function UpcomingLeads({
           WHERE customer_id = c.customer_id
         )
       WHERE c.service_lead_source = ?
-        AND c.status != 'DENIED'
       ORDER BY cf.service_next_followup ASC
       `,
       [leadSource]
