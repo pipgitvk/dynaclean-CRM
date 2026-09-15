@@ -95,6 +95,13 @@ export default function ExpenseTable({ rows, role }) {
   const getApprovedValue = (row) =>
     row.approval_status === "Rejected" ? 0 : Number(row.approved_amount || 0);
 
+  const isBlankAmount = (value) =>
+    value == null || value === "" || Number.isNaN(Number(value)) || Number(value) <= 0;
+
+  const isBlankDate = (value) => !value || value === "0000-00-00";
+
+  const statusOf = (row) => (row.approval_status || "").toLowerCase();
+
   const handleSort = (key) => {
     setSortConfig((prev) =>
       prev.key === key
@@ -148,31 +155,73 @@ export default function ExpenseTable({ rows, role }) {
     return <span className="ml-1">{sortConfig.direction === "asc" ? "▲" : "▼"}</span>;
   };
 
-  // Calculate totals for Total and Approved Amt (exclude rejected from approved)
   const calculateTotals = (data) => {
-    let totalAmount = 0;
-    let approvedAmount = 0;
+    const summary = {
+      totalAmount: 0,
+      totalCount: 0,
+      rejectedAmount: 0,
+      rejectedCount: 0,
+      approvedAmount: 0,
+      approvedCount: 0,
+      pendingApprovalAmount: 0,
+      pendingApprovalCount: 0,
+      pendingPaymentAmount: 0,
+      pendingPaymentCount: 0,
+      paidAmount: 0,
+      paidCount: 0,
+    };
 
     data.forEach((row) => {
-      totalAmount +=
-        Number(row.TicketCost || 0) +
-        Number(row.HotelCost || 0) +
-        Number(row.MealsCost || 0) +
-        Number(row.OtherExpenses || 0);
-      const isRejected = row.approval_status === "Rejected";
-      const rowApproved = Number(row.approved_amount || 0);
-      if (!isRejected && rowApproved > 0) {
-        approvedAmount += rowApproved;
+      const uploaded = getRowTotal(row);
+      const approvedAmt = Number(row.approved_amount || 0);
+      const status = statusOf(row);
+
+      summary.totalAmount += uploaded;
+      summary.totalCount += 1;
+
+      if (status === "rejected") {
+        summary.rejectedAmount += uploaded;
+        summary.rejectedCount += 1;
+      }
+
+      if (status === "approved") {
+        summary.approvedAmount += approvedAmt > 0 ? approvedAmt : uploaded;
+        summary.approvedCount += 1;
+      }
+
+      if (status === "pending" && isBlankAmount(row.approved_amount)) {
+        summary.pendingApprovalAmount += uploaded;
+        summary.pendingApprovalCount += 1;
+      }
+
+      if (status === "approved" && isBlankDate(row.payment_date)) {
+        summary.pendingPaymentAmount += approvedAmt > 0 ? approvedAmt : uploaded;
+        summary.pendingPaymentCount += 1;
+      }
+
+      if (status === "approved" && !isBlankDate(row.payment_date)) {
+        summary.paidAmount += approvedAmt > 0 ? approvedAmt : uploaded;
+        summary.paidCount += 1;
       }
     });
 
-    return {
-      totalAmount,
-      approvedAmount,
-    };
+    return summary;
   };
 
-  const { totalAmount, approvedAmount } = calculateTotals(filteredRows);
+  const {
+    totalAmount,
+    totalCount,
+    rejectedAmount,
+    rejectedCount,
+    approvedAmount,
+    approvedCount,
+    pendingApprovalAmount,
+    pendingApprovalCount,
+    pendingPaymentAmount,
+    pendingPaymentCount,
+    paidAmount,
+    paidCount,
+  } = calculateTotals(filteredRows);
 
   // Reset all filters
   const handleReset = () => {
@@ -307,18 +356,36 @@ export default function ExpenseTable({ rows, role }) {
   return (
     <div className="space-y-4">
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-4">
         <div className="bg-white p-4 rounded-lg shadow border-l-4 border-blue-600">
-          <div className="text-sm text-gray-500 font-medium uppercase tracking-wider">Total Amount</div>
+          <div className="text-sm text-gray-500 font-medium uppercase tracking-wider">Total</div>
           <div className="text-2xl font-bold text-gray-800">₹{totalAmount.toFixed(2)}</div>
+          <div className="text-xs text-gray-500 mt-1">{totalCount} uploaded by employees</div>
+        </div>
+        <div className="bg-white p-4 rounded-lg shadow border-l-4 border-red-600">
+          <div className="text-sm text-gray-500 font-medium uppercase tracking-wider">Rejected</div>
+          <div className="text-2xl font-bold text-gray-800">₹{rejectedAmount.toFixed(2)}</div>
+          <div className="text-xs text-gray-500 mt-1">{rejectedCount} rejected</div>
         </div>
         <div className="bg-white p-4 rounded-lg shadow border-l-4 border-green-600">
-          <div className="text-sm text-gray-500 font-medium uppercase tracking-wider">Approved Amount</div>
+          <div className="text-sm text-gray-500 font-medium uppercase tracking-wider">Approved</div>
           <div className="text-2xl font-bold text-gray-800">₹{approvedAmount.toFixed(2)}</div>
+          <div className="text-xs text-gray-500 mt-1">{approvedCount} approved</div>
         </div>
         <div className="bg-white p-4 rounded-lg shadow border-l-4 border-yellow-600">
-          <div className="text-sm text-gray-500 font-medium uppercase tracking-wider">Pending Amount</div>
-          <div className="text-2xl font-bold text-gray-800">₹{(totalAmount - approvedAmount).toFixed(2)}</div>
+          <div className="text-sm text-gray-500 font-medium uppercase tracking-wider">Pending approval</div>
+          <div className="text-2xl font-bold text-gray-800">₹{pendingApprovalAmount.toFixed(2)}</div>
+          <div className="text-xs text-gray-500 mt-1">{pendingApprovalCount} pending, amount blank</div>
+        </div>
+        <div className="bg-white p-4 rounded-lg shadow border-l-4 border-orange-600">
+          <div className="text-sm text-gray-500 font-medium uppercase tracking-wider">Pending to payment</div>
+          <div className="text-2xl font-bold text-gray-800">₹{pendingPaymentAmount.toFixed(2)}</div>
+          <div className="text-xs text-gray-500 mt-1">{pendingPaymentCount} approved, not paid</div>
+        </div>
+        <div className="bg-white p-4 rounded-lg shadow border-l-4 border-teal-600">
+          <div className="text-sm text-gray-500 font-medium uppercase tracking-wider">Paid</div>
+          <div className="text-2xl font-bold text-gray-800">₹{paidAmount.toFixed(2)}</div>
+          <div className="text-xs text-gray-500 mt-1">{paidCount} paid</div>
         </div>
       </div>
 
@@ -657,12 +724,28 @@ export default function ExpenseTable({ rows, role }) {
             <div className="bg-blue-600 text-white p-4 rounded-lg shadow-md border-2 border-blue-700">
               <h3 className="text-lg font-bold mb-2">Summary</h3>
               <div className="flex justify-between items-center text-sm">
-                <span className="font-semibold">Total Amount:</span>
+                <span className="font-semibold">Total:</span>
                 <span>₹{totalAmount.toFixed(2)}</span>
               </div>
               <div className="flex justify-between items-center text-sm">
-                <span className="font-semibold">Approved Amount:</span>
+                <span className="font-semibold">Rejected:</span>
+                <span>₹{rejectedAmount.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between items-center text-sm">
+                <span className="font-semibold">Approved:</span>
                 <span>₹{approvedAmount.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between items-center text-sm">
+                <span className="font-semibold">Pending approval:</span>
+                <span>₹{pendingApprovalAmount.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between items-center text-sm">
+                <span className="font-semibold">Pending to payment:</span>
+                <span>₹{pendingPaymentAmount.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between items-center text-sm">
+                <span className="font-semibold">Paid:</span>
+                <span>₹{paidAmount.toFixed(2)}</span>
               </div>
             </div>
           </>
