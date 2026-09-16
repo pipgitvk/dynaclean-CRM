@@ -28,6 +28,7 @@ import {
   REFERENCE_COLUMN_KEYS,
 } from "@/lib/profileReassignFields";
 import { deriveIsExperiencedForForm } from "@/lib/profileExperiencedUi";
+import { liveProfileToFormInitialData } from "@/lib/buildProfileSubmissionInitialData";
 
 function normalizeSubmissionStatus(status) {
   if (status == null || status === undefined) return "";
@@ -160,95 +161,33 @@ export default function ProfileForm({
       const data = await response.json();
 
       if (data.success && data.profile) {
-        // Parse documents if string
-        let joiningDocs = data.profile.joining_form_documents;
-        if (typeof joiningDocs === 'string') {
-          try { joiningDocs = JSON.parse(joiningDocs); } catch { joiningDocs = []; }
-        }
+        const built = liveProfileToFormInitialData(data.profile);
+        if (!built) return;
 
-        let docsSubmitted = data.profile.documents_submitted;
-        if (typeof docsSubmitted === 'string') {
-          try { docsSubmitted = JSON.parse(docsSubmitted); } catch { docsSubmitted = {}; }
-        }
-
-        // Construct fileUrls for existing documents
-        const existingFileUrls = {};
-        // Legacy key mapping
-        const legacyMap = {
-          document_pan_copy: "doc_pan_card",
-          document_voter_id: "doc_voter_id", // assuming legacy matches
-          document_aadhaar_card: "doc_aadhaar_card", // assuming legacy matches
-          document_electricity_bill: "doc_electricity_bill", // assuming legacy matches
-          document_rent_agreement: "doc_rent_agreement", // assuming legacy matches
-          document_10th_certificate: "doc_10th_certificate",
-          document_12th_certificate: "doc_12th_certificate",
-          document_graduation_certificate: "doc_degree_diploma",
-          document_professional_certificates: "doc_technical_cert",
-          document_relieve_experience_letters: "doc_exp_letter",
-          document_salary_slips: "doc_salary_slips",
-          document_appointment_ack: "doc_loi_appointment",
-        };
-
-        if (Array.isArray(joiningDocs)) {
-          joiningDocs.forEach(url => {
-            const filename = url.split('/').pop();
-            const decodedFilename = decodeURIComponent(filename);
-            const match = decodedFilename.match(/^(.*)_\d+(?:\.[^.]+)?$/);
-            if (match) {
-              const extractedKey = match[1];
-              // Add direct key
-              existingFileUrls[extractedKey] = url;
-
-              // Add mapped key if exists (so new UI finds old doc)
-              if (legacyMap[extractedKey]) {
-                existingFileUrls[legacyMap[extractedKey]] = url;
-              }
-
-              // Also handle reverse mapping if needed? No, purely legacy -> new.
-            }
-          });
-        }
-
-
-        setFormData(prev => ({
+        setFormData((prev) => ({
           ...prev,
-          ...data.profile,
-          joining_form_documents: joiningDocs, // Ensure array
-          documents_submitted: docsSubmitted, // Ensure object
-          fileUrls: existingFileUrls
+          ...built.formData,
         }));
 
-        setReferences((data.profile.references || []).map(ref => ({
-          name: ref.name || ref.reference_name || "",
-          contact: ref.contact || ref.reference_mobile || "",
-          address: ref.address || ref.reference_address || "",
-          relationship: ref.relationship || ""
-        })));
-
-        // Initialize documents checklist
-        // If documents_submitted is empty, infer from existing files
-        if (Object.keys(docsSubmitted).length === 0 && Object.keys(existingFileUrls).length > 0) {
-          Object.keys(existingFileUrls).forEach(key => {
-            // If the file key exists, mark checklist as true
-            docsSubmitted[key] = true;
-          });
-        }
-
-        setEducation(data.profile.education || []);
-        setExperience(data.profile.experience || []);
-        setDocuments(docsSubmitted || {});
+        setReferences(built.references);
+        setEducation(built.education);
+        setExperience(built.experience);
+        setDocuments(built.documents);
 
         setIsExperienced(deriveIsExperiencedForForm(data.profile));
 
-        // Save original state for field change tracking (only once, on first load)
-        setOriginalFormData(prev => prev === null ? JSON.parse(JSON.stringify({
-          ...data.profile,
-          joining_form_documents: joiningDocs,
-          documents_submitted: docsSubmitted,
-          references: data.profile.references || [],
-          education: data.profile.education || [],
-          experience: data.profile.experience || [],
-        })) : prev);
+        setOriginalFormData((prev) =>
+          prev === null
+            ? JSON.parse(
+                JSON.stringify({
+                  ...built.formData,
+                  references: built.references,
+                  education: built.education,
+                  experience: built.experience,
+                })
+              )
+            : prev
+        );
       }
     } catch (error) {
       console.error("Error fetching profile:", error);
