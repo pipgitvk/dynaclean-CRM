@@ -4,6 +4,47 @@ import { NextResponse } from "next/server";
 import { getSessionPayload } from "@/lib/auth";
 import { UNREGISTERED_PRODUCT_ORDER_SQL } from "@/lib/pendingProductRegistrationCount";
 
+async function attachMachineStatus(conn, rows) {
+  if (!rows.length) return rows;
+
+  const serialKeys = [
+    ...new Set(
+      rows
+        .map((row) => String(row.serial_number || "").trim())
+        .filter(Boolean),
+    ),
+  ];
+
+  const statusBySerial = {};
+
+  if (serialKeys.length > 0) {
+    const placeholders = serialKeys.map(() => "?").join(", ");
+    const [openServices] = await conn.execute(
+      `SELECT service_id, serial_number, status
+       FROM service_records
+       WHERE TRIM(serial_number) IN (${placeholders})
+         AND UPPER(TRIM(COALESCE(status, ''))) <> 'COMPLETED'
+       ORDER BY service_id DESC`,
+      serialKeys,
+    );
+
+    for (const service of openServices) {
+      const key = String(service.serial_number || "").trim();
+      if (key && !statusBySerial[key]) {
+        statusBySerial[key] = service.status;
+      }
+    }
+  }
+
+  return rows.map((row) => {
+    const key = String(row.serial_number || "").trim();
+    return {
+      ...row,
+      machine_status: key && statusBySerial[key] ? statusBySerial[key] : "Ok",
+    };
+  });
+}
+
 export async function GET(req) {
   const conn = await getDbConnection();
 
@@ -223,7 +264,7 @@ export async function GET(req) {
       mfParams.push(startDate, endDate);
     }
 
-    const [mfRows] = await conn.execute(
+    const [mfRowsRaw] = await conn.execute(
       `SELECT
          mf.id,
          mf.machine_id,
@@ -234,28 +275,14 @@ export async function GET(req) {
          mf.added_by,
          mf.followed_at,
          mf.next_followup_date,
-         mf.notes,
-         CASE
-           WHEN open_sr.status IS NULL THEN 'Ok'
-           ELSE open_sr.status
-         END AS machine_status
+         mf.notes
        FROM machines_followup mf
-       LEFT JOIN (
-         SELECT
-           TRIM(sr.serial_number) AS serial_key,
-           sr.status
-         FROM service_records sr
-         INNER JOIN (
-           SELECT TRIM(serial_number) AS serial_key, MAX(service_id) AS max_id
-           FROM service_records
-           WHERE UPPER(TRIM(COALESCE(status, ''))) <> 'COMPLETED'
-           GROUP BY TRIM(serial_number)
-         ) latest ON TRIM(sr.serial_number) = latest.serial_key AND sr.service_id = latest.max_id
-       ) open_sr ON TRIM(mf.serial_number) = open_sr.serial_key
        WHERE ${mfConditions.join(" AND ")}
        ORDER BY mf.followed_at DESC`,
       mfParams
     );
+
+    const mfRows = await attachMachineStatus(conn, mfRowsRaw);
 
     // Serialize dates
     const serializeDates = (rows) =>
@@ -275,6 +302,9 @@ export async function GET(req) {
     });
   } catch (error) {
     console.error("service-support-report error:", error);
-    return NextResponse.json({ error: "Failed to fetch data" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to fetch data", details: error.message },
+      { status: 500 },
+    );
   }
 }
