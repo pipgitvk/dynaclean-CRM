@@ -31,7 +31,7 @@ const KPI_DETAIL_COLUMNS = {
     { key: "contact", label: "Contact" },
     { key: "assigned_to", label: "Assigned To" },
     { key: "status", label: "Status" },
-    { key: "complaint_date", label: "Complaint Date", format: "datetime" },
+    { key: "complaint_date", label: "Complaint Date", format: "date" },
     { key: "complaint_summary", label: "Summary", wide: true },
   ],
   complaintsResolved: [
@@ -42,8 +42,8 @@ const KPI_DETAIL_COLUMNS = {
     { key: "contact", label: "Contact" },
     { key: "assigned_to", label: "Assigned To" },
     { key: "status", label: "Status" },
-    { key: "complaint_date", label: "Complaint Date", format: "datetime" },
-    { key: "completed_date", label: "Completed Date", format: "datetime" },
+    { key: "complaint_date", label: "Complaint Date", format: "date" },
+    { key: "completed_date", label: "Completed Date", format: "date" },
     { key: "complaint_summary", label: "Summary", wide: true },
   ],
   quotations: [
@@ -53,7 +53,7 @@ const KPI_DETAIL_COLUMNS = {
     { key: "emp_name", label: "Employee" },
     { key: "grand_total", label: "Amount", format: "currency" },
     { key: "quote_date", label: "Quote Date", format: "date" },
-    { key: "created_at", label: "Created At", format: "datetime" },
+    { key: "created_at", label: "Created At", format: "date" },
   ],
   ordersProcessed: [
     { key: "order_id", label: "Order ID" },
@@ -63,7 +63,7 @@ const KPI_DETAIL_COLUMNS = {
     { key: "created_by", label: "Created By" },
     { key: "totalamt", label: "Amount", format: "currency" },
     { key: "approval_status", label: "Status" },
-    { key: "created_at", label: "Created At", format: "datetime" },
+    { key: "created_at", label: "Created At", format: "date" },
   ],
   upcomingInstallations: [
     { key: "order_id", label: "Order ID" },
@@ -81,7 +81,7 @@ const KPI_DETAIL_COLUMNS = {
     { key: "model", label: "Model" },
     { key: "contact", label: "Contact" },
     { key: "created_by", label: "Registered By" },
-    { key: "created_at", label: "Registered At", format: "datetime" },
+    { key: "created_at", label: "Registered At", format: "date" },
   ],
   warrantyPending: [
     { key: "order_id", label: "Order ID" },
