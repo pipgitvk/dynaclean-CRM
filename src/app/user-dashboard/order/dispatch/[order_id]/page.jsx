@@ -15,6 +15,7 @@ export default function DispatchFormPage({ params }) {
   const [zeroStockWarnings, setZeroStockWarnings] = useState({});
   const [accessories, setAccessories] = useState({}); // { item_code: [accessories] }
   const [accessoriesChecked, setAccessoriesChecked] = useState({}); // { rowId: { accessoryId: boolean } }
+  const [accessoryStockInfo, setAccessoryStockInfo] = useState({}); // { rowId: { accessoryId: { stock_count } } }
 
   useEffect(() => {
     const load = async () => {
@@ -58,6 +59,17 @@ export default function DispatchFormPage({ params }) {
             }
           });
           setAccessoriesChecked(checkedState);
+
+          data.forEach((row) => {
+            if (row.godown && row.quote_number && row.item_code) {
+              fetchStockForRow(
+                row.id,
+                row.quote_number,
+                row.godown,
+                row.item_code,
+              );
+            }
+          });
         }
       } finally {
         setLoading(false);
@@ -68,10 +80,61 @@ export default function DispatchFormPage({ params }) {
 
   console.log("check data : ", rows);
 
+  const fetchAccessoryStockForRow = async (rowId, godown, itemCode, productAccessories) => {
+    if (!itemCode) {
+      setAccessoryStockInfo((prev) => ({ ...prev, [rowId]: null }));
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/stock/check-accessories", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          godown: godown || null,
+          product_code: itemCode,
+          accessories: productAccessories?.length
+            ? productAccessories.map((acc) => ({
+                id: acc.id,
+                accessory_name: acc.accessory_name,
+                spare_id: acc.spare_id || acc.resolved_spare_id,
+              }))
+            : [{ id: 0 }],
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setAccessoryStockInfo((prev) => ({
+          ...prev,
+          [rowId]: data.stockMap || {},
+        }));
+      } else {
+        setAccessoryStockInfo((prev) => ({ ...prev, [rowId]: null }));
+      }
+    } catch (err) {
+      console.error("Failed to fetch accessory stock:", err);
+      setAccessoryStockInfo((prev) => ({ ...prev, [rowId]: null }));
+    }
+  };
+
+  const applyStockFromAccessoryList = (rowId, accessoryList) => {
+    if (!accessoryList?.length) return;
+    const stockMap = {};
+    accessoryList.forEach((acc) => {
+      stockMap[acc.id] = {
+        stock_count: acc.stock_count,
+        matched: acc.stock_matched ?? acc.stock_count != null,
+      };
+    });
+    setAccessoryStockInfo((prev) => ({ ...prev, [rowId]: stockMap }));
+  };
+
   const fetchStockForRow = async (rowId, quoteNumber, godown, itemCode) => {
     if (!quoteNumber || !godown || !itemCode) {
       setStockInfo((prev) => ({ ...prev, [rowId]: null }));
       setZeroStockWarnings((prev) => ({ ...prev, [rowId]: false }));
+      setAccessoryStockInfo((prev) => ({ ...prev, [rowId]: null }));
       return;
     }
 
@@ -101,22 +164,69 @@ export default function DispatchFormPage({ params }) {
         setStockInfo((prev) => ({ ...prev, [rowId]: null }));
         setZeroStockWarnings((prev) => ({ ...prev, [rowId]: false }));
       }
+
+      const productAccessories =
+        accessories[itemCode]?.length > 0
+          ? accessories[itemCode]
+          : await fetch(
+              `/api/product-accessories?product_code=${itemCode}&package_status=available`,
+            )
+              .then((r) => (r.ok ? r.json() : null))
+              .then((j) => j?.data || [])
+              .catch(() => []);
+
+      fetchAccessoryStockForRow(rowId, godown, itemCode, productAccessories);
     } catch (err) {
       console.error("Failed to fetch stock:", err);
       setStockInfo((prev) => ({ ...prev, [rowId]: null }));
       setZeroStockWarnings((prev) => ({ ...prev, [rowId]: false }));
+      setAccessoryStockInfo((prev) => ({ ...prev, [rowId]: null }));
     }
   };
 
-  const loadAccessoriesForProduct = async (itemCode) => {
+  const loadAccessoriesForProduct = async (itemCode, godown = null) => {
     try {
-      const res = await fetch(
-        `/api/product-accessories?product_code=${itemCode}`,
-      );
+      const params = new URLSearchParams({
+        product_code: itemCode,
+        package_status: "available",
+        resolve_product: "1",
+      });
+      if (godown) params.set("godown", godown);
+
+      const res = await fetch(`/api/product-accessories?${params.toString()}`);
       if (res.ok) {
         const json = await res.json();
         if (json.success) {
-          setAccessories((prev) => ({ ...prev, [itemCode]: json.data || [] }));
+          const accessoryList = json.data || [];
+          const resolvedProductCode =
+            accessoryList[0]?.product_code || itemCode;
+
+          setAccessories((prev) => {
+            const next = { ...prev, [itemCode]: accessoryList };
+            if (resolvedProductCode !== itemCode) {
+              next[resolvedProductCode] = accessoryList;
+            }
+            return next;
+          });
+
+          setRows((currentRows) => {
+            currentRows.forEach((row) => {
+              const rowCodes = [row.item_code, resolvedProductCode].filter(Boolean);
+              if (rowCodes.includes(itemCode) || rowCodes.includes(resolvedProductCode)) {
+                if (godown && accessoryList.some((a) => a.stock_count != null)) {
+                  applyStockFromAccessoryList(row.id, accessoryList);
+                } else {
+                  fetchAccessoryStockForRow(
+                    row.id,
+                    row.godown || godown,
+                    row.item_code || itemCode,
+                    accessoryList,
+                  );
+                }
+              }
+            });
+            return currentRows;
+          });
         }
       }
     } catch (err) {
@@ -134,12 +244,12 @@ export default function DispatchFormPage({ params }) {
       const row = rows.find((r) => r.id === id);
       if (row && row.quote_number && row.item_code) {
         if (value) {
-          // Godown selected - fetch stock for this specific item
           fetchStockForRow(id, row.quote_number, value, row.item_code);
+          loadAccessoriesForProduct(row.item_code, value);
         } else {
-          // Godown cleared - clear stock info
           setStockInfo((prev) => ({ ...prev, [id]: null }));
           setZeroStockWarnings((prev) => ({ ...prev, [id]: false }));
+          setAccessoryStockInfo((prev) => ({ ...prev, [id]: null }));
         }
       }
     }
@@ -166,7 +276,7 @@ export default function DispatchFormPage({ params }) {
     if (row.godown) form.append("godown", row.godown);
 
     // Build accessories checklist JSON
-    const productAccessories = accessories[row.item_code] || [];
+    const productAccessories = getAccessoriesForRow(row);
     const checkedAccessories = productAccessories.filter(
       (acc) => accessoriesChecked[row.id]?.[acc.id],
     );
@@ -183,6 +293,25 @@ export default function DispatchFormPage({ params }) {
     );
     if (!allMandatoryChecked && mandatoryAccessories.length > 0) {
       throw new Error("Please check all mandatory accessories before saving.");
+    }
+
+    for (const acc of checkedAccessories) {
+      const requiredQty = Number(acc.qty) || 1;
+      const stock = accessoryStockInfo[row.id]?.[acc.id];
+      if (stock?.matched === false) {
+        throw new Error(
+          `Stock not found for accessory "${acc.accessory_name}". Please link spare in Product Accessories.`,
+        );
+      }
+      if (
+        stock?.matched &&
+        stock.stock_count != null &&
+        stock.stock_count < requiredQty
+      ) {
+        throw new Error(
+          `Insufficient stock for "${acc.accessory_name}". Available: ${stock.stock_count}, Required: ${requiredQty}`,
+        );
+      }
     }
 
     // append up to 4 photos: front, back, right, left
@@ -270,6 +399,13 @@ export default function DispatchFormPage({ params }) {
       setSaving(false);
     }
   };
+
+  const getAccessoriesForRow = (row) =>
+    accessories[row.item_code] ||
+    Object.values(accessories).find((list) =>
+      list.some((acc) => acc.product_code === row.item_code),
+    ) ||
+    [];
 
   if (loading) return <div className="p-4">Loading...</div>;
 
@@ -404,14 +540,13 @@ export default function DispatchFormPage({ params }) {
                 )}
 
                 {/* Accessories Checklist */}
-                {accessories[r.item_code] &&
-                  accessories[r.item_code].length > 0 && (
+                {getAccessoriesForRow(r).length > 0 && (
                     <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-md">
                       <h4 className="text-sm font-medium text-blue-800 mb-2">
                         Accessories Checklist:
                       </h4>
                       <div className="space-y-1">
-                        {accessories[r.item_code].map((acc) => (
+                        {getAccessoriesForRow(r).map((acc) => (
                           <label
                             key={acc.id}
                             className="flex items-center gap-2 text-sm cursor-pointer hover:bg-blue-100 p-1 rounded"
@@ -441,6 +576,49 @@ export default function DispatchFormPage({ params }) {
                                 </span>
                               )}
                             </span>
+                            {r.godown ? (
+                              <span
+                                className={`text-xs font-medium whitespace-nowrap ${
+                                  accessoryStockInfo[r.id]?.[acc.id]
+                                    ?.stock_count > 0
+                                    ? "text-green-700"
+                                    : accessoryStockInfo[r.id]?.[acc.id]
+                                          ?.matched === false
+                                      ? "text-gray-500"
+                                      : "text-red-600"
+                                }`}
+                              >
+                                Stock ({r.godown.split(" - ")[0]}):{" "}
+                                {accessoryStockInfo[r.id]?.[acc.id] == null
+                                  ? "..."
+                                  : accessoryStockInfo[r.id]?.[acc.id]
+                                        ?.matched === false
+                                    ? "N/A"
+                                    : accessoryStockInfo[r.id]?.[acc.id]
+                                        ?.stock_count ?? 0}
+                              </span>
+                            ) : (
+                              <span
+                                className={`text-xs font-medium whitespace-nowrap ${
+                                  accessoryStockInfo[r.id]?.[acc.id]
+                                    ?.stock_count > 0
+                                    ? "text-green-700"
+                                    : accessoryStockInfo[r.id]?.[acc.id]
+                                          ?.matched === false
+                                      ? "text-gray-500"
+                                      : "text-red-600"
+                                }`}
+                              >
+                                Total Stock:{" "}
+                                {accessoryStockInfo[r.id]?.[acc.id] == null
+                                  ? "..."
+                                  : accessoryStockInfo[r.id]?.[acc.id]
+                                        ?.matched === false
+                                    ? "N/A"
+                                    : accessoryStockInfo[r.id]?.[acc.id]
+                                        ?.stock_count ?? 0}
+                              </span>
+                            )}
                             {acc.description && (
                               <span className="text-xs text-gray-600 italic">
                                 {acc.description}

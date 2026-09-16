@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
+import {
+  deductCheckedAccessoryStock,
+  validateCheckedAccessoryStock,
+} from "@/lib/deductAccessoryStock";
 import { v2 as cloudinary } from "cloudinary";
 
 cloudinary.config({
@@ -19,6 +23,19 @@ async function uploadPhotoToCloudinary(file) {
     resource_type: "image",
   });
   return result.secure_url;
+}
+
+async function ensureAccessoriesStockDeductedColumn(conn) {
+  const [cols] = await conn.execute(
+    `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'dispatch' AND COLUMN_NAME = 'accessories_stock_deducted'`,
+  );
+  if (cols.length === 0) {
+    await conn.execute(
+      `ALTER TABLE dispatch ADD COLUMN accessories_stock_deducted TINYINT(1) NOT NULL DEFAULT 0
+       COMMENT '1 = accessory spare stock deducted for this dispatch row' AFTER stock_deducted`,
+    );
+  }
 }
 
 export async function POST(req) {
@@ -59,16 +76,19 @@ export async function POST(req) {
     }
 
     const conn = await getDbConnection();
+    await ensureAccessoriesStockDeductedColumn(conn);
 
-    // Retrieve previous photos and check if stock already deducted
+    // Retrieve previous photos and deduction flags
     const [rows] = await conn.execute(
-      `SELECT photos, stock_deducted FROM dispatch WHERE id = ?`,
-      [id]
+      `SELECT photos, stock_deducted, accessories_stock_deducted FROM dispatch WHERE id = ?`,
+      [id],
     );
     const prevPhotos =
       rows && rows[0] && rows[0].photos ? rows[0].photos : null;
     const stockAlreadyDeducted =
       rows && rows[0] && rows[0].stock_deducted === 1;
+    const accessoriesStockAlreadyDeducted =
+      rows && rows[0] && rows[0].accessories_stock_deducted === 1;
 
     let newPhotos = null;
     if (photoUrls.length) {
@@ -115,12 +135,23 @@ export async function POST(req) {
     );
 
     const orderRow = orderRows[0];
-    const orderNumber = orderRow.order_id;
+    const orderNumber = orderRow?.order_id;
+
+    const [quoteMetaRows] = await conn.execute(
+      `SELECT company_name, company_address FROM quotations_records WHERE quote_number = ?`,
+      [quoteNumber],
+    );
+    const companyName =
+      quoteMetaRows && quoteMetaRows[0] ? quoteMetaRows[0].company_name : null;
+    const companyAddress =
+      quoteMetaRows && quoteMetaRows[0]
+        ? quoteMetaRows[0].company_address
+        : null;
+
+    const isProduct = /[a-zA-Z]/.test(itemCode);
 
     // STEP 1: Validate and update dispatch details FIRST (this checks serial_no uniqueness)
-    // This ensures we don't deduct stock if there's a duplicate serial number error
     if (stockAlreadyDeducted) {
-      // If stock already deducted, only update dispatch details
       await conn.execute(
         `UPDATE dispatch SET serial_no = ?, remarks = ?, photos = ?, accessories_checklist = ?, updated_at = NOW() WHERE id = ?`,
         [
@@ -129,8 +160,40 @@ export async function POST(req) {
           newPhotos ?? null,
           accessoriesChecklist ?? null,
           id,
-        ]
+        ],
       );
+
+      // Product stock already deducted — still deduct accessory stock if pending
+      if (
+        !accessoriesStockAlreadyDeducted &&
+        accessoriesChecklist &&
+        isProduct
+      ) {
+        const accessoryResult = await deductCheckedAccessoryStock(conn, {
+          accessoriesChecklistJson: accessoriesChecklist,
+          productCode: itemCode,
+          godown,
+          quoteNumber,
+          orderNumber,
+          username,
+          dispatchRowId: id,
+          companyName,
+          companyAddress,
+          partial: true,
+        });
+
+        await conn.execute(
+          `UPDATE dispatch SET accessories_stock_deducted = 1, updated_at = NOW() WHERE id = ?`,
+          [id],
+        );
+
+        return NextResponse.json({
+          success: true,
+          note: "Accessory stock deducted",
+          accessories_deducted: accessoryResult.deducted,
+        });
+      }
+
       return NextResponse.json({
         success: true,
         note: "Stock already deducted, only updated dispatch details",
@@ -158,9 +221,9 @@ export async function POST(req) {
       [quoteNumber, itemCode]
     );
 
-    const [quoteMetaRows] = await conn.execute(
+    const [quoteMetaRowsFull] = await conn.execute(
       `SELECT company_name, company_address, gstin FROM quotations_records WHERE quote_number = ?`,
-      [quoteNumber]
+      [quoteNumber],
     );
 
     if (!itemRows || !itemRows[0]) {
@@ -172,20 +235,21 @@ export async function POST(req) {
 
     const { total_price, hsn_sac } = itemRows[0];
     const quantity = 1; // Each dispatch row is for ONE item
-    const companyName =
-      quoteMetaRows && quoteMetaRows[0] ? quoteMetaRows[0].company_name : null;
-    const companyAddress =
-      quoteMetaRows && quoteMetaRows[0]
-        ? quoteMetaRows[0].company_address
-        : null;
     const gstin =
-      quoteMetaRows && quoteMetaRows[0] ? quoteMetaRows[0].gstin : null;
+      quoteMetaRowsFull && quoteMetaRowsFull[0]
+        ? quoteMetaRowsFull[0].gstin
+        : null;
 
     const locationColumn = godown === "Delhi - Mundka" ? "Delhi" : "South";
     const locationColumnLower = godown === "Delhi - Mundka" ? "delhi" : "south";
 
-    // Reduce stock now based on whether item is product or spare
-    const isProduct = /[a-zA-Z]/.test(itemCode);
+    if (isProduct && accessoriesChecklist) {
+      await validateCheckedAccessoryStock(conn, {
+        accessoriesChecklistJson: accessoriesChecklist,
+        productCode: itemCode,
+        godown,
+      });
+    }
 
     if (isProduct) {
       const [rows] = await conn.execute(
@@ -395,10 +459,31 @@ export async function POST(req) {
       }
     }
 
+    // Deduct spare stock for checked product accessories (by product_accessories.qty)
+    if (isProduct && accessoriesChecklist) {
+      const accessoryResult = await deductCheckedAccessoryStock(conn, {
+        accessoriesChecklistJson: accessoriesChecklist,
+        productCode: itemCode,
+        godown,
+        quoteNumber,
+        orderNumber,
+        username,
+        dispatchRowId: id,
+        companyName,
+        companyAddress,
+      });
+      if (accessoryResult.deducted.length > 0) {
+        console.log(
+          `Accessory stock deducted for dispatch #${id}:`,
+          accessoryResult.deducted,
+        );
+      }
+    }
+
     // STEP 3: Mark stock as deducted (dispatch details already updated in STEP 1)
     await conn.execute(
-      `UPDATE dispatch SET stock_deducted = 1, updated_at = NOW() WHERE id = ?`,
-      [id]
+      `UPDATE dispatch SET stock_deducted = 1, accessories_stock_deducted = ?, updated_at = NOW() WHERE id = ?`,
+      [accessoriesChecklist && isProduct ? 1 : 0, id],
     );
 
     // Send dispatch update email

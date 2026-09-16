@@ -446,6 +446,14 @@ export async function POST(req) {
           );
         }
       }
+
+      // 5) Auto-add dispatch rows for accessories marked as "added" (separate dispatch)
+      try {
+        const { seedAddedAccessoryDispatchRows } = await import("@/lib/seedAddedAccessoryDispatch");
+        await seedAddedAccessoryDispatchRows(conn, quote_number, quotationItems);
+      } catch (accessoryDispatchErr) {
+        console.error("⚠️ Error seeding added accessory dispatch rows:", accessoryDispatchErr);
+      }
     } else {
       console.log(`⚠️ Dispatch rows already exist for quote: ${quote_number}. Skipping seeding.`);
     }
