@@ -234,8 +234,24 @@ export async function GET(req) {
          mf.added_by,
          mf.followed_at,
          mf.next_followup_date,
-         mf.notes
+         mf.notes,
+         CASE
+           WHEN open_sr.status IS NULL THEN 'Ok'
+           ELSE open_sr.status
+         END AS machine_status
        FROM machines_followup mf
+       LEFT JOIN (
+         SELECT
+           TRIM(sr.serial_number) AS serial_key,
+           sr.status
+         FROM service_records sr
+         INNER JOIN (
+           SELECT TRIM(serial_number) AS serial_key, MAX(service_id) AS max_id
+           FROM service_records
+           WHERE UPPER(TRIM(COALESCE(status, ''))) <> 'COMPLETED'
+           GROUP BY TRIM(serial_number)
+         ) latest ON TRIM(sr.serial_number) = latest.serial_key AND sr.service_id = latest.max_id
+       ) open_sr ON TRIM(mf.serial_number) = open_sr.serial_key
        WHERE ${mfConditions.join(" AND ")}
        ORDER BY mf.followed_at DESC`,
       mfParams

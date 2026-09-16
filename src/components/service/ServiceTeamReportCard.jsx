@@ -7,6 +7,32 @@ import dayjs from "dayjs";
 const formatDT = (val) =>
   val ? dayjs(val).format("DD MMM YYYY, hh:mm A") : "—";
 
+function getMachineStatusDisplay(status) {
+  const normalized = String(status || "Ok").trim().toUpperCase();
+  if (normalized === "OK") {
+    return { label: "Ok", className: "bg-green-100 text-green-700" };
+  }
+  if (normalized === "PENDING") {
+    return { label: "Pending", className: "bg-yellow-100 text-yellow-800" };
+  }
+  if (normalized === "PENDING FOR SPARES") {
+    return { label: "Pending for Spares", className: "bg-orange-100 text-orange-800" };
+  }
+  if (normalized === "PENDING BY CUSTOMER") {
+    return { label: "Pending by Customer", className: "bg-blue-100 text-blue-800" };
+  }
+  return { label: status, className: "bg-gray-100 text-gray-700" };
+}
+
+function MachineStatusBadge({ status }) {
+  const { label, className } = getMachineStatusDisplay(status);
+  return (
+    <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${className}`}>
+      {label}
+    </span>
+  );
+}
+
 export default function ServiceTeamReportCard({ rows = [] }) {
   const [popup, setPopup] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -145,6 +171,7 @@ export default function ServiceTeamReportCard({ rows = [] }) {
                       <th className="px-3 py-2 text-left">Service ID</th>
                       <th className="px-3 py-2 text-left">Serial</th>
                       <th className="px-3 py-2 text-left">Model</th>
+                      <th className="px-3 py-2 text-left">Machine Status</th>
                       <th className="px-3 py-2 text-left">Followed At</th>
                       <th className="px-3 py-2 text-left">Notes</th>
                     </tr>
@@ -157,6 +184,9 @@ export default function ServiceTeamReportCard({ rows = [] }) {
                         <td className="px-3 py-2">{row.service_id || "—"}</td>
                         <td className="px-3 py-2 font-medium">{row.serial_number || "—"}</td>
                         <td className="px-3 py-2">{row.product_model || "—"}</td>
+                        <td className="px-3 py-2">
+                          <MachineStatusBadge status={row.machine_status} />
+                        </td>
                         <td className="px-3 py-2 whitespace-nowrap">{formatDT(row.followed_at)}</td>
                         <td className="px-3 py-2 max-w-xs break-words">{row.notes || "—"}</td>
                       </tr>
