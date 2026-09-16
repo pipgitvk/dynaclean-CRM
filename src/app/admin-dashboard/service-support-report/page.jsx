@@ -1,9 +1,16 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import dayjs from "dayjs";
+import { X } from "lucide-react";
 
 const formatDT = (val) =>
   val ? dayjs(val).format("DD MMM YYYY, hh:mm A") : "—";
+
+const formatDate = (val) =>
+  val ? dayjs(val).format("DD MMM YYYY") : "—";
+
+const formatCurrency = (val) =>
+  val != null && val !== "" ? `₹${Number(val).toLocaleString("en-IN")}` : "—";
 
 const KPI_CARDS = [
   { key: "complaintsReceived", label: "Nos. Of Complaint Received", color: "text-red-600", border: "border-red-200 hover:border-red-300", bg: "bg-red-50" },
@@ -14,6 +21,86 @@ const KPI_CARDS = [
   { key: "warrantyRegistered", label: "Nos. Of Product Registered In Warranty", color: "text-teal-600", border: "border-teal-200 hover:border-teal-300", bg: "bg-teal-50" },
   { key: "warrantyPending", label: "Nos. Of Product Pending Register", color: "text-orange-600", border: "border-orange-200 hover:border-orange-300", bg: "bg-orange-50" },
 ];
+
+const KPI_DETAIL_COLUMNS = {
+  complaintsReceived: [
+    { key: "service_id", label: "Service ID" },
+    { key: "service_type", label: "Type" },
+    { key: "serial_number", label: "Serial No." },
+    { key: "customer_name", label: "Customer" },
+    { key: "contact", label: "Contact" },
+    { key: "assigned_to", label: "Assigned To" },
+    { key: "status", label: "Status" },
+    { key: "complaint_date", label: "Complaint Date", format: "datetime" },
+    { key: "complaint_summary", label: "Summary", wide: true },
+  ],
+  complaintsResolved: [
+    { key: "service_id", label: "Service ID" },
+    { key: "service_type", label: "Type" },
+    { key: "serial_number", label: "Serial No." },
+    { key: "customer_name", label: "Customer" },
+    { key: "contact", label: "Contact" },
+    { key: "assigned_to", label: "Assigned To" },
+    { key: "status", label: "Status" },
+    { key: "complaint_date", label: "Complaint Date", format: "datetime" },
+    { key: "completed_date", label: "Completed Date", format: "datetime" },
+    { key: "complaint_summary", label: "Summary", wide: true },
+  ],
+  quotations: [
+    { key: "quote_number", label: "Quote No." },
+    { key: "company_name", label: "Company" },
+    { key: "customer_id", label: "Customer ID" },
+    { key: "emp_name", label: "Employee" },
+    { key: "grand_total", label: "Amount", format: "currency" },
+    { key: "quote_date", label: "Quote Date", format: "date" },
+    { key: "created_at", label: "Created At", format: "datetime" },
+  ],
+  ordersProcessed: [
+    { key: "order_id", label: "Order ID" },
+    { key: "quote_number", label: "Quote No." },
+    { key: "client_name", label: "Client" },
+    { key: "contact", label: "Contact" },
+    { key: "created_by", label: "Created By" },
+    { key: "totalamt", label: "Amount", format: "currency" },
+    { key: "approval_status", label: "Status" },
+    { key: "created_at", label: "Created At", format: "datetime" },
+  ],
+  upcomingInstallations: [
+    { key: "order_id", label: "Order ID" },
+    { key: "quote_number", label: "Quote No." },
+    { key: "client_name", label: "Client" },
+    { key: "company_name", label: "Company" },
+    { key: "contact", label: "Contact" },
+    { key: "created_by", label: "Created By" },
+    { key: "delivery_date", label: "Delivery Date", format: "date" },
+  ],
+  warrantyRegistered: [
+    { key: "serial_number", label: "Serial No." },
+    { key: "customer_name", label: "Customer" },
+    { key: "product_name", label: "Product" },
+    { key: "model", label: "Model" },
+    { key: "contact", label: "Contact" },
+    { key: "created_by", label: "Registered By" },
+    { key: "created_at", label: "Registered At", format: "datetime" },
+  ],
+  warrantyPending: [
+    { key: "order_id", label: "Order ID" },
+    { key: "quote_number", label: "Quote No." },
+    { key: "client_name", label: "Client" },
+    { key: "company_name", label: "Company" },
+    { key: "contact", label: "Contact" },
+    { key: "created_by", label: "Created By" },
+    { key: "delivery_date", label: "Delivery Date", format: "date" },
+  ],
+};
+
+function formatCellValue(value, format) {
+  if (value == null || value === "") return "—";
+  if (format === "datetime") return formatDT(value);
+  if (format === "date") return formatDate(value);
+  if (format === "currency") return formatCurrency(value);
+  return value;
+}
 
 export default function ServiceSupportReportPage() {
   const [selectedEmployee, setSelectedEmployee] = useState("all");
@@ -34,33 +121,44 @@ export default function ServiceSupportReportPage() {
   const [customFromDate, setCustomFromDate] = useState("");
   const [customToDate, setCustomToDate] = useState("");
   const [activeTab, setActiveTab] = useState("customer"); // "customer" | "machine"
+  const [kpiPopup, setKpiPopup] = useState(null);
+  const [kpiDetails, setKpiDetails] = useState([]);
+  const [kpiDetailsLoading, setKpiDetailsLoading] = useState(false);
 
-  const fetchData = useCallback(async () => {
-    setIsLoading(true);
-    let startDate, endDate;
-
+  const getDateRange = useCallback(() => {
     const today = dayjs();
     switch (dateRange) {
       case "today":
-        startDate = today.startOf("day").toISOString();
-        endDate = today.endOf("day").toISOString();
-        break;
+        return {
+          startDate: today.startOf("day").toISOString(),
+          endDate: today.endOf("day").toISOString(),
+        };
       case "this_week":
-        startDate = today.startOf("week").toISOString();
-        endDate = today.endOf("week").toISOString();
-        break;
+        return {
+          startDate: today.startOf("week").toISOString(),
+          endDate: today.endOf("week").toISOString(),
+        };
       case "this_month":
-        startDate = today.startOf("month").toISOString();
-        endDate = today.endOf("month").toISOString();
-        break;
+        return {
+          startDate: today.startOf("month").toISOString(),
+          endDate: today.endOf("month").toISOString(),
+        };
       case "custom":
-        startDate = dayjs(customFromDate).startOf("day").toISOString();
-        endDate = dayjs(customToDate).endOf("day").toISOString();
-        break;
+        return {
+          startDate: dayjs(customFromDate).startOf("day").toISOString(),
+          endDate: dayjs(customToDate).endOf("day").toISOString(),
+        };
       default:
-        startDate = today.startOf("day").toISOString();
-        endDate = today.endOf("day").toISOString();
+        return {
+          startDate: today.startOf("day").toISOString(),
+          endDate: today.endOf("day").toISOString(),
+        };
     }
+  }, [dateRange, customFromDate, customToDate]);
+
+  const fetchData = useCallback(async () => {
+    setIsLoading(true);
+    const { startDate, endDate } = getDateRange();
 
     try {
       const params = new URLSearchParams({ employee: selectedEmployee, startDate, endDate });
@@ -95,9 +193,33 @@ export default function ServiceSupportReportPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedEmployee, dateRange, customFromDate, customToDate]);
+  }, [selectedEmployee, getDateRange]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  const openKpiPopup = async (card) => {
+    setKpiPopup(card);
+    setKpiDetails([]);
+    setKpiDetailsLoading(true);
+    const { startDate, endDate } = getDateRange();
+    try {
+      const params = new URLSearchParams({
+        employee: selectedEmployee,
+        startDate,
+        endDate,
+        detailType: card.key,
+      });
+      const res = await fetch(`/api/service-support-report?${params}`);
+      if (!res.ok) throw new Error("Failed");
+      const data = await res.json();
+      setKpiDetails(data.details || []);
+    } catch (err) {
+      console.error(err);
+      setKpiDetails([]);
+    } finally {
+      setKpiDetailsLoading(false);
+    }
+  };
 
   const dateButtons = [
     { key: "today", label: "Today" },
@@ -181,9 +303,11 @@ export default function ServiceSupportReportPage() {
         <h2 className="text-lg font-semibold text-gray-700 mb-4">Service Support Summary</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {KPI_CARDS.map(({ key, label, color, border, bg }) => (
-            <div
+            <button
               key={key}
-              className={`rounded-xl p-5 border-2 shadow-sm transition-all ${border} ${bg}`}
+              type="button"
+              onClick={() => openKpiPopup({ key, label })}
+              className={`rounded-xl p-5 border-2 shadow-sm transition-all text-left cursor-pointer hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-400 ${border} ${bg}`}
             >
               <p className="text-xs sm:text-sm text-gray-600 font-medium leading-snug min-h-[40px]">
                 {label}
@@ -191,7 +315,8 @@ export default function ServiceSupportReportPage() {
               <p className={`text-3xl sm:text-4xl font-bold mt-2 tabular-nums ${color}`}>
                 {isLoading ? "..." : (summary[key] ?? 0)}
               </p>
-            </div>
+              <p className="text-[11px] text-gray-400 mt-2">Click to view details</p>
+            </button>
           ))}
         </div>
       </div>
@@ -351,6 +476,66 @@ export default function ServiceSupportReportPage() {
               </tbody>
             </table>
           )}
+        </div>
+      )}
+
+      {kpiPopup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b">
+              <div>
+                <h3 className="text-lg font-bold text-gray-800">{kpiPopup.label}</h3>
+                <p className="text-xs text-gray-500">
+                  {selectedEmployee === "all" ? "All Employees" : selectedEmployee}
+                  {" · "}
+                  {kpiDetails.length} record{kpiDetails.length === 1 ? "" : "s"}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setKpiPopup(null)}
+                className="p-1 rounded-full hover:bg-gray-100"
+                aria-label="Close"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="overflow-auto flex-1 p-4">
+              {kpiDetailsLoading ? (
+                <p className="text-sm text-gray-500">Loading...</p>
+              ) : kpiDetails.length === 0 ? (
+                <p className="text-sm text-gray-400">No records found for this period.</p>
+              ) : (
+                <table className="min-w-full divide-y divide-gray-200 text-sm">
+                  <thead className="bg-gray-50 text-gray-600 text-xs uppercase sticky top-0">
+                    <tr>
+                      <th className="px-3 py-2 text-left">#</th>
+                      {(KPI_DETAIL_COLUMNS[kpiPopup.key] || []).map((col) => (
+                        <th key={col.key} className="px-3 py-2 text-left whitespace-nowrap">
+                          {col.label}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {kpiDetails.map((row, i) => (
+                      <tr key={row.id ?? row.service_id ?? row.order_id ?? row.quote_number ?? i} className="hover:bg-gray-50">
+                        <td className="px-3 py-2 text-gray-400">{i + 1}</td>
+                        {(KPI_DETAIL_COLUMNS[kpiPopup.key] || []).map((col) => (
+                          <td
+                            key={col.key}
+                            className={`px-3 py-2 ${col.wide ? "max-w-xs whitespace-pre-wrap break-words" : "whitespace-nowrap"}`}
+                          >
+                            {formatCellValue(row[col.key], col.format)}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>
