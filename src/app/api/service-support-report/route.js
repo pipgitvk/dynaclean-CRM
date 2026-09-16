@@ -2,6 +2,7 @@
 import { getDbConnection } from "@/lib/db";
 import { NextResponse } from "next/server";
 import { getSessionPayload } from "@/lib/auth";
+import { UNREGISTERED_PRODUCT_ORDER_SQL } from "@/lib/pendingProductRegistrationCount";
 
 export async function GET(req) {
   const conn = await getDbConnection();
@@ -34,6 +35,154 @@ export async function GET(req) {
 
     // Build employee filter
     const empFilter = employee !== "all" ? [employee] : employees;
+    const empPlaceholders =
+      empFilter.length > 0 ? empFilter.map(() => "?").join(",") : null;
+
+    const emptySummary = {
+      complaintsReceived: 0,
+      complaintsResolved: 0,
+      quotations: 0,
+      ordersProcessed: 0,
+      upcomingInstallations: 0,
+      warrantyRegistered: 0,
+      warrantyPending: 0,
+    };
+
+    let summary = { ...emptySummary };
+
+    if (empFilter.length > 0 && empPlaceholders) {
+      // 1) Complaints received
+      const complaintReceivedConditions = [
+        `sr.service_type = 'COMPLAINT'`,
+        `sr.assigned_to IN (${empPlaceholders})`,
+      ];
+      const complaintReceivedParams = [...empFilter];
+      if (startDate && endDate) {
+        complaintReceivedConditions.push(
+          `COALESCE(sr.complaint_date, sr.reg_date) BETWEEN ? AND ?`,
+        );
+        complaintReceivedParams.push(startDate, endDate);
+      }
+      const [complaintReceivedRows] = await conn.execute(
+        `SELECT COUNT(*) AS count FROM service_records sr
+         WHERE ${complaintReceivedConditions.join(" AND ")}`,
+        complaintReceivedParams,
+      );
+      summary.complaintsReceived = Number(complaintReceivedRows[0]?.count ?? 0);
+
+      // 2) Complaints resolved
+      const complaintResolvedConditions = [
+        `sr.service_type = 'COMPLAINT'`,
+        `sr.status = 'COMPLETED'`,
+        `sr.assigned_to IN (${empPlaceholders})`,
+      ];
+      const complaintResolvedParams = [...empFilter];
+      if (startDate && endDate) {
+        complaintResolvedConditions.push(`sr.completed_date BETWEEN ? AND ?`);
+        complaintResolvedParams.push(startDate, endDate);
+      }
+      const [complaintResolvedRows] = await conn.execute(
+        `SELECT COUNT(*) AS count FROM service_records sr
+         WHERE ${complaintResolvedConditions.join(" AND ")}`,
+        complaintResolvedParams,
+      );
+      summary.complaintsResolved = Number(complaintResolvedRows[0]?.count ?? 0);
+
+      // 3) Quotations
+      const quoteConditions = [`qr.emp_name IN (${empPlaceholders})`];
+      const quoteParams = [...empFilter];
+      if (startDate && endDate) {
+        quoteConditions.push(`qr.created_at BETWEEN ? AND ?`);
+        quoteParams.push(startDate, endDate);
+      }
+      const [quoteRows] = await conn.execute(
+        `SELECT COUNT(*) AS count FROM quotations_records qr
+         WHERE ${quoteConditions.join(" AND ")}`,
+        quoteParams,
+      );
+      summary.quotations = Number(quoteRows[0]?.count ?? 0);
+
+      // 4) Orders processed (service support orders in period)
+      const orderConditions = [`no.created_by IN (${empPlaceholders})`];
+      const orderParams = [...empFilter];
+      if (startDate && endDate) {
+        orderConditions.push(`no.created_at BETWEEN ? AND ?`);
+        orderParams.push(startDate, endDate);
+      }
+      const [orderRows] = await conn.execute(
+        `SELECT COUNT(*) AS count FROM neworder no
+         WHERE ${orderConditions.join(" AND ")}`,
+        orderParams,
+      );
+      summary.ordersProcessed = Number(orderRows[0]?.count ?? 0);
+
+      // 5) Upcoming installations (pending install, dispatched, delivery in range)
+      const installConditions = [
+        `no.installation_status = 0`,
+        `(no.is_returned = 0 OR no.is_returned = 2 OR no.is_returned IS NULL)`,
+        `(no.is_cancelled = 0 OR no.is_cancelled IS NULL)`,
+        `no.delivery_date IS NOT NULL`,
+        `no.dispatch_status = 1`,
+        `no.created_by IN (${empPlaceholders})`,
+        `EXISTS (
+          SELECT 1 FROM dispatch d
+          WHERE d.quote_number = no.quote_number
+            AND d.serial_no IS NOT NULL AND d.serial_no <> ''
+        )`,
+      ];
+      const installParams = [...empFilter];
+      if (startDate && endDate) {
+        installConditions.push(`no.delivery_date BETWEEN ? AND ?`);
+        installParams.push(startDate, endDate);
+      }
+      const [installRows] = await conn.execute(
+        `SELECT COUNT(DISTINCT no.id) AS count FROM neworder no
+         WHERE ${installConditions.join(" AND ")}`,
+        installParams,
+      );
+      summary.upcomingInstallations = Number(installRows[0]?.count ?? 0);
+
+      // 6) Products registered in warranty
+      const warrantyRegConditions = [`wp.created_by IN (${empPlaceholders})`];
+      const warrantyRegParams = [...empFilter];
+      if (startDate && endDate) {
+        warrantyRegConditions.push(`wp.created_at BETWEEN ? AND ?`);
+        warrantyRegParams.push(startDate, endDate);
+      }
+      const [warrantyRegRows] = await conn.execute(
+        `SELECT COUNT(*) AS count FROM warranty_products wp
+         WHERE ${warrantyRegConditions.join(" AND ")}`,
+        warrantyRegParams,
+      );
+      summary.warrantyRegistered = Number(warrantyRegRows[0]?.count ?? 0);
+
+      // 7) Products pending registration
+      const pendingConditions = [
+        `no.installation_status = 0`,
+        `(no.is_returned = 0 OR no.is_returned = 2 OR no.is_returned IS NULL)`,
+        `(no.is_cancelled = 0 OR no.is_cancelled IS NULL)`,
+        `no.delivery_date IS NOT NULL`,
+        `no.dispatch_status = 1`,
+        `no.created_by IN (${empPlaceholders})`,
+        UNREGISTERED_PRODUCT_ORDER_SQL,
+      ];
+      const pendingParams = [...empFilter];
+      const [pendingRows] = await conn.execute(
+        `SELECT COUNT(DISTINCT no.id) AS count FROM neworder no
+         WHERE ${pendingConditions.join(" AND ")}`,
+        pendingParams,
+      );
+      summary.warrantyPending = Number(pendingRows[0]?.count ?? 0);
+    }
+
+    if (empFilter.length === 0) {
+      return NextResponse.json({
+        employees,
+        summary,
+        customerFollowups: [],
+        machineFollowups: [],
+      });
+    }
 
     // ─── customers_followup (service followups) ───────────────────────────────
     let cfConditions = [`cf.followed_by IN (${empFilter.map(() => "?").join(",")})`];
@@ -104,6 +253,7 @@ export async function GET(req) {
 
     return NextResponse.json({
       employees,
+      summary,
       customerFollowups: serializeDates(cfRows),
       machineFollowups: serializeDates(mfRows),
     });

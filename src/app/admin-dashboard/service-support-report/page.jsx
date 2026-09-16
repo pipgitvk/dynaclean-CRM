@@ -5,11 +5,30 @@ import dayjs from "dayjs";
 const formatDT = (val) =>
   val ? dayjs(val).format("DD MMM YYYY, hh:mm A") : "—";
 
+const KPI_CARDS = [
+  { key: "complaintsReceived", label: "Nos. Of Complaint Received", color: "text-red-600", border: "border-red-200 hover:border-red-300", bg: "bg-red-50" },
+  { key: "complaintsResolved", label: "Nos. Of Complaint Resolved", color: "text-green-600", border: "border-green-200 hover:border-green-300", bg: "bg-green-50" },
+  { key: "quotations", label: "Nos. Of Quotation", color: "text-amber-600", border: "border-amber-200 hover:border-amber-300", bg: "bg-amber-50" },
+  { key: "ordersProcessed", label: "Nos. Of Order Process", color: "text-blue-600", border: "border-blue-200 hover:border-blue-300", bg: "bg-blue-50" },
+  { key: "upcomingInstallations", label: "Nos. Of Upcoming Installation", color: "text-indigo-600", border: "border-indigo-200 hover:border-indigo-300", bg: "bg-indigo-50" },
+  { key: "warrantyRegistered", label: "Nos. Of Product Registered In Warranty", color: "text-teal-600", border: "border-teal-200 hover:border-teal-300", bg: "bg-teal-50" },
+  { key: "warrantyPending", label: "Nos. Of Product Pending Register", color: "text-orange-600", border: "border-orange-200 hover:border-orange-300", bg: "bg-orange-50" },
+];
+
 export default function ServiceSupportReportPage() {
   const [selectedEmployee, setSelectedEmployee] = useState("all");
   const [employees, setEmployees] = useState([]);
   const [customerFollowups, setCustomerFollowups] = useState([]);
   const [machineFollowups, setMachineFollowups] = useState([]);
+  const [summary, setSummary] = useState({
+    complaintsReceived: 0,
+    complaintsResolved: 0,
+    quotations: 0,
+    ordersProcessed: 0,
+    upcomingInstallations: 0,
+    warrantyRegistered: 0,
+    warrantyPending: 0,
+  });
   const [isLoading, setIsLoading] = useState(false);
   const [dateRange, setDateRange] = useState("today");
   const [customFromDate, setCustomFromDate] = useState("");
@@ -49,12 +68,30 @@ export default function ServiceSupportReportPage() {
       if (!res.ok) throw new Error("Failed");
       const data = await res.json();
       setEmployees(data.employees || []);
+      setSummary(data.summary || {
+        complaintsReceived: 0,
+        complaintsResolved: 0,
+        quotations: 0,
+        ordersProcessed: 0,
+        upcomingInstallations: 0,
+        warrantyRegistered: 0,
+        warrantyPending: 0,
+      });
       setCustomerFollowups(data.customerFollowups || []);
       setMachineFollowups(data.machineFollowups || []);
     } catch (err) {
       console.error(err);
       setCustomerFollowups([]);
       setMachineFollowups([]);
+      setSummary({
+        complaintsReceived: 0,
+        complaintsResolved: 0,
+        quotations: 0,
+        ordersProcessed: 0,
+        upcomingInstallations: 0,
+        warrantyRegistered: 0,
+        warrantyPending: 0,
+      });
     } finally {
       setIsLoading(false);
     }
@@ -139,7 +176,29 @@ export default function ServiceSupportReportPage() {
         </div>
       </div>
 
-      {/* ── Summary Cards ── */}
+      {/* ── KPI Summary Cards ── */}
+      <div>
+        <h2 className="text-lg font-semibold text-gray-700 mb-4">Service Support Summary</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {KPI_CARDS.map(({ key, label, color, border, bg }) => (
+            <div
+              key={key}
+              className={`rounded-xl p-5 border-2 shadow-sm transition-all ${border} ${bg}`}
+            >
+              <p className="text-xs sm:text-sm text-gray-600 font-medium leading-snug min-h-[40px]">
+                {label}
+              </p>
+              <p className={`text-3xl sm:text-4xl font-bold mt-2 tabular-nums ${color}`}>
+                {isLoading ? "..." : (summary[key] ?? 0)}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <hr className="border-gray-200" />
+
+      {/* ── Follow-up Summary Cards ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
         <div
           onClick={() => setActiveTab("customer")}
