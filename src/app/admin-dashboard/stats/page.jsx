@@ -20,7 +20,6 @@ import {
     BarChart2,
     X,
     Eye,
-    PackageCheck,
 } from "lucide-react";
 import { Line, Bar, Doughnut } from "react-chartjs-2";
 import {
@@ -101,7 +100,7 @@ export default function AdminStatsDashboard() {
         } finally {
             setLoading(false);
         }
-    };
+    };  
 
     const fetchTotalAchievedAmount = async () => {
         try {
@@ -459,7 +458,7 @@ export default function AdminStatsDashboard() {
                     <ShoppingCart className="w-6 h-6 mr-2 text-blue-600" />
                     Sales Statistics
                 </h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                     <div className="relative">
                         <KPICard
                             title="Total Orders"
@@ -479,30 +478,47 @@ export default function AdminStatsDashboard() {
                             <BarChart2 className="w-5 h-5" />
                         </button>
                     </div>
-                    <KPICard
-                        title="Total Revenue"
-                        value={formatCurrency(ordersTotalAmount)}
-                        icon={DollarSign}
-                        color="bg-gradient-to-br from-green-500 to-green-600"
-                        subtitle={ordersTaxableAmount > 0 ? `Base: ${formatCurrency(ordersTaxableAmount)} | Tax: ${formatCurrency(ordersTotalAmount - ordersTaxableAmount)}` : undefined}
-                        onClick={() => router.push("/admin-dashboard/order")}
-                    />
-                    <KPICard
-                        title="Dispatched"
-                        value={stats?.sales?.dispatched || 0}
-                        icon={PackageCheck}
-                        color="bg-gradient-to-br from-teal-500 to-teal-600"
-                        subtitle="Dispatch Done "
-                        onClick={() => router.push(getOrderPageUrl("dispatchdone"))}
-                    />
-                    <KPICard
-                        title="Pending Dispatched"
-                        value={stats?.sales?.pendingDispatched || 0}
-                        icon={Truck}
-                        color="bg-gradient-to-br from-amber-500 to-amber-600"
-                        subtitle="Pending Invoice / Uploaded / Booking Done"
-                        onClick={() => router.push(getOrderPageUrl("pendingdispatched"))}
-                    />
+                    <div className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 p-6">
+                        <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                                <p className="text-sm font-medium text-gray-600 mb-2">Total Revenue</p>
+                                <p className="text-3xl font-bold text-gray-900 mb-1">
+                                    {formatCurrency(ordersTotalAmount)}
+                                </p>
+                                {ordersTaxableAmount > 0 && (
+                                    <p className="text-xs text-gray-500">
+                                        Base: {formatCurrency(ordersTaxableAmount)} | Tax:{" "}
+                                        {formatCurrency(ordersTotalAmount - ordersTaxableAmount)}
+                                    </p>
+                                )}
+                                <div className="mt-3 flex flex-wrap items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => router.push(getOrderPageUrl("dispatchdone"))}
+                                        className="inline-flex cursor-pointer items-center rounded-md border border-teal-200 bg-teal-50 px-2 py-1 text-xs text-gray-700 hover:border-teal-300 hover:bg-teal-100"
+                                    >
+                                        Dispatched ={" "}
+                                        <span className="font-bold text-teal-800">
+                                            {stats?.sales?.dispatched || 0}
+                                        </span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => router.push(getOrderPageUrl("pendingdispatched"))}
+                                        className="inline-flex cursor-pointer items-center rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-gray-700 hover:border-amber-300 hover:bg-amber-100"
+                                    >
+                                        Non-dispatched ={" "}
+                                        <span className="font-bold text-amber-800">
+                                            {stats?.sales?.pendingDispatched || 0}
+                                        </span>
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="p-3 rounded-lg bg-gradient-to-br from-green-500 to-green-600">
+                                <DollarSign className="w-6 h-6 text-white" />
+                            </div>
+                        </div>
+                    </div>
                     <KPICard
                         title="Conversion Rate"
                         value={`${stats?.sales?.conversionRate || 0}%`}
