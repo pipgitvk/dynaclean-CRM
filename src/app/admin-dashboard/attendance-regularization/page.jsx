@@ -155,6 +155,16 @@ export default function AdminAttendanceRegularizationPage() {
     return matchesStatus && matchesEmployee && matchesDate;
   });
 
+  const statusOrder = { pending: 0, rejected: 1, approved: 2 };
+  const sortedRequests = [...filteredRequests].sort((a, b) => {
+    const orderA =
+      statusOrder[String(a.status || "").toLowerCase()] ?? 99;
+    const orderB =
+      statusOrder[String(b.status || "").toLowerCase()] ?? 99;
+    if (orderA !== orderB) return orderA - orderB;
+    return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+  });
+
   return (
     <div className="w-full min-w-0 max-w-full">
       <div className="mb-6 flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -227,7 +237,7 @@ export default function AdminAttendanceRegularizationPage() {
 
       {loading ? (
         <p className="text-gray-600 py-12 text-center">Loading…</p>
-      ) : filteredRequests.length === 0 ? (
+      ) : sortedRequests.length === 0 ? (
         <p className="w-full text-gray-600 rounded-lg border border-gray-200 bg-white p-8 shadow-sm text-center">
           No regularization requests found for the selected filters.
         </p>
@@ -260,7 +270,7 @@ export default function AdminAttendanceRegularizationPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {filteredRequests.map((req) => (
+                {sortedRequests.map((req) => (
                   <tr key={req.id} className="hover:bg-gray-50">
                     <td className="px-3 py-2 text-gray-800">{req.id}</td>
                     <td className="px-3 py-2 font-medium text-gray-900">
