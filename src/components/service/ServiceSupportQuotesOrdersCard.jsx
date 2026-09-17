@@ -13,6 +13,18 @@ const formatAmt = (val) => {
   return Number.isFinite(n) ? n.toLocaleString("en-IN") : String(val);
 };
 
+/** Match admin Order Process: quotation grand_total first, then order totalamt. */
+const getOrderAmount = (row) => {
+  if (row?.amount != null && Number(row.amount) > 0) return row.amount;
+  const quotationTotal = Number(row?.quotation_grand_total) || 0;
+  if (quotationTotal > 0) return quotationTotal;
+  const total = Number(row?.totalamt) || 0;
+  if (total > 0) return total;
+  const base = Number(row?.baseAmount) || 0;
+  const tax = Number(row?.taxamt) || 0;
+  return base + tax;
+};
+
 export default function ServiceSupportQuotesOrdersCard({ rows = [] }) {
   const [popup, setPopup] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -196,7 +208,7 @@ export default function ServiceSupportQuotesOrdersCard({ rows = [] }) {
                         <td className="px-3 py-2">{row.client_name || "—"}</td>
                         <td className="px-3 py-2">{row.contact || "—"}</td>
                         <td className="px-3 py-2 whitespace-nowrap">{formatDT(row.created_at)}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">{formatAmt(row.totalamt)}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{formatAmt(getOrderAmount(row))}</td>
                       </tr>
                     ))}
                   </tbody>

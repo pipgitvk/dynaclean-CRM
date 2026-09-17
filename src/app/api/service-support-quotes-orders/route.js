@@ -74,8 +74,18 @@ export async function GET(req) {
          no.created_by,
          no.created_at,
          no.totalamt,
-         no.approval_status
+         no.baseAmount,
+         no.taxamt,
+         no.approval_status,
+         qr.grand_total AS quotation_grand_total,
+         CASE
+           WHEN qr.grand_total > 0 THEN qr.grand_total
+           WHEN no.totalamt > 0 THEN no.totalamt
+           ELSE COALESCE(no.baseAmount, 0) + COALESCE(no.taxamt, 0)
+         END AS amount
        FROM neworder no
+       LEFT JOIN quotations_records qr
+         ON no.quote_number COLLATE utf8mb4_unicode_ci = qr.quote_number COLLATE utf8mb4_unicode_ci
        WHERE ${orderConditions.join(" AND ")}
        ORDER BY no.created_at DESC`,
       orderParams,
