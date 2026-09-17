@@ -369,7 +369,11 @@ Thanks for doing business with us!`,
 
   // fetch data with quotation number 
 const fetchQuotationAndFill = async (quoteNoArg) => {
-  const qn = String(quoteNoArg ?? quotationNumber ?? "").trim();
+  const raw =
+    typeof quoteNoArg === "string" || typeof quoteNoArg === "number"
+      ? quoteNoArg
+      : quotationNumber;
+  const qn = String(raw ?? "").trim();
   if (!qn) {
     toast.error("Enter quotation number");
     return;
@@ -971,7 +975,7 @@ const fetchQuotationAndFill = async (quoteNoArg) => {
 
         <button
           className="px-4 py-2 bg-emerald-600 text-white rounded"
-          onClick={fetchQuotationAndFill}
+          onClick={() => fetchQuotationAndFill()}
         >
           Load Quotation
         </button>
