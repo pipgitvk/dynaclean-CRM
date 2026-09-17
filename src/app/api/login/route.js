@@ -125,18 +125,18 @@ export async function POST(request) {
     if (isTimeRestrictionEnabled) {
       const { hour, minute } = getCurrentISTTime();
       const currentTimeMinutes = hour * 60 + minute;
-      const startRange = 9 * 60;
-      const endRange = 19 * 60;
+      const startRange = 9 * 60; // 09:00 IST
+      const endRange = 19 * 60 + 15; // 19:15 IST
 
       if (currentTimeMinutes < startRange || currentTimeMinutes > endRange) {
         await recordActivity(
           username,
           userRole,
           "FAILED",
-          `Login attempted outside allowed hours (09:00 - 19:00 IST). Current IST time: ${hour}:${minute}`,
+          `Login attempted outside allowed hours (09:00 - 19:15 IST). Current IST time: ${hour}:${String(minute).padStart(2, "0")}`,
         );
         return NextResponse.json(
-          { error: "Login allowed only between 09:00 and 19:00 IST" },
+          { error: "Login allowed only between 09:00 and 19:15 IST" },
           { status: 403 },
         );
       }

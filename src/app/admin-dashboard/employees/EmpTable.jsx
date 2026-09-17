@@ -294,8 +294,8 @@ const EmployeeCard = ({
         }`}
         title={
           employee.login_time_restriction_enabled === 1
-            ? "Login time restriction ON (09:00–19:00 IST) — click to disable"
-            : "Login time restriction OFF — click to enable (09:00–19:00 IST)"
+            ? "Login time restriction ON (09:00–19:15 IST) — click to disable"
+            : "Login time restriction OFF — click to enable (09:00–19:15 IST)"
         }
       >
         <Clock size={16} />
@@ -403,7 +403,7 @@ const EmpTable = ({ employees }) => {
       setTimeRestrictionMap((prev) => ({ ...prev, [username]: next }));
       toast.success(
         next === 1
-          ? `${username}: login restricted to 09:00–19:00 IST`
+          ? `${username}: login restricted to 09:00–19:15 IST`
           : `${username}: login time restriction removed`,
       );
     } catch (err) {
@@ -1079,8 +1079,8 @@ const EmpTable = ({ employees }) => {
                           }`}
                           title={
                             emp.login_time_restriction_enabled === 1
-                              ? "Login time restriction ON (09:00–19:00 IST) — click to disable"
-                              : "Login time restriction OFF — click to enable (09:00–19:00 IST)"
+                              ? "Login time restriction ON (09:00–19:15 IST) — click to disable"
+                              : "Login time restriction OFF — click to enable (09:00–19:15 IST)"
                           }
                         >
                           <Clock size={20} />

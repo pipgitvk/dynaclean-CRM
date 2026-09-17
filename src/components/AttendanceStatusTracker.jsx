@@ -137,11 +137,9 @@ export default function AttendanceStatusTracker({ username }) {
   );
 
   const canCheckIn = useCallback(() => {
-    const checkinMin = scheduleTimeToMinutes(rules?.checkin_time);
-    if (checkinMin == null) return true;
-    const grace = rules?.grace_period_minutes ?? 15;
-    return currentMinutes >= checkinMin - grace;
-  }, [rules, currentMinutes]);
+    // Check-in allowed anytime from 09:00 IST onwards (no early check-in before 9 AM)
+    return currentMinutes >= 9 * 60;
+  }, [currentMinutes]);
 
   const getBreakStatus = useCallback(() => {
     if (!rules) return { type: "loading", status: "pending", label: "Loading" };
@@ -154,7 +152,7 @@ export default function AttendanceStatusTracker({ username }) {
         return {
           type: "waiting",
           status: "pending",
-          label: `Check-in at ${formatScheduleTimeLabel(rules.checkin_time)}`,
+          label: "Check-in at 9:00 am",
         };
       }
       return { type: "checkin", status: "pending", label: "Check In" };
