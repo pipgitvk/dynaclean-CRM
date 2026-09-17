@@ -20,6 +20,7 @@
     "migrate:return-products": "node scripts/migrate-return-products.js",
     "migrate:notes-language": "node scripts/migrate-notes-language-column.js",
     "migrate:pre-booking-remark": "node scripts/migrate-pre-booking-remark.js",
+    "migrate:manual-payment-followups": "node scripts/migrate-manual-payment-followups.js",
     "build": "next build",
     "start": "node --no-deprecation ./node_modules/next/dist/bin/next start -p 3001",
     "lint": "next lint"
