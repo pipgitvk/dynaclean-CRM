@@ -48,20 +48,27 @@ export async function syncPreBookingsForOrder(
   const updatedIds = new Set();
   let updated = 0;
 
+  const collateEq = (column) =>
+    `${column} COLLATE utf8mb4_unicode_ci = CONVERT(? USING utf8mb4) COLLATE utf8mb4_unicode_ci`;
+
   for (const qi of quotationItems) {
     const productName = qi.item_name;
     const itemCode = String(qi.item_code || "").trim();
     const orderQuantity = Number(qi.quantity) || 0;
 
+    const matchClause = itemCode
+      ? `(${collateEq("product_name")} OR ${collateEq("item_code")})`
+      : collateEq("product_name");
+    const matchParams = itemCode
+      ? [productName, itemCode]
+      : [productName];
+
     const [preBookings] = await conn.execute(
       `SELECT id, expected_date, quantity FROM pre_booking
        WHERE customer_id = ?
          AND status IN ('pending', 'postponed', 'cancelled')
-         AND (
-           product_name COLLATE utf8mb4_unicode_ci = ? COLLATE utf8mb4_unicode_ci
-           OR (? != '' AND item_code COLLATE utf8mb4_unicode_ci = ? COLLATE utf8mb4_unicode_ci)
-         )`,
-      [customerIdStr, productName, itemCode, itemCode],
+         AND ${matchClause}`,
+      [customerIdStr, ...matchParams],
     );
 
     for (const preBooking of preBookings) {

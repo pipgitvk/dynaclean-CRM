@@ -7,8 +7,15 @@ import ServiceAttachmentLink from "./ServiceAttachmentLink";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { useWarrantyProductFollowup } from "@/components/warranty/WarrantyProductFollowupControls";
 
+/** warranty_products JOIN can return multiple rows per service_id — keep one row per service. */
+function dedupeServiceRecords(rows) {
+  return Array.from(
+    new Map((rows || []).map((row) => [row.service_id, row])).values(),
+  );
+}
+
 export default function ServiceTable({ serviceRecords, role }) {
-  const [records, setRecords] = useState(serviceRecords || []);
+  const [records, setRecords] = useState(() => dedupeServiceRecords(serviceRecords));
   const [searchTerm, setSearchTerm] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
   const [complaintDateFilter, setComplaintDateFilter] = useState("");
@@ -45,7 +52,7 @@ export default function ServiceTable({ serviceRecords, role }) {
   const { ProductFollowupIcons, followupModals } = useWarrantyProductFollowup();
 
   useEffect(() => {
-    setRecords(serviceRecords || []);
+    setRecords(dedupeServiceRecords(serviceRecords));
   }, [serviceRecords]);
 
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
