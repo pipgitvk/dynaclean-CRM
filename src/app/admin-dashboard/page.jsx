@@ -259,10 +259,18 @@ export default async function UserDashboardPage() {
     let regPending = 0;
     try {
       const [regTotalRows] = await connection.execute(
-        `SELECT COUNT(*) AS c FROM attendance_regularization_requests`,
+        `SELECT COUNT(*) AS c
+         FROM attendance_regularization_requests
+         WHERE YEAR(log_date) = YEAR(CURDATE())
+           AND MONTH(log_date) = MONTH(CURDATE())`,
       );
       const [regPendingRows] = await connection.execute(
-        `SELECT COUNT(*) AS c FROM attendance_regularization_requests WHERE status = 'pending'`,
+        `SELECT COUNT(*) AS c
+         FROM attendance_regularization_requests
+         WHERE status = 'pending'
+           AND acknowledged_at IS NULL
+           AND YEAR(log_date) = YEAR(CURDATE())
+           AND MONTH(log_date) = MONTH(CURDATE())`,
       );
       regTotal = Number(regTotalRows[0]?.c ?? 0);
       regPending = Number(regPendingRows[0]?.c ?? 0);
@@ -416,7 +424,7 @@ export default async function UserDashboardPage() {
                   {regPending}
                 </p>
                 <p className="text-xs text-gray-600 mt-0.5">
-                  Pending · {regTotal}
+                  This month · {regTotal} total
                 </p>
               </div>
             </div>
