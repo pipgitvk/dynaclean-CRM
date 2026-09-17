@@ -1,7 +1,11 @@
 import { getDbConnection } from "@/lib/db";
 import { NextResponse } from "next/server";
 import { getSessionPayload } from "@/lib/auth";
-import { OWN_INVOICE_CREATOR_SQL } from "@/lib/performaInvoiceAccess";
+import {
+  OWN_INVOICE_CREATOR_SQL,
+  canSeeAllPerformaInvoices,
+  isAccountantRole,
+} from "@/lib/performaInvoiceAccess";
 
 /** Parse linked_trans_ids JSON or plain string → array of strings */
 function parseTransIds(raw) {
@@ -718,15 +722,16 @@ export async function GET(req) {
       "HR HEAD",
       "HR MANAGER",
     ];
-    const hasAccountant = /ACCOUNTANT/.test(userRole);
+    const hasAccountant = isAccountantRole(userRole);
     const isPrivileged = PRIVILEGED_ROLES.includes(userRole) || hasAccountant;
     const isSuperadmin = userRole === "SUPERADMIN";
+    const seeAllPerforma = canSeeAllPerformaInvoices(payload);
     const isPerformaOnly =
       String(invoiceType || "").trim().toLowerCase() === "performa";
 
     if (isPerformaOnly) {
-      // Performa: SUPERADMIN sees all; ADMIN and every other role see only own
-      if (!isSuperadmin && sessionUsername) {
+      // Performa list: SUPERADMIN + ACCOUNTANT see all; others see only own
+      if (!seeAllPerforma && sessionUsername) {
         where += ` AND ${OWN_INVOICE_CREATOR_SQL}`;
         values.push(sessionUsername, sessionUsername);
       }
@@ -734,8 +739,8 @@ export async function GET(req) {
       // Tax / mixed list: non-privileged users only see invoices they created
       where += ` AND ${OWN_INVOICE_CREATOR_SQL}`;
       values.push(sessionUsername, sessionUsername);
-    } else if (isPrivileged && !isSuperadmin && sessionUsername) {
-      // Privileged roles still see all tax invoices, but only their own performa
+    } else if (isPrivileged && !seeAllPerforma && sessionUsername) {
+      // Privileged roles see all tax invoices; performa limited to own unless accountant/superadmin
       where += ` AND ((type IS NULL OR LOWER(TRIM(type)) <> 'performa') OR ${OWN_INVOICE_CREATOR_SQL})`;
       values.push(sessionUsername, sessionUsername);
     }

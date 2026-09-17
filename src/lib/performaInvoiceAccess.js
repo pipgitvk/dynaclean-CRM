@@ -9,17 +9,27 @@ export function invoiceOwnedByUsername(invoice, username) {
   return employeeName === u;
 }
 
+export function isAccountantRole(role) {
+  return /ACCOUNTANT/.test(String(role || "").toUpperCase().trim());
+}
+
 /**
- * SUPERADMIN can see every performa invoice.
- * ADMIN and all other roles only see performa invoices they created.
+ * SUPERADMIN and ACCOUNTANT roles can see every performa invoice.
+ * Other roles only see performa invoices they created.
+ */
+export function canSeeAllPerformaInvoices(payload) {
+  const role = String(payload?.role || payload?.userRole || "")
+    .toUpperCase()
+    .trim();
+  return role === "SUPERADMIN" || isAccountantRole(role);
+}
+
+/**
  * Non-performa invoices are not restricted by this helper.
  */
 export function canAccessPerformaInvoice(payload, invoice) {
   if (!isPerformaInvoice(invoice)) return true;
-  const role = String(payload?.role || payload?.userRole || "")
-    .toUpperCase()
-    .trim();
-  if (role === "SUPERADMIN") return true;
+  if (canSeeAllPerformaInvoices(payload)) return true;
   return invoiceOwnedByUsername(invoice, payload?.username);
 }
 
