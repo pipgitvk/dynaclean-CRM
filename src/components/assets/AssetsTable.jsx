@@ -21,6 +21,8 @@ export default function AssetsTable() {
   const [statusFilter, setStatusFilter] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [nameFilter, setNameFilter] = useState("");
+  const [assignedToFilter, setAssignedToFilter] = useState("");
+  const [brandFilter, setBrandFilter] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: "asset_id", direction: "asc" });
   const [showLinkStatementModal, setShowLinkStatementModal] = useState(false);
   const [selectedAssetIds, setSelectedAssetIds] = useState(new Set());
@@ -175,8 +177,15 @@ export default function AssetsTable() {
 
   // Sort assets client-side (stable clone)
   const filteredAssets = assets.filter((a) => {
-    if (categoryFilter && (a.asset_category || a.type || '') !== categoryFilter) return false;
-    if (nameFilter && !(a.asset_name || '').toLowerCase().includes(nameFilter.toLowerCase())) return false;
+    if (categoryFilter && (a.asset_category || a.type || "") !== categoryFilter) return false;
+    if (nameFilter && !(a.asset_name || "").toLowerCase().includes(nameFilter.toLowerCase())) return false;
+    if (
+      assignedToFilter &&
+      !(a.Assigned_to || "").toLowerCase().includes(assignedToFilter.toLowerCase())
+    ) {
+      return false;
+    }
+    if (brandFilter && (a.brand_name || "") !== brandFilter) return false;
     return true;
   });
 
@@ -197,8 +206,8 @@ export default function AssetsTable() {
 
   return (
     <div className="container mx-auto p-4 sm:p-8">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center space-x-4">
+      <div className="mb-4">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center space-x-2">
             <label className="text-sm text-gray-700">Status:</label>
             <select
@@ -219,24 +228,67 @@ export default function AssetsTable() {
               className="border rounded px-2 py-1"
             >
               <option value="">All</option>
-              {[...new Set(assets.map(a => a.asset_category || a.type).filter(Boolean))]
+              {[...new Set(assets.map((a) => a.asset_category || a.type).filter(Boolean))]
                 .sort()
                 .map((c) => (
                   <option key={c} value={c}>{c}</option>
                 ))}
             </select>
           </div>
-        <div className="flex items-center space-x-2">
-          <label className="text-sm text-gray-700">Name:</label>
-          <input
-            type="text"
-            value={nameFilter}
-            onChange={(e) => setNameFilter(e.target.value)}
-            placeholder="Search name"
-            className="border rounded px-2 py-1"
-          />
+          <div className="flex items-center space-x-2">
+            <label className="text-sm text-gray-700">Brand:</label>
+            <select
+              value={brandFilter}
+              onChange={(e) => setBrandFilter(e.target.value)}
+              className="border rounded px-2 py-1 min-w-[140px]"
+            >
+              <option value="">All</option>
+              {[...new Set(assets.map((a) => a.brand_name).filter(Boolean))]
+                .sort()
+                .map((brand) => (
+                  <option key={brand} value={brand}>{brand}</option>
+                ))}
+            </select>
+          </div>
+          <div className="flex items-center space-x-2">
+            <label className="text-sm text-gray-700">Name:</label>
+            <input
+              type="text"
+              value={nameFilter}
+              onChange={(e) => setNameFilter(e.target.value)}
+              placeholder="Search asset name"
+              className="border rounded px-2 py-1"
+            />
+          </div>
+          <div className="flex items-center space-x-2">
+            <label className="text-sm text-gray-700">Assigned To:</label>
+            <input
+              type="text"
+              value={assignedToFilter}
+              onChange={(e) => setAssignedToFilter(e.target.value)}
+              placeholder="Search assigned name"
+              className="border rounded px-2 py-1"
+            />
+          </div>
+          {(statusFilter || categoryFilter || nameFilter || assignedToFilter || brandFilter) && (
+            <button
+              type="button"
+              onClick={() => {
+                setStatusFilter("");
+                setCategoryFilter("");
+                setNameFilter("");
+                setAssignedToFilter("");
+                setBrandFilter("");
+              }}
+              className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+            >
+              Clear filters
+            </button>
+          )}
         </div>
-        </div>
+        <p className="mt-2 text-xs text-gray-500">
+          Showing {sortedAssets.length} of {assets.length} assets
+        </p>
       </div>
 
       {/* Bulk Actions Toolbar */}
