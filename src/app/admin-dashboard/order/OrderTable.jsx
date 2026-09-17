@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   FileText,
   UploadCloud,
@@ -54,6 +54,12 @@ const SkeletonLoader = () => (
     </div>
   </div>
 );
+
+const PENDING_DISPATCH_STATUS_KEYS = new Set([
+  "pendinginvoice",
+  "invoiceuploaded",
+  "bookingdone",
+]);
 
 /** Matches UI status "Dispatch Done" (same rules as getStatusText). */
 function isDisplayedDispatchDone(order) {
@@ -151,6 +157,8 @@ function orderCreatedInDateRange(order, dateFrom, dateTo) {
 }
 
 export default function OrderTable({ orders, userRole }) {
+  const searchParams = useSearchParams();
+
   // Initialize from localStorage with defaults
   const [searchQuery, setSearchQuery] = useState(() => {
     if (typeof window !== "undefined") {
@@ -209,6 +217,15 @@ export default function OrderTable({ orders, userRole }) {
   // Sorting state
   const [sortColumn, setSortColumn] = useState("created_at");
   const [sortDirection, setSortDirection] = useState("desc");
+
+  useEffect(() => {
+    const status = searchParams.get("status");
+    const from = searchParams.get("dateFrom");
+    const to = searchParams.get("dateTo");
+    if (status) setStatusFilter(status);
+    if (from) setDateFrom(from);
+    if (to) setDateTo(to);
+  }, [searchParams]);
 
   // Save filter states to localStorage whenever they change
   useEffect(() => {
@@ -431,7 +448,11 @@ export default function OrderTable({ orders, userRole }) {
         const orderStatus = getStatusText(order)
           .text.toLowerCase()
           .replace(/\s+/g, "");
-        if (orderStatus !== statusFilter.toLowerCase()) return false; 
+        if (statusFilter === "pendingdispatched") {
+          if (!PENDING_DISPATCH_STATUS_KEYS.has(orderStatus)) return false;
+        } else if (orderStatus !== statusFilter.toLowerCase()) {
+          return false;
+        }
       }
 
       // Step 2: Date range filter (created_at)

@@ -19,7 +19,8 @@ import {
     Calendar,
     BarChart2,
     X,
-    Eye
+    Eye,
+    PackageCheck,
 } from "lucide-react";
 import { Line, Bar, Doughnut } from "react-chartjs-2";
 import {
@@ -218,6 +219,37 @@ export default function AdminStatsDashboard() {
             currency: "INR",
             maximumFractionDigits: 0,
         }).format(isNaN(val) ? 0 : val);
+    };
+
+    const getOrderPageUrl = (status) => {
+        const now = new Date();
+        let dateFrom;
+        let dateTo;
+
+        if (timeRange === "today") {
+            dateFrom = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            dateTo = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        } else if (timeRange === "thisWeek") {
+            const start = new Date(now);
+            start.setDate(now.getDate() - now.getDay());
+            dateFrom = start;
+            dateTo = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        } else if (timeRange === "lastMonth") {
+            dateFrom = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+            dateTo = new Date(now.getFullYear(), now.getMonth(), 0);
+        } else {
+            dateFrom = new Date(now.getFullYear(), now.getMonth(), 1);
+            dateTo = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        }
+
+        const pad = (n) => String(n).padStart(2, "0");
+        const fmt = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+        const params = new URLSearchParams({
+            status,
+            dateFrom: fmt(dateFrom),
+            dateTo: fmt(dateTo),
+        });
+        return `/admin-dashboard/order?${params.toString()}`;
     };
 
     // KPI Card Component
@@ -427,7 +459,7 @@ export default function AdminStatsDashboard() {
                     <ShoppingCart className="w-6 h-6 mr-2 text-blue-600" />
                     Sales Statistics
                 </h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
                     <div className="relative">
                         <KPICard
                             title="Total Orders"
@@ -454,6 +486,22 @@ export default function AdminStatsDashboard() {
                         color="bg-gradient-to-br from-green-500 to-green-600"
                         subtitle={ordersTaxableAmount > 0 ? `Base: ${formatCurrency(ordersTaxableAmount)} | Tax: ${formatCurrency(ordersTotalAmount - ordersTaxableAmount)}` : undefined}
                         onClick={() => router.push("/admin-dashboard/order")}
+                    />
+                    <KPICard
+                        title="Dispatched"
+                        value={stats?.sales?.dispatched || 0}
+                        icon={PackageCheck}
+                        color="bg-gradient-to-br from-teal-500 to-teal-600"
+                        subtitle="Dispatch Done "
+                        onClick={() => router.push(getOrderPageUrl("dispatchdone"))}
+                    />
+                    <KPICard
+                        title="Pending Dispatched"
+                        value={stats?.sales?.pendingDispatched || 0}
+                        icon={Truck}
+                        color="bg-gradient-to-br from-amber-500 to-amber-600"
+                        subtitle="Pending Invoice / Uploaded / Booking Done"
+                        onClick={() => router.push(getOrderPageUrl("pendingdispatched"))}
                     />
                     <KPICard
                         title="Conversion Rate"

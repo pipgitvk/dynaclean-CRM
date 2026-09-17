@@ -85,6 +85,30 @@ export async function GET(req) {
       ? ((salesStats[0].total_orders / quotationStats[0].total_quotations) * 100).toFixed(2)
       : 0;
 
+    const [dispatchStats] = await conn.execute(`
+      SELECT
+        SUM(CASE
+          WHEN approval_status = 'approved'
+            AND COALESCE(is_cancelled, 0) = 0
+            AND COALESCE(is_returned, 0) NOT IN (1, 2, 3)
+            AND COALESCE(installation_status, 0) = 0
+            AND COALESCE(delivery_status, 0) = 0
+            AND COALESCE(dispatch_status, 0) = 1
+          THEN 1 ELSE 0
+        END) as dispatched_orders,
+        SUM(CASE
+          WHEN approval_status = 'approved'
+            AND COALESCE(is_cancelled, 0) = 0
+            AND COALESCE(is_returned, 0) NOT IN (1, 2, 3)
+            AND COALESCE(installation_status, 0) = 0
+            AND COALESCE(delivery_status, 0) = 0
+            AND COALESCE(dispatch_status, 0) = 0
+          THEN 1 ELSE 0
+        END) as pending_dispatch_orders
+      FROM neworder
+      WHERE DATE(created_at) >= ? AND DATE(created_at) <= ?
+    `, [startDateStr, endDateStr]);
+
     // All performing salespeople (sorted by revenue, highest first)
     // Uses same logic as modal: approved orders only, taxable amount from quotation_items
     const [topSalespeople] = await conn.execute(`
@@ -247,7 +271,9 @@ export async function GET(req) {
           totalTax: gstTaxBreakdown[0]?.total_tax || 0,
           activeSalespeople: salesStats[0].active_salespeople || 0,
           conversionRate: parseFloat(conversionRate),
-          topPerformers: topSalespeople
+          topPerformers: topSalespeople,
+          dispatched: dispatchStats[0]?.dispatched_orders || 0,
+          pendingDispatched: dispatchStats[0]?.pending_dispatch_orders || 0,
         },
         delivery: {
           totalDeliveries: deliveryStats[0].total_deliveries || 0,
