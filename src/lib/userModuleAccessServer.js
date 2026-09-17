@@ -64,6 +64,10 @@ export async function getEffectiveAllowedModuleKeys(username, role) {
   return uniqueStrings(next);
 }
 
+export async function userHasManualPaymentsModuleAccess(username, role) {
+  return userHasModuleKey(username, role, "manual-payments");
+}
+
 export async function userHasModuleKey(username, role, moduleKey) {
   const key = String(moduleKey || "").trim();
   if (!key) return false;

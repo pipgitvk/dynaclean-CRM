@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
-import { History, Loader2, PhoneCall, X } from "lucide-react";
+import { History, PhoneCall } from "lucide-react";
+import ManualPaymentFollowupModal from "./ManualPaymentFollowupModal";
+import ManualPaymentHistoryModal from "./ManualPaymentHistoryModal";
 
 dayjs.extend(utc);
 
@@ -421,7 +423,7 @@ export default function PaymentTable({ rows, role, editBasePath = "/admin-dashbo
                 </div>
             )}
 
-            <FollowupModal
+            <ManualPaymentFollowupModal
                 open={followupModalOpen}
                 payment={selectedPayment}
                 onClose={() => {
@@ -434,7 +436,7 @@ export default function PaymentTable({ rows, role, editBasePath = "/admin-dashbo
                 }}
             />
 
-            <HistoryModal
+            <ManualPaymentHistoryModal
                 open={historyModalOpen}
                 payment={selectedPayment}
                 onClose={() => {
@@ -442,290 +444,6 @@ export default function PaymentTable({ rows, role, editBasePath = "/admin-dashbo
                     setSelectedPayment(null);
                 }}
             />
-        </div>
-    );
-}
-
-function FollowupModal({ open, onClose, payment, onSaved }) {
-    const [followedDate, setFollowedDate] = useState("");
-    const [communicationMode, setCommunicationMode] = useState("Call");
-    const [nextFollowupDate, setNextFollowupDate] = useState("");
-    const [notes, setNotes] = useState("");
-    const [submitting, setSubmitting] = useState(false);
-
-    useEffect(() => {
-        if (!open) return;
-        setFollowedDate(dayjs().format("YYYY-MM-DDTHH:mm"));
-        setCommunicationMode("Call");
-        setNextFollowupDate("");
-        setNotes("");
-    }, [open, payment?.id]);
-
-    if (!open || !payment) return null;
-
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-            <div className="w-full max-w-xl rounded-lg bg-white shadow-xl">
-                <div className="flex items-center justify-between border-b px-5 py-4">
-                    <div>
-                        <div className="text-lg font-bold text-gray-900">Add Followup</div>
-                        <div className="text-xs text-gray-600">
-                            Payment #{payment.id}
-                            {payment.customer_name ? ` | ${payment.customer_name}` : ""}
-                            {payment.customer_phone ? ` | ${payment.customer_phone}` : ""}
-                        </div>
-                    </div>
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        className="rounded-md p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
-                    >
-                        <X size={18} />
-                    </button>
-                </div>
-
-                <div className="space-y-4 px-5 py-4">
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                        <div className="flex flex-col">
-                            <label className="mb-1 text-xs font-semibold text-gray-700">
-                                Followed Date
-                            </label>
-                            <input
-                                type="datetime-local"
-                                value={followedDate}
-                                readOnly
-                                className="rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            />
-                        </div>
-                        <div className="flex flex-col">
-                            <label className="mb-1 text-xs font-semibold text-gray-700">
-                                Communication Mode
-                            </label>
-                            <select
-                                value={communicationMode}
-                                onChange={(e) => setCommunicationMode(e.target.value)}
-                                className="rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            >
-                                <option value="Call">Call</option>
-                                <option value="WhatsApp">WhatsApp</option>
-                                <option value="Email">Email</option>
-                                <option value="Visit">Visit</option>
-                                <option value="Other">Other</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                        <div className="flex flex-col">
-                            <label className="mb-1 text-xs font-semibold text-gray-700">
-                                Next Followup Date
-                            </label>
-                            <input
-                                type="datetime-local"
-                                value={nextFollowupDate}
-                                onChange={(e) => setNextFollowupDate(e.target.value)}
-                                className="rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            />
-                        </div>
-                        <div className="flex flex-col">
-                            <label className="mb-1 text-xs font-semibold text-gray-700">
-                                Amount
-                            </label>
-                            <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-900">
-                                ₹{Number(payment.amount || 0).toLocaleString("en-IN", {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2,
-                                })}
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="flex flex-col">
-                        <label className="mb-1 text-xs font-semibold text-gray-700">Notes</label>
-                        <textarea
-                            value={notes}
-                            onChange={(e) => setNotes(e.target.value)}
-                            rows={4}
-                            className="resize-none rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            placeholder="Call details / customer response / payment plan..."
-                        />
-                    </div>
-                </div>
-
-                <div className="flex items-center justify-end gap-2 border-t px-5 py-4">
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        className="rounded-md bg-gray-200 px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-300"
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        type="button"
-                        disabled={submitting}
-                        onClick={async () => {
-                            if (!notes.trim()) {
-                                alert("Notes required");
-                                return;
-                            }
-                            try {
-                                setSubmitting(true);
-                                const res = await fetch("/api/manual-payment-pending/followups", {
-                                    method: "POST",
-                                    headers: { "Content-Type": "application/json" },
-                                    body: JSON.stringify({
-                                        payment_id: payment.id,
-                                        customer_name: payment.customer_name || null,
-                                        customer_phone: payment.customer_phone || null,
-                                        followed_date: followedDate || null,
-                                        communication_mode: communicationMode || null,
-                                        next_followup_date: nextFollowupDate || null,
-                                        notes: notes.trim(),
-                                    }),
-                                });
-
-                                const data = await res.json();
-                                if (!res.ok || !data?.success) {
-                                    throw new Error(data?.error || "Failed to save followup");
-                                }
-
-                                alert("Followup saved");
-                                onSaved?.();
-                            } catch (e) {
-                                alert(e?.message || "Failed to save followup");
-                            } finally {
-                                setSubmitting(false);
-                            }
-                        }}
-                        className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                        {submitting ? <Loader2 size={16} className="animate-spin" /> : <PhoneCall size={16} />}
-                        Save
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-}
-
-function HistoryModal({ open, onClose, payment }) {
-    const [loading, setLoading] = useState(false);
-    const [followups, setFollowups] = useState([]);
-    const [error, setError] = useState("");
-
-    useEffect(() => {
-        if (!open || !payment?.id) return;
-        let cancelled = false;
-
-        async function run() {
-            try {
-                setError("");
-                setLoading(true);
-                const res = await fetch(
-                    `/api/manual-payment-pending/followups?payment_id=${encodeURIComponent(payment.id)}`,
-                );
-                const data = await res.json();
-                if (!res.ok || !data?.success) {
-                    throw new Error(data?.error || "Failed to fetch history");
-                }
-                if (cancelled) return;
-                setFollowups(data.followups || []);
-            } catch (e) {
-                if (cancelled) return;
-                setError(e?.message || "Failed to fetch history");
-                setFollowups([]);
-            } finally {
-                if (!cancelled) setLoading(false);
-            }
-        }
-
-        run();
-
-        return () => {
-            cancelled = true;
-        };
-    }, [open, payment?.id]);
-
-    if (!open || !payment) return null;
-
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-            <div className="w-full max-w-2xl rounded-lg bg-white shadow-xl">
-                <div className="flex items-center justify-between border-b px-5 py-4">
-                    <div>
-                        <div className="text-lg font-bold text-gray-900">Followup History</div>
-                        <div className="text-xs text-gray-600">
-                            Payment #{payment.id}
-                            {payment.customer_name ? ` | ${payment.customer_name}` : ""}
-                            {payment.customer_phone ? ` | ${payment.customer_phone}` : ""}
-                        </div>
-                    </div>
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        className="rounded-md p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
-                    >
-                        <X size={18} />
-                    </button>
-                </div>
-
-                <div className="max-h-[70vh] overflow-y-auto px-5 py-4">
-                    {loading ? (
-                        <div className="flex items-center justify-center gap-2 py-10 text-sm text-gray-700">
-                            <Loader2 size={18} className="animate-spin" />
-                            Loading...
-                        </div>
-                    ) : error ? (
-                        <div className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
-                    ) : followups.length === 0 ? (
-                        <div className="rounded-md bg-gray-50 px-4 py-8 text-center text-sm text-gray-600">
-                            No followups yet
-                        </div>
-                    ) : (
-                        <div className="space-y-3">
-                            {followups.map((f) => (
-                                <div key={f.id} className="rounded-md border border-gray-200 p-4">
-                                    <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
-                                        <div className="text-sm font-semibold text-gray-900">
-                                            {f.created_by || "Unknown"}
-                                        </div>
-                                        <div className="text-xs text-gray-600">
-                                            {f.created_at ? dayjs(f.created_at).format("DD/MM/YYYY hh:mm A") : ""}
-                                        </div>
-                                    </div>
-                                    <div className="mt-2 text-sm text-gray-800 whitespace-pre-wrap">{f.notes}</div>
-                                    <div className="mt-3 flex flex-wrap items-center gap-2">
-                                        {f.followed_date && (
-                                            <div className="inline-flex items-center rounded-full bg-green-50 px-3 py-1 text-xs font-semibold text-green-800">
-                                                Followed: {dayjs(f.followed_date).format("DD/MM/YYYY hh:mm A")}
-                                            </div>
-                                        )}
-                                        {f.communication_mode && (
-                                            <div className="inline-flex items-center rounded-full bg-purple-50 px-3 py-1 text-xs font-semibold text-purple-800">
-                                                Mode: {String(f.communication_mode)}
-                                            </div>
-                                        )}
-                                        {f.next_followup_date && (
-                                            <div className="inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-800">
-                                                Next: {dayjs(f.next_followup_date).format("DD/MM/YYYY hh:mm A")}
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-
-                <div className="flex items-center justify-end border-t px-5 py-4">
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        className="rounded-md bg-gray-200 px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-300"
-                    >
-                        Close
-                    </button>
-                </div>
-            </div>
         </div>
     );
 }

@@ -2,19 +2,8 @@ import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { ensureManualPaymentFollowupsTable } from "@/lib/ensureManualPaymentFollowupsTable";
-
-const allowedRoles = [
-  "SUPERADMIN",
-  "ADMIN",
-  "ACCOUNTANT",
-  "DIRECTOR",
-  "SALES CUM BACKOFFICE",
-];
-
-function hasAccess(role) {
-  const roleNorm = String(role || "").toUpperCase().trim();
-  return allowedRoles.includes(roleNorm);
-}
+import { validateNextFollowupDate } from "@/lib/manualPaymentFollowupValidation";
+import { userHasManualPaymentsModuleAccess } from "@/lib/userModuleAccessServer";
 
 function normalizeDatetimeLocal(value) {
   if (!value) return null;
@@ -35,7 +24,11 @@ export async function GET(req) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (!hasAccess(payload.role)) {
+    const hasAccess = await userHasManualPaymentsModuleAccess(
+      payload.username,
+      payload.role ?? payload.userRole,
+    );
+    if (!hasAccess) {
       return NextResponse.json({ error: "Access denied" }, { status: 403 });
     }
 
@@ -83,7 +76,11 @@ export async function POST(req) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (!hasAccess(payload.role)) {
+    const hasAccess = await userHasManualPaymentsModuleAccess(
+      payload.username,
+      payload.role ?? payload.userRole,
+    );
+    if (!hasAccess) {
       return NextResponse.json({ error: "Access denied" }, { status: 403 });
     }
 
@@ -104,6 +101,11 @@ export async function POST(req) {
 
     if (!notes) {
       return NextResponse.json({ error: "notes is required" }, { status: 400 });
+    }
+
+    const nextDateCheck = validateNextFollowupDate(nextFollowupDate);
+    if (!nextDateCheck.ok) {
+      return NextResponse.json({ error: nextDateCheck.error }, { status: 400 });
     }
 
     await ensureManualPaymentFollowupsTable();

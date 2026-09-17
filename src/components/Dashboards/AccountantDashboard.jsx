@@ -1,6 +1,7 @@
 // components/Dashboards/AccountantDashboard.jsx
 import UpcomingTasks from "@/components/task/UpcomingTasks";
 import AccountantPendingCards from "@/components/AccountantPendingCards";
+import ManualPaymentUpcomingFollowups from "@/components/manual-payments/ManualPaymentUpcomingFollowups";
 
 export default function AccountantDashboard({ user, reportingManager, counts }) {
   return (
@@ -9,6 +10,8 @@ export default function AccountantDashboard({ user, reportingManager, counts }) 
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-5">
         <AccountantPendingCards />
       </div>
+
+      <ManualPaymentUpcomingFollowups dashboardPrefix="/accounts-dashboard" />
 
       {/* Tasks */}
       <div className="rounded-2xl border border-slate-200 bg-white p-1 shadow-sm md:p-2">
