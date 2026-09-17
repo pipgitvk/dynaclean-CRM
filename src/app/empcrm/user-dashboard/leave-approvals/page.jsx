@@ -340,10 +340,9 @@ export default function LeaveApprovalsPage() {
                     <td className="px-6 py-4">
                       <div className="flex flex-col gap-1">
                         <span
-                          className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${leave.is_half_day ? "bg-orange-100 text-orange-700" : getLeaveTypeColor(leave.leave_type)}`}
+                          className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${getLeaveTypeColor(leave.leave_type)}`}
                         >
-                          {leave.is_half_day ? "Half-Day" : leave.leave_type?.charAt(0)?.toUpperCase() +
-                            leave.leave_type?.slice(1)}
+                          {leave.leave_type?.charAt(0)?.toUpperCase() + leave.leave_type?.slice(1)}
                         </span>
                         {leave.is_half_day ? (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700 border border-orange-200">

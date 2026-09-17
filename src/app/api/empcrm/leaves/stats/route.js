@@ -158,14 +158,14 @@ export async function GET(request) {
       };
     });
 
-    // Count unpaid leaves (full-day only)
-    const unpaidStats = stats.find(s => s.leave_type === 'unpaid' && s.is_half_day == 0);
+    // Count unpaid leaves (full-day + half-day)
+    const unpaidRows = stats.filter(s => s.leave_type === "unpaid");
     const unpaidLeaves = {
-      type: 'unpaid',
+      type: "unpaid",
       enabled: true,
-      taken: unpaidStats ? Number(unpaidStats.taken) : 0,
-      pending: unpaidStats ? Number(unpaidStats.pending) : 0,
-      rejected: unpaidStats ? Number(unpaidStats.rejected) : 0
+      taken: unpaidRows.reduce((sum, s) => sum + Number(s.taken || 0), 0),
+      pending: unpaidRows.reduce((sum, s) => sum + Number(s.pending || 0), 0),
+      rejected: unpaidRows.reduce((sum, s) => sum + Number(s.rejected || 0), 0),
     };
 
     // Count half-day leaves — all rows where is_half_day=1, any leave_type

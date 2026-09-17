@@ -183,11 +183,14 @@ export async function POST(request) {
 
     // Half-day specific validation
     const isHalfDay = !!is_half_day;
-    if (isHalfDay && half_day_type && !["1st_half", "2nd_half"].includes(half_day_type)) {
-      return NextResponse.json(
-        { success: false, error: "Invalid half_day_type. Must be '1st_half' or '2nd_half'" },
-        { status: 400 }
-      );
+    if (isHalfDay) {
+      to_date = from_date;
+      if (half_day_type && !["1st_half", "2nd_half"].includes(half_day_type)) {
+        return NextResponse.json(
+          { success: false, error: "Invalid half_day_type. Must be '1st_half' or '2nd_half'" },
+          { status: 400 }
+        );
+      }
     }
 
     const conn = await getDbConnection();
@@ -497,6 +500,9 @@ export async function POST(request) {
       } catch (schedErr) {
         console.error("Could not auto-detect half_day_type:", schedErr);
         // Non-fatal — fall back to whatever was sent by client
+      }
+      if (!resolvedHalfDayType) {
+        resolvedHalfDayType = half_day_type || "1st_half";
       }
     }
 
@@ -914,6 +920,12 @@ export async function PATCH(request) {
         console.error("Smart leave day calculation failed (non-fatal):", smartErr);
         // Fall back to original values — don't block approval
       }
+    }
+
+    // Unpaid half-day: always keep 0.5 day and half-day flag after approval
+    if (status === "approved" && leave.leave_type === "unpaid" && leave.is_half_day == 1) {
+      overrideTotalDays = Number(leave.total_days) || 0.5;
+      overrideIsHalfDay = 1;
     }
     // ─────────────────────────────────────────────────────────────────────────────
 

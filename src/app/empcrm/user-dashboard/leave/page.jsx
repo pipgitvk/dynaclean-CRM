@@ -28,36 +28,12 @@ export default function UserLeaveManagement() {
     from_date: "",
     to_date: "",
     reason: "",
+    is_half_day: false,
+    half_day_type: "1st_half",
     has_time_range: false,
     start_time: "",
     end_time: ""
   });
-
-  // Half-day leave form
-  const [showHalfDayForm, setShowHalfDayForm] = useState(false);
-  const [halfDayData, setHalfDayData] = useState({
-    leave_type: "",
-    date: "",
-    half_day_type: "",   // auto-detected from start_time vs lunch break
-    reason: "",
-    has_time_range: false,
-    start_time: "",
-    end_time: ""
-  });
-
-  // Lunch break time fetched from server for current user (used for auto-detect preview in UI)
-  const [lunchBreakTime, setLunchBreakTime] = useState(null);
-
-  useEffect(() => {
-    fetch("/api/empcrm/attendance-schedule")
-      .then((r) => r.json())
-      .then((d) => {
-        if (d.break_lunch) {
-          setLunchBreakTime(d.break_lunch); // "HH:MM:SS"
-        }
-      })
-      .catch(() => {}); // non-fatal
-  }, []);
 
   const [submitting, setSubmitting] = useState(false);
   const [emailConfigured, setEmailConfigured] = useState(null);
@@ -87,14 +63,6 @@ export default function UserLeaveManagement() {
       setShowSettingsModal(true);
     } else {
       setShowApplicationForm(true);
-    }
-  };
-
-  const handleHalfDayClick = () => {
-    if (emailConfigured === false) {
-      setShowSettingsModal(true);
-    } else {
-      setShowHalfDayForm(true);
     }
   };
 
@@ -128,8 +96,12 @@ export default function UserLeaveManagement() {
   // Full-day leave submit
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.leave_type || !formData.from_date || !formData.to_date || !formData.reason.trim()) {
+    if (!formData.leave_type || !formData.from_date || !formData.reason.trim()) {
       alert("Please fill in all fields");
+      return;
+    }
+    if (!formData.is_half_day && !formData.to_date) {
+      alert("Please select to date");
       return;
     }
     if (formData.has_time_range && (!formData.start_time || !formData.end_time)) {
@@ -138,10 +110,17 @@ export default function UserLeaveManagement() {
     }
     try {
       setSubmitting(true);
-      const payload = { ...formData };
+      const leaveDate = formData.from_date;
+      const payload = {
+        ...formData,
+        to_date: formData.is_half_day ? leaveDate : formData.to_date,
+        is_half_day: formData.is_half_day,
+        half_day_type: formData.is_half_day ? formData.half_day_type : null,
+      };
       if (formData.has_time_range && formData.start_time && formData.end_time) {
-        payload.start_date_time = formData.from_date ? `${formData.from_date}T${formData.start_time}` : null;
-        payload.end_date_time   = formData.to_date   ? `${formData.to_date}T${formData.end_time}`     : null;
+        const endDate = formData.is_half_day ? leaveDate : formData.to_date;
+        payload.start_date_time = leaveDate ? `${leaveDate}T${formData.start_time}` : null;
+        payload.end_date_time   = endDate ? `${endDate}T${formData.end_time}` : null;
       }
       const response = await fetch("/api/empcrm/leaves", {
         method: "POST",
@@ -152,7 +131,17 @@ export default function UserLeaveManagement() {
       if (data.success) {
         alert("Leave application submitted successfully");
         setShowApplicationForm(false);
-        setFormData({ leave_type: "", from_date: "", to_date: "", reason: "", has_time_range: false, start_time: "", end_time: "" });
+        setFormData({
+          leave_type: "",
+          from_date: "",
+          to_date: "",
+          reason: "",
+          is_half_day: false,
+          half_day_type: "1st_half",
+          has_time_range: false,
+          start_time: "",
+          end_time: "",
+        });
         fetchLeaves();
         fetchStats();
       } else {
@@ -161,57 +150,6 @@ export default function UserLeaveManagement() {
     } catch (error) {
       console.error("Error submitting leave:", error);
       alert("Error submitting leave application");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  // Half-day leave submit
-  const handleHalfDaySubmit = async (e) => {
-    e.preventDefault();
-    if (!halfDayData.leave_type || !halfDayData.date || !halfDayData.reason.trim()) {
-      alert("Please fill in all fields");
-      return;
-    }
-    if (halfDayData.has_time_range && (!halfDayData.start_time || !halfDayData.end_time)) {
-      alert("Please fill Start Time and End Time when time range is enabled");
-      return;
-    }
-    try {
-      setSubmitting(true);
-      const payload = {
-        leave_type: halfDayData.leave_type,
-        from_date: halfDayData.date,
-        to_date: halfDayData.date,
-        reason: halfDayData.reason,
-        is_half_day: true,
-        half_day_type: halfDayData.half_day_type,
-        has_time_range: halfDayData.has_time_range,
-        start_time: halfDayData.start_time,
-        end_time: halfDayData.end_time
-      };
-      if (halfDayData.has_time_range && halfDayData.start_time && halfDayData.end_time && halfDayData.date) {
-        payload.start_date_time = `${halfDayData.date}T${halfDayData.start_time}`;
-        payload.end_date_time   = `${halfDayData.date}T${halfDayData.end_time}`;
-      }
-      const response = await fetch("/api/empcrm/leaves", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-      const data = await response.json();
-      if (data.success) {
-        alert("Half-day leave application submitted successfully");
-        setShowHalfDayForm(false);
-        setHalfDayData({ leave_type: "", date: "", half_day_type: "", reason: "", has_time_range: false, start_time: "", end_time: "" });
-        fetchLeaves();
-        fetchStats();
-      } else {
-        alert(data.error || "Failed to submit half-day leave application");
-      }
-    } catch (error) {
-      console.error("Error submitting half-day leave:", error);
-      alert("Error submitting half-day leave application");
     } finally {
       setSubmitting(false);
     }
@@ -286,6 +224,7 @@ export default function UserLeaveManagement() {
   };
 
   const calculateTotalDays = () => {
+    if (formData.is_half_day && formData.from_date) return 0.5;
     if (formData.from_date && formData.to_date) {
       const from = new Date(formData.from_date);
       const to = new Date(formData.to_date);
@@ -473,8 +412,8 @@ export default function UserLeaveManagement() {
                   <tr key={leave.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4">
                       <div className="flex flex-col gap-1">
-                        <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${leave.is_half_day ? "bg-orange-100 text-orange-700" : getLeaveTypeColor(leave.leave_type)}`}>
-                          {leave.is_half_day ? "Half-Day" : leave.leave_type.charAt(0).toUpperCase() + leave.leave_type.slice(1)}
+                        <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${getLeaveTypeColor(leave.leave_type)}`}>
+                          {leave.leave_type.charAt(0).toUpperCase() + leave.leave_type.slice(1)}
                         </span>
                         {leave.is_half_day ? (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700 border border-orange-200">
@@ -583,32 +522,114 @@ export default function UserLeaveManagement() {
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Duration <span className="text-red-500">*</span>
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setFormData({
+                        ...formData,
+                        is_half_day: false,
+                        to_date: formData.is_half_day ? "" : formData.to_date,
+                      })
+                    }
+                    className={`px-4 py-2 rounded-lg border text-sm font-medium transition-colors ${
+                      !formData.is_half_day
+                        ? "bg-blue-600 text-white border-blue-600"
+                        : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                    }`}
+                  >
+                    Full Day
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setFormData({
+                        ...formData,
+                        is_half_day: true,
+                        to_date: formData.from_date,
+                      })
+                    }
+                    className={`px-4 py-2 rounded-lg border text-sm font-medium transition-colors ${
+                      formData.is_half_day
+                        ? "bg-orange-600 text-white border-orange-600"
+                        : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                    }`}
+                  >
+                    Half Day
+                  </button>
+                </div>
+              </div>
+
+              {formData.is_half_day && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    From Date <span className="text-red-500">*</span>
+                    Half-Day Session <span className="text-red-500">*</span>
+                  </label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, half_day_type: "1st_half" })}
+                      className={`px-4 py-2 rounded-lg border text-sm font-medium transition-colors ${
+                        formData.half_day_type === "1st_half"
+                          ? "bg-orange-100 text-orange-800 border-orange-300"
+                          : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                      }`}
+                    >
+                      1st Half (Morning)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, half_day_type: "2nd_half" })}
+                      className={`px-4 py-2 rounded-lg border text-sm font-medium transition-colors ${
+                        formData.half_day_type === "2nd_half"
+                          ? "bg-orange-100 text-orange-800 border-orange-300"
+                          : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                      }`}
+                    >
+                      2nd Half (Afternoon)
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div className={formData.is_half_day ? "" : "grid grid-cols-2 gap-4"}>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    {formData.is_half_day ? "Date" : "From Date"} <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="date"
                     value={formData.from_date}
-                    onChange={(e) => setFormData({ ...formData, from_date: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        from_date: e.target.value,
+                        to_date: formData.is_half_day ? e.target.value : formData.to_date,
+                      })
+                    }
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     required
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    To Date <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="date"
-                    value={formData.to_date}
-                    onChange={(e) => setFormData({ ...formData, to_date: e.target.value })}
-                    min={formData.from_date}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    required
-                  />
-                </div>
+                {!formData.is_half_day && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      To Date <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="date"
+                      value={formData.to_date}
+                      onChange={(e) => setFormData({ ...formData, to_date: e.target.value })}
+                      min={formData.from_date}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      required
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Time Range Toggle + Start/End Time */}
@@ -666,9 +687,12 @@ export default function UserLeaveManagement() {
               </div>
 
               {totalDays > 0 && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                  <p className="text-sm text-blue-800">
-                    Total Leave Days: <span className="font-bold">{totalDays} days</span>
+                <div className={`border rounded-lg p-3 ${formData.is_half_day ? "bg-orange-50 border-orange-200" : "bg-blue-50 border-blue-200"}`}>
+                  <p className={`text-sm ${formData.is_half_day ? "text-orange-800" : "text-blue-800"}`}>
+                    Total Leave Days:{" "}
+                    <span className="font-bold">
+                      {formData.is_half_day ? "0.5 day (Half-Day)" : `${totalDays} days`}
+                    </span>
                   </p>
                 </div>
               )}
@@ -692,7 +716,17 @@ export default function UserLeaveManagement() {
                   type="button"
                   onClick={() => {
                     setShowApplicationForm(false);
-                    setFormData({ leave_type: "", from_date: "", to_date: "", reason: "", has_time_range: false, start_time: "", end_time: "" });
+                    setFormData({
+          leave_type: "",
+          from_date: "",
+          to_date: "",
+          reason: "",
+          is_half_day: false,
+          half_day_type: "1st_half",
+          has_time_range: false,
+          start_time: "",
+          end_time: "",
+        });
                   }}
                   className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
                   disabled={submitting}
