@@ -295,25 +295,6 @@ export default function DispatchFormPage({ params }) {
       throw new Error("Please check all mandatory accessories before saving.");
     }
 
-    for (const acc of checkedAccessories) {
-      const requiredQty = Number(acc.qty) || 1;
-      const stock = accessoryStockInfo[row.id]?.[acc.id];
-      if (stock?.matched === false) {
-        throw new Error(
-          `Stock not found for accessory "${acc.accessory_name}". Please link spare in Product Accessories.`,
-        );
-      }
-      if (
-        stock?.matched &&
-        stock.stock_count != null &&
-        stock.stock_count < requiredQty
-      ) {
-        throw new Error(
-          `Insufficient stock for "${acc.accessory_name}". Available: ${stock.stock_count}, Required: ${requiredQty}`,
-        );
-      }
-    }
-
     // append up to 4 photos: front, back, right, left
     const photoKeys = [
       "_frontPhoto",

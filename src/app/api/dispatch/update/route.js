@@ -1,10 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
-import {
-  deductCheckedAccessoryStock,
-  validateCheckedAccessoryStock,
-} from "@/lib/deductAccessoryStock";
+import { deductCheckedAccessoryStock } from "@/lib/deductAccessoryStock";
 import { v2 as cloudinary } from "cloudinary";
 
 cloudinary.config({
@@ -243,14 +240,6 @@ export async function POST(req) {
     const locationColumn = godown === "Delhi - Mundka" ? "Delhi" : "South";
     const locationColumnLower = godown === "Delhi - Mundka" ? "delhi" : "south";
 
-    if (isProduct && accessoriesChecklist) {
-      await validateCheckedAccessoryStock(conn, {
-        accessoriesChecklistJson: accessoriesChecklist,
-        productCode: itemCode,
-        godown,
-      });
-    }
-
     if (isProduct) {
       const [rows] = await conn.execute(
         `SELECT total_quantity, ${locationColumn} FROM product_stock_summary
@@ -471,6 +460,7 @@ export async function POST(req) {
         dispatchRowId: id,
         companyName,
         companyAddress,
+        partial: true,
       });
       if (accessoryResult.deducted.length > 0) {
         console.log(
