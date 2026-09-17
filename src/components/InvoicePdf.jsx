@@ -375,7 +375,7 @@ const InvoicePDFDocument = ({ data, logoSrc, signatureSrc }) => {
     <Document>
       <Page size="A4" style={styles.page}>
         <View style={styles.invoiceTitleOutside}>
-          <Text style={styles.headerTitle}>Tax Invoice</Text>
+          <Text style={styles.headerTitle}>{data.invoiceTypeLabel || "Tax Invoice"}</Text>
         </View>
         <View style={styles.container}>
           {/* Logo + company (matches DesignInvoice: 25% / 75%) */}

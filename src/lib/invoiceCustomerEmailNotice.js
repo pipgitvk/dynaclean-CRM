@@ -10,6 +10,7 @@ import { renderToBuffer } from "@react-pdf/renderer";
 import InvoicePDFDocument from "@/components/InvoicePdf";
 import { sendImportCrmSmtpEmail } from "@/lib/importCrmEmail";
 import { INVOICE_LETTERHEAD } from "@/lib/invoiceLetterhead";
+import { isPerformaInvoice } from "@/lib/ledgerInvoiceFilters";
 
 function formatMoneyInr(n) {
   const num = typeof n === "number" ? n : Number(n) || 0;
@@ -196,8 +197,12 @@ export function buildInvoicePdfDocumentData(invoice) {
   const paymentRaw = invo.payment_status || "UNPAID";
   const paymentLabel =
     paymentRaw === "PAID" ? "PAID" : paymentRaw === "PARTIAL" ? "PARTIAL" : "UNPAID";
+  const invoiceTypeLabel = isPerformaInvoice(invo)
+    ? "Performa Invoice"
+    : "Tax Invoice";
 
   return {
+    invoiceTypeLabel,
     company: { ...INVOICE_LETTERHEAD },
     buyer: {
       name: invo.customer_name || "",
@@ -390,8 +395,13 @@ function statusLabelFriendly(code) {
  * caller can log; returns structured result for API response.
  */
 export async function sendInvoicePaymentNoticeEmail(invWithItems) {
+  if (isPerformaInvoice(invWithItems)) {
+    return { sent: false, skipped: true, reason: "performa_invoice_no_email" };
+  }
+
   const to = String(invWithItems.customer_email || "").trim();
   const invNum = String(invWithItems.invoice_number || "").trim();
+  const typeLabel = "Tax Invoice";
 
   const amountPaidNum = Number(invWithItems.amount_paid) || 0;
   const grandTotalNum = Number(invWithItems.grand_total) || 0;
@@ -409,12 +419,12 @@ export async function sendInvoicePaymentNoticeEmail(invWithItems) {
     const pdfBuffer = await renderInvoicePdfBuffer(invWithItems);
     const safeName = invNum.replace(/[/\\?%*:|"<>]/g, "_") || String(invWithItems.id);
 
-    const subj = `Invoice ${invNum ? invNum : ""} — payment / invoice update from Dynaclean Industries`;
+    const subj = `${typeLabel} ${invNum ? invNum : ""} — payment / invoice update from Dynaclean Industries`;
 
     const paidLine =
       amountPaidNum > 0
-        ? `We have updated our records for invoice <strong>${invNum}</strong> — payment recorded: <strong>₹${formatMoneyInr(amountPaidNum)}</strong>.`
-        : `Please find invoice <strong>${invNum}</strong> attached. Payment recorded to date: <strong>₹${formatMoneyInr(0)}</strong>.`;
+        ? `We have updated our records for ${typeLabel.toLowerCase()} <strong>${invNum}</strong> — payment recorded: <strong>₹${formatMoneyInr(amountPaidNum)}</strong>.`
+        : `Please find ${typeLabel.toLowerCase()} <strong>${invNum}</strong> attached. Payment recorded to date: <strong>₹${formatMoneyInr(0)}</strong>.`;
 
     const cust = invWithItems.customer_name?.trim()
       ? invWithItems.customer_name.trim()
@@ -424,11 +434,11 @@ export async function sendInvoicePaymentNoticeEmail(invWithItems) {
         <p>Hello ${cust},</p>
         <p>${paidLine}</p>
         <p>
-          Invoice total: <strong>₹${formatMoneyInr(grandTotalNum)}</strong><br/>
+          ${typeLabel} total: <strong>₹${formatMoneyInr(grandTotalNum)}</strong><br/>
           Balance remaining: <strong>₹${formatMoneyInr(balanceNum)}</strong><br/>
           Payment status (per our records): <strong>${statusLabelFriendly(statusCode)}</strong>
         </p>
-        <p>A copy of the invoice is attached as a PDF. If you have any questions, please contact us.</p>
+        <p>A copy of the ${typeLabel.toLowerCase()} is attached as a PDF. If you have any questions, please contact us.</p>
         <p>Regards,<br/>Dynaclean Industries</p>
       </div>
     `.trim();

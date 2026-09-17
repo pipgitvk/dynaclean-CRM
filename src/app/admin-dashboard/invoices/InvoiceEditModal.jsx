@@ -342,9 +342,9 @@ export default function InvoiceEditModal({
         cgst_rate: cgstRate,
         sgst_rate: sgstRate,
         igst_rate: igstRate,
-        send_customer_payment_notice: Boolean(
-          String(form.customer_email || "").trim(),
-        ),
+        send_customer_payment_notice:
+          invoiceType !== "performa" &&
+          Boolean(String(form.customer_email || "").trim()),
       };
 
       const removedTransIds = originalLinkedTransIdsRef.current.filter(tid => !linkedTransIds.includes(tid));
@@ -402,7 +402,9 @@ export default function InvoiceEditModal({
           }
         }
       }
-      const mailed = !!String(form.customer_email || "").trim();
+      const mailed =
+        invoiceType !== "performa" &&
+        !!String(form.customer_email || "").trim();
       const n = out.customerEmailNotice;
       if (mailed && n) {
         if (n.sent) {
