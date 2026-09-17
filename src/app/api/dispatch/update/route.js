@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { deductCheckedAccessoryStock } from "@/lib/deductAccessoryStock";
+import { isSpare1110 } from "@/lib/isSpare1110";
 import { v2 as cloudinary } from "cloudinary";
 
 cloudinary.config({
@@ -146,6 +147,16 @@ export async function POST(req) {
         : null;
 
     const isProduct = /[a-zA-Z]/.test(itemCode);
+    const [spareMetaRows] = await conn.execute(
+      `SELECT id, spare_number FROM spare_list
+       WHERE CAST(spare_number AS CHAR) = ? OR CAST(id AS CHAR) = ?
+       LIMIT 1`,
+      [String(dispatchRow.item_code), String(dispatchRow.item_code)],
+    );
+    const skipStockDeduction = isSpare1110(
+      dispatchRow.item_code,
+      spareMetaRows[0]?.spare_number,
+    );
 
     // STEP 1: Validate and update dispatch details FIRST (this checks serial_no uniqueness)
     if (stockAlreadyDeducted) {
@@ -209,6 +220,18 @@ export async function POST(req) {
         id,
       ]
     );
+
+    if (skipStockDeduction) {
+      await conn.execute(
+        `UPDATE dispatch SET stock_deducted = 1, updated_at = NOW() WHERE id = ?`,
+        [id],
+      );
+
+      return NextResponse.json({
+        success: true,
+        note: "Spare 1110 saved without stock deduction",
+      });
+    }
 
     // STEP 2: If we reach here, serial_no is valid. Now proceed with stock deduction
     // Determine item info from quotation
@@ -306,23 +329,25 @@ export async function POST(req) {
     } else {
       // Verify the spare_id actually exists in spare_list before inserting into stock_list
       const [spareCheck] = await conn.execute(
-        `SELECT id FROM spare_list WHERE id = ? LIMIT 1`,
-        [itemCode]
+        `SELECT id, spare_number FROM spare_list
+         WHERE CAST(spare_number AS CHAR) = ? OR CAST(id AS CHAR) = ?
+         LIMIT 1`,
+        [String(itemCode), String(itemCode)],
       );
 
       if (spareCheck.length === 0) {
-        // spare_id not found in spare_list — could be a product with a numeric code
+        // spare not found in spare_list — could be a product with a numeric code
         // Fall back to product_stock deduction using item_name lookup
-        console.warn(`spare_id ${itemCode} not found in spare_list. Attempting product stock fallback.`);
+        console.warn(`spare ${itemCode} not found in spare_list. Attempting product stock fallback.`);
 
         const [productFallback] = await conn.execute(
-          `SELECT product_code FROM products_list WHERE item_name LIKE ? LIMIT 1`,
+          `SELECT item_code FROM products_list WHERE item_name LIKE ? LIMIT 1`,
           [`%${dispatchRow.item_name}%`]
         );
 
         if (productFallback.length > 0) {
-          const fallbackCode = productFallback[0].product_code;
-          console.log(`Fallback product_code found: ${fallbackCode} for item: ${dispatchRow.item_name}`);
+          const fallbackCode = productFallback[0].item_code;
+          console.log(`Fallback item_code found: ${fallbackCode} for item: ${dispatchRow.item_name}`);
 
           const [fallbackStock] = await conn.execute(
             `SELECT total_quantity, ${locationColumn} FROM product_stock_summary WHERE product_code = ?`,
@@ -384,11 +409,12 @@ export async function POST(req) {
           console.warn(`No product or spare found for item_code=${itemCode}, item_name=${dispatchRow.item_name}. Skipping stock deduction.`);
         }
       } else {
-        // spare_id exists — proceed normally
+        // spare exists — proceed normally
+        const spareId = spareCheck[0].id;
         const [rows] = await conn.execute(
           `SELECT total_quantity, ${locationColumn} FROM stock_summary
            WHERE spare_id = ?`,
-          [itemCode]
+          [spareId]
         );
 
         let totalDB = 0;
@@ -410,7 +436,7 @@ export async function POST(req) {
             (spare_id, quantity, amount_per_unit, net_amount, note, location, stock_status, to_company, delivery_address, quotation_id, order_id, added_by, godown, total, delhi, south)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
-            itemCode,
+            spareId,
             quantity,
             total_price,
             total_price,
@@ -431,7 +457,7 @@ export async function POST(req) {
 
         const [summary] = await conn.execute(
           `SELECT total_quantity, ${locationColumn} FROM stock_summary WHERE spare_id = ?`,
-          [itemCode]
+          [spareId]
         );
         if (summary.length > 0) {
           const prevTotal = summary[0].total_quantity;
@@ -442,7 +468,7 @@ export async function POST(req) {
             `UPDATE stock_summary 
               SET last_updated_quantity = ?, total_quantity = ?, last_status = ?, updated_at = NOW(), ${locationColumn} = ?
               WHERE spare_id = ?`,
-            [quantity, newTotal, "OUT", newv, itemCode]
+            [quantity, newTotal, "OUT", newv, spareId]
           );
         }
       }

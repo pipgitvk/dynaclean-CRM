@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useAsyncClick } from "@/lib/useAsyncClick";
 import { useParams, useRouter } from "next/navigation";
+import { isSpare1110 } from "@/lib/isSpare1110";
 
 export default function DispatchFormPage({ params }) {
   const router = useRouter();
@@ -153,10 +154,13 @@ export default function DispatchFormPage({ params }) {
         const data = await res.json();
         setStockInfo((prev) => ({ ...prev, [rowId]: data.stockResults }));
 
-        // Check if any item has 0 or null stock
-        const hasZeroStock = data.stockResults.some(
-          (item) => !item.stock_count || item.stock_count <= 0
-        );
+        // Check if any item has 0 or null stock (spare 1110 is allowed at 0 stock)
+        const hasZeroStock =
+          !data.allowZeroStock &&
+          !isSpare1110(itemCode) &&
+          data.stockResults.some(
+            (item) => !item.stock_count || item.stock_count <= 0,
+          );
         setZeroStockWarnings((prev) => ({ ...prev, [rowId]: hasZeroStock }));
       } else {
         const { error } = await res.json();
@@ -311,8 +315,8 @@ export default function DispatchFormPage({ params }) {
       throw new Error("Please select a godown before saving.");
     }
 
-    // Block dispatch if stock is 0 in selected godown
-    if (zeroStockWarnings[row.id]) {
+    // Block dispatch if stock is 0 in selected godown (except spare 1110)
+    if (zeroStockWarnings[row.id] && !isSpare1110(row.item_code)) {
       throw new Error(
         "Stock is 0 in the selected godown. Cannot dispatch this item.",
       );
@@ -357,7 +361,9 @@ export default function DispatchFormPage({ params }) {
         );
       }
       // Block if any item has 0 stock in selected godown
-      const hasZeroStock = rows.some((r) => zeroStockWarnings[r.id]);
+      const hasZeroStock = rows.some(
+        (r) => zeroStockWarnings[r.id] && !isSpare1110(r.item_code),
+      );
       if (hasZeroStock) {
         throw new Error(
           "Stock is 0 for one or more items in the selected godown. Please resolve before completing dispatch.",
@@ -509,7 +515,7 @@ export default function DispatchFormPage({ params }) {
                 )}
 
                 {/* Zero Stock Warning */}
-                {zeroStockWarnings[r.id] && (
+                {zeroStockWarnings[r.id] && !isSpare1110(r.item_code) && (
                   <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-md">
                     <h4 className="text-sm font-medium text-red-800 mb-1">
                       ⚠️ Stock Not Available:
@@ -621,7 +627,9 @@ export default function DispatchFormPage({ params }) {
                       hasSerialNo={r.serial_no && r.serial_no.trim() !== ""}
                       hasGodown={r.godown && r.godown.trim() !== ""}
                       isLocked={false}
-                      hasZeroStock={!!zeroStockWarnings[r.id]}
+                      hasZeroStock={
+                        !!zeroStockWarnings[r.id] && !isSpare1110(r.item_code)
+                      }
                       isProduct={isProductItem(r.item_code)}
                     />
                   )}
@@ -653,7 +661,9 @@ export default function DispatchFormPage({ params }) {
               .filter((r) => isProductItem(r.item_code))
               .every((r) => r.serial_no && r.serial_no.trim() !== "") ||
             // Block if any item has 0 stock
-            rows.some((r) => zeroStockWarnings[r.id])
+            rows.some(
+              (r) => zeroStockWarnings[r.id] && !isSpare1110(r.item_code),
+            )
           }
           saving={saving}
         />

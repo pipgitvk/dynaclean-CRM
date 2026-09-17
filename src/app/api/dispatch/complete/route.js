@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
+import { isSpare1110 } from "@/lib/isSpare1110";
 
 export async function POST(req) {
   try {
@@ -32,7 +33,7 @@ export async function POST(req) {
     // Products are identified by item_code containing at least one alphabet character;
     // spares (purely numeric codes) are allowed to have empty serial numbers.
     const [dispatchRows] = await conn.execute(
-      `SELECT item_code, serial_no, godown FROM dispatch WHERE quote_number = ?`,
+      `SELECT item_code, item_name, serial_no, godown FROM dispatch WHERE quote_number = ?`,
       [quoteNumber]
     );
 
@@ -64,7 +65,7 @@ export async function POST(req) {
     // Products have item_codes with letters (e.g. DSC-30); spares use spare_number (e.g. S-001) or numeric ids.
     const spareDispatchRows = dispatchRows.filter((row) => {
       const itemCode = row.item_code || "";
-      return itemCode.trim() !== "";
+      return itemCode.trim() !== "" && !isSpare1110(itemCode);
     });
 
     if (spareDispatchRows.length > 0) {
@@ -83,11 +84,15 @@ export async function POST(req) {
       for (const { itemCode, godown, count } of Object.values(spareGroups)) {
         // Resolve item_code (could be spare_number INT or spare_list.id) → spare_list.id
         const [spareMatch] = await conn.execute(
-          `SELECT id FROM spare_list WHERE CAST(spare_number AS CHAR) = ? OR CAST(id AS CHAR) = ? LIMIT 1`,
+          `SELECT id, spare_number FROM spare_list
+           WHERE CAST(spare_number AS CHAR) = ? OR CAST(id AS CHAR) = ? LIMIT 1`,
           [String(itemCode), String(itemCode)]
         );
         if (!spareMatch || spareMatch.length === 0) {
           console.warn(`⚠️ spare not found in spare_list for item_code=${itemCode}, skipping stock deduction`);
+          continue;
+        }
+        if (isSpare1110(itemCode, spareMatch[0].spare_number)) {
           continue;
         }
         const spareId = spareMatch[0].id;
