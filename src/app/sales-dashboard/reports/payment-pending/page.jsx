@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import dayjs from "dayjs";
 import { Download, Search, Calendar, DollarSign, ArrowUp, ArrowDown, X } from "lucide-react";
 
@@ -50,6 +51,7 @@ export default function PaymentPendingReport() {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(order => 
         order.order_id?.toLowerCase().includes(query) ||
+        order.quote_number?.toLowerCase().includes(query) ||
         order.client_name?.toLowerCase().includes(query) ||
         order.company_name?.toLowerCase().includes(query) ||
         order.contact?.toLowerCase().includes(query) ||
@@ -368,7 +370,16 @@ export default function PaymentPendingReport() {
                   return (
                     <tr key={index} className="hover:bg-gray-50 transition-colors">
                       <td className="px-4 py-3 border-b font-medium text-gray-800">
-                        {order.order_id}
+                        <div>{order.order_id}</div>
+                        {order.quote_number && (
+                          <Link
+                            href={`/sales-dashboard/quotations/${encodeURIComponent(order.quote_number)}`}
+                            className="text-[11px] font-medium text-blue-600 hover:text-blue-800 hover:underline mt-0.5 inline-block"
+                            title="View Quotation"
+                          >
+                            {order.quote_number}
+                          </Link>
+                        )}
                       </td>
                       <td className="px-4 py-3 border-b">
                         <div className="text-xs">
