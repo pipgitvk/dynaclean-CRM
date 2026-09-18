@@ -9,6 +9,20 @@ import ManualPaymentHistoryModal from "./ManualPaymentHistoryModal";
 
 dayjs.extend(utc);
 
+function formatMoney(value) {
+    return `₹${parseFloat(value || 0).toLocaleString("en-IN", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    })}`;
+}
+
+function getPaymentAmounts(row) {
+    const total = Number(row.amount || 0);
+    const received = Number(row.total_received ?? 0);
+    const balance = Math.max(total - received, 0);
+    return { total, received, balance };
+}
+
 export default function PaymentTable({ rows, role, editBasePath = "/admin-dashboard/manual-payments" }) {
     const [searchTerm, setSearchTerm] = useState("");
     const [statusFilter, setStatusFilter] = useState("all");
@@ -174,7 +188,13 @@ export default function PaymentTable({ rows, role, editBasePath = "/admin-dashbo
                                 onClick={() => handleSort("amount")}
                                 className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                             >
-                                Amount {sortField === "amount" && (sortOrder === "asc" ? "↑" : "↓")}
+                                Total Amount {sortField === "amount" && (sortOrder === "asc" ? "↑" : "↓")}
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                                Received
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                                Balance
                             </th>
                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                                 Payment Type
@@ -203,7 +223,9 @@ export default function PaymentTable({ rows, role, editBasePath = "/admin-dashbo
                         </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                        {paginatedData.map((row) => (
+                        {paginatedData.map((row) => {
+                            const { total, received, balance } = getPaymentAmounts(row);
+                            return (
                             <tr key={row.id} className="hover:bg-gray-50">
                                 <td className="px-4 py-3">
                                     <div className="text-sm font-medium text-gray-900">
@@ -214,10 +236,13 @@ export default function PaymentTable({ rows, role, editBasePath = "/admin-dashbo
                                     )}
                                 </td>
                                 <td className="px-4 py-3 text-sm font-semibold text-gray-900">
-                                    ₹{parseFloat(row.amount).toLocaleString("en-IN", {
-                                        minimumFractionDigits: 2,
-                                        maximumFractionDigits: 2,
-                                    })}
+                                    {formatMoney(total)}
+                                </td>
+                                <td className="px-4 py-3 text-sm font-semibold text-green-700">
+                                    {formatMoney(received)}
+                                </td>
+                                <td className="px-4 py-3 text-sm font-semibold text-orange-700">
+                                    {formatMoney(balance)}
                                 </td>
                                 <td className="px-4 py-3">
                                     <span className={`px-2 py-1 text-xs font-medium rounded-full ${getPaymentTypeBadge(row.payment_type)}`}>
@@ -290,13 +315,16 @@ export default function PaymentTable({ rows, role, editBasePath = "/admin-dashbo
                                     </div>
                                 </td>
                             </tr>
-                        ))}
+                        );
+                        })}
                     </tbody>
                 </table>
             </div>
 
             <div className="md:hidden">
-                {paginatedData.map((row) => (
+                {paginatedData.map((row) => {
+                    const { total, received, balance } = getPaymentAmounts(row);
+                    return (
                     <div key={row.id} className="border-b border-gray-200 p-4 hover:bg-gray-50">
                         <div className="flex justify-between items-start mb-2">
                             <div>
@@ -312,13 +340,16 @@ export default function PaymentTable({ rows, role, editBasePath = "/admin-dashbo
 
                         <div className="grid grid-cols-2 gap-2 text-sm mb-3">
                             <div>
-                                <span className="text-gray-600">Amount:</span>
-                                <p className="font-semibold text-gray-900">
-                                    ₹{parseFloat(row.amount).toLocaleString("en-IN", {
-                                        minimumFractionDigits: 2,
-                                        maximumFractionDigits: 2,
-                                    })}
-                                </p>
+                                <span className="text-gray-600">Total Amount:</span>
+                                <p className="font-semibold text-gray-900">{formatMoney(total)}</p>
+                            </div>
+                            <div>
+                                <span className="text-gray-600">Received:</span>
+                                <p className="font-semibold text-green-700">{formatMoney(received)}</p>
+                            </div>
+                            <div>
+                                <span className="text-gray-600">Balance:</span>
+                                <p className="font-semibold text-orange-700">{formatMoney(balance)}</p>
                             </div>
                             <div>
                                 <span className="text-gray-600">Type:</span>
@@ -392,7 +423,8 @@ export default function PaymentTable({ rows, role, editBasePath = "/admin-dashbo
                             )}
                         </div>
                     </div>
-                ))}
+                );
+                })}
             </div>
 
             {totalPages > 1 && (
