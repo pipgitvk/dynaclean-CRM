@@ -52,7 +52,7 @@ export async function PUT(request, { params }) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
 
-    const { id } = params;
+    const { id } = await params;
     const formData = await request.formData();
 
     const conn = await getDbConnection();
@@ -190,7 +190,7 @@ export async function DELETE(request, { params }) {
       return NextResponse.json({ error: "Access denied" }, { status: 403 });
     }
 
-    const { id } = params;
+    const { id } = await params;
     const conn = await getDbConnection();
 
     // Check if entry exists

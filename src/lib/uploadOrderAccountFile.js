@@ -24,23 +24,22 @@ function mimeFromFilename(filename) {
   return "application/octet-stream";
 }
 
-async function savePdfLocally(file) {
+async function savePdfBufferLocally(buffer, originalFilename) {
   const uploadDir = path.join(process.cwd(), "public", "Order", "accounts");
   ensureDir(uploadDir);
 
-  const ext = path.extname(file.originalFilename || "") || ".pdf";
+  const ext = path.extname(originalFilename || "") || ".pdf";
   const uniqueName = `${Date.now()}_${Math.random()
     .toString(36)
     .substring(2, 8)}${ext}`;
   const destPath = path.join(uploadDir, uniqueName);
 
-  await fs.promises.copyFile(file.filepath, destPath);
+  await fs.promises.writeFile(destPath, buffer);
   return `/Order/accounts/${uniqueName}`;
 }
 
-async function uploadImageToCloudinary(file) {
-  const buffer = await fs.promises.readFile(file.filepath);
-  const mime = mimeFromFilename(file.originalFilename);
+async function uploadImageBufferToCloudinary(buffer, originalFilename) {
+  const mime = mimeFromFilename(originalFilename);
   const dataUri = `data:${mime};base64,${buffer.toString("base64")}`;
 
   const result = await cloudinary.uploader.upload(dataUri, {
@@ -54,17 +53,24 @@ async function uploadImageToCloudinary(file) {
 /**
  * PDF → local disk, images → Cloudinary.
  */
-export async function uploadOrderAccountFile(file) {
-  if (!file?.filepath) throw new Error("Missing file");
-
-  const ext = path.extname(file.originalFilename || "").toLowerCase();
+export async function uploadOrderAccountBuffer(buffer, originalFilename) {
+  const ext = path.extname(originalFilename || "").toLowerCase();
 
   if (ext === ".pdf") {
-    return savePdfLocally(file);
+    return savePdfBufferLocally(buffer, originalFilename);
   }
   if (IMAGE_EXT.has(ext)) {
-    return uploadImageToCloudinary(file);
+    return uploadImageBufferToCloudinary(buffer, originalFilename);
   }
 
   throw new Error(`Unsupported file type: ${ext || "unknown"}`);
+}
+
+/**
+ * PDF → local disk, images → Cloudinary (formidable temp file).
+ */
+export async function uploadOrderAccountFile(file) {
+  if (!file?.filepath) throw new Error("Missing file");
+  const buffer = await fs.promises.readFile(file.filepath);
+  return uploadOrderAccountBuffer(buffer, file.originalFilename);
 }
