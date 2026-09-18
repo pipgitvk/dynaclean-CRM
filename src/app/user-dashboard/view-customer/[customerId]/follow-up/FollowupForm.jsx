@@ -342,6 +342,15 @@ export default function FollowupForm({ customerId, userRole = "" }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [customerCreatedAt, hasOrder, isFromUpcoming, formData.stage]);
 
+  // GEM follow-up always allows 15 days (not tied to lead-age 48h rule)
+  const gemFollowupDateLimits = useMemo(() => {
+    const now = new Date();
+    return {
+      min: formatISTDateTime(now),
+      max: formatISTDateTime(new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000)),
+    };
+  }, []);
+
   // Fetch customer's current stage, status, comm_mode from database
   useEffect(() => {
     const fetchCustomerData = async () => {
@@ -428,6 +437,18 @@ export default function FollowupForm({ customerId, userRole = "" }) {
       }
     }
 
+    if (name === "gem_next_followup" && value) {
+      const maxDate = gemFollowupDateLimits.max
+        ? new Date(gemFollowupDateLimits.max)
+        : null;
+
+      if (maxDate && new Date(value) > maxDate) {
+        toast.error("You can schedule a GEM follow-up for a maximum of 15 days from now.");
+        setFormData({ ...formData, [name]: gemFollowupDateLimits.max });
+        return;
+      }
+    }
+
     setFormData({ ...formData, [name]: value });
   };
 
@@ -460,6 +481,18 @@ export default function FollowupForm({ customerId, userRole = "" }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (isGEM && formData.gem_next_followup) {
+      const selected = new Date(formData.gem_next_followup);
+      const maxDate = gemFollowupDateLimits.max
+        ? new Date(gemFollowupDateLimits.max)
+        : null;
+
+      if (maxDate && selected > maxDate) {
+        toast.error("You can schedule a GEM follow-up for a maximum of 15 days from now.");
+        return;
+      }
+    }
 
     // Final validation for next_followup_date before submitting
     if (formData.status !== "Denied" && formData.status !== "Invalid" && formData.next_followup_date) {
@@ -823,8 +856,8 @@ export default function FollowupForm({ customerId, userRole = "" }) {
             name="gem_next_followup"
             value={formData.gem_next_followup}
             onChange={handleChange}
-            min={nextFollowupDateLimits.min}
-            max={nextFollowupDateLimits.max}
+            min={gemFollowupDateLimits.min}
+            max={gemFollowupDateLimits.max}
             disabled={isLoadingCustomer}
             className={`w-full px-4 py-2 border rounded-lg ${isLoadingCustomer ? "bg-gray-100 cursor-not-allowed" : ""}`}
           />
