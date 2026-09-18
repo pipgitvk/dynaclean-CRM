@@ -269,12 +269,24 @@ import {
   getCrmInstantMs,
 } from "@/lib/timezone";
 
+function pickNextFollowupField(entry, userRole) {
+  if (userRole === "SERVICE SUPPORT") return entry.service_next_followup;
+  if (userRole === "GEM") return entry.gem_next_followup;
+  return entry.next_followup_date;
+}
+
 export default function FollowUpHistory({
   entries = [],
   cust_analysis_external,
   userRole = "",
 }) {
   const isServiceSupport = userRole === "SERVICE SUPPORT";
+  const isGEM = userRole === "GEM";
+  const nextFollowupLabel = isServiceSupport
+    ? "Service Next Follow-up"
+    : isGEM
+      ? "GEM Next Follow-up"
+      : "Next Follow-up";
   const uploads = isServiceSupport ? [] : (cust_analysis_external?.uploads || []);
 const mergedMap = {};
 
@@ -339,7 +351,7 @@ const mergedData = Object.values(mergedMap).sort((a, b) => {
       <table className="min-w-full divide-y divide-gray-200 text-sm">
         <thead className="bg-gray-100 text-gray-700 uppercase text-xs tracking-wide">
           <tr>
-            <th className="px-4 py-3">{isServiceSupport ? "Service Next Follow-up" : "Next Follow-up"}</th>
+            <th className="px-4 py-3">{nextFollowupLabel}</th>
             <th className="px-4 py-3">Followed By</th>
             <th className="px-4 py-3">Followed Date</th>
             <th className="px-4 py-3">Mode</th>
@@ -365,17 +377,16 @@ const mergedData = Object.values(mergedMap).sort((a, b) => {
                 {/* FOLLOWUPS */}
                 <td className="px-4 py-2">
                   {row.followups.length > 0
-                    ? row.followups.map((f, i) => (
+                    ? row.followups.map((f, i) => {
+                        const nextFollowup = pickNextFollowupField(f, userRole);
+                        return (
                         <div key={i} className="mb-3">
-                          {isServiceSupport
-                            ? f.service_next_followup
-                              ? formatCrmDatetimeForISTDisplay(f.service_next_followup)
-                              : "-"
-                            : f.next_followup_date
-                              ? formatCrmDatetimeForISTDisplay(f.next_followup_date)
-                              : "-"}
+                          {nextFollowup
+                            ? formatCrmDatetimeForISTDisplay(nextFollowup)
+                            : "-"}
                         </div>
-                      ))
+                        );
+                      })
                     : "-"}
                 </td>
 

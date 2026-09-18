@@ -53,11 +53,11 @@ export default async function CustomerPage({ params }) {
   const isServiceSupport = userRole === "SERVICE SUPPORT";
   const [fups] = await conn.execute(
     isServiceSupport
-      ? `SELECT next_followup_date, service_next_followup, followed_date, followed_by, notes, comm_mode, time_stamp 
+      ? `SELECT next_followup_date, service_next_followup, gem_next_followup, followed_date, followed_by, notes, comm_mode, time_stamp 
          FROM customers_followup
          WHERE customer_id = ? AND followed_by = ? AND followed_by IS NOT NULL AND followed_by != ''
          ORDER BY time_stamp DESC`
-      : `SELECT next_followup_date, service_next_followup, followed_date, followed_by, notes, comm_mode, time_stamp 
+      : `SELECT next_followup_date, service_next_followup, gem_next_followup, followed_date, followed_by, notes, comm_mode, time_stamp 
          FROM customers_followup
          WHERE customer_id = ?
          ORDER BY time_stamp DESC`,

@@ -37,6 +37,8 @@ export async function GET(req, { params }) {
   let sql = `SELECT 
       followed_date,
       next_followup_date,
+      service_next_followup,
+      gem_next_followup,
       comm_mode,
       notes,
       notes_language,
@@ -77,12 +79,14 @@ export async function POST(req, { params }) {
   }
 
   let followedBy = null;
+  let userRole = null;
   try {
     const { payload } = await jwtVerify(
       token,
       new TextEncoder().encode(JWT_SECRET),
     );
     followedBy = payload.username || null;
+    userRole = payload.role || null;
   } catch (e) {
     return new Response(JSON.stringify({ error: "Invalid token" }), {
       status: 401,
@@ -158,16 +162,16 @@ export async function POST(req, { params }) {
   let insertServiceNext = null;
   let insertGemNext = null;
 
-  if (data.service_next_followup) {
+  if (userRole === "SERVICE SUPPORT") {
     // SERVICE SUPPORT role - update service_next_followup, preserve others
     insertServiceNext = serviceNextFollowupUTC;
-    insertNextDate = latestDates.next_followup_date || null;   // preserve Sales date
-    insertGemNext = latestDates.gem_next_followup || null;     // preserve GEM date
-  } else if (data.gem_next_followup) {
+    insertNextDate = latestDates.next_followup_date || null;
+    insertGemNext = latestDates.gem_next_followup || null;
+  } else if (userRole === "GEM") {
     // GEM role - update gem_next_followup, preserve others
     insertGemNext = gemNextFollowupUTC;
-    insertNextDate = latestDates.next_followup_date || null;   // preserve Sales date
-    insertServiceNext = latestDates.service_next_followup || null; // preserve Service date
+    insertNextDate = latestDates.next_followup_date || null;
+    insertServiceNext = latestDates.service_next_followup || null;
   } else {
     // Sales / normal role - update next_followup_date, preserve others
     insertNextDate = data.status === "Denied" ? null : nextFollowupDateUTC;
