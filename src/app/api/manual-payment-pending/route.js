@@ -1,40 +1,15 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
-import { jwtVerify } from "jose";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
+import { verifyManualPaymentsApiAccess } from "@/lib/manualPaymentsAccess";
 
-const JWT_SECRET = process.env.JWT_SECRET;
 const UPLOAD_DIR = path.join(process.cwd(), "public", "payment_invoices");
-
-// Helper function to verify JWT and check roles
-async function verifyAccess(req, allowedRoles = ["ACCOUNTANT", "ADMIN", "SUPERADMIN"]) {
-    const token = req.cookies.get("token")?.value;
-    if (!token) {
-        return { error: "Unauthorized", status: 401 };
-    }
-
-    try {
-        const { payload } = await jwtVerify(
-            token,
-            new TextEncoder().encode(JWT_SECRET)
-        );
-
-        const role = payload.role;
-        if (!allowedRoles.includes(role)) {
-            return { error: "Access denied", status: 403 };
-        }
-
-        return { username: payload.username, role: payload.role };
-    } catch (err) {
-        return { error: "Invalid token", status: 401 };
-    }
-}
 
 // GET: Fetch all manual payment pending entries
 export async function GET(request) {
     try {
-        const auth = await verifyAccess(request);
+        const auth = await verifyManualPaymentsApiAccess(request);
         if (auth.error) {
             return NextResponse.json({ error: auth.error }, { status: auth.status });
         }
@@ -128,7 +103,7 @@ export async function GET(request) {
 // POST: Create new manual payment pending entry
 export async function POST(request) {
     try {
-        const auth = await verifyAccess(request);
+        const auth = await verifyManualPaymentsApiAccess(request);
         if (auth.error) {
             return NextResponse.json({ error: auth.error }, { status: auth.status });
         }

@@ -23,6 +23,7 @@ export const ROLE_DEFAULT_MODULE_KEYS = {
     "prospects-view",
     "prospects-add",
     "installation-videos",
+    "manual-payments",
   ],
   "SALES HEAD": [
     "dashboard-home",
@@ -43,6 +44,7 @@ export const ROLE_DEFAULT_MODULE_KEYS = {
     "product-stock",
     "expenses",
     "payment-pending",
+    "manual-payments",
     "employee-crm",
     "prospects-view",
     "prospects-add",

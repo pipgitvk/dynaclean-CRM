@@ -61,7 +61,7 @@ export default function EditPaymentPage() {
                 });
             } else {
                 alert("Payment entry not found");
-                router.push("/user-dashboard/manual-payments");
+                router.push("/sales-dashboard/manual-payments");
             }
         } catch (error) {
             console.error("Fetch error:", error);
@@ -113,7 +113,7 @@ export default function EditPaymentPage() {
 
             if (data.success) {
                 alert("Payment entry updated successfully!");
-                router.push("/user-dashboard/manual-payments");
+                router.push("/sales-dashboard/manual-payments");
             } else {
                 alert(`Error: ${data.error}`);
             }

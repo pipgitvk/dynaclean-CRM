@@ -1,44 +1,27 @@
 import { getDbConnection } from "@/lib/db";
-import { cookies } from "next/headers";
-import { jwtVerify } from "jose";
 import { redirect } from "next/navigation";
 import PaymentTable from "./PaymentTable";
-
-const JWT_SECRET = process.env.JWT_SECRET;
+import { getManualPaymentsPageAccess } from "@/lib/manualPaymentsAccess";
 
 export const dynamic = "force-dynamic";
 
 export default async function ManualPaymentsPage() {
-    const cookieStore = await cookies();
-    const token = cookieStore.get("token")?.value;
-
-    if (!token) {
+    const { payload, allowed } = await getManualPaymentsPageAccess();
+    if (!payload) {
         redirect("/login");
     }
-
-    let username = "";
-    let role = "";
-
-    try {
-        const { payload } = await jwtVerify(
-            token,
-            new TextEncoder().encode(JWT_SECRET)
+    if (!allowed) {
+        return (
+            <div className="p-6">
+                <p className="text-red-600">
+                    Access Denied. You do not have permission to view Manual Payments.
+                    Ask your admin to enable the Manual Payments module for your account.
+                </p>
+            </div>
         );
-
-        username = payload.username;
-        role = payload.role;
-
-        // Check if user has access
-        if (!["ACCOUNTANT", "ADMIN", "SUPERADMIN", "DIRECTOR"].includes(String(role).toUpperCase())) {
-            return (
-                <div className="p-6">
-                    <p className="text-red-600">Access Denied. This page is only accessible to Accountant, Admin, Superadmin, and Director roles.</p>
-                </div>
-            );
-        }
-    } catch (err) {
-        redirect("/login");
     }
+
+    const role = payload.role ?? payload.userRole ?? "";
 
     const conn = await getDbConnection();
 

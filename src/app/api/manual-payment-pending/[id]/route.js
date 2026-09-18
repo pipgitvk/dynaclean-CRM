@@ -1,44 +1,16 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
-import { jwtVerify } from "jose";
 import { writeFile, mkdir, unlink } from "fs/promises";
 import path from "path";
 import fs from "fs";
+import { verifyManualPaymentsApiAccess } from "@/lib/manualPaymentsAccess";
 
-const JWT_SECRET = process.env.JWT_SECRET;
 const UPLOAD_DIR = path.join(process.cwd(), "public", "payment_invoices");
-
-// Helper function to verify JWT and check roles
-async function verifyAccess(
-  req,
-  allowedRoles = ["ACCOUNTANT", "ADMIN", "SUPERADMIN"],
-) {
-  const token = req.cookies.get("token")?.value;
-  if (!token) {
-    return { error: "Unauthorized", status: 401 };
-  }
-
-  try {
-    const { payload } = await jwtVerify(
-      token,
-      new TextEncoder().encode(JWT_SECRET),
-    );
-
-    const role = payload.role;
-    if (!allowedRoles.includes(role)) {
-      return { error: "Access denied", status: 403 };
-    }
-
-    return { username: payload.username, role: payload.role };
-  } catch (err) {
-    return { error: "Invalid token", status: 401 };
-  }
-}
 
 // GET: Fetch single payment entry by ID
 export async function GET(request, { params }) {
   try {
-    const auth = await verifyAccess(request);
+    const auth = await verifyManualPaymentsApiAccess(request);
     if (auth.error) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
@@ -75,7 +47,7 @@ export async function GET(request, { params }) {
 // PUT: Update existing payment entry
 export async function PUT(request, { params }) {
   try {
-    const auth = await verifyAccess(request);
+    const auth = await verifyManualPaymentsApiAccess(request);
     if (auth.error) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
@@ -210,10 +182,12 @@ export async function PUT(request, { params }) {
 // DELETE: Delete payment entry (soft delete)
 export async function DELETE(request, { params }) {
   try {
-    // Only ADMIN and SUPERADMIN can delete
-    const auth = await verifyAccess(request, ["ADMIN", "SUPERADMIN"]);
+    const auth = await verifyManualPaymentsApiAccess(request);
     if (auth.error) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+    if (!["ADMIN", "SUPERADMIN"].includes(String(auth.role || "").toUpperCase())) {
+      return NextResponse.json({ error: "Access denied" }, { status: 403 });
     }
 
     const { id } = params;
