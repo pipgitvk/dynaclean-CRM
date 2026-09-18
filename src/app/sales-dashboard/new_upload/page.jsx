@@ -10,8 +10,10 @@ export default function LeadDistributionPage() {
   const [showModal, setShowModal] = useState(false);
   const [fromDate, setFromDate] = useState(""); // YYYY-MM-DD
   const [toDate, setToDate] = useState("");   // YYYY-MM-DD
-  const [assignedTo, setAssignedTo] = useState(""); // Filter by assigned_to
-  const [assignedToOptions, setAssignedToOptions] = useState([]); // Unique assigned_to values
+  const [assignedTo, setAssignedTo] = useState("");
+  const [assignedToOptions, setAssignedToOptions] = useState([]);
+  const [campaign, setCampaign] = useState("");
+  const [campaignOptions, setCampaignOptions] = useState([]);
   useEffect(() => {
     let isMounted = true;
     const load = async () => {
@@ -27,9 +29,11 @@ export default function LeadDistributionPage() {
         const data = await res.json();
         if (isMounted) {
           setCustomers(data.data || []);
-          // Extract unique assigned_to values for dropdown - always from all data
-          const uniqueAssignedTo = [...new Set((data.data || []).map(c => c.sales_representative).filter(Boolean))];
+          const rows = data.data || [];
+          const uniqueAssignedTo = [...new Set(rows.map((c) => c.sales_representative).filter(Boolean))];
+          const uniqueCampaigns = [...new Set(rows.map((c) => c.lead_campaign).filter(Boolean))];
           setAssignedToOptions(uniqueAssignedTo.sort());
+          setCampaignOptions(uniqueCampaigns.sort());
         }
       } catch (e) {
         if (isMounted) setCustomers([]);
@@ -42,6 +46,12 @@ export default function LeadDistributionPage() {
       isMounted = false;
     };
   }, [fromDate, toDate]);
+
+  const filteredCustomers = customers.filter((c) => {
+    if (assignedTo && c.sales_representative !== assignedTo) return false;
+    if (campaign && c.lead_campaign !== campaign) return false;
+    return true;
+  });
 
   return (
     <>
@@ -81,6 +91,21 @@ export default function LeadDistributionPage() {
             />
           </div>
           <div className="flex flex-col">
+            <label className="text-xs text-gray-600 mb-1">Campaign</label>
+            <select
+              value={campaign}
+              onChange={(e) => setCampaign(e.target.value)}
+              className="border border-gray-300 rounded px-3 py-2 min-w-[160px]"
+            >
+              <option value="">All</option>
+              {campaignOptions.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-col">
             <label className="text-xs text-gray-600 mb-1">Assigned To</label>
             <select
               value={assignedTo}
@@ -104,9 +129,15 @@ export default function LeadDistributionPage() {
           >
             Apply
           </button> */}
-          {(fromDate || toDate || assignedTo) && (
+          {(fromDate || toDate || assignedTo || campaign) && (
             <button
-              onClick={() => { setFromDate(""); setToDate(""); setAssignedTo(""); setIsLoading(true); }}
+              onClick={() => {
+                setFromDate("");
+                setToDate("");
+                setAssignedTo("");
+                setCampaign("");
+                setIsLoading(true);
+              }}
               className="bg-gray-200 text-gray-800 px-4 py-2 rounded shadow"
             >
               Clear
@@ -133,8 +164,8 @@ export default function LeadDistributionPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {customers.filter(c => !assignedTo || c.sales_representative === assignedTo).length > 0 ? (
-                  customers.filter(c => !assignedTo || c.sales_representative === assignedTo).map((c, i) => (
+                {filteredCustomers.length > 0 ? (
+                  filteredCustomers.map((c, i) => (
                     <tr key={c.customer_id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-3 py-3 text-center">{i + 1}</td>
                       <td className="px-3 py-3">{new Date(c.date_created).toLocaleDateString()}</td>
