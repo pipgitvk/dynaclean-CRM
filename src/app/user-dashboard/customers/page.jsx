@@ -3,6 +3,7 @@ import CustomerTable from "./CustomerTable";
 import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 import { getSessionPayload } from "@/lib/auth";
+import { buildGemCustomerScopeWhere } from "@/lib/dataScope";
 
 export const dynamic = "force-dynamic";
 
@@ -91,11 +92,9 @@ export default async function CustomersPage({ searchParams }) {
     ))`);
     customerParams.push(username, username);
   } else if (userRole === "GEM") {
-    // GEM: customers assigned to them OR customers they have followed up
-    customerConditions.push(`(c.gem_lead_source = ? OR c.customer_id IN (
-      SELECT DISTINCT cf.customer_id FROM customers_followup cf WHERE cf.followed_by = ?
-    ))`);
-    customerParams.push(username, username);
+    const gemScope = buildGemCustomerScopeWhere({ username, tableAlias: "c" });
+    customerConditions.push(gemScope.sql);
+    customerParams.push(...gemScope.params);
   } else if (userRole !== "ADMIN" && userRole !== "SUPERADMIN" && userRole !== "SERVICE HEAD" && userRole !== "TEAM LEADER" && userRole !== "EA") {
     customerConditions.push("(c.lead_source = ? OR c.sales_representative = ? OR c.assigned_to = ?)");
     customerParams.push(username, username, username);

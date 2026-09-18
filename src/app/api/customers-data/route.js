@@ -3,6 +3,7 @@ import { getDbConnection } from "@/lib/db";
 import { NextResponse } from "next/server";
 import { getSessionPayload } from "@/lib/auth";
 import {
+  buildGemCustomerScopeWhere,
   buildOwnershipWhere,
   canViewAllCustomers,
   getScopedUsername,
@@ -73,16 +74,13 @@ export async function GET(req) {
 
     // Data visibility:
     // Privileged roles (incl. SALES CUM BACKOFFICE) → all rows incl. Denied
-    // When globalSearch=1 (header search): SERVICE SUPPORT / GEM also see all customers
-    // SERVICE SUPPORT → rows where service_lead_source = their username
-    // GEM → rows where gem_lead_source = their username
+    // When globalSearch=1 (header search): SERVICE SUPPORT sees processed-order customers
+    // GEM → own customers (lead_source, gem_lead_source, assignment, follow-up)
     // everyone else → only rows assigned/owned by them (or deny if username missing)
     if (!canViewAllCustomers(role)) {
       const normalizedRole = normalizeRoleKey(role);
 
-      if (globalSearch && normalizedRole === "GEM") {
-        // Skip ownership scoping for GEM when using global header search
-      } else if (globalSearch && normalizedRole === "SERVICE SUPPORT") {
+      if (globalSearch && normalizedRole === "SERVICE SUPPORT") {
         // SERVICE SUPPORT global header search: only customers with at least one fully processed order
         // (account_status = 1 AND dispatch_status = 1)
         // Use subquery with no outer-table reference so it works in both countSql (no alias) and dataSql (alias c)
@@ -100,13 +98,9 @@ export async function GET(req) {
           whereClause += ` AND 1=0`;
         }
       } else if (normalizedRole === "GEM") {
-        // GEM sees only customers assigned to them via gem_lead_source
-        if (username) {
-          whereClause += ` AND gem_lead_source = ?`;
-          params.push(username);
-        } else {
-          whereClause += ` AND 1=0`;
-        }
+        const gemScope = buildGemCustomerScopeWhere({ username });
+        whereClause += ` AND ${gemScope.sql}`;
+        params.push(...gemScope.params);
       } else {
         const ownership = buildOwnershipWhere({
           role,

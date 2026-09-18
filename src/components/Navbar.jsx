@@ -251,7 +251,8 @@ export default function Navbar({ onToggleSidebar, showSalesMeta = false }) {
       r === "DIRECTOR" ||
       r === "EA" ||
       r === "SERVICE SUPPORT" ||
-      r === "SALES CUM BACKOFFICE"
+      r === "SALES CUM BACKOFFICE" ||
+      r === "GEM"
     );
   };
 

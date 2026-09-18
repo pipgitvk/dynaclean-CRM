@@ -65,3 +65,23 @@ export function buildOwnershipWhere({ role, username, columns }) {
   return { sql, params: cols.map(() => u) };
 }
 
+/** GEM users: own customers via gem_lead_source, lead_source, assignment, or follow-up. */
+export function buildGemCustomerScopeWhere({ username, tableAlias = "" }) {
+  const prefix = tableAlias ? `${tableAlias}.` : "";
+  const u = String(username ?? "").trim();
+  if (!u) return { sql: "1=0", params: [] };
+
+  return {
+    sql: `(
+      ${prefix}gem_lead_source = ?
+      OR ${prefix}lead_source = ?
+      OR ${prefix}sales_representative = ?
+      OR ${prefix}assigned_to = ?
+      OR ${prefix}customer_id IN (
+        SELECT DISTINCT cf.customer_id FROM customers_followup cf WHERE cf.followed_by = ?
+      )
+    )`,
+    params: [u, u, u, u, u],
+  };
+}
+

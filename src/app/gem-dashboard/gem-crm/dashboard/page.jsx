@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   FileText,
@@ -436,12 +437,15 @@ export default function GemCrmDashboard() {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <h3 className="text-lg font-semibold text-gray-900">Upcoming Enquiry</h3>
-            <div className="flex items-center gap-2">
+            <Link
+              href="/user-dashboard/customers?status=New"
+              className="flex items-center gap-2 transition hover:opacity-80"
+            >
               <span className="text-sm font-semibold text-gray-600">New Leads</span>
               <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-full bg-red-500 px-3 text-sm font-bold text-white shadow">
                 {newLeadsCount}
               </span>
-            </div>
+            </Link>
           </div>
           <a href="/user-dashboard/customers" className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 transition-colors flex items-center gap-2">
             View All

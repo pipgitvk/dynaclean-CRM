@@ -1,5 +1,5 @@
 import { normalizeRoleKey } from "@/lib/roleKeyUtils";
-import { getScopedUsername } from "@/lib/dataScope";
+import { buildGemCustomerScopeWhere, getScopedUsername } from "@/lib/dataScope";
 
 export function isScheduleVisitSuperAdmin(role) {
   return normalizeRoleKey(role) === "SUPERADMIN";
@@ -27,7 +27,8 @@ function buildCustomerOwnershipSql({ role, username }) {
   }
 
   if (roleKey === "GEM") {
-    return { sql: "gem_lead_source = ?", params: [u] };
+    const gemScope = buildGemCustomerScopeWhere({ username: u });
+    return { sql: gemScope.sql, params: gemScope.params };
   }
 
   return {
