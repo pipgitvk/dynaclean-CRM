@@ -46,9 +46,11 @@ export async function PATCH(request, { params }) {
   const userRole = payload?.role;
   const isServiceUser = userRole === "SERVICE SUPPORT" || userRole === "SERVICE HEAD";
   const isSuperAdminOrEA = userRole === "SUPERADMIN" || userRole === "EA";
+  const isSalesCumBackoffice = userRole === "SALES CUM BACKOFFICE";
+  const canUpdateAllLeadFields = isSuperAdminOrEA || isSalesCumBackoffice;
 
   // Basic validation
-  if (!isServiceUser && !isSuperAdminOrEA && !lead_source) {
+  if (!isServiceUser && !canUpdateAllLeadFields && !lead_source) {
     return NextResponse.json({ error: "Lead source is required." }, { status: 400 });
   }
 
@@ -74,8 +76,8 @@ export async function PATCH(request, { params }) {
 
     let result;
 
-    if (isSuperAdminOrEA) {
-      // SUPERADMIN / EA: update lead_source + service_lead_source + gem_lead_source all at once
+    if (canUpdateAllLeadFields) {
+      // SUPERADMIN / EA / SALES CUM BACKOFFICE: update lead_source + service_lead_source + gem_lead_source
       const newLeadSource = lead_source !== undefined ? lead_source : currentData.lead_source;
       const newServiceLeadSource = service_lead_source !== undefined
         ? (service_lead_source === '' ? null : service_lead_source)
