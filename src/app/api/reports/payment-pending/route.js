@@ -112,6 +112,7 @@ export async function GET(request) {
 
             return {
                 order_id: order.order_id,
+                quote_number: order.quote_number,
                 client_name: order.client_name,
                 company_name: order.company_name,
                 contact: order.contact,
