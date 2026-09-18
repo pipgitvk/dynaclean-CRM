@@ -22,6 +22,7 @@ function ProductAndSpareLists({ type, userRole }) {
   const [showMachineDropdown, setShowMachineDropdown] = useState(false);
 
   const isPrivileged = ["ADMIN", "DIRECTOR", "SUPERADMIN", "DESIGN ENGINEER", "SERVICE SUPPORT", "EA"].includes(userRole);
+  const canEditSpare = ["ADMIN", "DIRECTOR", "SUPERADMIN", "DESIGN ENGINEER", "EA"].includes(userRole);
   const canSeePriceFields = ["ADMIN", "DIRECTOR", "SUPERADMIN"].includes(userRole);
 
   useEffect(() => {
@@ -81,7 +82,7 @@ function ProductAndSpareLists({ type, userRole }) {
       formData.append('sale_price', editingSpare.sale_price);
       formData.append('last_negotiation_price', editingSpare.last_negotiation_price);
       formData.append('specification', editingSpare.specification);
-      if (isPrivileged) {
+      if (canEditSpare) {
         formData.append('type', editingSpare.type || '');
         formData.append('make', editingSpare.make || '');
         formData.append('model', editingSpare.model || '');
@@ -352,13 +353,15 @@ function ProductAndSpareLists({ type, userRole }) {
                         {canSeePriceFields && <td className="p-2 text-xs bg-orange-50">{r.tax || 0}%</td>}
                         <td className="p-2">{r.specification}</td>
                         <td className="p-2">
-                          {isPrivileged && (
+                          {canEditSpare ? (
                             <button
                               onClick={() => handleEditClick(r)}
                               className="px-2 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
                             >
                               Edit
                             </button>
+                          ) : (
+                            "-"
                           )}
                         </td>
                       </>
@@ -502,7 +505,7 @@ function ProductAndSpareLists({ type, userRole }) {
                 />
               </div>
               {/* Privileged fields */}
-              {isPrivileged && (
+              {canEditSpare && (
                 <>
                   {/* Type */}
                   <div>
