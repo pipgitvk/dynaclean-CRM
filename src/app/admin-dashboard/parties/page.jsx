@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import {
   Search,
   Filter,
@@ -22,9 +22,22 @@ function formatAmount(n) {
   );
 }
 
+function balanceMeta(net) {
+  const value = Number(net || 0);
+  if (Math.abs(value) <= 0.01) {
+    return { balance: 0, amountType: "flat" };
+  }
+  if (value > 0) {
+    return { balance: value, amountType: "receivable" };
+  }
+  return { balance: value, amountType: "payable" };
+}
+
 function rowKey(p) {
-  const cid = p.customer_id != null ? String(p.customer_id) : "";
-  return (p.name || "") + "||" + cid;
+  const cid =
+    p.customer_id != null ? String(p.customer_id).trim() : "";
+  if (cid) return `cid:${cid}`;
+  return `name:${(p.name || "").toLowerCase()}`;
 }
 
 export default function PartiesPage() {
@@ -50,9 +63,10 @@ export default function PartiesPage() {
         if (!res.ok || !data.success) {
           throw new Error(data.error || data.message || "Failed to load parties");
         }
-        setParties(data.parties || []);
-        if (data.parties?.length > 0 && !selectedKey) {
-          setSelectedKey(rowKey(data.parties[0]));
+        const loaded = data.parties || [];
+        setParties(loaded);
+        if (loaded.length > 0 && !selectedKey) {
+          setSelectedKey(rowKey(loaded[0]));
         }
       } catch (err) {
         if (!cancelled) setListError(err?.message || String(err));
@@ -90,7 +104,22 @@ export default function PartiesPage() {
         if (!res.ok || !data.success) {
           throw new Error(data.error || data.message || "Failed to load ledger");
         }
-        setLedgerEntries(data.entries || []);
+        const entries = data.entries || [];
+        setLedgerEntries(entries);
+        const debit = entries.reduce(
+          (sum, row) => sum + Number(row.debit || 0),
+          0,
+        );
+        const credit = entries.reduce(
+          (sum, row) => sum + Number(row.credit || 0),
+          0,
+        );
+        const { balance, amountType } = balanceMeta(debit - credit);
+        setParties((prev) =>
+          prev.map((p) =>
+            rowKey(p) === selectedKey ? { ...p, balance, amountType } : p,
+          ),
+        );
       } catch (err) {
         if (!cancelled) {
           setLedgerError(err?.message || String(err));
@@ -105,6 +134,19 @@ export default function PartiesPage() {
     };
      
   }, [selectedKey, selected?.name, selected?.customer_id]);
+
+  const handleLedgerTotals = useCallback(
+    (totals) => {
+      if (!selectedKey) return;
+      const { balance, amountType } = balanceMeta(totals?.balance ?? 0);
+      setParties((prev) =>
+        prev.map((p) =>
+          rowKey(p) === selectedKey ? { ...p, balance, amountType } : p,
+        ),
+      );
+    },
+    [selectedKey],
+  );
 
   const filteredParties = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -203,7 +245,13 @@ export default function PartiesPage() {
                             : "text-gray-500"
                       }`}
                     >
-                      <div className="leading-tight">{formatAmount(Math.abs(p.balance || 0))}</div>
+                      <div className="leading-tight">
+                        {formatAmount(
+                          p.amountType === "flat"
+                            ? 0
+                            : Math.abs(p.balance || 0),
+                        )}
+                      </div>
                       {p.amountType !== "flat" && (
                         <div className="text-[10px] font-medium opacity-75 mt-0.5">
                           {p.amountType === "receivable" ? "Dr" : "Cr"}
@@ -332,6 +380,7 @@ export default function PartiesPage() {
                   rows={ledgerEntries}
                   companyName={selected.name}
                   customerId={selected.customer_id || null}
+                  onTotalsChange={handleLedgerTotals}
                 />
               </div>
             ) : (

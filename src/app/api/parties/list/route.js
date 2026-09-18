@@ -55,6 +55,76 @@ function buildCustomerNameLookup(custRows) {
   return lookup;
 }
 
+function buildCanonicalNameByCustomerId(custRows) {
+  const lookup = new Map();
+  for (const row of custRows) {
+    const cid =
+      row.customer_id != null ? String(row.customer_id).trim() : "";
+    if (!cid) continue;
+    const name = String(row.company || row.full_name || row.first_name || "").trim();
+    if (!name) continue;
+    const existing = lookup.get(cid);
+    if (!existing || name.length > existing.length) {
+      lookup.set(cid, name);
+    }
+  }
+  return lookup;
+}
+
+function mergeContactField(existing, incoming) {
+  if (existing != null && String(existing).trim() !== "") return existing;
+  if (incoming != null && String(incoming).trim() !== "") return incoming;
+  return existing;
+}
+
+function groupPartiesByCustomerId(parties, canonicalNameByCustomerId) {
+  const grouped = [];
+  const byCustomerId = new Map();
+
+  for (const party of parties) {
+    const customerId =
+      party.customer_id != null ? String(party.customer_id).trim() : "";
+    if (!customerId) {
+      grouped.push({ ...party, aliasNames: [party.name] });
+      continue;
+    }
+
+    if (!byCustomerId.has(customerId)) {
+      byCustomerId.set(customerId, {
+        ...party,
+        name: canonicalNameByCustomerId.get(customerId) || party.name,
+        aliasNames: [party.name],
+      });
+      continue;
+    }
+
+    const existing = byCustomerId.get(customerId);
+    existing.aliasNames.push(party.name);
+    existing._psrTotal =
+      Number(existing._psrTotal || 0) + Number(party._psrTotal || 0);
+    existing._psrCount =
+      Number(existing._psrCount || 0) + Number(party._psrCount || 0);
+    existing._spareTotal =
+      Number(existing._spareTotal || 0) + Number(party._spareTotal || 0);
+    existing.phone = mergeContactField(existing.phone, party.phone);
+    existing.billing_address = mergeContactField(
+      existing.billing_address,
+      party.billing_address,
+    );
+    existing.gstin = mergeContactField(existing.gstin, party.gstin);
+
+    const canonicalName = canonicalNameByCustomerId.get(customerId);
+    if (canonicalName) {
+      existing.name = canonicalName;
+    } else if ((party.name || "").length > (existing.name || "").length) {
+      existing.name = party.name;
+    }
+  }
+
+  grouped.push(...byCustomerId.values());
+  return grouped;
+}
+
 async function safeQuery(conn, label, sql, params = []) {
   try {
     const [rows] = await conn.execute(sql, params);
@@ -91,11 +161,13 @@ export async function GET(req) {
     const manualDrByName = new Map();
     const manualCrByName = new Map();
     const invoicesByName = new Map();
+    const invoicesByCustomerId = new Map();
 
     console.time("[parties-list] queries");
     const [
       invNameRows,
       invBuyerRows,
+      invCustomerIdRows,
       custRows,
       psrRows,
       spareRows,
@@ -135,6 +207,24 @@ export async function GET(req) {
            AND TRIM(i.customer_name) != ''
            AND ${EXCLUDE_PROFORMA_INVOICE_SQL_I}
          GROUP BY TRIM(i.customer_name), i.customer_id`,
+      ),
+      safeQuery(
+        conn,
+        "invoices by customer_id",
+        `SELECT
+           CAST(i.customer_id AS CHAR) AS customer_id,
+           COUNT(*) AS invoice_count,
+           SUM(i.grand_total) AS total_amount,
+           SUM(COALESCE(i.amount_paid, 0)) AS total_paid,
+           SUM(COALESCE(i.balance_amount, 0)) AS total_balance_amount,
+           MAX(NULLIF(TRIM(i.customer_phone), '')) AS customer_phone,
+           MAX(NULLIF(TRIM(i.billing_address), '')) AS billing_address,
+           MAX(NULLIF(TRIM(i.gst_number), '')) AS gstin
+         FROM invoices i
+         WHERE i.customer_id IS NOT NULL
+           AND i.customer_id != 0
+           AND ${EXCLUDE_PROFORMA_INVOICE_SQL_I}
+         GROUP BY CAST(i.customer_id AS CHAR)`,
       ),
       safeQuery(
         conn,
@@ -252,7 +342,22 @@ export async function GET(req) {
       });
     }
 
+    for (const r of invCustomerIdRows) {
+      const cid = String(r.customer_id || "").trim();
+      if (!cid) continue;
+      invoicesByCustomerId.set(cid, {
+        phone: r.customer_phone || undefined,
+        billing_address: r.billing_address || undefined,
+        gstin: r.gstin || undefined,
+        _invTotal: Number(r.total_amount || 0),
+        _invPaid: Number(r.total_paid || 0),
+        _invBalance: Number(r.total_balance_amount || 0),
+        _invCount: Number(r.invoice_count || 0),
+      });
+    }
+
     const customerNameLookup = buildCustomerNameLookup(custRows);
+    const canonicalNameByCustomerId = buildCanonicalNameByCustomerId(custRows);
 
     for (const r of custRows) {
       addRow(r.company || r.full_name, r.customer_id, {
@@ -346,33 +451,62 @@ export async function GET(req) {
       }
     }
 
-    const partiesArr = Array.from(rows.values());
+    const partiesArr = groupPartiesByCustomerId(
+      Array.from(rows.values()),
+      canonicalNameByCustomerId,
+    );
 
-    // ── Per-party balance
-    // Invoice side uses NAME-ONLY totals (matches buildLedgerForParty logic
-    // where invoice SQL is name-only match, not customer_id scoped).
-    // Purchases (PSR/spare) are per (name, customer_id) — already correct.
+    // ── Fast approximate balance for list (exact net loaded per-party on client)
     const out = [];
     for (const p of partiesArr) {
-      const nmLow = p.name.toLowerCase();
+      const aliasNames = Array.from(
+        new Set((p.aliasNames || [p.name]).map((name) => String(name || "").trim()).filter(Boolean)),
+      );
 
-      const invAgg = invoicesByName.get(nmLow) || null;
-      const invTotal = invAgg ? invAgg._invTotal : 0;
-      const invPaid = invAgg ? invAgg._invPaid : 0;
-      const invBalance = invAgg ? invAgg._invBalance : 0;
+      let invTotal = 0;
+      let invPaid = 0;
+      let invBalance = 0;
+      let hasInvoiceAgg = false;
+      let invAggForContact = null;
 
-      const receivableFromInvoices = invAgg
+      const customerIdKey =
+        p.customer_id != null ? String(p.customer_id).trim() : "";
+      if (customerIdKey && invoicesByCustomerId.has(customerIdKey)) {
+        const invAgg = invoicesByCustomerId.get(customerIdKey);
+        hasInvoiceAgg = true;
+        invAggForContact = invAgg;
+        invTotal = Number(invAgg._invTotal || 0);
+        invPaid = Number(invAgg._invPaid || 0);
+        invBalance = Number(invAgg._invBalance || 0);
+      } else {
+        for (const alias of aliasNames) {
+          const invAgg = invoicesByName.get(alias.toLowerCase());
+          if (!invAgg) continue;
+          hasInvoiceAgg = true;
+          invAggForContact = invAggForContact || invAgg;
+          invTotal += Number(invAgg._invTotal || 0);
+          invPaid += Number(invAgg._invPaid || 0);
+          invBalance += Number(invAgg._invBalance || 0);
+        }
+      }
+
+      const receivableFromInvoices = hasInvoiceAgg
         ? invBalance
         : Math.max(0, invTotal - invPaid);
 
       const purchasesPayable =
         Number(p._psrTotal || 0) + Number(p._spareTotal || 0);
 
-      // Manual dr/cr: apply name-level aggregate to all rows for that name
-      const mDr = manualDrByName.get(nmLow) || 0;
-      const mCr = manualCrByName.get(nmLow) || 0;
+      let mDr = 0;
+      let mCr = 0;
+      let returnCr = 0;
+      for (const alias of aliasNames) {
+        const aliasLow = alias.toLowerCase();
+        mDr += manualDrByName.get(aliasLow) || 0;
+        mCr += manualCrByName.get(aliasLow) || 0;
+        returnCr += returnCrByName.get(aliasLow) || 0;
+      }
 
-      let returnCr = returnCrByName.get(nmLow) || 0;
       if (
         returnCr === 0 &&
         p.customer_id != null &&
@@ -389,14 +523,15 @@ export async function GET(req) {
       if (net > 0.01) amountType = "receivable";
       else if (net < -0.01) amountType = "payable";
 
-      // Merge contact info from invoice name-level data (if not already on row)
       let phoneOut = p.phone;
       let billingOut = p.billing_address;
       let gstinOut = p.gstin;
-      if (invAgg) {
-        if (!phoneOut && invAgg.phone) phoneOut = invAgg.phone;
-        if (!billingOut && invAgg.billing_address) billingOut = invAgg.billing_address;
-        if (!gstinOut && invAgg.gstin) gstinOut = invAgg.gstin;
+      if (invAggForContact) {
+        if (!phoneOut && invAggForContact.phone) phoneOut = invAggForContact.phone;
+        if (!billingOut && invAggForContact.billing_address) {
+          billingOut = invAggForContact.billing_address;
+        }
+        if (!gstinOut && invAggForContact.gstin) gstinOut = invAggForContact.gstin;
       }
 
       const {
@@ -410,6 +545,7 @@ export async function GET(req) {
         phone: _origPhone,
         billing_address: _origBill,
         gstin: _origGstin,
+        aliasNames: _aliasNames,
         ...rest
       } = p;
 

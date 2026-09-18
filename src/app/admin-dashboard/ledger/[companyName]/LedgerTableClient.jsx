@@ -34,7 +34,12 @@ function VchBadge({ type }) {
   );
 }
 
-export default function LedgerTableClient({ rows: initialRows, companyName, customerId }) {
+export default function LedgerTableClient({
+  rows: initialRows,
+  companyName,
+  customerId,
+  onTotalsChange,
+}) {
   const [sortCol, setSortCol] = useState("entry_date");
   const [sortDir, setSortDir] = useState("asc");
 
@@ -126,6 +131,10 @@ export default function LedgerTableClient({ rows: initialRows, companyName, cust
     const credit = filtered.reduce((s, r) => s + Number(r.credit || 0), 0);
     return { debit, credit, balance: debit - credit };
   }, [filtered]);
+
+  useEffect(() => {
+    onTotalsChange?.(totals);
+  }, [onTotalsChange, totals]);
 
   /* ── Download Excel (CSV) ── */
   const handleDownloadExcel = () => {

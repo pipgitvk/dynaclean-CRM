@@ -236,6 +236,63 @@ export async function appendReturnCompletedEntries(conn, {
   }
 }
 
+async function getPartyNameAliases(conn, decodedCompany, customerId) {
+  const aliases = new Set();
+  const primary = String(decodedCompany || "").trim();
+  if (primary) aliases.add(primary);
+
+  const cid =
+    customerId != null && String(customerId).trim() !== ""
+      ? String(customerId).trim()
+      : null;
+
+  if (cid) {
+    const [custRows] = await conn.execute(
+      `SELECT company, CONCAT_WS(' ', first_name, last_name) AS full_name, first_name
+       FROM customers WHERE CAST(customer_id AS CHAR) = ?`,
+      [cid],
+    );
+    for (const r of custRows) {
+      for (const n of [r.company, r.full_name, r.first_name]) {
+        const trimmed = String(n || "").trim();
+        if (trimmed) aliases.add(trimmed);
+      }
+    }
+
+    const [invNames] = await conn.execute(
+      `SELECT DISTINCT TRIM(customer_name) AS nm
+       FROM invoices
+       WHERE CAST(customer_id AS CHAR) = ?
+         AND customer_name IS NOT NULL
+         AND TRIM(customer_name) != ''`,
+      [cid],
+    );
+    for (const r of invNames) {
+      if (r.nm) aliases.add(r.nm);
+    }
+
+    const [psrNames] = await conn.execute(
+      `SELECT DISTINCT TRIM(client_company_name) AS nm
+       FROM product_stock_request
+       WHERE CAST(customer_id AS CHAR) = ?
+         AND client_company_name IS NOT NULL
+         AND TRIM(client_company_name) != ''
+       UNION
+       SELECT DISTINCT TRIM(client_name) AS nm
+       FROM product_stock_request
+       WHERE CAST(customer_id AS CHAR) = ?
+         AND client_name IS NOT NULL
+         AND TRIM(client_name) != ''`,
+      [cid, cid],
+    );
+    for (const r of psrNames) {
+      if (r.nm) aliases.add(r.nm);
+    }
+  }
+
+  return [...aliases].filter(Boolean);
+}
+
 /**
  * Compute ledger entries for a buyer/party.
  * Reuses the exact same logic as /admin-dashboard/ledger/[companyName] page.
@@ -252,6 +309,27 @@ export async function buildLedgerForParty(decodedCompany, customerIdFilter = nul
       ? String(customerIdFilter).trim()
       : null;
 
+  const nameAliases = await getPartyNameAliases(conn, decodedCompany, cidFilter);
+
+  const invoiceWhereParts = [];
+  const invoiceParams = [];
+  if (cidFilter) {
+    invoiceWhereParts.push("CAST(customer_id AS CHAR) = ?");
+    invoiceParams.push(cidFilter);
+  }
+  if (nameAliases.length > 0) {
+    const nameClause = nameAliases
+      .map(() => "(TRIM(customer_name) = ? OR customer_name = ?)")
+      .join(" OR ");
+    invoiceWhereParts.push(`(${nameClause})`);
+    for (const alias of nameAliases) {
+      invoiceParams.push(alias, alias);
+    }
+  } else {
+    invoiceWhereParts.push("(TRIM(customer_name) = ? OR customer_name = ?)");
+    invoiceParams.push(decodedCompany, decodedCompany);
+  }
+
   const [invRows] = await conn.execute(
     `SELECT
        id,
@@ -267,10 +345,10 @@ export async function buildLedgerForParty(decodedCompany, customerIdFilter = nul
        DATE(created_at) AS created_date,
        created_at
      FROM invoices
-     WHERE (TRIM(customer_name) = ? OR customer_name = ?)
+     WHERE (${invoiceWhereParts.join(" OR ")})
        AND ${EXCLUDE_PROFORMA_INVOICE_SQL}
      ORDER BY COALESCE(order_date, invoice_date) DESC, id DESC`,
-    [decodedCompany, decodedCompany]
+    invoiceParams,
   );
   invoices = invRows;
 
@@ -358,12 +436,15 @@ export async function buildLedgerForParty(decodedCompany, customerIdFilter = nul
     } catch (_) {}
   }
 
+  const supplierAliases = nameAliases.length > 0 ? nameAliases : [decodedCompany];
+  const supplierPlaceholders = supplierAliases.map(() => "?").join(",");
   const [supplierPurchases] = await conn.execute(
     `${purchaseSelect}
      FROM product_stock_request
-     WHERE TRIM(client_company_name) = ?
+     WHERE TRIM(client_company_name) IN (${supplierPlaceholders})
+        OR TRIM(client_name) IN (${supplierPlaceholders})
      ORDER BY COALESCE(invoice_date, DATE(created_at)) DESC, id DESC`,
-    [decodedCompany],
+    [...supplierAliases, ...supplierAliases],
   );
   // Supplier purchases: NOT marked as buyer — don't use their linked_statement_ids
   // to avoid pulling in payments that belong to other parties
@@ -661,12 +742,15 @@ export async function buildLedgerForParty(decodedCompany, customerIdFilter = nul
     }
   } catch (_) {}
 
+  const manualAliases = nameAliases.length > 0 ? nameAliases : [decodedCompany];
+  const manualPlaceholders = manualAliases.map(() => "?").join(",");
   const [manualRows] = await conn.execute(
     `SELECT id, entry_date, particulars, vch_type, vch_no, debit, credit, created_at
      FROM ledger_entries
-     WHERE buyer_name = ?
+     WHERE TRIM(buyer_name) IN (${manualPlaceholders})
+        OR buyer_name IN (${manualPlaceholders})
      ORDER BY entry_date ASC, id ASC`,
-    [decodedCompany]
+    [...manualAliases, ...manualAliases],
   );
 
   const returnEntriesMap = {};
@@ -733,4 +817,21 @@ export async function buildLedgerForParty(decodedCompany, customerIdFilter = nul
   }));
 
   return { entries: serialized, customerId: customerIdForCompany };
+}
+
+/** Sum debit/credit from ledger rows — same math as LedgerTableClient net balance. */
+export function computeLedgerTotals(entries) {
+  const debit = (entries || []).reduce(
+    (sum, row) => sum + Number(row.debit || 0),
+    0,
+  );
+  const credit = (entries || []).reduce(
+    (sum, row) => sum + Number(row.credit || 0),
+    0,
+  );
+  return {
+    debit,
+    credit,
+    netBalance: debit - credit,
+  };
 }
