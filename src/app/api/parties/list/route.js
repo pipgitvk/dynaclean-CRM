@@ -100,12 +100,7 @@ function groupPartiesByCustomerId(parties, canonicalNameByCustomerId) {
 
     const existing = byCustomerId.get(customerId);
     existing.aliasNames.push(party.name);
-    existing._psrTotal =
-      Number(existing._psrTotal || 0) + Number(party._psrTotal || 0);
-    existing._psrCount =
-      Number(existing._psrCount || 0) + Number(party._psrCount || 0);
-    existing._spareTotal =
-      Number(existing._spareTotal || 0) + Number(party._spareTotal || 0);
+    // Purchase totals are resolved once per customer_id in the balance loop.
     existing.phone = mergeContactField(existing.phone, party.phone);
     existing.billing_address = mergeContactField(
       existing.billing_address,
@@ -162,6 +157,8 @@ export async function GET(req) {
     const manualCrByName = new Map();
     const invoicesByName = new Map();
     const invoicesByCustomerId = new Map();
+    const purchasesByCustomerId = new Map();
+    const spareByCustomerId = new Map();
 
     console.time("[parties-list] queries");
     const [
@@ -171,6 +168,8 @@ export async function GET(req) {
       custRows,
       psrRows,
       spareRows,
+      psrByCustomerIdRows,
+      spareByCustomerIdRows,
       leRows,
       retLedgerRows,
       cnRows,
@@ -289,6 +288,30 @@ export async function GET(req) {
       ),
       safeQuery(
         conn,
+        "psr by customer_id",
+        `SELECT
+           CAST(customer_id AS CHAR) AS customer_id,
+           SUM(COALESCE(net_amount, 0)) AS total_purchase,
+           COUNT(*) AS purchase_count
+         FROM product_stock_request
+         WHERE customer_id IS NOT NULL
+           AND customer_id != 0
+         GROUP BY CAST(customer_id AS CHAR)`,
+      ),
+      safeQuery(
+        conn,
+        "spare by customer_id",
+        `SELECT
+           CAST(customer_id AS CHAR) AS customer_id,
+           SUM(COALESCE(net_amount, 0)) AS total_purchase,
+           COUNT(*) AS purchase_count
+         FROM spare_stock_request
+         WHERE customer_id IS NOT NULL
+           AND customer_id != 0
+         GROUP BY CAST(customer_id AS CHAR)`,
+      ),
+      safeQuery(
+        conn,
         "ledger_entries",
         `SELECT
            TRIM(buyer_name) AS buyer_name,
@@ -339,6 +362,24 @@ export async function GET(req) {
         _invPaid: Number(r.total_paid || 0),
         _invBalance: Number(r.total_balance_amount || 0),
         _invCount: Number(r.invoice_count || 0),
+      });
+    }
+
+    for (const r of psrByCustomerIdRows) {
+      const cid = String(r.customer_id || "").trim();
+      if (!cid) continue;
+      purchasesByCustomerId.set(cid, {
+        total: Number(r.total_purchase || 0),
+        count: Number(r.purchase_count || 0),
+      });
+    }
+
+    for (const r of spareByCustomerIdRows) {
+      const cid = String(r.customer_id || "").trim();
+      if (!cid) continue;
+      spareByCustomerId.set(cid, {
+        total: Number(r.total_purchase || 0),
+        count: Number(r.purchase_count || 0),
       });
     }
 
@@ -471,14 +512,19 @@ export async function GET(req) {
 
       const customerIdKey =
         p.customer_id != null ? String(p.customer_id).trim() : "";
+      let usedCustomerIdInv = false;
       if (customerIdKey && invoicesByCustomerId.has(customerIdKey)) {
         const invAgg = invoicesByCustomerId.get(customerIdKey);
-        hasInvoiceAgg = true;
-        invAggForContact = invAgg;
-        invTotal = Number(invAgg._invTotal || 0);
-        invPaid = Number(invAgg._invPaid || 0);
-        invBalance = Number(invAgg._invBalance || 0);
-      } else {
+        if (Number(invAgg._invCount || 0) > 0) {
+          usedCustomerIdInv = true;
+          hasInvoiceAgg = true;
+          invAggForContact = invAgg;
+          invTotal = Number(invAgg._invTotal || 0);
+          invPaid = Number(invAgg._invPaid || 0);
+          invBalance = Number(invAgg._invBalance || 0);
+        }
+      }
+      if (!usedCustomerIdInv) {
         for (const alias of aliasNames) {
           const invAgg = invoicesByName.get(alias.toLowerCase());
           if (!invAgg) continue;
@@ -494,8 +540,21 @@ export async function GET(req) {
         ? invBalance
         : Math.max(0, invTotal - invPaid);
 
-      const purchasesPayable =
-        Number(p._psrTotal || 0) + Number(p._spareTotal || 0);
+      let purchasesPayable = 0;
+      let purchaseCount = 0;
+      if (customerIdKey) {
+        const psrAgg = purchasesByCustomerId.get(customerIdKey);
+        const spareAgg = spareByCustomerId.get(customerIdKey);
+        purchasesPayable =
+          Number(psrAgg?.total || 0) + Number(spareAgg?.total || 0);
+        purchaseCount =
+          Number(psrAgg?.count || 0) + Number(spareAgg?.count || 0);
+      } else {
+        purchasesPayable =
+          Number(p._psrTotal || 0) + Number(p._spareTotal || 0);
+        purchaseCount =
+          Number(p._psrCount || 0) + Number(p._spareTotal ? 1 : 0);
+      }
 
       let mDr = 0;
       let mCr = 0;
@@ -518,6 +577,17 @@ export async function GET(req) {
       const debitSide = receivableFromInvoices + mDr;
       const creditSide = purchasesPayable + mCr + returnCr;
       const net = debitSide - creditSide;
+
+      const hasActivity =
+        (hasInvoiceAgg && (invTotal > 0 || invBalance > 0)) ||
+        purchaseCount > 0 ||
+        mDr > 0 ||
+        mCr > 0 ||
+        returnCr > 0 ||
+        (customerIdKey &&
+          (invoicesByCustomerId.has(customerIdKey) ||
+            purchasesByCustomerId.has(customerIdKey) ||
+            spareByCustomerId.has(customerIdKey)));
 
       let amountType = "flat";
       if (net > 0.01) amountType = "receivable";
@@ -556,12 +626,17 @@ export async function GET(req) {
         gstin: gstinOut,
         balance: Number(net.toFixed(2)),
         amountType,
+        hasActivity,
+        searchableNames: aliasNames,
       });
     }
 
     console.timeEnd("[parties-list] merge");
 
-    const filtered = out.filter((p) => Math.abs(Number(p.balance || 0)) > 0.01);
+    const filtered = out.filter(
+      (p) =>
+        p.hasActivity || Math.abs(Number(p.balance || 0)) > 0.01,
+    );
 
     filtered.sort((a, b) => {
       const an = Math.abs(a.balance || 0);
@@ -570,8 +645,15 @@ export async function GET(req) {
       return a.name.localeCompare(b.name);
     });
 
+    const partiesOut = filtered.map(
+      ({ hasActivity: _ha, searchableNames, ...party }) => ({
+        ...party,
+        searchableNames,
+      }),
+    );
+
     console.timeEnd("[parties-list] total");
-    return NextResponse.json({ success: true, parties: filtered });
+    return NextResponse.json({ success: true, parties: partiesOut });
   } catch (err) {
     console.error("[parties list GET]", err?.message);
     return NextResponse.json(

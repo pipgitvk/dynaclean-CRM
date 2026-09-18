@@ -153,6 +153,14 @@ export default function PartiesPage() {
     if (!q) return parties;
     return parties.filter((p) => {
       if (p.name.toLowerCase().includes(q)) return true;
+      if (
+        Array.isArray(p.searchableNames) &&
+        p.searchableNames.some((name) =>
+          String(name || "").toLowerCase().includes(q),
+        )
+      ) {
+        return true;
+      }
       if (p.phone && String(p.phone).includes(q)) return true;
       if (p.gstin && String(p.gstin).toLowerCase().includes(q)) return true;
       if (p.customer_id && String(p.customer_id).toLowerCase().includes(q)) return true;
