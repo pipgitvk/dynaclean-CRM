@@ -201,6 +201,7 @@ import KeywordPerformanceQuickCard from "@/components/keywords/KeywordPerformanc
 import { Package, BarChart3, Upload, DollarSign, Calendar, Plane, FileText, ClipboardList } from "lucide-react";
 import ServiceTeamReportCard from "@/components/service/ServiceTeamReportCard";
 import ServiceSupportQuotesOrdersCard from "@/components/service/ServiceSupportQuotesOrdersCard";
+import ServiceSupportTotalCard from "@/components/service/ServiceSupportTotalCard";
 
 // import UpcomingLeads from "@/components/Leads/UpcommingLeads";
 
@@ -302,6 +303,13 @@ export default async function UserDashboardPage() {
 
     let todayServiceTeamRows = [];
     let todayServiceQuoteOrderRows = [];
+    let serviceSupportTotals = {
+      totalAmount: 0,
+      quotationCount: 0,
+      quotationAmount: 0,
+      orderProcessCount: 0,
+      orderProcessAmount: 0,
+    };
     try {
       const todayIst = new Date().toLocaleDateString("en-CA", {
         timeZone: "Asia/Kolkata",
@@ -356,6 +364,41 @@ export default async function UserDashboardPage() {
           quotes: qtMap[name] || 0,
           orders: opMap[name] || 0,
         }));
+
+        const [quoteTotalRows] = await connection.execute(
+          `SELECT
+            COUNT(*) AS count,
+            COALESCE(SUM(COALESCE(grand_total, 0)), 0) AS amount
+          FROM quotations_records
+          WHERE emp_name IN (${placeholders})`,
+          [...employees],
+        );
+        const [orderTotalRows] = await connection.execute(
+          `SELECT
+            COUNT(*) AS count,
+            COALESCE(SUM(
+              CASE
+                WHEN qr.grand_total > 0 THEN qr.grand_total
+                WHEN no.totalamt > 0 THEN no.totalamt
+                ELSE COALESCE(no.baseAmount, 0) + COALESCE(no.taxamt, 0)
+              END
+            ), 0) AS amount
+          FROM neworder no
+          LEFT JOIN quotations_records qr
+            ON no.quote_number COLLATE utf8mb4_unicode_ci = qr.quote_number COLLATE utf8mb4_unicode_ci
+          WHERE no.created_by IN (${placeholders})`,
+          [...employees],
+        );
+
+        const quotationAmount = parseFloat(quoteTotalRows[0]?.amount) || 0;
+        const orderProcessAmount = parseFloat(orderTotalRows[0]?.amount) || 0;
+        serviceSupportTotals = {
+          quotationCount: Number(quoteTotalRows[0]?.count) || 0,
+          quotationAmount,
+          orderProcessCount: Number(orderTotalRows[0]?.count) || 0,
+          orderProcessAmount,
+          totalAmount: quotationAmount + orderProcessAmount,
+        };
       }
     } catch (e) {
       console.warn("today service support followup counts:", e.message);
@@ -494,6 +537,7 @@ export default async function UserDashboardPage() {
 
           {/* Service Team Report */}
           <ServiceTeamReportCard rows={todayServiceTeamRows} />
+          <ServiceSupportTotalCard {...serviceSupportTotals} />
           <ServiceSupportQuotesOrdersCard rows={todayServiceQuoteOrderRows} />
         </div>
 
