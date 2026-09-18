@@ -7,6 +7,7 @@ import Link from "next/link";
 import { pickProductImageUrl } from "@/lib/productImageUrl";
 
 function ProductAndSpareLists({ type, userRole }) {
+  const isGemRole = userRole === "GEM" || userRole === "GEM PORTAL";
   const [rows, setRows] = useState([]);
   const [q, setQ] = useState("");
   const [showSparesModal, setShowSparesModal] = useState(false);
@@ -190,15 +191,7 @@ function ProductAndSpareLists({ type, userRole }) {
                         {/* All prices in one column */}
                         <td className="p-2">
                           <div className="space-y-1 min-w-[180px]">
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="text-gray-500 text-xs w-28 shrink-0">Price</span>
-                              <span className="font-medium">{r.price_per_unit || 0}</span>
-                            </div>
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="text-gray-500 text-xs w-28 shrink-0">Last Neg. Price</span>
-                              <span className="font-medium">{r.last_negotiation_price || 0}</span>
-                            </div>
-                            {["SUPERADMIN", "ADMIN", "GEM", "EA"].includes(userRole) && (
+                            {isGemRole ? (
                               <>
                                 <div className="flex items-center justify-between gap-2">
                                   <span className="text-gray-500 text-xs w-28 shrink-0">GEM Price</span>
@@ -208,10 +201,33 @@ function ProductAndSpareLists({ type, userRole }) {
                                   <span className="text-gray-500 text-xs w-28 shrink-0">GEM Last Neg.</span>
                                   <span className="font-medium">{parseFloat(r.gem_last_negotiation_price) || 0}</span>
                                 </div>
+                              </>
+                            ) : (
+                              <>
                                 <div className="flex items-center justify-between gap-2">
-                                  <span className="text-gray-500 text-xs w-28 shrink-0">Dealer Price</span>
-                                  <span className="font-medium">{parseFloat(r.dealer_price) || 0}</span>
+                                  <span className="text-gray-500 text-xs w-28 shrink-0">Price</span>
+                                  <span className="font-medium">{r.price_per_unit || 0}</span>
                                 </div>
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-gray-500 text-xs w-28 shrink-0">Last Neg. Price</span>
+                                  <span className="font-medium">{r.last_negotiation_price || 0}</span>
+                                </div>
+                                {["SUPERADMIN", "ADMIN", "EA"].includes(userRole) && (
+                                  <>
+                                    <div className="flex items-center justify-between gap-2">
+                                      <span className="text-gray-500 text-xs w-28 shrink-0">GEM Price</span>
+                                      <span className="font-medium">{r.gem_price || 0}</span>
+                                    </div>
+                                    <div className="flex items-center justify-between gap-2">
+                                      <span className="text-gray-500 text-xs w-28 shrink-0">GEM Last Neg.</span>
+                                      <span className="font-medium">{parseFloat(r.gem_last_negotiation_price) || 0}</span>
+                                    </div>
+                                    <div className="flex items-center justify-between gap-2">
+                                      <span className="text-gray-500 text-xs w-28 shrink-0">Dealer Price</span>
+                                      <span className="font-medium">{parseFloat(r.dealer_price) || 0}</span>
+                                    </div>
+                                  </>
+                                )}
                               </>
                             )}
                           </div>
@@ -231,16 +247,18 @@ function ProductAndSpareLists({ type, userRole }) {
                       <>
                         {/* Spare prices in one column */}
                         <td className="p-2">
-                          <div className="space-y-1 min-w-[160px]">
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="text-gray-500 text-xs w-28 shrink-0">Price</span>
-                              <span className="font-medium">{r.price || 0}</span>
+                          {!isGemRole && (
+                            <div className="space-y-1 min-w-[160px]">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-gray-500 text-xs w-28 shrink-0">Price</span>
+                                <span className="font-medium">{r.price || 0}</span>
+                              </div>
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-gray-500 text-xs w-28 shrink-0">Last Neg. Price</span>
+                                <span className="font-medium">{r.last_negotiation_price || 0}</span>
+                              </div>
                             </div>
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="text-gray-500 text-xs w-28 shrink-0">Last Neg. Price</span>
-                              <span className="font-medium">{r.last_negotiation_price || 0}</span>
-                            </div>
-                          </div>
+                          )}
                         </td>
                         <td className="p-2">{r.specification}</td>
                       </>
@@ -311,30 +329,45 @@ function ProductAndSpareLists({ type, userRole }) {
                       <span className="font-semibold">Min Qty:</span>{" "}
                       {r.min_qty}
                     </p>
-                    <p>
-                      <span className="font-semibold">Price:</span>{" "}
-                      {r.price_per_unit}
-                    </p>
-                    {["SUPERADMIN", "ADMIN", "GEM", "EA"].includes(userRole) && (
+                    {isGemRole ? (
                       <>
                         <p>
                           <span className="font-semibold">GEM Price:</span>{" "}
                           {r.gem_price || 0}
                         </p>
                         <p>
-                          <span className="font-semibold">GEM Last Neg. Price:</span>{" "}
+                          <span className="font-semibold">GEM Last Neg.:</span>{" "}
                           {parseFloat(r.gem_last_negotiation_price) || 0}
                         </p>
+                      </>
+                    ) : (
+                      <>
                         <p>
-                          <span className="font-semibold">Dealer Price:</span>{" "}
-                          {parseFloat(r.dealer_price) || 0}
+                          <span className="font-semibold">Price:</span>{" "}
+                          {r.price_per_unit}
+                        </p>
+                        {["SUPERADMIN", "ADMIN", "EA"].includes(userRole) && (
+                          <>
+                            <p>
+                              <span className="font-semibold">GEM Price:</span>{" "}
+                              {r.gem_price || 0}
+                            </p>
+                            <p>
+                              <span className="font-semibold">GEM Last Neg. Price:</span>{" "}
+                              {parseFloat(r.gem_last_negotiation_price) || 0}
+                            </p>
+                            <p>
+                              <span className="font-semibold">Dealer Price:</span>{" "}
+                              {parseFloat(r.dealer_price) || 0}
+                            </p>
+                          </>
+                        )}
+                        <p>
+                          <span className="font-semibold">Last Neg. Price:</span>{" "}
+                          {r.last_negotiation_price || 0}
                         </p>
                       </>
                     )}
-                    <p>
-                      <span className="font-semibold">Last Neg. Price:</span>{" "}
-                      {r.last_negotiation_price || 0}
-                    </p>
                     <p>
                       <span className="font-semibold">Specification:</span>{" "}
                       {r.specification}
@@ -350,13 +383,17 @@ function ProductAndSpareLists({ type, userRole }) {
                       <span className="font-semibold">Min Qty:</span>{" "}
                       {r.min_qty}
                     </p>
-                    <p>
-                      <span className="font-semibold">Price:</span> {r.price}
-                    </p>
-                    <p>
-                      <span className="font-semibold">Last Neg. Price:</span>{" "}
-                      {r.last_negotiation_price || 0}
-                    </p>
+                    {!isGemRole && (
+                      <>
+                        <p>
+                          <span className="font-semibold">Price:</span> {r.price}
+                        </p>
+                        <p>
+                          <span className="font-semibold">Last Neg. Price:</span>{" "}
+                          {r.last_negotiation_price || 0}
+                        </p>
+                      </>
+                    )}
                     <p>
                       <span className="font-semibold">Specification:</span>{" "}
                       {r.specification}
@@ -447,8 +484,12 @@ function ProductAndSpareLists({ type, userRole }) {
                       <th className="p-2 text-left">Name</th>
                       <th className="p-2 text-left">Type</th>
                       <th className="p-2 text-left">Model</th>
-                      <th className="p-2 text-left">Sale Price</th>
-                      <th className="p-2 text-left">Last Neg. Price</th>
+                      {!isGemRole && (
+                        <>
+                          <th className="p-2 text-left">Sale Price</th>
+                          <th className="p-2 text-left">Last Neg. Price</th>
+                        </>
+                      )}
                       <th className="p-2 text-left">Specification</th>
                     </tr>
                   </thead>
@@ -488,8 +529,12 @@ function ProductAndSpareLists({ type, userRole }) {
                         <td className="p-2 font-semibold text-gray-800">{spare.item_name}</td>
                         <td className="p-2">{spare.type || '-'}</td>
                         <td className="p-2">{spare.model || '-'}</td>
-                        <td className="p-2">₹{spare.sale_price || 0}</td>
-                        <td className="p-2">₹{spare.last_negotiation_price || 0}</td>
+                        {!isGemRole && (
+                          <>
+                            <td className="p-2">₹{spare.sale_price || 0}</td>
+                            <td className="p-2">₹{spare.last_negotiation_price || 0}</td>
+                          </>
+                        )}
                         <td className="p-2">{spare.specification || '-'}</td>
                       </tr>
                     ))}
