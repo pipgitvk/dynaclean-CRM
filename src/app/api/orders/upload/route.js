@@ -1,43 +1,31 @@
 import { NextResponse } from "next/server";
-import { parseFormData } from "@/lib/parseFormData";
-import fs from "fs";
-import path from "path";
+import { parseFormData } from "@/lib/parseForm";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
+import { uploadOrderAccountFile } from "@/lib/uploadOrderAccountFile";
 
-// Ensure the target folder exists
-const ensureDir = (dirPath) => {
-  if (!fs.existsSync(dirPath)) {
-    fs.mkdirSync(dirPath, { recursive: true });
-  }
-};
-
-// Save file to public/Order/accounts/
-async function saveFileLocally(file) {
-  if (!file || !file.filepath) throw new Error("Missing file");
-
-  const uploadDir = path.join(process.cwd(), "public", "Order", "accounts");
-  ensureDir(uploadDir);
-
-  const ext = path.extname(file.originalFilename || "") || ".bin";
-  const uniqueName = `${Date.now()}_${Math.random()
-    .toString(36)
-    .substring(2, 8)}${ext}`;
-  const destPath = path.join(uploadDir, uniqueName);
-
-  await fs.promises.copyFile(file.filepath, destPath);
-
-  // Return relative URL (for database usage)
-  return `/Order/accounts/${uniqueName}`;
-}
+const MAX_FILES_PER_FIELD = 5;
 
 // Normalize file input
 const getFile = (f) => (Array.isArray(f) ? f[0] : f);
 
+async function saveFilesField(fileField) {
+  if (!fileField) return "";
+  const list = Array.isArray(fileField) ? fileField : [fileField];
+  const paths = [];
+  for (const item of list.slice(0, MAX_FILES_PER_FIELD)) {
+    const file = getFile(item);
+    if (file?.filepath) {
+      paths.push(await uploadOrderAccountFile(file));
+    }
+  }
+  return paths.filter(Boolean).join(",");
+}
+
 // POST handler
 export async function POST(req) {
   try {
-    const { fields, files } = await parseFormData(req);
+    const { fields, files } = await parseFormData(req, { multiples: true });
 
     const orderId = parseInt(fields.order_id);
     if (!orderId) throw new Error("Missing or invalid order_id");
@@ -80,19 +68,18 @@ export async function POST(req) {
           )
         : null;
 
-    // Save files locally (if present)
-    const ewaybillPath = files.ewaybill_file
-      ? await saveFileLocally(getFile(files.ewaybill_file))
-      : "";
-    const einvoicePath = files.einvoice_file
-      ? await saveFileLocally(getFile(files.einvoice_file))
-      : "";
-    const reportPath = files.report_file
-      ? await saveFileLocally(getFile(files.report_file))
-      : "";
-    const challanPath = files.deliverchallan
-      ? await saveFileLocally(getFile(files.deliverchallan))
-      : "";
+    const reportPath = await saveFilesField(files.report_file);
+    if (!reportPath) {
+      return NextResponse.json(
+        { error: "Invoice PDF is required" },
+        { status: 400 },
+      );
+    }
+
+    // PDF → local, images → Cloudinary — up to 5 per field, comma-separated paths/URLs
+    const ewaybillPath = await saveFilesField(files.ewaybill_file);
+    const einvoicePath = await saveFilesField(files.einvoice_file);
+    const challanPath = await saveFilesField(files.deliverchallan);
 
     // DB connection
     const conn = await getDbConnection();

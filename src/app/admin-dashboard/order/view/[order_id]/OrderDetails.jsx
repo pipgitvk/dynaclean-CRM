@@ -178,36 +178,13 @@ export default function OrderDetails({ data, userRole }) {
 
       {/* File Downloads */}
       <div className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {files.map(({ label, key }) => {
-          const fileUrl = orderDetails[key];
-          const displayUrl = resolveStoredFileUrl(fileUrl);
-          return (
-            <div key={key} className="p-4 border rounded-lg">
-              <h4 className="text-sm font-semibold mb-2">{label}</h4>
-              {fileUrl ? (
-                <div className="flex gap-2">
-                  <a
-                    href={displayUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:underline text-sm"
-                  >
-                    View
-                  </a>
-                  <a
-                    href={displayUrl}
-                    download
-                    className="text-green-600 hover:underline text-sm"
-                  >
-                    Download
-                  </a>
-                </div>
-              ) : (
-                <p className="text-gray-500 text-xs">Not uploaded</p>
-              )}
-            </div>
-          );
-        })}
+        {files.map(({ label, key }) => (
+          <FileLinksCard
+            key={key}
+            label={label}
+            file={orderDetails[key]}
+          />
+        ))}
 
         {orderDetails.booking_url && (
           <div className="p-4 border rounded-lg">
@@ -243,6 +220,92 @@ export default function OrderDetails({ data, userRole }) {
           ← Back to Order List
         </a>
       </div>
+    </div>
+  );
+}
+
+function getDisplayUrl(fileUrl) {
+  if (!fileUrl) return "";
+  if (fileUrl.includes("res.cloudinary.com")) {
+    return `/api/cloudinary-proxy?url=${encodeURIComponent(fileUrl)}`;
+  }
+  return resolveStoredFileUrl(fileUrl);
+}
+
+function fileLabelFromUrl(fileUrl, index) {
+  const segment = fileUrl.split("/").pop() || "";
+  const decoded = decodeURIComponent(segment.split("?")[0]);
+  return decoded || `File ${index + 1}`;
+}
+
+function FileLinksCard({ label, file }) {
+  const fileUrls = String(file || "")
+    .split(",")
+    .map((url) => url.trim())
+    .filter(Boolean);
+
+  return (
+    <div className="p-4 border rounded-lg">
+      <h4 className="text-sm font-semibold mb-2">{label}</h4>
+      {fileUrls.length === 0 ? (
+        <p className="text-gray-500 text-xs">Not uploaded</p>
+      ) : fileUrls.length === 1 ? (
+        <div className="flex gap-2">
+          <a
+            href={getDisplayUrl(fileUrls[0])}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-600 hover:underline text-sm"
+          >
+            View
+          </a>
+          <a
+            href={getDisplayUrl(fileUrls[0])}
+            download
+            className="text-green-600 hover:underline text-sm"
+          >
+            Download
+          </a>
+        </div>
+      ) : (
+        <details className="cursor-pointer">
+          <summary className="text-blue-600 underline hover:text-blue-800 text-sm">
+            {fileUrls.length} files
+          </summary>
+          <div className="mt-2 space-y-2 rounded border border-gray-200 bg-gray-50 p-2">
+            {fileUrls.map((fileUrl, idx) => {
+              const displayUrl = getDisplayUrl(fileUrl);
+              return (
+                <div
+                  key={`${fileUrl}-${idx}`}
+                  className="flex items-center justify-between gap-2 rounded bg-white p-2 text-sm"
+                >
+                  <span className="truncate flex-1">
+                    {idx + 1}. {fileLabelFromUrl(fileUrl, idx)}
+                  </span>
+                  <div className="flex shrink-0 gap-2">
+                    <a
+                      href={displayUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:underline text-xs"
+                    >
+                      View
+                    </a>
+                    <a
+                      href={displayUrl}
+                      download
+                      className="text-green-600 hover:underline text-xs"
+                    >
+                      Download
+                    </a>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </details>
+      )}
     </div>
   );
 }
