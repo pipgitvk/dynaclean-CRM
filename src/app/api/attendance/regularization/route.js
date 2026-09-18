@@ -1,6 +1,6 @@
 import path from "path";
-import { mkdir, writeFile } from "fs/promises";
 import { NextResponse } from "next/server";
+import { uploadAttendanceRegularizationAttachment } from "@/lib/uploadAttendanceRegularizationAttachment";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import {
@@ -298,40 +298,10 @@ export async function POST(request) {
 
     let publicUrl = null;
     if (hasFile) {
-      const mime = typeof file.type === "string" ? file.type : "";
-      const nameExt = path
-        .extname(typeof file.name === "string" ? file.name : "")
-        .toLowerCase();
-      const extFromMime =
-        mime === "application/pdf"
-          ? ".pdf"
-          : mime === "image/jpeg"
-            ? ".jpg"
-            : mime === "image/png"
-              ? ".png"
-              : mime === "image/webp"
-                ? ".webp"
-                : "";
-      const safeExt = [".pdf", ".jpg", ".jpeg", ".png", ".webp"].includes(nameExt)
-        ? nameExt === ".jpeg"
-          ? ".jpg"
-          : nameExt
-        : extFromMime || (nameExt || ".bin");
-
-      const userFolder = String(subjectUsername).replace(/[^a-zA-Z0-9._-]/g, "_");
-      const uploadDir = path.join(
-        process.cwd(),
-        "public",
-        "attendance_regularization",
-        userFolder
+      publicUrl = await uploadAttendanceRegularizationAttachment(
+        file,
+        subjectUsername,
       );
-      await mkdir(uploadDir, { recursive: true });
-      const fileName = `${Date.now()}_${Math.random().toString(36).slice(2, 10)}${safeExt}`;
-      const fullPath = path.join(uploadDir, fileName);
-      const buf = Buffer.from(await file.arrayBuffer());
-      await writeFile(fullPath, buf);
-
-      publicUrl = `/attendance_regularization/${encodeURIComponent(userFolder)}/${encodeURIComponent(fileName)}`;
     }
 
     await conn.execute(
@@ -682,36 +652,10 @@ export async function PUT(request) {
         );
       }
 
-      const extFromMime =
-        mime === "application/pdf"
-          ? ".pdf"
-          : mime === "image/jpeg"
-            ? ".jpg"
-            : mime === "image/png"
-              ? ".png"
-              : mime === "image/webp"
-                ? ".webp"
-                : "";
-      const safeExt = [".pdf", ".jpg", ".jpeg", ".png", ".webp"].includes(nameExt)
-        ? nameExt === ".jpeg"
-          ? ".jpg"
-          : nameExt
-        : extFromMime || (nameExt || ".bin");
-
-      const userFolder = String(session.username).replace(/[^a-zA-Z0-9._-]/g, "_");
-      const uploadDir = path.join(
-        process.cwd(),
-        "public",
-        "attendance_regularization",
-        userFolder
+      newAttachmentUrl = await uploadAttendanceRegularizationAttachment(
+        file,
+        session.username,
       );
-      await mkdir(uploadDir, { recursive: true });
-      const fileName = `${Date.now()}_${Math.random().toString(36).slice(2, 10)}${safeExt}`;
-      const fullPath = path.join(uploadDir, fileName);
-      const buf = Buffer.from(await file.arrayBuffer());
-      await writeFile(fullPath, buf);
-
-      newAttachmentUrl = `/attendance_regularization/${encodeURIComponent(userFolder)}/${encodeURIComponent(fileName)}`;
     }
 
     await conn.execute(

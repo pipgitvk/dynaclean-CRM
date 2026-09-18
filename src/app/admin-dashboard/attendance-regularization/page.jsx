@@ -5,6 +5,7 @@ import Link from "next/link";
 import toast from "react-hot-toast";
 import { BadgeCheck } from "lucide-react";
 import { formatAttendanceTimeForDisplay as formatTime } from "@/lib/istDateTime";
+import { getAttendanceRegularizationAttachmentHref } from "@/lib/attendanceRegularizationAttachmentHref";
 
 function formatLogDate(v) {
   if (v == null) return "—";
@@ -339,7 +340,10 @@ export default function AdminAttendanceRegularizationPage() {
                     <td className="px-3 py-2">
                       {req.attachment_url ? (
                         <a
-                          href={req.attachment_url}
+                          href={getAttendanceRegularizationAttachmentHref(
+                            req.attachment_url,
+                            req.id,
+                          )}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-teal-700 underline hover:text-teal-900"

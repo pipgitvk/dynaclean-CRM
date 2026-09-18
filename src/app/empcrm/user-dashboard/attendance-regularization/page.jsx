@@ -5,6 +5,7 @@ import Link from "next/link";
 import toast from "react-hot-toast";
 import { BadgeCheck } from "lucide-react";
 import { formatAttendanceTimeForDisplay as formatTime } from "@/lib/istDateTime";
+import { getAttendanceRegularizationAttachmentHref } from "@/lib/attendanceRegularizationAttachmentHref";
 
 const FIELDS = [
   { key: "checkin_time", label: "Check-in" },
@@ -257,7 +258,10 @@ export default function AttendanceRegularizationApprovalsPage() {
                       <td className="px-4 py-3 whitespace-nowrap">
                         {req.attachment_url ? (
                           <a
-                            href={req.attachment_url}
+                            href={getAttendanceRegularizationAttachmentHref(
+                              req.attachment_url,
+                              req.id,
+                            )}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-teal-700 underline hover:text-teal-900 font-medium"
@@ -405,7 +409,10 @@ export default function AttendanceRegularizationApprovalsPage() {
                   {req.attachment_url && (
                     <p className="text-sm mb-3">
                       <a
-                        href={req.attachment_url}
+                        href={getAttendanceRegularizationAttachmentHref(
+                          req.attachment_url,
+                          req.id,
+                        )}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="font-medium text-teal-700 underline hover:text-teal-900"

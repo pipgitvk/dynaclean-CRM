@@ -14,6 +14,7 @@ import {
 } from "@/lib/attendanceRulesEngine";
 import { rowHasMeaningfulCheckinOrCheckout } from "@/lib/attendanceMeaningfulPunch";
 import { formatAttendanceTimeForDisplay as formatTime } from "@/lib/istDateTime";
+import { getAttendanceRegularizationAttachmentHref } from "@/lib/attendanceRegularizationAttachmentHref";
 import AttendanceRegularizeModal from "@/app/user-dashboard/attendance/AttendanceRegularizeModal";
 
 function statusBadgeClass(status) {
@@ -1597,7 +1598,10 @@ const AttendancePage = () => {
                 {editRegRequest?.attachment_url && (
                   <div className="mb-2">
                     <a
-                      href={editRegRequest.attachment_url}
+                      href={getAttendanceRegularizationAttachmentHref(
+                        editRegRequest.attachment_url,
+                        editRegRequest.id,
+                      )}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-xs text-amber-700 hover:text-amber-900 underline"
