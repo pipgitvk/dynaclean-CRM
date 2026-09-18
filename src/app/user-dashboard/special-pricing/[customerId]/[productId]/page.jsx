@@ -3,6 +3,10 @@ import { getSessionPayload } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { deleteSpecialPrice, updateSpecialPrice } from "../../_actions";
+import {
+  resolveSpecialPriceTerm,
+  resolveSpecialPriceType,
+} from "@/lib/specialPriceDefaults";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +45,8 @@ export default async function ProductSpecialPrice({ params }) {
       SELECT 
         sp.id,
         sp.special_price,
+        sp.price_type,
+        sp.price_term,
         sp.status,
         sp.item_type,
         sp.product_id,
@@ -74,6 +80,8 @@ export default async function ProductSpecialPrice({ params }) {
       SELECT 
         sp.id,
         sp.special_price,
+        sp.price_type,
+        sp.price_term,
         sp.status,
         sp.item_type,
         sp.product_id,
@@ -121,6 +129,8 @@ export default async function ProductSpecialPrice({ params }) {
         <p><strong>Customer:</strong> {data.first_name} {data.last_name}</p>
         <p><strong>Product:</strong> {data.item_name}</p>
         <p><strong>Original Price:</strong> ₹ {data.price_per_unit}</p>
+        <p><strong>Price Type:</strong> {resolveSpecialPriceType(data.price_type)}</p>
+        <p><strong>Price Term:</strong> {resolveSpecialPriceTerm(data.price_term)}</p>
         <p><strong>GST:</strong> {data.gst_rate}%</p>
         <p>
           <strong>Status:</strong>{" "}

@@ -1,6 +1,10 @@
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { redirect } from "next/navigation";
+import {
+  SPECIAL_PRICE_TERM_DEFAULT,
+  SPECIAL_PRICE_TYPE_DEFAULT,
+} from "@/lib/specialPriceDefaults";
 
 /* =========================
    UPDATE SPECIAL PRICE
@@ -41,10 +45,21 @@ export async function updateSpecialPrice(formData) {
     await conn.execute(
       `
       UPDATE special_price
-      SET special_price = ?, status = 'pending', approved_by = NULL, approved_date = NULL
+      SET special_price = ?,
+          price_type = ?,
+          price_term = ?,
+          status = 'pending',
+          approved_by = NULL,
+          approved_date = NULL
       WHERE id = ? AND customer_id = ?
       `,
-      [Number(specialPrice), Number(id), Number(customerId)]
+      [
+        Number(specialPrice),
+        SPECIAL_PRICE_TYPE_DEFAULT,
+        SPECIAL_PRICE_TERM_DEFAULT,
+        Number(id),
+        Number(customerId),
+      ]
     );
 
     redirect(`/user-dashboard/special-pricing/${customerId}`);

@@ -1,6 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import {
+  resolveSpecialPriceTerm,
+  resolveSpecialPriceType,
+} from "@/lib/specialPriceDefaults";
 
 export default function SpecialPriceDetailsModal({
   details,
@@ -21,6 +25,8 @@ export default function SpecialPriceDetailsModal({
     productCode,
     originalPrice,
     specialPrice,
+    priceType,
+    priceTerm,
     status,
     setBy,
     setDate,
@@ -115,6 +121,18 @@ export default function SpecialPriceDetailsModal({
                   </div>
                   <div className="text-green-700 font-semibold">
                     ₹ {specialPrice ?? 0}
+                  </div>
+                </div>
+                <div>
+                  <div className="font-semibold text-gray-600">Price Type</div>
+                  <div className="text-gray-800 capitalize">
+                    {resolveSpecialPriceType(priceType)}
+                  </div>
+                </div>
+                <div>
+                  <div className="font-semibold text-gray-600">Price Term</div>
+                  <div className="text-gray-800 capitalize">
+                    {resolveSpecialPriceTerm(priceTerm)}
                   </div>
                 </div>
               </div>

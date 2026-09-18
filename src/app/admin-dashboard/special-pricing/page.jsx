@@ -8,6 +8,11 @@ import SpecialPriceApproveRejectButtons from "@/components/specialPrice/SpecialP
 import SpecialPricingSearch from "./SpecialPricingSearch";
 import StatusFilter from "./StatusFilter";
 import TypeFilter from "./TypeFilter";
+import {
+  isDealerPricePending,
+  resolveSpecialPriceTerm,
+  resolveSpecialPriceType,
+} from "@/lib/specialPriceDefaults";
 
 export const dynamic = "force-dynamic";
 
@@ -78,6 +83,8 @@ export default async function AdminSpecialPricingPage({ searchParams }) {
       sp.product_id,
       sp.product_code,
       sp.special_price,
+      sp.price_type,
+      sp.price_term,
       sp.status,
       sp.set_by,
       sp.set_date,
@@ -94,6 +101,10 @@ export default async function AdminSpecialPricingPage({ searchParams }) {
         WHEN sp.item_type = 'spare' THEN sl.sale_price
         ELSE p.price_per_unit
       END AS price_per_unit,
+      CASE 
+        WHEN sp.item_type = 'spare' THEN sl.last_negotiation_price
+        ELSE p.last_negotiation_price
+      END AS last_negotiation_price,
       CASE 
         WHEN sp.item_type = 'spare' THEN sl.image
         ELSE p.product_image
@@ -206,7 +217,7 @@ export default async function AdminSpecialPricingPage({ searchParams }) {
           className="overflow-x-scroll w-full min-w-0 touch-pan-x"
           style={{ WebkitOverflowScrolling: "touch" }}
         >
-          <table className="min-w-[900px] w-full border-collapse text-sm">
+          <table className="min-w-[1000px] w-full border-collapse text-sm">
             <thead className="bg-gray-100">
               <tr>
                 <th className="p-3 text-left">Type</th>
@@ -214,7 +225,10 @@ export default async function AdminSpecialPricingPage({ searchParams }) {
                 <th className="p-3 text-left">Image</th>
                 <th className="p-3 text-left">Product/Spare</th>
                 <th className="p-3 text-right">Original Price</th>
+                <th className="p-3 text-right">Last Neg. Price</th>
                 <th className="p-3 text-right">Special Price</th>
+                <th className="p-3 text-left">Price Type</th>
+                <th className="p-3 text-left">Price Term</th>
                 <th className="p-3 text-center">Status</th>
                 <th className="p-3 text-left">Set By</th>
                 <th className="p-3 text-left">Set Date</th>
@@ -225,7 +239,7 @@ export default async function AdminSpecialPricingPage({ searchParams }) {
               {rows.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={10}
+                    colSpan={13}
                     className="p-4 text-center text-gray-500 text-sm"
                   >
                     {searchQuery || statusFilter || typeFilter ? "No data found" : "No special prices found."}
@@ -298,8 +312,23 @@ export default async function AdminSpecialPricingPage({ searchParams }) {
                       <td className="p-3 text-right text-gray-600">
                         ₹ {row.price_per_unit}
                       </td>
+                      <td className="p-3 text-right text-gray-600">
+                        ₹ {row.last_negotiation_price ?? 0}
+                      </td>
                       <td className="p-3 text-right font-semibold">
-                        ₹ {row.special_price}
+                        {isDealerPricePending(row) ? (
+                          <span className="text-gray-400 italic text-sm font-normal">
+                            Enter on approve
+                          </span>
+                        ) : (
+                          `₹ ${row.special_price}`
+                        )}
+                      </td>
+                      <td className="p-3 text-sm capitalize">
+                        {resolveSpecialPriceType(row.price_type)}
+                      </td>
+                      <td className="p-3 text-sm capitalize">
+                        {resolveSpecialPriceTerm(row.price_term)}
                       </td>
                       <td className="p-3 text-center">
                         <div className="flex flex-col items-center gap-1">
@@ -348,6 +377,8 @@ export default async function AdminSpecialPricingPage({ searchParams }) {
                               productCode: row.product_code,
                               originalPrice: row.price_per_unit,
                               specialPrice: row.special_price,
+                              priceType: row.price_type,
+                              priceTerm: row.price_term,
                               status: row.status,
                               setBy: row.set_by,
                               setDate: row.set_date,
@@ -360,7 +391,11 @@ export default async function AdminSpecialPricingPage({ searchParams }) {
                           />
                         </div>
                         {!isApproved && !isRejected && (
-                          <SpecialPriceApproveRejectButtons id={row.id} itemType={row.item_type} />
+                          <SpecialPriceApproveRejectButtons
+                            id={row.id}
+                            itemType={row.item_type}
+                            needsDealerPrice={isDealerPricePending(row)}
+                          />
                         )}
                       </td>
                     </tr>

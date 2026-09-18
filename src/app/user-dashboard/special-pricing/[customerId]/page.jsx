@@ -1,7 +1,13 @@
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import AddSpecialPriceModal from "@/components/specialPrice/AddSpecialPriceModal";
+import RequestDealerPriceModal from "@/components/specialPrice/RequestDealerPriceModal";
 import Link from "next/link";
+import {
+  isDealerPricePending,
+  resolveSpecialPriceTerm,
+  resolveSpecialPriceType,
+} from "@/lib/specialPriceDefaults";
 
 export const dynamic = "force-dynamic";
 
@@ -49,6 +55,8 @@ export default async function CustomerSpecialPrice({ params }) {
       sp.product_id,
       sp.item_type,
       sp.special_price,
+      sp.price_type,
+      sp.price_term,
       sp.status,
       sp.set_by,
       sp.approved_by,
@@ -137,8 +145,10 @@ export default async function CustomerSpecialPrice({ params }) {
       
  
         </div>
-         <AddSpecialPriceModal customerId={customerId} />
-      
+        <div className="flex flex-wrap gap-2">
+          <RequestDealerPriceModal customerId={customerId} />
+          <AddSpecialPriceModal customerId={customerId} />
+        </div>
       </div>
 
       {customerInfo && (
@@ -176,6 +186,8 @@ export default async function CustomerSpecialPrice({ params }) {
                 <th className="p-3 text-left">Product No/Model</th>
                 <th className="p-3 text-right">Original Price</th>
                 <th className="p-3 text-right">Special Price</th>
+                <th className="p-3 text-left">Price Type</th>
+                <th className="p-3 text-left">Price Term</th>
                 <th className="p-3 text-center">Status</th>
                 <th className="p-3 text-left">Set By</th>
                 <th className="p-3 text-left">Set Date</th>
@@ -186,7 +198,7 @@ export default async function CustomerSpecialPrice({ params }) {
             <tbody>
               {rows.map((row) => {
                 const imageUrl = row.image_path || null;
-                const itemId = row.item_type === 'product' ? row.product_id : row.spare_id;
+                const dealerPending = isDealerPricePending(row);
 
                 return (
                   <tr key={`${row.item_type}-${row.id}`} className="hover:bg-gray-50">
@@ -230,12 +242,29 @@ export default async function CustomerSpecialPrice({ params }) {
 
                     {/* Original */}
                     <td className="p-3 text-right text-gray-500">
-                      ₹ {row.price_per_unit}
+                      {dealerPending ? (
+                        <span className="text-gray-400">-</span>
+                      ) : (
+                        `₹ ${row.price_per_unit}`
+                      )}
                     </td>
 
                     {/* Special Price */}
                     <td className="p-3 text-right font-semibold text-green-600">
-                      ₹ {row.special_price}
+                      {dealerPending ? (
+                        <span className="text-yellow-700 text-sm font-normal italic">
+                          Requested
+                        </span>
+                      ) : (
+                        `₹ ${row.special_price}`
+                      )}
+                    </td>
+
+                    <td className="p-3 text-sm capitalize">
+                      {resolveSpecialPriceType(row.price_type)}
+                    </td>
+                    <td className="p-3 text-sm capitalize">
+                      {resolveSpecialPriceTerm(row.price_term)}
                     </td>
 
                     {/* Status */}
@@ -278,9 +307,9 @@ export default async function CustomerSpecialPrice({ params }) {
 
                     {/* Actions */}
                     <td className="p-3 text-center">
-                      {row.status === "approved" ? (
+                      {row.status === "approved" || dealerPending ? (
                         <span className="text-xs text-gray-400">
-                          Approved
+                          {dealerPending ? "Pending" : "Approved"}
                         </span>
                       ) : (
                         <Link

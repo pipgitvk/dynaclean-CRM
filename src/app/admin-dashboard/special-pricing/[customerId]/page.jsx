@@ -1,6 +1,7 @@
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import AddSpecialPriceModal from "@/components/specialPrice/AddSpecialPriceModal";
+import RequestDealerPriceModal from "@/components/specialPrice/RequestDealerPriceModal";
 import DeleteButton from "@/components/specialPrice/DeleteButton";
 import Link from "next/link";
 
@@ -119,8 +120,10 @@ export default async function CustomerSpecialPrice({ params }) {
       
  
         </div>
-         <AddSpecialPriceModal customerId={customerId} />
-      
+        <div className="flex flex-wrap gap-2">
+          <RequestDealerPriceModal customerId={customerId} />
+          <AddSpecialPriceModal customerId={customerId} />
+        </div>
       </div>
 
       {customerInfo && (

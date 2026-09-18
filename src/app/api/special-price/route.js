@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
+import {
+  SPECIAL_PRICE_TERM_DEFAULT,
+  SPECIAL_PRICE_TYPE_DEFAULT,
+} from "@/lib/specialPriceDefaults";
 
 export async function POST(req) {
   try {
@@ -11,7 +15,14 @@ export async function POST(req) {
 
     const { username } = payload;
     const body = await req.json();
-    const { customer_id, item_type, product_id, product_code, spare_id, price } = body;
+    const {
+      customer_id,
+      item_type,
+      product_id,
+      product_code,
+      spare_id,
+      price,
+    } = body;
 
     console.log("👉 [DEBUG] Received body:", body);
 
@@ -62,11 +73,14 @@ export async function POST(req) {
       }
     }
 
-    // Insert — spare_id saved in product_id column
+    // Add Special Price always uses standard type/term
+    const resolvedPriceType = SPECIAL_PRICE_TYPE_DEFAULT;
+    const resolvedPriceTerm = SPECIAL_PRICE_TERM_DEFAULT;
+
     const insertQuery = `
       INSERT INTO special_price 
-      (customer_id, item_type, product_id, product_code, special_price, status, set_by, set_date)
-      VALUES (?, ?, ?, ?, ?, 'draft', ?, NOW())
+      (customer_id, item_type, product_id, product_code, special_price, price_type, price_term, status, set_by, set_date)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 'draft', ?, NOW())
     `;
 
     try {
@@ -76,6 +90,8 @@ export async function POST(req) {
         itemId,
         itemCode,
         Number(price),
+        resolvedPriceType,
+        resolvedPriceTerm,
         username,
       ]);
     } catch (e) {
