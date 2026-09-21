@@ -4,11 +4,11 @@ import UpcomingTasks from "@/components/task/UpcomingTasks";
 import UpcomingLeads from "@/components/Leads/UpcommingLeads";
 import HotLeadsCards from "@/components/Leads/HotLeadsCards";
 import FastCardButton from "@/components/FastCardButton";
-import VeryGoodCustomersCard from "@/components/customers/VeryGoodCustomersCard";
+import VeryGoodCustomersCard from "@/components/Customers/VeryGoodCustomersCard";
 import TodayReportButton from "@/components/TodayReportButton";
 import TodaysReportingButton from "@/components/TodaysReportingButton";
 import PaymentPendingButton from "@/components/PaymentPendingCircle";
-import SalesAchievedQuickCard from "@/components/targets/SalesAchievedQuickCard";
+// import SalesAchievedQuickCard from "@/components/targets/SalesAchievedQuickCard";
 import ScheduleVisitCard from "@/components/scheduleVisit/ScheduleVisitCard";
 import ManualPaymentUpcomingFollowups from "@/components/manual-payments/ManualPaymentUpcomingFollowups";
 
@@ -34,7 +34,7 @@ export default function SalesDashboard({ user }) {
           href="/sales-dashboard/order"
           iconColor="border-purple-200"
         />
-        <SalesAchievedQuickCard />
+        {/* <SalesAchievedQuickCard /> */}
       </div>
 
       <ManualPaymentUpcomingFollowups dashboardPrefix="/sales-dashboard" />

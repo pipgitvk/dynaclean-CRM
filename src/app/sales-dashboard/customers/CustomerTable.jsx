@@ -72,6 +72,18 @@ export default function CustomerTable({
     notes_language: searchParams.notes_language ?? "",
   });
   const [isInputVisible, setIsInputVisible] = useState(false);
+  const urlFilter = searchParams.filter ?? "";
+  const isVeryGoodFollowupToday = urlFilter === "very_good_followup_today";
+
+  const buildQueryString = (filterValues, page) => {
+    const query = new URLSearchParams();
+    Object.entries(filterValues).forEach(([k, v]) => {
+      if (v !== "") query.set(k, v);
+    });
+    if (urlFilter) query.set("filter", urlFilter);
+    if (page) query.set("page", String(page));
+    return query.toString();
+  };
 
   useEffect(() => {
     console.log("ROWS:", rows);
@@ -116,7 +128,7 @@ export default function CustomerTable({
       notes_language: "",
     };
     setFilters(cleared);
-    router.push("?");
+    router.push(urlFilter ? `?filter=${urlFilter}` : "?");
   };
 
   const update = (key, value) => {
@@ -124,27 +136,13 @@ export default function CustomerTable({
     setFilters(updated);
 
     startTransition(() => {
-      const query = new URLSearchParams();
-      Object.entries(updated).forEach(([k, v]) => {
-        if (v !== "") {
-          query.set(k, v);
-        }
-      });
-
-      router.push(`?${query.toString()}`);
+      router.push(`?${buildQueryString(updated)}`);
     });
   };
 
   const handlePageChange = (newPage) => {
     startTransition(() => {
-      const query = new URLSearchParams();
-      Object.entries(filters).forEach(([k, v]) => {
-        if (v !== "") {
-          query.set(k, v);
-        }
-      });
-      query.set("page", newPage.toString());
-      router.push(`?${query.toString()}`);
+      router.push(`?${buildQueryString(filters, newPage)}`);
     });
   };
 
@@ -166,6 +164,19 @@ export default function CustomerTable({
 
   return (
     <div className="space-y-4">
+      {isVeryGoodFollowupToday && (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+          Showing customers marked <strong>Very Good</strong> in today&apos;s follow-up.
+          <button
+            type="button"
+            onClick={() => router.push("/sales-dashboard/customers")}
+            className="ml-3 font-medium text-emerald-700 underline hover:text-emerald-900"
+          >
+            Clear filter
+          </button>
+        </div>
+      )}
+
       {/* Filters */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-8 gap-2">
         <input

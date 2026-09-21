@@ -34,6 +34,18 @@ const suffixMap = {
   quotations: "Quotes",
 };
 
+function getIstMonthRange() {
+  const today = new Date().toLocaleDateString("en-CA", {
+    timeZone: "Asia/Kolkata",
+  });
+  const [y, m] = today.split("-");
+  const lastDay = new Date(Number(y), Number(m), 0).getDate();
+  return {
+    start: `${y}-${m}-01`,
+    end: `${y}-${m}-${String(lastDay).padStart(2, "0")}`,
+  };
+}
+
 export default function FastCardButton({
   type,
   label,
@@ -98,9 +110,21 @@ export default function FastCardButton({
     const suffix = monthly
       ? dayjs().format("MMM YYYY")
       : suffixMap[type] || "";
+    const linkHref =
+      monthly && type === "sales"
+        ? (() => {
+            const month = getIstMonthRange();
+            const params = new URLSearchParams({
+              date_from: month.start,
+              date_to: month.end,
+              has_invoice: "1",
+            });
+            return `${href}?${params.toString()}`;
+          })()
+        : href;
     return (
       <SummaryStatCard
-        href={href}
+        href={linkHref}
         label={label}
         count={count}
         suffix={suffix}

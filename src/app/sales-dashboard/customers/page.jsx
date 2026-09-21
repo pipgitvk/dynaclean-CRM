@@ -1,9 +1,11 @@
 import { getDbConnection } from "@/lib/db";
 import CustomerTable from "./CustomerTable";
-import { cookies } from "next/headers";
-import { jwtVerify } from "jose";
+import { redirect } from "next/navigation";
 import { getSessionPayload } from "@/lib/auth";
 import { notesLanguageExistsSql } from "@/constants/notesLanguageOptions";
+import { mysqlBoundsForIstDateRange } from "@/lib/timezone";
+import { appendVeryGoodFollowupTodayFilter } from "@/lib/veryGoodFollowupTodaySql";
+import { getTodayYmdIST } from "@/lib/prospectCommitmentRules";
 
 export const dynamic = "force-dynamic";
 
@@ -45,6 +47,17 @@ export default async function CustomersPage({ searchParams }) {
   } = searchParamsResolved;
 
   const status = resolveStatusForQuery(statusParam);
+  const isVeryGoodFollowupToday = filter === "very_good_followup_today";
+  const todayIst = getTodayYmdIST();
+
+  if (
+    !isVeryGoodFollowupToday &&
+    status === "Very Good" &&
+    date_from === todayIst &&
+    date_to === todayIst
+  ) {
+    redirect("/sales-dashboard/customers?filter=very_good_followup_today");
+  }
 
   const currentPage = parseInt(page);
   const pageSize = 50;
@@ -72,7 +85,14 @@ export default async function CustomersPage({ searchParams }) {
 
   if (isSalesCumBackoffice) {
     // No condition added — all customers visible, same as SUPERADMIN
-  } else if (userRole !== "ADMIN" && userRole !== "SUPERADMIN" && userRole !== "SERVICE HEAD" && userRole !== "TEAM LEADER" && userRole !== "EA") {
+  } else if (
+    !isVeryGoodFollowupToday &&
+    userRole !== "ADMIN" &&
+    userRole !== "SUPERADMIN" &&
+    userRole !== "SERVICE HEAD" &&
+    userRole !== "TEAM LEADER" &&
+    userRole !== "EA"
+  ) {
     // Only filter by assigned fields for non-admin roles
     customerConditions.push("(c.lead_source = ? OR c.sales_representative = ? OR c.assigned_to = ?)");
     customerParams.push(username, username, username);
@@ -90,6 +110,14 @@ export default async function CustomersPage({ searchParams }) {
   let joinClause = "";
   const followupConditions = [];
   const followupParams = [];
+
+  if (isVeryGoodFollowupToday) {
+    appendVeryGoodFollowupTodayFilter({
+      conditions: customerConditions,
+      params: customerParams,
+      restrictToFollowedBy: isSalesCumBackoffice ? null : username,
+    });
+  }
 
   // Handle today_reporting filter - show customers with today's TL followup
   if (filter === "today_reporting") {
@@ -180,8 +208,11 @@ export default async function CustomersPage({ searchParams }) {
   }
 
   if (date_from && date_to) {
-    customerConditions.push("c.date_created BETWEEN ? AND ?");
-    customerParams.push(date_from, date_to);
+    const createdBounds = mysqlBoundsForIstDateRange(date_from, date_to);
+    if (createdBounds) {
+      customerConditions.push("c.date_created >= ? AND c.date_created <= ?");
+      customerParams.push(createdBounds.start, createdBounds.end);
+    }
   }
 
   if (reporting_date_from && reporting_date_to) {
@@ -299,7 +330,11 @@ export default async function CustomersPage({ searchParams }) {
 
     return (
       <div className="p-6 max-w-7xl mx-auto text-gray-700 border">
-        <h1 className="text-2xl font-bold mb-4">Customers</h1>
+        <h1 className="text-2xl font-bold mb-4">
+          {filter === "very_good_followup_today"
+            ? "Very Good Customers (Today's Follow-up)"
+            : "Customers"}
+        </h1>
         <CustomerTable
           rows={rows}
           searchParams={searchParamsResolved}

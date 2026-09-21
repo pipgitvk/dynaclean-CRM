@@ -4,16 +4,15 @@ import { useEffect, useState } from "react";
 import { Users } from "lucide-react";
 import SummaryStatCard from "@/components/sales/SummaryStatCard";
 
-export default function VeryGoodCustomersCard({
-  href = "/sales-dashboard/customers?status=Very%20Good",
-}) {
+export default function VeryGoodCustomersCard() {
   const [count, setCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const href = "/sales-dashboard/customers?filter=very_good_followup_today";
 
   useEffect(() => {
     const fetchCount = async () => {
       try {
-        const response = await fetch("/api/card-data", {
+        const response = await fetch("/api/card-data?period=today", {
           credentials: "include",
           cache: "no-store",
         });
@@ -36,7 +35,7 @@ export default function VeryGoodCustomersCard({
       href={href}
       label="Very Good Customers"
       count={count}
-      suffix="Customers"
+      suffix="Follow-up Today"
       icon={Users}
       iconWrapClass="bg-emerald-500"
       arrowClass="text-emerald-500"

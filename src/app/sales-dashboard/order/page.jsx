@@ -1,5 +1,6 @@
 import { getDbConnection } from "@/lib/db";
 import OrderTable from "./OrderTable";
+import SalesOrderMonthlyTarget from "./SalesOrderMonthlyTarget";
 import { getSessionPayload } from "@/lib/auth";
 import { canViewAllOrders } from "@/lib/dataScope";
 
@@ -36,7 +37,7 @@ export default async function OrdersPage() {
                 no.order_id, no.report_file, no.po_file, no.payment_proof, no.booking_url,
                 no.client_name, no.contact, no.is_cancelled, no.dispatch_status,
                 no.created_at, no.created_by , no.einvoice_file, no.booking_id, no.quote_number, no.duedate,
-                no.invoice_date , no.account_by ,no.booking_by , no.dispatch_person,
+                no.invoice_number, no.invoice_date , no.account_by ,no.booking_by , no.dispatch_person,
                 no.payment_id, no.payment_date, no.payment_amount, no.payment_status,no.totalamt,
                 no.delivery_date, no.delivered_on, no.delivery_status,no.delivery_proof,
                 no.installation_status, no.is_returned, no.approval_status, no.approval_remark, no.approval_date,
@@ -104,6 +105,7 @@ export default async function OrdersPage() {
         </div>
       </div>
 
+      <SalesOrderMonthlyTarget />
 
       <OrderTable orders={orders} userRole={userRole} />
     </div>

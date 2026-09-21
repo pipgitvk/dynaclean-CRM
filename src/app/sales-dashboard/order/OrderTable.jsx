@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   FileText,
   UploadCloud,
@@ -51,14 +51,24 @@ const SkeletonLoader = () => (
 );
 
 export default function OrderTable({ orders, userRole }) {
+  const searchParams = useSearchParams();
   const [searchQuery, setSearchQuery] = useState("");
   const [filteredOrders, setFilteredOrders] = useState([]);
   const [statusFilter, setStatusFilter] = useState(""); // '', pendinginvoice, invoiceuploaded, bookingdone, dispatchdone, canceled
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [createdByFilter, setCreatedByFilter] = useState("");
+  const [hasInvoiceFilter, setHasInvoiceFilter] = useState(false);
   const [openMenuId, setOpenMenuId] = useState(null); // State to track which menu is open
   // const canShowInstall = ["ADMIN", "SALES", "SERVICE"].includes(userRole);
+
+  useEffect(() => {
+    const from = searchParams.get("date_from");
+    const to = searchParams.get("date_to");
+    if (from) setDateFrom(from);
+    if (to) setDateTo(to);
+    setHasInvoiceFilter(searchParams.get("has_invoice") === "1");
+  }, [searchParams]);
 
   const toggleMenu = (id) => {
     setOpenMenuId(openMenuId === id ? null : id);
@@ -78,23 +88,25 @@ export default function OrderTable({ orders, userRole }) {
         if (orderStatus !== statusFilter.toLowerCase()) return false;
       }
 
-      // Step 2: Date range filter (created_at)
+      // Step 2: Date range filter (created_at, IST calendar day)
       if (dateFrom || dateTo) {
-        const created = order.created_at ? new Date(order.created_at) : null;
-        if (!created || isNaN(created)) return false;
-        if (dateFrom) {
-          const from = new Date(dateFrom + "T00:00:00");
-          if (created < from) return false;
-        }
-        if (dateTo) {
-          const to = new Date(dateTo + "T23:59:59");
-          if (created > to) return false;
-        }
+        if (!order.created_at) return false;
+        const createdKey = new Date(order.created_at).toLocaleDateString(
+          "en-CA",
+          { timeZone: "Asia/Kolkata" },
+        );
+        if (dateFrom && createdKey < dateFrom) return false;
+        if (dateTo && createdKey > dateTo) return false;
       }
 
       // Step 2.5: Filter by created_by
       if (createdByFilter && order.created_by !== createdByFilter) {
         return false;
+      }
+
+      if (hasInvoiceFilter) {
+        const invoiceNumber = String(order.invoice_number || "").trim();
+        if (!invoiceNumber) return false;
       }
 
       // Step 2.6: Filter by approval_status (User Dashboard specific)
@@ -112,7 +124,7 @@ export default function OrderTable({ orders, userRole }) {
       );
     });
     setFilteredOrders(result);
-  }, [searchQuery, orders, statusFilter, dateFrom, dateTo, createdByFilter]);
+  }, [searchQuery, orders, statusFilter, dateFrom, dateTo, createdByFilter, hasInvoiceFilter]);
 
   const getStatusText = (order) => {
     // Check for return status first (highest priority)

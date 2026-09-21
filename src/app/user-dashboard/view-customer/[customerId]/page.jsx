@@ -8,6 +8,7 @@ import ViewCustomerQuotationsLink from "@/components/Customers/ViewCustomerQuota
 import CustomerPerformaInvoiceButton from "@/components/invoice/CustomerPerformaInvoiceButton";
 import ScheduleVisitModal from "@/components/scheduleVisit/ScheduleVisitModal";
 import { canShowScheduleVisitOnCustomerProfile } from "@/lib/scheduleVisitScope";
+import { isSalesRole } from "@/lib/isSalesRole";
 import { userHasModuleKey } from "@/lib/userModuleAccessServer";
 import Link from "next/link";
 import axios from "axios";
@@ -22,6 +23,8 @@ export default async function CustomerPage({ params }) {
   const userRole = payload?.role || "";
   const username = payload?.username || "";
   const isRestrictedRole = userRole === "SERVICE SUPPORT" || userRole === "GEM";
+  const hideServiceLeadSource = isSalesRole(userRole);
+  const hideLeadSource = userRole === "SERVICE SUPPORT";
   const showScheduleVisitBtn = canShowScheduleVisitOnCustomerProfile(userRole);
 
   // Explicitly select all columns including service_lead_source
@@ -49,20 +52,42 @@ export default async function CustomerPage({ params }) {
     .trim();
 
   // Fetch followup history
-  // SERVICE SUPPORT: only their own followups; everyone else: all followups
-  const isServiceSupport = userRole === "SERVICE SUPPORT";
-  const [fups] = await conn.execute(
-    isServiceSupport
-      ? `SELECT next_followup_date, service_next_followup, gem_next_followup, followed_date, followed_by, notes, comm_mode, time_stamp 
-         FROM customers_followup
-         WHERE customer_id = ? AND followed_by = ? AND followed_by IS NOT NULL AND followed_by != ''
-         ORDER BY time_stamp DESC`
-      : `SELECT next_followup_date, service_next_followup, gem_next_followup, followed_date, followed_by, notes, comm_mode, time_stamp 
+  // SERVICE SUPPORT / GEM: only their own followups
+  // Sales roles: hide SERVICE SUPPORT follow-ups
+  const hideServiceSupportFollowups = isSalesRole(userRole);
+  const followupSelect = `SELECT next_followup_date, service_next_followup, gem_next_followup, followed_date, followed_by, notes, comm_mode, time_stamp`;
+
+  let followupSql = `${followupSelect}
          FROM customers_followup
          WHERE customer_id = ?
-         ORDER BY time_stamp DESC`,
-    isServiceSupport ? [customerId, username] : [customerId],
-  );
+         ORDER BY time_stamp DESC`;
+  let followupParams = [customerId];
+
+  if (isRestrictedRole) {
+    followupSql = `${followupSelect}
+         FROM customers_followup
+         WHERE customer_id = ? AND followed_by = ? AND followed_by IS NOT NULL AND followed_by != ''
+         ORDER BY time_stamp DESC`;
+    followupParams = [customerId, username];
+  } else if (hideServiceSupportFollowups) {
+    followupSql = `${followupSelect}
+         FROM customers_followup cf
+         WHERE cf.customer_id = ?
+           AND (
+             cf.followed_by IS NULL
+             OR cf.followed_by = ''
+             OR NOT EXISTS (
+               SELECT 1
+               FROM rep_list rl
+               WHERE rl.username = cf.followed_by
+                 AND UPPER(TRIM(rl.userRole)) = 'SERVICE SUPPORT'
+             )
+           )
+         ORDER BY cf.time_stamp DESC`;
+    followupParams = [customerId];
+  }
+
+  const [fups] = await conn.execute(followupSql, followupParams);
 
   // Fetch orders count for this customer
   // SUPERADMIN/DIRECTOR: see all orders for customer
@@ -195,19 +220,23 @@ export default async function CustomerPage({ params }) {
       </div>
 
       {/* Row 4 */}
-      <div>
-        <dt className="text-sm font-medium text-gray-500">Lead Source</dt>
-        <dd className="mt-1 text-gray-800">
-          {customer.lead_source || "-"}
-        </dd>
-      </div>
+      {!hideLeadSource && (
+        <div>
+          <dt className="text-sm font-medium text-gray-500">Lead Source</dt>
+          <dd className="mt-1 text-gray-800">
+            {customer.lead_source || "-"}
+          </dd>
+        </div>
+      )}
 
-      <div>
-        <dt className="text-sm font-medium text-gray-500">Service Lead Source</dt>
-        <dd className="mt-1 text-gray-800">
-          {customer.service_lead_source || "-"}
-        </dd>
-      </div>
+      {!hideServiceLeadSource && (
+        <div>
+          <dt className="text-sm font-medium text-gray-500">Service Lead Source</dt>
+          <dd className="mt-1 text-gray-800">
+            {customer.service_lead_source || "-"}
+          </dd>
+        </div>
+      )}
 
       <div>
         <dt className="text-sm font-medium text-gray-500">
