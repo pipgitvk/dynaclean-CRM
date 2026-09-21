@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import InvoiceTable from "@/app/director-dashboard/invoices/InvoiceTable";
+import InvoiceTable from "@/app/admin-dashboard/invoices/InvoiceTable";
 
 export const dynamic = "force-dynamic";
 
@@ -26,13 +26,13 @@ export default function StatementsInvoicesPage() {
         <h1 className="text-2xl font-bold text-gray-800">Invoice Management</h1>
         <div className="flex items-center gap-3">
           <a
-            href="/director-dashboard/invoices"
+            href="/admin-dashboard/invoices"
             className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 transition-colors"
           >
             Cards
           </a>
           <a
-            href="/director-dashboard/invoices/new"
+            href="/admin-dashboard/invoices/new"
             className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition-colors"
           >
             Add Invoice

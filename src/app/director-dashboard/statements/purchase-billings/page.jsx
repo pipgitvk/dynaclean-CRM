@@ -1,4 +1,4 @@
-import PurchaseProductsPage from "@/app/director-dashboard/purchase-products/PurchaseProductsPage";
+import PurchaseProductsPage from "@/app/admin-dashboard/purchase-products/PurchaseProductsPage";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Purchase Billings | DynaClean CRM" };

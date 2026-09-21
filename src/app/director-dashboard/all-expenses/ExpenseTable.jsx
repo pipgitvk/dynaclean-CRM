@@ -5,7 +5,7 @@ import dayjs from "dayjs";
 import { useState, useEffect } from "react";
 import { Eye, CreditCard, Download, ExternalLink, Pencil, Link2, Edit3 } from "lucide-react";
 import Modal from "../../user-dashboard/expenses/Model";
-import StatementLinkModal from "../../director-dashboard/expenses/StatementLinkModal";
+import StatementLinkModal from "@/app/admin-dashboard/expenses/StatementLinkModal";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import ExcelJS from "exceljs";
