@@ -49,6 +49,15 @@ function transformMenuItemPaths(item, roleKey) {
       "employee-list": "/director-dashboard/employees",
       "client-expenses": "/director-dashboard/client-expenses/cards",
       statements: "/director-dashboard/statements",
+      "attendance-rules": "/director-dashboard/attendance-rules",
+      "hr-daily-report": "/director-dashboard/hr-today-report",
+      "all-hr-report": "/director-dashboard/all-hr-report",
+      "paid-leave-ledger": "/director-dashboard/paid-leave-ledger",
+      "prospects-view": "/director-dashboard/prospects",
+      "prospects-add": "/director-dashboard/prospects/add-manual",
+      "prospects-new": "/director-dashboard/prospects/new",
+      "hr-designation-targets": "/director-dashboard/hr-designation-targets",
+      "sales-target": "/director-dashboard/monitor-targets",
     };
     if (item.moduleKey && directorModulePaths[item.moduleKey]) {
       return { ...item, path: directorModulePaths[item.moduleKey] };
