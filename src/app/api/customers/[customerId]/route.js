@@ -2,12 +2,14 @@ import { getDbConnection } from "@/lib/db";
 import { NextResponse } from "next/server";
 import { getSessionPayload } from "@/lib/auth";
 import { cookies } from "next/headers";
+import { ensureCustomersServiceColumns } from "@/lib/ensureCustomersServiceColumns";
 
 export async function GET(request, { params }) {
   const { customerId } = await params;
 
   try {
     const conn = await getDbConnection();
+    await ensureCustomersServiceColumns(conn);
     const [rows] = await conn.execute(
       `SELECT c.*,
         IF(EXISTS (

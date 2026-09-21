@@ -2,6 +2,7 @@ import { getDbConnection } from "@/lib/db";
 import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 import { convertISTtoUTC } from "@/lib/timezone";
+import { ensureCustomersServiceColumns } from "@/lib/ensureCustomersServiceColumns";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret";
 
@@ -94,6 +95,7 @@ export async function POST(req, { params }) {
   }
 
   const conn = await getDbConnection();
+  await ensureCustomersServiceColumns(conn);
 
   // First try to get from customers_followup (existing records), fallback to customers table
   let [rows] = await conn.execute(
@@ -187,6 +189,16 @@ export async function POST(req, { params }) {
     });
   }
   const purpose = data.purpose ? data.purpose.slice(0, 100) : null;
+  const isServiceSupport = userRole === "SERVICE SUPPORT";
+  const serviceStatus = isServiceSupport
+    ? String(data.service_status || "").trim().slice(0, 50) || null
+    : null;
+  const serviceStage = isServiceSupport
+    ? String(data.service_stage || "").trim().slice(0, 100) || null
+    : null;
+  const serviceTags = isServiceSupport
+    ? String(data.service_tags || "").trim().slice(0, 255) || null
+    : null;
 
   await conn.execute(
     `INSERT INTO customers_followup 
@@ -205,10 +217,17 @@ export async function POST(req, { params }) {
       data.notes,
       notesLanguage,
       followedBy,
-      data.multi_tag || null,
+      isServiceSupport ? null : data.multi_tag || null,
       purpose,
     ],
   );
+
+  if (isServiceSupport) {
+    await conn.execute(
+      `UPDATE customers SET service_status = ?, service_stage = ?, service_tags = ? WHERE customer_id = ?`,
+      [serviceStatus, serviceStage || "New", serviceTags, customerId],
+    );
+  }
 
   // If status is Denied, insert second follow-up row with employee name + notes + client name + contact
   if (data.status === "Denied") {
@@ -237,8 +256,8 @@ export async function POST(req, { params }) {
     );
   }
 
-  // Only update status and stage if they are provided (not SERVICE SUPPORT or GEM)
-  if (data.status || data.stage) {
+  // Only update sales status/stage on customers table (not SERVICE SUPPORT or GEM)
+  if ((data.status || data.stage) && userRole !== "SERVICE SUPPORT" && userRole !== "GEM") {
     await conn.execute(
       `UPDATE customers SET status=?, stage=? WHERE customer_id=?`,
       [data.status, data.stage || "New", customerId],
