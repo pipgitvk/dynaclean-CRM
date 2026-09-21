@@ -119,7 +119,17 @@ export default async function OrdersPage({ searchParams }) {
                 MAX(cn.credit_note_number) as credit_note_number,
                 GROUP_CONCAT(DISTINCT qi.item_name SEPARATOR ', ') as item_name,
                 GROUP_CONCAT(DISTINCT qi.item_code SEPARATOR ', ') as item_code,
-                COALESCE(SUM(COALESCE(qi.total_taxable_amt, qi.taxable_price, 0)), 0) AS order_taxable_total
+                COALESCE(SUM(COALESCE(qi.total_taxable_amt, qi.taxable_price, 0)), 0) AS order_taxable_total,
+                GROUP_CONCAT(
+                  CONCAT(
+                    COALESCE(qi.item_name, ''),
+                    '::',
+                    COALESCE(qi.item_code, ''),
+                    '::',
+                    COALESCE(qi.quantity, 0)
+                  )
+                  SEPARATOR '||'
+                ) AS line_items_raw
             FROM 
                 neworder no
             LEFT JOIN 
@@ -154,7 +164,24 @@ export default async function OrdersPage({ searchParams }) {
 
   const [orders] = await conn.execute(sql, params);
 
-  const enrichedOrders = orders;
+  const enrichedOrders = orders.map((order) => {
+    const raw = order.line_items_raw;
+    const line_items =
+      typeof raw === "string" && raw
+        ? raw
+            .split("||")
+            .map((part) => {
+              const [item_name, item_code, quantity] = part.split("::");
+              return {
+                item_name: item_name || "",
+                item_code: item_code || "",
+                quantity: Number(quantity) || 0,
+              };
+            })
+            .filter((item) => item.item_name)
+        : [];
+    return { ...order, line_items };
+  });
 
   // await conn.end();
 

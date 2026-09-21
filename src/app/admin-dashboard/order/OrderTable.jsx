@@ -23,6 +23,25 @@ import ExcelJS from "exceljs";
 import DeleteButton from "@/components/accounts/DeleteButton";
 import toast from "react-hot-toast";
 
+function parseOrderLineItems(order) {
+  if (Array.isArray(order?.line_items)) return order.line_items;
+  return [];
+}
+
+function orderMatchesModelFilter(order, modelName) {
+  if (!modelName) return true;
+  return parseOrderLineItems(order).some(
+    (item) => String(item.item_name || "").trim() === modelName,
+  );
+}
+
+function modelQuantityInOrder(order, modelName) {
+  if (!modelName) return 0;
+  return parseOrderLineItems(order)
+    .filter((item) => String(item.item_name || "").trim() === modelName)
+    .reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
+}
+
 // 👻 A sleek skeleton loader for a modern feel
 const SkeletonLoader = () => (
   <div className="animate-pulse space-y-4">
@@ -193,6 +212,20 @@ export default function OrderTable({ orders, userRole }) {
     }
     return "";
   });
+  const [modelNameFilter, setModelNameFilter] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("orderTable_modelNameFilter") || "";
+    }
+    return "";
+  });
+  const [modelSearchText, setModelSearchText] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("orderTable_modelNameFilter") || "";
+    }
+    return "";
+  });
+  const [showModelDropdown, setShowModelDropdown] = useState(false);
+  const modelSearchRef = useRef(null);
   const [openMenuId, setOpenMenuId] = useState(null); // State to track which menu is open
   // const canShowInstall = ["SUPERADMIN"].includes(userRole);
   const [approvalStatusFilter, setApprovalStatusFilter] = useState(() => {
@@ -257,6 +290,26 @@ export default function OrderTable({ orders, userRole }) {
       localStorage.setItem("orderTable_createdByFilter", createdByFilter);
     }
   }, [createdByFilter]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("orderTable_modelNameFilter", modelNameFilter);
+    }
+  }, [modelNameFilter]);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        modelSearchRef.current &&
+        !modelSearchRef.current.contains(event.target)
+      ) {
+        setShowModelDropdown(false);
+        setModelSearchText(modelNameFilter);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [modelNameFilter]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -328,6 +381,9 @@ export default function OrderTable({ orders, userRole }) {
     setDateFrom(dayjs().startOf('month').format('YYYY-MM-DD'));
     setDateTo(dayjs().endOf('month').format('YYYY-MM-DD'));
     setCreatedByFilter("");
+    setModelNameFilter("");
+    setModelSearchText("");
+    setShowModelDropdown(false);
     setApprovalStatusFilter("");
     setShowRejected(false);
     
@@ -338,6 +394,7 @@ export default function OrderTable({ orders, userRole }) {
       localStorage.removeItem("orderTable_dateFrom");
       localStorage.removeItem("orderTable_dateTo");
       localStorage.removeItem("orderTable_createdByFilter");
+      localStorage.removeItem("orderTable_modelNameFilter");
       localStorage.removeItem("orderTable_approvalStatusFilter");
       localStorage.removeItem("orderTable_showRejected");
     }
@@ -470,6 +527,10 @@ export default function OrderTable({ orders, userRole }) {
         return false;
       }
 
+      if (!orderMatchesModelFilter(order, modelNameFilter)) {
+        return false;
+      }
+
       // Step 3: Search across multiple fields
       return (
         order.order_id?.toLowerCase().includes(lowercasedQuery) ||
@@ -506,7 +567,35 @@ export default function OrderTable({ orders, userRole }) {
     sortColumn,
     sortDirection,
     showRejected,
+    modelNameFilter,
   ]);
+
+  const modelNameOptions = useMemo(() => {
+    const names = new Set();
+    orders?.forEach((order) => {
+      parseOrderLineItems(order).forEach((item) => {
+        const name = String(item.item_name || "").trim();
+        if (name) names.add(name);
+      });
+    });
+    return [...names].sort((a, b) => a.localeCompare(b));
+  }, [orders]);
+
+  const filteredModelQuantity = useMemo(() => {
+    if (!modelNameFilter) return 0;
+    return filteredOrders.reduce(
+      (sum, order) => sum + modelQuantityInOrder(order, modelNameFilter),
+      0,
+    );
+  }, [filteredOrders, modelNameFilter]);
+
+  const filteredModelOptions = useMemo(() => {
+    const query = modelSearchText.trim().toLowerCase();
+    if (!query) return modelNameOptions.slice(0, 50);
+    return modelNameOptions
+      .filter((name) => name.toLowerCase().includes(query))
+      .slice(0, 50);
+  }, [modelNameOptions, modelSearchText]);
 
   const dispatchDoneTotals = useMemo(() => {
     if (!orders?.length) return { gstTotal: 0, taxableTotal: 0 };
@@ -784,6 +873,133 @@ export default function OrderTable({ orders, userRole }) {
                   })}
                 </p>
               </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="w-full rounded-xl border border-blue-200 bg-gradient-to-br from-blue-50 to-white shadow-sm p-3 sm:p-4 cursor-default hover:shadow-md transition-shadow">
+          <div className="flex items-start justify-between">
+            <div className="w-full">
+              <p className="text-xs text-blue-700 mb-0.5 font-semibold uppercase tracking-wide">
+                Model Summary
+              </p>
+              <p className="text-[10px] text-blue-600/90 mb-2 leading-tight">
+                Filter by model name
+              </p>
+
+              <div ref={modelSearchRef} className="relative mb-2">
+                <div className="relative">
+                  <Search
+                    size={14}
+                    className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-blue-400"
+                  />
+                  <input
+                    type="text"
+                    value={modelSearchText}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setModelSearchText(value);
+                      setShowModelDropdown(true);
+                      if (!value.trim()) {
+                        setModelNameFilter("");
+                      }
+                    }}
+                    onFocus={() => setShowModelDropdown(true)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") {
+                        setShowModelDropdown(false);
+                        setModelSearchText(modelNameFilter);
+                      } else if (e.key === "Enter" && filteredModelOptions.length > 0) {
+                        e.preventDefault();
+                        const selected = filteredModelOptions[0];
+                        setModelNameFilter(selected);
+                        setModelSearchText(selected);
+                        setShowModelDropdown(false);
+                      }
+                    }}
+                    placeholder="Search model name..."
+                    autoComplete="off"
+                    className="w-full border border-blue-200 rounded-lg py-1.5 pl-7 pr-7 text-xs bg-white"
+                  />
+                  {modelSearchText && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setModelNameFilter("");
+                        setModelSearchText("");
+                        setShowModelDropdown(false);
+                      }}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-blue-400 hover:text-blue-600"
+                      aria-label="Clear model filter"
+                    >
+                      <XCircle size={14} />
+                    </button>
+                  )}
+                </div>
+
+                {showModelDropdown && (
+                  <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-48 overflow-y-auto rounded-lg border border-blue-200 bg-white shadow-lg">
+                    {!modelSearchText.trim() && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setModelNameFilter("");
+                          setModelSearchText("");
+                          setShowModelDropdown(false);
+                        }}
+                        className="w-full border-b border-blue-50 px-3 py-2 text-left text-xs text-blue-700 hover:bg-blue-50"
+                      >
+                        All Models
+                      </button>
+                    )}
+                    {filteredModelOptions.length > 0 ? (
+                      filteredModelOptions.map((modelName) => (
+                        <button
+                          key={modelName}
+                          type="button"
+                          onClick={() => {
+                            setModelNameFilter(modelName);
+                            setModelSearchText(modelName);
+                            setShowModelDropdown(false);
+                          }}
+                          className={`w-full border-b border-blue-50 px-3 py-2 text-left text-xs hover:bg-blue-50 ${
+                            modelNameFilter === modelName
+                              ? "bg-blue-50 font-medium text-blue-900"
+                              : "text-gray-700"
+                          }`}
+                        >
+                          {modelName}
+                        </button>
+                      ))
+                    ) : (
+                      <div className="px-3 py-2 text-xs text-gray-500">
+                        No models found
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {modelNameFilter ? (
+                <>
+                  <div className="mb-2 pb-2 border-b border-blue-100">
+                    <p className="text-[10px] text-blue-600 font-medium">Total Quantity</p>
+                    <p className="text-lg font-bold text-blue-950 tabular-nums">
+                      {filteredModelQuantity.toLocaleString("en-IN")}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-sky-600 font-medium">Orders</p>
+                    <p className="text-lg font-bold text-sky-700 tabular-nums">
+                      {filteredOrders.length.toLocaleString("en-IN")}
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <p className="text-xs text-blue-600/80">
+                  Select a model to view quantity
+                </p>
+              )}
             </div>
           </div>
         </div>
