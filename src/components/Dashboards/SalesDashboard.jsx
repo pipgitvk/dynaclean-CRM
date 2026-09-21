@@ -4,6 +4,7 @@ import UpcomingTasks from "@/components/task/UpcomingTasks";
 import UpcomingLeads from "@/components/Leads/UpcommingLeads";
 import HotLeadsCards from "@/components/Leads/HotLeadsCards";
 import FastCardButton from "@/components/FastCardButton";
+import VeryGoodCustomersCard from "@/components/customers/VeryGoodCustomersCard";
 import TodayReportButton from "@/components/TodayReportButton";
 import TodaysReportingButton from "@/components/TodaysReportingButton";
 import PaymentPendingButton from "@/components/PaymentPendingCircle";
@@ -23,15 +24,7 @@ export default function SalesDashboard({ user }) {
         <PaymentPendingButton variant="sales" monthly />
         <TodayReportButton variant="sales" />
         <ScheduleVisitCard variant="sales" href="/sales-dashboard/schedule-visits" />
-        <FastCardButton
-          variant="sales"
-          monthly
-          type="customers"
-          label="Good Customers"
-          iconName="Users"
-          href="/sales-dashboard/customers"
-          iconColor="border-green-200"
-        />
+        <VeryGoodCustomersCard />
         <FastCardButton
           variant="sales"
           monthly
