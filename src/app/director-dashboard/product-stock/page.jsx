@@ -390,7 +390,7 @@ function ProductStockList() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
         <h1 className="text-2xl font-bold text-gray-800">Product Stock Management</h1>
         <div className="flex flex-wrap items-center gap-2">
-          <Link href="/admin-dashboard/add-assets" className="text-sm px-4 py-2 rounded text-white bg-blue-600 hover:bg-blue-700">
+          <Link href="/director-dashboard/add-assets" className="text-sm px-4 py-2 rounded text-white bg-blue-600 hover:bg-blue-700">
             Add New Product
           </Link>
           {/* Section Toggle Buttons */}

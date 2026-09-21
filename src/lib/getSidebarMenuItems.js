@@ -13,8 +13,7 @@ import { getDbConnection } from "@/lib/db";
 // Role to dashboard prefix mapping
 function getDashboardPrefix(roleKey) {
   const role = String(roleKey || "").toUpperCase();
-  // Director uses user-dashboard, not director-dashboard
-  // (director-dashboard catch-all redirects to user-dashboard anyway)
+  // Director keeps user-dashboard for most CRM routes; specific modules use director-dashboard copies.
   if (role === "DIRECTOR") return "/user-dashboard";
   if (role.includes("SALES")) return "/sales-dashboard";
   if (role.includes("SERVICE") && role.includes("HEAD")) return "/service-head-dashboard";
@@ -40,6 +39,20 @@ function transformMenuItemPaths(item, roleKey) {
 
   if (roleUpper === "SALES CUM BACKOFFICE" && item.moduleKey === "backlinks-excel-data") {
     return { ...item, path: "/sales-dashboard/backlinks-excel" };
+  }
+
+  if (roleUpper === "DIRECTOR") {
+    const directorModulePaths = {
+      "dashboard-home": "/director-dashboard",
+      "keywords-management": "/director-dashboard/keywords",
+      "backlinks-management": "/director-dashboard/backlinks",
+      "employee-list": "/director-dashboard/employees",
+      "client-expenses": "/director-dashboard/client-expenses/cards",
+      statements: "/director-dashboard/statements",
+    };
+    if (item.moduleKey && directorModulePaths[item.moduleKey]) {
+      return { ...item, path: directorModulePaths[item.moduleKey] };
+    }
   }
 
   if (item.moduleKey === "denied-leads") {
