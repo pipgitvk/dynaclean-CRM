@@ -179,7 +179,13 @@ export async function POST(req, { params }) {
     insertGemNext = latestDates.gem_next_followup || null;         // preserve GEM date
   }
 
-  const notesLanguage = (data.notes_language || "en").slice(0, 10);
+  const notesLanguage = String(data.notes_language || "").trim().slice(0, 10);
+  if (!notesLanguage) {
+    return new Response(JSON.stringify({ error: "Language is required." }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
   const purpose = data.purpose ? data.purpose.slice(0, 100) : null;
 
   await conn.execute(

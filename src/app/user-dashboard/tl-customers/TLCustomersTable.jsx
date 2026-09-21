@@ -698,7 +698,7 @@ export default function TLCustomersTable({
                     }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
-                    <option value="">All Notes Languages</option>
+                    <option value="">All Language</option>
                     {NOTES_LANGUAGE_OPTIONS.map((lang) => (
                       <option key={lang.code} value={lang.code}>
                         {lang.name}

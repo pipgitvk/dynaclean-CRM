@@ -31,7 +31,7 @@ export default function FollowupForm({ customerId, userRole = "" }) {
   const [customerCreatedAt, setCustomerCreatedAt] = useState(null);
   const [isLoadingCustomer, setIsLoadingCustomer] = useState(true);
   const [hasOrder, setHasOrder] = useState(false);
-  const [notesLanguage, setNotesLanguage] = useState("en");
+  const [notesLanguage, setNotesLanguage] = useState("");
 
   // Languages supported by Google Input Tools (GOOGLE_ITC map in transliterate API)
   const notesLanguageOptions = [
@@ -482,6 +482,11 @@ export default function FollowupForm({ customerId, userRole = "" }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    if (!notesLanguage) {
+      toast.error("Please select a language.");
+      return;
+    }
+
     if (isGEM && formData.gem_next_followup) {
       const selected = new Date(formData.gem_next_followup);
       const maxDate = gemFollowupDateLimits.max
@@ -590,13 +595,17 @@ export default function FollowupForm({ customerId, userRole = "" }) {
         <div className="flex items-center justify-between mb-1">
           <label className="block text-sm font-medium text-gray-700">Notes</label>
           <div className="flex items-center gap-2">
-            <label className="text-xs text-gray-600">Language:</label>
+            <label className="text-xs text-gray-600">
+              Language <span className="text-red-500">*</span>:
+            </label>
             <select
               value={notesLanguage}
               onChange={handleNotesLanguageChange}
               disabled={isNotesTransliterating}
+              required
               className="text-sm px-2 py-1 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-gray-400 disabled:opacity-60"
             >
+              <option value="">Select Language</option>
               {notesLanguageOptions.map((lang) => (
                 <option key={lang.code} value={lang.code}>
                   {lang.name}

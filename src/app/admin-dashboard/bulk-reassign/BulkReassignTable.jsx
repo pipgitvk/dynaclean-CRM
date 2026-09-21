@@ -331,7 +331,7 @@ export default function BulkReassignTable() {
                         onChange={(e) => setFilters({ ...filters, notes_language: e.target.value })}
                         className="border rounded px-3 py-2"
                     >
-                        <option value="">All Notes Languages</option>
+                        <option value="">All Language</option>
                         {NOTES_LANGUAGE_OPTIONS.map((lang) => (
                             <option key={lang.code} value={lang.code}>
                                 {lang.name}

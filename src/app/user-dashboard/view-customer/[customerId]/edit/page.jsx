@@ -2,6 +2,7 @@ import { getDbConnection } from "@/lib/db";
 import EditCustomerForm from "@/components/customer/EditCustomerForm";
 import UpdateLeadSourceForm from "@/components/customer/UpdateLeadSourceForm";
 import { getSessionPayload } from "@/lib/auth";
+import { latestFollowupNotesLanguageSelectSql } from "@/lib/customerFollowupNotesLanguage";
 
 export const dynamic = "force-dynamic";
 
@@ -12,9 +13,25 @@ export default async function EditCustomerPage({ params }) {
   const userRole = payload?.role;
 
   const conn = await getDbConnection();
-  // Explicitly select all columns including service_lead_source
+
   const [rows] = await conn.execute(
-    `SELECT customer_id, first_name, email, tags, status, phone, gstin, stage, company, address, lead_source, service_lead_source, gem_lead_source FROM customers WHERE customer_id = ?`,
+    `SELECT
+      c.customer_id,
+      c.first_name,
+      c.email,
+      c.tags,
+      c.status,
+      c.phone,
+      c.gstin,
+      c.stage,
+      c.company,
+      c.address,
+      c.lead_source,
+      c.service_lead_source,
+      c.gem_lead_source,
+      ${latestFollowupNotesLanguageSelectSql}
+    FROM customers c
+    WHERE c.customer_id = ?`,
     [customerId]
   );
   const customerData = rows[0] || {};
