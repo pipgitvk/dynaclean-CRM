@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import Modal from "./Modal";
 import ServiceAttachmentLink from "./ServiceAttachmentLink";
+import ServiceReportPrintButton from "./ServiceReportPrintButton";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { useWarrantyProductFollowup } from "@/components/warranty/WarrantyProductFollowupControls";
 
@@ -58,6 +59,11 @@ export default function ServiceTable({ serviceRecords, role }) {
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
   const dashboardPath =
     role?.toLowerCase() === "superadmin" ? "admin-dashboard" : "user-dashboard";
+
+  const canViewDigitalReport = (record) =>
+    record.status?.toUpperCase() === "COMPLETED" &&
+    (Number(record.view_status) === 1 ||
+      record.installation_report === "uploadFO");
 
   // Helper: format dates safely
   const formatDate = (value) => {
@@ -719,17 +725,23 @@ export default function ServiceTable({ serviceRecords, role }) {
                                 Complete Service
                               </Link>
                             </>
-                          ) : record.status?.toUpperCase() === "COMPLETED" &&
-                            (Number(record.view_status) === 1 ||
-                              record.installation_report === "uploadFO") ? (
-                            <a
-                              href={`/${dashboardPath}/view-service-report/${record.service_id}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-block px-3 py-1 text-sm bg-green-700 text-white rounded-md hover:bg-green-800 text-center"
-                            >
-                              View Report
-                            </a>
+                          ) : canViewDigitalReport(record) ? (
+                            <>
+                              <a
+                                href={`/${dashboardPath}/view-service-report/${record.service_id}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-block px-3 py-1 text-sm bg-green-700 text-white rounded-md hover:bg-green-800 text-center"
+                              >
+                                View Report
+                              </a>
+                              <ServiceReportPrintButton
+                                serviceId={record.service_id}
+                                dashboardPath={dashboardPath}
+                                preCompletion={record.pre_completion}
+                                afterCompletion={record.after_completion}
+                              />
+                            </>
                           ) : record.final_report_path ? (
                             <a
                               href={
@@ -991,17 +1003,24 @@ export default function ServiceTable({ serviceRecords, role }) {
                           Complete Service
                         </Link>
                       </>
-                    ) : record.status?.toUpperCase() === "COMPLETED" &&
-                      (Number(record.view_status) === 1 ||
-                        record.installation_report === "uploadFO") ? (
-                      <a
-                        href={`/${dashboardPath}/view-service-report/${record.service_id}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="px-3 py-2 text-sm bg-green-700 text-white rounded-md hover:bg-green-800 text-center"
-                      >
-                        View Report
-                      </a>
+                    ) : canViewDigitalReport(record) ? (
+                      <>
+                        <a
+                          href={`/${dashboardPath}/view-service-report/${record.service_id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-3 py-2 text-sm bg-green-700 text-white rounded-md hover:bg-green-800 text-center"
+                        >
+                          View Report
+                        </a>
+                        <ServiceReportPrintButton
+                          serviceId={record.service_id}
+                          dashboardPath={dashboardPath}
+                          preCompletion={record.pre_completion}
+                          afterCompletion={record.after_completion}
+                          className="px-3 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 text-center"
+                        />
+                      </>
                     ) : record.final_report_path ? (
                       <a
                         href={

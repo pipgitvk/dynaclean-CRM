@@ -1,11 +1,11 @@
 "use client";
 
 import * as React from "react";
-import { useEffect, useState } from "react";
-import Image from "next/image";
+import { useEffect, useRef, useState } from "react";
 import dayjs from "dayjs";
 import { generateServiceReportPDF, downloadPDF } from "@/utils/pdfGenerator";
 import { isInstallationReportLayout } from "@/utils/reportLayout";
+import ServiceReportPrintModal from "@/components/services/ServiceReportPrintModal";
 import "./print.css";
 
 // Lightweight image component with prioritized fallbacks for signatures
@@ -76,6 +76,95 @@ const formatDate = (date) => {
   return date ? dayjs(date).format("YYYY-MM-DD") : "-";
 };
 
+const parseImageList = (value) =>
+  value
+    ? String(value)
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+    : [];
+
+const normalizeAttachmentPath = (filePath) => {
+  if (!filePath) return "";
+  let path = String(filePath).trim();
+  if (path.startsWith("http")) {
+    try {
+      path = new URL(path).pathname;
+    } catch {
+      // keep original path
+    }
+  }
+  path = path.replace(/^\/public\//, "/").replace(/^public\//, "");
+  if (!path.startsWith("/")) path = `/${path}`;
+  if (!path.includes("/completion_files/") && !path.includes("/attachments/")) {
+    const cleanPath = path.replace(/^\/+/, "");
+    path = `/completion_files/${cleanPath}`;
+  }
+  return path;
+};
+
+const resolveAttachmentUrl = async (filePath) => {
+  const pathOnly = normalizeAttachmentPath(filePath);
+  const fallback = `https://service.dynacleanindustries.com${pathOnly}`;
+  try {
+    const res = await fetch(
+      `/api/resolve-attachment?path=${encodeURIComponent(pathOnly)}`,
+      { cache: "no-store" }
+    );
+    const data = await res.json();
+    return data?.url || fallback;
+  } catch {
+    return fallback;
+  }
+};
+
+const buildPhotosPrintSection = async (preImages, postImages, serviceId, serialNumber) => {
+  const resolveAll = async (paths) =>
+    Promise.all(
+      paths.map(async (path, index) => {
+        const fileName = path.split("/").pop() || `Photo ${index + 1}`;
+        return {
+          label: fileName,
+          url: await resolveAttachmentUrl(path),
+        };
+      })
+    );
+
+  const preResolved = await resolveAll(preImages);
+  const postResolved = await resolveAll(postImages);
+
+  const renderPhotoItem = (item, title) =>
+    `<figure class="print-photo-item">
+      <div class="print-photo-frame">
+        <img src="${item.url}" alt="${title} ${item.label}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" />
+        <div class="print-photo-placeholder" style="display:none">${item.label}</div>
+      </div>
+      <figcaption>${item.label}</figcaption>
+    </figure>`;
+
+  const renderSection = (title, items) => {
+    if (!items.length) {
+      return `<div class="print-photo-section"><h3>${title}</h3><p class="print-photo-empty">No photos available.</p></div>`;
+    }
+    const grid = items.map((item) => renderPhotoItem(item, title)).join("");
+    return `<div class="print-photo-section"><h3>${title}</h3><div class="print-photo-grid">${grid}</div></div>`;
+  };
+
+  const section = document.createElement("div");
+  section.id = "print-photos";
+  section.className = "print-photos-page";
+  section.innerHTML = `
+    <h2 class="print-photos-title">SERVICE PHOTOS</h2>
+    <p class="print-photos-meta">Service ID: ${serviceId} | Serial: ${serialNumber || "-"}</p>
+    <div class="print-photos-row">
+      ${renderSection("Pre-Completion Photos", preResolved)}
+      ${renderSection("Post-Completion Photos", postResolved)}
+    </div>
+  `;
+
+  return section;
+};
+
 export default function ViewServiceReport({ params }) {
   const [report, setReport] = useState(null);
   const [product, setProduct] = useState(null);
@@ -83,8 +172,16 @@ export default function ViewServiceReport({ params }) {
   const [loading, setLoading] = useState(true);
   const [trainees, setTrainees] = useState([]);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [showPrintModal, setShowPrintModal] = useState(false);
+  const [printMode, setPrintMode] = useState("withImages");
+  const [isPrinting, setIsPrinting] = useState(false);
+  const autoPrintTriggered = useRef(false);
 
   const { service_id } = React.use(params);
+
+  const preImages = parseImageList(report?.pre_completion);
+  const postImages = parseImageList(report?.after_completion);
+  const hasPhotos = preImages.length > 0 || postImages.length > 0;
 
   const installationLayout = isInstallationReportLayout(
     report?.complaint_summary
@@ -143,7 +240,10 @@ export default function ViewServiceReport({ params }) {
     }
     return traineesArray;
   };
-  const compressImagesInClone = async (container) => {
+  const compressImagesInClone = async (
+    container,
+    { maxSize = 400, quality = 0.82 } = {}
+  ) => {
     const images = Array.from(container.querySelectorAll("img"));
     await Promise.all(
       images.map(
@@ -154,17 +254,22 @@ export default function ViewServiceReport({ params }) {
               resolve();
               return;
             }
-            const original = new Image();
+            const original = document.createElement("img");
             original.crossOrigin = "anonymous";
             original.onload = () => {
               try {
-                const MAX = 400;
-                const scale = Math.min(1, MAX / Math.max(original.naturalWidth, original.naturalHeight));
+                const scale = Math.min(
+                  1,
+                  maxSize /
+                    Math.max(original.naturalWidth, original.naturalHeight)
+                );
                 const canvas = document.createElement("canvas");
                 canvas.width = Math.round(original.naturalWidth * scale);
                 canvas.height = Math.round(original.naturalHeight * scale);
-                canvas.getContext("2d").drawImage(original, 0, 0, canvas.width, canvas.height);
-                img.setAttribute("src", canvas.toDataURL("image/jpeg", 0.82));
+                canvas
+                  .getContext("2d")
+                  .drawImage(original, 0, 0, canvas.width, canvas.height);
+                img.setAttribute("src", canvas.toDataURL("image/jpeg", quality));
               } catch {
                 // keep original if canvas fails (e.g. tainted)
               }
@@ -177,42 +282,82 @@ export default function ViewServiceReport({ params }) {
     );
   };
 
-  const handlePrint = async () => {
-    const printContent = document
-      .getElementById("print-content")
-      .cloneNode(true);
+  const handlePrint = async (includeImages = false) => {
+    setShowPrintModal(false);
+    setIsPrinting(true);
 
-    await compressImagesInClone(printContent);
+    let photosEl = null;
+    let cleanedUp = false;
 
-    const printWindow = window.open("", "_blank", "height=600,width=800");
-    const docTitle = isInstallationReportLayout(report.complaint_summary)
-      ? "Installation Report"
-      : "Service Report";
-    printWindow.document.write(`<html><head><title>${docTitle}</title>`);
-    const styles = Array.from(document.styleSheets)
-      .map((sheet) => {
-        try {
-          return sheet.cssRules
-            ? Array.from(sheet.cssRules)
-              .map((rule) => rule.cssText)
-              .join("")
-            : "";
-        } catch (e) {
-          return "";
-        }
-      })
-      .join("");
-    printWindow.document.write("<style>" + styles + "</style>");
-    printWindow.document.write("</head><body>");
-    printWindow.document.write(printContent.outerHTML);
-    printWindow.document.write("</body></html>");
-    printWindow.document.close();
-    printWindow.focus();
-    printWindow.onload = () => {
-      printWindow.print();
-      printWindow.close();
+    const cleanup = () => {
+      if (cleanedUp) return;
+      cleanedUp = true;
+      if (photosEl?.parentNode) {
+        photosEl.parentNode.removeChild(photosEl);
+      }
+      photosEl = null;
+      setIsPrinting(false);
+      window.removeEventListener("afterprint", cleanup);
     };
+
+    try {
+      const printRoot = document.getElementById("print-root");
+      if (!printRoot) {
+        alert("Report is still loading. Please try again.");
+        setIsPrinting(false);
+        return;
+      }
+
+      if (includeImages && hasPhotos) {
+        photosEl = await buildPhotosPrintSection(
+          preImages,
+          postImages,
+          report.service_id,
+          report.serial_number
+        );
+        printRoot.appendChild(photosEl);
+        await compressImagesInClone(photosEl, {
+          maxSize: 480,
+          quality: 0.82,
+        });
+      }
+
+      window.addEventListener("afterprint", cleanup);
+      setTimeout(cleanup, 5000);
+      window.print();
+    } catch (error) {
+      console.error("Print failed:", error);
+      alert("Failed to open print. Please try again.");
+      cleanup();
+    }
   };
+
+  const openPrintModal = () => {
+    setPrintMode(hasPhotos ? "withImages" : "reportOnly");
+    setShowPrintModal(true);
+  };
+
+  const confirmPrint = () => {
+    handlePrint(printMode === "withImages");
+  };
+
+  useEffect(() => {
+    if (loading || !report || autoPrintTriggered.current) return;
+
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("showPrintModal") !== "1") return;
+
+    autoPrintTriggered.current = true;
+    const mode = params.get("printMode");
+    setPrintMode(
+      mode === "withImages" || mode === "reportOnly"
+        ? mode
+        : hasPhotos
+          ? "withImages"
+          : "reportOnly"
+    );
+    setShowPrintModal(true);
+  }, [loading, report, hasPhotos]);
 
   const getFilename = (input) => {
     if (!input) return null;
@@ -376,18 +521,24 @@ export default function ViewServiceReport({ params }) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 p-2 sm:p-4 md:p-8 flex items-center justify-center">
-      <div className="bg-white border border-gray-200 shadow-xl rounded-lg p-4 sm:p-6 w-full md:max-w-6xl">
+    <div className="print-page-wrapper min-h-screen bg-gray-100 p-2 sm:p-4 md:p-8 flex items-center justify-center">
+      <div className="print-card bg-white border border-gray-200 shadow-xl rounded-lg p-4 sm:p-6 w-full md:max-w-6xl">
+        <div id="print-root">
         <div id="print-content">
           {/* Header */}
           <header className="flex flex-col sm:flex-row items-center justify-between mb-4 sm:mb-8 pb-2 sm:pb-4 border-b-2 border-gray-200 text-center sm:text-left">
             <div className="mb-2 sm:mb-0 sm:w-1/4 flex-shrink-0">
               <img
-                src="/images/logo.png"
+                src="https://service.dynacleanindustries.com/images/logo.png"
                 alt="Dynaclean Industries Logo"
                 width={120}
                 height={120}
-                className="mx-auto sm:mx-0"
+                className="print-logo mx-auto sm:mx-0"
+                onError={(e) => {
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src =
+                    "https://app.dynacleanindustries.com/images/logo.png";
+                }}
               />
             </div>
             <div className="sm:w-3/4">
@@ -468,11 +619,11 @@ export default function ViewServiceReport({ params }) {
               </div>
             </div>
           ) : (
-            <div className="mb-6 p-4 border rounded-md bg-gray-50">
+            <div className="mb-6 p-4 border rounded-md bg-gray-50 print-section">
               <h3 className="text-lg font-semibold mb-3">
                 PRODUCT & CUSTOMER DETAILS
               </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-y-2 gap-x-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-y-2 gap-x-6 print-detail-grid">
                 <ReadRow label="Service ID" value={report.service_id} />
                 <ReadRow
                   label="Service Date"
@@ -521,11 +672,11 @@ export default function ViewServiceReport({ params }) {
 
           {/* Checklist (Responsive) */}
           {!installationLayout && (
-            <div className="mb-6 p-4 border rounded-md bg-gray-50">
+            <div className="mb-6 p-4 border rounded-md bg-gray-50 print-section">
               <h3 className="text-lg font-semibold mb-3">
                 CHECKLIST
               </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-2 text-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-2 text-sm print-checklist-grid">
                 {CHECKLIST_ITEMS.map((item, index) => (
                   <div key={index} className="flex items-center">
                     <input
@@ -919,15 +1070,17 @@ export default function ViewServiceReport({ params }) {
           </>
           )}
         </div>
+        </div>
 
         {/* Print and Download Buttons */}
         <div className="flex flex-col sm:flex-row gap-4 justify-center sm:justify-end mt-8 no-print">
           <button
             type="button"
-            onClick={handlePrint}
-            className="w-full sm:w-auto px-6 py-3 bg-blue-600 text-white font-semibold rounded-md shadow-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-150 ease-in-out"
+            onClick={openPrintModal}
+            disabled={isPrinting}
+            className="w-full sm:w-auto px-6 py-3 bg-blue-600 text-white font-semibold rounded-md shadow-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-150 ease-in-out disabled:bg-gray-400 disabled:cursor-not-allowed"
           >
-            Print Report
+            {isPrinting ? "Preparing Print..." : "Print Report"}
           </button>
           <button
             type="button"
@@ -938,6 +1091,16 @@ export default function ViewServiceReport({ params }) {
             {isGeneratingPDF ? "Generating PDF..." : "Download PDF"}
           </button>
         </div>
+
+        <ServiceReportPrintModal
+          isOpen={showPrintModal}
+          onClose={() => setShowPrintModal(false)}
+          printMode={printMode}
+          setPrintMode={setPrintMode}
+          hasPhotos={hasPhotos}
+          onConfirm={confirmPrint}
+          isPrinting={isPrinting}
+        />
       </div>
     </div>
   );
