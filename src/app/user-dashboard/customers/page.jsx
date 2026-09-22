@@ -4,6 +4,10 @@ import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 import { getSessionPayload } from "@/lib/auth";
 import { buildGemCustomerScopeWhere } from "@/lib/dataScope";
+import {
+  appendLatestFollowedDateIstFilter,
+  latestFollowedDateSelectSql,
+} from "@/lib/customerFollowupNotesLanguage";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +39,7 @@ export default async function CustomersPage({ searchParams }) {
     date_to,
     sort,
     next_follow_date,
+    followed_date,
     employee,
     page = '1'
   } = searchParamsResolved;
@@ -180,6 +185,14 @@ export default async function CustomersPage({ searchParams }) {
     customerParams.push(date_from, date_to);
   }
 
+  if (followed_date) {
+    appendLatestFollowedDateIstFilter({
+      conditions: customerConditions,
+      params: customerParams,
+      followedDateYmd: followed_date,
+    });
+  }
+
   // Combine all WHERE clauses
   let allWhereConditions = [...customerConditions];
   if (followupConditions.length > 0) {
@@ -203,7 +216,8 @@ export default async function CustomersPage({ searchParams }) {
       c.lead_campaign,
       c.products_interest,
       c.service_lead_source,
-      IFNULL(GROUP_CONCAT(b.bid_number), '') as bid_numbers
+      IFNULL(GROUP_CONCAT(b.bid_number), '') as bid_numbers,
+      ${latestFollowedDateSelectSql}
       ${followupSelectFields} -- This inserts the conditional select statement
     FROM customers c
     LEFT JOIN bids b ON c.customer_id = b.customer_id

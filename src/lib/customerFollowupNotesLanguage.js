@@ -1,4 +1,32 @@
 import { ensureCustomerNotesLanguageColumn } from "@/lib/ensureCustomerNotesLanguageColumn";
+import { mysqlBoundsForIstDateRange } from "@/lib/timezone";
+
+export const latestFollowedDateSelectSql = `(
+  SELECT cf2.followed_date
+  FROM customers_followup cf2
+  WHERE cf2.customer_id = c.customer_id
+  ORDER BY cf2.followed_date DESC, cf2.time_stamp DESC
+  LIMIT 1
+) AS followed_date`;
+
+export function appendLatestFollowedDateIstFilter({
+  conditions,
+  params,
+  followedDateYmd,
+  customerAlias = "c",
+}) {
+  const bounds = mysqlBoundsForIstDateRange(followedDateYmd, followedDateYmd);
+  if (!bounds) return;
+
+  conditions.push(`(
+    SELECT cf2.followed_date
+    FROM customers_followup cf2
+    WHERE cf2.customer_id = ${customerAlias}.customer_id
+    ORDER BY cf2.followed_date DESC, cf2.time_stamp DESC
+    LIMIT 1
+  ) BETWEEN ? AND ?`);
+  params.push(bounds.start, bounds.end);
+}
 
 export const latestFollowupNotesLanguageSelectSql = `COALESCE(
   c.notes_language,

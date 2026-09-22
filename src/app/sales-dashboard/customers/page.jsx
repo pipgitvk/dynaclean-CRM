@@ -6,6 +6,10 @@ import { notesLanguageExistsSql } from "@/constants/notesLanguageOptions";
 import { mysqlBoundsForIstDateRange } from "@/lib/timezone";
 import { appendVeryGoodFollowupTodayFilter } from "@/lib/veryGoodFollowupTodaySql";
 import { getTodayYmdIST } from "@/lib/prospectCommitmentRules";
+import {
+  appendLatestFollowedDateIstFilter,
+  latestFollowedDateSelectSql,
+} from "@/lib/customerFollowupNotesLanguage";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +41,7 @@ export default async function CustomersPage({ searchParams }) {
     date_to,
     sort,
     next_follow_date,
+    followed_date,
     employee,
     tags,
     notes_language,
@@ -221,6 +226,14 @@ export default async function CustomersPage({ searchParams }) {
     customerParams.push(reporting_date_from, reporting_date_to);
   }
 
+  if (followed_date) {
+    appendLatestFollowedDateIstFilter({
+      conditions: customerConditions,
+      params: customerParams,
+      followedDateYmd: followed_date,
+    });
+  }
+
   // Combine all WHERE clauses
   let allWhereConditions = [...customerConditions];
   if (followupConditions.length > 0) {
@@ -246,7 +259,8 @@ export default async function CustomersPage({ searchParams }) {
       COALESCE(${filter === "today_reporting" ? "tlf.multi_tag" : "cf.multi_tag"}, '') AS multi_tag,
       ${filter === "today_reporting" ? "tlf.next_followup_date" : "cf.next_followup_date"} AS next_follow_date,
       ${filter === "today_reporting" ? "tlf.notes" : "cf.notes"} AS latest_followup_notes,
-      COALESCE(${filter === "today_reporting" ? "tlf" : "tl_report"}.next_followup_date, '') AS reporting_date
+      COALESCE(${filter === "today_reporting" ? "tlf" : "tl_report"}.next_followup_date, '') AS reporting_date,
+      ${latestFollowedDateSelectSql}
     FROM customers c
     ${filter === "today_reporting" ? "" : `
     LEFT JOIN (
