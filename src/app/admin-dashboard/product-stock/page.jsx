@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { Eye, Search, Pencil, ArrowRightLeft, History, X } from "lucide-react";
 import Link from "next/link";
 import { pickProductImageUrl } from "@/lib/productImageUrl";
@@ -1479,8 +1479,134 @@ export default function ProductStockForm() {
   const [preBookingDetails, setPreBookingDetails] = useState([]);
   const [loadingPreBookings, setLoadingPreBookings] = useState(false);
   const [selectedProductForPreBooking, setSelectedProductForPreBooking] = useState(null);
+  const [editingCustomerIds, setEditingCustomerIds] = useState({});
+  const [savingCustomerIdFor, setSavingCustomerIdFor] = useState(null);
+  const [customerSuggestions, setCustomerSuggestions] = useState({});
+  const [activeSuggestionBookingId, setActiveSuggestionBookingId] = useState(null);
+  const [searchingCustomerFor, setSearchingCustomerFor] = useState(null);
+  const customerSearchTimerRef = useRef(null);
 
+  const resetPreBookingModal = () => {
+    setShowPreBookingModal(false);
+    setSelectedProductForPreBooking(null);
+    setPreBookingDetails([]);
+    setEditingCustomerIds({});
+    setSavingCustomerIdFor(null);
+    setCustomerSuggestions({});
+    setActiveSuggestionBookingId(null);
+    setSearchingCustomerFor(null);
+    if (customerSearchTimerRef.current) {
+      clearTimeout(customerSearchTimerRef.current);
+    }
+  };
 
+  const fetchCustomerSuggestions = async (bookingId, term) => {
+    setSearchingCustomerFor(bookingId);
+    setActiveSuggestionBookingId(bookingId);
+
+    try {
+      const response = await fetch(
+        `/api/customers/search?q=${encodeURIComponent(term)}&limit=10`,
+        { credentials: "include" },
+      );
+      const data = await response.json();
+      setCustomerSuggestions((prev) => ({
+        ...prev,
+        [bookingId]: data.success ? data.data || [] : [],
+      }));
+    } catch (error) {
+      console.error("Error fetching customer suggestions:", error);
+      setCustomerSuggestions((prev) => ({
+        ...prev,
+        [bookingId]: [],
+      }));
+    } finally {
+      setSearchingCustomerFor(null);
+    }
+  };
+
+  const handleCustomerIdChange = (bookingId, value) => {
+    setEditingCustomerIds((prev) => ({
+      ...prev,
+      [bookingId]: value,
+    }));
+
+    if (customerSearchTimerRef.current) {
+      clearTimeout(customerSearchTimerRef.current);
+    }
+
+    customerSearchTimerRef.current = setTimeout(() => {
+      fetchCustomerSuggestions(bookingId, value);
+    }, 300);
+  };
+
+  const handleCustomerIdFocus = (bookingId) => {
+    const term = editingCustomerIds[bookingId] ?? "";
+    fetchCustomerSuggestions(bookingId, term);
+  };
+
+  const handleSelectCustomerSuggestion = (bookingId, customer) => {
+    setEditingCustomerIds((prev) => ({
+      ...prev,
+      [bookingId]: String(customer.customer_id),
+    }));
+    setCustomerSuggestions((prev) => ({
+      ...prev,
+      [bookingId]: [],
+    }));
+    setActiveSuggestionBookingId(null);
+  };
+
+  const handleSaveCustomerId = async (booking) => {
+    const bookingId = booking.id;
+    const nextCustomerId = String(
+      editingCustomerIds[bookingId] ?? booking.customer_id ?? "",
+    ).trim();
+
+    if (!nextCustomerId) {
+      alert("Please enter a customer ID");
+      return;
+    }
+
+    if (String(booking.customer_id || "") === nextCustomerId) {
+      return;
+    }
+
+    setSavingCustomerIdFor(bookingId);
+
+    try {
+      const response = await fetch("/api/pre-booking", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: bookingId,
+          customer_id: nextCustomerId,
+        }),
+      });
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        alert(data.error || "Failed to update customer ID");
+        return;
+      }
+
+      if (data.booking) {
+        setPreBookingDetails((prev) =>
+          prev.map((item) => (item.id === bookingId ? data.booking : item)),
+        );
+        setEditingCustomerIds((prev) => {
+          const next = { ...prev };
+          delete next[bookingId];
+          return next;
+        });
+      }
+    } catch (error) {
+      console.error("Error updating pre-booking customer ID:", error);
+      alert("Failed to update customer ID");
+    } finally {
+      setSavingCustomerIdFor(null);
+    }
+  };
 
   // Fetch all data on component mount
   useEffect(() => {
@@ -1562,14 +1688,23 @@ export default function ProductStockForm() {
       const data = await response.json();
       
       if (data.success) {
-        setPreBookingDetails(data.bookings || []);
+        const bookings = data.bookings || [];
+        setPreBookingDetails(bookings);
+        setEditingCustomerIds(
+          bookings.reduce((acc, booking) => {
+            acc[booking.id] = booking.customer_id || "";
+            return acc;
+          }, {}),
+        );
       } else {
         console.error('Failed to fetch pre-bookings:', data.error);
         setPreBookingDetails([]);
+        setEditingCustomerIds({});
       }
     } catch (error) {
       console.error('Error fetching pre-bookings:', error);
       setPreBookingDetails([]);
+      setEditingCustomerIds({});
     } finally {
       setLoadingPreBookings(false);
     }
@@ -2888,20 +3023,12 @@ export default function ProductStockForm() {
       
       {/* Pre-Booking Details Modal */}
       {showPreBookingModal && selectedProductForPreBooking && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={() => {
-          setShowPreBookingModal(false);
-          setSelectedProductForPreBooking(null);
-          setPreBookingDetails([]);
-        }}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={resetPreBookingModal}>
           <div className="bg-white p-6 rounded-lg max-w-4xl w-full mx-4 max-h-[80vh] overflow-auto shadow-lg" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold text-gray-800">Pre-Booking Details</h3>
               <button 
-                onClick={() => {
-                  setShowPreBookingModal(false);
-                  setSelectedProductForPreBooking(null);
-                  setPreBookingDetails([]);
-                }}
+                onClick={resetPreBookingModal}
                 className="text-gray-500 hover:text-gray-700"
               >
                 <X className="w-5 h-5" />
@@ -2940,9 +3067,71 @@ export default function ProductStockForm() {
                     </tr>
                   </thead>
                   <tbody>
-                    {preBookingDetails.map((booking, idx) => (
-                      <tr key={idx} className="border-t hover:bg-gray-50">
-                        <td className="p-3 font-semibold">{booking.customer_id || "--"}</td>
+                    {preBookingDetails.map((booking) => (
+                      <tr key={booking.id} className="border-t hover:bg-gray-50">
+                        <td className="p-3">
+                          <div className="relative min-w-[220px]">
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="text"
+                                value={editingCustomerIds[booking.id] ?? booking.customer_id ?? ""}
+                                onChange={(e) => handleCustomerIdChange(booking.id, e.target.value)}
+                                onFocus={() => handleCustomerIdFocus(booking.id)}
+                                onBlur={() => {
+                                  setTimeout(() => setActiveSuggestionBookingId(null), 200);
+                                }}
+                                className="w-28 px-2 py-1 border border-gray-300 rounded text-sm"
+                                placeholder="Customer ID"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => handleSaveCustomerId(booking)}
+                                disabled={savingCustomerIdFor === booking.id}
+                                className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                              >
+                                {savingCustomerIdFor === booking.id ? "Saving..." : "Save"}
+                              </button>
+                            </div>
+                            {activeSuggestionBookingId === booking.id && (
+                              <ul className="absolute left-0 top-full z-30 mt-1 w-72 max-h-48 overflow-y-auto rounded-md border border-gray-200 bg-white shadow-lg">
+                                {searchingCustomerFor === booking.id && (
+                                  <li className="px-3 py-2 text-xs text-gray-500">Searching...</li>
+                                )}
+                                {!searchingCustomerFor &&
+                                  (customerSuggestions[booking.id] || []).map((customer) => {
+                                    const name = [customer.first_name, customer.last_name]
+                                      .filter(Boolean)
+                                      .join(" ")
+                                      .trim() || customer.customer_name || "Unnamed";
+                                    return (
+                                      <li
+                                        key={customer.customer_id}
+                                        onMouseDown={(e) => {
+                                          e.preventDefault();
+                                          handleSelectCustomerSuggestion(booking.id, customer);
+                                        }}
+                                        className="cursor-pointer px-3 py-2 text-xs hover:bg-blue-50 border-b last:border-b-0"
+                                      >
+                                        <div className="font-semibold text-gray-800">
+                                          ID: {customer.customer_id}
+                                        </div>
+                                        <div className="text-gray-600">{name}</div>
+                                        <div className="text-gray-500">
+                                          {[customer.company, customer.phone].filter(Boolean).join(" • ")}
+                                        </div>
+                                      </li>
+                                    );
+                                  })}
+                                {!searchingCustomerFor &&
+                                  (customerSuggestions[booking.id] || []).length === 0 && (
+                                    <li className="px-3 py-2 text-xs text-gray-500">
+                                      No customers found
+                                    </li>
+                                  )}
+                              </ul>
+                            )}
+                          </div>
+                        </td>
                         <td className="p-3 font-medium">{booking.customer_name || "--"}</td>
                         <td className="p-3">{booking.company || "--"}</td>
                         <td className="p-3">{booking.phone || "--"}</td>

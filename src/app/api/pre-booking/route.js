@@ -138,7 +138,24 @@ export async function DELETE(request) {
   }
 }
 
-// PATCH - Add remark (order cancelled / order postponed)
+function formatPreBookingRow(booking) {
+  return {
+    id: booking.id,
+    customer_id: booking.customer_id,
+    customer_name: `${booking.first_name || ""} ${booking.last_name || ""}`.trim() || "N/A",
+    company: booking.company || "N/A",
+    phone: booking.phone || "N/A",
+    email: booking.email || "N/A",
+    product_name: booking.product_name,
+    item_code: booking.item_code,
+    quantity: booking.quantity || 1,
+    expected_date: booking.expected_date,
+    status: booking.status,
+    created_at: booking.created_at,
+  };
+}
+
+// PATCH - Update customer_id OR add remark (order cancelled / order postponed)
 export async function PATCH(request) {
   try {
     const payload = await getSessionPayload();
@@ -147,11 +164,73 @@ export async function PATCH(request) {
     }
 
     const body = await request.json();
-    const { id, remark_type, remark_reason, postponed_date } = body;
+    const { id, customer_id, remark_type, remark_reason, postponed_date } = body;
 
-    if (!id || !remark_type) {
+    if (!id) {
+      return NextResponse.json({ error: "id is required" }, { status: 400 });
+    }
+
+    if (customer_id !== undefined && !remark_type) {
+      const normalizedCustomerId = String(customer_id || "").trim();
+      if (!normalizedCustomerId) {
+        return NextResponse.json(
+          { error: "customer_id is required" },
+          { status: 400 },
+        );
+      }
+
+      const connection = await getDbConnection();
+      const [customers] = await connection.execute(
+        "SELECT customer_id FROM customers WHERE customer_id = ? LIMIT 1",
+        [normalizedCustomerId],
+      );
+
+      if (!customers.length) {
+        return NextResponse.json(
+          { error: "Customer not found" },
+          { status: 404 },
+        );
+      }
+
+      await connection.execute(
+        `UPDATE pre_booking
+         SET customer_id = ?, updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+        [normalizedCustomerId, id],
+      );
+
+      const [rows] = await connection.execute(
+        `SELECT
+          pb.id,
+          pb.customer_id,
+          pb.product_name,
+          pb.item_code,
+          pb.quantity,
+          pb.expected_date,
+          pb.status,
+          pb.created_at,
+          c.first_name,
+          c.last_name,
+          c.company,
+          c.phone,
+          c.email
+         FROM pre_booking pb
+         LEFT JOIN customers c ON pb.customer_id = c.customer_id
+         WHERE pb.id = ?
+         LIMIT 1`,
+        [id],
+      );
+
+      return NextResponse.json({
+        success: true,
+        message: "Customer ID updated successfully",
+        booking: rows[0] ? formatPreBookingRow(rows[0]) : null,
+      });
+    }
+
+    if (!remark_type) {
       return NextResponse.json(
-        { error: "id and remark_type are required" },
+        { error: "remark_type or customer_id is required" },
         { status: 400 },
       );
     }
