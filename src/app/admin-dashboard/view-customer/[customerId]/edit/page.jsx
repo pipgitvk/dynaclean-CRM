@@ -3,6 +3,7 @@ import EditCustomerForm from "@/components/customer/EditCustomerForm";
 import UpdateLeadSourceForm from "@/components/customer/UpdateLeadSourceForm";
 import { getSessionPayload } from "@/lib/auth";
 import { latestFollowupNotesLanguageSelectSql } from "@/lib/customerFollowupNotesLanguage";
+import { ensureCustomerNotesLanguageColumn } from "@/lib/ensureCustomerNotesLanguageColumn";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +14,7 @@ export default async function EditCustomerPage({ params }) {
   const userRole = payload?.role;
 
   const conn = await getDbConnection();
+  await ensureCustomerNotesLanguageColumn(conn);
 
   const [rows] = await conn.execute(
     `SELECT

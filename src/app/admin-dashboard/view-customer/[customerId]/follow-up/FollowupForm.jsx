@@ -137,6 +137,11 @@ export default function FollowupForm({ customerId }) {
           setCustomerCurrentStage(data.stage || "New");
           setCustomerCreatedAt(data.date_created || null);
           setHasOrder(data.has_order === 1 || data.has_order === true);
+
+          if (data.notes_language) {
+            setNotesLanguage(data.notes_language);
+          }
+
           setFormData((prev) => ({
             ...prev,
             stage: data.stage || "New",

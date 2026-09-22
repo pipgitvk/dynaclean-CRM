@@ -1,10 +1,24 @@
-export const latestFollowupNotesLanguageSelectSql = `(
-  SELECT cf.notes_language
-  FROM customers_followup cf
-  WHERE cf.customer_id = c.customer_id
-  ORDER BY cf.followed_date DESC, cf.time_stamp DESC
-  LIMIT 1
+import { ensureCustomerNotesLanguageColumn } from "@/lib/ensureCustomerNotesLanguageColumn";
+
+export const latestFollowupNotesLanguageSelectSql = `COALESCE(
+  c.notes_language,
+  (
+    SELECT cf.notes_language
+    FROM customers_followup cf
+    WHERE cf.customer_id = c.customer_id
+    ORDER BY cf.followed_date DESC, cf.time_stamp DESC
+    LIMIT 1
+  )
 ) AS notes_language`;
+
+export async function updateCustomerNotesLanguage(conn, customerId, language) {
+  await ensureCustomerNotesLanguageColumn(conn);
+  const normalized = language ? String(language).trim().slice(0, 10) : null;
+  await conn.execute(
+    "UPDATE customers SET notes_language = ? WHERE customer_id = ?",
+    [normalized, customerId],
+  );
+}
 
 export async function getLatestFollowupNotesLanguage(conn, customerId) {
   const [rows] = await conn.execute(

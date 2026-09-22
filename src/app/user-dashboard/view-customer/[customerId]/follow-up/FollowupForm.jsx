@@ -393,6 +393,10 @@ export default function FollowupForm({ customerId, userRole = "" }) {
           setCustomerCreatedAt(stageData.date_created || null);
           setHasOrder(stageData.has_order === 1 || stageData.has_order === true);
 
+          if (stageData.notes_language) {
+            setNotesLanguage(stageData.notes_language);
+          }
+
           setFormData((prev) => ({
             ...prev,
             stage: isServiceSupport ? serviceStage : dbStage,

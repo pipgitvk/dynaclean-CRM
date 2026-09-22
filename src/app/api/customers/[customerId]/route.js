@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { getSessionPayload } from "@/lib/auth";
 import { cookies } from "next/headers";
 import { ensureCustomersServiceColumns } from "@/lib/ensureCustomersServiceColumns";
+import { ensureCustomerNotesLanguageColumn } from "@/lib/ensureCustomerNotesLanguageColumn";
+import { latestFollowupNotesLanguageSelectSql } from "@/lib/customerFollowupNotesLanguage";
 
 export async function GET(request, { params }) {
   const { customerId } = await params;
@@ -10,6 +12,7 @@ export async function GET(request, { params }) {
   try {
     const conn = await getDbConnection();
     await ensureCustomersServiceColumns(conn);
+    await ensureCustomerNotesLanguageColumn(conn);
     const [rows] = await conn.execute(
       `SELECT c.*,
         IF(EXISTS (
@@ -17,13 +20,7 @@ export async function GET(request, { params }) {
           INNER JOIN quotations_records qr ON no.quote_number = qr.quote_number
           WHERE qr.customer_id = c.customer_id
         ), 1, 0) AS has_order,
-        (
-          SELECT cf.notes_language
-          FROM customers_followup cf
-          WHERE cf.customer_id = c.customer_id
-          ORDER BY cf.followed_date DESC, cf.time_stamp DESC
-          LIMIT 1
-        ) AS followup_notes_language
+        ${latestFollowupNotesLanguageSelectSql}
        FROM customers c
        WHERE c.customer_id = ?
        LIMIT 1`,
@@ -38,10 +35,7 @@ export async function GET(request, { params }) {
     }
 
     const customer = rows[0];
-    return NextResponse.json({
-      ...customer,
-      notes_language: customer.followup_notes_language ?? null,
-    });
+    return NextResponse.json(customer);
   } catch (error) {
     console.error("Database query error:", error);
     return NextResponse.json(

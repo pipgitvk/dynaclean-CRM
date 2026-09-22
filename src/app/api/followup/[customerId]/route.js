@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 import { convertISTtoUTC } from "@/lib/timezone";
 import { ensureCustomersServiceColumns } from "@/lib/ensureCustomersServiceColumns";
+import { updateCustomerNotesLanguage } from "@/lib/customerFollowupNotesLanguage";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret";
 
@@ -221,6 +222,8 @@ export async function POST(req, { params }) {
       purpose,
     ],
   );
+
+  await updateCustomerNotesLanguage(conn, customerId, notesLanguage);
 
   if (isServiceSupport) {
     await conn.execute(

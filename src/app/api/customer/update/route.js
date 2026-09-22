@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
-import { updateLatestFollowupNotesLanguage } from "@/lib/customerFollowupNotesLanguage";
+import { updateCustomerNotesLanguage } from "@/lib/customerFollowupNotesLanguage";
 
 export async function POST(req) {
   try {
@@ -30,7 +30,7 @@ export async function POST(req) {
     );
 
     if (notes_language !== undefined) {
-      await updateLatestFollowupNotesLanguage(conn, customer_id, notes_language);
+      await updateCustomerNotesLanguage(conn, customer_id, notes_language);
     }
 
     return NextResponse.json({ success: true });
