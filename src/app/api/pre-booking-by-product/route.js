@@ -53,6 +53,7 @@ export async function GET(request) {
       params.push(item_code);
     }
 
+    query += " AND pb.status IN ('pending', 'partial', 'postponed')";
     query += " ORDER BY pb.created_at DESC";
 
     const [bookings] = await connection.execute(query, params);

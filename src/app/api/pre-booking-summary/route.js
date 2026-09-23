@@ -4,12 +4,13 @@ export async function GET() {
   const conn = await getDbConnection();
 
   try {
-    // Get pre-booked quantities grouped by product_name
+    // Active pre-bookings only — cancelled/received must not reduce available stock
     const [rows] = await conn.execute(`
       SELECT
         product_name,
         SUM(quantity) as pre_booked_quantity
       FROM pre_booking
+      WHERE status IN ('pending', 'partial', 'postponed')
       GROUP BY product_name
     `);
 
