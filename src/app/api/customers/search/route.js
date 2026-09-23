@@ -31,7 +31,8 @@ export async function GET(req) {
         email,
         address,
         company,
-        state
+        state,
+        lead_source
       FROM customers 
       WHERE 1=1
     `;

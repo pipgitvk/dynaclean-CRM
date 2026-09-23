@@ -138,23 +138,6 @@ export async function DELETE(request) {
   }
 }
 
-function formatPreBookingRow(booking) {
-  return {
-    id: booking.id,
-    customer_id: booking.customer_id,
-    customer_name: `${booking.first_name || ""} ${booking.last_name || ""}`.trim() || "N/A",
-    company: booking.company || "N/A",
-    phone: booking.phone || "N/A",
-    email: booking.email || "N/A",
-    product_name: booking.product_name,
-    item_code: booking.item_code,
-    quantity: booking.quantity || 1,
-    expected_date: booking.expected_date,
-    status: booking.status,
-    created_at: booking.created_at,
-  };
-}
-
 // PATCH - Update customer_id OR add remark (order cancelled / order postponed)
 export async function PATCH(request) {
   try {
@@ -164,53 +147,215 @@ export async function PATCH(request) {
     }
 
     const body = await request.json();
-    const { id, customer_id, remark_type, remark_reason, postponed_date } = body;
+    const {
+      id,
+      customer_id,
+      item_code,
+      quantity,
+      status,
+      order_id,
+      received_date,
+      remark_type,
+      remark_reason,
+      postponed_date,
+    } = body;
 
     if (!id) {
       return NextResponse.json({ error: "id is required" }, { status: 400 });
     }
 
-    if (customer_id !== undefined && !remark_type) {
-      const normalizedCustomerId = String(customer_id || "").trim();
-      if (!normalizedCustomerId) {
+    const isRemarkOnlyUpdate =
+      remark_type &&
+      remark_reason !== undefined &&
+      customer_id === undefined &&
+      item_code === undefined &&
+      quantity === undefined &&
+      status === undefined &&
+      order_id === undefined &&
+      received_date === undefined;
+
+    const isEditUpdate =
+      !isRemarkOnlyUpdate &&
+      (customer_id !== undefined ||
+        item_code !== undefined ||
+        quantity !== undefined ||
+        status !== undefined ||
+        order_id !== undefined ||
+        received_date !== undefined ||
+        remark_type !== undefined ||
+        remark_reason !== undefined ||
+        postponed_date !== undefined);
+
+    if (isEditUpdate) {
+      const connection = await getDbConnection();
+      await ensurePreBookingRemarkColumns(connection);
+      const updates = [];
+      const params = [];
+
+      if (customer_id !== undefined) {
+        const normalizedCustomerId = String(customer_id || "").trim();
+        if (!normalizedCustomerId) {
+          return NextResponse.json(
+            { error: "customer_id is required" },
+            { status: 400 },
+          );
+        }
+
+        const [customers] = await connection.execute(
+          "SELECT customer_id FROM customers WHERE customer_id = ? LIMIT 1",
+          [normalizedCustomerId],
+        );
+
+        if (!customers.length) {
+          return NextResponse.json(
+            { error: "Customer not found" },
+            { status: 404 },
+          );
+        }
+
+        updates.push("customer_id = ?");
+        params.push(normalizedCustomerId);
+      }
+
+      if (item_code !== undefined) {
+        const normalizedItemCode = String(item_code || "").trim();
+        updates.push("item_code = ?");
+        params.push(normalizedItemCode || null);
+
+        if (normalizedItemCode) {
+          const [products] = await connection.execute(
+            `SELECT item_name FROM products_list WHERE item_code = ? LIMIT 1`,
+            [normalizedItemCode],
+          );
+          if (products.length) {
+            updates.push("product_name = ?");
+            params.push(products[0].item_name);
+          }
+        }
+      }
+
+      if (quantity !== undefined) {
+        const parsedQty = parseInt(quantity, 10);
+        if (!Number.isFinite(parsedQty) || parsedQty < 1) {
+          return NextResponse.json(
+            { error: "quantity must be at least 1" },
+            { status: 400 },
+          );
+        }
+
+        updates.push("quantity = ?");
+        params.push(parsedQty);
+      }
+
+      if (status !== undefined) {
+        const normalizedStatus = String(status || "").trim().toLowerCase();
+        const allowedStatuses = [
+          "pending",
+          "partial",
+          "received",
+          "cancelled",
+          "postponed",
+        ];
+
+        if (!allowedStatuses.includes(normalizedStatus)) {
+          return NextResponse.json(
+            { error: "Invalid status value" },
+            { status: 400 },
+          );
+        }
+
+        updates.push("status = ?");
+        params.push(normalizedStatus);
+      }
+
+      if (order_id !== undefined) {
+        const normalizedOrderId = String(order_id || "").trim();
+        updates.push("order_id = ?");
+        params.push(normalizedOrderId || null);
+      }
+
+      if (received_date !== undefined) {
+        const normalizedReceivedDate = String(received_date || "").trim();
+        updates.push("received_date = ?");
+        params.push(normalizedReceivedDate || null);
+      }
+
+      if (
+        remark_type !== undefined ||
+        remark_reason !== undefined ||
+        postponed_date !== undefined
+      ) {
+        const normalizedRemarkType = String(remark_type || "")
+          .trim()
+          .toLowerCase();
+
+        if (!normalizedRemarkType) {
+          updates.push("remark_type = NULL");
+          updates.push("remark_reason = NULL");
+          updates.push("postponed_date = NULL");
+        } else if (normalizedRemarkType === "cancelled") {
+          if (!remark_reason?.trim()) {
+            return NextResponse.json(
+              { error: "remark_reason is required for cancelled remark" },
+              { status: 400 },
+            );
+          }
+
+          updates.push("remark_type = ?");
+          params.push("cancelled");
+          updates.push("remark_reason = ?");
+          params.push(remark_reason.trim());
+          updates.push("postponed_date = NULL");
+        } else if (normalizedRemarkType === "postponed") {
+          if (!remark_reason?.trim()) {
+            return NextResponse.json(
+              { error: "remark_reason is required for postponed remark" },
+              { status: 400 },
+            );
+          }
+
+          if (!postponed_date) {
+            return NextResponse.json(
+              { error: "postponed_date is required for postponed remark" },
+              { status: 400 },
+            );
+          }
+
+          updates.push("remark_type = ?");
+          params.push("postponed");
+          updates.push("remark_reason = ?");
+          params.push(remark_reason.trim());
+          updates.push("postponed_date = ?");
+          params.push(postponed_date);
+        } else {
+          return NextResponse.json(
+            { error: "Invalid remark_type. Must be 'cancelled' or 'postponed'" },
+            { status: 400 },
+          );
+        }
+      }
+
+      if (!updates.length) {
         return NextResponse.json(
-          { error: "customer_id is required" },
+          { error: "No fields to update" },
           { status: 400 },
         );
       }
 
-      const connection = await getDbConnection();
-      const [customers] = await connection.execute(
-        "SELECT customer_id FROM customers WHERE customer_id = ? LIMIT 1",
-        [normalizedCustomerId],
-      );
-
-      if (!customers.length) {
-        return NextResponse.json(
-          { error: "Customer not found" },
-          { status: 404 },
-        );
-      }
+      updates.push("updated_at = CURRENT_TIMESTAMP");
+      params.push(id);
 
       await connection.execute(
-        `UPDATE pre_booking
-         SET customer_id = ?, updated_at = CURRENT_TIMESTAMP
-         WHERE id = ?`,
-        [normalizedCustomerId, id],
+        `UPDATE pre_booking SET ${updates.join(", ")} WHERE id = ?`,
+        params,
       );
 
       const [rows] = await connection.execute(
         `SELECT
-          pb.id,
-          pb.customer_id,
-          pb.product_name,
-          pb.item_code,
-          pb.quantity,
-          pb.expected_date,
-          pb.status,
-          pb.created_at,
+          pb.*,
           c.first_name,
           c.last_name,
+          c.lead_source,
           c.company,
           c.phone,
           c.email
@@ -223,14 +368,17 @@ export async function PATCH(request) {
 
       return NextResponse.json({
         success: true,
-        message: "Customer ID updated successfully",
-        booking: rows[0] ? formatPreBookingRow(rows[0]) : null,
+        message: "Pre-booking updated successfully",
+        booking: rows[0] || null,
       });
     }
 
     if (!remark_type) {
       return NextResponse.json(
-        { error: "remark_type or customer_id is required" },
+        {
+          error:
+            "remark_type or at least one editable field is required",
+        },
         { status: 400 },
       );
     }
