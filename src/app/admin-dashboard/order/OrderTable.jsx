@@ -28,17 +28,27 @@ function parseOrderLineItems(order) {
   return [];
 }
 
-function orderMatchesModelFilter(order, modelName) {
-  if (!modelName) return true;
-  return parseOrderLineItems(order).some(
-    (item) => String(item.item_name || "").trim() === modelName,
-  );
+function normalizeModelCode(code) {
+  return String(code || "").trim().toUpperCase();
 }
 
-function modelQuantityInOrder(order, modelName) {
-  if (!modelName) return 0;
+function lineItemMatchesModelFilter(item, filterKey) {
+  if (!filterKey) return false;
+  const code = normalizeModelCode(item.item_code);
+  const filterCode = normalizeModelCode(filterKey);
+  if (code && filterCode && code === filterCode) return true;
+  return String(item.item_name || "").trim() === String(filterKey).trim();
+}
+
+function orderMatchesModelFilter(order, filterKey) {
+  if (!filterKey) return true;
+  return parseOrderLineItems(order).some((item) => lineItemMatchesModelFilter(item, filterKey));
+}
+
+function modelQuantityInOrder(order, filterKey) {
+  if (!filterKey) return 0;
   return parseOrderLineItems(order)
-    .filter((item) => String(item.item_name || "").trim() === modelName)
+    .filter((item) => lineItemMatchesModelFilter(item, filterKey))
     .reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
 }
 
@@ -49,33 +59,70 @@ function formatModelOptionLabel(item) {
   return name || code || "";
 }
 
-function buildModelOptions(orders) {
+function buildModelOptions(orders, catalogByCode) {
   const map = new Map();
+
   orders?.forEach((order) => {
     parseOrderLineItems(order).forEach((item) => {
-      const name = String(item.item_name || "").trim();
-      if (!name) return;
       const code = String(item.item_code || "").trim();
-      if (!map.has(name)) {
-        map.set(name, {
-          item_name: name,
+      const codeKey = normalizeModelCode(code);
+      const orderName = String(item.item_name || "").trim();
+
+      if (codeKey) {
+        const catalogName = String(catalogByCode.get(codeKey)?.item_name || "").trim();
+        const name = catalogName || orderName;
+        if (!name) return;
+        map.set(codeKey, {
+          filterKey: codeKey,
           item_code: code,
+          item_name: name,
           label: formatModelOptionLabel({ item_code: code, item_name: name }),
         });
-      } else if (code && !map.get(name).item_code) {
-        const entry = map.get(name);
-        entry.item_code = code;
-        entry.label = formatModelOptionLabel(entry);
+        return;
+      }
+
+      if (!orderName) return;
+      const nameKey = `name:${orderName.toLowerCase()}`;
+      if (!map.has(nameKey)) {
+        map.set(nameKey, {
+          filterKey: orderName,
+          item_code: "",
+          item_name: orderName,
+          label: orderName,
+        });
       }
     });
   });
-  return [...map.values()].sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }));
+
+  return [...map.values()].sort((a, b) =>
+    a.label.localeCompare(b.label, undefined, { sensitivity: "base" }),
+  );
 }
 
-function getModelLabel(modelName, modelOptions) {
-  if (!modelName) return "";
-  const match = modelOptions.find((opt) => opt.item_name === modelName);
-  return match?.label || modelName;
+function findModelOption(filterKey, modelOptions) {
+  if (!filterKey) return null;
+  const codeKey = normalizeModelCode(filterKey);
+  return (
+    modelOptions.find((opt) => opt.filterKey === filterKey) ||
+    modelOptions.find((opt) => normalizeModelCode(opt.filterKey) === codeKey) ||
+    modelOptions.find((opt) => opt.item_name === filterKey) ||
+    modelOptions.find((opt) => normalizeModelCode(opt.item_code) === codeKey) ||
+    null
+  );
+}
+
+function getModelLabel(filterKey, modelOptions) {
+  if (!filterKey) return "";
+  return findModelOption(filterKey, modelOptions)?.label || filterKey;
+}
+
+function isSameModelFilter(filterKey, opt) {
+  if (!filterKey || !opt) return false;
+  return (
+    filterKey === opt.filterKey ||
+    normalizeModelCode(filterKey) === normalizeModelCode(opt.filterKey) ||
+    filterKey === opt.item_name
+  );
 }
 
 // 👻 A sleek skeleton loader for a modern feel
@@ -212,6 +259,7 @@ function orderCreatedInDateRange(order, dateFrom, dateTo) {
 }
 
 export default function OrderTable({ orders, userRole }) {
+  const [productCatalog, setProductCatalog] = useState([]);
   const searchParams = useSearchParams();
 
   // Initialize from localStorage with defaults
@@ -262,6 +310,23 @@ export default function OrderTable({ orders, userRole }) {
   });
   const [showModelDropdown, setShowModelDropdown] = useState(false);
   const modelSearchRef = useRef(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/products/list", { cache: "no-store" });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled && Array.isArray(data)) setProductCatalog(data);
+      } catch {
+        /* non-fatal */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const [openMenuId, setOpenMenuId] = useState(null); // State to track which menu is open
   // const canShowInstall = ["SUPERADMIN"].includes(userRole);
   const [approvalStatusFilter, setApprovalStatusFilter] = useState(() => {
@@ -592,7 +657,19 @@ export default function OrderTable({ orders, userRole }) {
     modelNameFilter,
   ]);
 
-  const modelOptions = useMemo(() => buildModelOptions(orders), [orders]);
+  const catalogByCode = useMemo(() => {
+    const map = new Map();
+    productCatalog.forEach((product) => {
+      const key = normalizeModelCode(product.item_code);
+      if (key) map.set(key, product);
+    });
+    return map;
+  }, [productCatalog]);
+
+  const modelOptions = useMemo(
+    () => buildModelOptions(orders, catalogByCode),
+    [orders, catalogByCode],
+  );
 
   const filteredModelQuantity = useMemo(() => {
     if (!modelNameFilter) return 0;
@@ -617,11 +694,16 @@ export default function OrderTable({ orders, userRole }) {
 
   useEffect(() => {
     if (!modelNameFilter || !modelOptions.length) return;
-    setModelSearchText((prev) => {
-      const next = getModelLabel(modelNameFilter, modelOptions);
-      return prev === modelNameFilter ? next : prev === next ? prev : next;
-    });
+    const match = findModelOption(modelNameFilter, modelOptions);
+    if (match && match.filterKey !== modelNameFilter) {
+      setModelNameFilter(match.filterKey);
+    }
   }, [modelNameFilter, modelOptions]);
+
+  useEffect(() => {
+    if (!modelNameFilter || !modelOptions.length || showModelDropdown) return;
+    setModelSearchText(getModelLabel(modelNameFilter, modelOptions));
+  }, [modelNameFilter, modelOptions, showModelDropdown]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -948,11 +1030,11 @@ export default function OrderTable({ orders, userRole }) {
                     onKeyDown={(e) => {
                       if (e.key === "Escape") {
                         setShowModelDropdown(false);
-                        setModelSearchText(modelNameFilter);
+                        setModelSearchText(getModelLabel(modelNameFilter, modelOptions));
                       } else if (e.key === "Enter" && filteredModelOptions.length > 0) {
                         e.preventDefault();
                         const selected = filteredModelOptions[0];
-                        setModelNameFilter(selected.item_name);
+                        setModelNameFilter(selected.filterKey);
                         setModelSearchText(selected.label);
                         setShowModelDropdown(false);
                       }
@@ -995,15 +1077,15 @@ export default function OrderTable({ orders, userRole }) {
                     {filteredModelOptions.length > 0 ? (
                       filteredModelOptions.map((opt) => (
                         <button
-                          key={`${opt.item_code}-${opt.item_name}`}
+                          key={opt.filterKey}
                           type="button"
                           onClick={() => {
-                            setModelNameFilter(opt.item_name);
+                            setModelNameFilter(opt.filterKey);
                             setModelSearchText(opt.label);
                             setShowModelDropdown(false);
                           }}
                           className={`w-full border-b border-blue-50 px-3 py-2 text-left text-xs hover:bg-blue-50 ${
-                            modelNameFilter === opt.item_name
+                            isSameModelFilter(modelNameFilter, opt)
                               ? "bg-blue-50 font-medium text-blue-900"
                               : "text-gray-700"
                           }`}
