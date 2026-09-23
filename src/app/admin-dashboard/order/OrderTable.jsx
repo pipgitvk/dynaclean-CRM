@@ -334,20 +334,6 @@ export default function OrderTable({ orders, userRole }) {
   }, [modelNameFilter]);
 
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (
-        modelSearchRef.current &&
-        !modelSearchRef.current.contains(event.target)
-      ) {
-        setShowModelDropdown(false);
-        setModelSearchText(getModelLabel(modelNameFilter, modelOptions));
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [modelNameFilter, modelOptions]);
-
-  useEffect(() => {
     if (typeof window !== "undefined") {
       localStorage.setItem("orderTable_approvalStatusFilter", approvalStatusFilter);
     }
@@ -635,6 +621,20 @@ export default function OrderTable({ orders, userRole }) {
       const next = getModelLabel(modelNameFilter, modelOptions);
       return prev === modelNameFilter ? next : prev === next ? prev : next;
     });
+  }, [modelNameFilter, modelOptions]);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        modelSearchRef.current &&
+        !modelSearchRef.current.contains(event.target)
+      ) {
+        setShowModelDropdown(false);
+        setModelSearchText(getModelLabel(modelNameFilter, modelOptions));
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [modelNameFilter, modelOptions]);
 
   const dispatchDoneTotals = useMemo(() => {
