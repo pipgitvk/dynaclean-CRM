@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import toast from "react-hot-toast";
 import { set } from "date-fns";
+import { INVOICE_LETTERHEAD } from "@/lib/invoiceLetterhead";
 
 // Remove local generation - will fetch from API
 
@@ -63,7 +64,7 @@ export default function QuotationForm() {
   const [roundOff, setRoundOff] = useState(0);
   const [isAutoRoundOff, setIsAutoRoundOff] = useState(true);
 
-  // Supplier state is fixed (header shows: GSTIN: 07AAKCD6495M1ZV | State: Tamil Nadu (33))
+  // Supplier state is fixed (header shows: GSTIN: 07AAKCD6495M1ZV | State: Delhi (07))
   const SUPPLIER_STATE_CODE = "07";
   const SUPPLIER_STATE_NAME = "Delhi";
 
@@ -662,24 +663,23 @@ export default function QuotationForm() {
           {/* Company Info */}
           <div className="flex-1 text-sm text-gray-700">
             <h2 className="text-xl font-bold text-red-600 mb-1">
-              Dynaclean Industries Pvt Ltd
+              {INVOICE_LETTERHEAD.name}
             </h2>
             <p className="leading-relaxed">
-              <span className="block">
-                1st Floor, 13-B, Kattabomman Street, Gandhi Nagar Main Road,
+              <span className="block">{INVOICE_LETTERHEAD.addressLine1}</span>
+              <span className="block">{INVOICE_LETTERHEAD.addressLine2}</span>
+              <span className="block mt-1">
+                <strong>Phone:</strong> {INVOICE_LETTERHEAD.phone}
               </span>
               <span className="block">
-                Gandhi Nagar, Ganapathy, Coimbatore, Tamil Nadu, 641006
+                <strong>Email:</strong> {INVOICE_LETTERHEAD.email}
               </span>
               <span className="block mt-1">
-                <strong>Phone:</strong> 011-45143666, +91-7982456944
+                <strong>GSTIN:</strong> {INVOICE_LETTERHEAD.gstin} |{" "}
+                <strong>State:</strong> {INVOICE_LETTERHEAD.state}
               </span>
               <span className="block">
-                <strong>Email:</strong> sales@dynacleanindustries.com
-              </span>
-              <span className="block mt-1">
-                <strong>GSTIN:</strong> 07AAKCD6495M1ZV |{" "}
-                <strong>State:</strong> Tamil Nadu (33)
+                <strong>CIN:</strong> {INVOICE_LETTERHEAD.cin}
               </span>
             </p>
           </div>
@@ -936,7 +936,7 @@ export default function QuotationForm() {
           {/* Bank Details */}
           <div className="lg:col-span-1 border p-4 rounded bg-gray-50 text-sm">
             <h4 className="font-semibold mb-2">Bank Details</h4>
-            <p>A/C Holder Name : Dynaclean Industries Private Limited</p>
+            <p>A/C Holder Name : {INVOICE_LETTERHEAD.name}</p>
             <p>Bank Name : ICICI Bank</p>
             <p>A/c no. : 343405500379</p>
             <p>Branch & IFS Code: ICIC0003434</p>
@@ -945,7 +945,7 @@ export default function QuotationForm() {
           {/* Signatory */}
           <div className="lg:col-span-1 border p-4 rounded bg-gray-50 text-sm text-center flex flex-col justify-between">
             <div>
-              <p>For Dynaclean Industries Pvt Ltd</p>
+              <p>For {INVOICE_LETTERHEAD.name}</p>
               <Image
                 src="/images/sign.png"
                 alt="Sign"

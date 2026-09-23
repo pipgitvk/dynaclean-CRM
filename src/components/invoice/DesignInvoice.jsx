@@ -1996,7 +1996,7 @@ const NewInvoice = ({ invoice }) => {
     terms: parseTerms(),
     notes: invoice.notes || "",
     bank: {
-      accountHolderName: "Dynaclean Industries Pvt Ltd",
+      accountHolderName: "DYNACLEAN INDUSTRIES PRIVATE LIMITED",
       name: "ICICI Bank",
       accountNo: "343405500379",
       IFSC: "ICIC0003434",
@@ -2619,11 +2619,22 @@ const NewInvoice = ({ invoice }) => {
                     style={{
                       fontSize: "10px",
                       lineHeight: 1.45,
+                      marginBottom: "3px",
                       color: "#000",
                       fontWeight: 400,
                     }}
                   >
-                    GST: {INVOICE_LETTERHEAD.gstin}
+                    GST: {INVOICE_LETTERHEAD.gstin}, State: {INVOICE_LETTERHEAD.state}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: "10px",
+                      lineHeight: 1.45,
+                      color: "#000",
+                      fontWeight: 400,
+                    }}
+                  >
+                    CIN: {INVOICE_LETTERHEAD.cin}
                   </div>
                     </div>
                   </div>

@@ -5,6 +5,7 @@ import Link from "next/link";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import Image from "next/image";
+import { INVOICE_LETTERHEAD } from "@/lib/invoiceLetterhead";
 
 // Mask PII for PDF download
 function maskName(name) {
@@ -413,18 +414,21 @@ export default forwardRef(function QuotationViewer({
             />
             <div className="text-sm text-gray-700 break-words">
               <h2 className="text-lg font-bold text-red-600">
-                Dynaclean Industries Pvt Ltd
+                {INVOICE_LETTERHEAD.name}
               </h2>
               <p>
-                1st Floor, 13-B, Kattabomman Street, Gandhi Nagar Main Road,
-                Gandhi Nagar, Ganapathy, Coimbatore, Coimbatore, Tamil Nadu,
-                641006
+                {INVOICE_LETTERHEAD.addressLine1}{" "}
+                {INVOICE_LETTERHEAD.addressLine2}
               </p>
               <p>
-                Email: sales@dynacleanindustries.com | Conatact: +91 7982456944,
-                011-45143666
+                Email: {INVOICE_LETTERHEAD.email} | Contact:{" "}
+                {INVOICE_LETTERHEAD.phone}
               </p>
-              <p>GSTIN: 07AAKCD6495M1ZV </p>
+              <p>
+                GSTIN: {INVOICE_LETTERHEAD.gstin} | State:{" "}
+                {INVOICE_LETTERHEAD.state}
+              </p>
+              <p>CIN: {INVOICE_LETTERHEAD.cin}</p>
             </div>
           </div>
         </div>
@@ -655,7 +659,7 @@ export default forwardRef(function QuotationViewer({
           {/* Bank */}
           <div className="border p-4 rounded bg-gray-50">
             <h4 className="font-semibold mb-1">Bank Details</h4>
-            <p>A/C Holder Name: Dynaclean Industries Private Limited</p>
+            <p>A/C Holder Name: {INVOICE_LETTERHEAD.name}</p>
             <p>ICICI Bank</p>
             <p>Account: 343405500379</p>
             <p>IFSC: ICIC0003434</p>
@@ -664,7 +668,7 @@ export default forwardRef(function QuotationViewer({
           {/* Signatory */}
           <div className="border p-4 rounded bg-gray-50 text-center flex flex-col justify-between">
             <div>
-              <p>For Dynaclean Industries Pvt Ltd</p>
+              <p>For {INVOICE_LETTERHEAD.name}</p>
               <Image
                 src="/images/sign.png"
                 alt="Sign"
