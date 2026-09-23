@@ -11,8 +11,6 @@ export default function EstimateDelivery() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
-  const [stockInfo, setStockInfo] = useState(null);
-  const [loadingStock, setLoadingStock] = useState(false);
 
   // Load product and spare list once
   useEffect(() => {
@@ -56,37 +54,12 @@ export default function EstimateDelivery() {
     setFiltered(results.slice(0, 20));
   }, [search, products, spares]);
 
-  const fetchStockInfo = async (item) => {
-    const code = item.item_code || item.spare_number;
-    if (!code) return;
-
-    setLoadingStock(true);
-    setStockInfo(null);
-    try {
-      const params = new URLSearchParams({
-        item_code: code,
-        type: item.type,
-      });
-      const res = await fetch(`/api/estimate-delivery?${params}`);
-      const data = await res.json();
-      if (res.ok) {
-        setStockInfo(data);
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoadingStock(false);
-    }
-  };
-
   const handleSelect = (item) => {
     setSelectedItem(item);
     setSearch(item.item_code || item.spare_number);
     setFiltered([]);
     setResult(null);
     setError(null);
-    setStockInfo({ total_qty: item.total_qty ?? 0 });
-    fetchStockInfo(item);
   };
 
   const submit = async (e) => {
@@ -144,9 +117,6 @@ export default function EstimateDelivery() {
                 <div>
                   <b>{item.item_code || item.spare_number}</b> —{" "}
                   {item.item_name}
-                  <span className="block text-xs text-gray-600 mt-0.5">
-                    Total Qty: {item.total_qty ?? 0}
-                  </span>
                 </div>
                 <span
                   className={`text-xs px-2 py-1 rounded text-white shrink-0 ${
@@ -170,13 +140,6 @@ export default function EstimateDelivery() {
             <p>
               <b>Name:</b> {selectedItem.item_name}
             </p>
-            {loadingStock ? (
-              <p className="text-sm text-gray-500 mt-2">Loading stock...</p>
-            ) : stockInfo ? (
-              <p className="mt-2 text-sm">
-                <b>Total Qty:</b> {stockInfo.total_qty ?? 0}
-              </p>
-            ) : null}
 
             {(selectedItem.product_image || selectedItem.image) && (
               <img
@@ -213,7 +176,6 @@ export default function EstimateDelivery() {
               setPincode("");
               setResult(null);
               setError(null);
-              setStockInfo(null);
             }}
             className="flex-1 bg-gray-500 text-white py-2 rounded-lg hover:bg-gray-600 transition"
           >
@@ -233,10 +195,6 @@ export default function EstimateDelivery() {
               <span className="text-green-700">
                 {result.available ? "Yes" : "No"}
               </span>
-            </p>
-
-            <p>
-              <b>Total Qty:</b> {result.total_qty ?? 0}
             </p>
 
             {result.available ? (
