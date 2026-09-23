@@ -355,7 +355,7 @@ const mergedData = Object.values(mergedMap).sort((a, b) => {
             <th className="px-4 py-3">Followed By</th>
             <th className="px-4 py-3">Followed Date</th>
             <th className="px-4 py-3">Mode</th>
-            <th className="px-4 py-3">Remarks</th>
+            <th className="px-4 py-3 min-w-[280px]">Remarks</th>
 
             <th className="px-4 py-3">Date & Time</th>
             <th className="px-4 py-3">User</th>
@@ -422,10 +422,13 @@ const mergedData = Object.values(mergedMap).sort((a, b) => {
                     : "-"}
                 </td>
 
-                <td className="px-4 py-2">
+                <td className="px-4 py-2 align-top min-w-[280px] max-w-xl">
                   {row.followups.length > 0
                     ? row.followups.map((f, i) => (
-                        <div key={i} className="mb-3">
+                        <div
+                          key={i}
+                          className="mb-3 whitespace-pre-wrap break-words [overflow-wrap:anywhere]"
+                        >
                           {f.notes || "-"}
                         </div>
                       ))
