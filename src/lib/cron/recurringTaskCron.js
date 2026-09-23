@@ -93,7 +93,7 @@ async function generateRecurringTasks() {
           const nextRunAt = RecurrenceService.calculateNextDate({
             recurrence_type: task.recurrence_type,
             repeat_interval: task.repeat_interval,
-            weekly_days: task.weekly_days ? JSON.parse(task.weekly_days) : null,
+            weekly_days: RecurrenceService.parseWeeklyDays(task.weekly_days),
             monthly_date: task.monthly_date,
             yearly_month: task.yearly_month,
             yearly_date: task.yearly_date,

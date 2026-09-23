@@ -141,17 +141,9 @@ export async function PUT(req, { params }) {
       data.due_date ||
       data.start_date
     ) {
-      let weeklyDays = data.weekly_days;
-      if (!weeklyDays && currentTask.weekly_days) {
-        try {
-          weeklyDays =
-            typeof currentTask.weekly_days === "string"
-              ? JSON.parse(currentTask.weekly_days)
-              : currentTask.weekly_days;
-        } catch {
-          weeklyDays = null;
-        }
-      }
+      let weeklyDays =
+        RecurrenceService.parseWeeklyDays(data.weekly_days) ??
+        RecurrenceService.parseWeeklyDays(currentTask.weekly_days);
 
       const nextRunAt = RecurrenceService.calculateNextDate({
         recurrence_type: data.recurrence_type || currentTask.recurrence_type,

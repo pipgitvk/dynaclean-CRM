@@ -47,6 +47,25 @@ class RecurrenceService {
     return dayjs();
   }
 
+  /** MySQL JSON / form strings / already-parsed arrays — safe for cron & API. */
+  parseWeeklyDays(value) {
+    if (value == null || value === "") return null;
+    if (Array.isArray(value)) {
+      return value.length > 0 ? value : null;
+    }
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (!trimmed) return null;
+      try {
+        const parsed = JSON.parse(trimmed);
+        return Array.isArray(parsed) && parsed.length > 0 ? parsed : null;
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
+
   /** After the manual first task: when is cron allowed to create the next one? */
   getNextRunAfterFirstTask(scheduledAt, config) {
     const scheduled = this.parseSchedule(scheduledAt);
@@ -342,7 +361,7 @@ class RecurrenceService {
     const nextRunAt = this.calculateNextDate({
       recurrence_type: recurringTask.recurrence_type,
       repeat_interval: recurringTask.repeat_interval,
-      weekly_days: recurringTask.weekly_days ? JSON.parse(recurringTask.weekly_days) : null,
+      weekly_days: this.parseWeeklyDays(recurringTask.weekly_days),
       monthly_date: recurringTask.monthly_date,
       yearly_month: recurringTask.yearly_month,
       yearly_date: recurringTask.yearly_date,
