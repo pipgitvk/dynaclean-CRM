@@ -6,7 +6,8 @@ import Image from "next/image";
 import toast from "react-hot-toast";
 import QuotationItemsTable from "@/app/admin-dashboard/quotations/new/quotation-table";
 import TaxAndSummary from "@/app/admin-dashboard/quotations/new/TaxAndSummary";
-import { INVOICE_LETTERHEAD } from "@/lib/invoiceLetterhead";
+import { LetterheadCompanyInfo, LetterheadBankLine, LetterheadSignatoryLine } from "@/components/invoice/InvoiceLetterheadSection";
+
 
 export default function QuotationEditForm({ quoteId }) {
   const router = useRouter();
@@ -346,28 +347,8 @@ export default function QuotationEditForm({ quoteId }) {
           className="object-contain"
           unoptimized
         />
-        <div className="flex-1 text-sm text-gray-700">
-          <h2 className="text-xl font-bold text-red-600 mb-1">
-            {INVOICE_LETTERHEAD.name}
-          </h2>
-          <p className="leading-relaxed">
-            <span className="block">{INVOICE_LETTERHEAD.addressLine1}</span>
-            <span className="block">{INVOICE_LETTERHEAD.addressLine2}</span>
-            <span className="block mt-1">
-              <strong>Phone:</strong> {INVOICE_LETTERHEAD.phone}
-            </span>
-            <span className="block">
-              <strong>Email:</strong> {INVOICE_LETTERHEAD.email}
-            </span>
-            <span className="block mt-1">
-              <strong>GSTIN:</strong> {INVOICE_LETTERHEAD.gstin} |{" "}
-              <strong>State:</strong> {INVOICE_LETTERHEAD.state}
-            </span>
-            <span className="block">
-              <strong>CIN:</strong> {INVOICE_LETTERHEAD.cin}
-            </span>
-          </p>
-        </div>
+        <LetterheadCompanyInfo />
+        
       </div>
 
       {/* Quote Info */}

@@ -5,7 +5,11 @@ import Link from "next/link";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import Image from "next/image";
-import { INVOICE_LETTERHEAD } from "@/lib/invoiceLetterhead";
+import {
+  LetterheadViewerInfo,
+  LetterheadBankLine,
+  LetterheadSignatoryLine,
+} from "@/components/invoice/InvoiceLetterheadSection";
 
 // Mask PII for PDF download
 function maskName(name) {
@@ -412,24 +416,7 @@ export default forwardRef(function QuotationViewer({
               className="object-contain"
               unoptimized
             />
-            <div className="text-sm text-gray-700 break-words">
-              <h2 className="text-lg font-bold text-red-600">
-                {INVOICE_LETTERHEAD.name}
-              </h2>
-              <p>
-                {INVOICE_LETTERHEAD.addressLine1}{" "}
-                {INVOICE_LETTERHEAD.addressLine2}
-              </p>
-              <p>
-                Email: {INVOICE_LETTERHEAD.email} | Contact:{" "}
-                {INVOICE_LETTERHEAD.phone}
-              </p>
-              <p>
-                GSTIN: {INVOICE_LETTERHEAD.gstin} | State:{" "}
-                {INVOICE_LETTERHEAD.state}
-              </p>
-              <p>CIN: {INVOICE_LETTERHEAD.cin}</p>
-            </div>
+            <LetterheadViewerInfo />
           </div>
         </div>
         <div className="text-center">
@@ -659,7 +646,7 @@ export default forwardRef(function QuotationViewer({
           {/* Bank */}
           <div className="border p-4 rounded bg-gray-50">
             <h4 className="font-semibold mb-1">Bank Details</h4>
-            <p>A/C Holder Name: {INVOICE_LETTERHEAD.name}</p>
+            <LetterheadBankLine label="A/C Holder Name" />
             <p>ICICI Bank</p>
             <p>Account: 343405500379</p>
             <p>IFSC: ICIC0003434</p>
@@ -668,7 +655,7 @@ export default forwardRef(function QuotationViewer({
           {/* Signatory */}
           <div className="border p-4 rounded bg-gray-50 text-center flex flex-col justify-between">
             <div>
-              <p>For {INVOICE_LETTERHEAD.name}</p>
+              <LetterheadSignatoryLine />
               <Image
                 src="/images/sign.png"
                 alt="Sign"

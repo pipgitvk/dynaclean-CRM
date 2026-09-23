@@ -11,6 +11,7 @@ import InvoicePDFDocument from "@/components/InvoicePdf";
 import { sendImportCrmSmtpEmail } from "@/lib/importCrmEmail";
 import { INVOICE_LETTERHEAD } from "@/lib/invoiceLetterhead";
 import { isPerformaInvoice } from "@/lib/ledgerInvoiceFilters";
+import { INVOICE_LETTERHEAD } from "@/lib/invoiceLetterhead";
 
 function formatMoneyInr(n) {
   const num = typeof n === "number" ? n : Number(n) || 0;
@@ -323,7 +324,7 @@ export function buildInvoicePdfDocumentData(invoice) {
     terms: parseTerms(invo.terms_conditions),
     notes: invo.notes || "",
     bank: {
-      accountHolderName: "Dynaclean Industries Pvt Ltd",
+      accountHolderName: INVOICE_LETTERHEAD.name,
       name: "ICICI Bank",
       accountNo: "343405500379",
       IFSC: "ICIC0003434",

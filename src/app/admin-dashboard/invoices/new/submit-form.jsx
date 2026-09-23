@@ -8,7 +8,8 @@ import Image from "next/image";
 import toast from "react-hot-toast";
 import AddSpecialPriceModal from "@/components/specialPrice/AddSpecialPriceModal";
 import dynacleanLogo from "@/components/logo1.jpg";
-import { INVOICE_LETTERHEAD } from "@/lib/invoiceLetterhead";
+import { LetterheadCompanyInfo, LetterheadBankLine, LetterheadSignatoryLine } from "@/components/invoice/InvoiceLetterheadSection";
+
 
 export default function InvoiceForm({ invoiceNumber, invoiceDate, invoiceType = "tax", onBack, onSuccessRedirect, initialQuotationNumber = "" }) {
   const router = useRouter();
@@ -522,28 +523,8 @@ const fetchQuotationAndFill = async (quoteNoArg) => {
           </div>
         )}
 
-        <div className="flex-1 text-sm text-gray-700">
-          <h2 className="text-xl font-bold text-red-600 mb-1">
-            {INVOICE_LETTERHEAD.name}
-          </h2>
-          <p className="leading-relaxed">
-            <span className="block">{INVOICE_LETTERHEAD.addressLine1}</span>
-            <span className="block">{INVOICE_LETTERHEAD.addressLine2}</span>
-            <span className="block mt-1">
-              <strong>Phone:</strong> {INVOICE_LETTERHEAD.phone}
-            </span>
-            <span className="block">
-              <strong>Email:</strong> {INVOICE_LETTERHEAD.email}
-            </span>
-            <span className="block mt-1">
-              <strong>GSTIN:</strong> {INVOICE_LETTERHEAD.gstin} |{" "}
-              <strong>State:</strong> {INVOICE_LETTERHEAD.state}
-            </span>
-            <span className="block">
-              <strong>CIN:</strong> {INVOICE_LETTERHEAD.cin}
-            </span>
-          </p>
-        </div>
+        <LetterheadCompanyInfo />
+        
       </div>
 
       {/* Invoice Info */}
@@ -911,7 +892,7 @@ const fetchQuotationAndFill = async (quoteNoArg) => {
         <div className="lg:col-span-1 space-y-4">
           <div className="border p-4 rounded bg-gray-50 text-sm">
             <h4 className="font-semibold mb-2">Bank Details</h4>
-            <p>A/C Holder: {INVOICE_LETTERHEAD.name}</p>
+            <LetterheadBankLine />
             <p>ICICI Bank</p>
             <p>Account: 343405500379</p>
             <p>IFSC: ICIC0003434</p>
@@ -919,7 +900,7 @@ const fetchQuotationAndFill = async (quoteNoArg) => {
 
           <div className="border p-4 rounded bg-gray-50 text-sm text-center flex flex-col justify-between">
             <div>
-              <p>For {INVOICE_LETTERHEAD.name}</p>
+              <LetterheadSignatoryLine />
               <Image
                 src="/images/sign.png"
                 alt="Sign"

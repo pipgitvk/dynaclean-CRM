@@ -7,7 +7,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import toast from "react-hot-toast";
 import { set } from "date-fns";
-import { INVOICE_LETTERHEAD } from "@/lib/invoiceLetterhead";
+import { LetterheadCompanyInfo, LetterheadBankLine, LetterheadSignatoryLine } from "@/components/invoice/InvoiceLetterheadSection";
+
 
 // Remove local generation - will fetch from API
 
@@ -661,28 +662,8 @@ export default function QuotationForm() {
           />
 
           {/* Company Info */}
-          <div className="flex-1 text-sm text-gray-700">
-            <h2 className="text-xl font-bold text-red-600 mb-1">
-              {INVOICE_LETTERHEAD.name}
-            </h2>
-            <p className="leading-relaxed">
-              <span className="block">{INVOICE_LETTERHEAD.addressLine1}</span>
-              <span className="block">{INVOICE_LETTERHEAD.addressLine2}</span>
-              <span className="block mt-1">
-                <strong>Phone:</strong> {INVOICE_LETTERHEAD.phone}
-              </span>
-              <span className="block">
-                <strong>Email:</strong> {INVOICE_LETTERHEAD.email}
-              </span>
-              <span className="block mt-1">
-                <strong>GSTIN:</strong> {INVOICE_LETTERHEAD.gstin} |{" "}
-                <strong>State:</strong> {INVOICE_LETTERHEAD.state}
-              </span>
-              <span className="block">
-                <strong>CIN:</strong> {INVOICE_LETTERHEAD.cin}
-              </span>
-            </p>
-          </div>
+          <LetterheadCompanyInfo />
+        
         </div>
 
         {/* Quote Info */}
@@ -936,7 +917,7 @@ export default function QuotationForm() {
           {/* Bank Details */}
           <div className="lg:col-span-1 border p-4 rounded bg-gray-50 text-sm">
             <h4 className="font-semibold mb-2">Bank Details</h4>
-            <p>A/C Holder Name : {INVOICE_LETTERHEAD.name}</p>
+            <LetterheadBankLine label="A/C Holder Name" />
             <p>Bank Name : ICICI Bank</p>
             <p>A/c no. : 343405500379</p>
             <p>Branch & IFS Code: ICIC0003434</p>
@@ -945,7 +926,7 @@ export default function QuotationForm() {
           {/* Signatory */}
           <div className="lg:col-span-1 border p-4 rounded bg-gray-50 text-sm text-center flex flex-col justify-between">
             <div>
-              <p>For {INVOICE_LETTERHEAD.name}</p>
+              <LetterheadSignatoryLine />
               <Image
                 src="/images/sign.png"
                 alt="Sign"

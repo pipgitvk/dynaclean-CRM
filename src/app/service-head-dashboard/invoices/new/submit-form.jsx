@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import toast from "react-hot-toast";
 import dynacleanLogo from "@/components/logo1.jpg";
+import { LetterheadCompanyInfo, LetterheadBankLine, LetterheadSignatoryLine } from "@/components/invoice/InvoiceLetterheadSection";
 
 export default function InvoiceForm({ invoiceNumber, invoiceDate }) {
   const router = useRouter();
@@ -546,29 +547,8 @@ const fetchQuotationAndFill = async () => {
           </div>
         )}
 
-        <div className="flex-1 text-sm text-gray-700">
-          <h2 className="text-xl font-bold text-red-600 mb-1">
-            Dynaclean Industries Pvt Ltd
-          </h2>
-          <p className="leading-relaxed">
-            <span className="block">
-              1st Floor, 13-B, Kattabomman Street, Gandhi Nagar Main Road,
-            </span>
-            <span className="block">
-              Gandhi Nagar, Ganapathy, Coimbatore, Tamil Nadu, 641006
-            </span>
-            <span className="block mt-1">
-              <strong>Phone:</strong> 011-45143666, +91-7982456944
-            </span>
-            <span className="block">
-              <strong>Email:</strong> sales@dynacleanindustries.com
-            </span>
-            <span className="block mt-1">
-              <strong>GSTIN:</strong> 07AAKCD6495M1ZV | <strong>State:</strong>{" "}
-              Tamil Nadu (33)
-            </span>
-          </p>
-        </div>
+        <LetterheadCompanyInfo />
+        
       </div>
 
       {/* Invoice Info */}
@@ -912,7 +892,7 @@ const fetchQuotationAndFill = async () => {
         <div className="lg:col-span-1 space-y-4">
           <div className="border p-4 rounded bg-gray-50 text-sm">
             <h4 className="font-semibold mb-2">Bank Details</h4>
-            <p>A/C Holder: Dynaclean Industries Private Limited</p>
+            <LetterheadBankLine />
             <p>ICICI Bank</p>
             <p>Account: 343405500379</p>
             <p>IFSC: ICIC0003434</p>
@@ -920,7 +900,7 @@ const fetchQuotationAndFill = async () => {
 
           <div className="border p-4 rounded bg-gray-50 text-sm text-center flex flex-col justify-between">
             <div>
-              <p>For Dynaclean Industries Pvt Ltd</p>
+              <LetterheadSignatoryLine />
               <Image
                 src="/images/sign.png"
                 alt="Sign"
