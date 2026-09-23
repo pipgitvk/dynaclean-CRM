@@ -42,6 +42,42 @@ function modelQuantityInOrder(order, modelName) {
     .reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
 }
 
+function formatModelOptionLabel(item) {
+  const code = String(item?.item_code || "").trim();
+  const name = String(item?.item_name || "").trim();
+  if (code && name) return `${code} (${name})`;
+  return name || code || "";
+}
+
+function buildModelOptions(orders) {
+  const map = new Map();
+  orders?.forEach((order) => {
+    parseOrderLineItems(order).forEach((item) => {
+      const name = String(item.item_name || "").trim();
+      if (!name) return;
+      const code = String(item.item_code || "").trim();
+      if (!map.has(name)) {
+        map.set(name, {
+          item_name: name,
+          item_code: code,
+          label: formatModelOptionLabel({ item_code: code, item_name: name }),
+        });
+      } else if (code && !map.get(name).item_code) {
+        const entry = map.get(name);
+        entry.item_code = code;
+        entry.label = formatModelOptionLabel(entry);
+      }
+    });
+  });
+  return [...map.values()].sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }));
+}
+
+function getModelLabel(modelName, modelOptions) {
+  if (!modelName) return "";
+  const match = modelOptions.find((opt) => opt.item_name === modelName);
+  return match?.label || modelName;
+}
+
 // 👻 A sleek skeleton loader for a modern feel
 const SkeletonLoader = () => (
   <div className="animate-pulse space-y-4">
@@ -304,12 +340,12 @@ export default function OrderTable({ orders, userRole }) {
         !modelSearchRef.current.contains(event.target)
       ) {
         setShowModelDropdown(false);
-        setModelSearchText(modelNameFilter);
+        setModelSearchText(getModelLabel(modelNameFilter, modelOptions));
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [modelNameFilter]);
+  }, [modelNameFilter, modelOptions]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -570,16 +606,7 @@ export default function OrderTable({ orders, userRole }) {
     modelNameFilter,
   ]);
 
-  const modelNameOptions = useMemo(() => {
-    const names = new Set();
-    orders?.forEach((order) => {
-      parseOrderLineItems(order).forEach((item) => {
-        const name = String(item.item_name || "").trim();
-        if (name) names.add(name);
-      });
-    });
-    return [...names].sort((a, b) => a.localeCompare(b));
-  }, [orders]);
+  const modelOptions = useMemo(() => buildModelOptions(orders), [orders]);
 
   const filteredModelQuantity = useMemo(() => {
     if (!modelNameFilter) return 0;
@@ -591,11 +618,24 @@ export default function OrderTable({ orders, userRole }) {
 
   const filteredModelOptions = useMemo(() => {
     const query = modelSearchText.trim().toLowerCase();
-    if (!query) return modelNameOptions.slice(0, 50);
-    return modelNameOptions
-      .filter((name) => name.toLowerCase().includes(query))
+    if (!query) return modelOptions.slice(0, 50);
+    return modelOptions
+      .filter((opt) => {
+        const code = String(opt.item_code || "").toLowerCase();
+        const name = String(opt.item_name || "").toLowerCase();
+        const label = String(opt.label || "").toLowerCase();
+        return code.includes(query) || name.includes(query) || label.includes(query);
+      })
       .slice(0, 50);
-  }, [modelNameOptions, modelSearchText]);
+  }, [modelOptions, modelSearchText]);
+
+  useEffect(() => {
+    if (!modelNameFilter || !modelOptions.length) return;
+    setModelSearchText((prev) => {
+      const next = getModelLabel(modelNameFilter, modelOptions);
+      return prev === modelNameFilter ? next : prev === next ? prev : next;
+    });
+  }, [modelNameFilter, modelOptions]);
 
   const dispatchDoneTotals = useMemo(() => {
     if (!orders?.length) return { gstTotal: 0, taxableTotal: 0 };
@@ -912,12 +952,12 @@ export default function OrderTable({ orders, userRole }) {
                       } else if (e.key === "Enter" && filteredModelOptions.length > 0) {
                         e.preventDefault();
                         const selected = filteredModelOptions[0];
-                        setModelNameFilter(selected);
-                        setModelSearchText(selected);
+                        setModelNameFilter(selected.item_name);
+                        setModelSearchText(selected.label);
                         setShowModelDropdown(false);
                       }
                     }}
-                    placeholder="Search model name..."
+                    placeholder="Search model code or name..."
                     autoComplete="off"
                     className="w-full border border-blue-200 rounded-lg py-1.5 pl-7 pr-7 text-xs bg-white"
                   />
@@ -953,22 +993,22 @@ export default function OrderTable({ orders, userRole }) {
                       </button>
                     )}
                     {filteredModelOptions.length > 0 ? (
-                      filteredModelOptions.map((modelName) => (
+                      filteredModelOptions.map((opt) => (
                         <button
-                          key={modelName}
+                          key={`${opt.item_code}-${opt.item_name}`}
                           type="button"
                           onClick={() => {
-                            setModelNameFilter(modelName);
-                            setModelSearchText(modelName);
+                            setModelNameFilter(opt.item_name);
+                            setModelSearchText(opt.label);
                             setShowModelDropdown(false);
                           }}
                           className={`w-full border-b border-blue-50 px-3 py-2 text-left text-xs hover:bg-blue-50 ${
-                            modelNameFilter === modelName
+                            modelNameFilter === opt.item_name
                               ? "bg-blue-50 font-medium text-blue-900"
                               : "text-gray-700"
                           }`}
                         >
-                          {modelName}
+                          {opt.label}
                         </button>
                       ))
                     ) : (
