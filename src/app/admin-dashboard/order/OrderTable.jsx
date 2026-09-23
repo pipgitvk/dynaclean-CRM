@@ -335,13 +335,6 @@ export default function OrderTable({ orders, userRole }) {
     }
     return "";
   });
-  const [showRejected, setShowRejected] = useState(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("orderTable_showRejected");
-      return saved ? JSON.parse(saved) : false;
-    }
-    return false;
-  });
   const [showNukePanel, setShowNukePanel] = useState(false);
   const [nukeConfirmText, setNukeConfirmText] = useState("");
   const [nukeLoading, setNukeLoading] = useState(false);
@@ -403,12 +396,6 @@ export default function OrderTable({ orders, userRole }) {
       localStorage.setItem("orderTable_approvalStatusFilter", approvalStatusFilter);
     }
   }, [approvalStatusFilter]);
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("orderTable_showRejected", JSON.stringify(showRejected));
-    }
-  }, [showRejected]);
 
   const toggleMenu = (id) => {
     setOpenMenuId(openMenuId === id ? null : id);
@@ -472,7 +459,6 @@ export default function OrderTable({ orders, userRole }) {
     setModelSearchText("");
     setShowModelDropdown(false);
     setApprovalStatusFilter("");
-    setShowRejected(false);
     
     // Clear localStorage
     if (typeof window !== "undefined") {
@@ -483,7 +469,6 @@ export default function OrderTable({ orders, userRole }) {
       localStorage.removeItem("orderTable_createdByFilter");
       localStorage.removeItem("orderTable_modelNameFilter");
       localStorage.removeItem("orderTable_approvalStatusFilter");
-      localStorage.removeItem("orderTable_showRejected");
     }
   };
 
@@ -582,11 +567,6 @@ export default function OrderTable({ orders, userRole }) {
 
     const lowercasedQuery = searchQuery.toLowerCase();
     let result = orders.filter((order) => {
-      // Step 0.5: Filter rejected orders based on toggle
-      if (!showRejected && order.approval_status === 'rejected') {
-        return false;
-      }
-
       // Step 1: Filter by status
       if (statusFilter) {
         const orderStatus = getStatusText(order)
@@ -653,7 +633,6 @@ export default function OrderTable({ orders, userRole }) {
     approvalStatusFilter,
     sortColumn,
     sortDirection,
-    showRejected,
     modelNameFilter,
   ]);
 
@@ -749,6 +728,7 @@ export default function OrderTable({ orders, userRole }) {
     if (!filteredOrders?.length) return { totalAmount: 0, paidAmount: 0, taxableAmount: 0, balanceAmount: 0 };
     return filteredOrders.reduce(
       (acc, o) => {
+        if (o.approval_status !== "approved") return acc;
         acc.totalAmount += getTotalAmount(o);
         acc.paidAmount += getTotalPaidAmount(o);
         acc.taxableAmount += getPaymentColumnAmount(o);
@@ -935,7 +915,7 @@ export default function OrderTable({ orders, userRole }) {
                 Amount Summary
               </p>
               <p className="text-[10px] text-emerald-600/90 mb-2 leading-tight">
-                All orders overview
+                Approved orders only
               </p>
               
               {/* Total Amount */}
@@ -971,7 +951,7 @@ export default function OrderTable({ orders, userRole }) {
                 Balance & Taxable
               </p>
               <p className="text-[10px] text-purple-600/90 mb-2 leading-tight">
-                Summary details
+                Approved orders only
               </p>
 
               {/* Balance Amount */}
@@ -1291,19 +1271,6 @@ export default function OrderTable({ orders, userRole }) {
             <option value="rejected">Rejected</option>
           </select>
         </div>
-      </div>
-
-      {/* Show Rejected Orders Toggle */}
-      <div className="mt-3 flex items-center">
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={showRejected}
-            onChange={(e) => setShowRejected(e.target.checked)}
-            className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
-          />
-          <span className="text-sm font-medium text-gray-700">Show Rejected Orders</span>
-        </label>
       </div>
 
       {/* 👨‍💼 TABLE VIEW for large screens */}
