@@ -17,7 +17,8 @@ import {
   Info,
 } from "lucide-react";
 import toast from "react-hot-toast";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import { getGemCrmBasePath } from "@/lib/gemCrmBasePath";
 
 const StatusBadge = ({ status }) => {
   const styles = {
@@ -45,6 +46,8 @@ const StatusBadge = ({ status }) => {
 
 export default function GemCrmBidsPage() {
   const router = useRouter();
+  const pathname = usePathname();
+  const gemCrmBase = getGemCrmBasePath(pathname);
   const searchParams = useSearchParams();
   const [bids, setBids] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -163,12 +166,12 @@ export default function GemCrmBidsPage() {
 
   const clearEndingSoonFilter = () => {
     setEndingSoonFilter(false);
-    router.push('/admin-dashboard/gem-crm/bids');
+    router.push(`${gemCrmBase}/bids`);
   };
 
   const clearActiveRAFilter = () => {
     setActiveRAFilter(false);
-    router.push('/admin-dashboard/gem-crm/bids');
+    router.push(`${gemCrmBase}/bids`);
   };
 
   const openBidOpenedModal = (bid) => {
@@ -278,7 +281,7 @@ export default function GemCrmBidsPage() {
           <p className="text-gray-600 mt-1">Manage government tenders and bids</p>
         </div>
         <button
-          onClick={() => router.push("/admin-dashboard/gem-crm/bids/new")}
+          onClick={() => router.push(`${gemCrmBase}/bids/new`)}
           className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
         >
           <Plus className="w-4 h-4" />
@@ -661,14 +664,14 @@ export default function GemCrmBidsPage() {
                     <td className="py-3 px-4">
                       <div className="flex items-center justify-center gap-2">
                         <button
-                          onClick={() => router.push(`/admin-dashboard/gem-crm/bids/${bid.bid_id}`)}
+                          onClick={() => router.push(`${gemCrmBase}/bids/${bid.bid_id}`)}
                           className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                           title="View Details"
                         >
                           <Eye className="w-4 h-4" />
                         </button>
                         <button
-                          onClick={() => router.push(`/admin-dashboard/gem-crm/bids/${bid.bid_id}/edit`)}
+                          onClick={() => router.push(`${gemCrmBase}/bids/${bid.bid_id}/edit`)}
                           className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
                           title="Edit"
                         >

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getDbConnection, withPool, dbExecute } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { parseFormData } from "@/lib/parseForm";
-import { resolveGemCrmEmployeeId } from "@/lib/gemCrmAuth";
+import { resolveGemCrmEmployeeId, isGemCrmAdmin } from "@/lib/gemCrmAuth";
 import {
   BID_DOCUMENT_PARSE_OPTIONS,
   normalizeFormidableFiles,
@@ -112,7 +112,7 @@ export async function GET(req) {
       const params = [];
 
       // Only SUPERADMIN can see all bids, others can only see their own assigned bids
-      if (payload.role !== "SUPERADMIN") {
+      if (!isGemCrmAdmin(payload.role)) {
         // Try to filter by employee ID first
         if (currentEmpId) {
           console.log("DEBUG: Using resolved employee ID:", currentEmpId);
@@ -176,7 +176,7 @@ export async function GET(req) {
         params.push(platform);
       }
 
-      if (employeeId && payload.role === "SUPERADMIN") {
+      if (employeeId && isGemCrmAdmin(payload.role)) {
         conditions.push("assigned_employee_id = ?");
         params.push(employeeId);
       }

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
+import { isGemCrmRoleAllowed } from "@/lib/gemCrmAuth";
 import ExcelJS from "exceljs";
 
 export async function GET(req) {
@@ -8,9 +9,9 @@ export async function GET(req) {
     const payload = await getSessionPayload();
     if (!payload) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     
-    const role = payload.role;
-    if (!["SUPERADMIN", "GEM"].includes(role)) {
-      return NextResponse.json({ error: "Forbidden - SUPERADMIN/GEM only" }, { status: 403 });
+    const role = String(payload.role || "").trim().toUpperCase();
+    if (!isGemCrmRoleAllowed(role)) {
+      return NextResponse.json({ error: "Forbidden - SUPERADMIN/GEM/DIRECTOR only" }, { status: 403 });
     }
     const currentEmpId = payload.empId || payload.id || null;
     if (role === "GEM" && !currentEmpId) {

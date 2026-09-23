@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, usePathname } from "next/navigation";
 import { ArrowLeft, CalendarClock, Loader2 } from "lucide-react";
 import {
   formatDt,
@@ -10,6 +10,7 @@ import {
   formatInterviewAt,
   StatusChip,
 } from "@/app/admin-dashboard/hiring-process/shared";
+import { getDirectorHrHiringBase } from "@/lib/directorHrPaths";
 
 /** Table-friendly datetime for status history table */
 function formatHistoryWhen(v) {
@@ -36,6 +37,8 @@ function formatHistoryWhen(v) {
 
 export default function EmpcrmHiringViewPage() {
   const params = useParams();
+  const pathname = usePathname();
+  const hiringBase = getDirectorHrHiringBase(pathname);
   const idRaw = params?.id;
   const entryId = idRaw != null ? parseInt(String(idRaw), 10) : NaN;
 
@@ -76,8 +79,8 @@ export default function EmpcrmHiringViewPage() {
     load();
   }, [load]);
 
-  const backHref = "/empcrm/admin-dashboard/hiring";
-  const editHref = `/empcrm/admin-dashboard/hiring/${entryId}/edit`;
+  const backHref = hiringBase;
+  const editHref = `${hiringBase}/${entryId}/edit`;
 
   const statusRows = useMemo(() => {
     const rows = historyRows.filter((h) => {

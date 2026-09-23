@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
+import { isGemCrmRoleAllowed } from "@/lib/gemCrmAuth";
 import { parseFormData } from "@/lib/parseForm";
 import { v2 as cloudinary } from "cloudinary";
 import fs from "fs/promises";
@@ -75,8 +76,8 @@ export async function GET(req, { params }) {
     if (!payload) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     
     const role = payload.role;
-    if (!["SUPERADMIN", "GEM"].includes(role)) {
-      return NextResponse.json({ error: "Forbidden - SUPERADMIN/GEM only" }, { status: 403 });
+    if (!isGemCrmRoleAllowed(role)) {
+      return NextResponse.json({ error: "Forbidden - SUPERADMIN/GEM/DIRECTOR only" }, { status: 403 });
     }
     const currentEmpId = payload.empId || payload.id || null;
     if (role === "GEM" && !currentEmpId) {
@@ -132,8 +133,8 @@ export async function POST(req, { params }) {
     if (!payload) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     
     const role = payload.role;
-    if (!["SUPERADMIN", "GEM"].includes(role)) {
-      return NextResponse.json({ error: "Forbidden - SUPERADMIN/GEM only" }, { status: 403 });
+    if (!isGemCrmRoleAllowed(role)) {
+      return NextResponse.json({ error: "Forbidden - SUPERADMIN/GEM/DIRECTOR only" }, { status: 403 });
     }
     const currentEmpId = payload.empId || payload.id || null;
     if (role === "GEM" && !currentEmpId) {

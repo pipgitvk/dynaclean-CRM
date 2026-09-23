@@ -14,8 +14,14 @@ export function canViewHrTargetChart(role) {
   return normalizeRoleKey(role || "") === "SUPERADMIN";
 }
 
-/** Hiring page + /api/empcrm/hiring (HR roles + Superadmin). */
+export function isEmpCrmHrAdmin(role) {
+  const k = normalizeRoleKey(role || "");
+  return k === "SUPERADMIN" || k === "DIRECTOR";
+}
+
+/** Hiring page + /api/empcrm/hiring (HR roles + Superadmin/Director). */
 export function canAccessHiringModule(role) {
+  if (isEmpCrmHrAdmin(role)) return true;
   if (isHrTargetDashboardRole(role)) return true;
-  return normalizeRoleKey(role || "") === "SUPERADMIN";
+  return false;
 }

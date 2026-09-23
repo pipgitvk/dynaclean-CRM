@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
+import { getGemCrmBasePath } from "@/lib/gemCrmBasePath";
 import {
   Save,
   X,
@@ -20,6 +21,8 @@ import { BID_DOCUMENT_MAX_FILE_SIZE_MB } from "@/lib/bidDocuments";
 
 export default function NewBidPage() {
   const router = useRouter();
+  const pathname = usePathname();
+  const gemCrmBase = getGemCrmBasePath(pathname);
   const [isLoading, setIsLoading] = useState(false);
   const [employees, setEmployees] = useState([]);
   const [bidNumberStatus, setBidNumberStatus] = useState(null); // null, 'checking', 'exists', 'available'
@@ -161,7 +164,7 @@ export default function NewBidPage() {
       const result = await res.json();
       if (result.success) {
         toast.success("Bid created successfully");
-        router.push("/admin-dashboard/gem-crm/bids");
+        router.push(`${gemCrmBase}/bids`);
       } else {
         toast.error(result.error || "Failed to create bid");
       }
@@ -182,7 +185,7 @@ export default function NewBidPage() {
           <p className="text-gray-600 mt-1">Add a new government tender/bid</p>
         </div>
         <button
-          onClick={() => router.push("/admin-dashboard/gem-crm/bids")}
+          onClick={() => router.push(`${gemCrmBase}/bids`)}
           className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
         >
           <X className="w-4 h-4" />
@@ -715,7 +718,7 @@ export default function NewBidPage() {
         <div className="flex justify-end gap-3 mt-6 pt-6 border-t border-gray-200">
           <button
             type="button"
-            onClick={() => router.push("/admin-dashboard/gem-crm/bids")}
+            onClick={() => router.push(`${gemCrmBase}/bids`)}
             className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
           >
             Cancel

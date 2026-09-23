@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
+import { isGemCrmAdmin } from "@/lib/gemCrmAuth";
 
 export async function POST(request) {
   try {
@@ -10,8 +11,8 @@ export async function POST(request) {
     }
 
     // Only SUPERADMIN can bulk assign
-    if (payload.role !== "SUPERADMIN") {
-      return NextResponse.json({ error: "Forbidden - SUPERADMIN only" }, { status: 403 });
+    if (!isGemCrmAdmin(payload.role)) {
+      return NextResponse.json({ error: "Forbidden - SUPERADMIN/DIRECTOR only" }, { status: 403 });
     }
 
     const body = await request.json();

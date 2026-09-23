@@ -58,6 +58,17 @@ function transformMenuItemPaths(item, roleKey) {
       "prospects-new": "/director-dashboard/prospects/new",
       "hr-designation-targets": "/director-dashboard/hr-designation-targets",
       "sales-target": "/director-dashboard/monitor-targets",
+      "import-suppliers": "/director-dashboard/import-crm/suppliers",
+      "import-shipments": "/director-dashboard/import-crm/shipments",
+      "import-agents": "/director-dashboard/import-crm/agents",
+      "import-quote-submissions": "/director-dashboard/import-crm/quote-submissions",
+      "import-award-followups": "/director-dashboard/import-crm/award-followups",
+      "import-billing": "/director-dashboard/import-crm/billing",
+      "gem-crm-bids": "/director-dashboard/gem-crm/bids",
+      "gem-crm-reports": "/director-dashboard/gem-crm/reports",
+      "hiring-process": "/director-dashboard/hiring",
+      "final-profile-approval": "/director-dashboard/final-profile-approval",
+      "salary-slips": "/director-dashboard/salary-slips",
     };
     if (item.moduleKey && directorModulePaths[item.moduleKey]) {
       return { ...item, path: directorModulePaths[item.moduleKey] };

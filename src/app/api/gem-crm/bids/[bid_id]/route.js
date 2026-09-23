@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { withPool } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { parseFormData } from "@/lib/parseForm";
-import { resolveGemCrmEmployeeId } from "@/lib/gemCrmAuth";
+import { resolveGemCrmEmployeeId, isGemCrmAdmin } from "@/lib/gemCrmAuth";
 import {
   BID_DOCUMENT_PARSE_OPTIONS,
   normalizeFormidableFiles,
@@ -120,7 +120,7 @@ export async function GET(req, { params }) {
       let queryParams = [bid_id];
 
       // Only SUPERADMIN can see all bids, others can only see their own assigned bids
-      if (payload.role !== "SUPERADMIN") {
+      if (!isGemCrmAdmin(payload.role)) {
         if (currentEmpId) {
           whereClause += " AND b.assigned_employee_id = ?";
           queryParams.push(currentEmpId);
@@ -325,7 +325,7 @@ export async function PUT(req, { params }) {
       let queryParams = [bid_id];
 
       // Only SUPERADMIN can update all bids, others can only update their own assigned bids
-      if (payload.role !== "SUPERADMIN") {
+      if (!isGemCrmAdmin(payload.role)) {
         if (currentEmpId) {
           whereClause += " AND assigned_employee_id = ?";
           queryParams.push(currentEmpId);
@@ -445,7 +445,7 @@ export async function PUT(req, { params }) {
       ];
 
       for (const field of allowedFields) {
-        if (payload.role !== "SUPERADMIN" && field === "assigned_employee_id") continue;
+        if (!isGemCrmAdmin(payload.role) && field === "assigned_employee_id") continue;
         if (fields[field] !== undefined) {
           updateFields.push(`${field} = ?`);
           updateValues.push(fields[field]);
@@ -529,7 +529,7 @@ export async function DELETE(req, { params }) {
       let queryParams = [bid_id];
 
       // Only SUPERADMIN can delete all bids, others can only delete their own assigned bids
-      if (payload.role !== "SUPERADMIN") {
+      if (!isGemCrmAdmin(payload.role)) {
         if (currentEmpId) {
           whereClause += " AND assigned_employee_id = ?";
           queryParams.push(currentEmpId);

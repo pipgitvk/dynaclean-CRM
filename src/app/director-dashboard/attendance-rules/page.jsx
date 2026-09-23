@@ -1,5 +1,1 @@
-import AttendanceRulesPageClient from "./AttendanceRulesPageClient";
-
-export default function AttendanceRulesPage() {
-  return <AttendanceRulesPageClient />;
-}
+export { default } from "../../admin-dashboard/attendance-rules/page";

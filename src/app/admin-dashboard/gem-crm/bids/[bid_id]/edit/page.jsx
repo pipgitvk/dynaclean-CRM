@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
+import { getGemCrmBasePath } from "@/lib/gemCrmBasePath";
 import {
   Save,
   X,
@@ -18,6 +19,8 @@ import { parseBidDocuments, BID_DOCUMENT_MAX_FILE_SIZE_MB } from "@/lib/bidDocum
 
 export default function EditBidPage({ params }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const gemCrmBase = getGemCrmBasePath(pathname);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [employees, setEmployees] = useState([]);
@@ -306,7 +309,7 @@ export default function EditBidPage({ params }) {
       const result = await res.json();
       if (result.success) {
         toast.success("Bid updated successfully");
-        router.push(`/admin-dashboard/gem-crm/bids/${bidId}`);
+        router.push(`${gemCrmBase}/bids/${bidId}`);
       } else {
         toast.error(result.error || "Failed to update bid");
       }
@@ -335,7 +338,7 @@ export default function EditBidPage({ params }) {
           <p className="text-gray-600 mt-1">Update bid information</p>
         </div>
         <button
-          onClick={() => router.push(`/admin-dashboard/gem-crm/bids/${params.bid_id}`)}
+          onClick={() => router.push(`${gemCrmBase}/bids/${params.bid_id}`)}
           className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
         >
           <X className="w-4 h-4" />
@@ -1222,7 +1225,7 @@ export default function EditBidPage({ params }) {
         <div className="flex justify-end gap-3 mt-6 pt-6 border-t border-gray-200">
           <button
             type="button"
-            onClick={() => router.push(`/admin-dashboard/gem-crm/bids/${params.bid_id}`)}
+            onClick={() => router.push(`${gemCrmBase}/bids/${params.bid_id}`)}
             className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
           >
             Cancel
