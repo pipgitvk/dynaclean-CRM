@@ -4,6 +4,8 @@ import { jwtVerify } from "jose";
 import { convertISTtoUTC } from "@/lib/timezone";
 import { ensureCustomersServiceColumns } from "@/lib/ensureCustomersServiceColumns";
 import { ensureCustomersGemColumns } from "@/lib/ensureCustomersGemColumns";
+import { ensureCustomersFollowupNotesText } from "@/lib/ensureCustomersFollowupNotesText";
+import { isGemRole } from "@/lib/isGemRole";
 import { updateCustomerNotesLanguage } from "@/lib/customerFollowupNotesLanguage";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret";
@@ -36,6 +38,7 @@ export async function GET(req, { params }) {
   }
 
   const conn = await getDbConnection();
+  await ensureCustomersFollowupNotesText(conn);
 
   let sql = `SELECT 
       followed_date,
@@ -99,6 +102,7 @@ export async function POST(req, { params }) {
   const conn = await getDbConnection();
   await ensureCustomersServiceColumns(conn);
   await ensureCustomersGemColumns(conn);
+  await ensureCustomersFollowupNotesText(conn);
 
   // First try to get from customers_followup (existing records), fallback to customers table
   let [rows] = await conn.execute(
@@ -172,8 +176,8 @@ export async function POST(req, { params }) {
     insertServiceNext = serviceNextFollowupUTC;
     insertNextDate = latestDates.next_followup_date || null;
     insertGemNext = latestDates.gem_next_followup || null;
-  } else if (userRole === "GEM") {
-    // GEM role - update gem_next_followup, preserve others
+  } else if (isGemRole(userRole)) {
+    // GEM / GEM PORTAL - update gem_next_followup, preserve others
     insertGemNext = gemNextFollowupUTC;
     insertNextDate = latestDates.next_followup_date || null;
     insertServiceNext = latestDates.service_next_followup || null;
@@ -202,7 +206,7 @@ export async function POST(req, { params }) {
   const serviceTags = isServiceSupport
     ? String(data.service_tags || "").trim().slice(0, 255) || null
     : null;
-  const isGEM = userRole === "GEM";
+  const isGEM = isGemRole(userRole);
   const gemStatus = isGEM
     ? String(data.gem_status || "").trim().slice(0, 50) || null
     : null;
@@ -278,8 +282,8 @@ export async function POST(req, { params }) {
     );
   }
 
-  // Only update sales status/stage on customers table (not SERVICE SUPPORT or GEM)
-  if ((data.status || data.stage) && userRole !== "SERVICE SUPPORT" && userRole !== "GEM") {
+  // Only update sales status/stage on customers table (not SERVICE SUPPORT or GEM roles)
+  if ((data.status || data.stage) && userRole !== "SERVICE SUPPORT" && !isGemRole(userRole)) {
     await conn.execute(
       `UPDATE customers SET status=?, stage=? WHERE customer_id=?`,
       [data.status, data.stage || "New", customerId],

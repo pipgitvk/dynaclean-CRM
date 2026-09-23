@@ -1,6 +1,7 @@
 // app/user-dashboard/view-customer/[customerId]/page.tsx
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
+import { ensureCustomersFollowupNotesText } from "@/lib/ensureCustomersFollowupNotesText";
 import dayjs from "dayjs";
 import FollowUpHistory from "@/components/Leads/FollowUpHistory";
 import CustomerContactsModal from "@/components/Customers/CustomerContactsModal";
@@ -9,6 +10,7 @@ import CustomerPerformaInvoiceButton from "@/components/invoice/CustomerPerforma
 import ScheduleVisitModal from "@/components/scheduleVisit/ScheduleVisitModal";
 import { canShowScheduleVisitOnCustomerProfile } from "@/lib/scheduleVisitScope";
 import { isSalesRole } from "@/lib/isSalesRole";
+import { isGemRole } from "@/lib/isGemRole";
 import { userHasModuleKey } from "@/lib/userModuleAccessServer";
 import Link from "next/link";
 import axios from "axios";
@@ -17,12 +19,13 @@ import { notFound } from "next/navigation";
 export default async function CustomerPage({ params }) {
   const { customerId } = await params;
   const conn = await getDbConnection();
+  await ensureCustomersFollowupNotesText(conn);
 
   // Fetch current user info
   const payload = await getSessionPayload();
   const userRole = payload?.role || "";
   const username = payload?.username || "";
-  const isRestrictedRole = userRole === "SERVICE SUPPORT" || userRole === "GEM";
+  const isRestrictedRole = userRole === "SERVICE SUPPORT" || isGemRole(userRole);
   const hideServiceLeadSource = isSalesRole(userRole);
   const hideLeadSource = userRole === "SERVICE SUPPORT";
   const showScheduleVisitBtn = canShowScheduleVisitOnCustomerProfile(userRole);
@@ -52,7 +55,8 @@ export default async function CustomerPage({ params }) {
     .trim();
 
   // Fetch followup history
-  // SERVICE SUPPORT / GEM: only their own followups
+  // SERVICE SUPPORT: only their own followups
+  // GEM / GEM PORTAL: all followups for this customer
   // Sales roles: hide SERVICE SUPPORT follow-ups
   const hideServiceSupportFollowups = isSalesRole(userRole);
   const followupSelect = `SELECT next_followup_date, service_next_followup, gem_next_followup, followed_date, followed_by, notes, comm_mode, time_stamp`;
@@ -63,7 +67,7 @@ export default async function CustomerPage({ params }) {
          ORDER BY time_stamp DESC`;
   let followupParams = [customerId];
 
-  if (isRestrictedRole) {
+  if (userRole === "SERVICE SUPPORT") {
     followupSql = `${followupSelect}
          FROM customers_followup
          WHERE customer_id = ? AND followed_by = ? AND followed_by IS NOT NULL AND followed_by != ''

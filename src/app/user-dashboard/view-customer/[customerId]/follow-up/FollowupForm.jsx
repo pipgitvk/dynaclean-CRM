@@ -5,12 +5,14 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import toast from "react-hot-toast";
 
+import { isGemRole } from "@/lib/isGemRole";
+
 export default function FollowupForm({ customerId, userRole = "" }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const isFromUpcoming = searchParams.get("source") === "upcoming";
   const isServiceSupport = userRole === "SERVICE SUPPORT";
-  const isGEM = userRole === "GEM";
+  const isGEM = isGemRole(userRole);
   const isRestrictedRole = isServiceSupport || isGEM;
   const [formData, setFormData] = useState({
     followed_date: "",

@@ -268,10 +268,11 @@ import {
   getCrmDateKeyIST,
   getCrmInstantMs,
 } from "@/lib/timezone";
+import { isGemRole } from "@/lib/isGemRole";
 
 function pickNextFollowupField(entry, userRole) {
   if (userRole === "SERVICE SUPPORT") return entry.service_next_followup;
-  if (userRole === "GEM") return entry.gem_next_followup;
+  if (isGemRole(userRole)) return entry.gem_next_followup;
   return entry.next_followup_date;
 }
 
@@ -281,215 +282,215 @@ export default function FollowUpHistory({
   userRole = "",
 }) {
   const isServiceSupport = userRole === "SERVICE SUPPORT";
-  const isGEM = userRole === "GEM";
+  const isGEM = isGemRole(userRole);
   const nextFollowupLabel = isServiceSupport
     ? "Service Next Follow-up"
     : isGEM
       ? "GEM Next Follow-up"
       : "Next Follow-up";
   const uploads = isServiceSupport ? [] : (cust_analysis_external?.uploads || []);
-const mergedMap = {};
+  const hasUploads = uploads.length > 0;
 
-// 1️⃣ Add followups (support multiple per date safely)
-entries.forEach((entry) => {
-  const sortSource =
-    entry.followed_date || entry.time_stamp || entry.next_followup_date || null;
-  const dateKey = entry.followed_date
-    ? getCrmDateKeyIST(entry.followed_date)
-    : sortSource
-      ? getCrmDateKeyIST(sortSource)
+  const uploadsByDate = {};
+  uploads.forEach((upload) => {
+    const dateKey = upload.datetime
+      ? getCrmDateKeyIST(upload.datetime)
       : "no-date";
+    if (!uploadsByDate[dateKey]) uploadsByDate[dateKey] = [];
+    uploadsByDate[dateKey].push(upload);
+  });
 
-  if (!mergedMap[dateKey]) {
-    mergedMap[dateKey] = {
-      followups: [],
-      uploads: [],
-      sortDate: sortSource,
-    };
-  }
+  const followupDateKeys = new Set(
+    entries
+      .map((entry) =>
+        entry.followed_date ? getCrmDateKeyIST(entry.followed_date) : null,
+      )
+      .filter(Boolean),
+  );
 
-  mergedMap[dateKey].followups.push(entry);
+  const followupRows = [...entries].sort(
+    (a, b) =>
+      getCrmInstantMs(b.time_stamp || b.followed_date) -
+      getCrmInstantMs(a.time_stamp || a.followed_date),
+  );
 
-  if (
-    sortSource &&
-    getCrmInstantMs(sortSource) > getCrmInstantMs(mergedMap[dateKey].sortDate)
-  ) {
-    mergedMap[dateKey].sortDate = sortSource;
-  }
-});
+  const uploadOnlyRows = uploads
+    .filter((upload) => {
+      const dateKey = upload.datetime
+        ? getCrmDateKeyIST(upload.datetime)
+        : "no-date";
+      return !followupDateKeys.has(dateKey);
+    })
+    .sort(
+      (a, b) => getCrmInstantMs(b.datetime) - getCrmInstantMs(a.datetime),
+    );
 
-// 2️⃣ Add uploads
-uploads.forEach((upload) => {
-  const dateKey = upload.datetime
-    ? getCrmDateKeyIST(upload.datetime)
-    : "no-date";
+  const totalColumns = hasUploads ? 9 : 5;
 
-  if (!mergedMap[dateKey]) {
-    mergedMap[dateKey] = {
-      followups: [],
-      uploads: [],
-      sortDate: upload.datetime || null,
-    };
-  }
-
-  mergedMap[dateKey].uploads.push(upload);
-
-  if (!mergedMap[dateKey].sortDate && upload.datetime) {
-    mergedMap[dateKey].sortDate = upload.datetime;
-  }
-});
-
-// 3️⃣ Convert to array & sort by latest date first
-const mergedData = Object.values(mergedMap).sort((a, b) => {
-  return getCrmInstantMs(b.sortDate) - getCrmInstantMs(a.sortDate);
-});
-
-  
+  const getRowUploads = (entry) => {
+    if (!hasUploads || !entry?.followed_date) return [];
+    const dateKey = getCrmDateKeyIST(entry.followed_date);
+    return uploadsByDate[dateKey] || [];
+  };
 
   return (
     <div className="overflow-x-auto bg-white shadow rounded w-full">
-      <table className="min-w-full divide-y divide-gray-200 text-sm">
+      <table className="w-full table-fixed divide-y divide-gray-200 text-sm">
+        <colgroup>
+          <col className={hasUploads ? "w-[11%]" : "w-[14%]"} />
+          <col className={hasUploads ? "w-[9%]" : "w-[12%]"} />
+          <col className={hasUploads ? "w-[11%]" : "w-[14%]"} />
+          <col className={hasUploads ? "w-[7%]" : "w-[10%]"} />
+          <col className={hasUploads ? "w-[38%]" : "w-[50%]"} />
+          {hasUploads && (
+            <>
+              <col className="w-[8%]" />
+              <col className="w-[6%]" />
+              <col className="w-[5%]" />
+              <col className="w-[5%]" />
+            </>
+          )}
+        </colgroup>
         <thead className="bg-gray-100 text-gray-700 uppercase text-xs tracking-wide">
           <tr>
-            <th className="px-4 py-3">{nextFollowupLabel}</th>
-            <th className="px-4 py-3">Followed By</th>
-            <th className="px-4 py-3">Followed Date</th>
-            <th className="px-4 py-3">Mode</th>
-            <th className="px-4 py-3 min-w-[280px]">Remarks</th>
-
-            <th className="px-4 py-3">Date & Time</th>
-            <th className="px-4 py-3">User</th>
-            <th className="px-4 py-3">Summary</th>
-            <th className="px-4 py-3">Key Points</th>
+            <th className="px-4 py-3 text-left">{nextFollowupLabel}</th>
+            <th className="px-4 py-3 text-left">Followed By</th>
+            <th className="px-4 py-3 text-left">Followed Date</th>
+            <th className="px-4 py-3 text-left">Mode</th>
+            <th className="px-4 py-3 text-left">Remarks</th>
+            {hasUploads && (
+              <>
+                <th className="px-4 py-3 text-left">Date & Time</th>
+                <th className="px-4 py-3 text-left">User</th>
+                <th className="px-4 py-3 text-left">Summary</th>
+                <th className="px-4 py-3 text-left">Key Points</th>
+              </>
+            )}
           </tr>
         </thead>
 
         <tbody className="bg-white divide-y divide-gray-200">
-          {mergedData.length === 0 ? (
+          {followupRows.length === 0 && uploadOnlyRows.length === 0 ? (
             <tr>
-              <td colSpan={9} className="text-center py-4 text-gray-500">
+              <td colSpan={totalColumns} className="text-center py-4 text-gray-500">
                 No Data Available
               </td>
             </tr>
           ) : (
-            mergedData.map((row, index) => (
-              <tr key={index}>
-                {/* FOLLOWUPS */}
-                <td className="px-4 py-2">
-                  {row.followups.length > 0
-                    ? row.followups.map((f, i) => {
-                        const nextFollowup = pickNextFollowupField(f, userRole);
-                        return (
-                        <div key={i} className="mb-3">
-                          {nextFollowup
-                            ? formatCrmDatetimeForISTDisplay(nextFollowup)
+            <>
+              {followupRows.map((entry, index) => {
+                const rowUploads = getRowUploads(entry);
+                const nextFollowup = pickNextFollowupField(entry, userRole);
+                const rowKey = `${entry.time_stamp || entry.followed_date || "f"}-${index}`;
+
+                return (
+                  <tr key={rowKey} className="align-top">
+                    <td className="px-4 py-3">
+                      {nextFollowup
+                        ? formatCrmDatetimeForISTDisplay(nextFollowup)
+                        : "-"}
+                    </td>
+                    <td className="px-4 py-3">{entry.followed_by || "-"}</td>
+                    <td className="px-4 py-3">
+                      {entry.followed_date
+                        ? formatCrmDatetimeForISTDisplay(entry.followed_date)
+                        : "-"}
+                    </td>
+                    <td className="px-4 py-3">{entry.comm_mode || "-"}</td>
+                    <td className="px-4 py-3 min-w-0">
+                      <div className="whitespace-pre-wrap break-words [overflow-wrap:anywhere] leading-relaxed text-gray-800">
+                        {entry.notes || "-"}
+                      </div>
+                    </td>
+                    {hasUploads && (
+                      <>
+                        <td className="px-4 py-3">
+                          {rowUploads.length > 0
+                            ? rowUploads.map((upload, uploadIndex) => (
+                                <div key={uploadIndex} className="mb-2 last:mb-0">
+                                  {upload.datetime
+                                    ? formatCrmDatetimeForISTDisplay(upload.datetime)
+                                    : "-"}
+                                </div>
+                              ))
                             : "-"}
-                        </div>
-                        );
-                      })
-                    : "-"}
-                </td>
-
-                <td className="px-4 py-2">
-                  {row.followups.length > 0
-                    ? row.followups.map((f, i) => (
-                        <div key={i} className="mb-3">
-                          {f.followed_by || "-"}
-                        </div>
-                      ))
-                    : "-"}
-                </td>
-
-                <td className="px-4 py-2">
-                  {row.followups.length > 0
-                    ? row.followups.map((f, i) => (
-                        <div key={i} className="mb-3">
-                          {f.followed_date
-                            ? formatCrmDatetimeForISTDisplay(f.followed_date)
+                        </td>
+                        <td className="px-4 py-3">
+                          {rowUploads.length > 0
+                            ? rowUploads.map((upload, uploadIndex) => (
+                                <div key={uploadIndex} className="mb-2 last:mb-0">
+                                  {upload.user_name || "-"}
+                                </div>
+                              ))
                             : "-"}
-                        </div>
-                      ))
-                    : "-"}
-                </td>
-
-                <td className="px-4 py-2">
-                  {row.followups.length > 0
-                    ? row.followups.map((f, i) => (
-                        <div key={i} className="mb-3">
-                          {f.comm_mode || "-"}
-                        </div>
-                      ))
-                    : "-"}
-                </td>
-
-                <td className="px-4 py-2 align-top min-w-[280px] max-w-xl">
-                  {row.followups.length > 0
-                    ? row.followups.map((f, i) => (
-                        <div
-                          key={i}
-                          className="mb-3 whitespace-pre-wrap break-words [overflow-wrap:anywhere]"
-                        >
-                          {f.notes || "-"}
-                        </div>
-                      ))
-                    : "-"}
-                </td>
-
-                {/* UPLOADS */}
-                <td className="px-4 py-2">
-                  {row.uploads.length > 0
-                    ? row.uploads.map((u, i) => (
-                        <div key={i} className="mb-3">
-                          {u.datetime
-                            ? formatCrmDatetimeForISTDisplay(u.datetime)
+                        </td>
+                        <td className="px-4 py-3 min-w-0">
+                          {rowUploads.length > 0
+                            ? rowUploads.map((upload, uploadIndex) => (
+                                <div
+                                  key={uploadIndex}
+                                  className="mb-2 last:mb-0 whitespace-pre-wrap break-words [overflow-wrap:anywhere]"
+                                >
+                                  {upload.summary || "-"}
+                                </div>
+                              ))
                             : "-"}
-                        </div>
-                      ))
-                    : "-"}
-                </td>
+                        </td>
+                        <td className="px-4 py-3">
+                          {rowUploads.length > 0
+                            ? rowUploads.map((upload, uploadIndex) => (
+                                <div key={uploadIndex} className="mb-2 last:mb-0">
+                                  {upload.keypoints?.length > 0 ? (
+                                    <ul className="list-disc list-inside space-y-1">
+                                      {upload.keypoints.map((point, pointIndex) => (
+                                        <li key={pointIndex}>{point}</li>
+                                      ))}
+                                    </ul>
+                                  ) : (
+                                    "-"
+                                  )}
+                                </div>
+                              ))
+                            : "-"}
+                        </td>
+                      </>
+                    )}
+                  </tr>
+                );
+              })}
 
-                <td className="px-4 py-2">
-                  {row.uploads.length > 0
-                    ? row.uploads.map((u, i) => (
-                        <div key={i} className="mb-3">
-                          {u.user_name || "-"}
-                        </div>
-                      ))
-                    : "-"}
-                </td>
-
-                <td className="px-4 py-2 max-w-xs">
-                  {row.uploads.length > 0
-                    ? row.uploads.map((u, i) => (
-                        <div
-                          key={i}
-                          className="mb-3 whitespace-pre-wrap break-words"
-                        >
-                          {u.summary || "-"}
-                        </div>
-                      ))
-                    : "-"}
-                </td>
-
-                <td className="px-4 py-2">
-                  {row.uploads.length > 0
-                    ? row.uploads.map((u, i) => (
-                        <div key={i} className="mb-3">
-                          {u.keypoints?.length > 0 ? (
-                            <ul className="list-disc list-inside space-y-1">
-                              {u.keypoints.map((point, kIndex) => (
-                                <li key={kIndex}>{point}</li>
-                              ))}
-                            </ul>
-                          ) : (
-                            "-"
-                          )}
-                        </div>
-                      ))
-                    : "-"}
-                </td>
-              </tr>
-            ))
+              {uploadOnlyRows.map((upload, index) => (
+                <tr key={`upload-${upload.datetime || index}`} className="align-top">
+                  <td className="px-4 py-3">-</td>
+                  <td className="px-4 py-3">-</td>
+                  <td className="px-4 py-3">-</td>
+                  <td className="px-4 py-3">-</td>
+                  <td className="px-4 py-3">-</td>
+                  <td className="px-4 py-3">
+                    {upload.datetime
+                      ? formatCrmDatetimeForISTDisplay(upload.datetime)
+                      : "-"}
+                  </td>
+                  <td className="px-4 py-3">{upload.user_name || "-"}</td>
+                  <td className="px-4 py-3 min-w-0">
+                    <div className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
+                      {upload.summary || "-"}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    {upload.keypoints?.length > 0 ? (
+                      <ul className="list-disc list-inside space-y-1">
+                        {upload.keypoints.map((point, pointIndex) => (
+                          <li key={pointIndex}>{point}</li>
+                        ))}
+                      </ul>
+                    ) : (
+                      "-"
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </>
           )}
         </tbody>
       </table>

@@ -1,6 +1,7 @@
 // app/user-dashboard/view-customer/[customerId]/page.tsx
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
+import { ensureCustomersFollowupNotesText } from "@/lib/ensureCustomersFollowupNotesText";
 import dayjs from "dayjs";
 import FollowUpHistory from "@/components/Leads/FollowUpHistory";
 import CustomerContactsModal from "@/components/Customers/CustomerContactsModal";
@@ -16,6 +17,7 @@ import { notFound } from "next/navigation";
 export default async function CustomerPage({ params }) {
   const { customerId } = await params;
   const conn = await getDbConnection();
+  await ensureCustomersFollowupNotesText(conn);
 
   // Fetch current user info
   const payload = await getSessionPayload();
