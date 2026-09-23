@@ -12,7 +12,6 @@ export default function FollowupForm({ customerId, userRole = "" }) {
   const isServiceSupport = userRole === "SERVICE SUPPORT";
   const isGEM = userRole === "GEM";
   const isRestrictedRole = isServiceSupport || isGEM;
-  const isSalesFieldsRestricted = isGEM;
   const [formData, setFormData] = useState({
     followed_date: "",
     next_followup_date: "",
@@ -382,14 +381,24 @@ export default function FollowupForm({ customerId, userRole = "" }) {
           const dbStage = stageData.stage || "New";
           const serviceStage = stageData.service_stage || "New";
           const serviceStatus = stageData.service_status || "";
+          const gemStage = stageData.gem_stage || "New";
+          const gemStatus = stageData.gem_status || "";
           const serviceTags = stageData.service_tags
             ? String(stageData.service_tags)
                 .split(",")
                 .map((tag) => tag.trim())
                 .filter(Boolean)
             : [];
+          const gemTags = stageData.gem_tags
+            ? String(stageData.gem_tags)
+                .split(",")
+                .map((tag) => tag.trim())
+                .filter(Boolean)
+            : [];
 
-          setCustomerCurrentStage(isServiceSupport ? serviceStage : dbStage);
+          setCustomerCurrentStage(
+            isServiceSupport ? serviceStage : isGEM ? gemStage : dbStage,
+          );
           setCustomerCreatedAt(stageData.date_created || null);
           setHasOrder(stageData.has_order === 1 || stageData.has_order === true);
 
@@ -399,9 +408,17 @@ export default function FollowupForm({ customerId, userRole = "" }) {
 
           setFormData((prev) => ({
             ...prev,
-            stage: isServiceSupport ? serviceStage : dbStage,
-            status: isServiceSupport ? serviceStatus : prev.status,
-            multi_tag: isServiceSupport ? serviceTags : prev.multi_tag,
+            stage: isServiceSupport ? serviceStage : isGEM ? gemStage : dbStage,
+            status: isServiceSupport
+              ? serviceStatus
+              : isGEM
+                ? gemStatus
+                : prev.status,
+            multi_tag: isServiceSupport
+              ? serviceTags
+              : isGEM
+                ? gemTags
+                : prev.multi_tag,
           }));
         }
       } catch (error) {
@@ -415,7 +432,7 @@ export default function FollowupForm({ customerId, userRole = "" }) {
     if (customerId) {
       fetchCustomerData();
     }
-  }, [customerId, isServiceSupport]);
+  }, [customerId, isServiceSupport, isGEM]);
 
   // Re-calculate limits when customerCreatedAt changes (triggers re-render automatically via state)
 
@@ -511,6 +528,17 @@ export default function FollowupForm({ customerId, userRole = "" }) {
       }
     }
 
+    if (isGEM) {
+      if (!formData.status) {
+        toast.error("Please select GEM status.");
+        return;
+      }
+      if (!formData.stage) {
+        toast.error("Please select GEM stage.");
+        return;
+      }
+    }
+
     if (isGEM && formData.gem_next_followup) {
       const selected = new Date(formData.gem_next_followup);
       const maxDate = gemFollowupDateLimits.max
@@ -559,8 +587,10 @@ export default function FollowupForm({ customerId, userRole = "" }) {
         delete payload.gem_next_followup;
       }
 
-      // GEM को next_followup_date की जरूरत नहीं, सिर्फ gem_next_followup भेजेंगे
       if (isGEM) {
+        payload.gem_status = formData.status;
+        payload.gem_stage = formData.stage;
+        payload.gem_tags = formData.multi_tag.join(", ");
         delete payload.next_followup_date;
         delete payload.status;
         delete payload.stage;
@@ -733,18 +763,18 @@ export default function FollowupForm({ customerId, userRole = "" }) {
 
       <div>
         <label className="block text-sm font-medium text-gray-700">
-          Status
+          {isGEM ? "GEM Status" : isServiceSupport ? "Service Status" : "Status"}
         </label>
         <select
           name="status"
           value={formData.status}
           onChange={handleChange}
-          disabled={isSalesFieldsRestricted}
-          className={`w-full px-4 py-2 border rounded-lg ${isSalesFieldsRestricted ? "bg-gray-100 cursor-not-allowed opacity-60" : ""}`}
+          disabled={false}
+          className="w-full px-4 py-2 border rounded-lg"
           required
         >
           <option value="" disabled>
-            {isSalesFieldsRestricted ? "Not allowed" : "Select Status"}
+            Select Status
           </option>
           {statusList.map((status) => (
             <option key={status} value={status}>
@@ -757,27 +787,33 @@ export default function FollowupForm({ customerId, userRole = "" }) {
       {/* Stage Field */}
       <div>
         <label className="block text-sm font-medium text-gray-700">
-          Stage <span className="text-red-500">*</span>
+          {isGEM ? "GEM Stage" : isServiceSupport ? "Service Stage" : "Stage"}{" "}
+          <span className="text-red-500">*</span>
         </label>
         <select
           name="stage"
           value={formData.stage}
           onChange={handleChange}
-          disabled={isLoadingCustomer || isSalesFieldsRestricted}
-          className={`w-full px-4 py-2 border rounded-lg ${(isLoadingCustomer || isSalesFieldsRestricted) ? "bg-gray-100 cursor-not-allowed opacity-60" : ""}`}
+          disabled={isLoadingCustomer}
+          className={`w-full px-4 py-2 border rounded-lg ${isLoadingCustomer ? "bg-gray-100 cursor-not-allowed opacity-60" : ""}`}
           required
         >
-          <option value="">{isLoadingCustomer ? "Loading..." : isSalesFieldsRestricted ? "Not allowed" : "Select Stage"}</option>
+          <option value="">
+            {isLoadingCustomer ? "Loading..." : "Select Stage"}
+          </option>
           {availableStages.map((stage) => (
             <option key={stage} value={stage}>
               {stage}
             </option>
           ))}
         </select>
-        {!isLoadingCustomer && !isSalesFieldsRestricted && (
+        {!isLoadingCustomer && (
           <p className="mt-1 text-xs text-gray-500">
-            Current {isServiceSupport ? "service " : ""}stage: <strong>{customerCurrentStage}</strong>.
-            {isServiceSupport ? " Saved in service follow-up history." : " Only forward progression allowed."}
+            Current {isServiceSupport ? "service " : isGEM ? "GEM " : ""}stage:{" "}
+            <strong>{customerCurrentStage}</strong>.
+            {isServiceSupport || isGEM
+              ? " Saved in follow-up history."
+              : " Only forward progression allowed."}
           </p>
         )}
       </div>
@@ -785,10 +821,13 @@ export default function FollowupForm({ customerId, userRole = "" }) {
       {/* Multi-Tag Selection */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          Tags (Multiple Selection)
-          {isSalesFieldsRestricted && <span className="text-red-500 ml-1">- Not allowed</span>}
+          {isGEM
+            ? "GEM Tags (Multiple Selection)"
+            : isServiceSupport
+              ? "Service Tags (Multiple Selection)"
+              : "Tags (Multiple Selection)"}
         </label>
-        <div className={`flex flex-wrap gap-2 ${isSalesFieldsRestricted ? "opacity-50 pointer-events-none" : ""}`}>
+        <div className="flex flex-wrap gap-2">
           {tagOptions.map((tag) => (
             <label
               key={tag}
@@ -803,8 +842,7 @@ export default function FollowupForm({ customerId, userRole = "" }) {
               <input
                 type="checkbox"
                 checked={formData.multi_tag.includes(tag)}
-                onChange={() => !isSalesFieldsRestricted && handleTagChange(tag)}
-                disabled={isSalesFieldsRestricted}
+                onChange={() => handleTagChange(tag)}
                 className="hidden"
               />
               <span className="text-sm font-medium">{tag}</span>

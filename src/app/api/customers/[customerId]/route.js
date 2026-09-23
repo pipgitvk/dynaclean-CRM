@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { getSessionPayload } from "@/lib/auth";
 import { cookies } from "next/headers";
 import { ensureCustomersServiceColumns } from "@/lib/ensureCustomersServiceColumns";
+import { ensureCustomersGemColumns } from "@/lib/ensureCustomersGemColumns";
 import { ensureCustomerNotesLanguageColumn } from "@/lib/ensureCustomerNotesLanguageColumn";
 import { latestFollowupNotesLanguageSelectSql } from "@/lib/customerFollowupNotesLanguage";
 
@@ -12,6 +13,7 @@ export async function GET(request, { params }) {
   try {
     const conn = await getDbConnection();
     await ensureCustomersServiceColumns(conn);
+    await ensureCustomersGemColumns(conn);
     await ensureCustomerNotesLanguageColumn(conn);
     const [rows] = await conn.execute(
       `SELECT c.*,

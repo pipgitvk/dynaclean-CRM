@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 import { convertISTtoUTC } from "@/lib/timezone";
 import { ensureCustomersServiceColumns } from "@/lib/ensureCustomersServiceColumns";
+import { ensureCustomersGemColumns } from "@/lib/ensureCustomersGemColumns";
 import { updateCustomerNotesLanguage } from "@/lib/customerFollowupNotesLanguage";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret";
@@ -97,6 +98,7 @@ export async function POST(req, { params }) {
 
   const conn = await getDbConnection();
   await ensureCustomersServiceColumns(conn);
+  await ensureCustomersGemColumns(conn);
 
   // First try to get from customers_followup (existing records), fallback to customers table
   let [rows] = await conn.execute(
@@ -200,6 +202,16 @@ export async function POST(req, { params }) {
   const serviceTags = isServiceSupport
     ? String(data.service_tags || "").trim().slice(0, 255) || null
     : null;
+  const isGEM = userRole === "GEM";
+  const gemStatus = isGEM
+    ? String(data.gem_status || "").trim().slice(0, 50) || null
+    : null;
+  const gemStage = isGEM
+    ? String(data.gem_stage || "").trim().slice(0, 100) || null
+    : null;
+  const gemTags = isGEM
+    ? String(data.gem_tags || "").trim().slice(0, 255) || null
+    : null;
 
   await conn.execute(
     `INSERT INTO customers_followup 
@@ -229,6 +241,13 @@ export async function POST(req, { params }) {
     await conn.execute(
       `UPDATE customers SET service_status = ?, service_stage = ?, service_tags = ? WHERE customer_id = ?`,
       [serviceStatus, serviceStage || "New", serviceTags, customerId],
+    );
+  }
+
+  if (isGEM) {
+    await conn.execute(
+      `UPDATE customers SET gem_status = ?, gem_stage = ?, gem_tags = ? WHERE customer_id = ?`,
+      [gemStatus, gemStage || "New", gemTags, customerId],
     );
   }
 
