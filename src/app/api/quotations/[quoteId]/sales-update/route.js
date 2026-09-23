@@ -44,8 +44,9 @@ const STATE_CODE_TO_NAME = {
   99: "Centre Jurisdiction",
 };
 
-function isSalesRole(role) {
-  return String(role || "").toUpperCase().includes("SALES");
+function canUpdateOwnQuotation(role) {
+  const normalized = String(role || "").trim().toUpperCase();
+  return normalized.includes("SALES") || normalized === "SERVICE SUPPORT";
 }
 
 function getStateFromGSTIN(gstin) {
@@ -73,7 +74,7 @@ export async function PATCH(req, { params }) {
     return Response.json({ success: false, message: "Invalid token" }, { status: 401 });
   }
 
-  if (!isSalesRole(payload.role)) {
+  if (!canUpdateOwnQuotation(payload.role)) {
     return Response.json({ success: false, message: "Forbidden" }, { status: 403 });
   }
 
