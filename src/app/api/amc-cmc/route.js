@@ -85,6 +85,7 @@ export async function POST(request) {
     const formData = await request.formData();
 
     const serial_number = formData.get("serial_number");
+    const contract_type = String(formData.get("contract_type") || "").trim().toUpperCase();
     const company_name = formData.get("company_name");
     const amc_start_datetime = formData.get("amc_start_datetime");
     const amc_end_datetime = formData.get("amc_end_datetime");
@@ -93,6 +94,13 @@ export async function POST(request) {
     if (!serial_number || !company_name || !amc_start_datetime || !amc_end_datetime) {
       return NextResponse.json(
         { error: "Missing required fields" },
+        { status: 400 }
+      );
+    }
+
+    if (!["AMC", "CMC"].includes(contract_type)) {
+      return NextResponse.json(
+        { error: "Contract type must be AMC or CMC" },
         { status: 400 }
       );
     }
@@ -145,12 +153,13 @@ export async function POST(request) {
 
     const [result] = await conn.execute(
       `INSERT INTO amc_cmc (
-        serial_number, model, image_at_the_time_of_amc, company_name, contact, email,
+        serial_number, contract_type, model, image_at_the_time_of_amc, company_name, contact, email,
         site_address, site_contact, site_email, amc_start_datetime, amc_end_datetime,
         quotation_ref, invoice, payment_proof, terms_and_conditions, created_by, status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         serial_number,
+        contract_type,
         model,
         image_filename,
         company_name,
