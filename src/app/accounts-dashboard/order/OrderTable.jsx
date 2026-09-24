@@ -888,19 +888,32 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
             )}
             {["accountant", "admin", "team leader"].includes(role) &&
               (r.report_file ? (
-                <Link
-                  href={`/user-dashboard/order/view/${r.order_id}`}
-                  className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
-                  title="View Report"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <FileText size={16} />
-                  <span>View Report</span>
-                </Link>
+                <>
+                  <Link
+                    href={`/accounts-dashboard/order/view/${r.order_id}`}
+                    className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
+                    title="View Report"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <FileText size={16} />
+                    <span>View Report</span>
+                  </Link>
+                  {dispatchStatus === 0 && (
+                    <Link
+                      href={`/accounts-dashboard/order/upload/${r.order_id}`}
+                      className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-blue-700"
+                      title="Edit Invoice"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Pencil size={16} />
+                      <span>Edit Invoice</span>
+                    </Link>
+                  )}
+                </>
               ) : (
                 <div className="flex items-center">
                   <Link
-                    href={`/user-dashboard/order/upload/${r.order_id}`}
+                    href={`/accounts-dashboard/order/upload/${r.order_id}`}
                     className="flex-1 flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-yellow-700"
                     title="Upload Report"
                     onClick={(e) => e.stopPropagation()}

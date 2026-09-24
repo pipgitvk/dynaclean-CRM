@@ -2506,6 +2506,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
   const isAccountant = role.includes("accountant");
   const canManageReturns = isSuperAdmin || isAccountant;
   const canEditBooking = isSuperAdmin || isAdmin;
+  const canManageInvoiceDocs = isSuperAdmin || isAccountant;
   const isWarehouse = role === "warehouse incharge";
   const hasBooking =
     r.booking_id !== undefined &&
@@ -2564,7 +2565,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                 <span>View Sales</span>
               </Link>
             )}
-            {["superadmin"].includes(role) &&
+            {canManageInvoiceDocs &&
               (r.report_file ? (
                 <>
                   <Link
@@ -2600,7 +2601,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                     <span>Upload Report</span>
                   </Link>
                   <div onClick={(e) => e.stopPropagation()}>
-                    <DeleteButton orderId={r.order_id} />
+                    {isSuperAdmin && <DeleteButton orderId={r.order_id} />}
                   </div>
                 </>
               ))}

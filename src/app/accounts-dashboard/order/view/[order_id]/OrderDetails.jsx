@@ -1,7 +1,18 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import Image from "next/image";
-import { resolveStoredFileUrl } from "@/lib/resolveStoredFileUrl";
+import OrderDocumentFileCard from "@/components/orders/OrderDocumentFileCard";
+
+const FILE_FIELDS = [
+  { label: "Payment Proof", key: "payment_proof" },
+  { label: "Purchase Order", key: "po_file" },
+  { label: "Invoice", key: "report_file" },
+  { label: "E-way Bill", key: "ewaybill_file" },
+  { label: "E-invoice", key: "einvoice_file" },
+  { label: "Delivery Challan", key: "deliverchallan" },
+  { label: "Delivery Proof", key: "delivery_proof" },
+];
 
 export default function OrderDetails({ data }) {
   const {
@@ -35,15 +46,32 @@ export default function OrderDetails({ data }) {
     return amounts.reduce((sum, n) => sum + n, 0);
   };
 
-  const files = [
-    { label: "Payment Proof", key: "payment_proof" },
-    { label: "Purchase Order", key: "po_file" },
-    { label: "Invoice", key: "report_file" },
-    { label: "E-way Bill", key: "ewaybill_file" },
-    { label: "E-invoice", key: "einvoice_file" },
-    { label: "Delivery Challan", key: "deliverchallan" },
-    { label: "Delivery Proof", key: "delivery_proof" },
-  ];
+  const files = FILE_FIELDS;
+
+  const [fileValues, setFileValues] = useState(() => {
+    const initial = {};
+    FILE_FIELDS.forEach(({ key }) => {
+      initial[key] = orderDetails[key] || "";
+    });
+    return initial;
+  });
+
+  const handleFilesUploaded = (fieldKey, newValue) => {
+    setFileValues((prev) => ({ ...prev, [fieldKey]: newValue }));
+  };
+
+  const orderForDocRules = useMemo(
+    () => ({
+      dispatch_status: orderDetails.dispatch_status,
+      delivery_status: orderDetails.delivery_status,
+      delivered_on: orderDetails.delivered_on,
+    }),
+    [
+      orderDetails.dispatch_status,
+      orderDetails.delivery_status,
+      orderDetails.delivered_on,
+    ],
+  );
 
   return (
     <div className="max-w-6xl mx-auto p-6">
@@ -188,40 +216,27 @@ export default function OrderDetails({ data }) {
       </div>
 
       {/* File Downloads */}
-      <div className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {files.map(({ label, key }) => {
-          const fileUrl = orderDetails[key];
-          const displayUrl = resolveStoredFileUrl(fileUrl);
-          return (
-            <div key={key} className="p-4 border rounded-lg">
-              <h4 className="text-sm font-semibold mb-2">{label}</h4>
-              {fileUrl ? (
-                <div className="flex gap-2">
-                  <a
-                    href={displayUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:underline text-sm"
-                  >
-                    View
-                  </a>
-                  <a
-                    href={displayUrl}
-                    download
-                    className="text-green-600 hover:underline text-sm"
-                  >
-                    Download
-                  </a>
-                </div>
-              ) : (
-                <p className="text-gray-500 text-xs">Not uploaded</p>
-              )}
-            </div>
-          );
-        })}
+      <div className="mt-8">
+        <p className="text-xs text-gray-500 mb-3">
+          E-way bill, e-invoice & invoice editable before dispatch (up to 5 invoice PDFs).
+          Delivery challan before delivered. Delivery proof within 24 hours of delivery.
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {files.map(({ label, key }) => (
+            <OrderDocumentFileCard
+              key={key}
+              label={label}
+              fieldKey={key}
+              file={fileValues[key]}
+              orderId={orderDetails.order_id}
+              order={orderForDocRules}
+              onUploaded={handleFilesUploaded}
+            />
+          ))}
+        </div>
 
         {orderDetails.booking_url && (
-          <div className="p-4 border rounded-lg">
+          <div className="p-4 border rounded-lg mt-4">
             <h4 className="text-sm font-semibold mb-2">Booking URL</h4>
             <a
               href={orderDetails.booking_url}
@@ -237,7 +252,7 @@ export default function OrderDetails({ data }) {
 
       <div className="mt-8 text-center">
         <a
-          href="/user-dashboard/order"
+          href="/accounts-dashboard/order"
           className="inline-block text-sm px-4 py-2 border rounded hover:bg-gray-100"
         >
           ← Back to Order List
