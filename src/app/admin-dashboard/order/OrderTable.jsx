@@ -532,6 +532,8 @@ export default function OrderTable({ orders, userRole }) {
         return getStatusText(order).text.toLowerCase();
       case "payment_status":
         return order.payment_status?.toString().toLowerCase() || "";
+      case "taxable_amount":
+        return getPaymentColumnAmount(order);
       case "totalamt":
         return Number(order.totalamt) || 0;
       case "paid_amount":
@@ -1896,11 +1898,11 @@ export default function OrderTable({ orders, userRole }) {
               </th>
               <th 
                 className="px-3 py-3 font-semibold text-center cursor-pointer hover:bg-gray-700 transition-colors"
-                onClick={() => handleSort("payment_status")}
+                onClick={() => handleSort("taxable_amount")}
               >
                 <div className="flex items-center gap-1 justify-center">
                   Taxable
-                  {sortColumn === "payment_status" && (
+                  {sortColumn === "taxable_amount" && (
                     sortDirection === "asc" ? <ArrowUp size={14} /> : <ArrowDown size={14} />
                   )}
                 </div>
