@@ -2071,9 +2071,16 @@ const NewInvoice = ({ invoice }) => {
       clonedEl = el.cloneNode(true);
       clonedEl.style.width = "794px";
       clonedEl.style.maxWidth = "794px";
-      clonedEl.style.padding = "25px";
+      clonedEl.style.padding = "0";
       clonedEl.style.border = "none";
       clonedEl.style.overflow = "visible";
+      clonedEl.style.boxSizing = "border-box";
+      const borderedRoot = clonedEl.querySelector("[data-invoice-border-root]");
+      if (borderedRoot) {
+        borderedRoot.style.border = "1px solid rgb(0, 0, 0)";
+        borderedRoot.style.boxSizing = "border-box";
+        borderedRoot.style.overflow = "visible";
+      }
       offscreenWrapper.appendChild(clonedEl);
 
       // Let the browser reflow the cloned element at 794px width
@@ -2134,7 +2141,7 @@ const NewInvoice = ({ invoice }) => {
       clonedEl.style.minHeight = `${finalHeight}px`;
 
       // Collect positions for ALL 4 bank detail lines using the cloned element
-      const bankLineSelectors = ["holder", "name", "acno", "ifsc"];
+      const bankLineSelectors = ["title", "holder", "name", "acno", "ifsc"];
       const bankLineBoxes = {};
       const rootRectForBank = clonedEl.getBoundingClientRect();
       if (rootRectForBank.width > 0 && rootRectForBank.height > 0) {
@@ -2210,17 +2217,17 @@ const NewInvoice = ({ invoice }) => {
 
       // Bank detail lines were HIDDEN from html2canvas. Now draw them cleanly with jsPDF text API at exact captured positions.
       // This avoids html2canvas corruption (browser auto-links / color artifacts) AND avoids double-draw (canvas + jsPDF) which causes jagged overlapping text.
-      const bankLineOrder = ["holder", "name", "acno", "ifsc"];
+      const bankLineOrder = ["title", "holder", "name", "acno", "ifsc"];
       if (bankLineOrder.some((k) => bankLineBoxes[k])) {
         const lineTexts = {
+          title: "Company's Bank Details",
           holder: `A/C Holder Name : ${data.bank.accountHolderName}`,
           name: `Bank Name : ${data.bank.name}`,
           acno: `A/c No. : ${data.bank.accountNo}`,
           ifsc: `Branch & IFSC Code: ${data.bank.IFSC}`,
         };
 
-        // Compute a union bounding-box across all 4 lines → one single tight white rect pass
-        // Much cleaner than per-line wipes; won't bleach into surrounding text.
+        // Compute a union bounding-box across all bank lines → one single tight white rect pass.
         let unionX = Infinity, unionY = Infinity, unionX2 = -Infinity, unionY2 = -Infinity;
         for (const key of bankLineOrder) {
           const b = bankLineBoxes[key];
@@ -2235,32 +2242,43 @@ const NewInvoice = ({ invoice }) => {
           if (ry > unionY2) unionY2 = ry;
         }
         if (isFinite(unionX)) {
-          // Minimal padding (0.3mm) — just enough to cover antialiased edge bleed
           const pad = 0.3;
+          const borderGuard = 1.5;
+          const pageRight = x + drawW;
+          if (unionX2 > pageRight - borderGuard) {
+            unionX2 = pageRight - borderGuard;
+          }
           pdf.setFillColor(255, 255, 255);
           pdf.rect(
             Math.max(0, unionX - pad),
             Math.max(0, unionY - pad),
-            unionX2 - unionX + pad * 2,
+            Math.max(0, unionX2 - unionX + pad * 2),
             unionY2 - unionY + pad * 2,
             "F",
           );
         }
 
-        // Draw all 4 lines in pure black using jsPDF native vector text — perfectly crisp, consistent
-        // Size matched to the left-side "Terms & Condition" body text (~7pt PDF visual)
         pdf.setTextColor(0, 0, 0);
-        pdf.setFont("helvetica", "normal");
-        pdf.setFontSize(7);
         for (const key of bankLineOrder) {
           const b = bankLineBoxes[key];
           if (!b) continue;
           const lineX = x + drawW * b.relX;
           const lineTopY = y + drawH * b.relY;
           const lineH = drawH * b.relH;
-          // Baseline: for 7pt font, push slightly deeper for visual alignment within original 9px box
+          const lineW = drawW * b.relW;
           const baselineY = lineTopY + Math.max(lineH * 0.72, 2.0);
-          pdf.text(lineTexts[key], lineX, baselineY);
+
+          if (key === "title") {
+            pdf.setFont("helvetica", "bold");
+            pdf.setFontSize(7.5);
+            pdf.text(lineTexts[key], lineX, baselineY);
+            continue;
+          }
+
+          pdf.setFont("helvetica", "normal");
+          pdf.setFontSize(7);
+          const wrapped = pdf.splitTextToSize(lineTexts[key], Math.max(lineW, 28));
+          pdf.text(wrapped, lineX, baselineY);
         }
       }
 
@@ -2485,11 +2503,13 @@ const NewInvoice = ({ invoice }) => {
           </h1>
         </div>
         <div
+          data-invoice-border-root="true"
           style={{
             padding: "6mm",
             background: "#fff",
             backgroundColor: "#fff",
             border: "1px solid #000",
+            boxSizing: "border-box",
           }}
         >
         {/* Logo flush left; company block left of row but lines centre-aligned within block */}
@@ -3619,73 +3639,88 @@ const NewInvoice = ({ invoice }) => {
         </div>
 
         {/* Terms & Bank Details */}
-        <div style={{ display: "flex", gap: "20px", marginBottom: "15px" }}>
-          <div style={{ flex: "1", fontSize: "9px" }}>
-            <div style={{ fontWeight: "bold", marginBottom: "5px" }}>
-              Terms & Condition
-            </div>
-            {data.terms.length > 0 ? (
-              data.terms.map((term, index) => (
-                <div key={index} style={{ marginBottom: "3px" }}>
-                  {term}
+        <table
+          style={{
+            width: "100%",
+            borderCollapse: "collapse",
+            tableLayout: "fixed",
+            marginBottom: "15px",
+          }}
+        >
+          <tbody>
+            <tr>
+              <td
+                style={{
+                  width: "58%",
+                  verticalAlign: "top",
+                  paddingRight: "16px",
+                  fontSize: "9px",
+                  lineHeight: 1.35,
+                }}
+              >
+                <div style={{ fontWeight: "bold", marginBottom: "5px" }}>
+                  Terms & Condition
                 </div>
-              ))
-            ) : (
-              <div>No terms and conditions specified.</div>
-            )}
-          </div>
-          <div
-            style={{
-              width: "250px",
-              display: "flex",
-              justifyContent: "flex-end",
-            }}
-          >
-            <div
-              data-pdf-bank-lines-root="true"
-              style={{ width: "100%", fontSize: "9px", lineHeight: 1.35 }}
-            >
-              <div style={{ fontWeight: "bold", marginBottom: "4px" }}>
-                Company's Bank Details
-              </div>
-              <div
-                data-pdf-bank-line="holder"
-                data-pdf-bank-holder="true"
+                {data.terms.length > 0 ? (
+                  data.terms.map((term, index) => (
+                    <div key={index} style={{ marginBottom: "3px" }}>
+                      {term}
+                    </div>
+                  ))
+                ) : (
+                  <div>No terms and conditions specified.</div>
+                )}
+              </td>
+              <td
                 style={{
+                  width: "42%",
+                  verticalAlign: "top",
+                  paddingLeft: "8px",
                   fontSize: "9px",
                   lineHeight: 1.35,
-                  marginBottom: "2px",
-                  whiteSpace: "nowrap",
                 }}
               >
-                A/C Holder Name : {data.bank.accountHolderName}
-              </div>
-              <div
-                data-pdf-bank-line="name"
-                data-pdf-bank-name="true"
-                style={{
-                  fontSize: "9px",
-                  lineHeight: 1.35,
-                  marginBottom: "2px",
-                }}
-              >
-                Bank Name : {data.bank.name}
-              </div>
-              <div
-                data-pdf-bank-line="acno"
-                style={{ fontSize: "9px", marginBottom: "2px", lineHeight: 1.35 }}
-              >
-                A/c No. : {data.bank.accountNo}
-              </div>
-              <div
-                data-pdf-bank-line="ifsc"
-                style={{ fontSize: "9px", lineHeight: 1.35 }}
-              >
-                Branch &amp; IFSC Code: {data.bank.IFSC}
-              </div>
-            </div>
-          </div>
-        </div>
+                <div
+                  data-pdf-bank-lines-root="true"
+                  style={{ width: "100%" }}
+                >
+                  <div
+                    data-pdf-bank-line="title"
+                    style={{ fontWeight: "bold", marginBottom: "4px" }}
+                  >
+                    Company&apos;s Bank Details
+                  </div>
+                  <div
+                    data-pdf-bank-line="holder"
+                    data-pdf-bank-holder="true"
+                    style={{
+                      marginBottom: "2px",
+                      wordBreak: "break-word",
+                    }}
+                  >
+                    A/C Holder Name : {data.bank.accountHolderName}
+                  </div>
+                  <div
+                    data-pdf-bank-line="name"
+                    data-pdf-bank-name="true"
+                    style={{ marginBottom: "2px" }}
+                  >
+                    Bank Name : {data.bank.name}
+                  </div>
+                  <div
+                    data-pdf-bank-line="acno"
+                    style={{ marginBottom: "2px" }}
+                  >
+                    A/c No. : {data.bank.accountNo}
+                  </div>
+                  <div data-pdf-bank-line="ifsc">
+                    Branch &amp; IFSC Code: {data.bank.IFSC}
+                  </div>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
 
         {/* Signature */}
        <div
