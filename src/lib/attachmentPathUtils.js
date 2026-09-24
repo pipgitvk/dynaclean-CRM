@@ -5,6 +5,25 @@ export const ATTACHMENT_DOMAINS = [
   "https://service.dynacleanindustries.com",
 ];
 
+/** Attendance regularization uploads from service CRM live on this host. */
+export const ATTENDANCE_REGULARIZATION_SERVICE_ORIGIN =
+  process.env.ATTENDANCE_REGULARIZATION_SERVICE_ORIGIN ||
+  "https://service.dynacleanindustries.com";
+
+/** Service CRM Cloudinary account (often different from app CRM). */
+export function getServiceCloudinaryCloudName() {
+  return (
+    process.env.SERVICE_CLOUDINARY_CLOUD_NAME?.trim() ||
+    process.env.ATTENDANCE_REGULARIZATION_SERVICE_CLOUDINARY_CLOUD_NAME?.trim() ||
+    ""
+  );
+}
+
+/** App CRM Cloudinary account. */
+export function getAppCloudinaryCloudName() {
+  return process.env.CLOUDINARY_CLOUD_NAME?.trim() || "";
+}
+
 const OWNED_HOSTS = new Set([
   "app.dynacleanindustries.com",
   "service.dynacleanindustries.com",

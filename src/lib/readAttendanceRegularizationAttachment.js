@@ -1,10 +1,85 @@
 import { existsSync } from "fs";
 import { readFile } from "fs/promises";
 import { join } from "path";
+import { v2 as cloudinary } from "cloudinary";
 import {
   ATTACHMENT_DOMAINS,
+  ATTENDANCE_REGULARIZATION_SERVICE_ORIGIN,
+  getAppCloudinaryCloudName,
+  getServiceCloudinaryCloudName,
   normalizeAttachmentPathParam,
 } from "@/lib/attachmentPathUtils";
+
+function getCloudinaryCloudNames(relativePath) {
+  const serviceCloud = getServiceCloudinaryCloudName();
+  const appCloud = getAppCloudinaryCloudName();
+  const preferServiceFirst =
+    String(relativePath || "").startsWith("attendance_regularization/") ||
+    String(relativePath || "").startsWith("uploads/regularization/");
+
+  const ordered = preferServiceFirst
+    ? [serviceCloud, appCloud]
+    : [appCloud, serviceCloud];
+
+  return [...new Set(ordered.filter(Boolean))];
+}
+
+/** DB may store Cloudinary folder path instead of full secure_url. */
+function buildCloudinaryCandidateUrls(relativePath, cloudName) {
+  if (!cloudName || !relativePath) return [];
+
+  const cleanPath = String(relativePath).replace(/^\/+/, "");
+  if (
+    !cleanPath.startsWith("attendance_regularization/") &&
+    !cleanPath.startsWith("uploads/regularization/")
+  ) {
+    return [];
+  }
+
+  const urls = new Set([
+    `https://res.cloudinary.com/${cloudName}/image/upload/${cleanPath}`,
+    `https://res.cloudinary.com/${cloudName}/auto/upload/${cleanPath}`,
+    `https://res.cloudinary.com/${cloudName}/raw/upload/${cleanPath}`,
+    `https://res.cloudinary.com/${cloudName}/image/upload/${encodeUrlPath(cleanPath)}`,
+  ]);
+
+  const dot = cleanPath.lastIndexOf(".");
+  const publicId = dot > 0 ? cleanPath.slice(0, dot) : cleanPath;
+  const format = dot > 0 ? cleanPath.slice(dot + 1) : undefined;
+
+  try {
+    urls.add(
+      cloudinary.url(publicId, {
+        cloud_name: cloudName,
+        secure: true,
+        resource_type: "auto",
+        ...(format ? { format } : {}),
+      }),
+    );
+    urls.add(
+      cloudinary.url(publicId, {
+        cloud_name: cloudName,
+        secure: true,
+        resource_type: "image",
+        ...(format ? { format } : {}),
+      }),
+    );
+  } catch {
+    // ignore URL builder errors
+  }
+
+  return [...urls];
+}
+
+async function readFromCloudinary(relativePath) {
+  for (const cloudName of getCloudinaryCloudNames(relativePath)) {
+    for (const url of buildCloudinaryCandidateUrls(relativePath, cloudName)) {
+      const result = await readFromRemoteUrl(url);
+      if (result) return result;
+    }
+  }
+  return null;
+}
 
 const MIME_BY_EXT = {
   jpg: "image/jpeg",
@@ -108,7 +183,7 @@ async function readFromRemoteUrl(url) {
   }
 }
 
-async function readFromKnownDomains(relativePath) {
+async function readFromRemoteDomains(relativePath, domains) {
   const pathVariants = new Set([
     `/${relativePath}`,
     `/${encodeUrlPath(relativePath)}`,
@@ -119,14 +194,40 @@ async function readFromKnownDomains(relativePath) {
     pathVariants.add(`/${encodeUrlPath(candidate)}`);
   }
 
-  for (const domain of ATTACHMENT_DOMAINS) {
+  const apiPathVariants = [...pathVariants].map((pathname) =>
+    `/api/serve-attachment?path=${encodeURIComponent(
+      pathname.replace(/^\/+/, ""),
+    )}`,
+  );
+
+  for (const domain of domains) {
     for (const pathname of pathVariants) {
       const result = await readFromRemoteUrl(`${domain}${pathname}`);
+      if (result) return result;
+    }
+
+    for (const apiPath of apiPathVariants) {
+      const result = await readFromRemoteUrl(`${domain}${apiPath}`);
       if (result) return result;
     }
   }
 
   return null;
+}
+
+async function readFromServiceHost(relativePath) {
+  return readFromRemoteDomains(relativePath, [
+    ATTENDANCE_REGULARIZATION_SERVICE_ORIGIN,
+  ]);
+}
+
+async function readFromKnownDomains(relativePath) {
+  return readFromRemoteDomains(
+    relativePath,
+    ATTACHMENT_DOMAINS.filter(
+      (domain) => domain !== ATTENDANCE_REGULARIZATION_SERVICE_ORIGIN,
+    ),
+  );
 }
 
 export async function readAttendanceRegularizationAttachment(attachmentUrl) {
@@ -144,6 +245,12 @@ export async function readAttendanceRegularizationAttachment(attachmentUrl) {
 
   const local = await readFromLocalDisk(relativePath);
   if (local) return local;
+
+  const serviceFile = await readFromServiceHost(relativePath);
+  if (serviceFile) return serviceFile;
+
+  const cloudinaryFile = await readFromCloudinary(relativePath);
+  if (cloudinaryFile) return cloudinaryFile;
 
   return readFromKnownDomains(relativePath);
 }
