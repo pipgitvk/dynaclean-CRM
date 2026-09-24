@@ -2114,21 +2114,26 @@ const NewInvoice = ({ invoice }) => {
 
       await new Promise((r) => setTimeout(r, 200));
 
-      // Apply color overrides directly to the off-screen cloned element
+      // Apply color overrides — avoid painting every cell white (can clip text in html2canvas).
       clonedEl.querySelectorAll("*").forEach((elem) => {
         elem.style.color = "rgb(0, 0, 0)";
         elem.style.webkitTextFillColor = "rgb(0, 0, 0)";
-        elem.style.backgroundColor = "rgb(255, 255, 255)";
         elem.style.borderColor = "rgb(0, 0, 0)";
-        // Release any overflow constraints that could clip rows
         const tag = elem.tagName?.toLowerCase();
+        if (tag !== "img" && tag !== "td" && tag !== "th" && tag !== "tr" && tag !== "table") {
+          elem.style.backgroundColor = "rgb(255, 255, 255)";
+        }
         if (tag !== "img") {
           elem.style.overflow = "visible";
           elem.style.overflowY = "visible";
         }
-        // Force all elements to be visible (no display:none, visibility:hidden)
-        if (elem.style.display === "none") elem.style.display = "block";
-        if (elem.style.visibility === "hidden") elem.style.visibility = "visible";
+      });
+
+      // Improve footer text metrics before capture.
+      clonedEl.querySelectorAll("[data-pdf-footer-block]").forEach((block) => {
+        block.style.lineHeight = "1.55";
+        block.style.paddingTop = "1px";
+        block.style.paddingBottom = "1px";
       });
 
       // Force layout recalculation
@@ -2140,32 +2145,32 @@ const NewInvoice = ({ invoice }) => {
       );
       clonedEl.style.minHeight = `${finalHeight}px`;
 
-      // Collect positions for ALL 4 bank detail lines using the cloned element
-      const bankLineSelectors = ["title", "holder", "name", "acno", "ifsc"];
-      const bankLineBoxes = {};
-      const rootRectForBank = clonedEl.getBoundingClientRect();
-      if (rootRectForBank.width > 0 && rootRectForBank.height > 0) {
-        for (const key of bankLineSelectors) {
-          const lineEl = clonedEl.querySelector(`[data-pdf-bank-line="${key}"]`);
-          if (lineEl) {
-            const r = lineEl.getBoundingClientRect();
-            bankLineBoxes[key] = {
-              relX: (r.left - rootRectForBank.left) / rootRectForBank.width,
-              relY: (r.top - rootRectForBank.top) / rootRectForBank.height,
-              relW: r.width / rootRectForBank.width,
-              relH: r.height / rootRectForBank.height,
-            };
-          }
+      const rootRect = clonedEl.getBoundingClientRect();
+      const footerBlockKeys = ["tax-words", "terms", "bank"];
+      const footerBlockBoxes = {};
+      if (rootRect.width > 0 && rootRect.height > 0) {
+        for (const key of footerBlockKeys) {
+          const blockEl = clonedEl.querySelector(`[data-pdf-footer-block="${key}"]`);
+          if (!blockEl) continue;
+          const r = blockEl.getBoundingClientRect();
+          footerBlockBoxes[key] = {
+            relX: (r.left - rootRect.left) / rootRect.width,
+            relY: (r.top - rootRect.top) / rootRect.height,
+            relW: r.width / rootRect.width,
+            relH: r.height / rootRect.height,
+          };
+          blockEl.style.minHeight = `${r.height}px`;
         }
       }
 
-      // Hide bank detail lines from html2canvas (will be redrawn by jsPDF)
-      clonedEl.querySelectorAll("[data-pdf-bank-line]").forEach((elem) => {
-        elem.style.opacity = "0";
-        elem.style.visibility = "hidden";
-        elem.style.color = "rgb(255,255,255)";
-        elem.style.backgroundColor = "rgb(255,255,255)";
-        elem.style.textIndent = "-9999px";
+      // Hide footer text from html2canvas; redraw cleanly with jsPDF after capture.
+      clonedEl.querySelectorAll("[data-pdf-footer-block]").forEach((block) => {
+        block.style.color = "rgb(255,255,255)";
+        block.style.webkitTextFillColor = "rgb(255,255,255)";
+        block.querySelectorAll("*").forEach((child) => {
+          child.style.color = "rgb(255,255,255)";
+          child.style.webkitTextFillColor = "rgb(255,255,255)";
+        });
       });
 
       // Measure the FULL height of the off-screen cloned element after reflow
@@ -2211,75 +2216,104 @@ const NewInvoice = ({ invoice }) => {
       const drawW = imgProps.width * scale;
       const drawH = imgProps.height * scale;
       const x = (pdfWidth - drawW) / 2;
-      const y = (pdfHeight - drawH) / 2;
+      const y = 1.5;
 
       pdf.addImage(imgData, "PNG", x, y, drawW, drawH, undefined, "FAST");
 
-      // Bank detail lines were HIDDEN from html2canvas. Now draw them cleanly with jsPDF text API at exact captured positions.
-      // This avoids html2canvas corruption (browser auto-links / color artifacts) AND avoids double-draw (canvas + jsPDF) which causes jagged overlapping text.
-      const bankLineOrder = ["title", "holder", "name", "acno", "ifsc"];
-      if (bankLineOrder.some((k) => bankLineBoxes[k])) {
-        const lineTexts = {
-          title: "Company's Bank Details",
-          holder: `A/C Holder Name : ${data.bank.accountHolderName}`,
-          name: `Bank Name : ${data.bank.name}`,
-          acno: `A/c No. : ${data.bank.accountNo}`,
-          ifsc: `Branch & IFSC Code: ${data.bank.IFSC}`,
-        };
-
-        // Compute a union bounding-box across all bank lines → one single tight white rect pass.
-        let unionX = Infinity, unionY = Infinity, unionX2 = -Infinity, unionY2 = -Infinity;
-        for (const key of bankLineOrder) {
-          const b = bankLineBoxes[key];
-          if (!b) continue;
-          const lx = x + drawW * b.relX;
-          const ly = y + drawH * b.relY;
-          const rx = lx + drawW * b.relW;
-          const ry = ly + drawH * b.relH;
-          if (lx < unionX) unionX = lx;
-          if (ly < unionY) unionY = ly;
-          if (rx > unionX2) unionX2 = rx;
-          if (ry > unionY2) unionY2 = ry;
-        }
-        if (isFinite(unionX)) {
-          const pad = 0.3;
-          const borderGuard = 1.5;
-          const pageRight = x + drawW;
-          if (unionX2 > pageRight - borderGuard) {
-            unionX2 = pageRight - borderGuard;
-          }
-          pdf.setFillColor(255, 255, 255);
-          pdf.rect(
-            Math.max(0, unionX - pad),
-            Math.max(0, unionY - pad),
-            Math.max(0, unionX2 - unionX + pad * 2),
-            unionY2 - unionY + pad * 2,
-            "F",
-          );
-        }
-
+      const ptToMm = 0.352778;
+      const toBlockRect = (box) => ({
+        left: x + drawW * box.relX,
+        top: y + drawH * box.relY,
+        width: drawW * box.relW,
+        height: drawH * box.relH,
+      });
+      const wipeBlock = (rect, maxRight = null) => {
+        const pad = 0.4;
+        let right = rect.left + rect.width;
+        if (maxRight != null) right = Math.min(right, maxRight);
+        pdf.setFillColor(255, 255, 255);
+        pdf.rect(
+          Math.max(0, rect.left - pad),
+          Math.max(0, rect.top - pad),
+          Math.max(0, right - rect.left + pad * 2),
+          rect.height + pad * 2,
+          "F",
+        );
+      };
+      const drawFlowParagraphs = ({
+        rect,
+        paragraphs,
+        startFontSize = 7,
+        title,
+        maxRight = null,
+      }) => {
+        wipeBlock(rect, maxRight);
         pdf.setTextColor(0, 0, 0);
-        for (const key of bankLineOrder) {
-          const b = bankLineBoxes[key];
-          if (!b) continue;
-          const lineX = x + drawW * b.relX;
-          const lineTopY = y + drawH * b.relY;
-          const lineH = drawH * b.relH;
-          const lineW = drawW * b.relW;
-          const baselineY = lineTopY + Math.max(lineH * 0.72, 2.0);
 
-          if (key === "title") {
-            pdf.setFont("helvetica", "bold");
-            pdf.setFontSize(7.5);
-            pdf.text(lineTexts[key], lineX, baselineY);
-            continue;
-          }
+        let cursorY = rect.top + startFontSize * ptToMm * 0.9;
+        const textWidth = Math.max(rect.width - 1, 20);
 
-          pdf.setFont("helvetica", "normal");
-          pdf.setFontSize(7);
-          const wrapped = pdf.splitTextToSize(lineTexts[key], Math.max(lineW, 28));
-          pdf.text(wrapped, lineX, baselineY);
+        if (title) {
+          pdf.setFont("helvetica", "bold");
+          pdf.setFontSize(7.5);
+          pdf.text(title, rect.left, cursorY);
+          cursorY += 7.5 * ptToMm * 1.35;
         }
+
+        const paragraphList = paragraphs;
+        for (const paragraph of paragraphList) {
+          pdf.setFont("helvetica", "normal");
+          pdf.setFontSize(startFontSize);
+          const wrapped = pdf.splitTextToSize(paragraph, textWidth);
+          const lineHeight = startFontSize * ptToMm * 1.45;
+          for (const line of wrapped) {
+            pdf.text(line, rect.left, cursorY);
+            cursorY += lineHeight;
+          }
+          cursorY += startFontSize * ptToMm * 0.35;
+        }
+      };
+
+      const pageRight = x + drawW - 1.5;
+
+      if (footerBlockBoxes["tax-words"]) {
+        const rect = toBlockRect(footerBlockBoxes["tax-words"]);
+        wipeBlock(rect);
+        pdf.setTextColor(0, 0, 0);
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(7.5);
+        pdf.text(
+          `Tax Amount (in words) : INR- ${numberToWords(data.taxAmount)}`,
+          rect.left,
+          rect.top + 7.5 * ptToMm * 0.9,
+          { maxWidth: rect.width },
+        );
+      }
+
+      if (footerBlockBoxes.terms) {
+        const termsParagraphs =
+          data.terms.length > 0
+            ? data.terms
+            : ["No terms and conditions specified."];
+        drawFlowParagraphs({
+          rect: toBlockRect(footerBlockBoxes.terms),
+          paragraphs: termsParagraphs,
+          title: "Terms & Condition",
+        });
+      }
+
+      if (footerBlockBoxes.bank) {
+        drawFlowParagraphs({
+          rect: toBlockRect(footerBlockBoxes.bank),
+          paragraphs: [
+            `A/C Holder Name : ${data.bank.accountHolderName}`,
+            `Bank Name : ${data.bank.name}`,
+            `A/c No. : ${data.bank.accountNo}`,
+            `Branch & IFSC Code: ${data.bank.IFSC}`,
+          ],
+          title: "Company's Bank Details",
+          maxRight: pageRight,
+        });
       }
 
       const pdfFileName = invoice.type === "performa"
@@ -3627,8 +3661,8 @@ const NewInvoice = ({ invoice }) => {
         </table>
 
         {/* Tax Amount in Words */}
-        <div style={{ marginBottom: "15px", fontSize: "9px", display: "flex", justifyContent: "space-between" }}>
-          <strong>
+        <div style={{ marginBottom: "10px", fontSize: "9px", display: "flex", justifyContent: "space-between" }}>
+          <strong data-pdf-footer-block="tax-words" style={{ display: "block", lineHeight: 1.55 }}>
             Tax Amount (in words) : INR- {numberToWords(data.taxAmount)}
           </strong>
           {data.roundOff !== 0 && (
@@ -3644,18 +3678,19 @@ const NewInvoice = ({ invoice }) => {
             width: "100%",
             borderCollapse: "collapse",
             tableLayout: "fixed",
-            marginBottom: "15px",
+            marginBottom: "10px",
           }}
         >
           <tbody>
             <tr>
               <td
+                data-pdf-footer-block="terms"
                 style={{
                   width: "58%",
                   verticalAlign: "top",
                   paddingRight: "16px",
                   fontSize: "9px",
-                  lineHeight: 1.35,
+                  lineHeight: 1.55,
                 }}
               >
                 <div style={{ fontWeight: "bold", marginBottom: "5px" }}>
@@ -3663,7 +3698,7 @@ const NewInvoice = ({ invoice }) => {
                 </div>
                 {data.terms.length > 0 ? (
                   data.terms.map((term, index) => (
-                    <div key={index} style={{ marginBottom: "3px" }}>
+                    <div key={index} style={{ marginBottom: "4px" }}>
                       {term}
                     </div>
                   ))
@@ -3672,50 +3707,29 @@ const NewInvoice = ({ invoice }) => {
                 )}
               </td>
               <td
+                data-pdf-footer-block="bank"
                 style={{
                   width: "42%",
                   verticalAlign: "top",
                   paddingLeft: "8px",
                   fontSize: "9px",
-                  lineHeight: 1.35,
+                  lineHeight: 1.55,
                 }}
               >
-                <div
-                  data-pdf-bank-lines-root="true"
-                  style={{ width: "100%" }}
-                >
-                  <div
-                    data-pdf-bank-line="title"
-                    style={{ fontWeight: "bold", marginBottom: "4px" }}
-                  >
+                <div style={{ width: "100%" }}>
+                  <div style={{ fontWeight: "bold", marginBottom: "4px" }}>
                     Company&apos;s Bank Details
                   </div>
-                  <div
-                    data-pdf-bank-line="holder"
-                    data-pdf-bank-holder="true"
-                    style={{
-                      marginBottom: "2px",
-                      wordBreak: "break-word",
-                    }}
-                  >
+                  <div style={{ marginBottom: "2px", wordBreak: "break-word" }}>
                     A/C Holder Name : {data.bank.accountHolderName}
                   </div>
-                  <div
-                    data-pdf-bank-line="name"
-                    data-pdf-bank-name="true"
-                    style={{ marginBottom: "2px" }}
-                  >
+                  <div style={{ marginBottom: "2px" }}>
                     Bank Name : {data.bank.name}
                   </div>
-                  <div
-                    data-pdf-bank-line="acno"
-                    style={{ marginBottom: "2px" }}
-                  >
+                  <div style={{ marginBottom: "2px" }}>
                     A/c No. : {data.bank.accountNo}
                   </div>
-                  <div data-pdf-bank-line="ifsc">
-                    Branch &amp; IFSC Code: {data.bank.IFSC}
-                  </div>
+                  <div>Branch &amp; IFSC Code: {data.bank.IFSC}</div>
                 </div>
               </td>
             </tr>
@@ -3726,7 +3740,7 @@ const NewInvoice = ({ invoice }) => {
        <div
   style={{
     textAlign: "right",
-    marginTop: "40px",
+    marginTop: "24px",
     fontSize: "9px",
   }}
 >
@@ -3771,7 +3785,7 @@ const NewInvoice = ({ invoice }) => {
         <div
           style={{
             textAlign: "center",
-            marginTop: "20px",
+            marginTop: "12px",
             fontSize: "8px",
             fontStyle: "italic",
           }}
