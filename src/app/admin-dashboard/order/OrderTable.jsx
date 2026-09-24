@@ -879,13 +879,32 @@ export default function OrderTable({ orders, userRole }) {
   const orderStats = useMemo(() => {
     return ordersInDateRange.reduce(
       (acc, order) => {
+        const taxable = getPaymentColumnAmount(order);
         acc.total += 1;
-        if (order.approval_status === "approved") acc.approved += 1;
-        if (order.approval_status === "rejected") acc.rejected += 1;
-        if (isOrderDispatchedForStats(order)) acc.dispatched += 1;
-        if (isOrderPendingDispatchForStats(order)) acc.pendingDispatch += 1;
-        if (isOrderPaid(order)) acc.paid += 1;
-        else acc.unpaid += 1;
+        acc.totalAmount += taxable;
+        if (order.approval_status === "approved") {
+          acc.approved += 1;
+          acc.approvedAmount += taxable;
+        }
+        if (order.approval_status === "rejected") {
+          acc.rejected += 1;
+          acc.rejectedAmount += taxable;
+        }
+        if (isOrderDispatchedForStats(order)) {
+          acc.dispatched += 1;
+          acc.dispatchedAmount += taxable;
+        }
+        if (isOrderPendingDispatchForStats(order)) {
+          acc.pendingDispatch += 1;
+          acc.pendingDispatchAmount += taxable;
+        }
+        if (isOrderPaid(order)) {
+          acc.paid += 1;
+          acc.paidAmount += taxable;
+        } else {
+          acc.unpaid += 1;
+          acc.unpaidAmount += taxable;
+        }
         return acc;
       },
       {
@@ -896,6 +915,13 @@ export default function OrderTable({ orders, userRole }) {
         pendingDispatch: 0,
         paid: 0,
         unpaid: 0,
+        totalAmount: 0,
+        approvedAmount: 0,
+        rejectedAmount: 0,
+        dispatchedAmount: 0,
+        pendingDispatchAmount: 0,
+        paidAmount: 0,
+        unpaidAmount: 0,
       },
     );
   }, [ordersInDateRange]);
@@ -1222,6 +1248,7 @@ export default function OrderTable({ orders, userRole }) {
       key: "total",
       label: "Total",
       value: orderStats.total,
+      amount: orderStats.totalAmount,
       icon: Package,
       border: "border-slate-200",
       bg: "bg-gradient-to-br from-slate-50 to-white",
@@ -1234,6 +1261,7 @@ export default function OrderTable({ orders, userRole }) {
       key: "approved",
       label: "Approved",
       value: orderStats.approved,
+      amount: orderStats.approvedAmount,
       icon: CheckCircle,
       border: "border-green-200",
       bg: "bg-gradient-to-br from-green-50 to-white",
@@ -1246,6 +1274,7 @@ export default function OrderTable({ orders, userRole }) {
       key: "rejected",
       label: "Rejected",
       value: orderStats.rejected,
+      amount: orderStats.rejectedAmount,
       icon: XCircle,
       border: "border-red-200",
       bg: "bg-gradient-to-br from-red-50 to-white",
@@ -1258,6 +1287,7 @@ export default function OrderTable({ orders, userRole }) {
       key: "dispatched",
       label: "Dispatched",
       value: orderStats.dispatched,
+      amount: orderStats.dispatchedAmount,
       icon: Truck,
       border: "border-violet-200",
       bg: "bg-gradient-to-br from-violet-50 to-white",
@@ -1270,6 +1300,7 @@ export default function OrderTable({ orders, userRole }) {
       key: "pendingDispatch",
       label: "Pending Dispatch",
       value: orderStats.pendingDispatch,
+      amount: orderStats.pendingDispatchAmount,
       icon: Clock,
       border: "border-amber-200",
       bg: "bg-gradient-to-br from-amber-50 to-white",
@@ -1282,6 +1313,7 @@ export default function OrderTable({ orders, userRole }) {
       key: "paid",
       label: "Paid",
       value: orderStats.paid,
+      amount: orderStats.paidAmount,
       icon: CheckCircle,
       border: "border-emerald-200",
       bg: "bg-gradient-to-br from-emerald-50 to-white",
@@ -1294,6 +1326,7 @@ export default function OrderTable({ orders, userRole }) {
       key: "unpaid",
       label: "Unpaid",
       value: orderStats.unpaid,
+      amount: orderStats.unpaidAmount,
       icon: CreditCard,
       border: "border-orange-200",
       bg: "bg-gradient-to-br from-orange-50 to-white",
@@ -1327,6 +1360,13 @@ export default function OrderTable({ orders, userRole }) {
             <p className={`text-2xl font-bold tabular-nums mt-1 ${card.valueColor}`}>
               {card.value.toLocaleString("en-IN")}
             </p>
+            <p className={`text-[11px] font-semibold tabular-nums mt-1 ${card.labelColor}`}>
+              ₹{card.amount.toLocaleString("en-IN", {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0,
+              })}
+            </p>
+            <p className="text-[10px] text-gray-500 mt-0.5">Taxable (excl. GST)</p>
           </div>
           <div className={`${card.iconBg} p-2 rounded-lg shrink-0`}>
             <Icon size={18} className={card.iconColor} />
