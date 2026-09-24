@@ -15,6 +15,9 @@ import {
   ArrowUp,
   ArrowDown,
   PackageCheck,
+  CreditCard,
+  Clock,
+  Package,
 } from "lucide-react";
 import { useState, useEffect, useRef, useMemo } from "react";
 import dayjs from "dayjs";
@@ -162,6 +165,38 @@ const PENDING_DISPATCH_STATUS_KEYS = new Set([
   "invoiceuploaded",
   "bookingdone",
 ]);
+
+function isOrderPaid(order) {
+  return (
+    (order.payment_status || "")
+      .toString()
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, "") === "paid"
+  );
+}
+
+/** Same rules as admin-dashboard-stats dispatched count. */
+function isOrderDispatchedForStats(order) {
+  if (order.approval_status !== "approved") return false;
+  if (order.is_cancelled) return false;
+  const returned = Number(order.is_returned);
+  if ([1, 2, 3].includes(returned)) return false;
+  if (order.installation_status) return false;
+  if (order.delivery_status) return false;
+  return Boolean(order.dispatch_status);
+}
+
+/** Same rules as admin-dashboard-stats pending dispatch count. */
+function isOrderPendingDispatchForStats(order) {
+  if (order.approval_status !== "approved") return false;
+  if (order.is_cancelled) return false;
+  const returned = Number(order.is_returned);
+  if ([1, 2, 3].includes(returned)) return false;
+  if (order.installation_status) return false;
+  if (order.delivery_status) return false;
+  return !order.dispatch_status;
+}
 
 /** Matches UI status "Dispatch Done" (same rules as getStatusText). */
 function isDisplayedDispatchDone(order) {
@@ -335,6 +370,12 @@ export default function OrderTable({ orders, userRole }) {
     }
     return "";
   });
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("orderTable_paymentStatusFilter") || "";
+    }
+    return "";
+  });
   const [showRejected, setShowRejected] = useState(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("orderTable_showRejected");
@@ -406,6 +447,12 @@ export default function OrderTable({ orders, userRole }) {
 
   useEffect(() => {
     if (typeof window !== "undefined") {
+      localStorage.setItem("orderTable_paymentStatusFilter", paymentStatusFilter);
+    }
+  }, [paymentStatusFilter]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
       localStorage.setItem("orderTable_showRejected", JSON.stringify(showRejected));
     }
   }, [showRejected]);
@@ -472,6 +519,7 @@ export default function OrderTable({ orders, userRole }) {
     setModelSearchText("");
     setShowModelDropdown(false);
     setApprovalStatusFilter("");
+    setPaymentStatusFilter("");
     setShowRejected(false);
     
     // Clear localStorage
@@ -483,7 +531,51 @@ export default function OrderTable({ orders, userRole }) {
       localStorage.removeItem("orderTable_createdByFilter");
       localStorage.removeItem("orderTable_modelNameFilter");
       localStorage.removeItem("orderTable_approvalStatusFilter");
+      localStorage.removeItem("orderTable_paymentStatusFilter");
       localStorage.removeItem("orderTable_showRejected");
+    }
+  };
+
+  const handleStatCardClick = (type) => {
+    switch (type) {
+      case "total":
+        setStatusFilter("");
+        setApprovalStatusFilter("");
+        setPaymentStatusFilter("");
+        break;
+      case "approved":
+        setStatusFilter("");
+        setApprovalStatusFilter("approved");
+        setPaymentStatusFilter("");
+        break;
+      case "rejected":
+        setStatusFilter("");
+        setApprovalStatusFilter("rejected");
+        setShowRejected(true);
+        setPaymentStatusFilter("");
+        break;
+      case "dispatched":
+        setStatusFilter("dispatchdone");
+        setApprovalStatusFilter("");
+        setPaymentStatusFilter("");
+        break;
+      case "pendingDispatch":
+        setStatusFilter("pendingdispatched");
+        setApprovalStatusFilter("");
+        setPaymentStatusFilter("");
+        break;
+      case "paid":
+        setStatusFilter("");
+        setApprovalStatusFilter("");
+        setPaymentStatusFilter("paid");
+        break;
+      case "unpaid":
+        setStatusFilter("");
+        setApprovalStatusFilter("");
+        setPaymentStatusFilter("unpaid");
+        break;
+      default:
+        break;
     }
   };
 
@@ -614,6 +706,13 @@ export default function OrderTable({ orders, userRole }) {
         return false;
       }
 
+      if (paymentStatusFilter === "paid" && !isOrderPaid(order)) {
+        return false;
+      }
+      if (paymentStatusFilter === "unpaid" && isOrderPaid(order)) {
+        return false;
+      }
+
       if (!orderMatchesModelFilter(order, modelNameFilter)) {
         return false;
       }
@@ -651,6 +750,7 @@ export default function OrderTable({ orders, userRole }) {
     dateTo,
     createdByFilter,
     approvalStatusFilter,
+    paymentStatusFilter,
     sortColumn,
     sortDirection,
     showRejected,
@@ -718,6 +818,55 @@ export default function OrderTable({ orders, userRole }) {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [modelNameFilter, modelOptions]);
+
+  const ordersInDateRange = useMemo(() => {
+    if (!orders?.length) return [];
+    return orders.filter((order) => {
+      if (!showRejected && order.approval_status === "rejected") return false;
+      return orderCreatedInDateRange(order, dateFrom, dateTo);
+    });
+  }, [orders, dateFrom, dateTo, showRejected]);
+
+  const orderStats = useMemo(() => {
+    return ordersInDateRange.reduce(
+      (acc, order) => {
+        acc.total += 1;
+        if (order.approval_status === "approved") acc.approved += 1;
+        if (order.approval_status === "rejected") acc.rejected += 1;
+        if (isOrderDispatchedForStats(order)) acc.dispatched += 1;
+        if (isOrderPendingDispatchForStats(order)) acc.pendingDispatch += 1;
+        if (isOrderPaid(order)) acc.paid += 1;
+        else acc.unpaid += 1;
+        return acc;
+      },
+      {
+        total: 0,
+        approved: 0,
+        rejected: 0,
+        dispatched: 0,
+        pendingDispatch: 0,
+        paid: 0,
+        unpaid: 0,
+      },
+    );
+  }, [ordersInDateRange]);
+
+  const activeStatCard = useMemo(() => {
+    if (paymentStatusFilter === "paid") return "paid";
+    if (paymentStatusFilter === "unpaid") return "unpaid";
+    if (statusFilter === "dispatchdone") return "dispatched";
+    if (statusFilter === "pendingdispatched") return "pendingDispatch";
+    if (approvalStatusFilter === "approved") return "approved";
+    if (approvalStatusFilter === "rejected") return "rejected";
+    if (
+      !statusFilter &&
+      !approvalStatusFilter &&
+      !paymentStatusFilter
+    ) {
+      return "total";
+    }
+    return "";
+  }, [statusFilter, approvalStatusFilter, paymentStatusFilter]);
 
   const dispatchDoneTotals = useMemo(() => {
     if (!orders?.length) return { gstTotal: 0, taxableTotal: 0 };
@@ -925,8 +1074,126 @@ export default function OrderTable({ orders, userRole }) {
   if (orders.length === 0)
     return <p className="text-gray-600">No orders submitted yet.</p>;
 
+  const statCards = [
+    {
+      key: "total",
+      label: "Total",
+      value: orderStats.total,
+      icon: Package,
+      border: "border-slate-200",
+      bg: "bg-gradient-to-br from-slate-50 to-white",
+      labelColor: "text-slate-600",
+      valueColor: "text-slate-900",
+      iconBg: "bg-slate-200",
+      iconColor: "text-slate-700",
+    },
+    {
+      key: "approved",
+      label: "Approved",
+      value: orderStats.approved,
+      icon: CheckCircle,
+      border: "border-green-200",
+      bg: "bg-gradient-to-br from-green-50 to-white",
+      labelColor: "text-green-700",
+      valueColor: "text-green-800",
+      iconBg: "bg-green-200",
+      iconColor: "text-green-700",
+    },
+    {
+      key: "rejected",
+      label: "Rejected",
+      value: orderStats.rejected,
+      icon: XCircle,
+      border: "border-red-200",
+      bg: "bg-gradient-to-br from-red-50 to-white",
+      labelColor: "text-red-700",
+      valueColor: "text-red-800",
+      iconBg: "bg-red-200",
+      iconColor: "text-red-700",
+    },
+    {
+      key: "dispatched",
+      label: "Dispatched",
+      value: orderStats.dispatched,
+      icon: Truck,
+      border: "border-violet-200",
+      bg: "bg-gradient-to-br from-violet-50 to-white",
+      labelColor: "text-violet-700",
+      valueColor: "text-violet-800",
+      iconBg: "bg-violet-200",
+      iconColor: "text-violet-700",
+    },
+    {
+      key: "pendingDispatch",
+      label: "Pending Dispatch",
+      value: orderStats.pendingDispatch,
+      icon: Clock,
+      border: "border-amber-200",
+      bg: "bg-gradient-to-br from-amber-50 to-white",
+      labelColor: "text-amber-700",
+      valueColor: "text-amber-800",
+      iconBg: "bg-amber-200",
+      iconColor: "text-amber-700",
+    },
+    {
+      key: "paid",
+      label: "Paid",
+      value: orderStats.paid,
+      icon: CheckCircle,
+      border: "border-emerald-200",
+      bg: "bg-gradient-to-br from-emerald-50 to-white",
+      labelColor: "text-emerald-700",
+      valueColor: "text-emerald-800",
+      iconBg: "bg-emerald-200",
+      iconColor: "text-emerald-700",
+    },
+    {
+      key: "unpaid",
+      label: "Unpaid",
+      value: orderStats.unpaid,
+      icon: CreditCard,
+      border: "border-orange-200",
+      bg: "bg-gradient-to-br from-orange-50 to-white",
+      labelColor: "text-orange-700",
+      valueColor: "text-orange-800",
+      iconBg: "bg-orange-200",
+      iconColor: "text-orange-700",
+    },
+  ];
+
   return (
     <div className="space-y-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-2">
+        {statCards.map((card) => {
+          const Icon = card.icon;
+          const isActive = activeStatCard === card.key;
+          return (
+            <button
+              key={card.key}
+              type="button"
+              onClick={() => handleStatCardClick(card.key)}
+              className={`w-full rounded-xl border ${card.border} ${card.bg} shadow-sm p-3 text-left transition-all hover:shadow-md ${
+                isActive ? "ring-2 ring-blue-500 ring-offset-1 shadow-md" : ""
+              }`}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className={`text-[11px] font-semibold uppercase tracking-wide ${card.labelColor}`}>
+                    {card.label}
+                  </p>
+                  <p className={`text-2xl font-bold tabular-nums mt-1 ${card.valueColor}`}>
+                    {card.value.toLocaleString("en-IN")}
+                  </p>
+                </div>
+                <div className={`${card.iconBg} p-2 rounded-lg shrink-0`}>
+                  <Icon size={18} className={card.iconColor} />
+                </div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
         {/* Combined Amount Summary Card */}
         <div className={`w-full rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white shadow-sm p-3 sm:p-4 cursor-default hover:shadow-md transition-shadow`}>
