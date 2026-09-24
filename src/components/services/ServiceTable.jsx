@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import Modal from "./Modal";
 import ServiceAttachmentLink from "./ServiceAttachmentLink";
 import ServiceReportPrintButton from "./ServiceReportPrintButton";
@@ -58,8 +59,12 @@ export default function ServiceTable({ serviceRecords, role }) {
   }, [serviceRecords]);
 
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
-  const dashboardPath =
-    role?.toLowerCase() === "superadmin" ? "admin-dashboard" : "user-dashboard";
+  const pathname = usePathname();
+  const dashboardPath = (() => {
+    const seg = pathname?.split("/").filter(Boolean)[0];
+    if (seg?.endsWith("-dashboard")) return seg;
+    return role?.toLowerCase() === "superadmin" ? "admin-dashboard" : "user-dashboard";
+  })();
 
   const canViewDigitalReport = (record) =>
     record.status?.toUpperCase() === "COMPLETED" &&
@@ -1135,6 +1140,7 @@ export default function ServiceTable({ serviceRecords, role }) {
         title={`Service Details (ID: ${selectedService?.service_id})`}
         selectedService={selectedService}
         baseUrl={baseUrl}
+        dashboardPath={dashboardPath}
       />
 
       {/* Status Change Modal */}

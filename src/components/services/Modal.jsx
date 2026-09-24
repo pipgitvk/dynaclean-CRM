@@ -10,6 +10,7 @@ export default function Modal({
   title,
   selectedService,
   baseUrl,
+  dashboardPath = "user-dashboard",
 }) {
   const [customerId, setCustomerId] = useState(null);
   const [loadingCustomerId, setLoadingCustomerId] = useState(false);
@@ -183,7 +184,7 @@ export default function Modal({
             <p>
               <strong>Service Report:</strong>{" "}
               <a
-                href={`/user-dashboard/view-service-report/${selectedService.service_id}`}
+                href={`/${dashboardPath}/view-service-report/${selectedService.service_id}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-purple-600 hover:underline"
