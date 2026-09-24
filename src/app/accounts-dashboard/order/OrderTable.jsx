@@ -13,6 +13,7 @@ import {
   Truck,
   Download,
   ArrowUp,
+  Pencil,
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import dayjs from "dayjs";
@@ -826,6 +827,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
   const isTeamLeader = role === "team leader";
   const isWarehouse = role === "warehouse incharge";
   const canManageReturns = isAdmin || isAccountant || isTeamLeader;
+  const canEditBooking = isAdmin || role === "superadmin";
   const hasBooking =
     r.booking_id !== undefined &&
     r.booking_id !== null &&
@@ -911,18 +913,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                   </div>
                 </div>
               ))}
-            {canManageReturns &&
-              (hasBooking ? (
-                <Link
-                  href={`/accounts-dashboard/order/view-booking/${r.order_id}`}
-                  className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
-                  title="View Booking"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <FileCheck size={16} />
-                  <span>View Booking</span>
-                </Link>
-              ) : (
+            {canManageReturns && !hasBooking && (
                 <Link
                   href={`/accounts-dashboard/order/upload-booking/${r.order_id}`}
                   className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-green-700"
@@ -932,7 +923,29 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                   <UploadCloud size={16} />
                   <span>Create Booking</span>
                 </Link>
-              ))}
+              )}
+            {canEditBooking && hasBooking && dispatchStatus === 0 && (
+              <Link
+                href={`/accounts-dashboard/order/upload-booking/${r.order_id}`}
+                className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-blue-700"
+                title="Edit Booking"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <Pencil size={16} />
+                <span>Edit Booking</span>
+              </Link>
+            )}
+            {canManageReturns && hasBooking && (
+                <Link
+                  href={`/accounts-dashboard/order/view-booking/${r.order_id}`}
+                  className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
+                  title="View Booking"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <FileCheck size={16} />
+                  <span>View Booking</span>
+                </Link>
+              )}
             {isWarehouse && hasBooking && dispatchStatus === 0 && (
               <>
                 <Link

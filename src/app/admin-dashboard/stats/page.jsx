@@ -68,6 +68,7 @@ export default function AdminStatsDashboard() {
     const [activeTargetCount, setActiveTargetCount] = useState(0);
     const [ordersTotalAmount, setOrdersTotalAmount] = useState(0);
     const [ordersTaxableAmount, setOrdersTaxableAmount] = useState(0);
+    const [ordersTotalCount, setOrdersTotalCount] = useState(0);
 
     // Salesperson quotations modal
     const [quotationsModalOpen, setQuotationsModalOpen] = useState(false);
@@ -155,6 +156,7 @@ export default function AdminStatsDashboard() {
             if (data.success && data.data) {
                 setOrdersTotalAmount(data.data.total_amount);
                 setOrdersTaxableAmount(data.data.taxable_amount || 0);
+                setOrdersTotalCount(data.data.total_orders || 0);
             }
         } catch (error) {
             console.error("Error fetching orders total amount:", error);
@@ -462,10 +464,10 @@ export default function AdminStatsDashboard() {
                     <div className="relative">
                         <KPICard
                             title="Total Orders"
-                            value={stats?.sales?.totalOrders || 0}
+                            value={ordersTotalCount || stats?.sales?.totalOrders || 0}
                             icon={ShoppingCart}
                             color="bg-gradient-to-br from-blue-500 to-blue-600"
-                            subtitle="New orders received"
+                            subtitle="Approved orders (excl. cancelled)"
                             onClick={() => router.push("/admin-dashboard/order")}
                         />
                         <button

@@ -18,6 +18,8 @@ import {
   CreditCard,
   Clock,
   Package,
+  Pencil,
+  AlertCircle,
 } from "lucide-react";
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import dayjs from "dayjs";
@@ -216,6 +218,12 @@ function isOrderPaid(order) {
   );
 }
 
+/** Cancelled and rejected orders are excluded from dashboard stat cards. */
+function isOrderExcludedFromStatCards(order) {
+  if (order.is_cancelled) return true;
+  return (order.approval_status || "").toString().trim().toLowerCase() === "rejected";
+}
+
 /** Same rules as admin-dashboard-stats dispatched count. */
 function isOrderDispatchedForStats(order) {
   if (order.approval_status !== "approved") return false;
@@ -344,7 +352,6 @@ export default function OrderTable({ orders, userRole }) {
     }
     return "";
   });
-  const [filteredOrders, setFilteredOrders] = useState([]);
   const [statusFilter, setStatusFilter] = useState(() => {
     if (typeof window !== "undefined") {
       return localStorage.getItem("orderTable_statusFilter") || "";
@@ -598,10 +605,16 @@ export default function OrderTable({ orders, userRole }) {
         setStatusFilter("");
         setApprovalStatusFilter("");
         setPaymentStatusFilter("");
+        setShowRejected(false);
         break;
       case "approved":
         setStatusFilter("");
         setApprovalStatusFilter("approved");
+        setPaymentStatusFilter("");
+        break;
+      case "pending":
+        setStatusFilter("");
+        setApprovalStatusFilter("pending");
         setPaymentStatusFilter("");
         break;
       case "rejected":
@@ -724,18 +737,16 @@ export default function OrderTable({ orders, userRole }) {
     }
   };
 
-  // Filter orders based on search query, status filter, and date range
-  useEffect(() => {
-    if (!orders) return;
+  // Filter + sort orders (shared by table, stat cards, and amount summary)
+  const filteredOrders = useMemo(() => {
+    if (!orders) return [];
 
     const lowercasedQuery = searchQuery.toLowerCase();
     let result = orders.filter((order) => {
-      // Step 0.5: Filter rejected orders based on toggle
       if (!showRejected && order.approval_status === "rejected") {
         return false;
       }
 
-      // Step 1: Filter by status
       if (statusFilter) {
         const orderStatus = getStatusText(order)
           .text.toLowerCase()
@@ -747,10 +758,8 @@ export default function OrderTable({ orders, userRole }) {
         }
       }
 
-      // Step 2: Date range filter (created_at)
       if (!orderCreatedInDateRange(order, dateFrom, dateTo)) return false;
 
-      // Step 2.5: Filter by created_by
       if (createdByFilter && order.created_by !== createdByFilter) {
         return false;
       }
@@ -768,12 +777,14 @@ export default function OrderTable({ orders, userRole }) {
       if (paymentStatusFilter === "unpaid" && isOrderPaid(order)) {
         return false;
       }
+      if (paymentStatusFilter === "unpaid" && order.is_cancelled) {
+        return false;
+      }
 
       if (!orderMatchesModelFilters(order, modelNameFilters)) {
         return false;
       }
 
-      // Step 3: Search across multiple fields
       return (
         order.order_id?.toLowerCase().includes(lowercasedQuery) ||
         order.client_name?.toLowerCase().includes(lowercasedQuery) ||
@@ -783,8 +794,7 @@ export default function OrderTable({ orders, userRole }) {
       );
     });
 
-    // Step 4: Sort the filtered results
-    result = [...result].sort((a, b) => {
+    return [...result].sort((a, b) => {
       const valA = getSortValue(a, sortColumn);
       const valB = getSortValue(b, sortColumn);
 
@@ -796,8 +806,6 @@ export default function OrderTable({ orders, userRole }) {
       if (valA > valB) return sortDirection === "asc" ? 1 : -1;
       return 0;
     });
-
-    setFilteredOrders(result);
   }, [
     searchQuery,
     orders,
@@ -870,63 +878,70 @@ export default function OrderTable({ orders, userRole }) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const ordersInDateRange = useMemo(() => {
-    if (!orders?.length) return [];
-    return orders.filter((order) => {
-      if (!showRejected && order.approval_status === "rejected") return false;
-      return orderCreatedInDateRange(order, dateFrom, dateTo);
-    });
-  }, [orders, dateFrom, dateTo, showRejected]);
+  const ordersForStatCards = useMemo(
+    () => filteredOrders.filter((order) => !isOrderExcludedFromStatCards(order)),
+    [filteredOrders],
+  );
 
   const orderStats = useMemo(() => {
-    return ordersInDateRange.reduce(
+    return ordersForStatCards.reduce(
       (acc, order) => {
         const taxable = getPaymentColumnAmount(order);
-        acc.total += 1;
-        acc.totalAmount += taxable;
-        if (order.approval_status === "approved") {
+        const approval = (order.approval_status || "")
+          .toString()
+          .trim()
+          .toLowerCase();
+        const isPendingApproval = approval === "pending";
+        const isApproved = approval === "approved";
+
+        if (isPendingApproval) {
+          acc.pending += 1;
+          acc.pendingAmount += taxable;
+        }
+
+        if (isApproved) {
+          acc.total += 1;
+          acc.totalAmount += taxable;
           acc.approved += 1;
           acc.approvedAmount += taxable;
+
+          if (isOrderDispatchedForStats(order)) {
+            acc.dispatched += 1;
+            acc.dispatchedAmount += taxable;
+          }
+          if (isOrderPendingDispatchForStats(order)) {
+            acc.pendingDispatch += 1;
+            acc.pendingDispatchAmount += taxable;
+          }
+          if (isOrderPaid(order)) {
+            acc.paid += 1;
+            acc.paidAmount += taxable;
+          } else {
+            acc.unpaid += 1;
+            acc.unpaidAmount += taxable;
+          }
         }
-        if (order.approval_status === "rejected") {
-          acc.rejected += 1;
-          acc.rejectedAmount += taxable;
-        }
-        if (isOrderDispatchedForStats(order)) {
-          acc.dispatched += 1;
-          acc.dispatchedAmount += taxable;
-        }
-        if (isOrderPendingDispatchForStats(order)) {
-          acc.pendingDispatch += 1;
-          acc.pendingDispatchAmount += taxable;
-        }
-        if (isOrderPaid(order)) {
-          acc.paid += 1;
-          acc.paidAmount += taxable;
-        } else {
-          acc.unpaid += 1;
-          acc.unpaidAmount += taxable;
-        }
+
         return acc;
       },
       {
         total: 0,
+        pending: 0,
         approved: 0,
-        rejected: 0,
         dispatched: 0,
         pendingDispatch: 0,
         paid: 0,
         unpaid: 0,
         totalAmount: 0,
+        pendingAmount: 0,
         approvedAmount: 0,
-        rejectedAmount: 0,
         dispatchedAmount: 0,
         pendingDispatchAmount: 0,
         paidAmount: 0,
         unpaidAmount: 0,
       },
     );
-  }, [ordersInDateRange]);
+  }, [ordersForStatCards]);
 
   const activeStatCard = useMemo(() => {
     if (paymentStatusFilter === "paid") return "paid";
@@ -934,6 +949,7 @@ export default function OrderTable({ orders, userRole }) {
     if (statusFilter === "dispatchdone") return "dispatched";
     if (statusFilter === "pendingdispatched") return "pendingDispatch";
     if (approvalStatusFilter === "approved") return "approved";
+    if (approvalStatusFilter === "pending") return "pending";
     if (approvalStatusFilter === "rejected") return "rejected";
     if (
       !statusFilter &&
@@ -948,16 +964,16 @@ export default function OrderTable({ orders, userRole }) {
   const orderPieChartData = useMemo(() => {
     const entries = [
       {
+        key: "pending",
+        label: "Pending",
+        value: orderStats.pending,
+        color: "rgba(249, 115, 22, 0.85)",
+      },
+      {
         key: "approved",
         label: "Approved",
         value: orderStats.approved,
         color: "rgba(34, 197, 94, 0.85)",
-      },
-      {
-        key: "rejected",
-        label: "Rejected",
-        value: orderStats.rejected,
-        color: "rgba(239, 68, 68, 0.85)",
       },
       {
         key: "dispatched",
@@ -1058,7 +1074,8 @@ export default function OrderTable({ orders, userRole }) {
     return filteredOrders.reduce(
       (acc, o) => {
         if (o.approval_status !== "approved") return acc;
-        acc.taxableTotal += orderTaxableTotal(o);
+        if (isOrderExcludedFromStatCards(o)) return acc;
+        acc.taxableTotal += getPaymentColumnAmount(o);
         return acc;
       },
       { taxableTotal: 0 }
@@ -1070,6 +1087,7 @@ export default function OrderTable({ orders, userRole }) {
     return filteredOrders.reduce(
       (acc, o) => {
         if (o.approval_status !== "approved") return acc;
+        if (isOrderExcludedFromStatCards(o)) return acc;
         acc.totalAmount += getTotalAmount(o);
         acc.paidAmount += getTotalPaidAmount(o);
         acc.taxableAmount += getPaymentColumnAmount(o);
@@ -1273,17 +1291,17 @@ export default function OrderTable({ orders, userRole }) {
       iconColor: "text-green-700",
     },
     {
-      key: "rejected",
-      label: "Rejected",
-      value: orderStats.rejected,
-      amount: orderStats.rejectedAmount,
-      icon: XCircle,
-      border: "border-red-200",
-      bg: "bg-gradient-to-br from-red-50 to-white",
-      labelColor: "text-red-700",
-      valueColor: "text-red-800",
-      iconBg: "bg-red-200",
-      iconColor: "text-red-700",
+      key: "pending",
+      label: "Pending",
+      value: orderStats.pending,
+      amount: orderStats.pendingAmount,
+      icon: AlertCircle,
+      border: "border-orange-200",
+      bg: "bg-gradient-to-br from-orange-50 to-white",
+      labelColor: "text-orange-700",
+      valueColor: "text-orange-800",
+      iconBg: "bg-orange-200",
+      iconColor: "text-orange-700",
     },
     {
       key: "dispatched",
@@ -2483,8 +2501,10 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
     "warehouse incharge",
   ].includes(role);
   const isSuperAdmin = role === "superadmin";
+  const isAdmin = role === "admin";
   const isAccountant = role.includes("accountant");
   const canManageReturns = isSuperAdmin || isAccountant;
+  const canEditBooking = isSuperAdmin || isAdmin;
   const isWarehouse = role === "warehouse incharge";
   const hasBooking =
     r.booking_id !== undefined &&
@@ -2570,18 +2590,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                   </div>
                 </>
               ))}
-            {canManageReturns &&
-              (hasBooking ? (
-                <Link
-                  href={`/admin-dashboard/order/view-booking/${r.order_id}`}
-                  className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
-                  title="View Booking"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <FileCheck size={16} />
-                  <span>View Booking</span>
-                </Link>
-              ) : (
+            {canManageReturns && !hasBooking && (
                 <Link
                   href={`/admin-dashboard/order/upload-booking/${r.order_id}`}
                   className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-green-700"
@@ -2591,7 +2600,29 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                   <UploadCloud size={16} />
                   <span>Create Booking</span>
                 </Link>
-              ))}
+              )}
+            {canEditBooking && hasBooking && dispatchStatus === 0 && (
+              <Link
+                href={`/admin-dashboard/order/upload-booking/${r.order_id}`}
+                className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-blue-700"
+                title="Edit Booking"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <Pencil size={16} />
+                <span>Edit Booking</span>
+              </Link>
+            )}
+            {canManageReturns && hasBooking && (
+                <Link
+                  href={`/admin-dashboard/order/view-booking/${r.order_id}`}
+                  className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
+                  title="View Booking"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <FileCheck size={16} />
+                  <span>View Booking</span>
+                </Link>
+              )}
             {(isWarehouse || canManageReturns) &&
               hasBooking &&
               dispatchStatus === 0 && (

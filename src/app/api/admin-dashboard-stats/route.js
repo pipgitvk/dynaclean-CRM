@@ -120,6 +120,7 @@ export async function GET(req) {
       LEFT JOIN neworder no 
         ON no.quote_number = qr.quote_number
         AND no.approval_status = 'approved'
+        AND COALESCE(no.is_cancelled, 0) = 0
         AND DATE(no.created_at) >= ? AND DATE(no.created_at) <= ?
       LEFT JOIN quotation_items qi 
         ON qi.quote_number = no.quote_number
