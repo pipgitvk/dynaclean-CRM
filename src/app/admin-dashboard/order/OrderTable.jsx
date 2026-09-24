@@ -19,9 +19,13 @@ import {
   Clock,
   Package,
 } from "lucide-react";
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import dayjs from "dayjs";
 import ExcelJS from "exceljs";
+import { Pie } from "react-chartjs-2";
+import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
+
+ChartJS.register(ArcElement, Tooltip, Legend);
 
 import DeleteButton from "@/components/accounts/DeleteButton";
 import toast from "react-hot-toast";
@@ -536,7 +540,7 @@ export default function OrderTable({ orders, userRole }) {
     }
   };
 
-  const handleStatCardClick = (type) => {
+  const handleStatCardClick = useCallback((type) => {
     switch (type) {
       case "total":
         setStatusFilter("");
@@ -577,7 +581,7 @@ export default function OrderTable({ orders, userRole }) {
       default:
         break;
     }
-  };
+  }, []);
 
   const handleExportToExcel = async () => {
     setIsExporting(true);
@@ -867,6 +871,100 @@ export default function OrderTable({ orders, userRole }) {
     }
     return "";
   }, [statusFilter, approvalStatusFilter, paymentStatusFilter]);
+
+  const orderPieChartData = useMemo(() => {
+    const entries = [
+      {
+        key: "approved",
+        label: "Approved",
+        value: orderStats.approved,
+        color: "rgba(34, 197, 94, 0.85)",
+      },
+      {
+        key: "rejected",
+        label: "Rejected",
+        value: orderStats.rejected,
+        color: "rgba(239, 68, 68, 0.85)",
+      },
+      {
+        key: "dispatched",
+        label: "Dispatched",
+        value: orderStats.dispatched,
+        color: "rgba(139, 92, 246, 0.85)",
+      },
+      {
+        key: "pendingDispatch",
+        label: "Pending Dispatch",
+        value: orderStats.pendingDispatch,
+        color: "rgba(245, 158, 11, 0.85)",
+      },
+      {
+        key: "paid",
+        label: "Paid",
+        value: orderStats.paid,
+        color: "rgba(16, 185, 129, 0.85)",
+      },
+      {
+        key: "unpaid",
+        label: "Unpaid",
+        value: orderStats.unpaid,
+        color: "rgba(249, 115, 22, 0.85)",
+      },
+    ].filter((entry) => entry.value > 0);
+
+    return {
+      labels: entries.map((entry) => entry.label),
+      keys: entries.map((entry) => entry.key),
+      datasets: [
+        {
+          data: entries.map((entry) => entry.value),
+          backgroundColor: entries.map((entry) => entry.color),
+          borderWidth: 2,
+          borderColor: "#ffffff",
+          hoverOffset: 8,
+        },
+      ],
+    };
+  }, [orderStats]);
+
+  const orderPieChartOptions = useMemo(
+    () => ({
+      responsive: true,
+      maintainAspectRatio: false,
+      onClick: (_event, elements, chart) => {
+        if (!elements?.length) return;
+        const key = chart.data.keys?.[elements[0].index];
+        if (key) handleStatCardClick(key);
+      },
+      plugins: {
+        legend: {
+          position: "bottom",
+          labels: {
+            boxWidth: 12,
+            padding: 14,
+            font: { size: 11 },
+          },
+        },
+        title: {
+          display: true,
+          text: "Order Statistics Overview",
+          font: { size: 15, weight: "bold" },
+          padding: { bottom: 12 },
+        },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => {
+              const val = ctx.parsed || 0;
+              const total = orderStats.total || 1;
+              const pct = ((val / total) * 100).toFixed(1);
+              return ` ${ctx.label}: ${val.toLocaleString("en-IN")} (${pct}% of total orders)`;
+            },
+          },
+        },
+      },
+    }),
+    [handleStatCardClick, orderStats.total],
+  );
 
   const dispatchDoneTotals = useMemo(() => {
     if (!orders?.length) return { gstTotal: 0, taxableTotal: 0 };
@@ -1161,38 +1259,82 @@ export default function OrderTable({ orders, userRole }) {
     },
   ];
 
+  const leftStatCards = [...statCards.slice(0, 3), statCards[6]];
+  const rightStatCards = statCards.slice(3, 6);
+
+  const renderStatCard = (card) => {
+    const Icon = card.icon;
+    const isActive = activeStatCard === card.key;
+    return (
+      <button
+        key={card.key}
+        type="button"
+        onClick={() => handleStatCardClick(card.key)}
+        className={`w-full rounded-xl border ${card.border} ${card.bg} shadow-sm p-3 text-left transition-all hover:shadow-md ${
+          isActive ? "ring-2 ring-blue-500 ring-offset-1 shadow-md" : ""
+        }`}
+      >
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className={`text-[11px] font-semibold uppercase tracking-wide ${card.labelColor}`}>
+              {card.label}
+            </p>
+            <p className={`text-2xl font-bold tabular-nums mt-1 ${card.valueColor}`}>
+              {card.value.toLocaleString("en-IN")}
+            </p>
+          </div>
+          <div className={`${card.iconBg} p-2 rounded-lg shrink-0`}>
+            <Icon size={18} className={card.iconColor} />
+          </div>
+        </div>
+      </button>
+    );
+  };
+
+  const renderPieChart = () => (
+    <div className="rounded-xl border border-slate-200 bg-white shadow-sm p-4 h-full flex flex-col">
+      <div className="mb-3 flex flex-col gap-1">
+        <p className="text-sm font-semibold text-gray-800">Order Distribution</p>
+        <p className="text-xs text-gray-500">
+          {orderStats.total.toLocaleString("en-IN")} orders
+          {dateFrom || dateTo ? ` (${dateFrom || "…"} to ${dateTo || "…"})` : ""}
+        </p>
+        <p className="text-xs text-gray-400">Click slice to filter</p>
+      </div>
+      <div className="flex-1 min-h-[220px] lg:min-h-0">
+        {orderStats.total > 0 && orderPieChartData.labels.length > 0 ? (
+          <Pie data={orderPieChartData} options={orderPieChartOptions} />
+        ) : (
+          <div className="flex h-full min-h-[220px] items-center justify-center rounded-lg border border-dashed border-gray-200 bg-gray-50 text-sm text-gray-500">
+            No order data for the selected date range
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-2">
-        {statCards.map((card) => {
-          const Icon = card.icon;
-          const isActive = activeStatCard === card.key;
-          return (
-            <button
-              key={card.key}
-              type="button"
-              onClick={() => handleStatCardClick(card.key)}
-              className={`w-full rounded-xl border ${card.border} ${card.bg} shadow-sm p-3 text-left transition-all hover:shadow-md ${
-                isActive ? "ring-2 ring-blue-500 ring-offset-1 shadow-md" : ""
-              }`}
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className={`text-[11px] font-semibold uppercase tracking-wide ${card.labelColor}`}>
-                    {card.label}
-                  </p>
-                  <p className={`text-2xl font-bold tabular-nums mt-1 ${card.valueColor}`}>
-                    {card.value.toLocaleString("en-IN")}
-                  </p>
-                </div>
-                <div className={`${card.iconBg} p-2 rounded-lg shrink-0`}>
-                  <Icon size={18} className={card.iconColor} />
-                </div>
-              </div>
-            </button>
-          );
-        })}
+      {/* Mobile / tablet: all cards in grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 lg:hidden">
+        {statCards.map((card) => renderStatCard(card))}
       </div>
+
+      {/* Large screen: 4 left | 3 right | pie chart */}
+      <div className="hidden lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.35fr)] gap-3 items-stretch">
+        <div className="flex flex-col gap-2">
+          {leftStatCards.map((card) => renderStatCard(card))}
+        </div>
+
+        <div className="flex flex-col gap-2">
+          {rightStatCards.map((card) => renderStatCard(card))}
+        </div>
+
+        {renderPieChart()}
+      </div>
+
+      {/* Mobile / tablet: pie chart below cards */}
+      <div className="lg:hidden">{renderPieChart()}</div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
         {/* Combined Amount Summary Card */}
