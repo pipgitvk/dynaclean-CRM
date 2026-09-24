@@ -341,6 +341,119 @@ function orderCreatedInDateRange(order, dateFrom, dateTo) {
   return true;
 }
 
+function getStatusText(order) {
+  if (order.approval_status === "pending") {
+    return {
+      text: "Pending Approval",
+      bg: "bg-orange-100",
+      textCol: "text-orange-800",
+      icon: <MoreVertical size={14} className="mr-1" />,
+    };
+  }
+  if (order.approval_status === "rejected") {
+    return {
+      text: "Rejected",
+      bg: "bg-red-100",
+      textCol: "text-red-800",
+      icon: <XCircle size={14} className="mr-1" />,
+    };
+  }
+  if (Number(order.is_returned) === 3) {
+    if (Number(order.return_booking_done) === 1) {
+      return {
+        text: "Return Booking Done",
+        bg: "bg-indigo-100",
+        textCol: "text-indigo-800",
+        icon: <ArrowUp size={14} className="mr-1" />,
+      };
+    }
+    return {
+      text: "Return Initiated",
+      bg: "bg-purple-100",
+      textCol: "text-purple-800",
+      icon: <ArrowUp size={14} className="mr-1" />,
+    };
+  }
+  if (Number(order.is_returned) === 1) {
+    if (Number(order.warehouse_in_done) === 1) {
+      return {
+        text: "Return Completed",
+        bg: "bg-orange-100",
+        textCol: "text-orange-800",
+        icon: <CheckCircle size={14} className="mr-1" />,
+      };
+    }
+    return {
+      text: "Fully Returned",
+      bg: "bg-red-100",
+      textCol: "text-red-800",
+      icon: <XCircle size={14} className="mr-1" />,
+    };
+  }
+  if (Number(order.is_returned) === 2) {
+    return {
+      text: "Partially Returned",
+      bg: "bg-orange-100",
+      textCol: "text-orange-800",
+      icon: <XCircle size={14} className="mr-1" />,
+    };
+  }
+  if (order.is_cancelled || order.approval_status === "rejected") {
+    return {
+      text: "Canceled",
+      bg: "bg-red-100",
+      textCol: "text-red-800",
+      icon: <XCircle size={14} className="mr-1" />,
+    };
+  }
+  if (order.installation_status) {
+    return {
+      text: "Installed",
+      bg: "bg-green-100",
+      textCol: "text-green-800",
+      icon: <CheckCircle size={14} className="mr-1" />,
+    };
+  }
+  if (order.delivery_status) {
+    return {
+      text: "Delivered",
+      bg: "bg-orange-100",
+      textCol: "text-orange-800",
+      icon: <Truck size={14} className="mr-1" />,
+    };
+  }
+  if (order.dispatch_status) {
+    return {
+      text: "Dispatch Done",
+      bg: "bg-violet-100",
+      textCol: "text-violet-800",
+      icon: <FileText size={14} className="mr-1" />,
+    };
+  }
+  if (order.booking_id) {
+    return {
+      text: "Booking Done",
+      bg: "bg-green-100",
+      textCol: "text-green-800",
+      icon: <FileCheck size={14} className="mr-1" />,
+    };
+  }
+  if (order.report_file) {
+    return {
+      text: "Invoice Uploaded",
+      bg: "bg-blue-100",
+      textCol: "text-blue-800",
+      icon: <FileText size={14} className="mr-1" />,
+    };
+  }
+  return {
+    text: "Pending Invoice",
+    bg: "bg-yellow-100",
+    textCol: "text-yellow-800",
+    icon: <UploadCloud size={14} className="mr-1" />,
+  };
+}
+
 export default function OrderTable({ orders, userRole }) {
   const [productCatalog, setProductCatalog] = useState([]);
   const searchParams = useSearchParams();
@@ -1097,121 +1210,6 @@ export default function OrderTable({ orders, userRole }) {
       { totalAmount: 0, paidAmount: 0, taxableAmount: 0, balanceAmount: 0 }
     );
   }, [filteredOrders]);
-
-  const getStatusText = (order) => {
-    if (order.approval_status === "pending") {
-      return {
-        text: "Pending Approval",
-        bg: "bg-orange-100",
-        textCol: "text-orange-800",
-        icon: <MoreVertical size={14} className="mr-1" />,
-      };
-    }
-    if (order.approval_status === "rejected") {
-      return {
-        text: "Rejected",
-        bg: "bg-red-100",
-        textCol: "text-red-800",
-        icon: <XCircle size={14} className="mr-1" />,
-      };
-    }
-    // Check for return status first (highest priority)
-    if (Number(order.is_returned) === 3) {
-      if (Number(order.return_booking_done) === 1) {
-        return {
-          text: "Return Booking Done",
-          bg: "bg-indigo-100",
-          textCol: "text-indigo-800",
-          icon: <ArrowUp size={14} className="mr-1" />,
-        };
-      }
-      return {
-        text: "Return Initiated",
-        bg: "bg-purple-100",
-        textCol: "text-purple-800",
-        icon: <ArrowUp size={14} className="mr-1" />,
-      };
-    }
-    if (Number(order.is_returned) === 1) {
-      // Check if warehouse-in is also done for "Return Completed" status
-      if (Number(order.warehouse_in_done) === 1) {
-        return {
-          text: "Return Completed",
-          bg: "bg-orange-100",
-          textCol: "text-orange-800",
-          icon: <CheckCircle size={14} className="mr-1" />,
-        };
-      }
-      return {
-        text: "Fully Returned",
-        bg: "bg-red-100",
-        textCol: "text-red-800",
-        icon: <XCircle size={14} className="mr-1" />,
-      };
-    }
-    if (Number(order.is_returned) === 2) {
-      return {
-        text: "Partially Returned",
-        bg: "bg-orange-100",
-        textCol: "text-orange-800",
-        icon: <XCircle size={14} className="mr-1" />,
-      };
-    }
-    if (order.is_cancelled || order.approval_status === "rejected") {
-      return {
-        text: "Canceled",
-        bg: "bg-red-100",
-        textCol: "text-red-800",
-        icon: <XCircle size={14} className="mr-1" />,
-      };
-    }
-    if (order.installation_status) {
-      return {
-        text: "Installed",
-        bg: "bg-green-100",
-        textCol: "text-green-800",
-        icon: <CheckCircle size={14} className="mr-1" />,
-      };
-    }
-    if (order.delivery_status) {
-      return {
-        text: "Delivered",
-        bg: "bg-orange-100",
-        textCol: "text-orange-800",
-        icon: <Truck size={14} className="mr-1" />,
-      };
-    }
-    if (order.dispatch_status) {
-      return {
-        text: "Dispatch Done",
-        bg: "bg-violet-100",
-        textCol: "text-violet-800",
-        icon: <FileText size={14} className="mr-1" />,
-      };
-    }
-    if (order.booking_id) {
-      return {
-        text: "Booking Done",
-        bg: "bg-green-100",
-        textCol: "text-green-800",
-        icon: <FileCheck size={14} className="mr-1" />,
-      };
-    }
-    if (order.report_file) {
-      return {
-        text: "Invoice Uploaded",
-        bg: "bg-blue-100",
-        textCol: "text-blue-800",
-        icon: <FileText size={14} className="mr-1" />,
-      };
-    }
-    return {
-      text: "Pending Invoice",
-      bg: "bg-yellow-100",
-      textCol: "text-yellow-800",
-      icon: <UploadCloud size={14} className="mr-1" />,
-    };
-  };
 
   const getPaymentBadge = (paymentStatusRaw) => {
     const s = (paymentStatusRaw || "").toString().trim().toLowerCase();
