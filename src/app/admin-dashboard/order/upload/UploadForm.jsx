@@ -12,14 +12,18 @@ const FILE_FIELD_NAMES = new Set([
   "deliverchallan",
 ]);
 
-export default function UploadForm({ orderDetails }) {
+export default function UploadForm({ orderDetails, isEditMode = false }) {
   const [form, setForm] = useState({
-    invoice_number: "",
-    duedate: "",
-    baseAmount: "",
-    taxamt: "",
-    totalamt: "",
-    remark: "",
+    invoice_number: orderDetails.invoice_number || "",
+    duedate: orderDetails.invoice_date
+      ? String(orderDetails.invoice_date).slice(0, 10)
+      : orderDetails.duedate
+        ? String(orderDetails.duedate).slice(0, 10)
+        : "",
+    baseAmount: orderDetails.baseAmount ? String(orderDetails.baseAmount) : "",
+    taxamt: orderDetails.taxamt ? String(orderDetails.taxamt) : "",
+    totalamt: orderDetails.totalamt ? String(orderDetails.totalamt) : "",
+    remark: orderDetails.account_remark || "",
     ewaybill_file: [],
     einvoice_file: [],
     report_file: [],
@@ -171,7 +175,7 @@ export default function UploadForm({ orderDetails }) {
       setLoading(false);
       return;
     }
-    if (!form.report_file?.length) {
+    if (!form.report_file?.length && !isEditMode) {
       setMessage("❌ Please upload at least one Invoice PDF.");
       setLoading(false);
       return;
@@ -329,7 +333,7 @@ export default function UploadForm({ orderDetails }) {
           name="report_file"
           label="Invoice PDF (Required)"
           files={form.report_file}
-          required
+          required={!isEditMode}
           onChange={handleChange}
           onRemove={handleRemoveFile}
         />
@@ -349,7 +353,7 @@ export default function UploadForm({ orderDetails }) {
           className="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700 transition"
           disabled={loading}
         >
-          {loading ? "Uploading..." : "Upload Files"}
+          {loading ? "Uploading..." : isEditMode ? "Save Changes" : "Upload Files"}
         </button>
         <a
           href="/admin-dashboard/order"

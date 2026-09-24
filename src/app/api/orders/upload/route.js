@@ -3,6 +3,7 @@ import { parseFormData } from "@/lib/parseForm";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { uploadOrderAccountFile } from "@/lib/uploadOrderAccountFile";
+import { isBeforeDispatch } from "@/lib/orderDocumentEditRules";
 
 const MAX_FILES_PER_FIELD = 5;
 
@@ -86,13 +87,23 @@ export async function POST(req) {
     const payload = await getSessionPayload();
     const accountBy = payload?.username || payload?.name || null;
 
-    // Find quote_number and, if needed, existing invoice date for this order
+    // Find quote_number and order state
     const [orderRows] = await conn.execute(
-      `SELECT quote_number, duedate FROM neworder WHERE order_id = ?`,
+      `SELECT quote_number, duedate, dispatch_status,
+              ewaybill_file, einvoice_file, report_file, deliverchallan
+       FROM neworder WHERE order_id = ?`,
       [orderId]
     );
     const existingOrder =
       Array.isArray(orderRows) && orderRows.length ? orderRows[0] : {};
+
+    if (!isBeforeDispatch(existingOrder)) {
+      return NextResponse.json(
+        { error: "Invoice and tax documents cannot be edited after dispatch." },
+        { status: 403 },
+      );
+    }
+
     const quoteNumber = existingOrder.quote_number;
 
     // Get payment_term_days from quotation (if available)
@@ -128,7 +139,15 @@ export async function POST(req) {
     else if (paid === 0 && isOverdue) paymentStatus = "over due";
     else paymentStatus = "pending";
 
-    // Save to DB (include baseAmount and new payment fields)
+    // Save to DB (merge file fields when not re-uploaded)
+    const mergedReportPath = reportPath || existingOrder.report_file || "";
+    const mergedEwaybillPath =
+      ewaybillPath || existingOrder.ewaybill_file || "";
+    const mergedEinvoicePath =
+      einvoicePath || existingOrder.einvoice_file || "";
+    const mergedChallanPath =
+      challanPath || existingOrder.deliverchallan || "";
+
     await conn.execute(
       `UPDATE neworder SET 
         baseAmount = ?, 
@@ -150,10 +169,10 @@ export async function POST(req) {
       WHERE order_id = ?`,
       [
         baseAmount,
-        ewaybillPath,
-        reportPath,
-        einvoicePath,
-        challanPath,
+        mergedEwaybillPath,
+        mergedReportPath,
+        mergedEinvoicePath,
+        mergedChallanPath,
         invoiceNumber,
         dueDate,
         taxAmt,

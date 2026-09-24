@@ -26,6 +26,9 @@ import dayjs from "dayjs";
 import ExcelJS from "exceljs";
 import { Pie } from "react-chartjs-2";
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
+import {
+  canEditDeliveryProof,
+} from "@/lib/orderDocumentEditRules";
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
@@ -2563,15 +2566,28 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
             )}
             {["superadmin"].includes(role) &&
               (r.report_file ? (
-                <Link
-                  href={`/admin-dashboard/order/view/${r.order_id}`}
-                  className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
-                  title="View Report"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <FileText size={16} />
-                  <span>View Report</span>
-                </Link>
+                <>
+                  <Link
+                    href={`/admin-dashboard/order/view/${r.order_id}`}
+                    className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
+                    title="View Report"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <FileText size={16} />
+                    <span>View Report</span>
+                  </Link>
+                  {dispatchStatus === 0 && (
+                    <Link
+                      href={`/admin-dashboard/order/upload/${r.order_id}`}
+                      className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-blue-700"
+                      title="Edit Invoice"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Pencil size={16} />
+                      <span>Edit Invoice</span>
+                    </Link>
+                  )}
+                </>
               ) : (
                 <>
                   <Link
@@ -3029,6 +3045,24 @@ function UpdateDeliveryMenuItem({ order }) {
   };
 
   const isDelivered = Number(order.delivery_status) === 1;
+  const canUpdateDeliveryProof = canEditDeliveryProof(order);
+
+  const uploadDeliveryProofFile = async () => {
+    if (!deliveryProof) return null;
+    setUploading(true);
+    const formData = new FormData();
+    formData.append("file", deliveryProof);
+    const uploadRes = await fetch("/api/upload-delivery-proof", {
+      method: "POST",
+      body: formData,
+    });
+    setUploading(false);
+    if (!uploadRes.ok) {
+      throw new Error("Failed to upload delivery proof");
+    }
+    const uploadJson = await uploadRes.json();
+    return uploadJson.url;
+  };
 
   const handleSave = async () => {
     if (!deliveredOn) {
@@ -3038,27 +3072,7 @@ function UpdateDeliveryMenuItem({ order }) {
 
     try {
       setSaving(true);
-      let deliveryProofUrl = null;
-
-      // Upload delivery proof if file is selected
-      if (deliveryProof) {
-        setUploading(true);
-        const formData = new FormData();
-        formData.append("file", deliveryProof);
-
-        const uploadRes = await fetch("/api/upload-delivery-proof", {
-          method: "POST",
-          body: formData,
-        });
-
-        if (!uploadRes.ok) {
-          throw new Error("Failed to upload delivery proof");
-        }
-
-        const uploadJson = await uploadRes.json();
-        deliveryProofUrl = uploadJson.url;
-        setUploading(false);
-      }
+      const deliveryProofUrl = await uploadDeliveryProofFile();
 
       const res = await fetch("/api/orders/delivery", {
         method: "POST",
@@ -3082,6 +3096,44 @@ function UpdateDeliveryMenuItem({ order }) {
     } catch (error) {
       console.error(error);
       alert(error.message || "Failed to update delivery status");
+    } finally {
+      setSaving(false);
+      setUploading(false);
+    }
+  };
+
+  const handleUpdateProof = async () => {
+    if (!deliveryProof) {
+      alert("Please select a delivery proof file");
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const deliveryProofUrl = await uploadDeliveryProofFile();
+
+      const res = await fetch("/api/orders/delivery", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          order_id: order.order_id,
+          delivery_proof: deliveryProofUrl,
+          update_proof_only: true,
+        }),
+      });
+
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || "Failed to update delivery proof");
+      }
+
+      alert("Delivery proof updated successfully!");
+      setOpen(false);
+      setDeliveryProof(null);
+      router.refresh();
+    } catch (error) {
+      console.error(error);
+      alert(error.message || "Failed to update delivery proof");
     } finally {
       setSaving(false);
       setUploading(false);
@@ -3217,6 +3269,31 @@ function UpdateDeliveryMenuItem({ order }) {
                         No delivery proof uploaded
                       </p>
                     )}
+                    {canUpdateDeliveryProof && (
+                      <div className="mt-3">
+                        <label className="block text-sm text-gray-700 font-medium mb-1">
+                          {order.delivery_proof
+                            ? "Replace Delivery Proof"
+                            : "Upload Delivery Proof"}
+                        </label>
+                        <input
+                          type="file"
+                          accept="image/*,application/pdf"
+                          onChange={(e) =>
+                            setDeliveryProof(e.target.files?.[0] || null)
+                          }
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                        />
+                        {deliveryProof && (
+                          <p className="text-xs text-gray-600 mt-1">
+                            Selected: {deliveryProof.name}
+                          </p>
+                        )}
+                        <p className="text-xs text-amber-700 mt-1">
+                          Editable within 24 hours of delivery
+                        </p>
+                      </div>
+                    )}
                   </div>
 
                   <div>
@@ -3304,6 +3381,19 @@ function UpdateDeliveryMenuItem({ order }) {
                     : saving
                     ? "Saving..."
                     : "Mark as Delivered"}
+                </button>
+              )}
+              {isDelivered && canUpdateDeliveryProof && (
+                <button
+                  onClick={handleUpdateProof}
+                  disabled={saving || uploading || !deliveryProof}
+                  className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+                >
+                  {uploading
+                    ? "Uploading..."
+                    : saving
+                    ? "Saving..."
+                    : "Update Proof"}
                 </button>
               )}
             </div>

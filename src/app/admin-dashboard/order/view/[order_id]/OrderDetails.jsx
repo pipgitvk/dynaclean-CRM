@@ -1,11 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import toast from "react-hot-toast";
 import OrderApprovalActions from "../../OrderApprovalActions";
-import { resolveStoredFileUrl } from "@/lib/resolveStoredFileUrl";
-
-const MAX_FILES_PER_FIELD = 5;
+import OrderDocumentFileCard from "@/components/orders/OrderDocumentFileCard";
 
 const FILE_FIELDS = [
   { label: "Payment Proof", key: "payment_proof" },
@@ -49,6 +46,19 @@ export default function OrderDetails({ data, userRole }) {
   const handleFilesUploaded = (fieldKey, newValue) => {
     setFileValues((prev) => ({ ...prev, [fieldKey]: newValue }));
   };
+
+  const orderForDocRules = useMemo(
+    () => ({
+      dispatch_status: orderDetails.dispatch_status,
+      delivery_status: orderDetails.delivery_status,
+      delivered_on: orderDetails.delivered_on,
+    }),
+    [
+      orderDetails.dispatch_status,
+      orderDetails.delivery_status,
+      orderDetails.delivered_on,
+    ],
+  );
 
   return (
     <div className="max-w-6xl mx-auto p-6">
@@ -192,20 +202,27 @@ export default function OrderDetails({ data, userRole }) {
       </div>
 
       {/* File Downloads */}
-      <div className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {FILE_FIELDS.map(({ label, key }) => (
-          <FileLinksCard
-            key={key}
-            label={label}
-            fieldKey={key}
-            file={fileValues[key]}
-            orderId={orderDetails.order_id}
-            onUploaded={handleFilesUploaded}
-          />
-        ))}
+      <div className="mt-8">
+        <p className="text-xs text-gray-500 mb-3">
+          E-way bill, e-invoice & invoice editable before dispatch (up to 5 invoice PDFs).
+          Delivery challan before delivered. Delivery proof within 24 hours of delivery.
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {FILE_FIELDS.map(({ label, key }) => (
+            <OrderDocumentFileCard
+              key={key}
+              label={label}
+              fieldKey={key}
+              file={fileValues[key]}
+              orderId={orderDetails.order_id}
+              order={orderForDocRules}
+              onUploaded={handleFilesUploaded}
+            />
+          ))}
+        </div>
 
         {orderDetails.booking_url && (
-          <div className="p-4 border rounded-lg">
+          <div className="p-4 border rounded-lg mt-4">
             <h4 className="text-sm font-semibold mb-2">Booking URL</h4>
             <a
               href={orderDetails.booking_url}
@@ -238,157 +255,6 @@ export default function OrderDetails({ data, userRole }) {
           ← Back to Order List
         </a>
       </div>
-    </div>
-  );
-}
-
-function getDisplayUrl(fileUrl) {
-  if (!fileUrl) return "";
-  if (fileUrl.includes("res.cloudinary.com")) {
-    return `/api/cloudinary-proxy?url=${encodeURIComponent(fileUrl)}`;
-  }
-  return resolveStoredFileUrl(fileUrl);
-}
-
-function fileLabelFromUrl(fileUrl, index) {
-  const segment = fileUrl.split("/").pop() || "";
-  const decoded = decodeURIComponent(segment.split("?")[0]);
-  return decoded || `File ${index + 1}`;
-}
-
-function FileLinksCard({ label, fieldKey, file, orderId, onUploaded }) {
-  const [uploading, setUploading] = useState(false);
-
-  const fileUrls = useMemo(
-    () =>
-      String(file || "")
-        .split(",")
-        .map((url) => url.trim())
-        .filter(Boolean),
-    [file],
-  );
-
-  const atMax = fileUrls.length >= MAX_FILES_PER_FIELD;
-
-  const handleFileSelect = async (e) => {
-    const selected = Array.from(e.target.files || []);
-    e.target.value = "";
-    if (!selected.length || uploading) return;
-
-    const remaining = MAX_FILES_PER_FIELD - fileUrls.length;
-    if (remaining <= 0) {
-      toast.error(`Maximum ${MAX_FILES_PER_FIELD} files allowed per field`);
-      return;
-    }
-
-    const toUpload = selected.slice(0, remaining);
-    if (selected.length > remaining) {
-      toast.error(`Only ${remaining} more file(s) allowed`);
-    }
-
-    setUploading(true);
-    try {
-      const formData = new FormData();
-      formData.append("field", fieldKey);
-      toUpload.forEach((f) => formData.append("files", f));
-
-      const res = await fetch(`/api/orders/${orderId}/files`, {
-        method: "POST",
-        body: formData,
-      });
-      const result = await res.json();
-
-      if (!res.ok) {
-        throw new Error(result.error || "Upload failed");
-      }
-
-      onUploaded(fieldKey, result.value);
-      toast.success(`${result.added} file(s) uploaded`);
-    } catch (error) {
-      toast.error(error.message || "Upload failed");
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  return (
-    <div className="p-4 border rounded-lg">
-      <h4 className="text-sm font-semibold mb-2">{label}</h4>
-      {fileUrls.length === 0 ? (
-        <p className="text-gray-500 text-xs mb-2">Not uploaded</p>
-      ) : fileUrls.length === 1 ? (
-        <div className="flex gap-2">
-          <a
-            href={getDisplayUrl(fileUrls[0])}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-blue-600 hover:underline text-sm"
-          >
-            View
-          </a>
-          <a
-            href={getDisplayUrl(fileUrls[0])}
-            download
-            className="text-green-600 hover:underline text-sm"
-          >
-            Download
-          </a>
-        </div>
-      ) : (
-        <details className="cursor-pointer">
-          <summary className="text-blue-600 underline hover:text-blue-800 text-sm">
-            {fileUrls.length} files
-          </summary>
-          <div className="mt-2 space-y-2 rounded border border-gray-200 bg-gray-50 p-2">
-            {fileUrls.map((fileUrl, idx) => {
-              const displayUrl = getDisplayUrl(fileUrl);
-              return (
-                <div
-                  key={`${fileUrl}-${idx}`}
-                  className="flex items-center justify-between gap-2 rounded bg-white p-2 text-sm"
-                >
-                  <span className="truncate flex-1">
-                    {idx + 1}. {fileLabelFromUrl(fileUrl, idx)}
-                  </span>
-                  <div className="flex shrink-0 gap-2">
-                    <a
-                      href={displayUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 hover:underline text-xs"
-                    >
-                      View
-                    </a>
-                    <a
-                      href={displayUrl}
-                      download
-                      className="text-green-600 hover:underline text-xs"
-                    >
-                      Download
-                    </a>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </details>
-      )}
-
-      {!atMax && (
-        <div className="mt-3 border-t pt-3">
-          <input
-            type="file"
-            accept=".pdf,.jpg,.jpeg,.png"
-            multiple
-            disabled={uploading}
-            onChange={handleFileSelect}
-            className="w-full text-xs file:mr-2 file:rounded file:border-0 file:bg-gray-100 file:px-2 file:py-1 disabled:opacity-50"
-          />
-          {uploading && (
-            <p className="mt-1 text-xs text-blue-600">Uploading...</p>
-          )}
-        </div>
-      )}
     </div>
   );
 }

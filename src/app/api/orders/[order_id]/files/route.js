@@ -2,8 +2,11 @@ import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { uploadOrderAccountBuffer } from "@/lib/uploadOrderAccountFile";
-
-const MAX_FILES_PER_FIELD = 5;
+import {
+  canEditOrderDocumentField,
+  getMaxFilesForField,
+  getOrderDocumentEditBlockReason,
+} from "@/lib/orderDocumentEditRules";
 
 const ALLOWED_FIELDS = {
   payment_proof: "payment_proof",
@@ -52,7 +55,8 @@ export async function POST(request, { params }) {
 
     const conn = await getDbConnection();
     const [rows] = await conn.execute(
-      `SELECT \`${column}\` AS file_value FROM neworder WHERE order_id = ? LIMIT 1`,
+      `SELECT dispatch_status, delivery_status, delivered_on, \`${column}\` AS file_value
+       FROM neworder WHERE order_id = ? LIMIT 1`,
       [orderId],
     );
 
@@ -60,12 +64,25 @@ export async function POST(request, { params }) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
 
-    const existing = parseStoredPaths(rows[0].file_value);
-    const remaining = MAX_FILES_PER_FIELD - existing.length;
+    const order = rows[0];
+    if (!canEditOrderDocumentField(order, field)) {
+      return NextResponse.json(
+        {
+          error:
+            getOrderDocumentEditBlockReason(order, field) ||
+            "Editing is not allowed for this document.",
+        },
+        { status: 403 },
+      );
+    }
+
+    const maxFiles = getMaxFilesForField(field);
+    const existing = parseStoredPaths(order.file_value);
+    const remaining = maxFiles - existing.length;
 
     if (remaining <= 0) {
       return NextResponse.json(
-        { error: `Maximum ${MAX_FILES_PER_FIELD} files allowed for this field` },
+        { error: `Maximum ${maxFiles} files allowed for this field` },
         { status: 400 },
       );
     }
