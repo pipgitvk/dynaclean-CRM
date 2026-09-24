@@ -52,11 +52,35 @@ function orderMatchesModelFilter(order, filterKey) {
   return parseOrderLineItems(order).some((item) => lineItemMatchesModelFilter(item, filterKey));
 }
 
+function orderMatchesModelFilters(order, filterKeys) {
+  if (!filterKeys?.length) return true;
+  return filterKeys.some((filterKey) =>
+    parseOrderLineItems(order).some((item) => lineItemMatchesModelFilter(item, filterKey)),
+  );
+}
+
 function modelQuantityInOrder(order, filterKey) {
   if (!filterKey) return 0;
   return parseOrderLineItems(order)
     .filter((item) => lineItemMatchesModelFilter(item, filterKey))
     .reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
+}
+
+function modelQuantityInOrders(order, filterKeys) {
+  if (!filterKeys?.length) return 0;
+  return filterKeys.reduce((sum, filterKey) => sum + modelQuantityInOrder(order, filterKey), 0);
+}
+
+function parseModelFiltersFromStorage(raw) {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed.map((item) => String(item || "").trim()).filter(Boolean);
+  } catch {
+    const legacy = String(raw).trim();
+    if (legacy) return [legacy];
+  }
+  return [];
 }
 
 function formatModelOptionLabel(item) {
@@ -130,6 +154,18 @@ function isSameModelFilter(filterKey, opt) {
     normalizeModelCode(filterKey) === normalizeModelCode(opt.filterKey) ||
     filterKey === opt.item_name
   );
+}
+
+function isModelFilterSelected(filterKeys, opt) {
+  if (!filterKeys?.length || !opt) return false;
+  return filterKeys.some((filterKey) => isSameModelFilter(filterKey, opt));
+}
+
+function normalizeModelFilterKeys(filterKeys, modelOptions) {
+  if (!filterKeys?.length || !modelOptions?.length) return filterKeys || [];
+  return [...new Set(
+    filterKeys.map((filterKey) => findModelOption(filterKey, modelOptions)?.filterKey || filterKey),
+  )];
 }
 
 // 👻 A sleek skeleton loader for a modern feel
@@ -335,18 +371,16 @@ export default function OrderTable({ orders, userRole }) {
     }
     return "";
   });
-  const [modelNameFilter, setModelNameFilter] = useState(() => {
+  const [modelNameFilters, setModelNameFilters] = useState(() => {
     if (typeof window !== "undefined") {
-      return localStorage.getItem("orderTable_modelNameFilter") || "";
+      const saved =
+        localStorage.getItem("orderTable_modelNameFilters") ||
+        localStorage.getItem("orderTable_modelNameFilter");
+      return parseModelFiltersFromStorage(saved);
     }
-    return "";
+    return [];
   });
-  const [modelSearchText, setModelSearchText] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("orderTable_modelNameFilter") || "";
-    }
-    return "";
-  });
+  const [modelSearchText, setModelSearchText] = useState("");
   const [showModelDropdown, setShowModelDropdown] = useState(false);
   const modelSearchRef = useRef(null);
 
@@ -439,9 +473,9 @@ export default function OrderTable({ orders, userRole }) {
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      localStorage.setItem("orderTable_modelNameFilter", modelNameFilter);
+      localStorage.setItem("orderTable_modelNameFilters", JSON.stringify(modelNameFilters));
     }
-  }, [modelNameFilter]);
+  }, [modelNameFilters]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -519,7 +553,7 @@ export default function OrderTable({ orders, userRole }) {
     setDateFrom(dayjs().startOf('month').format('YYYY-MM-DD'));
     setDateTo(dayjs().endOf('month').format('YYYY-MM-DD'));
     setCreatedByFilter("");
-    setModelNameFilter("");
+    setModelNameFilters([]);
     setModelSearchText("");
     setShowModelDropdown(false);
     setApprovalStatusFilter("");
@@ -533,12 +567,28 @@ export default function OrderTable({ orders, userRole }) {
       localStorage.removeItem("orderTable_dateFrom");
       localStorage.removeItem("orderTable_dateTo");
       localStorage.removeItem("orderTable_createdByFilter");
+      localStorage.removeItem("orderTable_modelNameFilters");
       localStorage.removeItem("orderTable_modelNameFilter");
       localStorage.removeItem("orderTable_approvalStatusFilter");
       localStorage.removeItem("orderTable_paymentStatusFilter");
       localStorage.removeItem("orderTable_showRejected");
     }
   };
+
+  const toggleModelFilter = useCallback((opt) => {
+    setModelNameFilters((prev) => {
+      if (isModelFilterSelected(prev, opt)) {
+        return prev.filter((filterKey) => !isSameModelFilter(filterKey, opt));
+      }
+      return [...prev, opt.filterKey];
+    });
+  }, []);
+
+  const removeModelFilter = useCallback((filterKey) => {
+    setModelNameFilters((prev) =>
+      prev.filter((selectedKey) => !isSameModelFilter(selectedKey, { filterKey, item_name: filterKey })),
+    );
+  }, []);
 
   const handleStatCardClick = useCallback((type) => {
     switch (type) {
@@ -717,7 +767,7 @@ export default function OrderTable({ orders, userRole }) {
         return false;
       }
 
-      if (!orderMatchesModelFilter(order, modelNameFilter)) {
+      if (!orderMatchesModelFilters(order, modelNameFilters)) {
         return false;
       }
 
@@ -758,7 +808,7 @@ export default function OrderTable({ orders, userRole }) {
     sortColumn,
     sortDirection,
     showRejected,
-    modelNameFilter,
+    modelNameFilters,
   ]);
 
   const catalogByCode = useMemo(() => {
@@ -776,12 +826,12 @@ export default function OrderTable({ orders, userRole }) {
   );
 
   const filteredModelQuantity = useMemo(() => {
-    if (!modelNameFilter) return 0;
+    if (!modelNameFilters.length) return 0;
     return filteredOrders.reduce(
-      (sum, order) => sum + modelQuantityInOrder(order, modelNameFilter),
+      (sum, order) => sum + modelQuantityInOrders(order, modelNameFilters),
       0,
     );
-  }, [filteredOrders, modelNameFilter]);
+  }, [filteredOrders, modelNameFilters]);
 
   const filteredModelOptions = useMemo(() => {
     const query = modelSearchText.trim().toLowerCase();
@@ -797,17 +847,13 @@ export default function OrderTable({ orders, userRole }) {
   }, [modelOptions, modelSearchText]);
 
   useEffect(() => {
-    if (!modelNameFilter || !modelOptions.length) return;
-    const match = findModelOption(modelNameFilter, modelOptions);
-    if (match && match.filterKey !== modelNameFilter) {
-      setModelNameFilter(match.filterKey);
-    }
-  }, [modelNameFilter, modelOptions]);
-
-  useEffect(() => {
-    if (!modelNameFilter || !modelOptions.length || showModelDropdown) return;
-    setModelSearchText(getModelLabel(modelNameFilter, modelOptions));
-  }, [modelNameFilter, modelOptions, showModelDropdown]);
+    if (!modelNameFilters.length || !modelOptions.length) return;
+    const normalized = normalizeModelFilterKeys(modelNameFilters, modelOptions);
+    const changed =
+      normalized.length !== modelNameFilters.length ||
+      normalized.some((key, index) => key !== modelNameFilters[index]);
+    if (changed) setModelNameFilters(normalized);
+  }, [modelNameFilters, modelOptions]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -816,12 +862,11 @@ export default function OrderTable({ orders, userRole }) {
         !modelSearchRef.current.contains(event.target)
       ) {
         setShowModelDropdown(false);
-        setModelSearchText(getModelLabel(modelNameFilter, modelOptions));
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [modelNameFilter, modelOptions]);
+  }, []);
 
   const ordersInDateRange = useMemo(() => {
     if (!orders?.length) return [];
@@ -1416,7 +1461,7 @@ export default function OrderTable({ orders, userRole }) {
                 Model Summary
               </p>
               <p className="text-[10px] text-blue-600/90 mb-2 leading-tight">
-                Filter by model name
+                Select one or more models
               </p>
 
               <div ref={modelSearchRef} className="relative mb-2">
@@ -1429,45 +1474,58 @@ export default function OrderTable({ orders, userRole }) {
                     type="text"
                     value={modelSearchText}
                     onChange={(e) => {
-                      const value = e.target.value;
-                      setModelSearchText(value);
+                      setModelSearchText(e.target.value);
                       setShowModelDropdown(true);
-                      if (!value.trim()) {
-                        setModelNameFilter("");
-                      }
                     }}
                     onFocus={() => setShowModelDropdown(true)}
                     onKeyDown={(e) => {
                       if (e.key === "Escape") {
                         setShowModelDropdown(false);
-                        setModelSearchText(getModelLabel(modelNameFilter, modelOptions));
                       } else if (e.key === "Enter" && filteredModelOptions.length > 0) {
                         e.preventDefault();
-                        const selected = filteredModelOptions[0];
-                        setModelNameFilter(selected.filterKey);
-                        setModelSearchText(selected.label);
-                        setShowModelDropdown(false);
+                        toggleModelFilter(filteredModelOptions[0]);
                       }
                     }}
                     placeholder="Search model code or name..."
                     autoComplete="off"
                     className="w-full border border-blue-200 rounded-lg py-1.5 pl-7 pr-7 text-xs bg-white"
                   />
-                  {modelSearchText && (
+                  {(modelSearchText || modelNameFilters.length > 0) && (
                     <button
                       type="button"
                       onClick={() => {
-                        setModelNameFilter("");
+                        setModelNameFilters([]);
                         setModelSearchText("");
                         setShowModelDropdown(false);
                       }}
                       className="absolute right-2 top-1/2 -translate-y-1/2 text-blue-400 hover:text-blue-600"
-                      aria-label="Clear model filter"
+                      aria-label="Clear model filters"
                     >
                       <XCircle size={14} />
                     </button>
                   )}
                 </div>
+
+                {modelNameFilters.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {modelNameFilters.map((filterKey) => (
+                      <span
+                        key={filterKey}
+                        className="inline-flex max-w-full items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-800"
+                      >
+                        <span className="truncate">{getModelLabel(filterKey, modelOptions)}</span>
+                        <button
+                          type="button"
+                          onClick={() => removeModelFilter(filterKey)}
+                          className="shrink-0 text-blue-500 hover:text-blue-700"
+                          aria-label={`Remove ${getModelLabel(filterKey, modelOptions)}`}
+                        >
+                          <XCircle size={12} />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
 
                 {showModelDropdown && (
                   <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-48 overflow-y-auto rounded-lg border border-blue-200 bg-white shadow-lg">
@@ -1475,8 +1533,7 @@ export default function OrderTable({ orders, userRole }) {
                       <button
                         type="button"
                         onClick={() => {
-                          setModelNameFilter("");
-                          setModelSearchText("");
+                          setModelNameFilters([]);
                           setShowModelDropdown(false);
                         }}
                         className="w-full border-b border-blue-50 px-3 py-2 text-left text-xs text-blue-700 hover:bg-blue-50"
@@ -1485,24 +1542,30 @@ export default function OrderTable({ orders, userRole }) {
                       </button>
                     )}
                     {filteredModelOptions.length > 0 ? (
-                      filteredModelOptions.map((opt) => (
-                        <button
-                          key={opt.filterKey}
-                          type="button"
-                          onClick={() => {
-                            setModelNameFilter(opt.filterKey);
-                            setModelSearchText(opt.label);
-                            setShowModelDropdown(false);
-                          }}
-                          className={`w-full border-b border-blue-50 px-3 py-2 text-left text-xs hover:bg-blue-50 ${
-                            isSameModelFilter(modelNameFilter, opt)
-                              ? "bg-blue-50 font-medium text-blue-900"
-                              : "text-gray-700"
-                          }`}
-                        >
-                          {opt.label}
-                        </button>
-                      ))
+                      filteredModelOptions.map((opt) => {
+                        const selected = isModelFilterSelected(modelNameFilters, opt);
+                        return (
+                          <button
+                            key={opt.filterKey}
+                            type="button"
+                            onClick={() => toggleModelFilter(opt)}
+                            className={`flex w-full items-center gap-2 border-b border-blue-50 px-3 py-2 text-left text-xs hover:bg-blue-50 ${
+                              selected ? "bg-blue-50 font-medium text-blue-900" : "text-gray-700"
+                            }`}
+                          >
+                            <span
+                              className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
+                                selected
+                                  ? "border-blue-600 bg-blue-600 text-white"
+                                  : "border-gray-300 bg-white"
+                              }`}
+                            >
+                              {selected ? <CheckCircle size={10} /> : null}
+                            </span>
+                            <span className="truncate">{opt.label}</span>
+                          </button>
+                        );
+                      })
                     ) : (
                       <div className="px-3 py-2 text-xs text-gray-500">
                         No models found
@@ -1512,10 +1575,13 @@ export default function OrderTable({ orders, userRole }) {
                 )}
               </div>
 
-              {modelNameFilter ? (
+              {modelNameFilters.length > 0 ? (
                 <>
                   <div className="mb-2 pb-2 border-b border-blue-100">
-                    <p className="text-[10px] text-blue-600 font-medium">Total Quantity</p>
+                    <p className="text-[10px] text-blue-600 font-medium">
+                      Total Quantity ({modelNameFilters.length} model
+                      {modelNameFilters.length === 1 ? "" : "s"})
+                    </p>
                     <p className="text-lg font-bold text-blue-950 tabular-nums">
                       {filteredModelQuantity.toLocaleString("en-IN")}
                     </p>
@@ -1529,7 +1595,7 @@ export default function OrderTable({ orders, userRole }) {
                 </>
               ) : (
                 <p className="text-xs text-blue-600/80">
-                  Select a model to view quantity
+                  Select one or more models to view quantity
                 </p>
               )}
             </div>
