@@ -75,6 +75,20 @@ function transformMenuItemPaths(item, roleKey) {
     }
   }
 
+  if (roleUpper === "ACCOUNTANT") {
+    const accountantModulePaths = {
+      "client-expenses": "/accounts-dashboard/client-expenses/cards",
+      "delivery-challan": "/accounts-dashboard/delivery-challan",
+      statements: "/accounts-dashboard/statements",
+      "bank-management": "/accounts-dashboard/bank-masters",
+      ledger: "/accounts-dashboard/ledger",
+      parties: "/accounts-dashboard/parties",
+    };
+    if (item.moduleKey && accountantModulePaths[item.moduleKey]) {
+      return { ...item, path: accountantModulePaths[item.moduleKey] };
+    }
+  }
+
   if (item.moduleKey === "denied-leads") {
     return { ...item, path: "/sales-dashboard/denied-leads" };
   }

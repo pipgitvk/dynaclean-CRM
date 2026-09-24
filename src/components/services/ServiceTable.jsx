@@ -5,6 +5,7 @@ import Link from "next/link";
 import Modal from "./Modal";
 import ServiceAttachmentLink from "./ServiceAttachmentLink";
 import ServiceReportPrintButton from "./ServiceReportPrintButton";
+import ServiceCompletionDateCell from "./ServiceCompletionDateCell";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { useWarrantyProductFollowup } from "@/components/warranty/WarrantyProductFollowupControls";
 
@@ -685,8 +686,13 @@ export default function ServiceTable({ serviceRecords, role }) {
                             )}
                         </div>
                       </td>
-                      <td className="px-6 py-3">
-                        {formatDate(record.completed_date)}
+                      <td className="relative overflow-visible px-6 py-3 align-top">
+                        <ServiceCompletionDateCell
+                          completedDate={record.completed_date}
+                          preCompletion={record.pre_completion}
+                          afterCompletion={record.after_completion}
+                          formatDate={formatDate}
+                        />
                       </td>
 
                       {role === "ADMIN" && (
@@ -935,6 +941,19 @@ export default function ServiceTable({ serviceRecords, role }) {
                       </span>{" "}
                       {record.service_type}
                     </p>
+                    <div className="text-gray-500">
+                      <span className="font-semibold text-gray-700">
+                        Complete Date:
+                      </span>
+                      <div className="mt-1">
+                        <ServiceCompletionDateCell
+                          completedDate={record.completed_date}
+                          preCompletion={record.pre_completion}
+                          afterCompletion={record.after_completion}
+                          formatDate={formatDate}
+                        />
+                      </div>
+                    </div>
                   </div>
                   <div className="border-t border-gray-200 pt-2">
                     {record.model && (
