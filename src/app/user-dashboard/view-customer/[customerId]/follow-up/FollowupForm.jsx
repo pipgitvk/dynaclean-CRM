@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import toast from "react-hot-toast";
 
 import { isGemRole } from "@/lib/isGemRole";
+import { isSalesRole } from "@/lib/isSalesRole";
 
 export default function FollowupForm({ customerId, userRole = "" }) {
   const router = useRouter();
@@ -229,7 +230,32 @@ export default function FollowupForm({ customerId, userRole = "" }) {
   }, [formData.notes, notesCursor]);
 
   const statusList = ["Very Good", "Average", "Poor", "Denied", "Invalid"];
-  const tagOptions = ["Visiting factory", "Service Issue", "Payment Follow-Up", "Trucks Follow-Up", "Cancel Order", "Order received", "Prime", "Repeat Order", "Running Order", "Strong Follow-Up", "N/A"];
+  const baseTagOptions = [
+    "Visiting factory",
+    "Service Issue",
+    "Payment Follow-Up",
+    "Trucks Follow-Up",
+    "Cancel Order",
+    "Order received",
+    "Prime",
+    "Repeat Order",
+    "Running Order",
+    "Strong Follow-Up",
+    "N/A",
+  ];
+  const salesOnlyTags = [
+    "Delhi Visiting",
+    "Tamilnadu Visiting",
+    "Online Demo",
+    "Physical Demo",
+  ];
+  const tagOptions = useMemo(() => {
+    const isSalesUser =
+      isSalesRole(userRole) && !isServiceSupport && !isGEM;
+    if (!isSalesUser) return baseTagOptions;
+    const withoutNA = baseTagOptions.filter((tag) => tag !== "N/A");
+    return [...withoutNA, ...salesOnlyTags, "N/A"];
+  }, [userRole, isServiceSupport, isGEM]);
   const stageOptions = [
     "New",
     "Contacted",
