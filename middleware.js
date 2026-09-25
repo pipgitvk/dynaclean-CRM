@@ -134,9 +134,17 @@ export async function middleware(request) {
         // If accountant/admin role not found, fall through to generic checks
       }
 
-      // Prospects module is used by SALES roles too.
+      // Prospects: sales roles use sales-dashboard copy; admin/director stay on admin.
       if (pathname.startsWith("/admin-dashboard/prospects")) {
-        if (["SUPERADMIN", "ADMIN", "SALES", "SALES CUM BACKOFFICE", "SALES HEAD"].includes(role) || roleNorm === "DIRECTOR") {
+        if (roleNorm.includes("SALES") && role !== "SUPERADMIN") {
+          const dest = new URL(
+            pathname.replace("/admin-dashboard", "/sales-dashboard"),
+            request.url,
+          );
+          dest.search = request.nextUrl.search;
+          return NextResponse.redirect(dest);
+        }
+        if (["SUPERADMIN", "ADMIN", "DIRECTOR"].includes(role) || roleNorm === "DIRECTOR") {
           return NextResponse.next();
         }
       }
@@ -176,6 +184,17 @@ export async function middleware(request) {
         }
       }
 
+      if (roleNorm === "SALES CUM BACKOFFICE") {
+        if (pathname.startsWith("/admin-dashboard/reports/payment-pending")) {
+          const dest = new URL(
+            pathname.replace("/admin-dashboard", "/sales-dashboard"),
+            request.url,
+          );
+          dest.search = request.nextUrl.search;
+          return NextResponse.redirect(dest);
+        }
+      }
+
       if (pathname.startsWith("/admin-dashboard") && role !== "SUPERADMIN" && roleNorm !== "DIRECTOR") {
         // Allow EA for employee-related admin routes
         const eaAllowedRoutes = [
@@ -201,7 +220,6 @@ export async function middleware(request) {
         const isInvoicesBuyerRoute = pathname.startsWith("/admin-dashboard/invoices/buyer");
         const isPartiesRoute = pathname.startsWith("/admin-dashboard/parties");
         const isPurchaseProductsRoute = pathname.startsWith("/admin-dashboard/purchase-products");
-        const isPaymentPendingReportRoute = pathname.startsWith("/admin-dashboard/reports/payment-pending");
         const isManualPaymentsRoute = pathname.startsWith("/admin-dashboard/manual-payments");
         const isSalesDashboardManualPaymentsRoute = pathname.startsWith("/sales-dashboard/manual-payments");
         const isScheduleVisitAdminRoute =
@@ -224,7 +242,7 @@ export async function middleware(request) {
           !(roleNorm === "EA" && isEaAllowed) &&
           !(isTeamLeader && (isDeniedLeadsRoute || isViewCustomerRoute)) &&
           !(isSales && (isDeniedLeadsRoute || isViewCustomerRoute || isBulkReassignRoute)) &&
-          !(isSalesCumBackoffice && (isBulkReassignRoute || isPaymentPendingReportRoute || isManualPaymentsRoute || isSalesDashboardManualPaymentsRoute)) &&
+          !(isSalesCumBackoffice && (isBulkReassignRoute || isManualPaymentsRoute || isSalesDashboardManualPaymentsRoute)) &&
           !(isServiceHead && isServiceSupportReport) &&
           !(roleNorm === "EA" && isServiceSupportReport) &&
           !isEveryoneAllowedRoute

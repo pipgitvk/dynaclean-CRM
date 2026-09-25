@@ -34,11 +34,22 @@ function transformMenuItemPaths(item, roleKey) {
   }
 
   if (roleUpper === "SALES CUM BACKOFFICE" && item.moduleKey === "payment-pending") {
-    return { ...item, path: "/admin-dashboard/reports/payment-pending" };
+    return { ...item, path: "/sales-dashboard/reports/payment-pending" };
   }
 
   if (roleUpper === "SALES CUM BACKOFFICE" && item.moduleKey === "backlinks-excel-data") {
     return { ...item, path: "/sales-dashboard/backlinks-excel" };
+  }
+
+  if (dashboardPrefix === "/sales-dashboard" && item.moduleKey) {
+    const salesDashboardModulePaths = {
+      "prospects-view": "/sales-dashboard/prospects",
+      "prospects-add": "/sales-dashboard/prospects/add-manual",
+      "prospects-new": "/sales-dashboard/prospects/new",
+    };
+    if (salesDashboardModulePaths[item.moduleKey]) {
+      return { ...item, path: salesDashboardModulePaths[item.moduleKey] };
+    }
   }
 
   if (roleUpper === "DIRECTOR") {

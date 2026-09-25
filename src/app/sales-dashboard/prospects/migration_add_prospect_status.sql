@@ -1,0 +1,1 @@
+ALTER TABLE prospects ADD COLUMN status VARCHAR(32) NOT NULL DEFAULT 'open';
