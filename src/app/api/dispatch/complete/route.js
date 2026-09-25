@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { isSpare1110 } from "@/lib/isSpare1110";
+import { isDelhiGodown, pickRowColumn } from "@/lib/godownStock";
 
 export async function POST(req) {
   try {
@@ -33,7 +34,7 @@ export async function POST(req) {
     // Products are identified by item_code containing at least one alphabet character;
     // spares (purely numeric codes) are allowed to have empty serial numbers.
     const [dispatchRows] = await conn.execute(
-      `SELECT item_code, item_name, serial_no, godown FROM dispatch WHERE quote_number = ?`,
+      `SELECT item_code, item_name, serial_no, godown, stock_deducted FROM dispatch WHERE quote_number = ?`,
       [quoteNumber]
     );
 
@@ -65,7 +66,10 @@ export async function POST(req) {
     // Products have item_codes with letters (e.g. DSC-30); spares use spare_number (e.g. S-001) or numeric ids.
     const spareDispatchRows = dispatchRows.filter((row) => {
       const itemCode = row.item_code || "";
-      return itemCode.trim() !== "" && !isSpare1110(itemCode);
+      if (itemCode.trim() === "" || isSpare1110(itemCode)) return false;
+      if (row.stock_deducted === 1) return false;
+      if (!row.godown || !String(row.godown).trim()) return false;
+      return true;
     });
 
     if (spareDispatchRows.length > 0) {
@@ -96,7 +100,7 @@ export async function POST(req) {
           continue;
         }
         const spareId = spareMatch[0].id;
-        const isDelhi = godown === "Delhi - Mundka";
+        const isDelhi = isDelhiGodown(godown);
 
         // Fetch latest stock_list snapshot for running totals
         const [lastRows] = await conn.execute(
@@ -105,14 +109,16 @@ export async function POST(req) {
         );
         const last = lastRows[0] || { total: 0, delhi: 0, south: 0 };
 
+        const lastDelhi = pickRowColumn(last, "delhi");
+        const lastSouth = pickRowColumn(last, "south");
         const newTotal = Math.max(0, Number(last.total || 0) - count);
-        const newDelhi = isDelhi ? Math.max(0, Number(last.delhi || 0) - count) : Number(last.delhi || 0);
-        const newSouth = !isDelhi ? Math.max(0, Number(last.south || 0) - count) : Number(last.south || 0);
+        const newDelhi = isDelhi ? Math.max(0, lastDelhi - count) : lastDelhi;
+        const newSouth = !isDelhi ? Math.max(0, lastSouth - count) : lastSouth;
 
         await conn.execute(
-          `INSERT INTO stock_list (spare_id, quantity, amount_per_unit, net_amount, note, location, stock_status, added_date, from_company, supporting_file, added_by, godown, total, Delhi, South, godown_location)
-           VALUES (?, ?, NULL, NULL, ?, NULL, 'OUT', NOW(), NULL, NULL, ?, ?, ?, ?, ?, ?)`,
-          [spareId, count, `Dispatch order #${orderId}`, dispatchPerson, godown, newTotal, newDelhi, newSouth, godown]
+          `INSERT INTO stock_list (spare_id, quantity, amount_per_unit, net_amount, note, location, stock_status, added_date, from_company, supporting_file, added_by, godown, total, delhi, south)
+           VALUES (?, ?, NULL, NULL, ?, NULL, 'OUT', NOW(), NULL, NULL, ?, ?, ?, ?, ?)`,
+          [spareId, count, `Dispatch order #${orderId}`, dispatchPerson, godown, newTotal, newDelhi, newSouth]
         );
 
         // Update stock_summary
@@ -123,8 +129,10 @@ export async function POST(req) {
         if (summaryRows.length > 0) {
           const sum = summaryRows[0];
           const sumTotal = Math.max(0, Number(sum.total_quantity || 0) - count);
-          const sumDelhi = isDelhi ? Math.max(0, Number(sum.Delhi || 0) - count) : Number(sum.Delhi || 0);
-          const sumSouth = !isDelhi ? Math.max(0, Number(sum.South || 0) - count) : Number(sum.South || 0);
+          const prevDelhi = pickRowColumn(sum, "Delhi");
+          const prevSouth = pickRowColumn(sum, "South");
+          const sumDelhi = isDelhi ? Math.max(0, prevDelhi - count) : prevDelhi;
+          const sumSouth = !isDelhi ? Math.max(0, prevSouth - count) : prevSouth;
           await conn.execute(
             `UPDATE stock_summary SET last_updated_quantity = ?, total_quantity = ?, Delhi = ?, South = ?, last_status = 'OUT', updated_at = NOW() WHERE spare_id = ?`,
             [count, sumTotal, sumDelhi, sumSouth, spareId]

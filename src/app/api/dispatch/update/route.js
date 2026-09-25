@@ -3,6 +3,11 @@ import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { deductCheckedAccessoryStock } from "@/lib/deductAccessoryStock";
 import { isSpare1110 } from "@/lib/isSpare1110";
+import {
+  getGodownLocationColumn,
+  isDelhiGodown,
+  pickRowColumn,
+} from "@/lib/godownStock";
 import { v2 as cloudinary } from "cloudinary";
 
 cloudinary.config({
@@ -260,8 +265,8 @@ export async function POST(req) {
         ? quoteMetaRowsFull[0].gstin
         : null;
 
-    const locationColumn = godown === "Delhi - Mundka" ? "Delhi" : "South";
-    const locationColumnLower = godown === "Delhi - Mundka" ? "delhi" : "south";
+    const locationColumn = getGodownLocationColumn(godown);
+    const isDelhi = isDelhiGodown(godown);
 
     if (isProduct) {
       const [rows] = await conn.execute(
@@ -272,17 +277,19 @@ export async function POST(req) {
 
       let totalDB = 0;
       let locationDB = 0;
+      let delhiDB = 0;
+      let southDB = 0;
       if (rows.length > 0) {
-        totalDB = rows[0].total_quantity;
-        locationDB = rows[0][locationColumn];
+        totalDB = Number(rows[0].total_quantity || 0);
+        locationDB = pickRowColumn(rows[0], locationColumn);
+        delhiDB = pickRowColumn(rows[0], "Delhi");
+        southDB = pickRowColumn(rows[0], "South");
       }
 
-      let newLocationStock = locationDB - quantity;
+      const newLocationStock = locationDB - quantity;
       const totalD = totalDB - quantity;
-
-      // Calculate both delhi and south for the INSERT (lowercase for product_stock table)
-      let delhiD = locationColumnLower === "delhi" ? newLocationStock : locationDB;
-      let southD = locationColumnLower === "south" ? newLocationStock : locationDB;
+      const delhiD = isDelhi ? newLocationStock : delhiDB;
+      const southD = isDelhi ? southDB : newLocationStock;
 
       await conn.execute(
         `INSERT INTO product_stock
@@ -315,9 +322,9 @@ export async function POST(req) {
         [itemCode]
       );
       if (summary.length > 0) {
-        const prevTotal = summary[0].total_quantity;
+        const prevTotal = Number(summary[0].total_quantity || 0);
         const newTotal = Math.max(prevTotal - quantity, 0);
-        const prev = summary[0][locationColumn];
+        const prev = pickRowColumn(summary[0], locationColumn);
         const newv = Math.max(prev - quantity, 0);
         await conn.execute(
           `UPDATE product_stock_summary 
@@ -356,15 +363,19 @@ export async function POST(req) {
 
           let totalDB = 0;
           let locationDB = 0;
+          let delhiDB = 0;
+          let southDB = 0;
           if (fallbackStock.length > 0) {
-            totalDB = fallbackStock[0].total_quantity;
-            locationDB = fallbackStock[0][locationColumn];
+            totalDB = Number(fallbackStock[0].total_quantity || 0);
+            locationDB = pickRowColumn(fallbackStock[0], locationColumn);
+            delhiDB = pickRowColumn(fallbackStock[0], "Delhi");
+            southDB = pickRowColumn(fallbackStock[0], "South");
           }
 
           const newLocationStock = locationDB - quantity;
           const totalD = totalDB - quantity;
-          const delhiD = locationColumnLower === "delhi" ? newLocationStock : locationDB;
-          const southD = locationColumnLower === "south" ? newLocationStock : locationDB;
+          const delhiD = isDelhi ? newLocationStock : delhiDB;
+          const southD = isDelhi ? southDB : newLocationStock;
 
           await conn.execute(
             `INSERT INTO product_stock
@@ -393,9 +404,9 @@ export async function POST(req) {
           );
 
           if (fallbackStock.length > 0) {
-            const prevTotal = fallbackStock[0].total_quantity;
+            const prevTotal = Number(fallbackStock[0].total_quantity || 0);
             const newTotal = Math.max(prevTotal - quantity, 0);
-            const prev = fallbackStock[0][locationColumn];
+            const prev = pickRowColumn(fallbackStock[0], locationColumn);
             const newv = Math.max(prev - quantity, 0);
             await conn.execute(
               `UPDATE product_stock_summary 
@@ -419,17 +430,19 @@ export async function POST(req) {
 
         let totalDB = 0;
         let locationDB = 0;
+        let delhiDB = 0;
+        let southDB = 0;
         if (rows.length > 0) {
-          totalDB = rows[0].total_quantity;
-          locationDB = rows[0][locationColumn];
+          totalDB = Number(rows[0].total_quantity || 0);
+          locationDB = pickRowColumn(rows[0], locationColumn);
+          delhiDB = pickRowColumn(rows[0], "Delhi");
+          southDB = pickRowColumn(rows[0], "South");
         }
 
-        let newLocationStock = locationDB - quantity;
+        const newLocationStock = locationDB - quantity;
         const totalD = totalDB - quantity;
-
-        // Calculate both delhi and south for the INSERT (lowercase for stock_list table)
-        let delhiD = locationColumnLower === "delhi" ? newLocationStock : locationDB;
-        let southD = locationColumnLower === "south" ? newLocationStock : locationDB;
+        const delhiD = isDelhi ? newLocationStock : delhiDB;
+        const southD = isDelhi ? southDB : newLocationStock;
 
         await conn.execute(
           `INSERT INTO stock_list
@@ -460,9 +473,9 @@ export async function POST(req) {
           [spareId]
         );
         if (summary.length > 0) {
-          const prevTotal = summary[0].total_quantity;
+          const prevTotal = Number(summary[0].total_quantity || 0);
           const newTotal = Math.max(prevTotal - quantity, 0);
-          const prev = summary[0][locationColumn];
+          const prev = pickRowColumn(summary[0], locationColumn);
           const newv = Math.max(prev - quantity, 0);
           await conn.execute(
             `UPDATE stock_summary 
