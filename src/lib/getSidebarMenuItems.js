@@ -75,10 +75,22 @@ function transformMenuItemPaths(item, roleKey) {
     }
   }
 
-  if (roleUpper === "ACCOUNTANT") {
+  const accountsProcurementPaths = {
+    "purchase-products": "/accounts-dashboard/purchase-products",
+    "delivery-challan": "/accounts-dashboard/delivery-challan",
+  };
+
+  if (roleUpper === "ADMIN") {
+    if (item.moduleKey && accountsProcurementPaths[item.moduleKey]) {
+      return { ...item, path: accountsProcurementPaths[item.moduleKey] };
+    }
+  }
+
+  if (roleUpper === "ACCOUNTANT" || roleUpper.includes("ACCOUNTANT")) {
     const accountantModulePaths = {
       "client-expenses": "/accounts-dashboard/client-expenses/cards",
       "delivery-challan": "/accounts-dashboard/delivery-challan",
+      "purchase-products": "/accounts-dashboard/purchase-products",
       statements: "/accounts-dashboard/statements",
       "bank-management": "/accounts-dashboard/bank-masters",
       ledger: "/accounts-dashboard/ledger",

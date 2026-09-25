@@ -43,7 +43,7 @@ export const MODULE_KEY_TO_URL = {
 
   // Products & Inventory
   "parties": "/admin-dashboard/parties",
-  "purchase-products": "/admin-dashboard/purchase-products",
+  "purchase-products": "/accounts-dashboard/purchase-products",
   "product-stock": "/admin-dashboard/product-stock",
   "product-accessories": "/admin-dashboard/product-accessories",
   "purchase-direct-in": "/admin-dashboard/purchase/direct-in",
@@ -77,7 +77,7 @@ export const MODULE_KEY_TO_URL = {
   "view-expenses": "/admin-dashboard/all-expenses",
   "dd-management": "/admin-dashboard/dd-management",
   "other-income": "/admin-dashboard/other-income",
-  "delivery-challan": "/admin-dashboard/delivery-challan",
+  "delivery-challan": "/accounts-dashboard/delivery-challan",
   "statements": "/admin-dashboard/statements",
   "salary-slips": "/empcrm/admin-dashboard/salary-slips",
   "ledger": "/admin-dashboard/ledger",

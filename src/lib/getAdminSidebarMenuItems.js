@@ -546,13 +546,6 @@ const allMenuItems = [
         roles: ["ALL"],
         icon: "Users",
       },
-      {
-        path: "/admin-dashboard/purchase-products",
-        name: "Purchase Billings",
-        accessKey: "purchase-products",
-        roles: ["ALL"],
-        icon: "ShoppingBag",
-      },
           {
             path: "/admin-dashboard/purchase/purchases",
             name: "Purchases",
@@ -661,13 +654,6 @@ const allMenuItems = [
         path: "/admin-dashboard/client-expenses",
         name: "Main Expenses",
         accessKey: "client-expenses",
-        roles: ["ALL"],
-        icon: "Receipt",
-      },
-      {
-        path: "/admin-dashboard/delivery-challan",
-        name: "Delivery Challan",
-        accessKey: "delivery-challan",
         roles: ["ALL"],
         icon: "Receipt",
       },

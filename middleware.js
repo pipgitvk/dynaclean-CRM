@@ -121,7 +121,17 @@ export async function middleware(request) {
         if (isJwtAccountingRole(role)) {
           return NextResponse.next();
         }
-        // If accountant role not found, fall through to generic checks
+        const adminAccountsPrefixes = [
+          "/accounts-dashboard/purchase-products",
+          "/accounts-dashboard/delivery-challan",
+        ];
+        if (
+          roleKey === "ADMIN" &&
+          adminAccountsPrefixes.some((p) => pathname.startsWith(p))
+        ) {
+          return NextResponse.next();
+        }
+        // If accountant/admin role not found, fall through to generic checks
       }
 
       // Prospects module is used by SALES roles too.
@@ -136,7 +146,6 @@ export async function middleware(request) {
         "/admin-dashboard/client-expenses",
         "/admin-dashboard/statements",
         "/admin-dashboard/all-expenses",
-        "/admin-dashboard/delivery-challan",
         "/admin-dashboard/credit-notes",
         "/admin-dashboard/ledger",
         "/admin-dashboard/bank-masters",
@@ -145,6 +154,25 @@ export async function middleware(request) {
       if (ACCOUNTANT_ADMIN_PREFIXES.some((p) => pathname.startsWith(p))) {
         if (isJwtAccountingRole(role) || role === "ADMIN") {
           return NextResponse.next();
+        }
+      }
+
+      if (roleKey === "ADMIN") {
+        if (pathname.startsWith("/admin-dashboard/purchase-products")) {
+          const dest = new URL(
+            pathname.replace("/admin-dashboard", "/accounts-dashboard"),
+            request.url,
+          );
+          dest.search = request.nextUrl.search;
+          return NextResponse.redirect(dest);
+        }
+        if (pathname.startsWith("/admin-dashboard/delivery-challan")) {
+          const dest = new URL(
+            pathname.replace("/admin-dashboard", "/accounts-dashboard"),
+            request.url,
+          );
+          dest.search = request.nextUrl.search;
+          return NextResponse.redirect(dest);
         }
       }
 
