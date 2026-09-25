@@ -1059,6 +1059,23 @@ export default function OrderTable({ orders, userRole }) {
     );
   }, [ordersForStatCards]);
 
+  const rejectedOrderStats = useMemo(() => {
+    return filteredOrders.reduce(
+      (acc, order) => {
+        if (order.is_cancelled) return acc;
+        const approval = (order.approval_status || "")
+          .toString()
+          .trim()
+          .toLowerCase();
+        if (approval !== "rejected") return acc;
+        acc.rejected += 1;
+        acc.rejectedAmount += getPaymentColumnAmount(order);
+        return acc;
+      },
+      { rejected: 0, rejectedAmount: 0 },
+    );
+  }, [filteredOrders]);
+
   const activeStatCard = useMemo(() => {
     if (paymentStatusFilter === "paid") return "paid";
     if (paymentStatusFilter === "unpaid") return "unpaid";
@@ -1267,7 +1284,7 @@ export default function OrderTable({ orders, userRole }) {
   const statCards = [
     {
       key: "total",
-      label: "Total",
+      label: "Total-(Taxable)",
       value: orderStats.total,
       amount: orderStats.totalAmount,
       icon: Package,
@@ -1293,7 +1310,7 @@ export default function OrderTable({ orders, userRole }) {
     },
     {
       key: "pending",
-      label: "Pending",
+      label: "Pending approval",
       value: orderStats.pending,
       amount: orderStats.pendingAmount,
       icon: AlertCircle,
@@ -1356,10 +1373,20 @@ export default function OrderTable({ orders, userRole }) {
       iconBg: "bg-orange-200",
       iconColor: "text-orange-700",
     },
+    {
+      key: "rejected",
+      label: "Rejected",
+      value: rejectedOrderStats.rejected,
+      amount: rejectedOrderStats.rejectedAmount,
+      icon: XCircle,
+      border: "border-red-200",
+      bg: "bg-gradient-to-br from-red-50 to-white",
+      labelColor: "text-red-700",
+      valueColor: "text-red-800",
+      iconBg: "bg-red-200",
+      iconColor: "text-red-700",
+    },
   ];
-
-  const leftStatCards = [...statCards.slice(0, 3), statCards[6]];
-  const rightStatCards = statCards.slice(3, 6);
 
   const renderStatCard = (card) => {
     const Icon = card.icon;
@@ -1369,28 +1396,25 @@ export default function OrderTable({ orders, userRole }) {
         key={card.key}
         type="button"
         onClick={() => handleStatCardClick(card.key)}
-        className={`w-full rounded-xl border ${card.border} ${card.bg} shadow-sm p-3 text-left transition-all hover:shadow-md ${
+        className={`w-full rounded-lg border ${card.border} ${card.bg} shadow-sm p-2 text-left transition-all hover:shadow-md ${
           isActive ? "ring-2 ring-blue-500 ring-offset-1 shadow-md" : ""
         }`}
       >
-        <div className="flex items-start justify-between gap-2">
+        <div className="flex items-start justify-between gap-1.5">
           <div className="min-w-0">
-            <p className={`text-[11px] font-semibold uppercase tracking-wide ${card.labelColor}`}>
+            <p className={`text-[10px] font-semibold uppercase tracking-wide leading-tight ${card.labelColor}`}>
               {card.label}
             </p>
-            <p className={`text-2xl font-bold tabular-nums mt-1 ${card.valueColor}`}>
-              {card.value.toLocaleString("en-IN")}
-            </p>
-            <p className={`text-[11px] font-semibold tabular-nums mt-1 ${card.labelColor}`}>
-              ₹{card.amount.toLocaleString("en-IN", {
+            <p className={`text-lg font-bold tabular-nums mt-0.5 ${card.valueColor}`}>
+              ₹{(Number(card.amount) || 0).toLocaleString("en-IN", {
                 minimumFractionDigits: 0,
                 maximumFractionDigits: 0,
               })}
             </p>
-            <p className="text-[10px] text-gray-500 mt-0.5">Taxable (excl. GST)</p>
+          
           </div>
-          <div className={`${card.iconBg} p-2 rounded-lg shrink-0`}>
-            <Icon size={18} className={card.iconColor} />
+          <div className={`${card.iconBg} p-1.5 rounded-md shrink-0`}>
+            <Icon size={14} className={card.iconColor} />
           </div>
         </div>
       </button>
@@ -1399,13 +1423,8 @@ export default function OrderTable({ orders, userRole }) {
 
   const renderPieChart = () => (
     <div className="rounded-xl border border-slate-200 bg-white shadow-sm p-4 h-full flex flex-col">
-      <div className="mb-3 flex flex-col gap-1">
+      <div className="mb-3">
         <p className="text-sm font-semibold text-gray-800">Order Distribution</p>
-        <p className="text-xs text-gray-500">
-          {orderStats.total.toLocaleString("en-IN")} orders
-          {dateFrom || dateTo ? ` (${dateFrom || "…"} to ${dateTo || "…"})` : ""}
-        </p>
-        <p className="text-xs text-gray-400">Click slice to filter</p>
       </div>
       <div className="flex-1 min-h-[220px] lg:min-h-0">
         {orderStats.total > 0 && orderPieChartData.labels.length > 0 ? (
@@ -1426,14 +1445,10 @@ export default function OrderTable({ orders, userRole }) {
         {statCards.map((card) => renderStatCard(card))}
       </div>
 
-      {/* Large screen: 4 left | 3 right | pie chart */}
-      <div className="hidden lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.35fr)] gap-3 items-stretch">
-        <div className="flex flex-col gap-2">
-          {leftStatCards.map((card) => renderStatCard(card))}
-        </div>
-
-        <div className="flex flex-col gap-2">
-          {rightStatCards.map((card) => renderStatCard(card))}
+      {/* Large screen: 3 cards per row | pie chart */}
+      <div className="hidden lg:grid lg:grid-cols-[minmax(0,2fr)_minmax(0,1.35fr)] gap-3 items-stretch">
+        <div className="grid grid-cols-3 gap-2 content-start">
+          {statCards.map((card) => renderStatCard(card))}
         </div>
 
         {renderPieChart()}
