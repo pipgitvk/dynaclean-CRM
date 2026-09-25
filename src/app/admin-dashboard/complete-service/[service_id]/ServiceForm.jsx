@@ -70,6 +70,8 @@ const FormInput = ({
 );
 
 export default function ServiceForm({ service }) {
+  const isNewReport = Boolean(service.isNewReport);
+  const isReportLocked = service.status === "COMPLETED" && !isNewReport;
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -100,21 +102,31 @@ export default function ServiceForm({ service }) {
   const [formData, setFormData] = useState({
     service_id: service.service_id,
     serial_number: service.serial_number,
-    status: service.status || "PENDING",
-    completion_remark: service.completion_remark || "",
-    completed_date: service.completed_date || dayjs().format("YYYY-MM-DD"),
-    checklist: service.checklist?.split(",") || [],
-    nature_of_complaint: service.nature_of_complaint || "",
-    observation: service.observation || "",
-    action_taken: service.action_taken || "",
-    service_rating: service.service_rating || "",
-    customer_feedback: service.customer_feedback || "",
-    authorized_person_name: service.authorized_person_name || "",
-    authorized_person_designation: service.authorized_person_designation || "",
-    authorized_person_mobile: service.authorized_person_mobile || "",
-    customer_name: service.customer_name || "",
-    customer_designation: service.customer_designation || "",
-    customer_mobile: service.customer_mobile || "",
+    status: isNewReport ? "SELECT" : service.status || "PENDING",
+    completion_remark: isNewReport ? "" : service.completion_remark || "",
+    completed_date: isNewReport
+      ? dayjs().format("YYYY-MM-DD")
+      : service.completed_date || dayjs().format("YYYY-MM-DD"),
+    checklist: isNewReport ? [] : service.checklist?.split(",") || [],
+    nature_of_complaint: isNewReport
+      ? ""
+      : service.nature_of_complaint || service.nature_of_complaints || "",
+    observation: isNewReport ? "" : service.observation || "",
+    action_taken: isNewReport ? "" : service.action_taken || "",
+    service_rating: isNewReport ? "" : service.service_rating || "",
+    customer_feedback: isNewReport ? "" : service.customer_feedback || "",
+    authorized_person_name: isNewReport
+      ? ""
+      : service.authorized_person_name || "",
+    authorized_person_designation: isNewReport
+      ? ""
+      : service.authorized_person_designation || "",
+    authorized_person_mobile: isNewReport
+      ? ""
+      : service.authorized_person_mobile || "",
+    customer_name: isNewReport ? "" : service.customer_name || "",
+    customer_designation: isNewReport ? "" : service.customer_designation || "",
+    customer_mobile: isNewReport ? "" : service.customer_mobile || "",
     // NEW: Fields for completion status
     completion_engineer_name: "",
     completion_engineer_designation: "",
@@ -129,12 +141,14 @@ export default function ServiceForm({ service }) {
   });
 
   const [spareParts, setSpareParts] = useState(
-    service.spare_replaced && service.spare_to_be_replaced
-      ? service.spare_replaced.split(",").map((replaced, index) => ({
-          replaced,
-          tobereplaced: service.spare_to_be_replaced.split(",")[index] || "",
-        }))
-      : [{ replaced: "", tobereplaced: "" }]
+    isNewReport
+      ? [{ replaced: "", tobereplaced: "" }]
+      : service.spare_replaced && service.spare_to_be_replaced
+        ? service.spare_replaced.split(",").map((replaced, index) => ({
+            replaced,
+            tobereplaced: service.spare_to_be_replaced.split(",")[index] || "",
+          }))
+        : [{ replaced: "", tobereplaced: "" }]
   );
 
   const [files, setFiles] = useState({});
@@ -373,6 +387,12 @@ export default function ServiceForm({ service }) {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+
+    if (formData.status === "SELECT" || !formData.status) {
+      alert("Please select a status");
+      return;
+    }
+
     setIsLoading(true);
 
     const data = new FormData();
@@ -736,10 +756,22 @@ export default function ServiceForm({ service }) {
               className="border p-2 w-full rounded text-sm"
               value={formData.status}
               onChange={handleChange}
+              required
             >
-              <option value="PENDING">PENDING</option>
-              <option value="PENDING FOR SPARES">PENDING FOR SPARES</option>
-              <option value="COMPLETED">COMPLETED</option>
+              {isNewReport ? (
+                <>
+                  <option value="SELECT">SELECT</option>
+                  <option value="PENDING">PENDING</option>
+                  <option value="PENDING FOR SPARES">PENDING FOR SPARES</option>
+                  <option value="COMPLETED">COMPLETED</option>
+                </>
+              ) : (
+                <>
+                  <option value="PENDING">PENDING</option>
+                  <option value="PENDING FOR SPARES">PENDING FOR SPARES</option>
+                  <option value="COMPLETED">COMPLETED</option>
+                </>
+              )}
             </select>
           </div>
 
@@ -878,7 +910,7 @@ export default function ServiceForm({ service }) {
                     name={`checklist_${item}`}
                     checked={formData.checklist?.includes(item)}
                     onChange={handleChecklistChange}
-                    disabled={service.status === "COMPLETED"}
+                    disabled={isReportLocked}
                     className="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                   />
                   {item}
@@ -896,7 +928,7 @@ export default function ServiceForm({ service }) {
                 name="nature_of_complaint"
                 value={formData.nature_of_complaint}
                 onChange={handleChange}
-                readOnly={service.status === "COMPLETED"}
+                readOnly={isReportLocked}
                 required
               />
               <FormInput
@@ -904,7 +936,7 @@ export default function ServiceForm({ service }) {
                 name="observation"
                 value={formData.observation}
                 onChange={handleChange}
-                readOnly={service.status === "COMPLETED"}
+                readOnly={isReportLocked}
                 required
               />
               <FormInput
@@ -912,7 +944,7 @@ export default function ServiceForm({ service }) {
                 name="action_taken"
                 value={formData.action_taken}
                 onChange={handleChange}
-                readOnly={service.status === "COMPLETED"}
+                readOnly={isReportLocked}
                 required
               />
             </div>
@@ -949,7 +981,7 @@ export default function ServiceForm({ service }) {
                       data-index={index}
                       value={part.replaced}
                       onChange={(e) => handleSparePartChange(index, e)}
-                      readOnly={service.status === "COMPLETED"}
+                      readOnly={isReportLocked}
                       className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 disabled:bg-gray-100 text-sm"
                     />
                   </div>
@@ -968,7 +1000,7 @@ export default function ServiceForm({ service }) {
                       data-index={index}
                       value={part.tobereplaced}
                       onChange={(e) => handleSparePartChange(index, e)}
-                      readOnly={service.status === "COMPLETED"}
+                      readOnly={isReportLocked}
                       className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 disabled:bg-gray-100 text-sm"
                     />
                   </div>
@@ -1119,7 +1151,7 @@ export default function ServiceForm({ service }) {
 
             {/* end of new sectiomn */}
 
-            {service.service_type !== "INSTALLATION" && service.status !== "COMPLETED" && (
+            {service.service_type !== "INSTALLATION" && !isReportLocked && (
 
             <div className="hidden md:block overflow-x-auto">
               {/* Traditional table layout for medium and larger screens */}
@@ -1150,7 +1182,7 @@ export default function ServiceForm({ service }) {
                           data-index={index}
                           value={part.replaced}
                           onChange={(e) => handleSparePartChange(index, e)}
-                          readOnly={service.status === "COMPLETED"}
+                          readOnly={isReportLocked}
                           className="w-full p-2 border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 disabled:bg-gray-100 text-sm"
                         />
                       </td>
@@ -1161,7 +1193,7 @@ export default function ServiceForm({ service }) {
                           data-index={index}
                           value={part.tobereplaced}
                           onChange={(e) => handleSparePartChange(index, e)}
-                          readOnly={service.status === "COMPLETED"}
+                          readOnly={isReportLocked}
                           className="w-full p-2 border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 disabled:bg-gray-100 text-sm"
                         />
                       </td>
@@ -1172,7 +1204,7 @@ export default function ServiceForm({ service }) {
             </div>
             )}
 
-            {service.service_type !== "INSTALLATION" && service.status !== "COMPLETED" && (
+            {service.service_type !== "INSTALLATION" && !isReportLocked && (
               <button
                 type="button"
                 onClick={addSparePartRow}
@@ -1204,7 +1236,7 @@ export default function ServiceForm({ service }) {
                     value={rating}
                     checked={formData.service_rating === rating}
                     onChange={handleChange}
-                    disabled={service.status === "COMPLETED"}
+                    disabled={isReportLocked}
                     className="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500"
                   />
                   {rating.replace(/([A-Z])/g, " $1").trim()}
@@ -1217,7 +1249,7 @@ export default function ServiceForm({ service }) {
             name="customer_feedback"
             value={formData.customer_feedback}
             onChange={handleChange}
-            readOnly={service.status === "COMPLETED"}
+            readOnly={isReportLocked}
             required
             className="mt-4"
           />
@@ -1262,7 +1294,7 @@ export default function ServiceForm({ service }) {
                     name="authorized_person_name"
                     value={formData.authorized_person_name}
                     onChange={handleChange}
-                    readOnly={service.status === "COMPLETED"}
+                    readOnly={isReportLocked}
                     required
                   />
                   <FormInput
@@ -1270,7 +1302,7 @@ export default function ServiceForm({ service }) {
                     name="authorized_person_designation"
                     value={formData.authorized_person_designation}
                     onChange={handleChange}
-                    readOnly={service.status === "COMPLETED"}
+                    readOnly={isReportLocked}
                     required
                   />
                   <FormInput
@@ -1278,7 +1310,7 @@ export default function ServiceForm({ service }) {
                     name="authorized_person_mobile"
                     value={formData.authorized_person_mobile}
                     onChange={handleChange}
-                    readOnly={service.status === "COMPLETED"}
+                    readOnly={isReportLocked}
                     required
                   />
                 </div>
@@ -1320,7 +1352,7 @@ export default function ServiceForm({ service }) {
                     name="customer_name"
                     value={formData.customer_name}
                     onChange={handleChange}
-                    readOnly={service.status === "COMPLETED"}
+                    readOnly={isReportLocked}
                     required
                   />
                   <FormInput
@@ -1328,7 +1360,7 @@ export default function ServiceForm({ service }) {
                     name="customer_designation"
                     value={formData.customer_designation}
                     onChange={handleChange}
-                    readOnly={service.status === "COMPLETED"}
+                    readOnly={isReportLocked}
                     required
                   />
                   <FormInput
@@ -1336,7 +1368,7 @@ export default function ServiceForm({ service }) {
                     name="customer_mobile"
                     value={formData.customer_mobile}
                     onChange={handleChange}
-                    readOnly={service.status === "COMPLETED"}
+                    readOnly={isReportLocked}
                     required
                   />
                 </div>

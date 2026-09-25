@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import dayjs from "dayjs";
 import { generateServiceReportPDF, downloadPDF } from "@/utils/pdfGenerator";
 import { isInstallationReportLayout } from "@/utils/reportLayout";
@@ -178,6 +179,8 @@ export default function ViewServiceReport({ params }) {
   const autoPrintTriggered = useRef(false);
 
   const { service_id } = React.use(params);
+  const searchParams = useSearchParams();
+  const reportId = searchParams.get("reportId");
 
   const preImages = parseImageList(report?.pre_completion);
   const postImages = parseImageList(report?.after_completion);
@@ -195,10 +198,10 @@ export default function ViewServiceReport({ params }) {
   useEffect(() => {
     const fetchReport = async () => {
       try {
-        const res = await fetch(
-          `/api/service-records/${service_id}`,
-          { cache: "no-store" }
-        );
+        const apiUrl = reportId
+          ? `/api/service-records/${service_id}?reportId=${reportId}`
+          : `/api/service-records/${service_id}`;
+        const res = await fetch(apiUrl, { cache: "no-store" });
         const data = await res.json();
         setReport(data.record || {});
         setProduct(data.product || {});
@@ -216,7 +219,7 @@ export default function ViewServiceReport({ params }) {
     };
 
     fetchReport();
-  }, [service_id]);
+  }, [service_id, reportId]);
 
   const transformTraineeData = (installData) => {
     const names = installData.trainee_names
@@ -339,6 +342,15 @@ export default function ViewServiceReport({ params }) {
 
   const confirmPrint = () => {
     handlePrint(printMode === "withImages");
+  };
+
+  const handleImagesUpdated = (pre, after) => {
+    setReport((prev) => ({
+      ...prev,
+      pre_completion: pre,
+      after_completion: after,
+    }));
+    setPrintMode("withImages");
   };
 
   useEffect(() => {
@@ -595,7 +607,10 @@ export default function ViewServiceReport({ params }) {
                       report.completed_date
                   )}
                 />
-                <ReadRow label="Report ID" value={report.service_id} />
+                <ReadRow
+                  label="Report ID"
+                  value={report.report_db_id || reportId || "—"}
+                />
                 <ReadRow label="Customer Name" value={product.customer_name} />
                 <ReadRow label="Address" value={product.customer_address} />
                 <ReadRow
@@ -1100,6 +1115,16 @@ export default function ViewServiceReport({ params }) {
           hasPhotos={hasPhotos}
           onConfirm={confirmPrint}
           isPrinting={isPrinting}
+          reportId={report?.report_db_id || reportId}
+          reportDate={
+            report?.completed_date
+              ? formatDate(report.completed_date)
+              : ""
+          }
+          serviceId={service_id}
+          preCompletion={report?.pre_completion}
+          afterCompletion={report?.after_completion}
+          onImagesUpdated={handleImagesUpdated}
         />
       </div>
     </div>

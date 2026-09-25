@@ -8,7 +8,18 @@ import ServiceAttachmentLink from "./ServiceAttachmentLink";
 import ServiceReportPrintButton from "./ServiceReportPrintButton";
 import ServiceCompletionDateCell from "./ServiceCompletionDateCell";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import {
+  Eye,
+  ExternalLink,
+  FilePlus,
+  RefreshCw,
+  Upload,
+  UserPlus,
+} from "lucide-react";
 import { useWarrantyProductFollowup } from "@/components/warranty/WarrantyProductFollowupControls";
+
+const actionIconClass =
+  "inline-flex items-center justify-center p-1.5 rounded-md text-white transition-colors";
 
 /** warranty_products JOIN can return multiple rows per service_id — keep one row per service. */
 function dedupeServiceRecords(rows) {
@@ -66,10 +77,179 @@ export default function ServiceTable({ serviceRecords, role }) {
     return role?.toLowerCase() === "superadmin" ? "admin-dashboard" : "user-dashboard";
   })();
 
-  const canViewDigitalReport = (record) =>
-    record.status?.toUpperCase() === "COMPLETED" &&
-    (Number(record.view_status) === 1 ||
-      record.installation_report === "uploadFO");
+  const parseReportIds = (reportIds) =>
+    String(reportIds || "")
+      .split(",")
+      .map((id) => id.trim())
+      .filter(Boolean);
+
+  const getReportDateById = (record, reportId) => {
+    const ids = parseReportIds(record.report_ids);
+    const dates = String(record.report_dates || "")
+      .split(",")
+      .map((date) => date.trim());
+    const index = ids.indexOf(String(reportId));
+    return index >= 0 ? dates[index] || "" : "";
+  };
+
+  const handleRecordImagesUpdated = (serviceId, preCompletion, afterCompletion) => {
+    setRecords((prev) =>
+      prev.map((record) =>
+        record.service_id === serviceId
+          ? {
+              ...record,
+              pre_completion: preCompletion,
+              after_completion: afterCompletion,
+            }
+          : record
+      )
+    );
+    setSelectedService((prev) =>
+      prev?.service_id === serviceId
+        ? {
+            ...prev,
+            pre_completion: preCompletion,
+            after_completion: afterCompletion,
+          }
+        : prev
+    );
+  };
+
+  const renderReportLinks = (record) => {
+    const ids = parseReportIds(record.report_ids);
+    if (!ids.length) {
+      return <span className="text-gray-400">—</span>;
+    }
+    return (
+      <div className="flex flex-wrap gap-x-2 gap-y-1">
+        {ids.map((id, index) => (
+          <span key={id}>
+            <ServiceReportPrintButton
+              serviceId={record.service_id}
+              reportId={id}
+              reportDate={getReportDateById(record, id)}
+              dashboardPath={dashboardPath}
+              preCompletion={record.pre_completion}
+              afterCompletion={record.after_completion}
+              onRecordImagesUpdated={(pre, after) =>
+                handleRecordImagesUpdated(record.service_id, pre, after)
+              }
+              label={id}
+              variant="link"
+            />
+            {index < ids.length - 1 ? "," : ""}
+          </span>
+        ))}
+      </div>
+    );
+  };
+
+  const renderRowActionIcons = (record) => (
+    <>
+      {record.status?.toUpperCase() !== "COMPLETED" &&
+        (role === "ADMIN" ||
+          role === "SERVICE HEAD" ||
+          role === "SERVICE SUPPORT") && (
+          <button
+            type="button"
+            onClick={() => openAssignModal(record)}
+            title="Assign"
+            className={`${actionIconClass} bg-indigo-500 hover:bg-indigo-600`}
+          >
+            <UserPlus className="w-4 h-4" />
+          </button>
+        )}
+      <Link
+        href={`/${dashboardPath}/complete-service/${record.service_id}`}
+        title="+ Make Report"
+        className={`${actionIconClass} bg-purple-500 hover:bg-purple-600`}
+      >
+        <FilePlus className="w-4 h-4" />
+      </Link>
+      {record.status?.toUpperCase() === "COMPLETED" &&
+        (record.final_report_path ? (
+          <a
+            href={
+              record.final_report_path.startsWith("http")
+                ? record.final_report_path
+                : `https://service.dynacleanindustries.com/${record.final_report_path}`
+            }
+            target="_blank"
+            rel="noopener noreferrer"
+            title="View Report"
+            className={`${actionIconClass} bg-green-700 hover:bg-green-800`}
+          >
+            <ExternalLink className="w-4 h-4" />
+          </a>
+        ) : record.installation_report &&
+          record.installation_report.includes(",") ? (
+          record.installation_report
+            .split(",")
+            .filter(Boolean)
+            .map((file, index) => (
+              <ServiceAttachmentLink
+                key={index}
+                filePath={file.trim()}
+                fileName={`Report ${index + 1}`}
+                iconOnly
+              />
+            ))
+        ) : record.installation_report &&
+          record.installation_report !== "uploadFO" ? (
+          <ServiceAttachmentLink
+            filePath={
+              record.installation_report || record.attachments?.split(",")[0]
+            }
+            fileName="View Report"
+            iconOnly
+          />
+        ) : (
+          <Link
+            href={`/${dashboardPath}/update-service/${record.service_id}`}
+            title="Generate/Upload Report"
+            className={`${actionIconClass} bg-purple-500 hover:bg-purple-600`}
+          >
+            <Upload className="w-4 h-4" />
+          </Link>
+        ))}
+      {(role === "ADMIN" ||
+        role === "SUPERADMIN" ||
+        role === "TEAM LEADER" ||
+        role === "SERVICE HEAD" ||
+        role === "SERVICE SUPPORT") &&
+        record.status?.toUpperCase() !== "COMPLETED" && (
+          <button
+            type="button"
+            onClick={() => openStatusModal(record)}
+            title="Change Status"
+            className={`${actionIconClass} bg-yellow-600 hover:bg-yellow-700`}
+          >
+            <RefreshCw className="w-4 h-4" />
+          </button>
+        )}
+      <button
+        type="button"
+        onClick={() => openDetailsModal(record)}
+        title="View Details"
+        className={`${actionIconClass} bg-gray-600 hover:bg-gray-700`}
+      >
+        <Eye className="w-4 h-4" />
+      </button>
+    </>
+  );
+
+  const renderReportCell = (record) => (
+    <div className="min-w-[80px]">
+      {renderReportLinks(record)}
+      <div
+        className="flex flex-wrap items-center gap-1 mt-1 md:opacity-0 md:invisible md:group-hover:opacity-100 md:group-hover:visible transition-all duration-150"
+      >
+        {renderRowActionIcons(record)}
+      </div>
+    </div>
+  );
+
+  const tableColSpan = role === "ADMIN" ? 12 : 11;
 
   // Helper: format dates safely
   const formatDate = (value) => {
@@ -514,11 +694,11 @@ export default function ServiceTable({ serviceRecords, role }) {
         {/* Table (visible on larger screens) */}
         <div className="hidden md:block overflow-x-auto overflow-y-auto max-h-[82vh] bg-white rounded-lg border border-gray-200 shadow-sm">
           <table className="min-w-full text-sm text-gray-700">
-            <thead className="bg-blue-600 text-white sticky top-0">
+            <thead className="sticky top-0 z-20 bg-blue-600 text-white shadow-sm [&_th]:bg-blue-600">
               <tr>
                 <th
                   onClick={() => handleSort("service_id")}
-                  className="px-6 py-3 text-left cursor-pointer"
+                  className="bg-blue-600 px-6 py-3 text-left cursor-pointer"
                 >
                   Service ID {getSortIndicator("service_id")}
                 </th>
@@ -577,19 +757,17 @@ export default function ServiceTable({ serviceRecords, role }) {
                 >
                   Complete Date {getSortIndicator("completed_date")}
                 </th>
+                <th className="px-6 py-3 text-left">Reports</th>
                 {role === "ADMIN" && (
                   <th className="px-6 py-3 text-left">Company Cost</th>
                 )}
-                <th className="px-6 py-3 text-left text-sm font-medium">
-                  Actions
-                </th>
               </tr>
             </thead>
             <tbody>
               {uniqueRecords.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={role === "ADMIN" ? 12 : 11}
+                    colSpan={tableColSpan}
                     className="px-6 py-3 text-center text-gray-500"
                   >
                     No service records found.
@@ -609,7 +787,7 @@ export default function ServiceTable({ serviceRecords, role }) {
                   return (
                     <tr
                       key={record.service_id}
-                      className={`hover:bg-blue-50 transition-all duration-200 ${rowBackgroundColor}`}
+                      className={`group hover:bg-blue-50 transition-all duration-200 ${rowBackgroundColor}`}
                     >
                       <td className="px-6 py-3">
                         <ProductFollowupIcons
@@ -691,7 +869,7 @@ export default function ServiceTable({ serviceRecords, role }) {
                             )}
                         </div>
                       </td>
-                      <td className="relative overflow-visible px-6 py-3 align-top">
+                      <td className="px-6 py-3 align-top overflow-hidden">
                         <ServiceCompletionDateCell
                           completedDate={record.completed_date}
                           preCompletion={record.pre_completion}
@@ -699,6 +877,7 @@ export default function ServiceTable({ serviceRecords, role }) {
                           formatDate={formatDate}
                         />
                       </td>
+                      <td className="px-6 py-3">{renderReportCell(record)}</td>
 
                       {role === "ADMIN" && (
                         <td className="px-6 py-3">
@@ -714,104 +893,6 @@ export default function ServiceTable({ serviceRecords, role }) {
                           )}
                         </td>
                       )}
-
-                      <td className="px-6 py-3 text-right text-sm font-medium">
-                        <div className="flex flex-col space-y-2">
-                          {record.status?.toUpperCase() !== "COMPLETED" ? (
-                            <>
-                              {(role === "ADMIN" ||
-                                role === "SERVICE HEAD" ||
-                                role === "SERVICE SUPPORT") && (
-                                <button
-                                  onClick={() => openAssignModal(record)}
-                                  className="inline-block px-3 py-1 text-sm bg-indigo-500 text-white rounded-md hover:bg-indigo-600 text-center"
-                                >
-                                  Assign
-                                </button>
-                              )}
-                              <Link
-                                href={`/${dashboardPath}/complete-service/${record.service_id}`}
-                                className="inline-block px-3 py-1 text-sm bg-purple-500 text-white rounded-md hover:bg-purple-600 text-center"
-                              >
-                                Complete Service
-                              </Link>
-                            </>
-                          ) : canViewDigitalReport(record) ? (
-                            <>
-                              <a
-                                href={`/${dashboardPath}/view-service-report/${record.service_id}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-block px-3 py-1 text-sm bg-green-700 text-white rounded-md hover:bg-green-800 text-center"
-                              >
-                                View Report
-                              </a>
-                              <ServiceReportPrintButton
-                                serviceId={record.service_id}
-                                dashboardPath={dashboardPath}
-                                preCompletion={record.pre_completion}
-                                afterCompletion={record.after_completion}
-                              />
-                            </>
-                          ) : record.final_report_path ? (
-                            <a
-                              href={
-                                record.final_report_path.startsWith("http")
-                                  ? record.final_report_path
-                                  : `https://service.dynacleanindustries.com/${record.final_report_path}`
-                              }
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-block px-3 py-1 text-sm bg-green-700 text-white rounded-md hover:bg-green-800 text-center"
-                            >
-                              View Report
-                            </a>
-                          ) : record.installation_report &&
-                            record.installation_report.includes(",") ? (
-                            <div className="flex flex-col space-y-1">
-                              {record.installation_report
-                                .split(",")
-                                .filter(Boolean)
-                                .map((file, index) => (
-                                  <ServiceAttachmentLink
-                                    key={index}
-                                    filePath={file.trim()}
-                                    fileName={`Report ${index + 1}`}
-                                    className="inline-block px-2 py-1 text-xs bg-green-700 text-white rounded-md hover:bg-green-800 text-center"
-                                  />
-                                ))}
-                            </div>
-                          ) : (
-                            <Link
-                              href={`/${dashboardPath}/update-service/${record.service_id}`}
-                              className="inline-block px-3 py-1 text-sm bg-purple-500 text-white rounded-md hover:bg-purple-600 text-center"
-                            >
-                              Generate/Upload Report
-                            </Link>
-                          )}
-
-                          {(role === "ADMIN" ||
-                            role === "SUPERADMIN" ||
-                            role === "TEAM LEADER" ||
-                            role === "SERVICE HEAD" ||
-                            role === "SERVICE SUPPORT") &&
-                            record.status?.toUpperCase() !== "COMPLETED" && (
-                              <button
-                                onClick={() => openStatusModal(record)}
-                                className="inline-block px-3 py-1 text-sm bg-yellow-600 text-white rounded-md hover:bg-yellow-700 text-center"
-                              >
-                                Change Status
-                              </button>
-                            )}
-
-                          <button
-                            onClick={() => openDetailsModal(record)}
-                            className="inline-block px-3 py-1 text-sm bg-gray-600 text-white rounded-md hover:bg-gray-700 text-center"
-                          >
-                            View Details
-                          </button>
-                        </div>
-                      </td>
                     </tr>
                   );
                 })
@@ -880,7 +961,7 @@ export default function ServiceTable({ serviceRecords, role }) {
               return (
                 <div
                   key={record.service_id}
-                  className={`bg-white shadow-md rounded-lg p-4 space-y-2 ${cardBackgroundColor}`}
+                  className={`group bg-white shadow-md rounded-lg p-4 space-y-2 ${cardBackgroundColor}`}
                 >
                   <div className="flex justify-between items-center">
                     <div>
@@ -989,6 +1070,12 @@ export default function ServiceTable({ serviceRecords, role }) {
                       </span>{" "}
                       {record.installed_address}
                     </p>
+                    <div className="text-gray-500 mt-1">
+                      <span className="font-semibold text-gray-700">
+                        Reports:
+                      </span>
+                      <div className="mt-0.5">{renderReportCell(record)}</div>
+                    </div>
                   </div>
                   {role === "ADMIN" && (
                     <div className="border-t border-gray-200 pt-2">
@@ -1009,104 +1096,6 @@ export default function ServiceTable({ serviceRecords, role }) {
                       </p>
                     </div>
                   )}
-                  <div className="flex flex-col space-y-2 mt-4">
-                    {record.status?.toUpperCase() !== "COMPLETED" ? (
-                      <>
-                        {role === "ADMIN" && (
-                          <button
-                            onClick={() => openAssignModal(record)}
-                            className="px-3 py-2 text-sm bg-indigo-500 text-white rounded-md hover:bg-indigo-600 text-center"
-                          >
-                            Assign
-                          </button>
-                        )}
-                        <Link
-                          href={`/${dashboardPath}/complete-service/${record.service_id}`}
-                          className="px-3 py-2 text-sm bg-purple-500 text-white rounded-md hover:bg-purple-600 text-center"
-                        >
-                          Complete Service
-                        </Link>
-                      </>
-                    ) : canViewDigitalReport(record) ? (
-                      <>
-                        <a
-                          href={`/${dashboardPath}/view-service-report/${record.service_id}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="px-3 py-2 text-sm bg-green-700 text-white rounded-md hover:bg-green-800 text-center"
-                        >
-                          View Report
-                        </a>
-                        <ServiceReportPrintButton
-                          serviceId={record.service_id}
-                          dashboardPath={dashboardPath}
-                          preCompletion={record.pre_completion}
-                          afterCompletion={record.after_completion}
-                          className="px-3 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 text-center"
-                        />
-                      </>
-                    ) : record.final_report_path ? (
-                      <a
-                        href={
-                          record.final_report_path.startsWith("http")
-                            ? record.final_report_path
-                            : `https://service.dynacleanindustries.com/${record.final_report_path}`
-                        }
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="px-3 py-2 text-sm bg-green-700 text-white rounded-md hover:bg-green-800 text-center"
-                      >
-                        View Report
-                      </a>
-                    ) : record.installation_report &&
-                      record.installation_report.includes(",") ? (
-                      <div className="flex flex-wrap gap-1">
-                        {record.installation_report
-                          .split(",")
-                          .filter(Boolean)
-                          .map((file, index) => (
-                            <ServiceAttachmentLink
-                              key={index}
-                              filePath={file.trim()}
-                              fileName={`Report ${index + 1}`}
-                              className="px-2 py-1 text-xs bg-green-700 text-white rounded-md hover:bg-green-800 text-center"
-                            />
-                          ))}
-                      </div>
-                    ) : record.installation_report &&
-                      record.installation_report !== "uploadFO" ? (
-                      <ServiceAttachmentLink
-                        filePath={
-                          record.installation_report ||
-                          record.attachments?.split(",")[0]
-                        }
-                        fileName="View Report"
-                        className="px-3 py-2 text-sm bg-green-700 text-white rounded-md hover:bg-green-800 text-center"
-                      />
-                    ) : (
-                      <Link
-                        href={`/${dashboardPath}/update-service/${record.service_id}`}
-                        className="px-3 py-2 text-sm bg-purple-500 text-white rounded-md hover:bg-purple-600 text-center"
-                      >
-                        Generate/Upload Report
-                      </Link>
-                    )}
-                    {role === "ADMIN" &&
-                      record.status?.toUpperCase() !== "COMPLETED" && (
-                        <button
-                          onClick={() => openStatusModal(record)}
-                          className="px-3 py-2 text-sm bg-yellow-600 text-white rounded-md hover:bg-yellow-700 text-center"
-                        >
-                          Change Status
-                        </button>
-                      )}
-                    <button
-                      onClick={() => openDetailsModal(record)}
-                      className="px-3 py-2 text-sm bg-gray-600 text-white rounded-md hover:bg-gray-700 text-center"
-                    >
-                      View Details
-                    </button>
-                  </div>
                 </div>
               );
             })

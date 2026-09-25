@@ -1,5 +1,8 @@
 "use client";
 
+import { useState } from "react";
+import ServiceReportImagesModal from "./ServiceReportImagesModal";
+
 export default function ServiceReportPrintModal({
   isOpen,
   onClose,
@@ -8,7 +11,15 @@ export default function ServiceReportPrintModal({
   hasPhotos,
   onConfirm,
   isPrinting = false,
+  reportId,
+  reportDate,
+  serviceId,
+  preCompletion,
+  afterCompletion,
+  onImagesUpdated,
 }) {
+  const [showImagesModal, setShowImagesModal] = useState(false);
+
   if (!isOpen) return null;
 
   return (
@@ -19,12 +30,35 @@ export default function ServiceReportPrintModal({
         aria-modal="true"
         aria-labelledby="print-options-title"
       >
-        <h3
-          id="print-options-title"
-          className="text-lg font-semibold text-gray-900 mb-4"
-        >
-          Print Options
-        </h3>
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <h3
+            id="print-options-title"
+            className="text-lg font-semibold text-gray-900"
+          >
+            Print Options
+          </h3>
+          <button
+            type="button"
+            onClick={() => setShowImagesModal(true)}
+            className="shrink-0 px-3 py-1.5 rounded-md border border-green-300 bg-green-50 text-green-700 hover:bg-green-100 text-sm font-medium"
+          >
+            Add Image
+          </button>
+        </div>
+        {reportId && (
+          <div className="mb-4 rounded-md border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-gray-800">
+            <p>
+              <span className="font-semibold text-gray-900">Report ID:</span>{" "}
+              {reportId}
+            </p>
+            {reportDate ? (
+              <p className="mt-1">
+                <span className="font-semibold text-gray-900">Report Date:</span>{" "}
+                {reportDate}
+              </p>
+            ) : null}
+          </div>
+        )}
         <div className="space-y-3 mb-6">
           <label
             className={`flex items-start gap-3 p-3 border rounded-md cursor-pointer ${
@@ -100,6 +134,18 @@ export default function ServiceReportPrintModal({
           </button>
         </div>
       </div>
+
+      <ServiceReportImagesModal
+        isOpen={showImagesModal}
+        onClose={() => setShowImagesModal(false)}
+        serviceId={serviceId}
+        preCompletion={preCompletion}
+        afterCompletion={afterCompletion}
+        onImagesUpdated={(pre, after) => {
+          onImagesUpdated?.(pre, after);
+          setPrintMode("withImages");
+        }}
+      />
     </div>
   );
 }
