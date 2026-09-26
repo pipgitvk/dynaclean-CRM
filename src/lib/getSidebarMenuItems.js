@@ -80,6 +80,8 @@ function transformMenuItemPaths(item, roleKey) {
       "hiring-process": "/director-dashboard/hiring",
       "final-profile-approval": "/director-dashboard/final-profile-approval",
       "salary-slips": "/director-dashboard/salary-slips",
+      "lead-distribution": "/director-dashboard/lead-distribution",
+      "bulk-reassign": "/director-dashboard/bulk-reassign",
     };
     if (item.moduleKey && directorModulePaths[item.moduleKey]) {
       return { ...item, path: directorModulePaths[item.moduleKey] };
