@@ -385,6 +385,16 @@ function ProductStockList() {
     );
   }, [rows, q]);
 
+  const allLowStockItems = useMemo(() => {
+    const map = new Map();
+    [...lowStockProducts, ...zeroStockProducts].forEach((p) => {
+      if (p.product_code) map.set(p.product_code, p);
+    });
+    return Array.from(map.values()).sort(
+      (a, b) => (a.total_quantity ?? 0) - (b.total_quantity ?? 0)
+    );
+  }, [lowStockProducts, zeroStockProducts]);
+
   return (
     <div className="p-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
@@ -429,6 +439,21 @@ function ProductStockList() {
               }`}
           >
             Stock Summary
+          </button>
+          <button
+            onClick={() => setOpenSection("lowstock")}
+            className={`text-xs sm:text-sm px-3 sm:px-4 py-1.5 sm:py-2 rounded text-white flex items-center gap-1.5 ${openSection === "lowstock"
+              ? "bg-amber-600 hover:bg-amber-700"
+              : "bg-gray-500 hover:bg-gray-600"
+              }`}
+          >
+            <AlertTriangle size={14} />
+            Low Stock
+            {allLowStockItems.length > 0 && (
+              <span className="bg-white/25 px-1.5 py-0.5 rounded text-[10px] font-bold">
+                {allLowStockItems.length}
+              </span>
+            )}
           </button>
         </div>
       </div>
@@ -505,25 +530,21 @@ function ProductStockList() {
       )}
       {/* End Zero Stock Alert Card Comment */}
 
-      {/* ── Low Stock Alert Card ──────────────────────────────────── */}
-      {lowStockProducts.filter(p => (p.total_quantity ?? 0) > 0).length > 0 && (
-        <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 shadow-sm overflow-hidden">
-          {/* Card Header */}
-          <div className="flex items-center gap-3 px-5 py-4 bg-amber-100 border-b border-amber-200">
+      {/* Low Stock Section */}
+      {openSection === "lowstock" && (
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center gap-3 mb-4">
             <div className="p-2 rounded-xl bg-amber-500 text-white">
               <AlertTriangle size={18} />
             </div>
             <div>
-              <h2 className="font-bold text-amber-800 text-sm uppercase tracking-wide">
-                Low Stock Warning
-              </h2>
-              <p className="text-xs text-amber-600 mt-0.5">
-                {lowStockProducts.filter(p => (p.total_quantity ?? 0) > 0).length} product{lowStockProducts.filter(p => (p.total_quantity ?? 0) > 0).length !== 1 ? "s" : ""} below minimum quantity
+              <h2 className="text-xl font-semibold text-gray-800">Low Stock Products</h2>
+              <p className="text-sm text-gray-500">
+                {allLowStockItems.length} product{allLowStockItems.length !== 1 ? "s" : ""} at or below minimum quantity (including zero stock)
               </p>
             </div>
           </div>
 
-          {/* Product List */}
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
               <thead>
@@ -531,38 +552,54 @@ function ProductStockList() {
                   <th className="px-5 py-2 text-left font-semibold">Product Code</th>
                   <th className="px-5 py-2 text-left font-semibold">Item Name</th>
                   <th className="px-5 py-2 text-left font-semibold">Product No.</th>
-                  <th className="px-5 py-2 text-left font-semibold">Current Qty</th>
+                  <th className="px-5 py-2 text-left font-semibold">Total Qty</th>
                   <th className="px-5 py-2 text-left font-semibold">Min Qty</th>
                   <th className="px-5 py-2 text-left font-semibold">Delhi</th>
                   <th className="px-5 py-2 text-left font-semibold">South</th>
                   <th className="px-5 py-2 text-left font-semibold">Pre-booked</th>
                   <th className="px-5 py-2 text-left font-semibold">Net Qty</th>
+                  <th className="px-5 py-2 text-left font-semibold">Status</th>
                 </tr>
               </thead>
               <tbody>
-                {lowStockProducts
-                  .filter(p => (p.total_quantity ?? 0) > 0)
-                  .map((p, idx) => (
-                    <tr
-                      key={p.product_code || idx}
-                      className="border-t border-amber-100 hover:bg-amber-100/40 transition-colors"
-                    >
-                      <td className="px-5 py-3 font-bold text-amber-800">{p.product_code}</td>
-                      <td className="px-5 py-3 font-semibold text-gray-800">{p.item_name || "—"}</td>
-                      <td className="px-5 py-3 text-gray-600">{p.product_number || "—"}</td>
-                      <td className="px-5 py-3">
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-amber-500 text-white">
-                          <AlertTriangle size={11} />
-                          {p.total_quantity ?? 0}
-                        </span>
-                      </td>
-                      <td className="px-5 py-3 text-gray-600">{p.min_qty ?? "—"}</td>
-                      <td className="px-5 py-3 text-gray-700">{p.delhi ?? 0}</td>
-                      <td className="px-5 py-3 text-gray-700">{p.south ?? 0}</td>
-                      <td className="px-5 py-3 font-semibold text-orange-600">{getPreBookedQuantity(p.item_name)}</td>
-                      <td className="px-5 py-3 font-semibold text-green-600">{(p.total_quantity ?? 0) - getPreBookedQuantity(p.item_name)}</td>
-                    </tr>
-                  ))}
+                {allLowStockItems.length === 0 ? (
+                  <tr>
+                    <td colSpan="10" className="px-5 py-8 text-center text-gray-500">
+                      No low stock products found
+                    </td>
+                  </tr>
+                ) : (
+                  allLowStockItems.map((p, idx) => {
+                    const totalQty = p.total_quantity ?? 0;
+                    const isZero = totalQty <= 0;
+                    return (
+                      <tr
+                        key={p.product_code || idx}
+                        className={`border-t transition-colors ${isZero ? "border-red-100 hover:bg-red-50/40" : "border-amber-100 hover:bg-amber-100/40"}`}
+                      >
+                        <td className={`px-5 py-3 font-bold ${isZero ? "text-red-800" : "text-amber-800"}`}>{p.product_code}</td>
+                        <td className="px-5 py-3 font-semibold text-gray-800">{p.item_name || "—"}</td>
+                        <td className="px-5 py-3 text-gray-600">{p.product_number || "—"}</td>
+                        <td className="px-5 py-3">
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold text-white ${isZero ? "bg-red-500" : "bg-amber-500"}`}>
+                            {isZero ? <PackageX size={11} /> : <AlertTriangle size={11} />}
+                            {totalQty}
+                          </span>
+                        </td>
+                        <td className="px-5 py-3 text-gray-600">{p.min_qty ?? "—"}</td>
+                        <td className="px-5 py-3 text-gray-700">{p.delhi ?? 0}</td>
+                        <td className="px-5 py-3 text-gray-700">{p.south ?? 0}</td>
+                        <td className="px-5 py-3 font-semibold text-orange-600">{getPreBookedQuantity(p.item_name)}</td>
+                        <td className="px-5 py-3 font-semibold text-green-600">{totalQty - getPreBookedQuantity(p.item_name)}</td>
+                        <td className="px-5 py-3">
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${isZero ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}`}>
+                            {isZero ? "Zero Stock" : "Low Stock"}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
               </tbody>
             </table>
           </div>
