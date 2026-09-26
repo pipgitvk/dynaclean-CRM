@@ -71,6 +71,7 @@ export default async function Page({ params }) {
     await fetchOrderData(orderId);
 
   let orderListPath = "/user-dashboard/order";
+  let canUploadDocuments = false;
   const payload = await getSessionPayload();
   if (payload?.username) {
     const connAuth = await getDbConnection();
@@ -78,7 +79,9 @@ export default async function Page({ params }) {
       "SELECT userRole FROM rep_list WHERE username = ?",
       [payload.username],
     );
-    orderListPath = getOrderListPath(roleRows[0]?.userRole || "");
+    const userRole = roleRows[0]?.userRole || payload.role || "";
+    orderListPath = getOrderListPath(userRole);
+    canUploadDocuments = String(userRole).toUpperCase().includes("ACCOUNTANT");
   }
 
   if (!orderDetails) {
@@ -118,6 +121,7 @@ export default async function Page({ params }) {
         gstin={gstin}
         quoteCustomerId={quoteCustomerId}
         orderListPath={orderListPath}
+        canUploadDocuments={canUploadDocuments}
       />
     </div>
   );

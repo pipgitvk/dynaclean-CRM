@@ -1,8 +1,19 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import dayjs from "dayjs";
 import { resolveStoredFileUrl } from "@/lib/resolveStoredFileUrl";
+import OrderDocumentFileCard from "@/components/orders/OrderDocumentFileCard";
+
+const DOCUMENT_FIELDS = [
+  { label: "E-way Bill", key: "ewaybill_file" },
+  { label: "E-invoice", key: "einvoice_file" },
+  { label: "Invoice PDF", key: "report_file" },
+  { label: "Delivery Challan", key: "deliverchallan" },
+  { label: "Purchase Order", key: "po_file" },
+  { label: "Payment Proof", key: "payment_proof" },
+  { label: "Delivery Proof", key: "delivery_proof" },
+];
 
 const stages = [
   "Sales",
@@ -22,6 +33,7 @@ export default function OrderDetailsClient({
   gstin,
   quoteCustomerId,
   orderListPath = "/user-dashboard/order",
+  canUploadDocuments = false,
 }) {
   const formatDate = (value) => {
     if (!value) return "";
@@ -72,6 +84,31 @@ export default function OrderDetailsClient({
 
   const currentIndex = stages.indexOf(currentStage);
   const progressPercent = (currentIndex / (stages.length - 1)) * 100;
+
+  const [fileValues, setFileValues] = useState(() => {
+    const initial = {};
+    DOCUMENT_FIELDS.forEach(({ key }) => {
+      initial[key] = orderDetails[key] || "";
+    });
+    return initial;
+  });
+
+  const handleFilesUploaded = (fieldKey, newValue) => {
+    setFileValues((prev) => ({ ...prev, [fieldKey]: newValue }));
+  };
+
+  const orderForDocRules = useMemo(
+    () => ({
+      dispatch_status: orderDetails.dispatch_status,
+      delivery_status: orderDetails.delivery_status,
+      delivered_on: orderDetails.delivered_on,
+    }),
+    [
+      orderDetails.dispatch_status,
+      orderDetails.delivery_status,
+      orderDetails.delivered_on,
+    ],
+  );
 
   return (
     <div className="p-4 space-y-6">
@@ -238,18 +275,40 @@ export default function OrderDetailsClient({
       <FileSection label="Payment Proof" file={orderDetails.payment_proof} />
       <FileSection label="Invoice" file={orderDetails.report_file} /> */}
 
-      {/* Consolidated Documents Row */}
+      {/* Documents */}
       <div className="border rounded p-4 bg-white">
-        <h3 className="font-semibold mb-3">Documents</h3>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
-          <DocCell label="E-way Bill" file={orderDetails.ewaybill_file} optional />
-          <DocCell label="E-invoice (Optional)" file={orderDetails.einvoice_file} optional />
-          <DocCell label="Invoice PDF (Required)" file={orderDetails.report_file} required />
-          <DocCell label="Delivery Challan (Optional)" file={orderDetails.deliverchallan} optional />
-          <DocCell label="Purchase Order (Optional)" file={orderDetails.po_file} optional />
-          <DocCell label="Payment Proof (Optional)" file={orderDetails.payment_proof} optional />
-          <DocCell label="Delivery Proof (Optional)" file={orderDetails.delivery_proof} optional />
-        </div>
+        <h3 className="font-semibold mb-1">Documents</h3>
+        {canUploadDocuments ? (
+          <>
+            <p className="text-xs text-gray-500 mb-3">
+              E-way bill, e-invoice & invoice editable before dispatch (up to 5 invoice PDFs).
+              Delivery challan before delivered. Delivery proof within 24 hours of delivery.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {DOCUMENT_FIELDS.map(({ label, key }) => (
+                <OrderDocumentFileCard
+                  key={key}
+                  label={label}
+                  fieldKey={key}
+                  file={fileValues[key]}
+                  orderId={orderDetails.order_id}
+                  order={orderForDocRules}
+                  onUploaded={handleFilesUploaded}
+                />
+              ))}
+            </div>
+          </>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
+            <DocCell label="E-way Bill" file={orderDetails.ewaybill_file} optional />
+            <DocCell label="E-invoice (Optional)" file={orderDetails.einvoice_file} optional />
+            <DocCell label="Invoice PDF (Required)" file={orderDetails.report_file} required />
+            <DocCell label="Delivery Challan (Optional)" file={orderDetails.deliverchallan} optional />
+            <DocCell label="Purchase Order (Optional)" file={orderDetails.po_file} optional />
+            <DocCell label="Payment Proof (Optional)" file={orderDetails.payment_proof} optional />
+            <DocCell label="Delivery Proof (Optional)" file={orderDetails.delivery_proof} optional />
+          </div>
+        )}
       </div>
 
       {/* Accountant Details (if done) */}
