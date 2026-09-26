@@ -202,6 +202,7 @@ import { Package, BarChart3, Upload, DollarSign, Calendar, Plane, FileText, Clip
 import ServiceTeamReportCard from "@/components/service/ServiceTeamReportCard";
 import ServiceSupportQuotesOrdersCard from "@/components/service/ServiceSupportQuotesOrdersCard";
 import ServiceSupportTotalCard from "@/components/service/ServiceSupportTotalCard";
+import { SPECIAL_PRICE_PENDING_CONDITION } from "@/lib/specialPriceDefaults";
 
 // import UpcomingLeads from "@/components/Leads/UpcommingLeads";
 
@@ -249,8 +250,9 @@ export default async function UserDashboardPage() {
     const [pendingSpecialRows] = await connection.execute(
       `
       SELECT COUNT(*) AS total_pending
-      FROM special_price
-      WHERE status = 'pending'
+      FROM special_price sp
+      JOIN customers c ON sp.customer_id = c.customer_id
+      WHERE ${SPECIAL_PRICE_PENDING_CONDITION}
       `,
     );
     const pendingSpecialCount =

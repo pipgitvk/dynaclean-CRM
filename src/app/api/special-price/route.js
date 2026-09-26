@@ -80,7 +80,7 @@ export async function POST(req) {
     const insertQuery = `
       INSERT INTO special_price 
       (customer_id, item_type, product_id, product_code, special_price, price_type, price_term, status, set_by, set_date)
-      VALUES (?, ?, ?, ?, ?, ?, ?, 'draft', ?, NOW())
+      VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, NOW())
     `;
 
     try {
@@ -109,7 +109,7 @@ export async function POST(req) {
 
     return NextResponse.json({
       success: true,
-      message: "Special price created. You can edit it from the Customer Special Prices table to send for approval.",
+      message: "Special price created and sent for approval.",
     });
 
   } catch (err) {

@@ -22,6 +22,10 @@ export function resolveSpecialPriceTerm(value) {
   return trimmed || SPECIAL_PRICE_TERM_DEFAULT;
 }
 
+/** Rows the special-pricing table shows as pending (not approved/rejected). */
+export const SPECIAL_PRICE_PENDING_CONDITION =
+  "LOWER(TRIM(IFNULL(sp.status, ''))) NOT IN ('approved', 'rejected')";
+
 export function isDealerPricePending(row) {
   return (
     isDealerPriceType(row?.price_type) &&

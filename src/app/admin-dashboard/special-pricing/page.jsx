@@ -12,6 +12,7 @@ import {
   isDealerPricePending,
   resolveSpecialPriceTerm,
   resolveSpecialPriceType,
+  SPECIAL_PRICE_PENDING_CONDITION,
 } from "@/lib/specialPriceDefaults";
 
 export const dynamic = "force-dynamic";
@@ -59,7 +60,9 @@ export default async function AdminSpecialPricingPage({ searchParams }) {
     whereParams.push(like, like, like, like, like);
   }
 
-  if (statusFilter && ["approved", "rejected", "pending"].includes(statusFilter)) {
+  if (statusFilter === "pending") {
+    conditions.push(SPECIAL_PRICE_PENDING_CONDITION);
+  } else if (statusFilter && ["approved", "rejected"].includes(statusFilter)) {
     conditions.push("LOWER(TRIM(sp.status)) = ?");
     whereParams.push(statusFilter);
   }
@@ -151,22 +154,21 @@ export default async function AdminSpecialPricingPage({ searchParams }) {
   const totalCount = Number(countRows[0]?.total || 0);
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
-  // ✅ Get status counts
+  // Same pending rule as the admin dashboard card: visible rows that are not approved/rejected.
   const [statusRows] = await conn.execute(
-    `SELECT status, COUNT(*) AS count FROM special_price GROUP BY status`,
+    `SELECT
+       SUM(CASE WHEN LOWER(TRIM(IFNULL(sp.status, ''))) = 'approved' THEN 1 ELSE 0 END) AS approved,
+       SUM(CASE WHEN LOWER(TRIM(IFNULL(sp.status, ''))) = 'rejected' THEN 1 ELSE 0 END) AS rejected,
+       SUM(CASE WHEN ${SPECIAL_PRICE_PENDING_CONDITION} THEN 1 ELSE 0 END) AS pending
+     FROM special_price sp
+     JOIN customers c ON sp.customer_id = c.customer_id`,
   );
 
-  const statusCounts = statusRows.reduce(
-    (acc, row) => {
-      const key = String(row.status || "").toLowerCase();
-      const count = Number(row.count || 0);
-      if (key === "approved") acc.approved += count;
-      else if (key === "rejected") acc.rejected += count;
-      else if (key === "pending") acc.pending += count;
-      return acc;
-    },
-    { approved: 0, rejected: 0, pending: 0 },
-  );
+  const statusCounts = {
+    approved: Number(statusRows[0]?.approved || 0),
+    rejected: Number(statusRows[0]?.rejected || 0),
+    pending: Number(statusRows[0]?.pending || 0),
+  };
 
   return (
     <div className="p-4 sm:p-6 space-y-4 overflow-x-hidden min-w-0">
