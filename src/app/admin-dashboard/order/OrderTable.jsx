@@ -95,7 +95,22 @@ function formatModelOptionLabel(item) {
   return name || code || "";
 }
 
-function buildModelOptions(orders, catalogByCode) {
+function resolveItemType(codeKey, catalogByCode, spareCatalogByCode) {
+  if (catalogByCode.has(codeKey)) return "product";
+  if (spareCatalogByCode.has(codeKey)) return "spare";
+  return /[a-zA-Z]/.test(codeKey) ? "product" : "spare";
+}
+
+function sortModelOptions(options) {
+  return [...options].sort((a, b) => {
+    const typeOrder = (type) => (type === "product" ? 0 : 1);
+    const typeDiff = typeOrder(a.itemType) - typeOrder(b.itemType);
+    if (typeDiff !== 0) return typeDiff;
+    return a.label.localeCompare(b.label, undefined, { sensitivity: "base" });
+  });
+}
+
+function buildModelOptions(orders, catalogByCode, spareCatalogByCode) {
   const map = new Map();
 
   orders?.forEach((order) => {
@@ -106,12 +121,14 @@ function buildModelOptions(orders, catalogByCode) {
 
       if (codeKey) {
         const catalogName = String(catalogByCode.get(codeKey)?.item_name || "").trim();
-        const name = catalogName || orderName;
+        const spareName = String(spareCatalogByCode.get(codeKey)?.item_name || "").trim();
+        const name = catalogName || spareName || orderName;
         if (!name) return;
         map.set(codeKey, {
           filterKey: codeKey,
           item_code: code,
           item_name: name,
+          itemType: resolveItemType(codeKey, catalogByCode, spareCatalogByCode),
           label: formatModelOptionLabel({ item_code: code, item_name: name }),
         });
         return;
@@ -124,15 +141,14 @@ function buildModelOptions(orders, catalogByCode) {
           filterKey: orderName,
           item_code: "",
           item_name: orderName,
+          itemType: /[a-zA-Z]/.test(orderName) ? "product" : "spare",
           label: orderName,
         });
       }
     });
   });
 
-  return [...map.values()].sort((a, b) =>
-    a.label.localeCompare(b.label, undefined, { sensitivity: "base" }),
-  );
+  return sortModelOptions([...map.values()]);
 }
 
 function findModelOption(filterKey, modelOptions) {
@@ -459,6 +475,7 @@ function getStatusText(order) {
 
 export default function OrderTable({ orders, userRole }) {
   const [productCatalog, setProductCatalog] = useState([]);
+  const [spareCatalog, setSpareCatalog] = useState([]);
   const searchParams = useSearchParams();
 
   // Initialize from localStorage with defaults
@@ -511,10 +528,18 @@ export default function OrderTable({ orders, userRole }) {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/products/list", { cache: "no-store" });
-        if (!res.ok) return;
-        const data = await res.json();
-        if (!cancelled && Array.isArray(data)) setProductCatalog(data);
+        const [productsRes, sparesRes] = await Promise.all([
+          fetch("/api/products/list", { cache: "no-store" }),
+          fetch("/api/spare/list", { cache: "no-store" }),
+        ]);
+        if (!cancelled && productsRes.ok) {
+          const data = await productsRes.json();
+          if (Array.isArray(data)) setProductCatalog(data);
+        }
+        if (!cancelled && sparesRes.ok) {
+          const data = await sparesRes.json();
+          if (Array.isArray(data)) setSpareCatalog(data);
+        }
       } catch {
         /* non-fatal */
       }
@@ -946,9 +971,20 @@ export default function OrderTable({ orders, userRole }) {
     return map;
   }, [productCatalog]);
 
+  const spareCatalogByCode = useMemo(() => {
+    const map = new Map();
+    spareCatalog.forEach((spare) => {
+      const numberKey = normalizeModelCode(spare.spare_number);
+      const idKey = normalizeModelCode(spare.id);
+      if (numberKey) map.set(numberKey, spare);
+      if (idKey) map.set(idKey, spare);
+    });
+    return map;
+  }, [spareCatalog]);
+
   const modelOptions = useMemo(
-    () => buildModelOptions(orders, catalogByCode),
-    [orders, catalogByCode],
+    () => buildModelOptions(orders, catalogByCode, spareCatalogByCode),
+    [orders, catalogByCode, spareCatalogByCode],
   );
 
   const filteredModelQuantity = useMemo(() => {
@@ -961,15 +997,15 @@ export default function OrderTable({ orders, userRole }) {
 
   const filteredModelOptions = useMemo(() => {
     const query = modelSearchText.trim().toLowerCase();
-    if (!query) return modelOptions.slice(0, 50);
-    return modelOptions
-      .filter((opt) => {
-        const code = String(opt.item_code || "").toLowerCase();
-        const name = String(opt.item_name || "").toLowerCase();
-        const label = String(opt.label || "").toLowerCase();
-        return code.includes(query) || name.includes(query) || label.includes(query);
-      })
-      .slice(0, 50);
+    const list = !query
+      ? modelOptions
+      : modelOptions.filter((opt) => {
+          const code = String(opt.item_code || "").toLowerCase();
+          const name = String(opt.item_name || "").toLowerCase();
+          const label = String(opt.label || "").toLowerCase();
+          return code.includes(query) || name.includes(query) || label.includes(query);
+        });
+    return sortModelOptions(list).slice(0, 50);
   }, [modelOptions, modelSearchText]);
 
   useEffect(() => {
