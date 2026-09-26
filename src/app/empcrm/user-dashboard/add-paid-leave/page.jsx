@@ -12,8 +12,13 @@ import {
 } from "lucide-react";
 import SearchableSelect from "@/components/ui/SearchableSelect";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 export default function AddPaidLeavePage() {
+  const pathname = usePathname();
+  const homeHref = String(pathname || "").startsWith("/accounts-dashboard")
+    ? "/accounts-dashboard"
+    : "/user-dashboard";
   const [employees, setEmployees] = useState([]);
   const [selectedEmployee, setSelectedEmployee] = useState("");
   const [leaves, setLeaves] = useState([]);
@@ -252,7 +257,7 @@ export default function AddPaidLeavePage() {
             Access Denied. You don't have permission to access this module.
           </p>
           <Link
-            href="/user-dashboard"
+            href={homeHref}
             className="mt-4 inline-flex items-center gap-2 text-blue-600 hover:text-blue-800"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -269,7 +274,7 @@ export default function AddPaidLeavePage() {
       <div className="mb-8 flex justify-between items-start">
         <div>
           <Link
-            href="/user-dashboard"
+            href={homeHref}
             className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-3"
           >
             <ArrowLeft className="w-4 h-4" />

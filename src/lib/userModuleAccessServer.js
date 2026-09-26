@@ -61,6 +61,9 @@ export async function getEffectiveAllowedModuleKeys(username, role) {
 
   let next = applySuperadminOnlyModuleRestrictions(allowedRaw, roleKey) ?? [];
   next = applyRoleDenyModuleRestrictions(next, roleKey) ?? [];
+  if (roleKey === "ACCOUNTANT") {
+    next = uniqueStrings([...(next || []), "salary-management", "add-paid-leaves"]);
+  }
   return uniqueStrings(next);
 }
 

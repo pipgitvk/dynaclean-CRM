@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { ArrowLeft, Save, Calculator, AlertCircle, Download, CalendarDays, Lock } from "lucide-react";
 import toast from "react-hot-toast";
 import {
@@ -40,6 +40,10 @@ function payrollAttendanceFallbackRows(b) {
 
 const GenerateSalaryPage = () => {
     const router = useRouter();
+    const pathname = usePathname();
+    const salaryHome = String(pathname || "").startsWith("/accounts-dashboard")
+        ? "/accounts-dashboard/salary"
+        : "/empcrm/admin-dashboard/salary";
 
     // User Role State
     const [userRole, setUserRole] = useState("");
@@ -665,7 +669,7 @@ const GenerateSalaryPage = () => {
             const data = await response.json();
             if (response.ok) {
                 toast.success("Salary saved successfully!");
-                router.push("/empcrm/admin-dashboard/salary");
+                router.push(salaryHome);
             } else {
                 toast.error(data.message || "Failed to save salary");
             }

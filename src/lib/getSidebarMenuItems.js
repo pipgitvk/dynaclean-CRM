@@ -108,6 +108,10 @@ function transformMenuItemPaths(item, roleKey) {
       "bank-management": "/accounts-dashboard/bank-masters",
       ledger: "/accounts-dashboard/ledger",
       parties: "/accounts-dashboard/parties",
+      "paid-leave-ledger": "/accounts-dashboard/paid-leave-ledger",
+      "salary-slips": "/accounts-dashboard/salary-slips",
+      "salary-management": "/accounts-dashboard/salary",
+      "add-paid-leaves": "/accounts-dashboard/add-paid-leave",
     };
     if (item.moduleKey && accountantModulePaths[item.moduleKey]) {
       return { ...item, path: accountantModulePaths[item.moduleKey] };
@@ -1094,6 +1098,11 @@ export default async function getSidebarMenuItems() {
       applySuperadminOnlyModuleRestrictions(allowedModulesRaw, roleKey) ?? [],
       roleKey,
     ) ?? [];
+    if (roleKey === "ACCOUNTANT" && Array.isArray(allowedModules)) {
+      for (const key of ["salary-management", "add-paid-leaves"]) {
+        if (!allowedModules.includes(key)) allowedModules.push(key);
+      }
+    }
 
     const filterByModuleAccess = (list) =>
       (list || [])
