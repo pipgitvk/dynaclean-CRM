@@ -282,7 +282,7 @@ export default function DocumentsSection({
           <div className="flex items-center gap-4">
             <input
               type="file"
-              accept="image/*"
+              accept="image/*,application/pdf,.pdf"
               onChange={(e) => handleFileChange(e, "profile_photo")}
               disabled={ro || uploadingFiles.profile_photo}
               className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -316,7 +316,7 @@ export default function DocumentsSection({
           <div className="flex items-center gap-4">
             <input
               type="file"
-              accept="image/*"
+              accept="image/*,application/pdf,.pdf"
               onChange={(e) => handleFileChange(e, "signature")}
               disabled={ro || uploadingFiles.signature}
               className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -396,6 +396,7 @@ export default function DocumentsSection({
                         <input
                           id={`${htmlIdPrefix}file_${doc.key}`}
                           type="file"
+                          accept="image/*,application/pdf,.pdf"
                           onChange={(e) => handleFileChange(e, doc.key)}
                           disabled={ro}
                           className="hidden"

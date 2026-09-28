@@ -328,7 +328,7 @@ export default function PersonalInfoSection({
               <input
                 type="file"
                 name="doc_employment_confirmation_letter"
-                accept="image/*"
+                accept="image/*,application/pdf,.pdf"
                 onChange={handleConfirmationLetterUpload}
                 disabled={ro || uploadingFiles.doc_employment_confirmation_letter}
                 className="hidden"

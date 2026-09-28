@@ -13,13 +13,9 @@ import {
 function getCloudinaryCloudNames(relativePath) {
   const serviceCloud = getServiceCloudinaryCloudName();
   const appCloud = getAppCloudinaryCloudName();
-  const preferServiceFirst =
-    String(relativePath || "").startsWith("attendance_regularization/") ||
-    String(relativePath || "").startsWith("uploads/regularization/");
-
-  const ordered = preferServiceFirst
-    ? [serviceCloud, appCloud]
-    : [appCloud, serviceCloud];
+  // New uploads from both apps use the dynaclean Cloudinary account.
+  // The service account is only a fallback for files already stored there.
+  const ordered = [appCloud, serviceCloud];
 
   return [...new Set(ordered.filter(Boolean))];
 }
