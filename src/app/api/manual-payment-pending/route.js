@@ -1,10 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
-import { writeFile, mkdir } from "fs/promises";
-import path from "path";
 import { verifyManualPaymentsApiAccess } from "@/lib/manualPaymentsAccess";
-
-const UPLOAD_DIR = path.join(process.cwd(), "public", "payment_invoices");
+import { saveManualPaymentInvoice } from "@/lib/saveManualPaymentInvoice";
 
 // GET: Fetch all manual payment pending entries
 export async function GET(request) {
@@ -134,18 +131,8 @@ export async function POST(request) {
 
         let invoiceFilePath = null;
 
-        // Handle file upload if present
         if (invoiceFile && typeof invoiceFile === "object" && invoiceFile.size > 0) {
-            await mkdir(UPLOAD_DIR, { recursive: true });
-
-            const timestamp = Date.now();
-            const fileExt = path.extname(invoiceFile.name).slice(0, 16);
-            const fileName = `invoice_${timestamp}${fileExt}`;
-            const filePath = path.join(UPLOAD_DIR, fileName);
-            const buffer = Buffer.from(await invoiceFile.arrayBuffer());
-
-            await writeFile(filePath, buffer);
-            invoiceFilePath = `/payment_invoices/${fileName}`;
+            invoiceFilePath = await saveManualPaymentInvoice(invoiceFile);
         }
 
         const conn = await getDbConnection();

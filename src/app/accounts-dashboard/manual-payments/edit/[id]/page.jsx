@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { manualPaymentInvoiceHref } from "@/lib/manualPaymentInvoiceHref";
 
 const INPUT =
   "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500";
@@ -489,7 +490,7 @@ export default function EditPaymentPage() {
                 {currentInvoice && !removeInvoice && (
                   <div className="mb-2 flex items-center justify-between rounded border border-gray-200 bg-gray-50 p-2">
                     <a
-                      href={currentInvoice}
+                      href={manualPaymentInvoiceHref(currentInvoice)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-sm text-blue-600 underline"

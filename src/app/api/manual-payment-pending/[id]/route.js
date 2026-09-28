@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
-import { writeFile, mkdir, unlink } from "fs/promises";
-import path from "path";
-import fs from "fs";
 import { verifyManualPaymentsApiAccess } from "@/lib/manualPaymentsAccess";
-
-const UPLOAD_DIR = path.join(process.cwd(), "public", "payment_invoices");
+import {
+  deleteManualPaymentInvoice,
+  saveManualPaymentInvoice,
+} from "@/lib/saveManualPaymentInvoice";
 
 // GET: Fetch single payment entry by ID
 export async function GET(request, { params }) {
@@ -88,56 +87,22 @@ export async function PUT(request, { params }) {
     const removeInvoice = formData.get("remove_invoice") === "true";
 
     let invoiceFilePath = currentEntry.invoice_file;
-
-    // Handle invoice file removal
-    if (removeInvoice && currentEntry.invoice_file) {
-      try {
-        const oldFilePath = path.join(
-          process.cwd(),
-          "public",
-          currentEntry.invoice_file,
-        );
-        if (fs.existsSync(oldFilePath)) {
-          await unlink(oldFilePath);
-        }
-        invoiceFilePath = null;
-      } catch (fileError) {
-        console.error("Error deleting old invoice:", fileError);
-      }
-    }
-
-    // Handle new file upload
-    if (
+    const hasNewFile =
       invoiceFile &&
       typeof invoiceFile === "object" &&
-      invoiceFile.size > 0
-    ) {
-      await mkdir(UPLOAD_DIR, { recursive: true });
+      invoiceFile.size > 0;
 
-      // Delete old file if exists
-      if (currentEntry.invoice_file) {
-        try {
-          const oldFilePath = path.join(
-            process.cwd(),
-            "public",
-            currentEntry.invoice_file,
-          );
-          if (fs.existsSync(oldFilePath)) {
-            await unlink(oldFilePath);
-          }
-        } catch (fileError) {
-          console.error("Error deleting old invoice:", fileError);
-        }
+    if (hasNewFile) {
+      invoiceFilePath = await saveManualPaymentInvoice(invoiceFile);
+      if (
+        currentEntry.invoice_file &&
+        currentEntry.invoice_file !== invoiceFilePath
+      ) {
+        await deleteManualPaymentInvoice(currentEntry.invoice_file);
       }
-
-      const timestamp = Date.now();
-      const fileExt = path.extname(invoiceFile.name).slice(0, 16);
-      const fileName = `invoice_${timestamp}${fileExt}`;
-      const filePath = path.join(UPLOAD_DIR, fileName);
-      const buffer = Buffer.from(await invoiceFile.arrayBuffer());
-
-      await writeFile(filePath, buffer);
-      invoiceFilePath = `/payment_invoices/${fileName}`;
+    } else if (removeInvoice && currentEntry.invoice_file) {
+      await deleteManualPaymentInvoice(currentEntry.invoice_file);
+      invoiceFilePath = null;
     }
 
     // Update the entry
