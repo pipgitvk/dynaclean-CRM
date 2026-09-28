@@ -191,19 +191,32 @@ function mapOrderToStatus(order) {
 }
 
 function deriveInvoiceStatus(invoice, order) {
+  if (
+    order &&
+    (order.is_cancelled === 1 ||
+      String(order.approval_status || "").toLowerCase() === "rejected")
+  ) {
+    return "CANCELLED";
+  }
+
+  const invoiceStatus = String(invoice.status || "").trim().toUpperCase();
+  const grandTotal = Number(invoice.grand_total) || 0;
+  const rawBalance = Number(invoice.balance_amount);
+  const balance = Number.isFinite(rawBalance)
+    ? rawBalance
+    : grandTotal - Number(invoice.amount_paid || 0);
+
+  if (invoiceStatus === "PAID" || (balance === 0 && grandTotal > 0)) {
+    return "PAID";
+  }
+
   const fromOrder = mapOrderToStatus(order);
-  if (fromOrder) return fromOrder;
+  if (fromOrder && fromOrder !== "CANCELLED") return fromOrder;
 
   if (invoice.status && String(invoice.status).trim() !== "") {
     return invoice.status;
   }
 
-  const grandTotal = Number(invoice.grand_total) || 0;
-  const balance =
-    Number(invoice.balance_amount) ||
-    grandTotal - Number(invoice.amount_paid || 0);
-
-  if (balance === 0 && grandTotal > 0) return "PAID";
   if (balance > 0 && balance < grandTotal) return "PARTIAL PAID";
   return null;
 }

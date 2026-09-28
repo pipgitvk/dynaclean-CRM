@@ -33,6 +33,10 @@ import {
 ChartJS.register(ArcElement, Tooltip, Legend);
 
 import DeleteButton from "@/components/accounts/DeleteButton";
+import {
+  DispatchPhotosMenuButton,
+  DispatchPhotosModal,
+} from "@/components/orders/DispatchPhotosModal";
 import toast from "react-hot-toast";
 
 function parseOrderLineItems(order) {
@@ -2519,11 +2523,8 @@ function ReturnInitiateMenuItem({ order }) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
-  if (r.is_cancelled) {
-    return null;
-  }
-
   const popRef = useRef(null);
+  const [photosOpen, setPhotosOpen] = useState(false);
   const role = (userRole || "").toString().trim().toLowerCase();
   const canViewSales = [
     "back office",
@@ -2548,6 +2549,14 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
     String(r.booking_id).trim() !== "" &&
     String(r.booking_id) !== "0";
   const dispatchStatus = Number(r.dispatch_status);
+  const canViewDispatchPhotos = [
+    "warehouse incharge",
+    "superadmin",
+    "team leader",
+    "admin",
+    "director",
+    "accountant",
+  ].includes(role) || role.includes("accountant");
 
   useEffect(() => {
     if (!isOpen) return;
@@ -2573,8 +2582,18 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
     };
   }, [isOpen, toggleMenu]);
 
+  if (r.is_cancelled) {
+    return null;
+  }
+
   return (
     <div className="relative inline-block text-left">
+      {photosOpen && (
+        <DispatchPhotosModal
+          orderId={r.order_id}
+          onClose={() => setPhotosOpen(false)}
+        />
+      )}
       <button
         onClick={toggleMenu}
         className="p-2 rounded-full hover:bg-gray-200 transition-colors duration-150"
@@ -2687,6 +2706,12 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                   </Link>
                 </>
               )}
+            {dispatchStatus === 1 && canViewDispatchPhotos && (
+              <DispatchPhotosMenuButton
+                orderId={r.order_id}
+                onOpen={() => setPhotosOpen(true)}
+              />
+            )}
             {(isWarehouse || canManageReturns) &&
               hasBooking &&
               dispatchStatus === 1 && (

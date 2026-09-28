@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server';
 import { getDbConnection } from '@/lib/db';
+import { ensureCoveredInWarrantyColumn } from '@/lib/spareWarranty';
 
 export async function GET() {
     try {
         const db = await getDbConnection();
+        await ensureCoveredInWarrantyColumn(db);
         const [rows] = await db.execute(
-            `SELECT s.id, s.spare_number, s.item_name, s.specification, s.type, s.make, s.model,
+            `SELECT s.id, s.spare_number, s.covered_in_warranty, s.item_name, s.specification, s.type, s.make, s.model,
               s.compatible_machine, s.tax, s.image, s.min_qty, s.purchase_price, s.sale_price,
               s.last_negotiation_price, COALESCE(ss.total_quantity, 0) AS total_qty
              FROM spare_list s
