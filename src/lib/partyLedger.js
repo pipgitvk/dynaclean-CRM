@@ -253,40 +253,13 @@ async function getPartyNameAliases(conn, decodedCompany, customerId) {
       [cid],
     );
     for (const r of custRows) {
-      for (const n of [r.company, r.full_name, r.first_name]) {
-        const trimmed = String(n || "").trim();
-        if (trimmed) aliases.add(trimmed);
+      const company = String(r.company || "").trim();
+      if (company) {
+        aliases.add(company);
+        continue;
       }
-    }
-
-    const [invNames] = await conn.execute(
-      `SELECT DISTINCT TRIM(customer_name) AS nm
-       FROM invoices
-       WHERE CAST(customer_id AS CHAR) = ?
-         AND customer_name IS NOT NULL
-         AND TRIM(customer_name) != ''`,
-      [cid],
-    );
-    for (const r of invNames) {
-      if (r.nm) aliases.add(r.nm);
-    }
-
-    const [psrNames] = await conn.execute(
-      `SELECT DISTINCT TRIM(client_company_name) AS nm
-       FROM product_stock_request
-       WHERE CAST(customer_id AS CHAR) = ?
-         AND client_company_name IS NOT NULL
-         AND TRIM(client_company_name) != ''
-       UNION
-       SELECT DISTINCT TRIM(client_name) AS nm
-       FROM product_stock_request
-       WHERE CAST(customer_id AS CHAR) = ?
-         AND client_name IS NOT NULL
-         AND TRIM(client_name) != ''`,
-      [cid, cid],
-    );
-    for (const r of psrNames) {
-      if (r.nm) aliases.add(r.nm);
+      const person = String(r.full_name || r.first_name || "").trim();
+      if (person) aliases.add(person);
     }
   }
 
@@ -311,12 +284,10 @@ export async function buildLedgerForParty(decodedCompany, customerIdFilter = nul
 
   const nameAliases = await getPartyNameAliases(conn, decodedCompany, cidFilter);
 
+  // Match invoices by company name only. A shared customer_id or billing
+  // address must not pull in invoices raised to a different company.
   const invoiceWhereParts = [];
   const invoiceParams = [];
-  if (cidFilter) {
-    invoiceWhereParts.push("CAST(customer_id AS CHAR) = ?");
-    invoiceParams.push(cidFilter);
-  }
   if (nameAliases.length > 0) {
     const nameClause = nameAliases
       .map(() => "(TRIM(customer_name) = ? OR customer_name = ?)")
@@ -325,6 +296,9 @@ export async function buildLedgerForParty(decodedCompany, customerIdFilter = nul
     for (const alias of nameAliases) {
       invoiceParams.push(alias, alias);
     }
+  } else if (cidFilter) {
+    invoiceWhereParts.push("CAST(customer_id AS CHAR) = ?");
+    invoiceParams.push(cidFilter);
   } else {
     invoiceWhereParts.push("(TRIM(customer_name) = ? OR customer_name = ?)");
     invoiceParams.push(decodedCompany, decodedCompany);

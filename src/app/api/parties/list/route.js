@@ -596,6 +596,12 @@ export async function GET(req) {
       let phoneOut = p.phone;
       let billingOut = p.billing_address;
       let gstinOut = p.gstin;
+      const namedInv = invoicesByName.get(
+        String(p.name || "").trim().toLowerCase(),
+      );
+      if (namedInv?.billing_address) {
+        billingOut = namedInv.billing_address;
+      }
       if (invAggForContact) {
         if (!phoneOut && invAggForContact.phone) phoneOut = invAggForContact.phone;
         if (!billingOut && invAggForContact.billing_address) {
