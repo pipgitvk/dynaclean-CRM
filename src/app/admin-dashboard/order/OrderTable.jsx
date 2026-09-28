@@ -221,12 +221,6 @@ const SkeletonLoader = () => (
   </div>
 );
 
-const PENDING_DISPATCH_STATUS_KEYS = new Set([
-  "pendinginvoice",
-  "invoiceuploaded",
-  "bookingdone",
-]);
-
 function isOrderPaid(order) {
   return (
     (order.payment_status || "")
@@ -243,26 +237,13 @@ function isOrderExcludedFromStatCards(order) {
   return (order.approval_status || "").toString().trim().toLowerCase() === "rejected";
 }
 
-/** Same rules as admin-dashboard-stats dispatched count. */
+/** neworder.dispatch_status: 1 = dispatched, anything else = not dispatched. */
 function isOrderDispatchedForStats(order) {
-  if (order.approval_status !== "approved") return false;
-  if (order.is_cancelled) return false;
-  const returned = Number(order.is_returned);
-  if ([1, 2, 3].includes(returned)) return false;
-  if (order.installation_status) return false;
-  if (order.delivery_status) return false;
-  return Boolean(order.dispatch_status);
+  return Number(order.dispatch_status) === 1;
 }
 
-/** Same rules as admin-dashboard-stats pending dispatch count. */
 function isOrderPendingDispatchForStats(order) {
-  if (order.approval_status !== "approved") return false;
-  if (order.is_cancelled) return false;
-  const returned = Number(order.is_returned);
-  if ([1, 2, 3].includes(returned)) return false;
-  if (order.installation_status) return false;
-  if (order.delivery_status) return false;
-  return !order.dispatch_status;
+  return Number(order.dispatch_status) !== 1;
 }
 
 /** Matches UI status "Dispatch Done" (same rules as getStatusText). */
@@ -766,12 +747,12 @@ export default function OrderTable({ orders, userRole }) {
         break;
       case "dispatched":
         setStatusFilter("dispatchdone");
-        setApprovalStatusFilter("");
+        setApprovalStatusFilter("approved");
         setPaymentStatusFilter("");
         break;
       case "pendingDispatch":
         setStatusFilter("pendingdispatched");
-        setApprovalStatusFilter("");
+        setApprovalStatusFilter("approved");
         setPaymentStatusFilter("");
         break;
       case "paid":
@@ -893,7 +874,9 @@ export default function OrderTable({ orders, userRole }) {
           .text.toLowerCase()
           .replace(/\s+/g, "");
         if (statusFilter === "pendingdispatched") {
-          if (!PENDING_DISPATCH_STATUS_KEYS.has(orderStatus)) return false;
+          if (Number(order.dispatch_status) === 1) return false;
+        } else if (statusFilter === "dispatchdone") {
+          if (Number(order.dispatch_status) !== 1) return false;
         } else if (orderStatus !== statusFilter.toLowerCase()) {
           return false;
         }

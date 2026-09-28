@@ -2574,7 +2574,7 @@ const NewInvoice = ({ invoice }) => {
                     display: "flex",
                     flexDirection: "row",
                     alignItems: "flex-start",
-                    gap: "80px",
+                    gap: "120px",
                     width: "100%",
                     boxSizing: "border-box",
                   }}
