@@ -40,21 +40,6 @@ function mergePartyExtras(existing, extras = {}, customerId) {
   return merged;
 }
 
-function buildCustomerNameLookup(custRows) {
-  const lookup = new Map();
-  for (const row of custRows) {
-    if (row.customer_id == null || String(row.customer_id).trim() === "") {
-      continue;
-    }
-    const names = [row.company, row.full_name, row.first_name].filter(Boolean);
-    for (const name of names) {
-      const normalized = String(name).trim().toLowerCase();
-      if (normalized) lookup.set(normalized, row.customer_id);
-    }
-  }
-  return lookup;
-}
-
 function buildCanonicalNameByCustomerId(custRows) {
   const lookup = new Map();
   for (const row of custRows) {
@@ -85,15 +70,21 @@ function groupPartiesByCustomerId(parties, canonicalNameByCustomerId) {
     const customerId =
       party.customer_id != null ? String(party.customer_id).trim() : "";
     if (!customerId) {
-      grouped.push({ ...party, aliasNames: [party.name] });
+      const aliases = Array.isArray(party.aliasNames) && party.aliasNames.length
+        ? party.aliasNames
+        : [party.name];
+      grouped.push({ ...party, aliasNames: aliases });
       continue;
     }
 
     if (!byCustomerId.has(customerId)) {
+      const aliases = Array.isArray(party.aliasNames) && party.aliasNames.length
+        ? party.aliasNames
+        : [party.name];
       byCustomerId.set(customerId, {
         ...party,
         name: canonicalNameByCustomerId.get(customerId) || party.name,
-        aliasNames: [party.name],
+        aliasNames: aliases,
       });
       continue;
     }
@@ -145,12 +136,28 @@ export async function GET(req) {
     const addRow = (rawName, customerId, extras = {}) => {
       const name = String(rawName || "").trim();
       if (!name) return;
-      const k = keyFor(name);
+      const cidRaw = customerId != null ? String(customerId).trim() : "";
+      const cid = cidRaw && cidRaw !== "0" ? cidRaw : "";
+      const k = cid ? `cid:${cid}` : `name:${keyFor(name)}`;
       if (!rows.has(k)) {
-        rows.set(k, { name, customer_id: customerId || undefined, ...extras });
-      } else {
-        rows.set(k, mergePartyExtras(rows.get(k), extras, customerId));
+        rows.set(k, {
+          name,
+          customer_id: cid || undefined,
+          aliasNames: [name],
+          ...extras,
+        });
+        return;
       }
+      const existing = rows.get(k);
+      const aliasNames = Array.isArray(existing.aliasNames)
+        ? existing.aliasNames.slice()
+        : [existing.name];
+      if (!aliasNames.some((n) => keyFor(n) === keyFor(name))) {
+        aliasNames.push(name);
+      }
+      const merged = mergePartyExtras(existing, extras, cid || customerId);
+      merged.aliasNames = aliasNames;
+      rows.set(k, merged);
     };
 
     const manualDrByName = new Map();
@@ -397,8 +404,17 @@ export async function GET(req) {
       });
     }
 
-    const customerNameLookup = buildCustomerNameLookup(custRows);
     const canonicalNameByCustomerId = buildCanonicalNameByCustomerId(custRows);
+    const contactByCustomerId = new Map();
+    for (const r of custRows) {
+      const cid = r.customer_id != null ? String(r.customer_id).trim() : "";
+      if (!cid || contactByCustomerId.has(cid)) continue;
+      contactByCustomerId.set(cid, {
+        phone: r.phone ? String(r.phone).trim() : "",
+        billing_address: r.billing_address ? String(r.billing_address).trim() : "",
+        gstin: r.gstin ? String(r.gstin).trim() : "",
+      });
+    }
 
     for (const r of custRows) {
       addRow(r.company || r.full_name, r.customer_id, {
@@ -410,10 +426,7 @@ export async function GET(req) {
 
     for (const r of invBuyerRows) {
       const buyerName = String(r.buyer_name || "").trim();
-      let customerId = r.customer_id;
-      if (customerId == null || String(customerId).trim() === "") {
-        customerId = customerNameLookup.get(buyerName.toLowerCase());
-      }
+      const customerId = r.customer_id;
       addRow(buyerName, customerId, {
         phone: r.customer_phone || undefined,
         billing_address: r.billing_address || undefined,
@@ -559,11 +572,13 @@ export async function GET(req) {
       let mDr = 0;
       let mCr = 0;
       let returnCr = 0;
-      for (const alias of aliasNames) {
-        const aliasLow = alias.toLowerCase();
-        mDr += manualDrByName.get(aliasLow) || 0;
-        mCr += manualCrByName.get(aliasLow) || 0;
-        returnCr += returnCrByName.get(aliasLow) || 0;
+      if (!customerIdKey) {
+        for (const alias of aliasNames) {
+          const aliasLow = alias.toLowerCase();
+          mDr += manualDrByName.get(aliasLow) || 0;
+          mCr += manualCrByName.get(aliasLow) || 0;
+          returnCr += returnCrByName.get(aliasLow) || 0;
+        }
       }
 
       if (
@@ -596,13 +611,12 @@ export async function GET(req) {
       let phoneOut = p.phone;
       let billingOut = p.billing_address;
       let gstinOut = p.gstin;
-      const namedInv = invoicesByName.get(
-        String(p.name || "").trim().toLowerCase(),
-      );
-      if (namedInv?.billing_address) {
-        billingOut = namedInv.billing_address;
-      }
-      if (invAggForContact) {
+      if (customerIdKey && contactByCustomerId.has(customerIdKey)) {
+        const contact = contactByCustomerId.get(customerIdKey);
+        phoneOut = contact.phone;
+        billingOut = contact.billing_address;
+        gstinOut = contact.gstin;
+      } else if (invAggForContact) {
         if (!phoneOut && invAggForContact.phone) phoneOut = invAggForContact.phone;
         if (!billingOut && invAggForContact.billing_address) {
           billingOut = invAggForContact.billing_address;

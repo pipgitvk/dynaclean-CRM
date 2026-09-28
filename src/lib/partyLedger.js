@@ -101,6 +101,7 @@ export async function appendReturnCompletedEntries(conn, {
   gstins = [],
   existingRows = [],
   derivedLedger,
+  onlyCustomerId = false,
 }) {
   try {
     const partyGstinList = Array.from(
@@ -126,15 +127,20 @@ export async function appendReturnCompletedEntries(conn, {
       } catch (_) {}
     }
 
-    const whereParts = [
-      "LOWER(TRIM(cn.company_name)) = LOWER(?)",
-      "LOWER(TRIM(qr.company_name)) = LOWER(?)",
-      "LOWER(TRIM(no.client_name)) = LOWER(?)",
-    ];
-    const whereParams = [partyName, partyName, partyName];
+    const whereParts = [];
+    const whereParams = [];
+    if (onlyCustomerId && customerId) {
+      whereParts.push("CAST(qr.customer_id AS CHAR) = ?");
+      whereParams.push(String(customerId));
+    } else {
+      whereParts.push("LOWER(TRIM(cn.company_name)) = LOWER(?)");
+      whereParts.push("LOWER(TRIM(qr.company_name)) = LOWER(?)");
+      whereParts.push("LOWER(TRIM(no.client_name)) = LOWER(?)");
+      whereParams.push(partyName, partyName, partyName);
+    }
 
     const invs = Array.from(invoiceNumbers || []).filter(Boolean).map(String);
-    if (invs.length > 0) {
+    if (!onlyCustomerId && invs.length > 0) {
       const ph = invs.map(() => "?").join(",");
       whereParts.push(`TRIM(cn.invoice_no) IN (${ph})`);
       whereParams.push(...invs);
@@ -142,18 +148,20 @@ export async function appendReturnCompletedEntries(conn, {
       whereParams.push(...invs);
     }
 
-    if (customerId) {
+    if (customerId && !onlyCustomerId) {
       whereParts.push("CAST(qr.customer_id AS CHAR) = ?");
       whereParams.push(String(customerId));
     }
 
-    if (partyGstinList.length > 0) {
+    if (!onlyCustomerId && partyGstinList.length > 0) {
       const ph = partyGstinList.map(() => "?").join(",");
       whereParts.push(`UPPER(TRIM(cn.customer_gstin)) IN (${ph})`);
       whereParams.push(...partyGstinList);
       whereParts.push(`UPPER(TRIM(qr.gstin)) IN (${ph})`);
       whereParams.push(...partyGstinList);
     }
+
+    if (whereParts.length === 0) return;
 
     const [cnRows] = await conn.execute(
       `SELECT
@@ -282,13 +290,18 @@ export async function buildLedgerForParty(decodedCompany, customerIdFilter = nul
       ? String(customerIdFilter).trim()
       : null;
 
-  const nameAliases = await getPartyNameAliases(conn, decodedCompany, cidFilter);
+  const nameAliases = cidFilter
+    ? []
+    : await getPartyNameAliases(conn, decodedCompany, null);
 
-  // Match invoices by company name only. A shared customer_id or billing
-  // address must not pull in invoices raised to a different company.
+  // A selected party is loaded only by customer_id. Name and address
+  // must not pull in another customer's invoices.
   const invoiceWhereParts = [];
   const invoiceParams = [];
-  if (nameAliases.length > 0) {
+  if (cidFilter) {
+    invoiceWhereParts.push("CAST(customer_id AS CHAR) = ?");
+    invoiceParams.push(cidFilter);
+  } else if (nameAliases.length > 0) {
     const nameClause = nameAliases
       .map(() => "(TRIM(customer_name) = ? OR customer_name = ?)")
       .join(" OR ");
@@ -296,9 +309,6 @@ export async function buildLedgerForParty(decodedCompany, customerIdFilter = nul
     for (const alias of nameAliases) {
       invoiceParams.push(alias, alias);
     }
-  } else if (cidFilter) {
-    invoiceWhereParts.push("CAST(customer_id AS CHAR) = ?");
-    invoiceParams.push(cidFilter);
   } else {
     invoiceWhereParts.push("(TRIM(customer_name) = ? OR customer_name = ?)");
     invoiceParams.push(decodedCompany, decodedCompany);
@@ -410,19 +420,21 @@ export async function buildLedgerForParty(decodedCompany, customerIdFilter = nul
     } catch (_) {}
   }
 
-  const supplierAliases = nameAliases.length > 0 ? nameAliases : [decodedCompany];
-  const supplierPlaceholders = supplierAliases.map(() => "?").join(",");
-  const [supplierPurchases] = await conn.execute(
-    `${purchaseSelect}
-     FROM product_stock_request
-     WHERE TRIM(client_company_name) IN (${supplierPlaceholders})
-        OR TRIM(client_name) IN (${supplierPlaceholders})
-     ORDER BY COALESCE(invoice_date, DATE(created_at)) DESC, id DESC`,
-    [...supplierAliases, ...supplierAliases],
-  );
-  // Supplier purchases: NOT marked as buyer — don't use their linked_statement_ids
-  // to avoid pulling in payments that belong to other parties
-  addPurchases(supplierPurchases, false);
+  if (!cidFilter) {
+    const supplierAliases = nameAliases.length > 0 ? nameAliases : [decodedCompany];
+    const supplierPlaceholders = supplierAliases.map(() => "?").join(",");
+    const [supplierPurchases] = await conn.execute(
+      `${purchaseSelect}
+       FROM product_stock_request
+       WHERE TRIM(client_company_name) IN (${supplierPlaceholders})
+          OR TRIM(client_name) IN (${supplierPlaceholders})
+       ORDER BY COALESCE(invoice_date, DATE(created_at)) DESC, id DESC`,
+      [...supplierAliases, ...supplierAliases],
+    );
+    // Supplier purchases: NOT marked as buyer — don't use their linked_statement_ids
+    // to avoid pulling in payments that belong to other parties
+    addPurchases(supplierPurchases, false);
+  }
 
   const purchaseRows = Array.from(purchaseById.values());
   const purchaseTokenSet = new Set();
@@ -716,16 +728,20 @@ export async function buildLedgerForParty(decodedCompany, customerIdFilter = nul
     }
   } catch (_) {}
 
-  const manualAliases = nameAliases.length > 0 ? nameAliases : [decodedCompany];
-  const manualPlaceholders = manualAliases.map(() => "?").join(",");
-  const [manualRows] = await conn.execute(
-    `SELECT id, entry_date, particulars, vch_type, vch_no, debit, credit, created_at
-     FROM ledger_entries
-     WHERE TRIM(buyer_name) IN (${manualPlaceholders})
-        OR buyer_name IN (${manualPlaceholders})
-     ORDER BY entry_date ASC, id ASC`,
-    [...manualAliases, ...manualAliases],
-  );
+  let manualRows = [];
+  if (!cidFilter) {
+    const manualAliases = nameAliases.length > 0 ? nameAliases : [decodedCompany];
+    const manualPlaceholders = manualAliases.map(() => "?").join(",");
+    const [rows] = await conn.execute(
+      `SELECT id, entry_date, particulars, vch_type, vch_no, debit, credit, created_at
+       FROM ledger_entries
+       WHERE TRIM(buyer_name) IN (${manualPlaceholders})
+          OR buyer_name IN (${manualPlaceholders})
+       ORDER BY entry_date ASC, id ASC`,
+      [...manualAliases, ...manualAliases],
+    );
+    manualRows = rows;
+  }
 
   const returnEntriesMap = {};
   for (const row of manualRows) {
@@ -748,12 +764,13 @@ export async function buildLedgerForParty(decodedCompany, customerIdFilter = nul
   });
 
   await appendReturnCompletedEntries(conn, {
-    partyName: decodedCompany,
+    partyName: cidFilter ? "" : decodedCompany,
     customerId: customerIdForCompany,
-    invoiceNumbers: buyerInvoiceNumbers,
-    gstins: invoices.map((i) => i.gst_number).filter(Boolean),
+    invoiceNumbers: cidFilter ? [] : buyerInvoiceNumbers,
+    gstins: cidFilter ? [] : invoices.map((i) => i.gst_number).filter(Boolean),
     existingRows: filteredManualRows,
     derivedLedger,
+    onlyCustomerId: Boolean(cidFilter),
   });
 
   const combined = [
