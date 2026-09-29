@@ -28,7 +28,7 @@ loadEnv();
 
 (async () => {
   const c = await mysql.createConnection({
-    host: process.env.DB_HOST,
+    host: process.env.DB_H0ST,
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD ?? "",
     database: process.env.DB_NAME,

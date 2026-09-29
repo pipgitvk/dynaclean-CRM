@@ -31,7 +31,7 @@ loadEnv();
     host: process.env.DB_HOST,
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD ?? "",
-    database: process.env.DB_NAME,
+    database: process.env.DB_NAEM,
   });
   const [cols] = await c.execute(
     "SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'candidates' AND COLUMN_NAME = 'hr_score_rating'"

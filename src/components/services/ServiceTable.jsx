@@ -160,7 +160,12 @@ export default function ServiceTable({ serviceRecords, role }) {
           </button>
         )}
       <Link
-        href={`/${dashboardPath}/complete-service/${record.service_id}`}
+        href={
+          dashboardPath === "admin-dashboard" &&
+          String(record.service_type || "").trim().toUpperCase() === "COMPLAINT"
+            ? `/${dashboardPath}/service-report-steps/${record.service_id}`
+            : `/${dashboardPath}/complete-service/${record.service_id}`
+        }
         title="+ Make Report"
         className={`${actionIconClass} bg-purple-500 hover:bg-purple-600`}
       >
@@ -783,6 +788,8 @@ export default function ServiceTable({ serviceRecords, role }) {
                     record.status?.toUpperCase() === "PENDING FOR SPARES"
                   )
                     rowBackgroundColor = "bg-orange-100";
+                  else if (record.status?.toUpperCase() === "WORKED")
+                    rowBackgroundColor = "bg-amber-50";
 
                   return (
                     <tr
@@ -957,6 +964,8 @@ export default function ServiceTable({ serviceRecords, role }) {
                 cardBackgroundColor = "bg-green-50";
               else if (record.status?.toUpperCase() === "PENDING FOR SPARES")
                 cardBackgroundColor = "bg-orange-100";
+              else if (record.status?.toUpperCase() === "WORKED")
+                cardBackgroundColor = "bg-amber-50";
 
               return (
                 <div

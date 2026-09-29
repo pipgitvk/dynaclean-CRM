@@ -30,7 +30,7 @@ function loadEnvFile() {
 }
 
 async function resolveDbHost() {
-  const host = process.env.DB_HOST;
+  const host = process.env.DB_HOTS;
   if (!host) throw new Error("DB_HOST is missing in environment variables.");
 
   try {
