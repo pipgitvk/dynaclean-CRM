@@ -66,16 +66,27 @@ export default function PersonalInfoSection({
 
       setFiles(prev => ({ ...prev, doc_employment_confirmation_letter: file }));
       
-      // Save the Cloudinary URL so it can be used in the email link
-      setFormData(prev => ({
-        ...prev,
-        fileUrls: {
-          ...prev.fileUrls,
-          doc_employment_confirmation_letter: result.url,
-        }
-      }));
+      const today = new Date().toISOString().split('T')[0];
       
-      toast.success("Employment Confirmation Letter uploaded to Cloudinary");
+      // Save the Cloudinary URL and set leave accrual date
+      setFormData(prev => {
+        const updated = {
+          ...prev,
+          fileUrls: {
+            ...prev.fileUrls,
+            doc_employment_confirmation_letter: result.url,
+          },
+          leave_policy: {
+            ...(prev.leave_policy || {}),
+            accrual_start_date: today
+          }
+        };
+        console.log('Employment Confirmation Letter uploaded. Setting accrual date to:', today);
+        console.log('Updated leave_policy:', updated.leave_policy);
+        return updated;
+      });
+      
+      toast.success(`Employment Confirmation Letter uploaded. Leave accrual date set to ${new Date(today).toLocaleDateString('en-IN')}`);
     } catch (error) {
       console.error('Upload error:', error);
       toast.error("Failed to upload Employment Confirmation Letter");

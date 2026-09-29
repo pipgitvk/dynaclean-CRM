@@ -123,18 +123,38 @@ export default function DocumentsSection({
       setFiles(prev => ({ ...prev, [fieldName]: file }));
       setDocuments(prev => ({ ...prev, [fieldName]: true }));
       
-      // Store Cloudinary URL so it can be used for email links
-      if (fieldName === 'doc_employment_confirmation_letter') {
-        setFormData(prev => ({
-          ...prev,
-          fileUrls: {
-            ...prev.fileUrls,
-            [fieldName]: result.url,
-          }
-        }));
-      }
+      // Store Cloudinary URL
+      setFormData(prev => ({
+        ...prev,
+        fileUrls: {
+          ...prev.fileUrls,
+          [fieldName]: result.url,
+        }
+      }));
       
-      toast.success(`${fieldName.replace('_', ' ')} uploaded to Cloudinary`);
+      // If Employment Confirmation Letter is uploaded, auto-set leave accrual date
+      if (fieldName === 'doc_employment_confirmation_letter') {
+        const today = new Date().toISOString().split('T')[0];
+        
+        console.log('Setting accrual date to:', today);
+        
+        // Update form data with the accrual start date
+        setFormData(prev => {
+          const updated = {
+            ...prev,
+            leave_policy: {
+              ...(prev.leave_policy || {}),
+              accrual_start_date: today
+            }
+          };
+          console.log('Updated formData with accrual_start_date:', updated.leave_policy.accrual_start_date);
+          return updated;
+        });
+        
+        toast.success(`Employment Confirmation Letter uploaded. Leave accrual date set to ${new Date(today).toLocaleDateString('en-IN')}`);
+      } else {
+        toast.success(`${fieldName.replace('_', ' ')} uploaded`);
+      }
     } catch (error) {
       console.error('Upload error:', error);
       toast.error(`Failed to upload ${fieldName.replace('_', ' ')}`);
