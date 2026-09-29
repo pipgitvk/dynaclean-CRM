@@ -890,47 +890,11 @@ export async function PATCH(request) {
         overrideIsHalfDay = computedDays < 1 ? 1 : 0;
 
         // ── C. For paid leave: check balance ──
-        if (leave.leave_type === "paid") {
-          // Get accrual start date from employee_profiles
-          const [profRows] = await conn.execute(
-            `SELECT leave_policy FROM employee_profiles WHERE username = ? LIMIT 1`,
-            [leave.username]
-          );
-          const leavePolicy = profRows[0]?.leave_policy
-            ? (typeof profRows[0].leave_policy === "string"
-                ? JSON.parse(profRows[0].leave_policy)
-                : profRows[0].leave_policy)
-            : null;
-
-          const accrualStartDate = leavePolicy?.accrual_start_date || null;
-          const paidPerMonth = Number(leavePolicy?.paid_leaves_per_month) || 1.5;
-
-          let accrued = 0;
-          if (accrualStartDate) {
-            const start = new Date(accrualStartDate);
-            const now = new Date();
-            // Count completed months from accrual start up to now
-            const monthsElapsed =
-              (now.getFullYear() - start.getFullYear()) * 12 +
-              (now.getMonth() - start.getMonth());
-            accrued = Math.max(0, monthsElapsed) * paidPerMonth;
-          }
-
-          // Sum all approved paid leave days (excluding this leave)
-          const [usedRows] = await conn.execute(
-            `SELECT COALESCE(SUM(total_days), 0) AS used
-             FROM employee_leaves
-             WHERE username = ? AND leave_type = 'paid' AND status = 'approved' AND id != ?`,
-            [leave.username, leaveId]
-          );
-          const usedDays = Number(usedRows[0]?.used) || 0;
-          const balance = accrued - usedDays;
-
-          if (balance < computedDays) {
-            // Not enough paid leave → convert to unpaid
-            overrideLeaveType = "unpaid";
-          }
-        }
+        // Note: We don't auto-convert to unpaid anymore - let the system admin decide
+        // if (leave.leave_type === "paid") {
+        //   Get accrual start date from employee_profiles
+        //   ... balance check logic disabled ...
+        // }
 
         overrideTotalDays = computedDays;
       } catch (smartErr) {
