@@ -28,12 +28,20 @@ export function canEditDeliveryProof(order) {
   return Date.now() - deliveredAt.getTime() <= HOURS_24_MS;
 }
 
-export function canEditOrderDocumentField(order, fieldKey) {
+export function canEditOrderDocumentField(order, fieldKey, currentFileValue = "") {
+  // Check if files are already uploaded
+  const hasFiles = String(currentFileValue || "").trim().length > 0;
+  
   switch (fieldKey) {
     case "ewaybill_file":
     case "einvoice_file":
     case "report_file":
-      return isBeforeDispatch(order);
+      // If file is already uploaded, cannot edit (non-editable once uploaded)
+      if (hasFiles) return false;
+      
+      // If file is not uploaded yet, can always upload (even after dispatch)
+      return true;
+      
     case "deliverchallan":
       return isBeforeDelivered(order);
     case "delivery_proof":
@@ -46,14 +54,21 @@ export function canEditOrderDocumentField(order, fieldKey) {
   }
 }
 
-export function getOrderDocumentEditBlockReason(order, fieldKey) {
-  if (canEditOrderDocumentField(order, fieldKey)) return null;
+export function getOrderDocumentEditBlockReason(order, fieldKey, currentFileValue = "") {
+  if (canEditOrderDocumentField(order, fieldKey, currentFileValue)) return null;
+
+  const hasFiles = String(currentFileValue || "").trim().length > 0;
 
   switch (fieldKey) {
     case "ewaybill_file":
     case "einvoice_file":
     case "report_file":
-      return "Cannot edit after dispatch.";
+      // Only reason for blocking: file is already uploaded
+      if (hasFiles) {
+        return "Cannot edit once uploaded.";
+      }
+      return "Upload not allowed.";
+      
     case "deliverchallan":
       return "Cannot edit after delivery is marked complete.";
     case "delivery_proof":
