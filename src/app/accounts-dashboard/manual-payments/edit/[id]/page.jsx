@@ -332,7 +332,7 @@ export default function EditPaymentPage() {
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <div>
           <div className="border-b border-gray-200 pb-6">
             <h2 className="text-lg font-semibold text-gray-700 mb-4">
               Customer Information
@@ -346,7 +346,7 @@ export default function EditPaymentPage() {
                   type="text"
                   name="customer_name"
                   value={formData.customer_name}
-                  onChange={handleChange}
+                  disabled
                   required
                   className={INPUT}
                 />
@@ -359,7 +359,7 @@ export default function EditPaymentPage() {
                   type="text"
                   name="customer_phone"
                   value={formData.customer_phone}
-                  onChange={handleChange}
+                  disabled
                   className={INPUT}
                 />
               </div>
@@ -371,7 +371,7 @@ export default function EditPaymentPage() {
                   type="email"
                   name="customer_email"
                   value={formData.customer_email}
-                  onChange={handleChange}
+                  disabled
                   className={INPUT}
                 />
               </div>
@@ -391,7 +391,7 @@ export default function EditPaymentPage() {
                   type="number"
                   name="amount"
                   value={formData.amount}
-                  onChange={handleChange}
+                  disabled
                   step="0.01"
                   min="0"
                   required
@@ -405,7 +405,7 @@ export default function EditPaymentPage() {
                 <select
                   name="payment_type"
                   value={formData.payment_type}
-                  onChange={handleChange}
+                  disabled
                   className={INPUT}
                 >
                   <option value="advance">Advance</option>
@@ -421,7 +421,7 @@ export default function EditPaymentPage() {
                 <select
                   name="payment_method"
                   value={formData.payment_method}
-                  onChange={handleChange}
+                  disabled
                   className={INPUT}
                 >
                   <option value="cash">Cash</option>
@@ -440,7 +440,7 @@ export default function EditPaymentPage() {
                   type="text"
                   name="reference_number"
                   value={formData.reference_number}
-                  onChange={handleChange}
+                  disabled
                   className={INPUT}
                 />
               </div>
@@ -452,7 +452,7 @@ export default function EditPaymentPage() {
                   type="date"
                   name="payment_date"
                   value={formData.payment_date}
-                  onChange={handleChange}
+                  disabled
                   className={INPUT}
                 />
               </div>
@@ -464,7 +464,7 @@ export default function EditPaymentPage() {
                   type="date"
                   name="due_date"
                   value={formData.due_date}
-                  onChange={handleChange}
+                  disabled
                   className={INPUT}
                 />
               </div>
@@ -475,7 +475,7 @@ export default function EditPaymentPage() {
                 <select
                   name="status"
                   value={formData.status}
-                  onChange={handleChange}
+                  disabled
                   className={INPUT}
                 >
                   <option value="pending">Pending</option>
@@ -497,29 +497,10 @@ export default function EditPaymentPage() {
                     >
                       View Current Invoice
                     </a>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setRemoveInvoice(true);
-                        setNewInvoiceFile(null);
-                      }}
-                      className="text-sm font-medium text-red-600"
-                    >
-                      Remove
-                    </button>
                   </div>
                 )}
-                <input
-                  type="file"
-                  accept=".pdf,.jpg,.jpeg,.png"
-                  onChange={(e) => {
-                    setNewInvoiceFile(e.target.files?.[0] || null);
-                    setRemoveInvoice(false);
-                  }}
-                  className={INPUT}
-                />
                 <p className="mt-1 text-xs text-gray-500">
-                  Upload a new file to replace the current invoice.
+                  Invoice upload is disabled.
                 </p>
               </div>
               <div className="md:col-span-2">
@@ -529,7 +510,7 @@ export default function EditPaymentPage() {
                 <textarea
                   name="remarks"
                   value={formData.remarks}
-                  onChange={handleChange}
+                  disabled
                   rows={3}
                   className={INPUT}
                 />
@@ -543,17 +524,10 @@ export default function EditPaymentPage() {
               onClick={() => router.push("/accounts-dashboard/manual-payments")}
               className="px-6 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium"
             >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={submitting}
-              className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:opacity-50"
-            >
-              {submitting ? "Updating..." : "Update Payment Entry"}
+              ← Back
             </button>
           </div>
-        </form>
+        </div>
 
         <div className="mt-8">
           <h2 className="text-lg font-semibold text-gray-700 mb-4">
