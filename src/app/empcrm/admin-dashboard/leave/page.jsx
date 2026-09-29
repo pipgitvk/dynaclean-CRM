@@ -288,6 +288,32 @@ export default function AdminLeaveManagement() {
     }
   };
 
+  const handleRevert = async (leaveId) => {
+    try {
+      setActionLoading(true);
+      const response = await fetch("/api/empcrm/leaves", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ leaveId, revert: true })
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        alert("Leave reverted to pending successfully");
+        fetchLeaves();
+        setShowApprovalModal(false);
+      } else {
+        alert(data.error || "Failed to revert leave");
+      }
+    } catch (error) {
+      console.error("Error reverting leave:", error);
+      alert("Error reverting leave");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const handleReject = async (leaveId) => {
     if (!rejectionReason.trim()) {
       alert("Please provide a rejection reason");
@@ -748,6 +774,17 @@ export default function AdminLeaveManagement() {
                             Revert
                           </button>
                         )}
+                        {(leave.status === "approved" || leave.status === "rejected") && (
+                          <button
+                            onClick={() => {
+                              setSelectedLeave(leave);
+                              handleRevert(leave.id);
+                            }}
+                            className="px-3 py-1 bg-orange-600 text-white rounded-lg hover:bg-orange-700 text-sm font-medium"
+                          >
+                            Revert
+                          </button>
+                        )}
                         {leave.status === "pending" && !leave.acknowledged_at && userRole !== "HR RECRUITER" && (
                           <button
                             onClick={() => {
@@ -1078,6 +1115,15 @@ export default function AdminLeaveManagement() {
                   {selectedLeave.status === "pending" && selectedLeave.acknowledged_at && (
                     <button
                       onClick={() => handleRevertAcknowledgement(selectedLeave.id)}
+                      disabled={actionLoading}
+                      className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50"
+                    >
+                      {actionLoading ? "Processing..." : "Revert"}
+                    </button>
+                  )}
+                  {(selectedLeave.status === "approved" || selectedLeave.status === "rejected") && (
+                    <button
+                      onClick={() => handleRevert(selectedLeave.id)}
                       disabled={actionLoading}
                       className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50"
                     >

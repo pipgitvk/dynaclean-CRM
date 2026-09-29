@@ -649,9 +649,9 @@ export async function PATCH(request) {
     }
 
     const body = await request.json();
-    const { leaveId, status, rejection_reason, acknowledgement_remark, revert_acknowledgement } = body;
+    const { leaveId, status, rejection_reason, acknowledgement_remark, revert_acknowledgement, revert } = body;
 
-    if (!leaveId || (!status && !revert_acknowledgement)) {
+    if (!leaveId || (!status && !revert_acknowledgement && !revert)) {
       return NextResponse.json(
         { success: false, error: "Leave ID and status are required" },
         { status: 400 }
@@ -711,6 +711,23 @@ export async function PATCH(request) {
           { status: 400 }
         );
       }
+    }
+
+    // Revert status: change approved/rejected back to pending
+    if (revert) {
+      await conn.execute(
+        `UPDATE employee_leaves
+         SET status = 'pending', reviewed_by = NULL, reviewed_at = NULL
+         WHERE id = ?`,
+        [leaveId]
+      );
+      if (conn.release) conn.release();
+
+      return NextResponse.json({
+        success: true,
+        message: "Leave status reverted to pending successfully",
+        reverted: true,
+      });
     }
 
     // Revert acknowledgement: clear acknowledgement fields
