@@ -1241,6 +1241,17 @@ const GenerateSalaryPage = () => {
                                                         : attendanceBreakdown.halfDayPaid}
                                                 </dd>
                                             </div>
+                                            <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
+                                                <dt className="text-slate-600">
+                                                    <span className="text-xs block">Unpaid Half-Days</span>
+                                                    <span className="text-[11px] text-slate-500">(unpaid leave)</span>
+                                                </dt>
+                                                <dd className="font-semibold text-red-600 tabular-nums">
+                                                    {attendanceDisplayAllZero
+                                                        ? 0
+                                                        : attendanceBreakdown.halfDayUnpaid}
+                                                </dd>
+                                            </div>
                                             <div className="flex justify-between gap-2 pt-2 items-baseline">
                                                 <dt className="text-slate-800 font-medium">Pay days (for salary)</dt>
                                                 <dd className="text-lg font-bold text-purple-700 tabular-nums">
@@ -1279,6 +1290,15 @@ const GenerateSalaryPage = () => {
                                             </dt>
                                             <dd className="font-semibold text-emerald-600 tabular-nums">
                                                 {fz(attendanceBreakdown.halfDayPaid)}
+                                            </dd>
+                                        </div>
+                                        <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
+                                            <dt className="text-slate-600">
+                                                <span className="text-xs block">Unpaid Half-Days</span>
+                                                <span className="text-[11px] text-slate-500">(unpaid leave)</span>
+                                            </dt>
+                                            <dd className="font-semibold text-red-600 tabular-nums">
+                                                {fz(attendanceBreakdown.halfDayUnpaid)}
                                             </dd>
                                         </div>
                                         <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
@@ -1412,6 +1432,40 @@ const GenerateSalaryPage = () => {
                                         </div>
                                     </div>
                                 </div>
+
+                                {/* Unpaid Leaves Section */}
+                                {calculation.processedDeductions.filter(
+                                    (d) => d.deduction_code?.includes('UNPAID_LEAVE') ||
+                                           d.deduction_name?.toLowerCase().includes('unpaid leave')
+                                ).length > 0 && (
+                                    <div className="bg-orange-50 rounded-lg p-5 shadow-sm">
+                                        <h4 className="font-semibold text-orange-800 mb-3 flex items-center">
+                                            <Calculator className="w-4 h-4 mr-2" /> Unpaid Leaves
+                                        </h4>
+                                        <div className="space-y-2 text-sm">
+                                            {calculation.processedDeductions
+                                                .filter((d) => d.deduction_code?.includes('UNPAID_LEAVE') ||
+                                                               d.deduction_name?.toLowerCase().includes('unpaid leave'))
+                                                .map((d, i) => (
+                                                    <div key={`unpaid-${i}`} className="flex justify-between">
+                                                        <span>{d.deduction_name}</span>
+                                                        <span>{formatCurrency(d.calculatedAmount)}</span>
+                                                    </div>
+                                                ))}
+                                            <div className="border-t border-orange-200 mt-2 pt-2 flex justify-between font-bold text-orange-900">
+                                                <span>Subtotal</span>
+                                                <span>
+                                                    {formatCurrency(
+                                                        calculation.processedDeductions
+                                                            .filter((d) => d.deduction_code?.includes('UNPAID_LEAVE') ||
+                                                                           d.deduction_name?.toLowerCase().includes('unpaid leave'))
+                                                            .reduce((sum, d) => sum + (Number(d.calculatedAmount) || 0), 0)
+                                                    )}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
 
                             <div className="flex justify-end gap-3 pt-4 flex-wrap">
