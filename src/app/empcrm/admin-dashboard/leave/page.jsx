@@ -695,10 +695,15 @@ export default function AdminLeaveManagement() {
                           {leave.is_half_day ? "Half-Day" : leave.leave_type.charAt(0).toUpperCase() + leave.leave_type.slice(1)}
                         </span>
                         {leave.is_half_day ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700 border border-orange-200">
-                            <Sun className="w-3 h-3" />
-                            {leave.half_day_type === "1st_half" ? "1st Half" : "2nd Half"}
-                          </span>
+                          <>
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700 border border-orange-200">
+                              <Sun className="w-3 h-3" />
+                              {leave.half_day_type === "1st_half" ? "1st Half" : "2nd Half"}
+                            </span>
+                            <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${getLeaveTypeColor(leave.leave_type)}`}>
+                              {leave.leave_type.charAt(0).toUpperCase() + leave.leave_type.slice(1)}
+                            </span>
+                          </>
                         ) : null}
                       </div>
                     </td>
@@ -974,15 +979,20 @@ export default function AdminLeaveManagement() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium text-gray-600">Leave Type</label>
-                  <div className="flex flex-col gap-1 mt-1">
+                  <div className="flex flex-col gap-2 mt-1">
                     <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${selectedLeave.is_half_day ? "bg-orange-100 text-orange-700" : getLeaveTypeColor(selectedLeave.leave_type)}`}>
                       {selectedLeave.is_half_day ? "Half-Day" : selectedLeave.leave_type.charAt(0).toUpperCase() + selectedLeave.leave_type.slice(1)}
                     </span>
                     {selectedLeave.is_half_day && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700 border border-orange-200">
-                        <Sun className="w-3 h-3" />
-                        Half-Day · {selectedLeave.half_day_type === "1st_half" ? "1st Half (Morning)" : "2nd Half (Afternoon)"}
-                      </span>
+                      <>
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700 border border-orange-200 w-fit">
+                          <Sun className="w-3 h-3" />
+                          Half-Day · {selectedLeave.half_day_type === "1st_half" ? "1st Half (Morning)" : "2nd Half (Afternoon)"}
+                        </span>
+                        <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${getLeaveTypeColor(selectedLeave.leave_type)} w-fit`}>
+                          {selectedLeave.leave_type === 'paid' ? '💰 Paid Leave' : selectedLeave.leave_type === 'sick' ? '🏥 Sick Leave' : selectedLeave.leave_type === 'casual' ? '📅 Casual Leave' : selectedLeave.leave_type.charAt(0).toUpperCase() + selectedLeave.leave_type.slice(1)}
+                        </span>
+                      </>
                     )}
                   </div>
                 </div>
