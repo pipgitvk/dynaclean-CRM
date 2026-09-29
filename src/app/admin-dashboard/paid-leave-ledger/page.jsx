@@ -392,6 +392,9 @@ export default function PaidLeaveLedger() {
                           Days
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Half-Day
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Description / Reason
                         </th>
                         <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -431,6 +434,15 @@ export default function PaidLeaveLedger() {
                           </td>
                           <td className="px-6 py-4 text-center font-semibold text-gray-900">
                             {entry.days}
+                          </td>
+                          <td className="px-6 py-4">
+                            {entry.is_half_day ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-700 border border-orange-200">
+                                🌗 {entry.half_day_type === '1st_half' ? '1st Half' : '2nd Half'}
+                              </span>
+                            ) : (
+                              <span className="text-gray-400">Full Day</span>
+                            )}
                           </td>
                           <td className="px-6 py-4 text-sm text-gray-600">
                             <div>
@@ -542,6 +554,9 @@ export default function PaidLeaveLedger() {
                           Days
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Half-Day
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Reason
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -571,6 +586,15 @@ export default function PaidLeaveLedger() {
                                             entry.status === 'pending' ? 'text-amber-600' : 'text-red-600'}>
                               {entry.days}
                             </span>
+                          </td>
+                          <td className="px-6 py-4 text-sm">
+                            {entry.is_half_day ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-700 border border-orange-200">
+                                🌗 {entry.half_day_type === '1st_half' ? '1st Half' : '2nd Half'}
+                              </span>
+                            ) : (
+                              <span className="text-gray-400">Full Day</span>
+                            )}
                           </td>
                           <td className="px-6 py-4 text-sm text-gray-600 max-w-xs">
                             <div className="line-clamp-2">
