@@ -16,7 +16,7 @@ export default function StockStatusModal({ isOpen, onClose }) {
 
   useEffect(() => {
     if (isOpen) {
-      fetch("/api/product-stock-summary")
+      fetch("/api/product-stock/summary")
         .then((res) => res.json())
         .then(setData);
     }

@@ -1,32 +1,43 @@
 import { NextResponse } from "next/server";
-import { parseFormData } from "@/lib/parseForm";
+import { parseFormData } from "@/lib/parseFormData";
+import fs from "fs";
+import path from "path";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
-import { uploadOrderAccountFile } from "@/lib/uploadOrderAccountFile";
-import { isBeforeDispatch } from "@/lib/orderDocumentEditRules";
 
-const MAX_FILES_PER_FIELD = 5;
+// Ensure the target folder exists
+const ensureDir = (dirPath) => {
+  if (!fs.existsSync(dirPath)) {
+    fs.mkdirSync(dirPath, { recursive: true });
+  }
+};
+
+// Save file to public/Order/accounts/
+async function saveFileLocally(file) {
+  if (!file || !file.filepath) throw new Error("Missing file");
+
+  const uploadDir = path.join(process.cwd(), "public", "Order", "accounts");
+  ensureDir(uploadDir);
+
+  const ext = path.extname(file.originalFilename || "") || ".bin";
+  const uniqueName = `${Date.now()}_${Math.random()
+    .toString(36)
+    .substring(2, 8)}${ext}`;
+  const destPath = path.join(uploadDir, uniqueName);
+
+  await fs.promises.copyFile(file.filepath, destPath);
+
+  // Return relative URL (for database usage)
+  return `/Order/accounts/${uniqueName}`;
+}
 
 // Normalize file input
 const getFile = (f) => (Array.isArray(f) ? f[0] : f);
 
-async function saveFilesField(fileField) {
-  if (!fileField) return "";
-  const list = Array.isArray(fileField) ? fileField : [fileField];
-  const paths = [];
-  for (const item of list.slice(0, MAX_FILES_PER_FIELD)) {
-    const file = getFile(item);
-    if (file?.filepath) {
-      paths.push(await uploadOrderAccountFile(file));
-    }
-  }
-  return paths.filter(Boolean).join(",");
-}
-
 // POST handler
 export async function POST(req) {
   try {
-    const { fields, files } = await parseFormData(req, { multiples: true });
+    const { fields, files } = await parseFormData(req);
 
     const orderId = parseInt(fields.order_id);
     if (!orderId) throw new Error("Missing or invalid order_id");
@@ -69,41 +80,32 @@ export async function POST(req) {
           )
         : null;
 
-    const reportPath = await saveFilesField(files.report_file);
-    if (!reportPath) {
-      return NextResponse.json(
-        { error: "Invoice PDF is required" },
-        { status: 400 },
-      );
-    }
-
-    // PDF → local, images → Cloudinary — up to 5 per field, comma-separated paths/URLs
-    const ewaybillPath = await saveFilesField(files.ewaybill_file);
-    const einvoicePath = await saveFilesField(files.einvoice_file);
-    const challanPath = await saveFilesField(files.deliverchallan);
+    // Save files locally (if present)
+    const ewaybillPath = files.ewaybill_file
+      ? await saveFileLocally(getFile(files.ewaybill_file))
+      : "";
+    const einvoicePath = files.einvoice_file
+      ? await saveFileLocally(getFile(files.einvoice_file))
+      : "";
+    const reportPath = files.report_file
+      ? await saveFileLocally(getFile(files.report_file))
+      : "";
+    const challanPath = files.deliverchallan
+      ? await saveFileLocally(getFile(files.deliverchallan))
+      : "";
 
     // DB connection
     const conn = await getDbConnection();
     const payload = await getSessionPayload();
     const accountBy = payload?.username || payload?.name || null;
 
-    // Find quote_number and order state
+    // Find quote_number and, if needed, existing invoice date for this order
     const [orderRows] = await conn.execute(
-      `SELECT quote_number, duedate, dispatch_status,
-              ewaybill_file, einvoice_file, report_file, deliverchallan
-       FROM neworder WHERE order_id = ?`,
+      `SELECT quote_number, duedate FROM neworder WHERE order_id = ?`,
       [orderId]
     );
     const existingOrder =
       Array.isArray(orderRows) && orderRows.length ? orderRows[0] : {};
-
-    if (!isBeforeDispatch(existingOrder)) {
-      return NextResponse.json(
-        { error: "Invoice and tax documents cannot be edited after dispatch." },
-        { status: 403 },
-      );
-    }
-
     const quoteNumber = existingOrder.quote_number;
 
     // Get payment_term_days from quotation (if available)
@@ -139,15 +141,7 @@ export async function POST(req) {
     else if (paid === 0 && isOverdue) paymentStatus = "over due";
     else paymentStatus = "pending";
 
-    // Save to DB (merge file fields when not re-uploaded)
-    const mergedReportPath = reportPath || existingOrder.report_file || "";
-    const mergedEwaybillPath =
-      ewaybillPath || existingOrder.ewaybill_file || "";
-    const mergedEinvoicePath =
-      einvoicePath || existingOrder.einvoice_file || "";
-    const mergedChallanPath =
-      challanPath || existingOrder.deliverchallan || "";
-
+    // Save to DB (include baseAmount and new payment fields)
     await conn.execute(
       `UPDATE neworder SET 
         baseAmount = ?, 
@@ -169,10 +163,10 @@ export async function POST(req) {
       WHERE order_id = ?`,
       [
         baseAmount,
-        mergedEwaybillPath,
-        mergedReportPath,
-        mergedEinvoicePath,
-        mergedChallanPath,
+        ewaybillPath,
+        reportPath,
+        einvoicePath,
+        challanPath,
         invoiceNumber,
         dueDate,
         taxAmt,

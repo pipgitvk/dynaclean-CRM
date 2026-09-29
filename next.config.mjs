@@ -1,6 +1,15 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Inlined into the server runtime so remote MySQL always prefers TLS.
+  // Override locally with DB_SSL=false in the environment *before* next boots
+  // only works if this key is unset at config-eval time.
+  env: {
+    DB_SSL: process.env.DB_SLL ?? "true",
+  },
   serverExternalPackages: ["face-api.js", "@tensorflow/tfjs", "node-cron"],
+  logging: {
+    incomingRequests: false,
+  },
   images: {
     remotePatterns: [
       {
@@ -42,11 +51,6 @@ const nextConfig = {
       {
         source: "/company_documents/:path*",
         destination: "/api/serve/:path*",
-      },
-      // Order invoice / e-way bill uploads (public/Order/accounts/)
-      {
-        source: "/Order/:path*",
-        destination: "/api/serve/Order/:path*",
       },
     ];
   },

@@ -3,9 +3,6 @@ import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import LedgerTableClient from "./LedgerTableClient";
-import { appendReturnCompletedEntries } from "@/lib/partyLedger";
-import { EXCLUDE_PROFORMA_INVOICE_SQL } from "@/lib/ledgerInvoiceFilters";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
@@ -50,13 +47,18 @@ function parseLinkedPurchaseIds(raw) {
     const s = String(v).trim().toUpperCase();
     if (!s) continue;
     if (/^(IP|PP|PS|SP)\d+$/.test(s)) {
-      keys.push(s.startsWith("SP") ? `PS${s.slice(2)}` : s);
+      keys.push(s);
     } else if (/^\d+$/.test(s)) {
       keys.push(`IP${s}`);
     }
   }
   return keys;
 }
+
+const fmt = (n) => {
+  const num = Number(n) || 0;
+  return num.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
 
 export default async function LedgerPage({ params }) {
   const { companyName } = await params;
@@ -94,8 +96,7 @@ export default async function LedgerPage({ params }) {
          DATE(created_at) AS created_date,
          created_at
        FROM invoices
-       WHERE (TRIM(customer_name) = ? OR customer_name = ?)
-         AND ${EXCLUDE_PROFORMA_INVOICE_SQL}
+       WHERE TRIM(customer_name) = ? OR customer_name = ?
        ORDER BY COALESCE(order_date, invoice_date) DESC, id DESC`,
       [decodedCompany, decodedCompany]
     );
@@ -108,10 +109,9 @@ export default async function LedgerPage({ params }) {
     if (!customerIdForCompany) {
       const [cRows] = await conn.execute(
         `SELECT customer_id FROM product_stock_request 
-         WHERE (TRIM(client_name) = ? OR TRIM(client_company_name) = ?)
-           AND customer_id IS NOT NULL AND customer_id != 0
+         WHERE TRIM(client_name) = ? AND customer_id IS NOT NULL AND customer_id != 0
          LIMIT 1`,
-        [decodedCompany, decodedCompany]
+        [decodedCompany]
       );
       if (cRows.length > 0) {
         customerIdForCompany = cRows[0].customer_id;
@@ -185,7 +185,7 @@ export default async function LedgerPage({ params }) {
         const [allInvRows] = await conn.execute(
           `SELECT id, grand_total, linked_trans_ids, invoice_number
            FROM invoices
-           WHERE (${queryParts.join(" OR ")}) AND ${EXCLUDE_PROFORMA_INVOICE_SQL}`,
+           WHERE ${queryParts.join(" OR ")}`,
           queryParams
         );
         allLinkedInvoices = allInvRows;
@@ -262,71 +262,23 @@ export default async function LedgerPage({ params }) {
       }
     }
 
-    // ── 5. Fetch purchases for this company (customer_id and/or supplier name) ──────
-    const purchaseSelect = `
-      SELECT 
-        id,
-        COALESCE(invoice_date, DATE(created_at)) AS invoice_date,
-        invoice_number,
-        net_amount,
-        client_name,
-        CASE
-          WHEN EXISTS (
-            SELECT 1 FROM spare_list sl
-            WHERE CAST(sl.id AS CHAR) = TRIM(CAST(product_code AS CHAR))
-          )
-          AND NOT EXISTS (
-            SELECT 1 FROM products_list pl
-            WHERE LOWER(TRIM(pl.item_code)) = LOWER(TRIM(product_code))
-          ) THEN 'spare'
-          ELSE 'product'
-        END AS purchase_source
-    `;
-
-    const purchaseById = new Map();
-    const addPurchases = (rows) => {
-      for (const row of rows) {
-        const key = `${row.purchase_source}-${row.id}`;
-        if (!purchaseById.has(key)) purchaseById.set(key, row);
-      }
-    };
-
+    // ── 5. Fetch purchases for this company (by customer_id) ──────
+    let purchaseRows = [];
     if (customerIdForCompany) {
       const [pRows] = await conn.execute(
-        `${purchaseSelect}
+        `SELECT 
+           id,
+           COALESCE(invoice_date, DATE(created_at)) AS invoice_date,
+           invoice_number,
+           net_amount,
+           client_name
          FROM product_stock_request
          WHERE customer_id = ?
          ORDER BY COALESCE(invoice_date, DATE(created_at)) DESC, id DESC`,
         [customerIdForCompany]
       );
-      addPurchases(pRows);
-
-      const [spareRows] = await conn.execute(
-        `SELECT 
-           id,
-           DATE(created_at) AS invoice_date,
-           NULL AS invoice_number,
-           net_amount,
-           client_name,
-           'spare' AS purchase_source
-         FROM spare_stock_request
-         WHERE customer_id = ?
-         ORDER BY created_at DESC, id DESC`,
-        [customerIdForCompany]
-      );
-      addPurchases(spareRows);
+      purchaseRows = pRows;
     }
-
-    const [supplierPurchases] = await conn.execute(
-      `${purchaseSelect}
-       FROM product_stock_request
-       WHERE TRIM(client_company_name) = ?
-       ORDER BY COALESCE(invoice_date, DATE(created_at)) DESC, id DESC`,
-      [decodedCompany]
-    );
-    addPurchases(supplierPurchases);
-
-    const purchaseRows = Array.from(purchaseById.values());
 
     // ── 6. Build ledger entries ────────────────────────────
     const derivedLedger = [];
@@ -351,58 +303,15 @@ export default async function LedgerPage({ params }) {
       const purchDate = purch.invoice_date ? String(purch.invoice_date).slice(0, 10) : null;
       if (!purchDate) continue;
 
-      const purchLabel = purch.purchase_source === 'spare' ? 'Spare Purchase' : 'Purchase';
-      const purchIdPrefix = purch.purchase_source === 'spare' ? 'spare-purch' : 'purch';
-
       derivedLedger.push({
-        id: `${purchIdPrefix}-${purch.id}`,
+        id: `purch-${purch.id}`,
         entry_date: purchDate,
-        particulars: `${purchLabel} – ${purch.invoice_number || `#${purch.id}`}`,
-        vch_type: purchLabel,
+        particulars: `Purchase – ${purch.invoice_number}`,
+        vch_type: "Purchase",
         vch_no: purch.invoice_number,
         debit: 0,
         credit: Number(purch.net_amount) || 0,
         source: "purchase",
-      });
-    }
-
-    // Add purchase payment entries (statements linked via PP/PS tokens)
-    const purchaseTokenSet = new Set();
-    const tokenToSource = {};
-    for (const purch of purchaseRows) {
-      const token =
-        purch.purchase_source === "spare" ? `PS${purch.id}` : `PP${purch.id}`;
-      purchaseTokenSet.add(token);
-      tokenToSource[token] = purch.purchase_source;
-    }
-
-    const seenPaymentStmtIds = new Set();
-    for (const stmt of allStatements) {
-      const tokens = parseLinkedPurchaseIds(stmt.linked_purchase_ids);
-      const matchingTokens = tokens.filter(
-        (t) => (t.startsWith("PP") || t.startsWith("PS")) && purchaseTokenSet.has(t)
-      );
-      if (matchingTokens.length === 0 || seenPaymentStmtIds.has(stmt.id)) continue;
-      seenPaymentStmtIds.add(stmt.id);
-
-      const stmtDate = stmt.date ? String(stmt.date).slice(0, 10) : null;
-      if (!stmtDate) continue;
-
-      const isSparePayment = matchingTokens.every(
-        (t) => t.startsWith("PS") || tokenToSource[t] === "spare"
-      );
-
-      derivedLedger.push({
-        id: `pmt-${stmt.id}`,
-        entry_date: stmtDate,
-        particulars: stmt.description
-          ? stmt.description
-          : `${isSparePayment ? "Spare" : "Payment"} – ${stmt.trans_id}`,
-        vch_type: isSparePayment ? "Spare" : "Payment",
-        vch_no: String(stmt.trans_id),
-        debit: Math.abs(Number(stmt.amount) || 0),
-        credit: 0,
-        source: "purchase_payment",
       });
     }
 
@@ -489,14 +398,6 @@ export default async function LedgerPage({ params }) {
       return true;
     });
 
-    await appendReturnCompletedEntries(conn, {
-      partyName: decodedCompany,
-      customerId: customerIdForCompany,
-      invoiceNumbers: buyerInvoiceNumbers,
-      existingRows: filteredManualRows,
-      derivedLedger,
-    });
-
     // ── 8. Merge + sort by date
     const combined = [
       ...derivedLedger,
@@ -506,16 +407,7 @@ export default async function LedgerPage({ params }) {
       const db = String(b.entry_date).slice(0, 10);
       if (da < db) return -1;
       if (da > db) return 1;
-      const orderMap = {
-        Sales: 0,
-        Return: 1,
-        "Return Completed": 1,
-        Purchase: 2,
-        "Spare Purchase": 2,
-        Spare: 3,
-        Payment: 3,
-        Receipt: 4,
-      };
+      const orderMap = { "Sales": 0, "Purchase": 1, "Receipt": 2 };
       const aOrder = orderMap[a.vch_type] !== undefined ? orderMap[a.vch_type] : 99;
       const bOrder = orderMap[b.vch_type] !== undefined ? orderMap[b.vch_type] : 99;
       if (aOrder !== bOrder) return aOrder - bOrder;
@@ -527,12 +419,14 @@ export default async function LedgerPage({ params }) {
     console.error("[ledger page] DB error:", err?.message);
   }
 
-  // Serialize dates to strings for client component
-  const serializedEntries = ledgerEntries.map((e) => ({
-    ...e,
-    entry_date: String(e.entry_date).slice(0, 10),
-    created_at: e.created_at ? String(e.created_at).slice(0, 19) : undefined,
-  }));
+  // Calculate totals
+  let totalDebit = 0;
+  let totalCredit = 0;
+  for (const entry of ledgerEntries) {
+    totalDebit += Number(entry.debit) || 0;
+    totalCredit += Number(entry.credit) || 0;
+  }
+  const netBalance = totalDebit - totalCredit;
 
   return (
     <div className="max-w-7xl mx-auto p-6 w-full space-y-6">
@@ -549,19 +443,77 @@ export default async function LedgerPage({ params }) {
       <div>
         <h1 className="text-2xl font-bold text-gray-800">{decodedCompany}</h1>
         <p className="text-sm text-gray-500 mt-0.5">
-          {customerIdForCompany && (
-            <span className="font-medium">ID: {customerIdForCompany}</span>
-          )}{" "}
-          • {ledgerEntries.length} ledger entries on record
+          {customerIdForCompany && <span className="font-medium">ID: {customerIdForCompany}</span>} • {ledgerEntries.length} ledger entries on record
         </p>
       </div>
 
-      {/* Client component: date filter + download + table */}
-      <LedgerTableClient
-        rows={serializedEntries}
-        companyName={decodedCompany}
-        customerId={customerIdForCompany}
-      />
+      {/* Summary Cards */}
+      <div className="grid grid-cols-3 gap-4">
+        <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+          <p className="text-sm text-gray-600 mb-2">TOTAL DEBIT</p>
+          <p className="text-2xl font-bold text-red-600">₹{fmt(totalDebit)}</p>
+        </div>
+        <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+          <p className="text-sm text-gray-600 mb-2">TOTAL CREDIT</p>
+          <p className="text-2xl font-bold text-green-600">₹{fmt(totalCredit)}</p>
+        </div>
+        <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+          <p className="text-sm text-gray-600 mb-2">NET BALANCE</p>
+          <p className={`text-2xl font-bold ${netBalance > 0 ? 'text-red-600' : 'text-green-600'}`}>
+            ₹{fmt(Math.abs(netBalance))} {netBalance > 0 ? '(Dr)' : '(Cr)'}
+          </p>
+        </div>
+      </div>
+
+      {/* Ledger Table */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th className="px-4 py-3 text-left font-semibold text-gray-700">Date</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-700">Particulars</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-700">Vch Type</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-700">Vch No</th>
+                <th className="px-4 py-3 text-right font-semibold text-gray-700">Debit (₹)</th>
+                <th className="px-4 py-3 text-right font-semibold text-gray-700">Credit (₹)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ledgerEntries.length === 0 ? (
+                <tr>
+                  <td colSpan="6" className="px-4 py-8 text-center text-gray-500">
+                    No ledger entries found
+                  </td>
+                </tr>
+              ) : (
+                ledgerEntries.map((entry, idx) => (
+                  <tr key={entry.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                    <td className="px-4 py-3 text-gray-800">{String(entry.entry_date).slice(0, 10)}</td>
+                    <td className="px-4 py-3 text-gray-800">{entry.particulars}</td>
+                    <td className="px-4 py-3">
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${
+                        entry.vch_type === 'Sales' ? 'bg-purple-100 text-purple-800' :
+                        entry.vch_type === 'Receipt' ? 'bg-green-100 text-green-800' :
+                        'bg-blue-100 text-blue-800'
+                      }`}>
+                        {entry.vch_type}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-gray-800">{entry.vch_no}</td>
+                    <td className="px-4 py-3 text-right font-medium text-red-600">
+                      {Number(entry.debit) > 0 ? `₹${fmt(entry.debit)}` : '-'}
+                    </td>
+                    <td className="px-4 py-3 text-right font-medium text-green-600">
+                      {Number(entry.credit) > 0 ? `₹${fmt(entry.credit)}` : '-'}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }

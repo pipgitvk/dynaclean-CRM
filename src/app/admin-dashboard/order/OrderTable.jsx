@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import {
   FileText,
   UploadCloud,
@@ -15,183 +15,13 @@ import {
   ArrowUp,
   ArrowDown,
   PackageCheck,
-  CreditCard,
-  Clock,
-  Package,
-  Pencil,
-  AlertCircle,
 } from "lucide-react";
-import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import dayjs from "dayjs";
 import ExcelJS from "exceljs";
-import { Pie } from "react-chartjs-2";
-import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
-import {
-  canEditDeliveryProof,
-} from "@/lib/orderDocumentEditRules";
-
-ChartJS.register(ArcElement, Tooltip, Legend);
 
 import DeleteButton from "@/components/accounts/DeleteButton";
-import {
-  DispatchPhotosMenuButton,
-  DispatchPhotosModal,
-} from "@/components/orders/DispatchPhotosModal";
 import toast from "react-hot-toast";
-
-function parseOrderLineItems(order) {
-  if (Array.isArray(order?.line_items)) return order.line_items;
-  return [];
-}
-
-function normalizeModelCode(code) {
-  return String(code || "").trim().toUpperCase();
-}
-
-function lineItemMatchesModelFilter(item, filterKey) {
-  if (!filterKey) return false;
-  const code = normalizeModelCode(item.item_code);
-  const filterCode = normalizeModelCode(filterKey);
-  if (code && filterCode && code === filterCode) return true;
-  return String(item.item_name || "").trim() === String(filterKey).trim();
-}
-
-function orderMatchesModelFilter(order, filterKey) {
-  if (!filterKey) return true;
-  return parseOrderLineItems(order).some((item) => lineItemMatchesModelFilter(item, filterKey));
-}
-
-function orderMatchesModelFilters(order, filterKeys) {
-  if (!filterKeys?.length) return true;
-  return filterKeys.some((filterKey) =>
-    parseOrderLineItems(order).some((item) => lineItemMatchesModelFilter(item, filterKey)),
-  );
-}
-
-function modelQuantityInOrder(order, filterKey) {
-  if (!filterKey) return 0;
-  return parseOrderLineItems(order)
-    .filter((item) => lineItemMatchesModelFilter(item, filterKey))
-    .reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
-}
-
-function modelQuantityInOrders(order, filterKeys) {
-  if (!filterKeys?.length) return 0;
-  return filterKeys.reduce((sum, filterKey) => sum + modelQuantityInOrder(order, filterKey), 0);
-}
-
-function parseModelFiltersFromStorage(raw) {
-  if (!raw) return [];
-  try {
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) return parsed.map((item) => String(item || "").trim()).filter(Boolean);
-  } catch {
-    const legacy = String(raw).trim();
-    if (legacy) return [legacy];
-  }
-  return [];
-}
-
-function formatModelOptionLabel(item) {
-  const code = String(item?.item_code || "").trim();
-  const name = String(item?.item_name || "").trim();
-  if (code && name) return `${code} (${name})`;
-  return name || code || "";
-}
-
-function resolveItemType(codeKey, catalogByCode, spareCatalogByCode) {
-  if (catalogByCode.has(codeKey)) return "product";
-  if (spareCatalogByCode.has(codeKey)) return "spare";
-  return /[a-zA-Z]/.test(codeKey) ? "product" : "spare";
-}
-
-function sortModelOptions(options) {
-  return [...options].sort((a, b) => {
-    const typeOrder = (type) => (type === "product" ? 0 : 1);
-    const typeDiff = typeOrder(a.itemType) - typeOrder(b.itemType);
-    if (typeDiff !== 0) return typeDiff;
-    return a.label.localeCompare(b.label, undefined, { sensitivity: "base" });
-  });
-}
-
-function buildModelOptions(orders, catalogByCode, spareCatalogByCode) {
-  const map = new Map();
-
-  orders?.forEach((order) => {
-    parseOrderLineItems(order).forEach((item) => {
-      const code = String(item.item_code || "").trim();
-      const codeKey = normalizeModelCode(code);
-      const orderName = String(item.item_name || "").trim();
-
-      if (codeKey) {
-        const catalogName = String(catalogByCode.get(codeKey)?.item_name || "").trim();
-        const spareName = String(spareCatalogByCode.get(codeKey)?.item_name || "").trim();
-        const name = catalogName || spareName || orderName;
-        if (!name) return;
-        map.set(codeKey, {
-          filterKey: codeKey,
-          item_code: code,
-          item_name: name,
-          itemType: resolveItemType(codeKey, catalogByCode, spareCatalogByCode),
-          label: formatModelOptionLabel({ item_code: code, item_name: name }),
-        });
-        return;
-      }
-
-      if (!orderName) return;
-      const nameKey = `name:${orderName.toLowerCase()}`;
-      if (!map.has(nameKey)) {
-        map.set(nameKey, {
-          filterKey: orderName,
-          item_code: "",
-          item_name: orderName,
-          itemType: /[a-zA-Z]/.test(orderName) ? "product" : "spare",
-          label: orderName,
-        });
-      }
-    });
-  });
-
-  return sortModelOptions([...map.values()]);
-}
-
-function findModelOption(filterKey, modelOptions) {
-  if (!filterKey) return null;
-  const codeKey = normalizeModelCode(filterKey);
-  return (
-    modelOptions.find((opt) => opt.filterKey === filterKey) ||
-    modelOptions.find((opt) => normalizeModelCode(opt.filterKey) === codeKey) ||
-    modelOptions.find((opt) => opt.item_name === filterKey) ||
-    modelOptions.find((opt) => normalizeModelCode(opt.item_code) === codeKey) ||
-    null
-  );
-}
-
-function getModelLabel(filterKey, modelOptions) {
-  if (!filterKey) return "";
-  return findModelOption(filterKey, modelOptions)?.label || filterKey;
-}
-
-function isSameModelFilter(filterKey, opt) {
-  if (!filterKey || !opt) return false;
-  return (
-    filterKey === opt.filterKey ||
-    normalizeModelCode(filterKey) === normalizeModelCode(opt.filterKey) ||
-    filterKey === opt.item_name
-  );
-}
-
-function isModelFilterSelected(filterKeys, opt) {
-  if (!filterKeys?.length || !opt) return false;
-  return filterKeys.some((filterKey) => isSameModelFilter(filterKey, opt));
-}
-
-function normalizeModelFilterKeys(filterKeys, modelOptions) {
-  if (!filterKeys?.length || !modelOptions?.length) return filterKeys || [];
-  return [...new Set(
-    filterKeys.map((filterKey) => findModelOption(filterKey, modelOptions)?.filterKey || filterKey),
-  )];
-}
 
 // 👻 A sleek skeleton loader for a modern feel
 const SkeletonLoader = () => (
@@ -224,31 +54,6 @@ const SkeletonLoader = () => (
     </div>
   </div>
 );
-
-function isOrderPaid(order) {
-  return (
-    (order.payment_status || "")
-      .toString()
-      .trim()
-      .toLowerCase()
-      .replace(/\s+/g, "") === "paid"
-  );
-}
-
-/** Cancelled and rejected orders are excluded from dashboard stat cards. */
-function isOrderExcludedFromStatCards(order) {
-  if (order.is_cancelled) return true;
-  return (order.approval_status || "").toString().trim().toLowerCase() === "rejected";
-}
-
-/** neworder.dispatch_status: 1 = dispatched, anything else = not dispatched. */
-function isOrderDispatchedForStats(order) {
-  return Number(order.dispatch_status) === 1;
-}
-
-function isOrderPendingDispatchForStats(order) {
-  return Number(order.dispatch_status) !== 1;
-}
 
 /** Matches UI status "Dispatch Done" (same rules as getStatusText). */
 function isDisplayedDispatchDone(order) {
@@ -345,124 +150,7 @@ function orderCreatedInDateRange(order, dateFrom, dateTo) {
   return true;
 }
 
-function getStatusText(order) {
-  if (order.approval_status === "pending") {
-    return {
-      text: "Pending Approval",
-      bg: "bg-orange-100",
-      textCol: "text-orange-800",
-      icon: <MoreVertical size={14} className="mr-1" />,
-    };
-  }
-  if (order.approval_status === "rejected") {
-    return {
-      text: "Rejected",
-      bg: "bg-red-100",
-      textCol: "text-red-800",
-      icon: <XCircle size={14} className="mr-1" />,
-    };
-  }
-  if (Number(order.is_returned) === 3) {
-    if (Number(order.return_booking_done) === 1) {
-      return {
-        text: "Return Booking Done",
-        bg: "bg-indigo-100",
-        textCol: "text-indigo-800",
-        icon: <ArrowUp size={14} className="mr-1" />,
-      };
-    }
-    return {
-      text: "Return Initiated",
-      bg: "bg-purple-100",
-      textCol: "text-purple-800",
-      icon: <ArrowUp size={14} className="mr-1" />,
-    };
-  }
-  if (Number(order.is_returned) === 1) {
-    if (Number(order.warehouse_in_done) === 1) {
-      return {
-        text: "Return Completed",
-        bg: "bg-orange-100",
-        textCol: "text-orange-800",
-        icon: <CheckCircle size={14} className="mr-1" />,
-      };
-    }
-    return {
-      text: "Fully Returned",
-      bg: "bg-red-100",
-      textCol: "text-red-800",
-      icon: <XCircle size={14} className="mr-1" />,
-    };
-  }
-  if (Number(order.is_returned) === 2) {
-    return {
-      text: "Partially Returned",
-      bg: "bg-orange-100",
-      textCol: "text-orange-800",
-      icon: <XCircle size={14} className="mr-1" />,
-    };
-  }
-  if (order.is_cancelled || order.approval_status === "rejected") {
-    return {
-      text: "Canceled",
-      bg: "bg-red-100",
-      textCol: "text-red-800",
-      icon: <XCircle size={14} className="mr-1" />,
-    };
-  }
-  if (order.installation_status) {
-    return {
-      text: "Installed",
-      bg: "bg-green-100",
-      textCol: "text-green-800",
-      icon: <CheckCircle size={14} className="mr-1" />,
-    };
-  }
-  if (order.delivery_status) {
-    return {
-      text: "Delivered",
-      bg: "bg-orange-100",
-      textCol: "text-orange-800",
-      icon: <Truck size={14} className="mr-1" />,
-    };
-  }
-  if (order.dispatch_status) {
-    return {
-      text: "Dispatch Done",
-      bg: "bg-violet-100",
-      textCol: "text-violet-800",
-      icon: <FileText size={14} className="mr-1" />,
-    };
-  }
-  if (order.booking_id) {
-    return {
-      text: "Booking Done",
-      bg: "bg-green-100",
-      textCol: "text-green-800",
-      icon: <FileCheck size={14} className="mr-1" />,
-    };
-  }
-  if (order.report_file) {
-    return {
-      text: "Invoice Uploaded",
-      bg: "bg-blue-100",
-      textCol: "text-blue-800",
-      icon: <FileText size={14} className="mr-1" />,
-    };
-  }
-  return {
-    text: "Pending Invoice",
-    bg: "bg-yellow-100",
-    textCol: "text-yellow-800",
-    icon: <UploadCloud size={14} className="mr-1" />,
-  };
-}
-
 export default function OrderTable({ orders, userRole }) {
-  const [productCatalog, setProductCatalog] = useState([]);
-  const [spareCatalog, setSpareCatalog] = useState([]);
-  const searchParams = useSearchParams();
-
   // Initialize from localStorage with defaults
   const [searchQuery, setSearchQuery] = useState(() => {
     if (typeof window !== "undefined") {
@@ -470,6 +158,7 @@ export default function OrderTable({ orders, userRole }) {
     }
     return "";
   });
+  const [filteredOrders, setFilteredOrders] = useState([]);
   const [statusFilter, setStatusFilter] = useState(() => {
     if (typeof window !== "undefined") {
       return localStorage.getItem("orderTable_statusFilter") || "";
@@ -496,54 +185,11 @@ export default function OrderTable({ orders, userRole }) {
     }
     return "";
   });
-  const [modelNameFilters, setModelNameFilters] = useState(() => {
-    if (typeof window !== "undefined") {
-      const saved =
-        localStorage.getItem("orderTable_modelNameFilters") ||
-        localStorage.getItem("orderTable_modelNameFilter");
-      return parseModelFiltersFromStorage(saved);
-    }
-    return [];
-  });
-  const [modelSearchText, setModelSearchText] = useState("");
-  const [showModelDropdown, setShowModelDropdown] = useState(false);
-  const modelSearchRef = useRef(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const [productsRes, sparesRes] = await Promise.all([
-          fetch("/api/products/list", { cache: "no-store" }),
-          fetch("/api/spare/list", { cache: "no-store" }),
-        ]);
-        if (!cancelled && productsRes.ok) {
-          const data = await productsRes.json();
-          if (Array.isArray(data)) setProductCatalog(data);
-        }
-        if (!cancelled && sparesRes.ok) {
-          const data = await sparesRes.json();
-          if (Array.isArray(data)) setSpareCatalog(data);
-        }
-      } catch {
-        /* non-fatal */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
   const [openMenuId, setOpenMenuId] = useState(null); // State to track which menu is open
   // const canShowInstall = ["SUPERADMIN"].includes(userRole);
   const [approvalStatusFilter, setApprovalStatusFilter] = useState(() => {
     if (typeof window !== "undefined") {
       return localStorage.getItem("orderTable_approvalStatusFilter") || "";
-    }
-    return "";
-  });
-  const [paymentStatusFilter, setPaymentStatusFilter] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("orderTable_paymentStatusFilter") || "";
     }
     return "";
   });
@@ -563,15 +209,6 @@ export default function OrderTable({ orders, userRole }) {
   // Sorting state
   const [sortColumn, setSortColumn] = useState("created_at");
   const [sortDirection, setSortDirection] = useState("desc");
-
-  useEffect(() => {
-    const status = searchParams.get("status");
-    const from = searchParams.get("dateFrom");
-    const to = searchParams.get("dateTo");
-    if (status) setStatusFilter(status);
-    if (from) setDateFrom(from);
-    if (to) setDateTo(to);
-  }, [searchParams]);
 
   // Save filter states to localStorage whenever they change
   useEffect(() => {
@@ -606,21 +243,9 @@ export default function OrderTable({ orders, userRole }) {
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      localStorage.setItem("orderTable_modelNameFilters", JSON.stringify(modelNameFilters));
-    }
-  }, [modelNameFilters]);
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
       localStorage.setItem("orderTable_approvalStatusFilter", approvalStatusFilter);
     }
   }, [approvalStatusFilter]);
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("orderTable_paymentStatusFilter", paymentStatusFilter);
-    }
-  }, [paymentStatusFilter]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -665,8 +290,6 @@ export default function OrderTable({ orders, userRole }) {
         return getStatusText(order).text.toLowerCase();
       case "payment_status":
         return order.payment_status?.toString().toLowerCase() || "";
-      case "taxable_amount":
-        return getPaymentColumnAmount(order);
       case "totalamt":
         return Number(order.totalamt) || 0;
       case "paid_amount":
@@ -688,11 +311,7 @@ export default function OrderTable({ orders, userRole }) {
     setDateFrom(dayjs().startOf('month').format('YYYY-MM-DD'));
     setDateTo(dayjs().endOf('month').format('YYYY-MM-DD'));
     setCreatedByFilter("");
-    setModelNameFilters([]);
-    setModelSearchText("");
-    setShowModelDropdown(false);
     setApprovalStatusFilter("");
-    setPaymentStatusFilter("");
     setShowRejected(false);
     
     // Clear localStorage
@@ -702,77 +321,10 @@ export default function OrderTable({ orders, userRole }) {
       localStorage.removeItem("orderTable_dateFrom");
       localStorage.removeItem("orderTable_dateTo");
       localStorage.removeItem("orderTable_createdByFilter");
-      localStorage.removeItem("orderTable_modelNameFilters");
-      localStorage.removeItem("orderTable_modelNameFilter");
       localStorage.removeItem("orderTable_approvalStatusFilter");
-      localStorage.removeItem("orderTable_paymentStatusFilter");
       localStorage.removeItem("orderTable_showRejected");
     }
   };
-
-  const toggleModelFilter = useCallback((opt) => {
-    setModelNameFilters((prev) => {
-      if (isModelFilterSelected(prev, opt)) {
-        return prev.filter((filterKey) => !isSameModelFilter(filterKey, opt));
-      }
-      return [...prev, opt.filterKey];
-    });
-  }, []);
-
-  const removeModelFilter = useCallback((filterKey) => {
-    setModelNameFilters((prev) =>
-      prev.filter((selectedKey) => !isSameModelFilter(selectedKey, { filterKey, item_name: filterKey })),
-    );
-  }, []);
-
-  const handleStatCardClick = useCallback((type) => {
-    switch (type) {
-      case "total":
-        setStatusFilter("");
-        setApprovalStatusFilter("");
-        setPaymentStatusFilter("");
-        setShowRejected(false);
-        break;
-      case "approved":
-        setStatusFilter("");
-        setApprovalStatusFilter("approved");
-        setPaymentStatusFilter("");
-        break;
-      case "pending":
-        setStatusFilter("");
-        setApprovalStatusFilter("pending");
-        setPaymentStatusFilter("");
-        break;
-      case "rejected":
-        setStatusFilter("");
-        setApprovalStatusFilter("rejected");
-        setShowRejected(true);
-        setPaymentStatusFilter("");
-        break;
-      case "dispatched":
-        setStatusFilter("dispatchdone");
-        setApprovalStatusFilter("approved");
-        setPaymentStatusFilter("");
-        break;
-      case "pendingDispatch":
-        setStatusFilter("pendingdispatched");
-        setApprovalStatusFilter("approved");
-        setPaymentStatusFilter("");
-        break;
-      case "paid":
-        setStatusFilter("");
-        setApprovalStatusFilter("");
-        setPaymentStatusFilter("paid");
-        break;
-      case "unpaid":
-        setStatusFilter("");
-        setApprovalStatusFilter("");
-        setPaymentStatusFilter("unpaid");
-        break;
-      default:
-        break;
-    }
-  }, []);
 
   const handleExportToExcel = async () => {
     setIsExporting(true);
@@ -863,31 +415,29 @@ export default function OrderTable({ orders, userRole }) {
     }
   };
 
-  // Filter + sort orders (shared by table, stat cards, and amount summary)
-  const filteredOrders = useMemo(() => {
-    if (!orders) return [];
+  // Filter orders based on search query, status filter, and date range
+  useEffect(() => {
+    if (!orders) return;
 
     const lowercasedQuery = searchQuery.toLowerCase();
     let result = orders.filter((order) => {
-      if (!showRejected && order.approval_status === "rejected") {
+      // Step 0.5: Filter rejected orders based on toggle
+      if (!showRejected && order.approval_status === 'rejected') {
         return false;
       }
 
+      // Step 1: Filter by status
       if (statusFilter) {
         const orderStatus = getStatusText(order)
           .text.toLowerCase()
           .replace(/\s+/g, "");
-        if (statusFilter === "pendingdispatched") {
-          if (Number(order.dispatch_status) === 1) return false;
-        } else if (statusFilter === "dispatchdone") {
-          if (Number(order.dispatch_status) !== 1) return false;
-        } else if (orderStatus !== statusFilter.toLowerCase()) {
-          return false;
-        }
+        if (orderStatus !== statusFilter.toLowerCase()) return false; 
       }
 
+      // Step 2: Date range filter (created_at)
       if (!orderCreatedInDateRange(order, dateFrom, dateTo)) return false;
 
+      // Step 2.5: Filter by created_by
       if (createdByFilter && order.created_by !== createdByFilter) {
         return false;
       }
@@ -899,20 +449,7 @@ export default function OrderTable({ orders, userRole }) {
         return false;
       }
 
-      if (paymentStatusFilter === "paid" && !isOrderPaid(order)) {
-        return false;
-      }
-      if (paymentStatusFilter === "unpaid" && isOrderPaid(order)) {
-        return false;
-      }
-      if (paymentStatusFilter === "unpaid" && order.is_cancelled) {
-        return false;
-      }
-
-      if (!orderMatchesModelFilters(order, modelNameFilters)) {
-        return false;
-      }
-
+      // Step 3: Search across multiple fields
       return (
         order.order_id?.toLowerCase().includes(lowercasedQuery) ||
         order.client_name?.toLowerCase().includes(lowercasedQuery) ||
@@ -922,7 +459,8 @@ export default function OrderTable({ orders, userRole }) {
       );
     });
 
-    return [...result].sort((a, b) => {
+    // Step 4: Sort the filtered results
+    result = [...result].sort((a, b) => {
       const valA = getSortValue(a, sortColumn);
       const valB = getSortValue(b, sortColumn);
 
@@ -934,6 +472,8 @@ export default function OrderTable({ orders, userRole }) {
       if (valA > valB) return sortDirection === "asc" ? 1 : -1;
       return 0;
     });
+
+    setFilteredOrders(result);
   }, [
     searchQuery,
     orders,
@@ -942,274 +482,10 @@ export default function OrderTable({ orders, userRole }) {
     dateTo,
     createdByFilter,
     approvalStatusFilter,
-    paymentStatusFilter,
     sortColumn,
     sortDirection,
     showRejected,
-    modelNameFilters,
   ]);
-
-  const catalogByCode = useMemo(() => {
-    const map = new Map();
-    productCatalog.forEach((product) => {
-      const key = normalizeModelCode(product.item_code);
-      if (key) map.set(key, product);
-    });
-    return map;
-  }, [productCatalog]);
-
-  const spareCatalogByCode = useMemo(() => {
-    const map = new Map();
-    spareCatalog.forEach((spare) => {
-      const numberKey = normalizeModelCode(spare.spare_number);
-      const idKey = normalizeModelCode(spare.id);
-      if (numberKey) map.set(numberKey, spare);
-      if (idKey) map.set(idKey, spare);
-    });
-    return map;
-  }, [spareCatalog]);
-
-  const modelOptions = useMemo(
-    () => buildModelOptions(orders, catalogByCode, spareCatalogByCode),
-    [orders, catalogByCode, spareCatalogByCode],
-  );
-
-  const filteredModelQuantity = useMemo(() => {
-    if (!modelNameFilters.length) return 0;
-    return filteredOrders.reduce(
-      (sum, order) => sum + modelQuantityInOrders(order, modelNameFilters),
-      0,
-    );
-  }, [filteredOrders, modelNameFilters]);
-
-  const filteredModelOptions = useMemo(() => {
-    const query = modelSearchText.trim().toLowerCase();
-    const list = !query
-      ? modelOptions
-      : modelOptions.filter((opt) => {
-          const code = String(opt.item_code || "").toLowerCase();
-          const name = String(opt.item_name || "").toLowerCase();
-          const label = String(opt.label || "").toLowerCase();
-          return code.includes(query) || name.includes(query) || label.includes(query);
-        });
-    return sortModelOptions(list).slice(0, 50);
-  }, [modelOptions, modelSearchText]);
-
-  useEffect(() => {
-    if (!modelNameFilters.length || !modelOptions.length) return;
-    const normalized = normalizeModelFilterKeys(modelNameFilters, modelOptions);
-    const changed =
-      normalized.length !== modelNameFilters.length ||
-      normalized.some((key, index) => key !== modelNameFilters[index]);
-    if (changed) setModelNameFilters(normalized);
-  }, [modelNameFilters, modelOptions]);
-
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (
-        modelSearchRef.current &&
-        !modelSearchRef.current.contains(event.target)
-      ) {
-        setShowModelDropdown(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  const ordersForStatCards = useMemo(
-    () => filteredOrders.filter((order) => !isOrderExcludedFromStatCards(order)),
-    [filteredOrders],
-  );
-
-  const orderStats = useMemo(() => {
-    return ordersForStatCards.reduce(
-      (acc, order) => {
-        const taxable = getPaymentColumnAmount(order);
-        const approval = (order.approval_status || "")
-          .toString()
-          .trim()
-          .toLowerCase();
-        const isPendingApproval = approval === "pending";
-        const isApproved = approval === "approved";
-
-        if (isPendingApproval) {
-          acc.pending += 1;
-          acc.pendingAmount += taxable;
-        }
-
-        if (isApproved) {
-          acc.total += 1;
-          acc.totalAmount += taxable;
-          acc.approved += 1;
-          acc.approvedAmount += taxable;
-
-          if (isOrderDispatchedForStats(order)) {
-            acc.dispatched += 1;
-            acc.dispatchedAmount += taxable;
-          }
-          if (isOrderPendingDispatchForStats(order)) {
-            acc.pendingDispatch += 1;
-            acc.pendingDispatchAmount += taxable;
-          }
-          if (isOrderPaid(order)) {
-            acc.paid += 1;
-            acc.paidAmount += taxable;
-          } else {
-            acc.unpaid += 1;
-            acc.unpaidAmount += taxable;
-          }
-        }
-
-        return acc;
-      },
-      {
-        total: 0,
-        pending: 0,
-        approved: 0,
-        dispatched: 0,
-        pendingDispatch: 0,
-        paid: 0,
-        unpaid: 0,
-        totalAmount: 0,
-        pendingAmount: 0,
-        approvedAmount: 0,
-        dispatchedAmount: 0,
-        pendingDispatchAmount: 0,
-        paidAmount: 0,
-        unpaidAmount: 0,
-      },
-    );
-  }, [ordersForStatCards]);
-
-  const rejectedOrderStats = useMemo(() => {
-    return filteredOrders.reduce(
-      (acc, order) => {
-        if (order.is_cancelled) return acc;
-        const approval = (order.approval_status || "")
-          .toString()
-          .trim()
-          .toLowerCase();
-        if (approval !== "rejected") return acc;
-        acc.rejected += 1;
-        acc.rejectedAmount += getPaymentColumnAmount(order);
-        return acc;
-      },
-      { rejected: 0, rejectedAmount: 0 },
-    );
-  }, [filteredOrders]);
-
-  const activeStatCard = useMemo(() => {
-    if (paymentStatusFilter === "paid") return "paid";
-    if (paymentStatusFilter === "unpaid") return "unpaid";
-    if (statusFilter === "dispatchdone") return "dispatched";
-    if (statusFilter === "pendingdispatched") return "pendingDispatch";
-    if (approvalStatusFilter === "approved") return "approved";
-    if (approvalStatusFilter === "pending") return "pending";
-    if (approvalStatusFilter === "rejected") return "rejected";
-    if (
-      !statusFilter &&
-      !approvalStatusFilter &&
-      !paymentStatusFilter
-    ) {
-      return "total";
-    }
-    return "";
-  }, [statusFilter, approvalStatusFilter, paymentStatusFilter]);
-
-  const orderPieChartData = useMemo(() => {
-    const entries = [
-      {
-        key: "pending",
-        label: "Pending",
-        value: orderStats.pending,
-        color: "rgba(249, 115, 22, 0.85)",
-      },
-      {
-        key: "approved",
-        label: "Approved",
-        value: orderStats.approved,
-        color: "rgba(34, 197, 94, 0.85)",
-      },
-      {
-        key: "dispatched",
-        label: "Dispatched",
-        value: orderStats.dispatched,
-        color: "rgba(139, 92, 246, 0.85)",
-      },
-      {
-        key: "pendingDispatch",
-        label: "Pending Dispatch",
-        value: orderStats.pendingDispatch,
-        color: "rgba(245, 158, 11, 0.85)",
-      },
-      {
-        key: "paid",
-        label: "Paid",
-        value: orderStats.paid,
-        color: "rgba(16, 185, 129, 0.85)",
-      },
-      {
-        key: "unpaid",
-        label: "Unpaid",
-        value: orderStats.unpaid,
-        color: "rgba(249, 115, 22, 0.85)",
-      },
-    ].filter((entry) => entry.value > 0);
-
-    return {
-      labels: entries.map((entry) => entry.label),
-      keys: entries.map((entry) => entry.key),
-      datasets: [
-        {
-          data: entries.map((entry) => entry.value),
-          backgroundColor: entries.map((entry) => entry.color),
-          borderWidth: 2,
-          borderColor: "#ffffff",
-          hoverOffset: 8,
-        },
-      ],
-    };
-  }, [orderStats]);
-
-  const orderPieChartOptions = useMemo(
-    () => ({
-      responsive: true,
-      maintainAspectRatio: false,
-      onClick: (_event, elements, chart) => {
-        if (!elements?.length) return;
-        const key = chart.data.keys?.[elements[0].index];
-        if (key) handleStatCardClick(key);
-      },
-      plugins: {
-        legend: {
-          position: "bottom",
-          labels: {
-            boxWidth: 12,
-            padding: 14,
-            font: { size: 11 },
-          },
-        },
-        title: {
-          display: true,
-          text: "Order Statistics Overview",
-          font: { size: 15, weight: "bold" },
-          padding: { bottom: 12 },
-        },
-        tooltip: {
-          callbacks: {
-            label: (ctx) => {
-              const val = ctx.parsed || 0;
-              const total = orderStats.total || 1;
-              const pct = ((val / total) * 100).toFixed(1);
-              return ` ${ctx.label}: ${val.toLocaleString("en-IN")} (${pct}% of total orders)`;
-            },
-          },
-        },
-      },
-    }),
-    [handleStatCardClick, orderStats.total],
-  );
 
   const dispatchDoneTotals = useMemo(() => {
     if (!orders?.length) return { gstTotal: 0, taxableTotal: 0 };
@@ -1230,8 +506,7 @@ export default function OrderTable({ orders, userRole }) {
     return filteredOrders.reduce(
       (acc, o) => {
         if (o.approval_status !== "approved") return acc;
-        if (isOrderExcludedFromStatCards(o)) return acc;
-        acc.taxableTotal += getPaymentColumnAmount(o);
+        acc.taxableTotal += orderTaxableTotal(o);
         return acc;
       },
       { taxableTotal: 0 }
@@ -1242,8 +517,6 @@ export default function OrderTable({ orders, userRole }) {
     if (!filteredOrders?.length) return { totalAmount: 0, paidAmount: 0, taxableAmount: 0, balanceAmount: 0 };
     return filteredOrders.reduce(
       (acc, o) => {
-        if (o.approval_status !== "approved") return acc;
-        if (isOrderExcludedFromStatCards(o)) return acc;
         acc.totalAmount += getTotalAmount(o);
         acc.paidAmount += getTotalPaidAmount(o);
         acc.taxableAmount += getPaymentColumnAmount(o);
@@ -1253,6 +526,121 @@ export default function OrderTable({ orders, userRole }) {
       { totalAmount: 0, paidAmount: 0, taxableAmount: 0, balanceAmount: 0 }
     );
   }, [filteredOrders]);
+
+  const getStatusText = (order) => {
+    if (order.approval_status === "pending") {
+      return {
+        text: "Pending Approval",
+        bg: "bg-orange-100",
+        textCol: "text-orange-800",
+        icon: <MoreVertical size={14} className="mr-1" />,
+      };
+    }
+    if (order.approval_status === "rejected") {
+      return {
+        text: "Rejected",
+        bg: "bg-red-100",
+        textCol: "text-red-800",
+        icon: <XCircle size={14} className="mr-1" />,
+      };
+    }
+    // Check for return status first (highest priority)
+    if (Number(order.is_returned) === 3) {
+      if (Number(order.return_booking_done) === 1) {
+        return {
+          text: "Return Booking Done",
+          bg: "bg-indigo-100",
+          textCol: "text-indigo-800",
+          icon: <ArrowUp size={14} className="mr-1" />,
+        };
+      }
+      return {
+        text: "Return Initiated",
+        bg: "bg-purple-100",
+        textCol: "text-purple-800",
+        icon: <ArrowUp size={14} className="mr-1" />,
+      };
+    }
+    if (Number(order.is_returned) === 1) {
+      // Check if warehouse-in is also done for "Return Completed" status
+      if (Number(order.warehouse_in_done) === 1) {
+        return {
+          text: "Return Completed",
+          bg: "bg-green-100",
+          textCol: "text-green-800",
+          icon: <CheckCircle size={14} className="mr-1" />,
+        };
+      }
+      return {
+        text: "Fully Returned",
+        bg: "bg-red-100",
+        textCol: "text-red-800",
+        icon: <XCircle size={14} className="mr-1" />,
+      };
+    }
+    if (Number(order.is_returned) === 2) {
+      return {
+        text: "Partially Returned",
+        bg: "bg-orange-100",
+        textCol: "text-orange-800",
+        icon: <XCircle size={14} className="mr-1" />,
+      };
+    }
+    if (order.is_cancelled || order.approval_status === "rejected") {
+      return {
+        text: "Canceled",
+        bg: "bg-red-100",
+        textCol: "text-red-800",
+        icon: <XCircle size={14} className="mr-1" />,
+      };
+    }
+    if (order.installation_status) {
+      return {
+        text: "Installed",
+        bg: "bg-green-100",
+        textCol: "text-green-800",
+        icon: <CheckCircle size={14} className="mr-1" />,
+      };
+    }
+    if (order.delivery_status) {
+      return {
+        text: "Delivered",
+        bg: "bg-orange-100",
+        textCol: "text-orange-800",
+        icon: <Truck size={14} className="mr-1" />,
+      };
+    }
+    if (order.dispatch_status) {
+      return {
+        text: "Dispatch Done",
+        bg: "bg-violet-100",
+        textCol: "text-violet-800",
+        icon: <FileText size={14} className="mr-1" />,
+      };
+    }
+    if (order.booking_id) {
+      return {
+        text: "Booking Done",
+        bg: "bg-green-100",
+        textCol: "text-green-800",
+        icon: <FileCheck size={14} className="mr-1" />,
+      };
+    }
+    if (order.report_file) {
+      return {
+        text: "Invoice Uploaded",
+        bg: "bg-blue-100",
+        textCol: "text-blue-800",
+        icon: <FileText size={14} className="mr-1" />,
+      };
+    }
+    return {
+      text: "Pending Invoice",
+      bg: "bg-yellow-100",
+      textCol: "text-yellow-800",
+      icon: <UploadCloud size={14} className="mr-1" />,
+    };
+  };
 
   const getPaymentBadge = (paymentStatusRaw) => {
     const s = (paymentStatusRaw || "").toString().trim().toLowerCase();
@@ -1304,182 +692,8 @@ export default function OrderTable({ orders, userRole }) {
   if (orders.length === 0)
     return <p className="text-gray-600">No orders submitted yet.</p>;
 
-  const statCards = [
-    {
-      key: "total",
-      label: "Total-(Taxable)",
-      value: orderStats.total,
-      amount: orderStats.totalAmount,
-      icon: Package,
-      border: "border-slate-200",
-      bg: "bg-gradient-to-br from-slate-50 to-white",
-      labelColor: "text-slate-600",
-      valueColor: "text-slate-900",
-      iconBg: "bg-slate-200",
-      iconColor: "text-slate-700",
-    },
-    {
-      key: "approved",
-      label: "Approved",
-      value: orderStats.approved,
-      amount: orderStats.approvedAmount,
-      icon: CheckCircle,
-      border: "border-green-200",
-      bg: "bg-gradient-to-br from-green-50 to-white",
-      labelColor: "text-green-700",
-      valueColor: "text-green-800",
-      iconBg: "bg-green-200",
-      iconColor: "text-green-700",
-    },
-    {
-      key: "pending",
-      label: "Pending approval",
-      value: orderStats.pending,
-      amount: orderStats.pendingAmount,
-      icon: AlertCircle,
-      border: "border-orange-200",
-      bg: "bg-gradient-to-br from-orange-50 to-white",
-      labelColor: "text-orange-700",
-      valueColor: "text-orange-800",
-      iconBg: "bg-orange-200",
-      iconColor: "text-orange-700",
-    },
-    {
-      key: "dispatched",
-      label: "Dispatched",
-      value: orderStats.dispatched,
-      amount: orderStats.dispatchedAmount,
-      icon: Truck,
-      border: "border-violet-200",
-      bg: "bg-gradient-to-br from-violet-50 to-white",
-      labelColor: "text-violet-700",
-      valueColor: "text-violet-800",
-      iconBg: "bg-violet-200",
-      iconColor: "text-violet-700",
-    },
-    {
-      key: "pendingDispatch",
-      label: "Pending Dispatch",
-      value: orderStats.pendingDispatch,
-      amount: orderStats.pendingDispatchAmount,
-      icon: Clock,
-      border: "border-amber-200",
-      bg: "bg-gradient-to-br from-amber-50 to-white",
-      labelColor: "text-amber-700",
-      valueColor: "text-amber-800",
-      iconBg: "bg-amber-200",
-      iconColor: "text-amber-700",
-    },
-    {
-      key: "paid",
-      label: "Paid",
-      value: orderStats.paid,
-      amount: orderStats.paidAmount,
-      icon: CheckCircle,
-      border: "border-emerald-200",
-      bg: "bg-gradient-to-br from-emerald-50 to-white",
-      labelColor: "text-emerald-700",
-      valueColor: "text-emerald-800",
-      iconBg: "bg-emerald-200",
-      iconColor: "text-emerald-700",
-    },
-    {
-      key: "unpaid",
-      label: "Unpaid",
-      value: orderStats.unpaid,
-      amount: orderStats.unpaidAmount,
-      icon: CreditCard,
-      border: "border-orange-200",
-      bg: "bg-gradient-to-br from-orange-50 to-white",
-      labelColor: "text-orange-700",
-      valueColor: "text-orange-800",
-      iconBg: "bg-orange-200",
-      iconColor: "text-orange-700",
-    },
-    {
-      key: "rejected",
-      label: "Rejected",
-      value: rejectedOrderStats.rejected,
-      amount: rejectedOrderStats.rejectedAmount,
-      icon: XCircle,
-      border: "border-red-200",
-      bg: "bg-gradient-to-br from-red-50 to-white",
-      labelColor: "text-red-700",
-      valueColor: "text-red-800",
-      iconBg: "bg-red-200",
-      iconColor: "text-red-700",
-    },
-  ];
-
-  const renderStatCard = (card) => {
-    const Icon = card.icon;
-    const isActive = activeStatCard === card.key;
-    return (
-      <button
-        key={card.key}
-        type="button"
-        onClick={() => handleStatCardClick(card.key)}
-        className={`w-full rounded-lg border ${card.border} ${card.bg} shadow-sm p-2 text-left transition-all hover:shadow-md ${
-          isActive ? "ring-2 ring-blue-500 ring-offset-1 shadow-md" : ""
-        }`}
-      >
-        <div className="flex items-start justify-between gap-1.5">
-          <div className="min-w-0">
-            <p className={`text-[10px] font-semibold uppercase tracking-wide leading-tight ${card.labelColor}`}>
-              {card.label}
-            </p>
-            <p className={`text-lg font-bold tabular-nums mt-0.5 ${card.valueColor}`}>
-              ₹{(Number(card.amount) || 0).toLocaleString("en-IN", {
-                minimumFractionDigits: 0,
-                maximumFractionDigits: 0,
-              })}
-            </p>
-          
-          </div>
-          <div className={`${card.iconBg} p-1.5 rounded-md shrink-0`}>
-            <Icon size={14} className={card.iconColor} />
-          </div>
-        </div>
-      </button>
-    );
-  };
-
-  const renderPieChart = () => (
-    <div className="rounded-xl border border-slate-200 bg-white shadow-sm p-4 h-full flex flex-col">
-      <div className="mb-3">
-        <p className="text-sm font-semibold text-gray-800">Order Distribution</p>
-      </div>
-      <div className="flex-1 min-h-[220px] lg:min-h-0">
-        {orderStats.total > 0 && orderPieChartData.labels.length > 0 ? (
-          <Pie data={orderPieChartData} options={orderPieChartOptions} />
-        ) : (
-          <div className="flex h-full min-h-[220px] items-center justify-center rounded-lg border border-dashed border-gray-200 bg-gray-50 text-sm text-gray-500">
-            No order data for the selected date range
-          </div>
-        )}
-      </div>
-    </div>
-  );
-
   return (
     <div className="space-y-6">
-      {/* Mobile / tablet: all cards in grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 lg:hidden">
-        {statCards.map((card) => renderStatCard(card))}
-      </div>
-
-      {/* Large screen: 3 cards per row | pie chart */}
-      <div className="hidden lg:grid lg:grid-cols-[minmax(0,2fr)_minmax(0,1.35fr)] gap-3 items-stretch">
-        <div className="grid grid-cols-3 gap-2 content-start">
-          {statCards.map((card) => renderStatCard(card))}
-        </div>
-
-        {renderPieChart()}
-      </div>
-
-      {/* Mobile / tablet: pie chart below cards */}
-      <div className="lg:hidden">{renderPieChart()}</div>
-
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
         {/* Combined Amount Summary Card */}
         <div className={`w-full rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white shadow-sm p-3 sm:p-4 cursor-default hover:shadow-md transition-shadow`}>
@@ -1489,7 +703,7 @@ export default function OrderTable({ orders, userRole }) {
                 Amount Summary
               </p>
               <p className="text-[10px] text-emerald-600/90 mb-2 leading-tight">
-                Approved orders only
+                All orders overview
               </p>
               
               {/* Total Amount */}
@@ -1525,7 +739,7 @@ export default function OrderTable({ orders, userRole }) {
                 Balance & Taxable
               </p>
               <p className="text-[10px] text-purple-600/90 mb-2 leading-tight">
-                Approved orders only
+                Summary details
               </p>
 
               {/* Balance Amount */}
@@ -1549,154 +763,6 @@ export default function OrderTable({ orders, userRole }) {
                   })}
                 </p>
               </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="w-full rounded-xl border border-blue-200 bg-gradient-to-br from-blue-50 to-white shadow-sm p-3 sm:p-4 cursor-default hover:shadow-md transition-shadow">
-          <div className="flex items-start justify-between">
-            <div className="w-full">
-              <p className="text-xs text-blue-700 mb-0.5 font-semibold uppercase tracking-wide">
-                Model Summary
-              </p>
-              <p className="text-[10px] text-blue-600/90 mb-2 leading-tight">
-                Select one or more models
-              </p>
-
-              <div ref={modelSearchRef} className="relative mb-2">
-                <div className="relative">
-                  <Search
-                    size={14}
-                    className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-blue-400"
-                  />
-                  <input
-                    type="text"
-                    value={modelSearchText}
-                    onChange={(e) => {
-                      setModelSearchText(e.target.value);
-                      setShowModelDropdown(true);
-                    }}
-                    onFocus={() => setShowModelDropdown(true)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Escape") {
-                        setShowModelDropdown(false);
-                      } else if (e.key === "Enter" && filteredModelOptions.length > 0) {
-                        e.preventDefault();
-                        toggleModelFilter(filteredModelOptions[0]);
-                      }
-                    }}
-                    placeholder="Search model code or name..."
-                    autoComplete="off"
-                    className="w-full border border-blue-200 rounded-lg py-1.5 pl-7 pr-7 text-xs bg-white"
-                  />
-                  {(modelSearchText || modelNameFilters.length > 0) && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setModelNameFilters([]);
-                        setModelSearchText("");
-                        setShowModelDropdown(false);
-                      }}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-blue-400 hover:text-blue-600"
-                      aria-label="Clear model filters"
-                    >
-                      <XCircle size={14} />
-                    </button>
-                  )}
-                </div>
-
-                {modelNameFilters.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-1">
-                    {modelNameFilters.map((filterKey) => (
-                      <span
-                        key={filterKey}
-                        className="inline-flex max-w-full items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-800"
-                      >
-                        <span className="truncate">{getModelLabel(filterKey, modelOptions)}</span>
-                        <button
-                          type="button"
-                          onClick={() => removeModelFilter(filterKey)}
-                          className="shrink-0 text-blue-500 hover:text-blue-700"
-                          aria-label={`Remove ${getModelLabel(filterKey, modelOptions)}`}
-                        >
-                          <XCircle size={12} />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
-
-                {showModelDropdown && (
-                  <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-48 overflow-y-auto rounded-lg border border-blue-200 bg-white shadow-lg">
-                    {!modelSearchText.trim() && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setModelNameFilters([]);
-                          setShowModelDropdown(false);
-                        }}
-                        className="w-full border-b border-blue-50 px-3 py-2 text-left text-xs text-blue-700 hover:bg-blue-50"
-                      >
-                        All Models
-                      </button>
-                    )}
-                    {filteredModelOptions.length > 0 ? (
-                      filteredModelOptions.map((opt) => {
-                        const selected = isModelFilterSelected(modelNameFilters, opt);
-                        return (
-                          <button
-                            key={opt.filterKey}
-                            type="button"
-                            onClick={() => toggleModelFilter(opt)}
-                            className={`flex w-full items-center gap-2 border-b border-blue-50 px-3 py-2 text-left text-xs hover:bg-blue-50 ${
-                              selected ? "bg-blue-50 font-medium text-blue-900" : "text-gray-700"
-                            }`}
-                          >
-                            <span
-                              className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
-                                selected
-                                  ? "border-blue-600 bg-blue-600 text-white"
-                                  : "border-gray-300 bg-white"
-                              }`}
-                            >
-                              {selected ? <CheckCircle size={10} /> : null}
-                            </span>
-                            <span className="truncate">{opt.label}</span>
-                          </button>
-                        );
-                      })
-                    ) : (
-                      <div className="px-3 py-2 text-xs text-gray-500">
-                        No models found
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {modelNameFilters.length > 0 ? (
-                <>
-                  <div className="mb-2 pb-2 border-b border-blue-100">
-                    <p className="text-[10px] text-blue-600 font-medium">
-                      Total Quantity ({modelNameFilters.length} model
-                      {modelNameFilters.length === 1 ? "" : "s"})
-                    </p>
-                    <p className="text-lg font-bold text-blue-950 tabular-nums">
-                      {filteredModelQuantity.toLocaleString("en-IN")}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] text-sky-600 font-medium">Orders</p>
-                    <p className="text-lg font-bold text-sky-700 tabular-nums">
-                      {filteredOrders.length.toLocaleString("en-IN")}
-                    </p>
-                  </div>
-                </>
-              ) : (
-                <p className="text-xs text-blue-600/80">
-                  Select one or more models to view quantity
-                </p>
-              )}
             </div>
           </div>
         </div>
@@ -1955,11 +1021,11 @@ export default function OrderTable({ orders, userRole }) {
               </th>
               <th 
                 className="px-3 py-3 font-semibold text-center cursor-pointer hover:bg-gray-700 transition-colors"
-                onClick={() => handleSort("taxable_amount")}
+                onClick={() => handleSort("payment_status")}
               >
                 <div className="flex items-center gap-1 justify-center">
                   Taxable
-                  {sortColumn === "taxable_amount" && (
+                  {sortColumn === "payment_status" && (
                     sortDirection === "asc" ? <ArrowUp size={14} /> : <ArrowDown size={14} />
                   )}
                 </div>
@@ -2523,8 +1589,11 @@ function ReturnInitiateMenuItem({ order }) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
+  if (r.is_cancelled) {
+    return null;
+  }
+
   const popRef = useRef(null);
-  const [photosOpen, setPhotosOpen] = useState(false);
   const role = (userRole || "").toString().trim().toLowerCase();
   const canViewSales = [
     "back office",
@@ -2537,11 +1606,8 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
     "warehouse incharge",
   ].includes(role);
   const isSuperAdmin = role === "superadmin";
-  const isAdmin = role === "admin";
   const isAccountant = role.includes("accountant");
   const canManageReturns = isSuperAdmin || isAccountant;
-  const canEditBooking = isSuperAdmin || isAdmin;
-  const canManageInvoiceDocs = isSuperAdmin || isAccountant;
   const isWarehouse = role === "warehouse incharge";
   const hasBooking =
     r.booking_id !== undefined &&
@@ -2549,14 +1615,6 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
     String(r.booking_id).trim() !== "" &&
     String(r.booking_id) !== "0";
   const dispatchStatus = Number(r.dispatch_status);
-  const canViewDispatchPhotos = [
-    "warehouse incharge",
-    "superadmin",
-    "team leader",
-    "admin",
-    "director",
-    "accountant",
-  ].includes(role) || role.includes("accountant");
 
   useEffect(() => {
     if (!isOpen) return;
@@ -2582,18 +1640,8 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
     };
   }, [isOpen, toggleMenu]);
 
-  if (r.is_cancelled) {
-    return null;
-  }
-
   return (
     <div className="relative inline-block text-left">
-      {photosOpen && (
-        <DispatchPhotosModal
-          orderId={r.order_id}
-          onClose={() => setPhotosOpen(false)}
-        />
-      )}
       <button
         onClick={toggleMenu}
         className="p-2 rounded-full hover:bg-gray-200 transition-colors duration-150"
@@ -2618,30 +1666,17 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                 <span>View Sales</span>
               </Link>
             )}
-            {canManageInvoiceDocs &&
+            {["superadmin"].includes(role) &&
               (r.report_file ? (
-                <>
-                  <Link
-                    href={`/admin-dashboard/order/view/${r.order_id}`}
-                    className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
-                    title="View Report"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <FileText size={16} />
-                    <span>View Report</span>
-                  </Link>
-                  {dispatchStatus === 0 && (
-                    <Link
-                      href={`/admin-dashboard/order/upload/${r.order_id}`}
-                      className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-blue-700"
-                      title="Edit Invoice"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <Pencil size={16} />
-                      <span>Edit Invoice</span>
-                    </Link>
-                  )}
-                </>
+                <Link
+                  href={`/admin-dashboard/order/view/${r.order_id}`}
+                  className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
+                  title="View Report"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <FileText size={16} />
+                  <span>View Report</span>
+                </Link>
               ) : (
                 <>
                   <Link
@@ -2654,33 +1689,12 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                     <span>Upload Report</span>
                   </Link>
                   <div onClick={(e) => e.stopPropagation()}>
-                    {isSuperAdmin && <DeleteButton orderId={r.order_id} />}
+                    <DeleteButton orderId={r.order_id} />
                   </div>
                 </>
               ))}
-            {canManageReturns && !hasBooking && (
-                <Link
-                  href={`/admin-dashboard/order/upload-booking/${r.order_id}`}
-                  className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-green-700"
-                  title="Create Booking"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <UploadCloud size={16} />
-                  <span>Create Booking</span>
-                </Link>
-              )}
-            {canEditBooking && hasBooking && dispatchStatus === 0 && (
-              <Link
-                href={`/admin-dashboard/order/upload-booking/${r.order_id}`}
-                className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-blue-700"
-                title="Edit Booking"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <Pencil size={16} />
-                <span>Edit Booking</span>
-              </Link>
-            )}
-            {canManageReturns && hasBooking && (
+            {canManageReturns &&
+              (hasBooking ? (
                 <Link
                   href={`/admin-dashboard/order/view-booking/${r.order_id}`}
                   className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
@@ -2690,7 +1704,17 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                   <FileCheck size={16} />
                   <span>View Booking</span>
                 </Link>
-              )}
+              ) : (
+                <Link
+                  href={`/admin-dashboard/order/upload-booking/${r.order_id}`}
+                  className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-green-700"
+                  title="Create Booking"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <UploadCloud size={16} />
+                  <span>Create Booking</span>
+                </Link>
+              ))}
             {(isWarehouse || canManageReturns) &&
               hasBooking &&
               dispatchStatus === 0 && (
@@ -2706,12 +1730,6 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                   </Link>
                 </>
               )}
-            {dispatchStatus === 1 && canViewDispatchPhotos && (
-              <DispatchPhotosMenuButton
-                orderId={r.order_id}
-                onOpen={() => setPhotosOpen(true)}
-              />
-            )}
             {(isWarehouse || canManageReturns) &&
               hasBooking &&
               dispatchStatus === 1 && (
@@ -3105,24 +2123,6 @@ function UpdateDeliveryMenuItem({ order }) {
   };
 
   const isDelivered = Number(order.delivery_status) === 1;
-  const canUpdateDeliveryProof = canEditDeliveryProof(order);
-
-  const uploadDeliveryProofFile = async () => {
-    if (!deliveryProof) return null;
-    setUploading(true);
-    const formData = new FormData();
-    formData.append("file", deliveryProof);
-    const uploadRes = await fetch("/api/upload-delivery-proof", {
-      method: "POST",
-      body: formData,
-    });
-    setUploading(false);
-    if (!uploadRes.ok) {
-      throw new Error("Failed to upload delivery proof");
-    }
-    const uploadJson = await uploadRes.json();
-    return uploadJson.url;
-  };
 
   const handleSave = async () => {
     if (!deliveredOn) {
@@ -3132,7 +2132,27 @@ function UpdateDeliveryMenuItem({ order }) {
 
     try {
       setSaving(true);
-      const deliveryProofUrl = await uploadDeliveryProofFile();
+      let deliveryProofUrl = null;
+
+      // Upload delivery proof if file is selected
+      if (deliveryProof) {
+        setUploading(true);
+        const formData = new FormData();
+        formData.append("file", deliveryProof);
+
+        const uploadRes = await fetch("/api/upload-delivery-proof", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!uploadRes.ok) {
+          throw new Error("Failed to upload delivery proof");
+        }
+
+        const uploadJson = await uploadRes.json();
+        deliveryProofUrl = uploadJson.url;
+        setUploading(false);
+      }
 
       const res = await fetch("/api/orders/delivery", {
         method: "POST",
@@ -3156,44 +2176,6 @@ function UpdateDeliveryMenuItem({ order }) {
     } catch (error) {
       console.error(error);
       alert(error.message || "Failed to update delivery status");
-    } finally {
-      setSaving(false);
-      setUploading(false);
-    }
-  };
-
-  const handleUpdateProof = async () => {
-    if (!deliveryProof) {
-      alert("Please select a delivery proof file");
-      return;
-    }
-
-    try {
-      setSaving(true);
-      const deliveryProofUrl = await uploadDeliveryProofFile();
-
-      const res = await fetch("/api/orders/delivery", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          order_id: order.order_id,
-          delivery_proof: deliveryProofUrl,
-          update_proof_only: true,
-        }),
-      });
-
-      const json = await res.json();
-      if (!res.ok || !json.success) {
-        throw new Error(json.error || "Failed to update delivery proof");
-      }
-
-      alert("Delivery proof updated successfully!");
-      setOpen(false);
-      setDeliveryProof(null);
-      router.refresh();
-    } catch (error) {
-      console.error(error);
-      alert(error.message || "Failed to update delivery proof");
     } finally {
       setSaving(false);
       setUploading(false);
@@ -3329,31 +2311,6 @@ function UpdateDeliveryMenuItem({ order }) {
                         No delivery proof uploaded
                       </p>
                     )}
-                    {canUpdateDeliveryProof && (
-                      <div className="mt-3">
-                        <label className="block text-sm text-gray-700 font-medium mb-1">
-                          {order.delivery_proof
-                            ? "Replace Delivery Proof"
-                            : "Upload Delivery Proof"}
-                        </label>
-                        <input
-                          type="file"
-                          accept="image/*,application/pdf"
-                          onChange={(e) =>
-                            setDeliveryProof(e.target.files?.[0] || null)
-                          }
-                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                        />
-                        {deliveryProof && (
-                          <p className="text-xs text-gray-600 mt-1">
-                            Selected: {deliveryProof.name}
-                          </p>
-                        )}
-                        <p className="text-xs text-amber-700 mt-1">
-                          Editable within 24 hours of delivery
-                        </p>
-                      </div>
-                    )}
                   </div>
 
                   <div>
@@ -3441,19 +2398,6 @@ function UpdateDeliveryMenuItem({ order }) {
                     : saving
                     ? "Saving..."
                     : "Mark as Delivered"}
-                </button>
-              )}
-              {isDelivered && canUpdateDeliveryProof && (
-                <button
-                  onClick={handleUpdateProof}
-                  disabled={saving || uploading || !deliveryProof}
-                  className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
-                >
-                  {uploading
-                    ? "Uploading..."
-                    : saving
-                    ? "Saving..."
-                    : "Update Proof"}
                 </button>
               )}
             </div>

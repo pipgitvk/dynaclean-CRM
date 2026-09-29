@@ -4,7 +4,6 @@ import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { isUnknownApprovalNoteColumnError } from "@/lib/specialPriceApprovalNoteColumn";
-import { isDealerPriceType } from "@/lib/specialPriceDefaults";
 
 function getFormDataFromActionArgs(first, second) {
   if (second !== undefined && second && typeof second.get === "function") {
@@ -66,16 +65,11 @@ export async function decideSpecialPrice(prevState, formData) {
   }
 
   const id = fd.get("id");
-  const itemType = String(fd.get("itemType") || "product").toLowerCase().trim();
   const decision = String(fd.get("decision") || "").toLowerCase().trim();
   const note = String(fd.get("note") || "").trim();
-  const dealerPriceRaw = fd.get("dealer_price");
 
   if (!id || Number.isNaN(Number(id))) {
     return { error: "Invalid record." };
-  }
-  if (!["product", "spare"].includes(itemType)) {
-    return { error: "Invalid item type." };
   }
   if (decision !== "approve" && decision !== "reject") {
     return { error: "Invalid decision." };
@@ -85,7 +79,7 @@ export async function decideSpecialPrice(prevState, formData) {
   }
 
   const payload = await getSessionPayload();
-  if (!payload || !["SUPERADMIN", "DIRECTOR"].includes(String(payload.role).toUpperCase())) {
+  if (!payload || payload.role !== "SUPERADMIN") {
     return { error: "Unauthorized." };
   }
 
@@ -96,85 +90,39 @@ export async function decideSpecialPrice(prevState, formData) {
 
   const conn = await getDbConnection();
   const numericId = Number(id);
-  // Both products and spares are now in the same special_price table
 
   if (decision === "approve") {
-    const [existingRows] = await conn.execute(
-      `SELECT special_price, price_type FROM special_price WHERE id = ? LIMIT 1`,
-      [numericId],
-    );
-    const existing = existingRows[0];
-    const needsDealerPrice =
-      isDealerPriceType(existing?.price_type) &&
-      Number(existing?.special_price || 0) === 0;
-
-    let approvedPrice = null;
-    if (needsDealerPrice) {
-      const dealerPrice = Number(dealerPriceRaw);
-      if (!Number.isFinite(dealerPrice) || dealerPrice <= 0) {
-        return { error: "Dealer price is required before approval." };
-      }
-      approvedPrice = dealerPrice;
-    }
-
     try {
-      if (approvedPrice !== null) {
-        await conn.execute(
-          `
-          UPDATE special_price
-          SET
-            special_price = ?,
-            status = 'approved',
-            approved_by = ?,
-            approved_date = NOW(),
-            approval_note = ?
-          WHERE id = ?
-          `,
-          [approvedPrice, actor, note, numericId],
-        );
-      } else {
-        await conn.execute(
-          `
-          UPDATE special_price
-          SET
-            status = 'approved',
-            approved_by = ?,
-            approved_date = NOW(),
-            approval_note = ?
-          WHERE id = ?
-          `,
-          [actor, note, numericId],
-        );
-      }
+      await conn.execute(
+        `
+        UPDATE special_price
+        SET
+          status = 'approved',
+          approved_by = ?,
+          approved_date = NOW(),
+          approval_note = ?
+        WHERE id = ?
+        `,
+        [actor, note, numericId],
+      );
     } catch (e) {
       if (!isUnknownApprovalNoteColumnError(e)) throw e;
-      if (approvedPrice !== null) {
-        await conn.execute(
-          `
-          UPDATE special_price
-          SET
-            special_price = ?,
-            status = 'approved',
-            approved_by = ?,
-            approved_date = NOW()
-          WHERE id = ?
-          `,
-          [approvedPrice, actor, numericId],
-        );
-      } else {
-        await conn.execute(
-          `
-          UPDATE special_price
-          SET
-            status = 'approved',
-            approved_by = ?,
-            approved_date = NOW()
-          WHERE id = ?
-          `,
-          [actor, numericId],
-        );
-      }
+      await conn.execute(
+        `
+        UPDATE special_price
+        SET
+          status = 'approved',
+          approved_by = ?,
+          approved_date = NOW()
+        WHERE id = ?
+        `,
+        [actor, numericId],
+      );
     }
+
+    // Note: Removed automatic price update to products_list
+    // Special pricing should only apply to specific customers,
+    // not update the general product prices in the product stock
   } else {
     try {
       await conn.execute(

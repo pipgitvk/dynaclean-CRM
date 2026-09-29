@@ -90,15 +90,6 @@ import { getSessionPayload } from "@/lib/auth";
 import RecurrenceService from "@/lib/services/RecurrenceService";
 import { resolveGemCrmEmployeeId } from "@/lib/gemCrmAuth";
 
-// Import and start the recurring task cron job
-let cronStarted = false;
-if (!cronStarted) {
-  cronStarted = true;
-  import("@/lib/cron/recurringTaskCron").then((mod) => {
-    mod.startRecurringTaskCron();
-  });
-}
-
 export async function POST(req) {
   try {
     // ✅ Get token from cookies

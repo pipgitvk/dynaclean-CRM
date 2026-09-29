@@ -8,13 +8,6 @@ import {
   mysqlLowerBoundIstDayStart,
   mysqlUpperBoundIstDayEnd,
 } from "@/lib/timezone";
-import { notesLanguageExistsSql } from "@/constants/notesLanguageOptions";
-import {
-  appendExactMultiTagFilter,
-  appendStatusVisibilityFilter,
-  normalizeSearchParam,
-} from "@/lib/tlCustomersListSql";
-import { ensureTLFollowupsModelColumn } from "@/lib/ensureTLFollowupsModelColumn";
 
 export const dynamic = "force-dynamic";
 
@@ -30,42 +23,29 @@ export default async function AdminTLCustomersPage({ searchParams }) {
     employee,
     status,
     stage,
+    tag,
+    model,
     nextFromDate,
     nextToDate,
     lead_campaign,
-    notes_language,
     page = "1",
     tlOnly,
     preBookingOnly = "false",
   } = searchParamsResolved;
-  const tag = normalizeSearchParam(searchParamsResolved.tag);
-  const model = normalizeSearchParam(searchParamsResolved.model);
 
   // Default to showing TL-only customers if parameter not specified
   if (tlOnly === undefined || tlOnly === null) {
     tlOnly = "true";
   }
 
-  const currentPage = Math.max(1, parseInt(page, 10) || 1);
+  const currentPage = parseInt(page);
   const pageSize = 50; // Number of records per page
   const offset = (currentPage - 1) * pageSize;
   const showTLOnly = tlOnly === "true";
   const showPreBookingOnly = preBookingOnly === "true";
   const sqlNextForDateFilter = SQL_EFFECTIVE_NEXT_FOLLOWUP;
-  // TL toggle ON → TL_followups tags; OFF → latest customers_followup tags only
-  const sqlMultiTag = showTLOnly ? "tlf.multi_tag" : "cf.multi_tag";
-  const isSuperAdmin =
-    String(payload.role ?? payload.userRole ?? "").trim().toUpperCase() ===
-    "SUPERADMIN";
-  const statusVisibility = { showTLOnly, isSuperAdmin, statusFilter: status };
 
   const conn = await getDbConnection();
-  const hasModelColumn = await ensureTLFollowupsModelColumn(conn);
-  const tlModelSelect = hasModelColumn
-    ? "tlf.model as tl_model"
-    : "NULL AS tl_model";
-  const tlModelSubqueryCol = hasModelColumn ? "model, " : "";
-  const tlModelKpiSubqueryCol = hasModelColumn ? "model, " : "";
 
   // Build query to fetch customers with their latest followup info
   let query = `
@@ -79,8 +59,8 @@ export default async function AdminTLCustomersPage({ searchParams }) {
       tlf.id as tl_followup_id,
       tlf.estimated_order_date,
       tlf.lead_quality_score,
-      ${tlModelSelect},
-      ${sqlMultiTag} as multi_tag,
+      tlf.model as tl_model,
+      COALESCE(tlf.multi_tag, cf.multi_tag) as multi_tag,
       tlf.notes as tl_notes,
       tlf.next_followup_date as tl_next_followup,
       tlf.followed_date as tl_followed_date,
@@ -94,7 +74,7 @@ export default async function AdminTLCustomersPage({ searchParams }) {
       FROM customers_followup
     ) cf ON c.customer_id = cf.customer_id AND cf.rn = 1
     LEFT JOIN (
-      SELECT customer_id, id, estimated_order_date, lead_quality_score, multi_tag, ${tlModelSubqueryCol}notes, next_followup_date, followed_date, followed_by,
+      SELECT customer_id, id, estimated_order_date, lead_quality_score, multi_tag, model, notes, next_followup_date, followed_date, followed_by,
       ROW_NUMBER() OVER(PARTITION BY customer_id ORDER BY created_at DESC) as rn
       FROM TL_followups
     ) tlf ON c.customer_id = tlf.customer_id AND tlf.rn = 1
@@ -139,8 +119,6 @@ export default async function AdminTLCustomersPage({ searchParams }) {
   if (status) {
     query += ` AND c.status = ?`;
     params.push(status);
-  } else {
-    query = appendStatusVisibilityFilter(query, statusVisibility);
   }
 
   // Filter by stage
@@ -149,8 +127,15 @@ export default async function AdminTLCustomersPage({ searchParams }) {
     params.push(stage);
   }
 
-  // Filter by tag (source follows TL toggle — exact match like dropdown counts)
-  query = appendExactMultiTagFilter(query, params, tag, sqlMultiTag);
+  // Filter by tag
+  if (tag) {
+    if (tag === "N/A") {
+      query += ` AND (tlf.multi_tag IS NULL OR tlf.multi_tag = '') AND (cf.multi_tag IS NULL OR cf.multi_tag = '')`;
+    } else {
+      query += ` AND (tlf.multi_tag LIKE ? OR cf.multi_tag LIKE ?)`;
+      params.push(`%${tag}%`, `%${tag}%`);
+    }
+  }
 
   // When ON: show only customers that have TL_followups rows (TL ne follow-up dala ho)
   if (showTLOnly) {
@@ -203,14 +188,9 @@ export default async function AdminTLCustomersPage({ searchParams }) {
   }
 
   // Filter by model (product)
-  if (model && hasModelColumn) {
+  if (model) {
     query += ` AND tlf.model LIKE ?`;
     params.push(`%${model}%`);
-  }
-
-  if (notes_language) {
-    query += ` AND ${notesLanguageExistsSql("?")}`;
-    params.push(notes_language);
   }
 
   // Get total count for pagination (without LIMIT)
@@ -218,17 +198,7 @@ export default async function AdminTLCustomersPage({ searchParams }) {
     /SELECT[\s\S]*?FROM customers c/,
     "SELECT COUNT(*) as total FROM customers c",
   );
-  let countResult;
-  try {
-    [countResult] = await conn.execute(countQuery, params);
-  } catch (error) {
-    console.error(
-      "Admin TL customers count query failed:",
-      error?.code,
-      error?.message,
-    );
-    throw error;
-  }
+  const [countResult] = await conn.execute(countQuery, params);
   const totalRecords = countResult[0].total;
   const totalPages = Math.ceil(totalRecords / pageSize);
 
@@ -237,16 +207,10 @@ export default async function AdminTLCustomersPage({ searchParams }) {
     query += ` ORDER BY c.date_created DESC`;
   } else {
     query += ` ORDER BY c.date_created DESC LIMIT ? OFFSET ?`;
-    params.push(Number(pageSize), Number(offset));
+    params.push(pageSize, offset);
   }
 
-  let customers;
-  try {
-    [customers] = await conn.execute(query, params);
-  } catch (error) {
-    console.error("Admin TL customers query failed:", error?.code, error?.message);
-    throw error;
-  }
+  const [customers] = await conn.execute(query, params);
 
   // Fetch ALL customers for KPI calculations (just essential fields)
   let kpiQuery = `
@@ -254,8 +218,8 @@ export default async function AdminTLCustomersPage({ searchParams }) {
       c.customer_id,
       c.status,
       c.stage,
-      ${sqlMultiTag} as multi_tag,
-      ${tlModelSelect},
+      COALESCE(tlf.multi_tag, cf.multi_tag) as multi_tag,
+      tlf.model as tl_model,
       tlf.next_followup_date as tl_next_followup,
       tlf.followed_date as tl_followed_date,
       tlf.customer_id as tl_customer_id,
@@ -269,7 +233,7 @@ export default async function AdminTLCustomersPage({ searchParams }) {
       FROM customers_followup
     ) cf ON c.customer_id = cf.customer_id AND cf.rn = 1
     LEFT JOIN (
-      SELECT customer_id, multi_tag, ${tlModelKpiSubqueryCol}next_followup_date, followed_date,
+      SELECT customer_id, multi_tag, model, next_followup_date, followed_date,
       ROW_NUMBER() OVER(PARTITION BY customer_id ORDER BY created_at DESC) as rn
       FROM TL_followups
     ) tlf ON c.customer_id = tlf.customer_id AND tlf.rn = 1
@@ -301,8 +265,6 @@ export default async function AdminTLCustomersPage({ searchParams }) {
   if (status) {
     kpiQuery += ` AND c.status = ?`;
     kpiParams.push(status);
-  } else {
-    kpiQuery = appendStatusVisibilityFilter(kpiQuery, statusVisibility);
   }
 
   if (stage) {
@@ -310,7 +272,14 @@ export default async function AdminTLCustomersPage({ searchParams }) {
     kpiParams.push(stage);
   }
 
-  kpiQuery = appendExactMultiTagFilter(kpiQuery, kpiParams, tag, sqlMultiTag);
+  if (tag) {
+    if (tag === "N/A") {
+      kpiQuery += ` AND (tlf.multi_tag IS NULL OR tlf.multi_tag = '') AND (cf.multi_tag IS NULL OR cf.multi_tag = '')`;
+    } else {
+      kpiQuery += ` AND (tlf.multi_tag LIKE ? OR cf.multi_tag LIKE ?)`;
+      kpiParams.push(`%${tag}%`, `%${tag}%`);
+    }
+  }
 
   if (showTLOnly) {
     kpiQuery += ` AND tlf.customer_id IS NOT NULL`;
@@ -359,17 +328,16 @@ export default async function AdminTLCustomersPage({ searchParams }) {
   }
 
   // Filter by model (product) for KPI
-  if (model && hasModelColumn) {
+  if (model) {
     kpiQuery += ` AND tlf.model LIKE ?`;
     kpiParams.push(`%${model}%`);
   }
 
-  if (notes_language) {
-    kpiQuery += ` AND ${notesLanguageExistsSql("?")}`;
-    kpiParams.push(notes_language);
-  }
-
   const [allCustomersForKPI] = await conn.execute(kpiQuery, kpiParams);
+
+  const isSuperAdmin = String(payload.role ?? payload.userRole ?? "")
+    .trim()
+    .toUpperCase() === "SUPERADMIN";
 
   // Fetch employees for only sales role
   const [employees] = await conn.execute(

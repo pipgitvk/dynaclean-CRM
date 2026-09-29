@@ -1,12 +1,40 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
-import { verifyManualPaymentsApiAccess } from "@/lib/manualPaymentsAccess";
-import { saveManualPaymentInvoice } from "@/lib/saveManualPaymentInvoice";
+import { jwtVerify } from "jose";
+import { writeFile, mkdir } from "fs/promises";
+import path from "path";
+
+const JWT_SECRET = process.env.JWT_SECRET;
+const UPLOAD_DIR = path.join(process.cwd(), "public", "payment_invoices");
+
+// Helper function to verify JWT and check roles
+async function verifyAccess(req, allowedRoles = ["ACCOUNTANT", "ADMIN", "SUPERADMIN"]) {
+    const token = req.cookies.get("token")?.value;
+    if (!token) {
+        return { error: "Unauthorized", status: 401 };
+    }
+
+    try {
+        const { payload } = await jwtVerify(
+            token,
+            new TextEncoder().encode(JWT_SECRET)
+        );
+
+        const role = payload.role;
+        if (!allowedRoles.includes(role)) {
+            return { error: "Access denied", status: 403 };
+        }
+
+        return { username: payload.username, role: payload.role };
+    } catch (err) {
+        return { error: "Invalid token", status: 401 };
+    }
+}
 
 // GET: Fetch all manual payment pending entries
 export async function GET(request) {
     try {
-        const auth = await verifyManualPaymentsApiAccess(request);
+        const auth = await verifyAccess(request);
         if (auth.error) {
             return NextResponse.json({ error: auth.error }, { status: auth.status });
         }
@@ -100,7 +128,7 @@ export async function GET(request) {
 // POST: Create new manual payment pending entry
 export async function POST(request) {
     try {
-        const auth = await verifyManualPaymentsApiAccess(request);
+        const auth = await verifyAccess(request);
         if (auth.error) {
             return NextResponse.json({ error: auth.error }, { status: auth.status });
         }
@@ -131,8 +159,18 @@ export async function POST(request) {
 
         let invoiceFilePath = null;
 
+        // Handle file upload if present
         if (invoiceFile && typeof invoiceFile === "object" && invoiceFile.size > 0) {
-            invoiceFilePath = await saveManualPaymentInvoice(invoiceFile);
+            await mkdir(UPLOAD_DIR, { recursive: true });
+
+            const timestamp = Date.now();
+            const fileExt = path.extname(invoiceFile.name).slice(0, 16);
+            const fileName = `invoice_${timestamp}${fileExt}`;
+            const filePath = path.join(UPLOAD_DIR, fileName);
+            const buffer = Buffer.from(await invoiceFile.arrayBuffer());
+
+            await writeFile(filePath, buffer);
+            invoiceFilePath = `/payment_invoices/${fileName}`;
         }
 
         const conn = await getDbConnection();

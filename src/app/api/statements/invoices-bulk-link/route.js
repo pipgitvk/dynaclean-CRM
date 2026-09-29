@@ -1,5 +1,5 @@
 import { getDbConnection } from "@/lib/db";
-import { parseLinkedPurchaseTokens, parseLinkedTransIds } from "@/lib/statementLinkedPurchases";
+import { parseLinkedPurchaseTokens } from "@/lib/statementLinkedPurchases";
 
 export async function PATCH(req) {
   const pool = await getDbConnection();
@@ -223,7 +223,7 @@ export async function PATCH(req) {
       const invoiceTransIdsMap = {};
       sortedInvoices.forEach(inv => {
         invoicePaidMap[inv.id] = Number(inv.amount_paid || 0);
-        invoiceTransIdsMap[inv.id] = new Set(parseLinkedTransIds(inv.linked_trans_ids));
+        invoiceTransIdsMap[inv.id] = new Set(parseLinkedPurchaseTokens(inv.linked_trans_ids)); // preserve existing trans_ids!
       });
 
       // Add initially linked statements (that are still selected) to invoiceTransIdsMap!
@@ -327,17 +327,9 @@ export async function PATCH(req) {
         
         const linkedIdsFromInvoiceNumber = [];
         if (stmt.invoice_number) {
-          const invoiceNumbers = String(stmt.invoice_number)
-            .split(",")
-            .map((s) => s.trim())
-            .filter(Boolean);
-          for (const num of invoiceNumbers) {
-            const invWithMatchingNumber = sortedInvoices.find(
-              (i) => i.invoice_number === num,
-            );
-            if (invWithMatchingNumber) {
-              linkedIdsFromInvoiceNumber.push(invWithMatchingNumber.id);
-            }
+          const invWithMatchingNumber = sortedInvoices.find(i => i.invoice_number === stmt.invoice_number);
+          if (invWithMatchingNumber) {
+            linkedIdsFromInvoiceNumber.push(invWithMatchingNumber.id);
           }
         }
 

@@ -8,7 +8,7 @@ export async function GET(req) {
     if (!tokenPayload) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const role = tokenPayload.role;
     const roleUpperDispatch = String(role).toUpperCase();
-    if (!["WAREHOUSE INCHARGE", "SUPERADMIN", "TEAM LEADER", "ADMIN", "DIRECTOR", "ACCOUNTANT"].includes(roleUpperDispatch)) {
+    if (!["WAREHOUSE INCHARGE", "SUPERADMIN", "TEAM LEADER", "ADMIN", "DIRECTOR"].includes(roleUpperDispatch)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

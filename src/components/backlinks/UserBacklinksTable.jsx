@@ -19,7 +19,7 @@ const UserBacklinksTable = () => {
 
   const fetchCurrentUser = async () => {
     try {
-      const res = await fetch("/api/current-user");
+      const res = await fetch("/api/current/user");
       const data = await res.json();
       if (res.ok) {
         setCurrentUsername(data.username);
@@ -32,7 +32,7 @@ const UserBacklinksTable = () => {
   const fetchBacklinks = async () => {
     try {
       setLoading(true);
-      const res = await fetch("/api/backlinks");
+      const res = await fetch("/api/back/links");
       const data = await res.json();
 
       if (res.ok) {

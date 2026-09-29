@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { sendImportCrmSmtpEmail } from "@/lib/importCrmEmail";
-import { canEditOrderBooking } from "@/lib/getOrderForBookingUpload";
 
 export async function POST(req) {
   try {
@@ -13,31 +12,26 @@ export async function POST(req) {
       booking_date,
       booking_url,
       adminremark,
-      expected_delivery_date,
-      isEdit,
+      expected_delivery_date
     } = body;
 
     if (!orderId || !booking_id || !booking_date || !booking_url) {
       return NextResponse.json({ error: "Missing fields" }, { status: 400 });
     }
 
-    if (!expected_delivery_date) {
-      return NextResponse.json({ error: "Expected delivery date is required" }, { status: 400 });
-    }
-
     if (!adminremark || adminremark.trim() === '') {
       return NextResponse.json({ error: "Admin Remark is required" }, { status: 400 });
     }
+
+    console.log('This is the correct we should get orderId:', orderId);
 
     const conn = await getDbConnection();
     const payload = await getSessionPayload();
     const bookingBy = payload?.username || payload?.name || null;
 
-    // Fetch order details and current booking/dispatch state
+    // ✅ Step 1: Fetch order details for email
     const [orderRows] = await conn.execute(
-      `SELECT order_id, client_name, email, totalamt, payment_amount, quote_number, delivery_location,
-              booking_id, booking_date, booking_url, admin_remark, delivery_date, dispatch_status
-       FROM neworder WHERE order_id = ?`,
+      `SELECT order_id, client_name, email, totalamt, payment_amount, quote_number, delivery_location FROM neworder WHERE order_id = ?`,
       [orderId]
     );
 
@@ -46,28 +40,6 @@ export async function POST(req) {
     }
 
     const order = orderRows[0];
-    const isDispatched = Number(order.dispatch_status) === 1;
-
-    if (isDispatched) {
-      return NextResponse.json(
-        { error: "Booking details cannot be edited after dispatch." },
-        { status: 403 },
-      );
-    }
-
-    const hadExistingBooking =
-      order.booking_id !== null &&
-      order.booking_id !== undefined &&
-      String(order.booking_id).trim() !== "" &&
-      String(order.booking_id) !== "0";
-    const isBookingEdit = Boolean(isEdit) || hadExistingBooking;
-
-    if (isBookingEdit && !canEditOrderBooking(payload?.role ?? payload?.userRole)) {
-      return NextResponse.json(
-        { error: "Only Admin or Super Admin can edit booking details." },
-        { status: 403 },
-      );
-    }
     
     // Fetch total from quotation if not in order
     let totalAmount = Number(order.totalamt) || 0;
@@ -119,16 +91,7 @@ export async function POST(req) {
         admin_remark = ?,
         delivery_date = ?
     WHERE order_id = ?`,
-      [
-        booking_url ?? null,
-        booking_id ?? null,
-        booking_date ?? null,
-        1,
-        bookingBy ?? null,
-        adminremark ?? null,
-        expected_delivery_date ?? null,
-        orderId ?? null,
-      ]
+      [booking_url, booking_id, booking_date, 1, bookingBy, adminremark, expected_delivery_date, orderId]
     );
 
     // ✅ Step 3: Send email with custom template (not from database)
@@ -304,11 +267,9 @@ export async function POST(req) {
       
       <!-- Content -->
       <div class="content">
-        <h1 style="font-size: 32px; color: #000000; font-weight: bold; margin: 15px 0; text-align: center;">${isBookingEdit ? "Your Booking Order Updated" : "Your Booking Order Confirmed"}</h1>
+        <h1 style="font-size: 32px; color: #000000; font-weight: bold; margin: 15px 0; text-align: center;">Your Booking Order Confirmed</h1>
         <p style="font-size: 16px; color: #333; font-weight: bold; margin: 15px 0;">Dear ${order.client_name || 'Valued Customer'},</p>
-        <p style="font-size: 16px; color: #666; margin: 15px 0;">${isBookingEdit
-          ? "We're writing to inform you that your booking details have been updated."
-          : "We're pleased to inform you that your order has been confirmed successfully."}</p>
+        <p style="font-size: 16px; color: #666; margin: 15px 0;">We're pleased to inform you that your order has been confirmed successfully.</p>
         
         <!-- Delivery Info -->
         <h2 style="color: #10b981; font-weight: bold;">Expected Delivery: <span style="font-size: 24px; color: #10b981; font-weight: bold;">${new Date(expected_delivery_date).toLocaleDateString('en-IN')}</span></h2>
@@ -394,20 +355,14 @@ export async function POST(req) {
       };
 
       console.log(`📧 Sending email to: ${order.email}`);
+      
+      await sendImportCrmSmtpEmail({
+        to: order.email,
+        subject: `✅ Booking Confirmed - Order #${orderId} | Tracking: ${booking_id}`,
+        html: customEmailTemplate,
+      });
 
-      if (!order.email || !String(order.email).trim()) {
-        console.warn(`⚠️ No client email for order ${orderId}; booking saved without email.`);
-      } else {
-        await sendImportCrmSmtpEmail({
-          to: order.email,
-          subject: isBookingEdit
-            ? `✅ Booking Updated - Order #${orderId} | Tracking: ${booking_id}`
-            : `✅ Booking Confirmed - Order #${orderId} | Tracking: ${booking_id}`,
-          html: customEmailTemplate,
-        });
-
-        console.log(`✅ Booking ${isBookingEdit ? "update" : "confirmation"} email sent`);
-      }
+      console.log('✅ Booking confirmation email sent with custom template');
     } catch (emailError) {
       console.error('⚠️ Email Error Details:', {
         error: emailError.message,
@@ -417,7 +372,7 @@ export async function POST(req) {
       });
     }
 
-    return NextResponse.json({ success: true, isEdit: isBookingEdit });
+    return NextResponse.json({ success: true });
   } catch (error) {
     console.error("❌ Booking Upload Error:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });

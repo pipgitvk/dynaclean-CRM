@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
-import { notesLanguageExistsSql } from "@/constants/notesLanguageOptions";
 
 /** Map bulk-reassign / customers-table filter values to all status strings used in DB (forms vs legacy). */
 function statusValuesForFilter(statusParam) {
@@ -39,7 +38,6 @@ export async function GET(request) {
         const lead_source = searchParams.get("lead_source");
         const lead_campaign = searchParams.get("lead_campaign");
         const products_interest = searchParams.get("products_interest");
-        const notes_language = searchParams.get("notes_language");
 
         const connection = await getDbConnection();
 
@@ -97,11 +95,6 @@ export async function GET(request) {
         if (products_interest) {
             query += ` AND c.products_interest LIKE ?`;
             params.push(`%${products_interest}%`);
-        }
-
-        if (notes_language) {
-            query += ` AND ${notesLanguageExistsSql("?")}`;
-            params.push(notes_language);
         }
 
         // Order by most recent first (no limit - show all leads)

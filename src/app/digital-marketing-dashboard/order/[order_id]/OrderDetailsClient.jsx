@@ -2,7 +2,6 @@
 
 import { useMemo } from "react";
 import dayjs from "dayjs";
-import { resolveStoredFileUrl } from "@/lib/resolveStoredFileUrl";
 
 const stages = [
   "Sales",
@@ -361,21 +360,20 @@ function FileSection({ label, file }) {
 }
 
 function DocCell({ label, file, optional, required }) {
-  const displayUrl = resolveStoredFileUrl(file);
   return (
     <div>
       <p className="font-medium">{label}</p>
       {file ? (
         <div className="space-x-3">
           <a
-            href={displayUrl}
+            href={file}
             target="_blank"
             rel="noopener noreferrer"
             className="text-blue-600 underline"
           >
             View
           </a>
-          <a href={displayUrl} download className="text-blue-600 underline">
+          <a href={file} download className="text-blue-600 underline">
             Download
           </a>
         </div>

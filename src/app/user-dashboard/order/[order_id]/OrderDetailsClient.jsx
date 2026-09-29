@@ -1,19 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import dayjs from "dayjs";
-import { resolveStoredFileUrl } from "@/lib/resolveStoredFileUrl";
-import OrderDocumentFileCard from "@/components/orders/OrderDocumentFileCard";
-
-const DOCUMENT_FIELDS = [
-  { label: "E-way Bill", key: "ewaybill_file" },
-  { label: "E-invoice", key: "einvoice_file" },
-  { label: "Invoice PDF", key: "report_file" },
-  { label: "Delivery Challan", key: "deliverchallan" },
-  { label: "Purchase Order", key: "po_file" },
-  { label: "Payment Proof", key: "payment_proof" },
-  { label: "Delivery Proof", key: "delivery_proof" },
-];
 
 const stages = [
   "Sales",
@@ -32,8 +20,6 @@ export default function OrderDetailsClient({
   orderId,
   gstin,
   quoteCustomerId,
-  orderListPath = "/user-dashboard/order",
-  canUploadDocuments = false,
 }) {
   const formatDate = (value) => {
     if (!value) return "";
@@ -84,31 +70,6 @@ export default function OrderDetailsClient({
 
   const currentIndex = stages.indexOf(currentStage);
   const progressPercent = (currentIndex / (stages.length - 1)) * 100;
-
-  const [fileValues, setFileValues] = useState(() => {
-    const initial = {};
-    DOCUMENT_FIELDS.forEach(({ key }) => {
-      initial[key] = orderDetails[key] || "";
-    });
-    return initial;
-  });
-
-  const handleFilesUploaded = (fieldKey, newValue) => {
-    setFileValues((prev) => ({ ...prev, [fieldKey]: newValue }));
-  };
-
-  const orderForDocRules = useMemo(
-    () => ({
-      dispatch_status: orderDetails.dispatch_status,
-      delivery_status: orderDetails.delivery_status,
-      delivered_on: orderDetails.delivered_on,
-    }),
-    [
-      orderDetails.dispatch_status,
-      orderDetails.delivery_status,
-      orderDetails.delivered_on,
-    ],
-  );
 
   return (
     <div className="p-4 space-y-6">
@@ -275,40 +236,18 @@ export default function OrderDetailsClient({
       <FileSection label="Payment Proof" file={orderDetails.payment_proof} />
       <FileSection label="Invoice" file={orderDetails.report_file} /> */}
 
-      {/* Documents */}
+      {/* Consolidated Documents Row */}
       <div className="border rounded p-4 bg-white">
-        <h3 className="font-semibold mb-1">Documents</h3>
-        {canUploadDocuments ? (
-          <>
-            <p className="text-xs text-gray-500 mb-3">
-              E-way bill, e-invoice & invoice editable before dispatch (up to 5 invoice PDFs).
-              Delivery challan before delivered. Delivery proof within 24 hours of delivery.
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {DOCUMENT_FIELDS.map(({ label, key }) => (
-                <OrderDocumentFileCard
-                  key={key}
-                  label={label}
-                  fieldKey={key}
-                  file={fileValues[key]}
-                  orderId={orderDetails.order_id}
-                  order={orderForDocRules}
-                  onUploaded={handleFilesUploaded}
-                />
-              ))}
-            </div>
-          </>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
-            <DocCell label="E-way Bill" file={orderDetails.ewaybill_file} optional />
-            <DocCell label="E-invoice (Optional)" file={orderDetails.einvoice_file} optional />
-            <DocCell label="Invoice PDF (Required)" file={orderDetails.report_file} required />
-            <DocCell label="Delivery Challan (Optional)" file={orderDetails.deliverchallan} optional />
-            <DocCell label="Purchase Order (Optional)" file={orderDetails.po_file} optional />
-            <DocCell label="Payment Proof (Optional)" file={orderDetails.payment_proof} optional />
-            <DocCell label="Delivery Proof (Optional)" file={orderDetails.delivery_proof} optional />
-          </div>
-        )}
+        <h3 className="font-semibold mb-3">Documents</h3>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
+          <DocCell label="E-way Bill" file={orderDetails.ewaybill_file} optional />
+          <DocCell label="E-invoice (Optional)" file={orderDetails.einvoice_file} optional />
+          <DocCell label="Invoice PDF (Required)" file={orderDetails.report_file} required />
+          <DocCell label="Delivery Challan (Optional)" file={orderDetails.deliverchallan} optional />
+          <DocCell label="Purchase Order (Optional)" file={orderDetails.po_file} optional />
+          <DocCell label="Payment Proof (Optional)" file={orderDetails.payment_proof} optional />
+          <DocCell label="Delivery Proof (Optional)" file={orderDetails.delivery_proof} optional />
+        </div>
       </div>
 
       {/* Accountant Details (if done) */}
@@ -360,7 +299,7 @@ export default function OrderDetailsClient({
       {/* Back Link */}
       <div className="text-center mt-6">
         <a
-          href={orderListPath}
+          href="/user-dashboard/order"
           className="inline-block bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded"
         >
           ← Back to Order List
@@ -421,86 +360,28 @@ function FileSection({ label, file }) {
 }
 
 function DocCell({ label, file, optional, required }) {
-  if (!file) {
-    return (
-      <div>
-        <p className="font-medium">{label}</p>
-        <p className={`italic ${required ? "text-red-600" : "text-gray-500"}`}>
-          {required ? "Required but not uploaded" : "Not uploaded"}
-        </p>
-      </div>
-    );
-  }
-
-  // Handle multiple files (comma-separated)
-  const fileUrls = file
-    .split(",")
-    .map((url) => url.trim())
-    .filter((url) => url.length > 0);
-
-  // If there's only one file, show simple view
-  if (fileUrls.length === 1) {
-    const displayUrl = resolveStoredFileUrl(fileUrls[0]);
-    return (
-      <div>
-        <p className="font-medium">{label}</p>
-        <div className="space-x-3">
-          <a
-            href={displayUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-blue-600 underline hover:text-blue-800"
-          >
-            View
-          </a>
-          <a href={displayUrl} download className="text-blue-600 underline hover:text-blue-800">
-            Download
-          </a>
-        </div>
-      </div>
-    );
-  }
-
-  // Multiple files - show dropdown/expandable list
   return (
     <div>
       <p className="font-medium">{label}</p>
-      <details className="cursor-pointer">
-        <summary className="text-blue-600 underline hover:text-blue-800">
-          📁 {fileUrls.length} Files
-        </summary>
-        <div className="mt-2 space-y-2 bg-gray-50 p-2 rounded border border-gray-200">
-          {fileUrls.map((fileUrl, idx) => {
-            const displayUrl = resolveStoredFileUrl(fileUrl);
-
-            // Extract filename from URL
-            const filename = fileUrl.split('/').pop() || `File ${idx + 1}`;
-            
-            return (
-              <div key={idx} className="flex items-center justify-between text-sm p-2 bg-white rounded">
-                <span className="truncate flex-1">{idx + 1}. {filename}</span>
-                <div className="space-x-2 flex-shrink-0">
-                  <a
-                    href={displayUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 underline hover:text-blue-800 text-xs"
-                  >
-                    View
-                  </a>
-                  <a
-                    href={displayUrl}
-                    download
-                    className="text-blue-600 underline hover:text-blue-800 text-xs"
-                  >
-                    Download
-                  </a>
-                </div>
-              </div>
-            );
-          })}
+      {file ? (
+        <div className="space-x-3">
+          <a
+            href={file}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-600 underline"
+          >
+            View
+          </a>
+          <a href={file} download className="text-blue-600 underline">
+            Download
+          </a>
         </div>
-      </details>
+      ) : (
+        <p className={`italic ${required ? "text-red-600" : "text-gray-500"}`}>
+          {required ? "Required but not uploaded" : "Not uploaded"}
+        </p>
+      )}
     </div>
   );
 }

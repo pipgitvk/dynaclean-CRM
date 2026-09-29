@@ -14,15 +14,12 @@ cloudinary.config({
 
 // Helper function to upload file to Cloudinary
 async function uploadFileToCloudinary(buffer, filename, folder) {
-  const isPdf = String(filename || "").toLowerCase().endsWith(".pdf");
-  const baseName = path.parse(filename).name;
   return new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
       {
         folder: folder,
-        public_id: baseName,
-        resource_type: isPdf ? "image" : "auto",
-        access_mode: "public",
+        public_id: path.parse(filename).name,
+        resource_type: "auto",
       },
       (error, result) => {
         if (error) {

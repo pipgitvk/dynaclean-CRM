@@ -2,34 +2,11 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import Modal from "./Modal";
 import ServiceAttachmentLink from "./ServiceAttachmentLink";
-import ServiceReportPrintButton from "./ServiceReportPrintButton";
-import ServiceCompletionDateCell from "./ServiceCompletionDateCell";
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from "recharts";
-import {
-  Eye,
-  ExternalLink,
-  FilePlus,
-  RefreshCw,
-  Upload,
-  UserPlus,
-} from "lucide-react";
-import { useWarrantyProductFollowup } from "@/components/warranty/WarrantyProductFollowupControls";
-
-const actionIconClass =
-  "inline-flex items-center justify-center p-1.5 rounded-md text-white transition-colors";
-
-/** warranty_products JOIN can return multiple rows per service_id — keep one row per service. */
-function dedupeServiceRecords(rows) {
-  return Array.from(
-    new Map((rows || []).map((row) => [row.service_id, row])).values(),
-  );
-}
 
 export default function ServiceTable({ serviceRecords, role }) {
-  const [records, setRecords] = useState(() => dedupeServiceRecords(serviceRecords));
+  const [records, setRecords] = useState(serviceRecords || []);
   const [searchTerm, setSearchTerm] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
   const [complaintDateFilter, setComplaintDateFilter] = useState("");
@@ -38,7 +15,6 @@ export default function ServiceTable({ serviceRecords, role }) {
   const [serviceTypeFilter, setServiceTypeFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("PENDING");
   const [assignedFilter, setAssignedFilter] = useState("");
-  const [assignedToFilter, setAssignedToFilter] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedService, setSelectedService] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -55,206 +31,13 @@ export default function ServiceTable({ serviceRecords, role }) {
   const [statusError, setStatusError] = useState("");
   const [isStatusSubmitting, setIsStatusSubmitting] = useState(false);
 
-  // Assign modal state
-  const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
-  const [assignServiceId, setAssignServiceId] = useState(null);
-  const [assignEngineer, setAssignEngineer] = useState("NOT ASSIGNED");
-  const [engineers, setEngineers] = useState([]);
-  const [isAssignSubmitting, setIsAssignSubmitting] = useState(false);
-  const [assignError, setAssignError] = useState("");
-
-  const { ProductFollowupIcons, followupModals } = useWarrantyProductFollowup();
-
   useEffect(() => {
-    setRecords(dedupeServiceRecords(serviceRecords));
+    setRecords(serviceRecords || []);
   }, [serviceRecords]);
 
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
-  const pathname = usePathname();
-  const dashboardPath = (() => {
-    const seg = pathname?.split("/").filter(Boolean)[0];
-    if (seg?.endsWith("-dashboard")) return seg;
-    return role?.toLowerCase() === "superadmin" ? "admin-dashboard" : "user-dashboard";
-  })();
-
-  const parseReportIds = (reportIds) =>
-    String(reportIds || "")
-      .split(",")
-      .map((id) => id.trim())
-      .filter(Boolean);
-
-  const getReportDateById = (record, reportId) => {
-    const ids = parseReportIds(record.report_ids);
-    const dates = String(record.report_dates || "")
-      .split(",")
-      .map((date) => date.trim());
-    const index = ids.indexOf(String(reportId));
-    return index >= 0 ? dates[index] || "" : "";
-  };
-
-  const handleRecordImagesUpdated = (serviceId, preCompletion, afterCompletion) => {
-    setRecords((prev) =>
-      prev.map((record) =>
-        record.service_id === serviceId
-          ? {
-              ...record,
-              pre_completion: preCompletion,
-              after_completion: afterCompletion,
-            }
-          : record
-      )
-    );
-    setSelectedService((prev) =>
-      prev?.service_id === serviceId
-        ? {
-            ...prev,
-            pre_completion: preCompletion,
-            after_completion: afterCompletion,
-          }
-        : prev
-    );
-  };
-
-  const renderReportLinks = (record) => {
-    const ids = parseReportIds(record.report_ids);
-    if (!ids.length) {
-      return <span className="text-gray-400">—</span>;
-    }
-    return (
-      <div className="flex flex-wrap gap-x-2 gap-y-1">
-        {ids.map((id, index) => (
-          <span key={id}>
-            <ServiceReportPrintButton
-              serviceId={record.service_id}
-              reportId={id}
-              reportDate={getReportDateById(record, id)}
-              dashboardPath={dashboardPath}
-              preCompletion={record.pre_completion}
-              afterCompletion={record.after_completion}
-              onRecordImagesUpdated={(pre, after) =>
-                handleRecordImagesUpdated(record.service_id, pre, after)
-              }
-              label={id}
-              variant="link"
-            />
-            {index < ids.length - 1 ? "," : ""}
-          </span>
-        ))}
-      </div>
-    );
-  };
-
-  const renderRowActionIcons = (record) => (
-    <>
-      {record.status?.toUpperCase() !== "COMPLETED" &&
-        (role === "ADMIN" ||
-          role === "SERVICE HEAD" ||
-          role === "SERVICE SUPPORT") && (
-          <button
-            type="button"
-            onClick={() => openAssignModal(record)}
-            title="Assign"
-            className={`${actionIconClass} bg-indigo-500 hover:bg-indigo-600`}
-          >
-            <UserPlus className="w-4 h-4" />
-          </button>
-        )}
-      <Link
-        href={
-          dashboardPath === "admin-dashboard" &&
-          String(record.service_type || "").trim().toUpperCase() === "COMPLAINT"
-            ? `/${dashboardPath}/service-report-steps/${record.service_id}`
-            : `/${dashboardPath}/complete-service/${record.service_id}`
-        }
-        title="+ Make Report"
-        className={`${actionIconClass} bg-purple-500 hover:bg-purple-600`}
-      >
-        <FilePlus className="w-4 h-4" />
-      </Link>
-      {record.status?.toUpperCase() === "COMPLETED" &&
-        (record.final_report_path ? (
-          <a
-            href={
-              record.final_report_path.startsWith("http")
-                ? record.final_report_path
-                : `https://service.dynacleanindustries.com/${record.final_report_path}`
-            }
-            target="_blank"
-            rel="noopener noreferrer"
-            title="View Report"
-            className={`${actionIconClass} bg-green-700 hover:bg-green-800`}
-          >
-            <ExternalLink className="w-4 h-4" />
-          </a>
-        ) : record.installation_report &&
-          record.installation_report.includes(",") ? (
-          record.installation_report
-            .split(",")
-            .filter(Boolean)
-            .map((file, index) => (
-              <ServiceAttachmentLink
-                key={index}
-                filePath={file.trim()}
-                fileName={`Report ${index + 1}`}
-                iconOnly
-              />
-            ))
-        ) : record.installation_report &&
-          record.installation_report !== "uploadFO" ? (
-          <ServiceAttachmentLink
-            filePath={
-              record.installation_report || record.attachments?.split(",")[0]
-            }
-            fileName="View Report"
-            iconOnly
-          />
-        ) : (
-          <Link
-            href={`/${dashboardPath}/update-service/${record.service_id}`}
-            title="Generate/Upload Report"
-            className={`${actionIconClass} bg-purple-500 hover:bg-purple-600`}
-          >
-            <Upload className="w-4 h-4" />
-          </Link>
-        ))}
-      {(role === "ADMIN" ||
-        role === "SUPERADMIN" ||
-        role === "TEAM LEADER" ||
-        role === "SERVICE HEAD" ||
-        role === "SERVICE SUPPORT") &&
-        record.status?.toUpperCase() !== "COMPLETED" && (
-          <button
-            type="button"
-            onClick={() => openStatusModal(record)}
-            title="Change Status"
-            className={`${actionIconClass} bg-yellow-600 hover:bg-yellow-700`}
-          >
-            <RefreshCw className="w-4 h-4" />
-          </button>
-        )}
-      <button
-        type="button"
-        onClick={() => openDetailsModal(record)}
-        title="View Details"
-        className={`${actionIconClass} bg-gray-600 hover:bg-gray-700`}
-      >
-        <Eye className="w-4 h-4" />
-      </button>
-    </>
-  );
-
-  const renderReportCell = (record) => (
-    <div className="min-w-[80px]">
-      {renderReportLinks(record)}
-      <div
-        className="flex flex-wrap items-center gap-1 mt-1 md:opacity-0 md:invisible md:group-hover:opacity-100 md:group-hover:visible transition-all duration-150"
-      >
-        {renderRowActionIcons(record)}
-      </div>
-    </div>
-  );
-
-  const tableColSpan = role === "ADMIN" ? 12 : 11;
+  const dashboardPath =
+    role?.toLowerCase() === "superadmin" ? "admin-dashboard" : "user-dashboard";
 
   // Helper: format dates safely
   const formatDate = (value) => {
@@ -334,11 +117,6 @@ export default function ServiceTable({ serviceRecords, role }) {
       return false;
     }
 
-    // Assigned-to engineer filter
-    if (assignedToFilter && record.assigned_to !== assignedToFilter) {
-      return false;
-    }
-
     return true;
   });
 
@@ -381,7 +159,6 @@ export default function ServiceTable({ serviceRecords, role }) {
     setServiceTypeFilter("");
     setStatusFilter("");
     setAssignedFilter("");
-    setAssignedToFilter("");
     setCurrentPage(1);
   };
 
@@ -392,22 +169,25 @@ export default function ServiceTable({ serviceRecords, role }) {
   const uniqueStatuses = [
     ...new Set(records.map((r) => r.status).filter(Boolean)),
   ];
-  const uniqueEngineers = [
-    ...new Set(records.map((r) => r.assigned_to).filter(Boolean)),
-  ].sort();
 
   // Status options for the change-status modal (ensure Pending By Customer is available)
   const statusOptions = Array.from(
     new Set([...uniqueStatuses.filter(Boolean), "PENDING BY CUSTOMER"]),
   );
 
-  // Calculate KPIs — all from full unfiltered records so they never change with filters
+  // Calculate KPIs based on filtered status
   const kpiData = {
-    total: records.length,
-    completed: records.filter((r) => r.status?.toUpperCase() === "COMPLETED").length,
-    pending: records.filter((r) => r.status?.toUpperCase() === "PENDING").length,
-    pendingSpares: records.filter((r) => r.status?.toUpperCase() === "PENDING FOR SPARES").length,
-    pendingByCustomer: records.filter((r) => r.status?.toUpperCase() === "PENDING BY CUSTOMER").length,
+    total: filteredRecords.length,
+    completed: filteredRecords.filter((r) => r.status?.toUpperCase() === "COMPLETED")
+      .length,
+    pending: filteredRecords.filter((r) => r.status?.toUpperCase() === "PENDING")
+      .length,
+    pendingSpares: filteredRecords.filter(
+      (r) => r.status?.toUpperCase() === "PENDING FOR SPARES",
+    ).length,
+    pendingByCustomer: filteredRecords.filter(
+      (r) => r.status?.toUpperCase() === "PENDING BY CUSTOMER",
+    ).length,
   };
 
   // Calculate completion percentage
@@ -505,205 +285,236 @@ export default function ServiceTable({ serviceRecords, role }) {
     }
   };
 
-  const openAssignModal = async (record) => {
-    setAssignServiceId(record.service_id);
-    setAssignEngineer(record.assigned_to || "NOT ASSIGNED");
-    setAssignError("");
-    setIsAssignModalOpen(true);
-    try {
-      const res = await fetch("/api/reps");
-      const data = await res.json();
-      setEngineers(data.users?.map((u) => u.username) || []);
-    } catch {
-      setEngineers([]);
-    }
-  };
-
-  const closeAssignModal = () => {
-    if (isAssignSubmitting) return;
-    setIsAssignModalOpen(false);
-    setAssignError("");
-  };
-
-  const handleAssignSubmit = async () => {
-    if (!assignServiceId || !assignEngineer) {
-      setAssignError("Please select an engineer.");
-      return;
-    }
-    setIsAssignSubmitting(true);
-    setAssignError("");
-    try {
-      const res = await fetch("/api/service-status/assign", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ service_id: assignServiceId, assigned_to: assignEngineer }),
-      });
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({}));
-        throw new Error(d.message || "Failed to assign.");
-      }
-      setRecords((prev) =>
-        prev.map((r) =>
-          r.service_id === assignServiceId ? { ...r, assigned_to: assignEngineer } : r
-        )
-      );
-      setIsAssignModalOpen(false);
-    } catch (err) {
-      setAssignError(err.message || "Something went wrong.");
-    } finally {
-      setIsAssignSubmitting(false);
-    }
-  };
-
-  // Pie chart data — always from full records, unaffected by filters
-  const pieData = [
-   
-    { name: "Pending",             value: records.filter(r => r.status?.toUpperCase() === "PENDING").length,             fill: "#f11532ff" },
-    { name: "Pending Spares",      value: records.filter(r => r.status?.toUpperCase() === "PENDING FOR SPARES").length,  fill: "#f97316" },
-    { name: "Pending by Customer", value: records.filter(r => r.status?.toUpperCase() === "PENDING BY CUSTOMER").length, fill: "#e6e95bff" },
-  ].filter(d => d.value > 0);
-
   return (
-    <div className="w-full">
-      {/* KPI Section */}
-      <div className="flex flex-wrap gap-4 mb-4 items-stretch">
-        {/* Stats Card */}
-        <div className="bg-white border border-gray-200 rounded-lg shadow-sm px-5 py-4 min-w-[450px]">
-          <div className="grid grid-cols-2 gap-x-8 gap-y-2">
-            {[
-              { label: "Total", value: kpiData.total, color: "text-gray-900", dot: "bg-blue-500" },
-              { label: "Pending Spares", value: kpiData.pendingSpares, color: "text-orange-600", dot: "bg-orange-500" },
-              { label: "Completed", value: kpiData.completed, color: "text-green-600", dot: "bg-green-500" },
-              { label: "Pending by Customer", value: kpiData.pendingByCustomer, color: "text-red-600", dot: "bg-red-500" },
-              { label: "Pending", value: kpiData.pending, color: "text-yellow-600", dot: "bg-yellow-500" },
-              { label: "Completion %", value: `${completionPercentage}%`, color: "text-indigo-600", dot: "bg-indigo-500" },
-            ].map(({ label, value, color, dot }) => (
-              <div key={label} className="flex items-center justify-between gap-6">
-                <div className="flex items-center gap-2">
-                  <div className={`w-2 h-2 rounded-full shrink-0 ${dot}`} />
-                  <span className="text-sm text-gray-500 whitespace-nowrap">{label}</span>
+    <div className="flex justify-center items-center bg-gray-50 py-2 sm:py-4 lg:py-6 px-2 sm:px-4">
+      <div className="bg-white shadow-xl rounded-lg w-full overflow-hidden">
+        {/* KPI Section */}
+        <div className="bg-linear-to-r from-blue-50 to-indigo-50 p-4 border-b border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-800 mb-3">
+            Service Status Overview
+          </h3>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            <div className="bg-white rounded-lg p-3 shadow-sm border border-gray-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-gray-500 uppercase tracking-wide">
+                    Total
+                  </p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {kpiData.total}
+                  </p>
                 </div>
-                <span className={`text-base font-bold ${color}`}>{value}</span>
+                <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
               </div>
-            ))}
-          </div>
-        </div>
+            </div>
 
-        {/* Pie Chart — uses permanent (unfiltered) counts */}
-        <div className="bg-white border border-gray-200 rounded-lg shadow-sm px-4 py-3 flex items-center">
-          <ResponsiveContainer width={220} height={130}>
-            <PieChart>
-              <Pie
-                data={pieData}
-                cx="50%"
-                cy="50%"
-                outerRadius={58}
-                dataKey="value"
-                labelLine={false}
-                label={({ cx, cy, midAngle, innerRadius, outerRadius, percent, name }) => {
-                  const RADIAN = Math.PI / 180;
-                  const radius = innerRadius + (outerRadius - innerRadius) * 0.55;
-                  const x = cx + radius * Math.cos(-midAngle * RADIAN);
-                  const y = cy + radius * Math.sin(-midAngle * RADIAN);
-                  if (percent < 0.05) return null;
-                  return (
-                    <text x={x} y={y} textAnchor="middle" dominantBaseline="central" fill="#1f2937" fontSize={11} fontWeight="600">
-                      <tspan x={x} dy="-6">{name}</tspan>
-                      <tspan x={x} dy="14">{`${(percent * 100).toFixed(0)}%`}</tspan>
-                    </text>
-                  );
-                }}
-              >
-                {pieData.map((entry, index) => (
-                  <Cell key={index} fill={entry.fill} stroke="#fff" strokeWidth={2} />
-                ))}
-              </Pie>
-              <Tooltip
-                formatter={(value, name) => [value, name]}
-                contentStyle={{ fontSize: 12 }}
-              />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
+            <div className="bg-white rounded-lg p-3 shadow-sm border border-gray-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-gray-500 uppercase tracking-wide">
+                    Completed
+                  </p>
+                  <p className="text-2xl font-bold text-green-600">
+                    {kpiData.completed}
+                  </p>
+                </div>
+                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+              </div>
+            </div>
 
-      {/* Search + Filters */}
-      <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-3 mb-4 space-y-3">
-        <div className="flex gap-2">
-          <input
-            type="text"
-            placeholder="Search records (including company name)..."
-            className="p-2 w-full border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
-            value={searchTerm}
-            onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-          />
-          <button
-            onClick={handleResetSearch}
-            className="px-4 py-2 bg-gray-100 border border-gray-300 rounded-lg hover:bg-gray-200 transition-colors text-sm whitespace-nowrap"
-          >
-            Reset
-          </button>
-        </div>
+            <div className="bg-white rounded-lg p-3 shadow-sm border border-gray-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-gray-500 uppercase tracking-wide">
+                    Pending
+                  </p>
+                  <p className="text-2xl font-bold text-yellow-600">
+                    {kpiData.pending}
+                  </p>
+                </div>
+                <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+              </div>
+            </div>
 
-        {/* Filters Row */}
-        <div className="flex flex-wrap gap-3 items-end">
-          <div className="flex-1 min-w-[240px]">
-            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Date Range</label>
-            <div className="flex items-center gap-2">
-              <input type="date"
-                className="p-2 w-full border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                value={complaintDateFrom}
-                onChange={(e) => { setComplaintDateFrom(e.target.value); setCurrentPage(1); }} />
-              <span className="text-gray-400 text-xs shrink-0">to</span>
-              <input type="date"
-                className="p-2 w-full border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                value={complaintDateTo}
-                onChange={(e) => { setComplaintDateTo(e.target.value); setCurrentPage(1); }} />
+            <div className="bg-white rounded-lg p-3 shadow-sm border border-gray-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-gray-500 uppercase tracking-wide">
+                    Pending Spares
+                  </p>
+                  <p className="text-2xl font-bold text-orange-600">
+                    {kpiData.pendingSpares}
+                  </p>
+                </div>
+                <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg p-3 shadow-sm border border-gray-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-gray-500 uppercase tracking-wide">
+                    Pending by Customer
+                  </p>
+                  <p className="text-2xl font-bold text-red-600">
+                    {kpiData.pendingByCustomer}
+                  </p>
+                </div>
+                <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg p-3 shadow-sm border border-gray-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-gray-500 uppercase tracking-wide">
+                    Completion %
+                  </p>
+                  <p className="text-2xl font-bold text-indigo-600">
+                    {completionPercentage}%
+                  </p>
+                </div>
+                <div className="w-3 h-3 bg-indigo-500 rounded-full"></div>
+              </div>
             </div>
           </div>
-          <div className="flex-1 min-w-[130px]">
-            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Service Type</label>
-            <select className="p-2 w-full border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-              value={serviceTypeFilter} onChange={(e) => { setServiceTypeFilter(e.target.value); setCurrentPage(1); }}>
-              <option value="">All Types</option>
-              {uniqueServiceTypes.map((type) => <option key={type} value={type}>{type}</option>)}
-            </select>
+        </div>
+
+        {/* Search + Filters */}
+        <div className="px-2 sm:px-4 py-3 sm:py-4 space-y-3">
+          <div className="flex flex-col sm:flex-row gap-2">
+            <input
+              type="text"
+              placeholder="Search records (including company name)..."
+              className="p-2 sm:p-3 w-full border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setCurrentPage(1);
+              }}
+            />
+            <button
+              onClick={handleResetSearch}
+              className="px-3 sm:px-4 py-2 bg-gray-300 rounded-lg hover:bg-gray-400 transition-colors duration-200 whitespace-nowrap text-sm"
+            >
+              Reset
+            </button>
           </div>
-          <div className="flex-1 min-w-[130px]">
-            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Status</label>
-            <select className="p-2 w-full border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-              value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}>
-              <option value="">All Statuses</option>
-              {uniqueStatuses.map((s) => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
-          <div className="flex-1 min-w-[120px]">
-            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Assigned</label>
-            <select className="p-2 w-full border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-              value={assignedFilter} onChange={(e) => { setAssignedFilter(e.target.value); setCurrentPage(1); }}>
-              <option value="">All</option>
-              <option value="ASSIGNED">Assigned</option>
-              <option value="NOT_ASSIGNED">Not Assigned</option>
-            </select>
-          </div>
-          <div className="flex-1 min-w-[140px]">
-            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Engineer</label>
-            <select className="p-2 w-full border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-              value={assignedToFilter} onChange={(e) => { setAssignedToFilter(e.target.value); setCurrentPage(1); }}>
-              <option value="">All Engineers</option>
-              {uniqueEngineers.map((eng) => <option key={eng} value={eng}>{eng}</option>)}
-            </select>
+
+          {/* Filters Row */}
+          <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-4 gap-4">
+            {/* <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Complaint Date
+              </label>
+              <input
+                type="date"
+                className="p-2 w-full border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                value={complaintDateFilter}
+                onChange={(e) => {
+                  setComplaintDateFilter(e.target.value);
+                  setCurrentPage(1);
+                }}
+              />
+            </div> */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Complaint Date (Range)
+              </label>
+
+              <div className="flex flex-col sm:flex-row gap-2">
+                <input
+                  type="date"
+                  className="p-2 w-full border border-gray-300 rounded-lg shadow-sm
+      focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  value={complaintDateFrom}
+                  onChange={(e) => {
+                    setComplaintDateFrom(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                />
+
+                <input
+                  type="date"
+                  className="p-2 w-full border border-gray-300 rounded-lg shadow-sm
+      focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  value={complaintDateTo}
+                  onChange={(e) => {
+                    setComplaintDateTo(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Service Type
+              </label>
+              <select
+                className="p-2 w-full border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                value={serviceTypeFilter}
+                onChange={(e) => {
+                  setServiceTypeFilter(e.target.value);
+                  setCurrentPage(1);
+                }}
+              >
+                <option value="">All Service Types</option>
+                {uniqueServiceTypes.map((type) => (
+                  <option key={type} value={type}>
+                    {type}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Status
+              </label>
+              <select
+                className="p-2 w-full border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                value={statusFilter}
+                onChange={(e) => {
+                  setStatusFilter(e.target.value);
+                  setCurrentPage(1);
+                }}
+              >
+                <option value="">All Statuses</option>
+                {uniqueStatuses.map((status) => (
+                  <option key={status} value={status}>
+                    {status}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Assigned
+              </label>
+              <select
+                className="p-2 w-full border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                value={assignedFilter}
+                onChange={(e) => {
+                  setAssignedFilter(e.target.value);
+                  setCurrentPage(1);
+                }}
+              >
+                <option value="">All</option>
+                <option value="ASSIGNED">Assigned</option>
+                <option value="NOT_ASSIGNED">Not Assigned</option>
+              </select>
+            </div>
           </div>
         </div>
-      </div>
+
         {/* Table (visible on larger screens) */}
-        <div className="hidden md:block overflow-x-auto overflow-y-auto max-h-[82vh] bg-white rounded-lg border border-gray-200 shadow-sm">
+        <div className="hidden md:block overflow-x-auto overflow-y-auto max-h-[500px] lg:max-h-[600px]">
           <table className="min-w-full text-sm text-gray-700">
-            <thead className="sticky top-0 z-20 bg-blue-600 text-white shadow-sm [&_th]:bg-blue-600">
+            <thead className="bg-blue-600 text-white sticky top-0">
               <tr>
                 <th
                   onClick={() => handleSort("service_id")}
-                  className="bg-blue-600 px-6 py-3 text-left cursor-pointer"
+                  className="px-6 py-3 text-left cursor-pointer"
                 >
                   Service ID {getSortIndicator("service_id")}
                 </th>
@@ -720,12 +531,6 @@ export default function ServiceTable({ serviceRecords, role }) {
                   Company {getSortIndicator("customer_name")}
                 </th>
                 <th
-                  onClick={() => handleSort("model")}
-                  className="px-6 py-3 text-left cursor-pointer"
-                >
-                  Model {getSortIndicator("model")}
-                </th>
-                <th
                   onClick={() => handleSort("complaint_summary")}
                   className="px-6 py-3 text-left cursor-pointer"
                 >
@@ -737,7 +542,6 @@ export default function ServiceTable({ serviceRecords, role }) {
                 >
                   Installed Address {getSortIndicator("installed_address")}
                 </th>
-                <th className="px-6 py-3 text-left">Location</th>
                 <th
                   onClick={() => handleSort("assigned_to")}
                   className="px-6 py-3 text-left cursor-pointer"
@@ -762,17 +566,19 @@ export default function ServiceTable({ serviceRecords, role }) {
                 >
                   Complete Date {getSortIndicator("completed_date")}
                 </th>
-                <th className="px-6 py-3 text-left">Reports</th>
                 {role === "ADMIN" && (
                   <th className="px-6 py-3 text-left">Company Cost</th>
                 )}
+                <th className="px-6 py-3 text-left text-sm font-medium">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody>
               {uniqueRecords.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={tableColSpan}
+                    colSpan={role === "ADMIN" ? 10 : 9}
                     className="px-6 py-3 text-center text-gray-500"
                   >
                     No service records found.
@@ -788,79 +594,43 @@ export default function ServiceTable({ serviceRecords, role }) {
                     record.status?.toUpperCase() === "PENDING FOR SPARES"
                   )
                     rowBackgroundColor = "bg-orange-100";
-                  else if (record.status?.toUpperCase() === "WORKED")
-                    rowBackgroundColor = "bg-amber-50";
 
                   return (
                     <tr
                       key={record.service_id}
-                      className={`group hover:bg-blue-50 transition-all duration-200 ${rowBackgroundColor}`}
+                      className={`hover:bg-blue-50 transition-all duration-200 ${rowBackgroundColor}`}
                     >
-                      <td className="px-6 py-3">
-                        <ProductFollowupIcons
-                          product={{
-                            machine_id: record.machine_id,
-                            service_id: record.service_id,
-                            serial_number: record.serial_number,
-                            model: record.model,
-                            contact: record.contact,
-                            email: record.email,
-                            includeCustomerFollowups: true,
-                          }}
-                          className="mb-1"
-                        />
-                        <div>{record.service_id}</div>
-                        {record.serial_number && (
-                          <div className="text-xs text-green-600 font-medium mt-0.5">{record.serial_number}</div>
-                        )}
-                      </td>
+                      <td className="px-6 py-3">{record.service_id}</td>
                       <td className="px-6 py-3">
                         {formatDate(record.complaint_date)}
                       </td>
                       <td className="px-6 py-3">
                         {record.customer_name || "N/A"}
                       </td>
-                      <td className="px-6 py-3 max-w-[160px] whitespace-normal break-words">
-                        <div className="text-sm text-gray-700">
-                          {record.model || "N/A"}
-                        </div>
-                      </td>
-                      <td className="px-6 py-3 max-w-[300px] whitespace-normal break-words">
+                      <td className="px-6 py-3 max-w-[350px] whitespace-normal break-words relative group">
                         <div className="space-y-1">
+                          {record.model && (
+                            <div className="text-sm text-gray-700">
+                              <span className="font-semibold">Model:</span> {record.model}
+                            </div>
+                          )}
                           {record.state && (
                             <div className="text-sm text-gray-700">
                               <span className="font-semibold">State:</span> {record.state}
                             </div>
                           )}
                           <div className="text-sm">
-                            {record.complaint_summary}
+                            <span className="font-semibold">Issue:</span> {record.complaint_summary}
                           </div>
                         </div>
                       </td>
                       <td className="px-6 py-3 max-w-[180px] whitespace-normal break-words relative group">
                         <span>{record.installed_address}</span>
+
                         {/* Tooltip */}
                         <div className="absolute left-0 bottom-full mb-1 hidden group-hover:block bg-black text-white text-xs p-2 rounded shadow-lg max-w-xs z-50 whitespace-normal break-words">
                           {record.installed_address}
                         </div>
-                      </td>
-                      <td className="px-6 py-3 text-xs">
-                        {record.lat && record.longt ? (
-                          <div className="space-y-1">
-                            <div><span className="font-semibold text-gray-500">Lat:</span> {record.lat}</div>
-                            <div><span className="font-semibold text-gray-500">Long:</span> {record.longt}</div>
-                            <a
-                              href={`https://www.google.com/maps?q=${record.lat},${record.longt}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-blue-600 hover:underline"
-                            >
-                              Maps ↗
-                            </a>
-                          </div>
-                        ) : (
-                          <span className="text-gray-400">—</span>
-                        )}
                       </td>
                       <td className="px-6 py-3">{record.assigned_to}</td>
                       <td className="px-6 py-3">{record.service_type}</td>
@@ -876,15 +646,9 @@ export default function ServiceTable({ serviceRecords, role }) {
                             )}
                         </div>
                       </td>
-                      <td className="px-6 py-3 align-top overflow-hidden">
-                        <ServiceCompletionDateCell
-                          completedDate={record.completed_date}
-                          preCompletion={record.pre_completion}
-                          afterCompletion={record.after_completion}
-                          formatDate={formatDate}
-                        />
+                      <td className="px-6 py-3">
+                        {formatDate(record.completed_date)}
                       </td>
-                      <td className="px-6 py-3">{renderReportCell(record)}</td>
 
                       {role === "ADMIN" && (
                         <td className="px-6 py-3">
@@ -900,6 +664,98 @@ export default function ServiceTable({ serviceRecords, role }) {
                           )}
                         </td>
                       )}
+
+                      <td className="px-6 py-3 text-right text-sm font-medium">
+                        <div className="flex flex-col space-y-2">
+                          {record.status?.toUpperCase() !== "COMPLETED" ? (
+                            <>
+                              {(role === "ADMIN" ||
+                                role === "SERVICE HEAD" ||
+                                role === "SERVICE SUPPORT") && (
+                                <Link
+                                  href={`/${dashboardPath}/assign-service/${record.service_id}`}
+                                  className="inline-block px-3 py-1 text-sm bg-indigo-500 text-white rounded-md hover:bg-indigo-600 text-center"
+                                >
+                                  Assign
+                                </Link>
+                              )}
+                              <Link
+                                href={`/${dashboardPath}/complete-service/${record.service_id}`}
+                                className="inline-block px-3 py-1 text-sm bg-purple-500 text-white rounded-md hover:bg-purple-600 text-center"
+                              >
+                                Complete Service
+                              </Link>
+                            </>
+                          ) : record.status?.toUpperCase() === "COMPLETED" &&
+                            (Number(record.view_status) === 1 ||
+                              record.installation_report === "uploadFO") ? (
+                            <a
+                              href={`/${dashboardPath}/view-service-report/${record.service_id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-block px-3 py-1 text-sm bg-green-700 text-white rounded-md hover:bg-green-800 text-center"
+                            >
+                              View Report
+                            </a>
+                          ) : record.final_report_path ? (
+                            <a
+                              href={
+                                record.final_report_path.startsWith("http")
+                                  ? record.final_report_path
+                                  : `https://service.dynacleanindustries.com/${record.final_report_path}`
+                              }
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-block px-3 py-1 text-sm bg-green-700 text-white rounded-md hover:bg-green-800 text-center"
+                            >
+                              View Report
+                            </a>
+                          ) : record.installation_report &&
+                            record.installation_report.includes(",") ? (
+                            <div className="flex flex-col space-y-1">
+                              {record.installation_report
+                                .split(",")
+                                .filter(Boolean)
+                                .map((file, index) => (
+                                  <ServiceAttachmentLink
+                                    key={index}
+                                    filePath={file.trim()}
+                                    fileName={`Report ${index + 1}`}
+                                    className="inline-block px-2 py-1 text-xs bg-green-700 text-white rounded-md hover:bg-green-800 text-center"
+                                  />
+                                ))}
+                            </div>
+                          ) : (
+                            <Link
+                              href={`/${dashboardPath}/update-service/${record.service_id}`}
+                              className="inline-block px-3 py-1 text-sm bg-purple-500 text-white rounded-md hover:bg-purple-600 text-center"
+                            >
+                              Generate/Upload Report
+                            </Link>
+                          )}
+
+                          {(role === "ADMIN" ||
+                            role === "SUPERADMIN" ||
+                            role === "TEAM LEADER" ||
+                            role === "SERVICE HEAD" ||
+                            role === "SERVICE SUPPORT") &&
+                            record.status?.toUpperCase() !== "COMPLETED" && (
+                              <button
+                                onClick={() => openStatusModal(record)}
+                                className="inline-block px-3 py-1 text-sm bg-yellow-600 text-white rounded-md hover:bg-yellow-700 text-center"
+                              >
+                                Change Status
+                              </button>
+                            )}
+
+                          <button
+                            onClick={() => openDetailsModal(record)}
+                            className="inline-block px-3 py-1 text-sm bg-gray-600 text-white rounded-md hover:bg-gray-700 text-center"
+                          >
+                            View Details
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   );
                 })
@@ -951,7 +807,7 @@ export default function ServiceTable({ serviceRecords, role }) {
         </div>
 
         {/* Card view (visible on small screens) */}
-        <div className="md:hidden mt-4 space-y-3">
+        <div className="md:hidden p-2 sm:p-4 space-y-3 sm:space-y-4">
           {paginatedRecords.length === 0 ? (
             <div className="text-center text-gray-500 py-4">
               No service records found.
@@ -964,32 +820,16 @@ export default function ServiceTable({ serviceRecords, role }) {
                 cardBackgroundColor = "bg-green-50";
               else if (record.status?.toUpperCase() === "PENDING FOR SPARES")
                 cardBackgroundColor = "bg-orange-100";
-              else if (record.status?.toUpperCase() === "WORKED")
-                cardBackgroundColor = "bg-amber-50";
 
               return (
                 <div
                   key={record.service_id}
-                  className={`group bg-white shadow-md rounded-lg p-4 space-y-2 ${cardBackgroundColor}`}
+                  className={`bg-white shadow-md rounded-lg p-4 space-y-2 ${cardBackgroundColor}`}
                 >
                   <div className="flex justify-between items-center">
-                    <div>
-                      <ProductFollowupIcons
-                        product={{
-                          machine_id: record.machine_id,
-                          service_id: record.service_id,
-                          serial_number: record.serial_number,
-                          model: record.model,
-                          contact: record.contact,
-                          email: record.email,
-                          includeCustomerFollowups: true,
-                        }}
-                        className="mb-1"
-                      />
-                      <span className="font-bold text-lg text-blue-600">
-                        Service ID: {record.service_id}
-                      </span>
-                    </div>
+                    <span className="font-bold text-lg text-blue-600">
+                      Service ID: {record.service_id}
+                    </span>
                     <div className="flex flex-col items-end max-w-[50%]">
                       <span
                         className={`px-2 py-1 rounded-full text-xs font-semibold ${
@@ -1036,19 +876,6 @@ export default function ServiceTable({ serviceRecords, role }) {
                       </span>{" "}
                       {record.service_type}
                     </p>
-                    <div className="text-gray-500">
-                      <span className="font-semibold text-gray-700">
-                        Complete Date:
-                      </span>
-                      <div className="mt-1">
-                        <ServiceCompletionDateCell
-                          completedDate={record.completed_date}
-                          preCompletion={record.pre_completion}
-                          afterCompletion={record.after_completion}
-                          formatDate={formatDate}
-                        />
-                      </div>
-                    </div>
                   </div>
                   <div className="border-t border-gray-200 pt-2">
                     {record.model && (
@@ -1079,12 +906,6 @@ export default function ServiceTable({ serviceRecords, role }) {
                       </span>{" "}
                       {record.installed_address}
                     </p>
-                    <div className="text-gray-500 mt-1">
-                      <span className="font-semibold text-gray-700">
-                        Reports:
-                      </span>
-                      <div className="mt-0.5">{renderReportCell(record)}</div>
-                    </div>
                   </div>
                   {role === "ADMIN" && (
                     <div className="border-t border-gray-200 pt-2">
@@ -1105,6 +926,97 @@ export default function ServiceTable({ serviceRecords, role }) {
                       </p>
                     </div>
                   )}
+                  <div className="flex flex-col space-y-2 mt-4">
+                    {record.status?.toUpperCase() !== "COMPLETED" ? (
+                      <>
+                        {role === "ADMIN" && (
+                          <Link
+                            href={`/${dashboardPath}/assign-service/${record.service_id}`}
+                            className="px-3 py-2 text-sm bg-indigo-500 text-white rounded-md hover:bg-indigo-600 text-center"
+                          >
+                            Assign
+                          </Link>
+                        )}
+                        <Link
+                          href={`/${dashboardPath}/complete-service/${record.service_id}`}
+                          className="px-3 py-2 text-sm bg-purple-500 text-white rounded-md hover:bg-purple-600 text-center"
+                        >
+                          Complete Service
+                        </Link>
+                      </>
+                    ) : record.status?.toUpperCase() === "COMPLETED" &&
+                      (Number(record.view_status) === 1 ||
+                        record.installation_report === "uploadFO") ? (
+                      <a
+                        href={`/${dashboardPath}/view-service-report/${record.service_id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3 py-2 text-sm bg-green-700 text-white rounded-md hover:bg-green-800 text-center"
+                      >
+                        View Report
+                      </a>
+                    ) : record.final_report_path ? (
+                      <a
+                        href={
+                          record.final_report_path.startsWith("http")
+                            ? record.final_report_path
+                            : `https://service.dynacleanindustries.com/${record.final_report_path}`
+                        }
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3 py-2 text-sm bg-green-700 text-white rounded-md hover:bg-green-800 text-center"
+                      >
+                        View Report
+                      </a>
+                    ) : record.installation_report &&
+                      record.installation_report.includes(",") ? (
+                      <div className="flex flex-wrap gap-1">
+                        {record.installation_report
+                          .split(",")
+                          .filter(Boolean)
+                          .map((file, index) => (
+                            <ServiceAttachmentLink
+                              key={index}
+                              filePath={file.trim()}
+                              fileName={`Report ${index + 1}`}
+                              className="px-2 py-1 text-xs bg-green-700 text-white rounded-md hover:bg-green-800 text-center"
+                            />
+                          ))}
+                      </div>
+                    ) : record.installation_report &&
+                      record.installation_report !== "uploadFO" ? (
+                      <ServiceAttachmentLink
+                        filePath={
+                          record.installation_report ||
+                          record.attachments?.split(",")[0]
+                        }
+                        fileName="View Report"
+                        className="px-3 py-2 text-sm bg-green-700 text-white rounded-md hover:bg-green-800 text-center"
+                      />
+                    ) : (
+                      <Link
+                        href={`/${dashboardPath}/update-service/${record.service_id}`}
+                        className="px-3 py-2 text-sm bg-purple-500 text-white rounded-md hover:bg-purple-600 text-center"
+                      >
+                        Generate/Upload Report
+                      </Link>
+                    )}
+                    {role === "ADMIN" &&
+                      record.status?.toUpperCase() !== "COMPLETED" && (
+                        <button
+                          onClick={() => openStatusModal(record)}
+                          className="px-3 py-2 text-sm bg-yellow-600 text-white rounded-md hover:bg-yellow-700 text-center"
+                        >
+                          Change Status
+                        </button>
+                      )}
+                    <button
+                      onClick={() => openDetailsModal(record)}
+                      className="px-3 py-2 text-sm bg-gray-600 text-white rounded-md hover:bg-gray-700 text-center"
+                    >
+                      View Details
+                    </button>
+                  </div>
                 </div>
               );
             })
@@ -1130,6 +1042,7 @@ export default function ServiceTable({ serviceRecords, role }) {
             </button>
           </div>
         </div>
+      </div>
 
       {/* Details Modal */}
       <Modal
@@ -1138,12 +1051,11 @@ export default function ServiceTable({ serviceRecords, role }) {
         title={`Service Details (ID: ${selectedService?.service_id})`}
         selectedService={selectedService}
         baseUrl={baseUrl}
-        dashboardPath={dashboardPath}
       />
 
       {/* Status Change Modal */}
       {isStatusModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">
               Change Status (Service ID: {statusForm.service_id})
@@ -1227,68 +1139,6 @@ export default function ServiceTable({ serviceRecords, role }) {
           </div>
         </div>
       )}
-
-      {/* Assign Modal */}
-      {isAssignModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-sm p-6 relative">
-            <button
-              type="button"
-              onClick={closeAssignModal}
-              className="absolute top-3 right-3 text-gray-400 hover:text-gray-700"
-              aria-label="Close"
-            >
-              ✕
-            </button>
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">
-              Assign Service (ID: {assignServiceId})
-            </h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Assign To
-                </label>
-                <select
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
-                  value={assignEngineer}
-                  onChange={(e) => setAssignEngineer(e.target.value)}
-                >
-                  <option value="NOT ASSIGNED">NOT ASSIGNED</option>
-                  {engineers.length > 0 ? (
-                    engineers.map((eng) => (
-                      <option key={eng} value={eng}>{eng}</option>
-                    ))
-                  ) : (
-                    <option disabled>Loading...</option>
-                  )}
-                </select>
-              </div>
-              {assignError && (
-                <p className="text-sm text-red-600">{assignError}</p>
-              )}
-              <div className="flex justify-end gap-2 mt-4">
-                <button
-                  type="button"
-                  onClick={closeAssignModal}
-                  className="px-4 py-2 text-sm rounded-md border border-gray-300 text-gray-700 bg-white hover:bg-gray-50"
-                  disabled={isAssignSubmitting}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleAssignSubmit}
-                  className="px-4 py-2 text-sm rounded-md bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-60"
-                  disabled={isAssignSubmitting}
-                >
-                  {isAssignSubmitting ? "Assigning..." : "Assign"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-      {followupModals}
     </div>
   );
 }

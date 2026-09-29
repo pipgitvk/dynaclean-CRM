@@ -3,7 +3,6 @@
 import { useState, useMemo } from "react";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
-import { manualPaymentInvoiceHref } from "@/lib/manualPaymentInvoiceHref";
 
 dayjs.extend(utc);
 
@@ -236,7 +235,7 @@ export default function PaymentTable({ rows, role }) {
                                 <td className="px-4 py-3 text-sm">
                                     {row.invoice_file ? (
                                         <a
-                                            href={manualPaymentInvoiceHref(row.invoice_file)}
+                                            href={row.invoice_file}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className="text-blue-600 hover:text-blue-800 underline"
@@ -320,7 +319,7 @@ export default function PaymentTable({ rows, role }) {
                         {row.invoice_file && (
                             <div className="mb-3">
                                 <a
-                                    href={manualPaymentInvoiceHref(row.invoice_file)}
+                                    href={row.invoice_file}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="text-blue-600 hover:text-blue-800 text-sm underline"

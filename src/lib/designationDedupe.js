@@ -36,7 +36,6 @@ export const HR_TARGET_ALLOWED_DESIGNATIONS = [
   "GEM Tender Executive",
   "Field Sales and Service Executive",
   "Graphic Designer",
-  "Machine Operator",
 ];
 
 /**

@@ -3,12 +3,7 @@
 import { useActionState, useState } from "react";
 import { decideSpecialPrice } from "@/app/admin-dashboard/special-pricing/_actions";
 
-export default function SpecialPriceApproveRejectButtons({
-  id,
-  itemType = "product",
-  variant = "table",
-  needsDealerPrice = false,
-}) {
+export default function SpecialPriceApproveRejectButtons({ id, variant = "table" }) {
   const [modal, setModal] = useState(null);
   const [state, formAction, pending] = useActionState(decideSpecialPrice, null);
 
@@ -55,11 +50,7 @@ export default function SpecialPriceApproveRejectButtons({
                 id="sp-decision-title"
                 className="text-sm font-semibold text-gray-900"
               >
-                {isApprove
-                  ? needsDealerPrice
-                    ? "Approve dealer price"
-                    : "Approve special price"
-                  : "Reject special price"}
+                {isApprove ? "Approve special price" : "Reject special price"}
               </h2>
               <button
                 type="button"
@@ -73,34 +64,11 @@ export default function SpecialPriceApproveRejectButtons({
 
             <form action={formAction} className="px-4 py-3 space-y-3">
               <input type="hidden" name="id" value={id} />
-              <input type="hidden" name="itemType" value={itemType} />
               <input
                 type="hidden"
                 name="decision"
                 value={isApprove ? "approve" : "reject"}
               />
-
-              {isApprove && needsDealerPrice && (
-                <div>
-                  <label
-                    htmlFor="sp-dealer-price"
-                    className="block text-sm font-medium text-gray-700 mb-1"
-                  >
-                    Dealer Price <span className="text-red-600">*</span>
-                  </label>
-                  <input
-                    id="sp-dealer-price"
-                    name="dealer_price"
-                    type="number"
-                    step="0.01"
-                    min="0.01"
-                    required
-                    disabled={pending}
-                    placeholder="Enter dealer price"
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-50"
-                  />
-                </div>
-              )}
 
               <div>
                 <label
@@ -144,11 +112,7 @@ export default function SpecialPriceApproveRejectButtons({
                       : "px-4 py-2 rounded-md bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-50"
                   }
                 >
-                  {pending
-                    ? "Submitting…"
-                    : isApprove
-                      ? "Submit approval"
-                      : "Submit rejection"}
+                  {pending ? "Submitting…" : isApprove ? "Submit approval" : "Submit rejection"}
                 </button>
               </div>
             </form>
