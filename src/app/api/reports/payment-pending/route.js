@@ -47,12 +47,13 @@ export async function GET(request) {
         o.company_name,
         o.is_returned,
         c.customer_id,
-        ppf_latest.next_followup_date AS next_followup_date
+        ppf_latest.next_followup_date AS next_followup_date,
+        ppf_latest.notes AS latest_remark
       FROM neworder AS o
       LEFT JOIN customers AS c 
         ON o.contact COLLATE utf8mb4_unicode_ci = c.phone COLLATE utf8mb4_unicode_ci
       LEFT JOIN (
-        SELECT ppf.order_id, ppf.next_followup_date
+        SELECT ppf.order_id, ppf.next_followup_date, ppf.notes
         FROM payment_pending_followups ppf
         INNER JOIN (
           SELECT order_id, MAX(id) AS max_id
@@ -123,6 +124,7 @@ export async function GET(request) {
                 remaining_amount: remaining,
                 due_date: order.duedate,
                 next_followup_date: order.next_followup_date || null,
+                latest_remark: order.latest_remark || null,
                 payment_status: order.payment_status || 'pending',
                 created_at: order.created_at,
                 is_partially_returned: order.is_returned === 2,
