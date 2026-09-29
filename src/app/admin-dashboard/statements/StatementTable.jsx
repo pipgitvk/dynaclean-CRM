@@ -1,18 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import dayjs from "dayjs";
 import { useState, useEffect, useRef, useMemo } from "react";
 import toast from "react-hot-toast";
-import { Eye, Pencil, X, Upload, Download, FileSpreadsheet, Search, Trash2, Building2 } from "lucide-react";
+import { Eye, Pencil, X, Upload, Download, FileSpreadsheet, Search, Trash2 } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import ExcelJS from "exceljs";
 
 export default function StatementTable({ rows }) {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const fileInputRef = useRef(null);
   const STORAGE_KEY = "statements.filters.v1";
   const readPersisted = () => {
@@ -46,7 +44,6 @@ export default function StatementTable({ rows }) {
   const [expenseLoading, setExpenseLoading] = useState(false);
   const [importing, setImporting] = useState(false);
   const [deletingAll, setDeletingAll] = useState(false);
-  const [fixingStatus, setFixingStatus] = useState(false);
   const [skippedRows, setSkippedRows] = useState([]);
   const [showSkippedModal, setShowSkippedModal] = useState(false);
   const [selectedSkipped, setSelectedSkipped] = useState(new Set());
@@ -57,27 +54,6 @@ export default function StatementTable({ rows }) {
   const [expenseTxnForIdSearch, setExpenseTxnForIdSearch] = useState(null);
   const [expenseIdResolved, setExpenseIdResolved] = useState(null);
   const [purchaseTypeByLegacyId, setPurchaseTypeByLegacyId] = useState({});
-
-  useEffect(() => {
-    const statusFromCard = searchParams.get("status");
-    const fromCard = searchParams.get("fromCard");
-    if (statusFromCard === "Settled" || statusFromCard === "Unsettled") {
-      setStatusFilter(statusFromCard);
-    }
-    if (fromCard === "1") {
-      setSearchQuery("");
-      setLinkedTypeFilter("");
-      setDateFrom("");
-      setDateTo("");
-    }
-  }, [searchParams]);
-
-  // --- Import modal state ---
-  const [showImportModal, setShowImportModal] = useState(false);
-  const [banks, setBanks] = useState([]);
-  const [selectedBankId, setSelectedBankId] = useState("");
-  const [importFile, setImportFile] = useState(null);
-  const importFileRef = useRef(null);
 
   useEffect(() => {
     const q = searchQuery.trim();
@@ -130,12 +106,6 @@ export default function StatementTable({ rows }) {
       }
       const s = String(v).trim().toUpperCase();
       if (!s) continue;
-      if (/^IP\d+$/.test(s)) {
-        // Invoice-linked token — treat as settled
-        const id = Number(s.slice(2));
-        if (Number.isFinite(id) && id > 0) out.push({ prefix: "IP", id });
-        continue;
-      }
       if (/^(PP|PS|SP)\d+$/.test(s)) {
         const prefix = s.startsWith("SP") ? "PS" : s.slice(0, 2);
         const id = Number(s.slice(2));
@@ -158,8 +128,7 @@ export default function StatementTable({ rows }) {
     if (row?.client_expense_id) return true;
     if (row?.dd_id) return true;
     if (row?.linked_module_id && row?.linked_module_type === 'Assets') return true;
-    if (linked.length > 0) return true; // includes IP-prefixed invoice tokens
-    if (row?.invoice_number != null && String(row.invoice_number).trim() !== "") return true;
+    if (linked.length > 0) return true;
     if (row?.failed_transaction_id != null && String(row.failed_transaction_id).trim() !== "") return true;
     if (row?.cancelled_transaction_id != null && String(row.cancelled_transaction_id).trim() !== "") return true;
     return false;
@@ -170,12 +139,11 @@ export default function StatementTable({ rows }) {
     const inv = row?.invoice_status != null ? String(row.invoice_status).trim() : "";
     if (row?.failed_transaction_id != null && String(row.failed_transaction_id).trim() !== "") return "Failed";
     if (row?.cancelled_transaction_id != null && String(row.cancelled_transaction_id).trim() !== "") return "Cancelled";
-    if (linked.length > 0) return "Settled"; // includes IP-prefixed invoice tokens
+    if (linked.length > 0) return "Settled";
     if (row?.client_expense_id) return "Settled";
     if (row?.dd_id) return "Settled";
     if (row?.linked_module_id && row?.linked_module_type === 'Assets') return "Settled";
     if (inv) return inv;
-    if (row?.invoice_number != null && String(row.invoice_number).trim() !== "") return "Settled";
     return "Unsettled";
   };
 
@@ -233,17 +201,8 @@ export default function StatementTable({ rows }) {
     };
   }, [rows]);
 
-  // Fetch banks for import modal
-  useEffect(() => {
-    let cancelled = false;
-    fetch("/api/bank-masters", { credentials: "include" })
-      .then((r) => r.json())
-      .then((data) => { if (!cancelled) setBanks(data.banks || []); })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, []);
-
-  const filteredRows = useMemo(() => {    return rows.filter((row) => {
+  const filteredRows = useMemo(() => {
+    return rows.filter((row) => {
       const qRaw = searchQuery.trim();
       const q = qRaw.toLowerCase();
       const isNumericSearch = /^\d+$/.test(qRaw);
@@ -305,7 +264,7 @@ export default function StatementTable({ rows }) {
       // Linked type filter
       if (linkedTypeFilter) {
         const hasInvoice = !!String(row.invoice_number || "").trim();
-        const hasPurchases = getLinkedPurchaseRefs(row).filter(x => x.prefix !== "IP").length > 0;
+        const hasPurchases = getLinkedPurchaseRefs(row).length > 0;
         const hasDD = row.dd_id != null && String(row.dd_id).trim() !== "";
         const hasExpense = row.client_expense_id != null && String(row.client_expense_id).trim() !== "";
         const hasAssets = row.linked_module_type === 'Assets' && row.linked_module_id != null;
@@ -493,116 +452,13 @@ export default function StatementTable({ rows }) {
     toast.success("PDF exported");
   };
 
-  const handleExportExcel = async () => {
-    try {
-      const workbook = new ExcelJS.Workbook();
-      const worksheet = workbook.addWorksheet("Statements");
-
-      // Define columns
-      worksheet.columns = [
-        { header: "ID", key: "id", width: 10 },
-        { header: "Trans ID", key: "trans_id", width: 18 },
-        { header: "Date", key: "date", width: 12 },
-        { header: "Txn Dated Deb", key: "txn_dated_deb", width: 14 },
-        { header: "Txn Posted Date", key: "txn_posted_date", width: 16 },
-        { header: "Cheq No", key: "cheq_no", width: 12 },
-        { header: "Description", key: "description", width: 25 },
-        { header: "Debit", key: "debit", width: 12 },
-        { header: "Credit", key: "credit", width: 12 },
-        { header: "Status", key: "status", width: 12 },
-        { header: "Invoice No", key: "invoice_number", width: 14 },
-        { header: "Purchase IDs", key: "purchase_ids", width: 16 },
-        { header: "DD ID", key: "dd_id", width: 10 },
-        { header: "Expense ID", key: "expense_id", width: 12 },
-        { header: "Bank Account", key: "account_number", width: 16 },
-        { header: "Balance", key: "balance", width: 14 },
-      ];
-
-      // Style header row
-      worksheet.getRow(1).fill = {
-        type: "pattern",
-        pattern: "solid",
-        fgColor: { argb: "FF3B82F6" },
-      };
-      worksheet.getRow(1).font = {
-        bold: true,
-        color: { argb: "FFFFFFFF" },
-      };
-
-      // Add data rows
-      sortedRows.forEach((row) => {
-        worksheet.addRow({
-          id: row.id,
-          trans_id: row.trans_id || "-",
-          date: row.date ? dayjs(row.date).format("DD MMM YYYY") : "-",
-          txn_dated_deb: row.txn_dated_deb && row.txn_dated_deb !== "0000-00-00" ? dayjs(row.txn_dated_deb).format("DD MMM YYYY") : "-",
-          txn_posted_date: row.txn_posted_date && row.txn_posted_date !== "0000-00-00" ? dayjs(row.txn_posted_date).format("DD MMM YYYY") : "-",
-          cheq_no: row.cheq_no || "-",
-          description: row.description || "-",
-          debit: row.type === "Debit" ? formatPdfAmount(row.amount) : "-",
-          credit: row.type === "Credit" ? formatPdfAmount(row.amount) : "-",
-          status: displayInvoiceStatus(row),
-          invoice_number: row.invoice_number || "-",
-          purchase_ids: getLinkedPurchaseRefs(row).map(x => `${x.prefix}${x.id}`).join(", ") || "-",
-          dd_id: row.dd_id ? `DD#${row.dd_id}` : "-",
-          expense_id: row.client_expense_id ? `EXP#${row.client_expense_id}` : "-",
-          account_number: row.account_number || "-",
-          balance: displayBalance(row) != null ? formatPdfAmount(displayBalance(row)) : "-",
-        });
-      });
-
-      // Center align numeric columns
-      worksheet.columns.forEach((col) => {
-        if (["id", "debit", "credit", "balance"].includes(col.key)) {
-          worksheet.getColumn(col.key).alignment = { horizontal: "right" };
-        }
-      });
-
-      // Generate and download
-      const buffer = await workbook.xlsx.writeBuffer();
-      const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `statements_${dayjs().format("YYYY-MM-DD")}.xlsx`;
-      link.click();
-      window.URL.revokeObjectURL(url);
-
-      toast.success("Excel exported");
-    } catch (err) {
-      toast.error("Failed to export Excel: " + (err.message || "Unknown error"));
-    }
-  };
-
-  // Opens the import modal
-  const openImportModal = () => {
-    setSelectedBankId("");
-    setImportFile(null);
-    if (importFileRef.current) importFileRef.current.value = "";
-    setShowImportModal(true);
-  };
-
-  const closeImportModal = () => {
-    setShowImportModal(false);
-    setSelectedBankId("");
-    setImportFile(null);
-    if (importFileRef.current) importFileRef.current.value = "";
-  };
-
-  const handleImport = async () => {
-    if (!selectedBankId) {
-      toast.error("Please select a bank before importing");
-      return;
-    }
-    if (!importFile) {
-      toast.error("Please choose a CSV or Excel file");
-      return;
-    }
+  const handleImport = async (e) => {
+    const file = e?.target?.files?.[0];
+    if (!file) return;
     setImporting(true);
     try {
       const formData = new FormData();
-      formData.append("file", importFile);
-      formData.append("bank_id", selectedBankId);
+      formData.append("file", file);
       const res = await fetch("/api/statements/import", {
         method: "POST",
         body: formData,
@@ -610,8 +466,6 @@ export default function StatementTable({ rows }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Import failed");
-
-      closeImportModal();
 
       if (data.warning) {
         toast(`⚠ ${data.warning}`, { icon: "⚠️", duration: 6000 });
@@ -629,6 +483,7 @@ export default function StatementTable({ rows }) {
       toast.error(err.message || "Import failed");
     } finally {
       setImporting(false);
+      e.target.value = "";
     }
   };
 
@@ -708,22 +563,6 @@ export default function StatementTable({ rows }) {
     }
   };
 
-  const handleFixInvoiceStatus = async () => {
-    if (!window.confirm("Yeh action DB mein saari linked statements ka invoice_status 'Settled' kar dega. Continue?")) return;
-    setFixingStatus(true);
-    try {
-      const res = await fetch("/api/statements/fix-invoice-status", { method: "POST", credentials: "include" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Fix failed");
-      toast.success(data.message || "Fix complete");
-      router.refresh();
-    } catch (err) {
-      toast.error(err.message || "Fix failed");
-    } finally {
-      setFixingStatus(false);
-    }
-  };
-
   useEffect(() => {
     if (!modalId) {
       setExpense(null);
@@ -732,115 +571,17 @@ export default function StatementTable({ rows }) {
     }
     setExpenseLoading(true);
     setExpense(null);
-    
-    // Fetch the statement row first
     fetch(`/api/statements/${modalId}`)
       .then((r) => r.json())
-      .then(async (statement) => {
-        if (statement?.error) throw new Error(statement.error);
-        
-        const linkedData = { ...statement };
-        
-        // Fetch linked expense if exists
-        if (statement.client_expense_id) {
-          try {
-            const expRes = await fetch(`/api/client-expenses/${statement.client_expense_id}`);
-            const expData = await expRes.json();
-            if (expRes.ok && !expData.error) {
-              linkedData.expense = expData;
-            }
-          } catch (e) {
-            console.error("Failed to fetch expense:", e);
-          }
+      .then((row) => {
+        if (row?.error) throw new Error(row.error);
+        if (row.client_expense_id) {
+          return fetch(`/api/client-expenses/${row.client_expense_id}`).then((r) => r.json());
         }
-        
-        // Fetch linked invoice if exists
-        if (statement.invoice_number) {
-          try {
-            const invRes = await fetch(`/api/invoice-list?search=${encodeURIComponent(statement.invoice_number)}&limit=5`);
-            const invData = await invRes.json();
-            // API returns { data: [...] } or { invoices: [...] }
-            const invList = invData.data || invData.invoices || [];
-            const matched = invList.find(i =>
-              String(i.invoice_number || "").trim() === String(statement.invoice_number).trim()
-            ) || invList[0];
-            if (invRes.ok && matched) {
-              linkedData.invoice = matched;
-            }
-          } catch (e) {
-            console.error("Failed to fetch invoice:", e);
-          }
-        }
-        
-        // Fetch linked DD if exists
-        if (statement.dd_id) {
-          try {
-            const ddRes = await fetch(`/api/dd-management?search=${statement.dd_id}`, { credentials: "include" });
-            const ddData = await ddRes.json();
-            const ddList = ddData.data || ddData.records || (Array.isArray(ddData) ? ddData : []);
-            const matched = ddList.find(d => Number(d.id) === Number(statement.dd_id)) || ddList[0];
-            if (ddRes.ok && matched) {
-              linkedData.dd = matched;
-            }
-          } catch (e) {
-            console.error("Failed to fetch DD:", e);
-          }
-        }
-        
-        // Fetch linked purchases if exists
-        if (statement.linked_purchase_ids) {
-          try {
-            let tokens = [];
-            try { tokens = JSON.parse(String(statement.linked_purchase_ids)); } catch { tokens = String(statement.linked_purchase_ids).split(",").map(s => s.trim()); }
-            const hasInvoice = !!String(statement.invoice_number || "").trim();
-            const purchaseItems = [];
-            for (const token of tokens) {
-              const t = String(token).trim();
-              const match = t.match(/^(IP|PP|PS)(\d+)$/i);
-              if (!match) continue;
-              const prefix = match[1].toUpperCase();
-              // Skip IP-prefixed tokens when invoice_number already covers them
-              if (prefix === "IP" && hasInvoice) continue;
-              const pId = match[2];
-              const apiUrl = prefix === "PS"
-                ? `/api/spare/stock-request?id=${pId}`
-                : `/api/stock-request?id=${pId}`;
-              try {
-                const res = await fetch(apiUrl);
-                const data = await res.json();
-                const item = Array.isArray(data) ? data[0] : (data?.requests?.[0] || data?.request || data);
-                if (item && !item.error) {
-                  purchaseItems.push({ token: t, prefix, id: pId, ...item });
-                } else {
-                  purchaseItems.push({ token: t, prefix, id: pId });
-                }
-              } catch {
-                purchaseItems.push({ token: t, prefix, id: pId });
-              }
-            }
-            if (purchaseItems.length > 0) linkedData.purchases = purchaseItems;
-          } catch (e) {
-            console.error("Failed to fetch purchases:", e);
-          }
-        }
-        
-        // Fetch linked asset if exists
-        if (statement.linked_module_type === 'Assets' && statement.linked_module_id) {
-          try {
-            const assetRes = await fetch(`/api/assets-management/${statement.linked_module_id}`);
-            const assetData = await assetRes.json();
-            if (assetRes.ok && !assetData.error) {
-              linkedData.asset = assetData;
-            }
-          } catch (e) {
-            console.error("Failed to fetch asset:", e);
-          }
-        }
-        
-        return linkedData;
+        return null;
       })
-      .then((linkedData) => {
-        setExpense(linkedData);
+      .then((exp) => {
+        setExpense(exp && !exp.error ? exp : null);
       })
       .catch((e) => {
         toast.error(e.message || "Failed to load");
@@ -928,30 +669,29 @@ export default function StatementTable({ rows }) {
           Reset
         </button>
         <div className="flex flex-wrap gap-2 ml-auto">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv,.xlsx,.xls"
+            className="hidden"
+            onChange={handleImport}
+          />
           <button
             type="button"
-            onClick={openImportModal}
+            onClick={() => fileInputRef.current?.click()}
             disabled={importing}
             className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium flex items-center gap-2 disabled:opacity-50"
           >
             <Upload size={16} />
             {importing ? "Importing..." : "Import (CSV/Excel)"}
-          </button>          <button
+          </button>
+          <button
             type="button"
             onClick={handleExportPDF}
             className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium flex items-center gap-2"
           >
             <Download size={16} />
             Export PDF
-          </button>
-          <button
-            type="button"
-            onClick={handleExportExcel}
-            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium flex items-center gap-2"
-            title="Download filtered data as Excel"
-          >
-            <Download size={16} />
-            Export Excel
           </button>
           <button
             type="button"
@@ -972,15 +712,6 @@ export default function StatementTable({ rows }) {
             <Trash2 size={16} />
             {deletingAll ? "Deleting..." : "Delete All"}
           </button>
-          {/* <button
-            type="button"
-            onClick={handleFixInvoiceStatus}
-            disabled={fixingStatus}
-            className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Fix invoice_status for already-linked statements that still show Unsettled"
-          >
-            {fixingStatus ? "Fixing..." : "Fix Settled Status"}
-          </button> */}
         </div>
       </div>
 
@@ -998,7 +729,6 @@ export default function StatementTable({ rows }) {
               <th onClick={() => handleSort("debit")} className="p-3 cursor-pointer select-none">Debit<SortIcon column="debit" /></th>
               <th onClick={() => handleSort("credit")} className="p-3 cursor-pointer select-none">Credit<SortIcon column="credit" /></th>
               <th onClick={() => handleSort("status")} className="p-3 cursor-pointer select-none">Status<SortIcon column="status" /></th>
-              <th className="p-3">Bank</th>
               <th className="p-3">Invoice, Purchases, DD, Expense</th>
               <th
                 onClick={() => handleSort("balance")}
@@ -1059,16 +789,6 @@ export default function StatementTable({ rows }) {
                     )}
                   </td>
                   <td className="p-3">
-                    {row.account_number ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-800 text-xs font-medium rounded-full whitespace-nowrap">
-                        <Building2 size={11} />
-                        {row.account_number}
-                      </span>
-                    ) : (
-                      <span className="text-gray-300 text-xs">—</span>
-                    )}
-                  </td>
-                  <td className="p-3">
                     <div className="space-y-1">
                       {row.invoice_number && (
                         <div>
@@ -1109,16 +829,10 @@ export default function StatementTable({ rows }) {
                       {(() => {
                         const refs = getLinkedPurchaseRefs(row);
                         if (refs.length > 0) {
-                          // Hide IP-prefixed refs when an invoice_number already covers them (P299 is redundant when INV299 shown)
-                          const hasInvoice = !!String(row.invoice_number || "").trim();
-                          const visibleRefs = hasInvoice
-                            ? refs.filter(x => x.prefix !== "IP")
-                            : refs;
-                          if (visibleRefs.length === 0) return null;
                           return (
                             <div>
                               <span className="text-xs font-mono text-slate-700">
-                                {visibleRefs.map((x) => `P${x.id}`).join(", ")}
+                                {refs.map((x) => `P${x.id}`).join(", ")}
                               </span>
                             </div>
                           );
@@ -1192,7 +906,7 @@ export default function StatementTable({ rows }) {
               ))
             ) : (
               <tr>
-                <td colSpan="16" className="p-4 text-center text-gray-500">
+                <td colSpan="15" className="p-4 text-center text-gray-500">
                   No entries found.
                 </td>
               </tr>
@@ -1275,14 +989,9 @@ export default function StatementTable({ rows }) {
                 {(() => {
                   const refs = getLinkedPurchaseRefs(row);
                   if (refs.length > 0) {
-                    const hasInvoice = !!String(row.invoice_number || "").trim();
-                    const visibleRefs = hasInvoice
-                      ? refs.filter(x => x.prefix !== "IP")
-                      : refs;
-                    if (visibleRefs.length === 0) return null;
                     return (
                       <span className="block text-xs font-mono text-slate-700">
-                        {visibleRefs.map((x) => `P${x.id}`).join(", ")}
+                        {refs.map((x) => `P${x.id}`).join(", ")}
                       </span>
                     );
                   }
@@ -1324,14 +1033,6 @@ export default function StatementTable({ rows }) {
                 {displayBalance(row) != null ? `₹${displayBalance(row).toLocaleString("en-IN", { minimumFractionDigits: 2 })}` : "—"}
               </span>
             </div>
-            <div>
-              <strong>Bank Account:</strong>{" "}
-              {row.account_number ? (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-800 text-xs font-medium rounded-full">
-                  <Building2 size={11} />{row.account_number}
-                </span>
-              ) : <span className="text-gray-400 text-xs">—</span>}
-            </div>
             <div className="flex items-center gap-4 pt-2">
               <button type="button" onClick={() => setModalId(row.id)} className="text-blue-600 hover:underline">
                 <Eye size={16} /> View
@@ -1343,95 +1044,6 @@ export default function StatementTable({ rows }) {
           </div>
         ))}
       </div>
-
-      {/* Import Modal */}
-      {showImportModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
-            <div className="flex items-center justify-between px-6 py-4 border-b">
-              <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-                <Upload size={18} className="text-emerald-600" />
-                Import Bank Statement
-              </h3>
-              <button onClick={closeImportModal} className="p-1 hover:bg-gray-100 rounded">
-                <X size={20} />
-              </button>
-            </div>
-            <div className="p-6 space-y-5">
-              {/* Bank selector */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Select Bank <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={selectedBankId}
-                  onChange={(e) => setSelectedBankId(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">— Select Bank —</option>
-                  {banks.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.bank_name}{b.account_number ? ` (A/C: ${b.account_number})` : ""}
-                    </option>
-                  ))}
-                </select>
-                {banks.length === 0 && (
-                  <p className="text-xs text-amber-600 mt-1">
-                    No banks found. <a href="/admin-dashboard/bank-masters" className="underline font-medium">Add a bank first →</a>
-                  </p>
-                )}
-              </div>
-
-              {/* File selector */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Select CSV / Excel File <span className="text-red-500">*</span>
-                </label>
-                <input
-                  ref={importFileRef}
-                  type="file"
-                  accept=".csv,.xlsx,.xls"
-                  onChange={(e) => setImportFile(e.target.files?.[0] || null)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-medium file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 focus:outline-none"
-                />
-                {importFile && (
-                  <p className="text-xs text-gray-500 mt-1 truncate">Selected: {importFile.name}</p>
-                )}
-              </div>
-
-              {/* Info callout */}
-              {selectedBankId && (() => {
-                const bank = banks.find((b) => String(b.id) === String(selectedBankId));
-                if (!bank) return null;
-                return (
-                  <div className="rounded-lg bg-blue-50 border border-blue-200 px-4 py-3 text-xs text-blue-800 space-y-0.5">
-                    <p className="font-semibold">{bank.bank_name}</p>
-                    {bank.account_number && <p>Account: <span className="font-mono">{bank.account_number}</span></p>}
-                    {bank.ifsc && <p>IFSC: <span className="font-mono">{bank.ifsc}</span></p>}
-                    <p className="text-blue-600 mt-1">All imported rows will be tagged with this bank and account number automatically.</p>
-                  </div>
-                );
-              })()}
-            </div>
-            <div className="px-6 pb-6 flex justify-end gap-3">
-              <button
-                onClick={closeImportModal}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleImport}
-                disabled={importing || !selectedBankId || !importFile}
-                className="px-5 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Upload size={14} />
-                {importing ? "Importing..." : "Import"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Skipped Rows Modal */}
       {showSkippedModal && (
@@ -1649,12 +1261,12 @@ export default function StatementTable({ rows }) {
         </div>
       )}
 
-      {/* Statement Linked Records View Modal */}
+      {/* Expense View Modal */}
       {modalId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center">
-              <h3 className="text-lg font-semibold">Statement Linked Records</h3>
+              <h3 className="text-lg font-semibold">Client Expense Details</h3>
               <button
                 type="button"
                 onClick={() => setModalId(null)}
@@ -1667,174 +1279,51 @@ export default function StatementTable({ rows }) {
               {expenseLoading ? (
                 <div className="py-8 text-center text-gray-500">Loading...</div>
               ) : expense ? (
-                <div className="space-y-6">
-
-                  {/* Expense linked */}
-                  {expense.client_expense_id && (
-                    <div className="border rounded-lg p-4 bg-blue-50">
-                      <h4 className="font-semibold text-blue-900 mb-3">💰 Client Expense</h4>
-                      {expense.expense ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                          <p><span className="font-medium">ID:</span> {expense.expense.id}</p>
-                          {expense.expense.expense_name && <p><span className="font-medium">Expense Name:</span> {expense.expense.expense_name}</p>}
-                          {expense.expense.client_name && <p><span className="font-medium">Client:</span> {expense.expense.client_name}</p>}
-                          {expense.expense.group_name && <p><span className="font-medium">Group:</span> {expense.expense.group_name}</p>}
-                          {expense.expense.head && <p><span className="font-medium">Head:</span> {expense.expense.head}</p>}
-                          {expense.expense.amount != null && <p><span className="font-medium">Amount:</span> ₹{Number(expense.expense.amount).toLocaleString("en-IN", {minimumFractionDigits:2})}</p>}
-                          {expense.expense.hsn && <p><span className="font-medium">HSN:</span> {expense.expense.hsn}</p>}
-                          <p><span className="font-medium">Tax applicable:</span> {expense.expense.tax_applicable ? "Yes" : "No"}</p>
-                          {expense.expense.transaction_id && <p><span className="font-medium">Txn ID:</span> <span className="font-mono text-xs">{expense.expense.transaction_id}</span></p>}
-                          {expense.expense.created_at && <p><span className="font-medium">Created:</span> {dayjs(expense.expense.created_at).format("DD MMM YYYY")}</p>}
-                        </div>
-                      ) : (
-                        <p className="text-gray-400 text-xs">Expense details not available</p>
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 text-sm">
+                    <div className="space-y-2">
+                      <p><span className="font-medium">ID:</span> {expense.id}</p>
+                      <p><span className="font-medium">Expense Name:</span> {expense.expense_name}</p>
+                      <p><span className="font-medium">Client Name:</span> {expense.client_name}</p>
+                      <p><span className="font-medium">Group Name:</span> {expense.group_name || "-"}</p>
+                      <p><span className="font-medium">Tax applicable:</span> {expense.tax_applicable ? "Yes" : "No"}</p>
+                      {expense.tax_applicable && (
+                        <>
+                          {expense.gst_rate != null && <p><span className="font-medium">Tax Rate:</span> {Number(expense.gst_rate)}%</p>}
+                          {expense.tax_type && <p><span className="font-medium">Tax type:</span> {expense.tax_type}</p>}
+                          {expense.tax_type === "CGST+SGST" && (
+                            <>
+                              <p><span className="font-medium">CGST:</span> {expense.cgst != null ? `₹${Number(expense.cgst).toFixed(2)}` : "-"}</p>
+                              <p><span className="font-medium">SGST:</span> {expense.sgst != null ? `₹${Number(expense.sgst).toFixed(2)}` : "-"}</p>
+                            </>
+                          )}
+                          {expense.tax_type === "IGST" && <p><span className="font-medium">IGST:</span> {expense.igst != null ? `₹${Number(expense.igst).toFixed(2)}` : "-"}</p>}
+                        </>
                       )}
+                      <p><span className="font-medium">Main Head:</span> <span className={expense.main_head === "Direct" ? "text-blue-600" : "text-amber-600"}>{expense.main_head}</span></p>
+                      <p><span className="font-medium">Head:</span> {expense.head || "-"}</p>
+                      <p><span className="font-medium">Supply:</span> {expense.supply || "-"}</p>
+                      {expense.sub_heads?.length > 0 && <p><span className="font-medium">Sub-head:</span> {expense.sub_heads[0]}</p>}
                     </div>
-                  )}
-
-                  {/* Invoice linked */}
-                  {expense.invoice_number && (
-                    <div className="border rounded-lg p-4 bg-green-50">
-                      <h4 className="font-semibold text-green-900 mb-3">📄 Invoice</h4>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                        <p><span className="font-medium">Invoice No:</span> <span className="font-mono">{expense.invoice_number}</span></p>
-                        {expense.invoice ? (
-                          <>
-                            <p><span className="font-medium">Customer:</span> {expense.invoice.buyer_name || expense.invoice.customer_name || "-"}</p>
-                            <p><span className="font-medium">Amount:</span> {expense.invoice.grand_total != null ? `₹${Number(expense.invoice.grand_total).toLocaleString("en-IN", {minimumFractionDigits:2})}` : "-"}</p>
-                            <p><span className="font-medium">Date:</span> {expense.invoice.invoice_date ? dayjs(expense.invoice.invoice_date).format("DD MMM YYYY") : "-"}</p>
-                            {expense.invoice.employee_name && <p><span className="font-medium">Employee:</span> {expense.invoice.employee_name}</p>}
-                            {expense.invoice.gst_number && <p><span className="font-medium">GST:</span> {expense.invoice.gst_number}</p>}
-                            {expense.invoice.cgst != null && Number(expense.invoice.cgst) > 0 && <p><span className="font-medium">CGST:</span> ₹{Number(expense.invoice.cgst).toLocaleString("en-IN", {minimumFractionDigits:2})}</p>}
-                            {expense.invoice.sgst != null && Number(expense.invoice.sgst) > 0 && <p><span className="font-medium">SGST:</span> ₹{Number(expense.invoice.sgst).toLocaleString("en-IN", {minimumFractionDigits:2})}</p>}
-                            {expense.invoice.igst != null && Number(expense.invoice.igst) > 0 && <p><span className="font-medium">IGST:</span> ₹{Number(expense.invoice.igst).toLocaleString("en-IN", {minimumFractionDigits:2})}</p>}
-                          </>
-                        ) : (
-                          <p className="text-gray-400 text-xs col-span-2">Invoice details not available</p>
-                        )}
-                      </div>
-                      {/* Invoice items */}
-                      {expense.invoice?.items?.length > 0 && (
-                        <div className="mt-3 border-t border-green-200 pt-3">
-                          <p className="text-xs font-semibold text-green-800 mb-2">Items ({expense.invoice.items.length})</p>
-                          <div className="space-y-1">
-                            {expense.invoice.items.map((item, idx) => (
-                              <div key={idx} className="text-xs text-gray-700 flex justify-between gap-2">
-                                <span>{item.item_name || item.item_code || "-"}</span>
-                                <span className="text-gray-500 shrink-0">
-                                  {item.quantity && `Qty: ${item.quantity}`}
-                                  {item.price_per_unit != null && ` · ₹${Number(item.price_per_unit).toLocaleString("en-IN")}`}
-                                  {item.taxable_value != null && ` · ₹${Number(item.taxable_value).toLocaleString("en-IN")}`}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+                    <div className="space-y-2">
+                      <p><span className="font-medium">Type of Ledger:</span> {expense.type_of_ledger || "-"}</p>
+                      <p><span className="font-medium">HSN:</span> {expense.hsn || "-"}</p>
+                      <p><span className="font-medium">Transaction ID:</span> <span className="font-mono text-xs">{expense.transaction_id || "-"}</span></p>
+                      <p><span className="font-medium">Amount:</span> {expense.amount != null ? `₹${Number(expense.amount).toFixed(2)}` : "-"}</p>
+                      <p><span className="font-medium">Created:</span> {expense.created_at ? dayjs(expense.created_at).format("DD MMM YYYY HH:mm") : "-"}</p>
                     </div>
-                  )}
-
-                  {/* Purchases linked */}
-                  {(() => {
-                    const raw = expense.linked_purchase_ids;
-                    if (!raw) return null;
-                    let tokens = [];
-                    try { tokens = JSON.parse(String(raw)); } catch { tokens = String(raw).split(",").map(s => s.trim()); }
-                    const hasInvoice = !!String(expense.invoice_number || "").trim();
-                    // Filter out IP-prefixed tokens when invoice covers them
-                    const visibleTokens = hasInvoice
-                      ? tokens.filter(t => !String(t).trim().toUpperCase().startsWith("IP"))
-                      : tokens;
-                    if (visibleTokens.length === 0) return null;
-                    // Also filter purchases array
-                    const visiblePurchases = (expense.purchases || []).filter(p => !(hasInvoice && String(p.prefix || "").toUpperCase() === "IP"));
-                    return (
-                      <div className="border rounded-lg p-4 bg-purple-50">
-                        <h4 className="font-semibold text-purple-900 mb-3">🛒 Purchases</h4>
-                        <div className="space-y-4">
-                          {(visiblePurchases.length > 0 ? visiblePurchases : visibleTokens.map(t => ({ token: String(t).trim() }))).map((pur, idx) => {
-                            const token = pur.token || String(visibleTokens[idx] || "").trim();
-                            return (
-                              <div key={idx} className={`text-sm ${idx > 0 ? "pt-3 border-t border-purple-200" : ""}`}>
-                                <p className="font-semibold text-purple-800 mb-1 font-mono">{token}</p>
-                                {pur.id && (pur.product_name || pur.product_code || pur.vendor_name || pur.total_amount != null) ? (
-                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-gray-700">
-                                    {pur.product_name && <p><span className="font-medium">Product:</span> {pur.product_name}</p>}
-                                    {pur.product_code && <p><span className="font-medium">Code:</span> {pur.product_code}</p>}
-                                    {pur.vendor_name && <p><span className="font-medium">Vendor:</span> {pur.vendor_name}</p>}
-                                    {pur.quantity != null && <p><span className="font-medium">Qty:</span> {pur.quantity}</p>}
-                                    {pur.unit_price != null && <p><span className="font-medium">Unit Price:</span> ₹{Number(pur.unit_price).toLocaleString("en-IN", {minimumFractionDigits:2})}</p>}
-                                    {pur.total_amount != null && <p><span className="font-medium">Total:</span> ₹{Number(pur.total_amount).toLocaleString("en-IN", {minimumFractionDigits:2})}</p>}
-                                    {pur.status && <p><span className="font-medium">Status:</span> {pur.status}</p>}
-                                    {pur.created_at && <p><span className="font-medium">Date:</span> {dayjs(pur.created_at).format("DD MMM YYYY")}</p>}
-                                  </div>
-                                ) : (
-                                  <p className="text-gray-400 text-xs">Purchase details not available</p>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    );
-                  })()}
-
-                  {/* DD linked */}
-                  {expense.dd_id && (
-                    <div className="border rounded-lg p-4 bg-orange-50">
-                      <h4 className="font-semibold text-orange-900 mb-3">🏦 Demand Draft</h4>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                        <p><span className="font-medium">DD ID:</span> {expense.dd_id}</p>
-                        {expense.dd ? (
-                          <>
-                            {expense.dd.dd_number && <p><span className="font-medium">DD Number:</span> <span className="font-mono">{expense.dd.dd_number}</span></p>}
-                            {expense.dd.bg_number && <p><span className="font-medium">BG Number:</span> <span className="font-mono">{expense.dd.bg_number}</span></p>}
-                            {expense.dd.party_name && <p><span className="font-medium">Party:</span> {expense.dd.party_name}</p>}
-                            {expense.dd.beneficiary_name && <p><span className="font-medium">Beneficiary:</span> {expense.dd.beneficiary_name}</p>}
-                            {expense.dd.amount != null && <p><span className="font-medium">Amount:</span> ₹{Number(expense.dd.amount).toLocaleString("en-IN", {minimumFractionDigits:2})}</p>}
-                            {expense.dd.bank_name && <p><span className="font-medium">Bank:</span> {expense.dd.bank_name}</p>}
-                            {expense.dd.type && <p><span className="font-medium">Type:</span> {expense.dd.type}</p>}
-                            {expense.dd.status && <p><span className="font-medium">Status:</span> {expense.dd.status}</p>}
-                            {expense.dd.dd_date && <p><span className="font-medium">DD Date:</span> {dayjs(expense.dd.dd_date).format("DD MMM YYYY")}</p>}
-                            {expense.dd.expiry_date && <p><span className="font-medium">Expiry:</span> {dayjs(expense.dd.expiry_date).format("DD MMM YYYY")}</p>}
-                            {expense.dd.dd_location && <p><span className="font-medium">Location:</span> {expense.dd.dd_location}</p>}
-                            {expense.dd.claim_date && <p><span className="font-medium">Claim Date:</span> {dayjs(expense.dd.claim_date).format("DD MMM YYYY")}</p>}
-                          </>
-                        ) : (
-                          <p className="text-gray-400 text-xs col-span-2">DD details not available</p>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Asset linked */}
-                  {expense.linked_module_type === "Assets" && expense.linked_module_id && (
-                    <div className="border rounded-lg p-4 bg-red-50">
-                      <h4 className="font-semibold text-red-900 mb-3">🏢 Asset</h4>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                        <p><span className="font-medium">Asset ID:</span> {expense.linked_module_id}</p>
-                        {expense.asset ? (
-                          <>
-                            {expense.asset.asset_name && <p><span className="font-medium">Name:</span> {expense.asset.asset_name}</p>}
-                            {expense.asset.cost != null && <p><span className="font-medium">Cost:</span> ₹{Number(expense.asset.cost).toLocaleString("en-IN", {minimumFractionDigits:2})}</p>}
-                            {expense.asset.category && <p><span className="font-medium">Category:</span> {expense.asset.category}</p>}
-                            {expense.asset.purchase_date && <p><span className="font-medium">Purchase Date:</span> {dayjs(expense.asset.purchase_date).format("DD MMM YYYY")}</p>}
-                            {expense.asset.status && <p><span className="font-medium">Status:</span> {expense.asset.status}</p>}
-                          </>
-                        ) : (
-                          <p className="text-gray-400 text-xs col-span-2">Asset details not available</p>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Nothing linked */}
-                  {!expense.client_expense_id && !expense.invoice_number && !expense.dd_id && !(expense.linked_module_type === "Assets" && expense.linked_module_id) && !expense.linked_purchase_ids && (
-                    <div className="py-8 text-center text-gray-500">No records linked to this statement</div>
-                  )}
-                </div>
+                  </div>
+                  <div className="mt-6 flex justify-end">
+                    <Link
+                      href={`/admin-dashboard/client-expenses/edit/${expense.id}?from=statements`}
+                      className="px-6 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700"
+                    >
+                      Edit Expenses
+                    </Link>
+                  </div>
+                </>
               ) : (
-                <div className="py-8 text-center text-gray-500">No records linked to this statement</div>
+                <div className="py-8 text-center text-gray-500">No expense linked to this statement</div>
               )}
             </div>
           </div>
