@@ -119,12 +119,15 @@ export default function InvoiceTable({ onSummaryUpdate }) {
         groupIds.forEach(parentId => {
           const group = grouped[parentId];
           if (group.parent && !processedIds.has(group.parent.id)) {
-            sortedData.push(group.parent);
-            processedIds.add(group.parent.id);
+            // Skip performa invoices
+            if (group.parent.type !== 'performa') {
+              sortedData.push(group.parent);
+              processedIds.add(group.parent.id);
+            }
           }
           // Add children sorted by id (ascending)
           group.children.sort((a, b) => a.id - b.id).forEach(child => {
-            if (!processedIds.has(child.id)) {
+            if (!processedIds.has(child.id) && child.type !== 'performa') {
               sortedData.push(child);
               processedIds.add(child.id);
             }
@@ -300,7 +303,6 @@ export default function InvoiceTable({ onSummaryUpdate }) {
           >
             <option value="">All Types</option>
             <option value="tax">Tax Invoice</option>
-            <option value="performa">Performa Invoice</option>
           </select>
           <select
             value={statusFilter}
@@ -456,7 +458,7 @@ export default function InvoiceTable({ onSummaryUpdate }) {
                       <span className={`px-3 py-1 rounded text-sm font-semibold ${
                         i.status === 'PAID'
                           ? 'bg-green-100 text-green-800'
-                          : i.status === 'PARTIAL PAID'
+                          : i.status === 'PARTIAL PAID' || i.status === 'PARTIAL'
                             ? 'bg-yellow-100 text-yellow-800'
                             : i.status === 'CANCELLED'
                               ? 'bg-red-100 text-red-800'
