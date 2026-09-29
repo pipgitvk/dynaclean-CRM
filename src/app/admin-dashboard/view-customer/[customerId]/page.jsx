@@ -49,7 +49,46 @@ export default async function CustomerPage({ params }) {
     .join(" ")
     .trim();
 
-  // Fetch followup history
+  // Fetch child contacts (members under this customer)
+  const [childContacts] = await conn.execute(
+    `SELECT customer_id, first_name, last_name, phone 
+     FROM customers 
+     WHERE parent_customer_id = ?
+     ORDER BY first_name ASC`,
+    [customerId],
+  );
+  console.log(`[View Customer] Fetched ${childContacts?.length || 0} child contacts for customer ${customerId}:`, childContacts);
+
+  // Also fetch parent and siblings if this customer has a parent
+  let parentContact = null;
+  let siblingContacts = [];
+  const [selfRows] = await conn.execute(
+    `SELECT customer_id, first_name, last_name, phone, parent_customer_id
+     FROM customers
+     WHERE customer_id = ?`,
+    [customerId],
+  );
+  const selfData = selfRows?.[0];
+  if (selfData?.parent_customer_id) {
+    const [parentRows] = await conn.execute(
+      `SELECT customer_id, first_name, last_name, phone
+       FROM customers
+       WHERE customer_id = ?`,
+      [selfData.parent_customer_id],
+    );
+    parentContact = parentRows?.[0];
+    
+    // Fetch siblings (other children of the same parent)
+    const [siblingRows] = await conn.execute(
+      `SELECT customer_id, first_name, last_name, phone
+       FROM customers
+       WHERE parent_customer_id = ? AND customer_id != ?
+       ORDER BY first_name ASC`,
+      [selfData.parent_customer_id, customerId],
+    );
+    siblingContacts = siblingRows || [];
+    console.log(`[View Customer] Customer ${customerId} has parent ${selfData.parent_customer_id}, ${siblingContacts.length} siblings`);
+  }
   const [fups] = await conn.execute(
     `SELECT next_followup_date, service_next_followup, gem_next_followup, followed_date, followed_by, notes, comm_mode, time_stamp 
      FROM customers_followup
@@ -288,6 +327,85 @@ export default async function CustomerPage({ params }) {
         {cust_analysis_external?.next_suggestion_transcription || "No transcription available."}
       </p>
 
+    </div>
+
+    {/* Contact Hierarchy Section */}
+    <div className="p-2 rounded-xl h-fit max-h-96 overflow-y-auto">
+      <h3 className="text-lg font-semibold text-gray-800 mb-3">
+        Contact Hierarchy
+      </h3>
+      <div className="space-y-2">
+        {/* Parent */}
+        {parentContact && (
+          <div className="p-3 bg-blue-50 rounded border border-blue-200">
+            <p className="text-xs text-blue-600 font-medium mb-2">Parent:</p>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-800">
+                  {[parentContact.first_name, parentContact.last_name].filter(Boolean).join(" ") || "—"}
+                </p>
+                <p className="text-sm text-gray-600">{parentContact.phone || "—"}</p>
+              </div>
+              <Link
+                href={`/admin-dashboard/view-customer/${parentContact.customer_id}/follow-up`}
+                className="ml-2 px-3 py-1 text-xs whitespace-nowrap bg-green-600 text-white rounded hover:bg-green-700 transition"
+              >
+                Follow
+              </Link>
+            </div>
+          </div>
+        )}
+
+        {/* Siblings */}
+        {siblingContacts && siblingContacts.length > 0 && (
+          <>
+            <p className="text-xs text-gray-600 font-medium">Siblings ({siblingContacts.length}):</p>
+            {siblingContacts.map((contact) => (
+              <div key={contact.customer_id} className="flex items-center justify-between p-3 bg-gray-50 rounded border border-gray-200">
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-gray-800">
+                    {[contact.first_name, contact.last_name].filter(Boolean).join(" ") || "—"}
+                  </p>
+                  <p className="text-sm text-gray-600">{contact.phone || "—"}</p>
+                </div>
+                <Link
+                  href={`/admin-dashboard/view-customer/${contact.customer_id}/follow-up`}
+                  className="ml-2 px-3 py-1 text-xs whitespace-nowrap bg-green-600 text-white rounded hover:bg-green-700 transition"
+                >
+                  Follow
+                </Link>
+              </div>
+            ))}
+          </>
+        )}
+
+        {/* Children */}
+        {childContacts && childContacts.length > 0 && (
+          <>
+            <p className="text-xs text-gray-600 font-medium">Members ({childContacts.length}):</p>
+            {childContacts.map((contact) => (
+              <div key={contact.customer_id} className="flex items-center justify-between p-3 bg-purple-50 rounded border border-purple-200">
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-gray-800">
+                    {[contact.first_name, contact.last_name].filter(Boolean).join(" ") || "—"}
+                  </p>
+                  <p className="text-sm text-gray-600">{contact.phone || "—"}</p>
+                </div>
+                <Link
+                  href={`/admin-dashboard/view-customer/${contact.customer_id}/follow-up`}
+                  className="ml-2 px-3 py-1 text-xs whitespace-nowrap bg-green-600 text-white rounded hover:bg-green-700 transition"
+                >
+                  Follow
+                </Link>
+              </div>
+            ))}
+          </>
+        )}
+
+        {!parentContact && (!childContacts || childContacts.length === 0) && (!siblingContacts || siblingContacts.length === 0) && (
+          <p className="text-sm text-gray-600">No contact hierarchy available.</p>
+        )}
+      </div>
     </div>
   </div>
   
