@@ -166,7 +166,8 @@ function buildSimpleInvoiceSelectSql() {
     COALESCE(balance_amount, grand_total - COALESCE(amount_paid, 0)) AS balance_amount,
     created_at,
     type,
-    status
+    status,
+    payment_status
   `;
 }
 
@@ -322,11 +323,10 @@ async function bulkFetchLatestOrdersForInvoices(conn, invoices) {
 
 function applyOrderMetaToRows(rows, orderMap) {
   return rows.map((invoice) => {
-    const order = orderMap.get(invoice.id);
     return {
       ...invoice,
-      status: deriveInvoiceStatus(invoice, order),
-      order_id: order?.order_id ?? null,
+      status: invoice.payment_status || invoice.status,
+      order_id: orderMap.get(invoice.id)?.order_id ?? null,
     };
   });
 }
@@ -635,24 +635,12 @@ async function enrichInvoicesWithDetails(conn, rows) {
       Number(invoice.grand_total) - totalLinkedAmount,
     );
 
-    const grandTotal = Number(invoice.grand_total) || 0;
-    let derivedPaymentStatus = invoice.payment_status || "UNPAID";
-    if (grandTotal > 0) {
-      if (newBalanceAmount === 0) {
-        derivedPaymentStatus = "PAID";
-      } else if (newBalanceAmount < grandTotal) {
-        derivedPaymentStatus = "PARTIAL";
-      } else {
-        derivedPaymentStatus = "UNPAID";
-      }
-    }
-
     return {
       ...invoice,
       items: itemsByInvoiceId.get(invoice.id) || [],
       linkedStatements,
       balance_amount: newBalanceAmount,
-      payment_status: derivedPaymentStatus,
+      payment_status: invoice.payment_status,
     };
   });
 }

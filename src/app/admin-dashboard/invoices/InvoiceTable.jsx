@@ -57,9 +57,12 @@ export default function InvoiceTable({ onSummaryUpdate }) {
   const [selectedInvoices, setSelectedInvoices] = useState([]);
 
   const processInvoicesForView = (data) => {
+    // Filter out performa invoices
+    const filteredData = data.filter(invoice => invoice.type !== 'performa');
+    
     const grouped = {};
 
-    data.forEach((invoice) => {
+    filteredData.forEach((invoice) => {
       if (invoice.parent_id) {
         if (!grouped[invoice.parent_id]) {
           grouped[invoice.parent_id] = { parent: null, children: [] };
@@ -73,7 +76,7 @@ export default function InvoiceTable({ onSummaryUpdate }) {
       }
     });
 
-    data.forEach((inv) => {
+    filteredData.forEach((inv) => {
       inv.totalLinkedAmount =
         inv.linkedStatements?.reduce(
           (sum, stmt) => sum + Number(stmt.amount || 0),
@@ -362,7 +365,6 @@ export default function InvoiceTable({ onSummaryUpdate }) {
           >
             <option value="">All Types</option>
             <option value="tax">Tax Invoice</option>
-            <option value="performa">Performa Invoice</option>
           </select>
           <select
             value={statusFilter}
@@ -530,7 +532,7 @@ export default function InvoiceTable({ onSummaryUpdate }) {
                       <span className={`px-3 py-1 rounded text-sm font-semibold ${
                         i.status === 'PAID'
                           ? 'bg-green-100 text-green-800'
-                          : i.status === 'PARTIAL PAID'
+                          : i.status === 'PARTIAL PAID' || i.status === 'PARTIAL'
                             ? 'bg-yellow-100 text-yellow-800'
                             : i.status === 'CANCELLED'
                               ? 'bg-red-100 text-red-800'
