@@ -33,9 +33,19 @@ export async function uploadServiceReportVideo(buffer, serviceId, step) {
       (error, result) => {
         if (error || !result?.secure_url) {
           reject(error || new Error("Cloudinary did not return a video URL."));
-        } else {
-          resolve(result.secure_url);
+          return;
         }
+        const duration = Number(result.duration);
+        if (Number.isFinite(duration) && duration > 47) {
+          cloudinary.uploader
+            .destroy(result.public_id, { resource_type: "video" })
+            .catch(() => {})
+            .finally(() => {
+              reject(new Error("Video must be 45 seconds or less."));
+            });
+          return;
+        }
+        resolve(result.secure_url);
       },
     );
     stream.end(buffer);

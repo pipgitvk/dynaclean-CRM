@@ -197,6 +197,10 @@ export async function POST(request, context) {
     return NextResponse.json(payloadFromRow(row));
   } catch (error) {
     console.error("[service-report-steps POST]", error);
-    return NextResponse.json({ message: "Could not save this step." }, { status: 500 });
+    const tooLong = /45 seconds/.test(String(error?.message || ""));
+    return NextResponse.json(
+      { message: tooLong ? error.message : "Could not save this step." },
+      { status: tooLong ? 400 : 500 },
+    );
   }
 }

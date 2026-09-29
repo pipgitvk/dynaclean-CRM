@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { Check, ChevronLeft, Video } from "lucide-react";
@@ -43,6 +43,58 @@ const STEP_DEFS = [
     help: "Record a video of the machine after the work is finished. The add report form opens after this step.",
   },
 ];
+
+const MAX_VIDEO_SECONDS = 45;
+
+function formatClock(totalSeconds) {
+  const seconds = Math.max(0, Math.min(MAX_VIDEO_SECONDS, totalSeconds));
+  return `0:${String(seconds).padStart(2, "0")}`;
+}
+
+function readVideoDuration(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const video = document.createElement("video");
+    video.preload = "metadata";
+    let settled = false;
+    const finish = (handler) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timeout);
+      URL.revokeObjectURL(url);
+      handler();
+    };
+    const timeout = window.setTimeout(() => {
+      finish(() => reject(new Error("Could not read the video length.")));
+    }, 8000);
+    video.onloadedmetadata = () => {
+      if (video.duration === Infinity) {
+        video.currentTime = 1e101;
+        video.ontimeupdate = () => {
+          video.ontimeupdate = null;
+          const duration = video.duration;
+          video.currentTime = 0;
+          finish(() => resolve(duration));
+        };
+        return;
+      }
+      finish(() => resolve(video.duration));
+    };
+    video.onerror = () => {
+      finish(() => reject(new Error("Could not read the video length.")));
+    };
+    video.src = url;
+  });
+}
+
+function recorderMimeType() {
+  if (typeof MediaRecorder === "undefined") return "";
+  return (
+    ["video/webm;codecs=vp8,opus", "video/webm", "video/mp4"].find((type) =>
+      MediaRecorder.isTypeSupported(type),
+    ) || ""
+  );
+}
 
 function isStepDone(steps, key) {
   if (!steps) return false;
@@ -91,6 +143,15 @@ export default function ServiceReportStepsPage() {
   const [busyKey, setBusyKey] = useState("");
   const [progress, setProgress] = useState(0);
   const [picked, setPicked] = useState(null);
+  const [recording, setRecording] = useState(false);
+  const [recordSeconds, setRecordSeconds] = useState(0);
+  const previewUrlRef = useRef("");
+  const streamRef = useRef(null);
+  const recorderRef = useRef(null);
+  const timerRef = useRef(null);
+  const chunksRef = useRef([]);
+  const discardRef = useRef(false);
+  const liveRef = useRef(null);
 
   const reportHref = `/admin-dashboard/complete-service/${serviceId}`;
 
@@ -117,6 +178,36 @@ export default function ServiceReportStepsPage() {
   useEffect(() => {
     if (serviceId) load();
   }, [serviceId, load]);
+
+  const releaseStream = () => {
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+    if (liveRef.current) liveRef.current.srcObject = null;
+  };
+
+  const stopRecording = () => {
+    if (timerRef.current) {
+      window.clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    const recorder = recorderRef.current;
+    if (recorder && recorder.state !== "inactive") recorder.stop();
+  };
+
+  useEffect(() => {
+    return () => {
+      discardRef.current = true;
+      stopRecording();
+      releaseStream();
+      if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (recording && liveRef.current && streamRef.current) {
+      liveRef.current.srcObject = streamRef.current;
+    }
+  }, [recording]);
 
   const openIndex = useMemo(() => firstOpenIndex(data?.steps), [data]);
   const allDone = openIndex >= STEP_DEFS.length;
@@ -149,21 +240,113 @@ export default function ServiceReportStepsPage() {
     }
   };
 
-  const onPickFile = (event) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  const rememberVideo = (file) => {
+    if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+    const preview = URL.createObjectURL(file);
+    previewUrlRef.current = preview;
+    setPicked({ file, preview });
+  };
+
+  const acceptVideoFile = async (file, { recorded = false } = {}) => {
     if (!file.type.startsWith("video/") && !/\.(mp4|mov|webm|3gp|mkv|m4v|avi)$/i.test(file.name)) {
       setError("Choose a video file.");
-      event.target.value = "";
       return;
     }
     if (file.size > 200 * 1024 * 1024) {
       setError("Video is too large. Maximum size is 200 MB.");
-      event.target.value = "";
       return;
     }
+    try {
+      const duration = await readVideoDuration(file);
+      const limit = recorded ? MAX_VIDEO_SECONDS + 2 : MAX_VIDEO_SECONDS + 0.5;
+      if (!Number.isFinite(duration) || duration > limit) {
+        setError("Video must be 45 seconds or less.");
+        return;
+      }
+    } catch (err) {
+      if (!recorded) {
+        setError(err.message || "Could not read the video length.");
+        return;
+      }
+    }
     setError("");
-    setPicked({ file, preview: URL.createObjectURL(file) });
+    rememberVideo(file);
+  };
+
+  const onPickFile = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    await acceptVideoFile(file);
+  };
+
+  const startRecording = async () => {
+    setError("");
+    if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+    previewUrlRef.current = "";
+    setPicked(null);
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+      setError("This browser cannot record video. Choose a video of 45 seconds or less.");
+      return;
+    }
+    try {
+      let stream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: "environment" } },
+          audio: true,
+        });
+      } catch {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: "environment" } },
+          audio: false,
+        });
+      }
+      streamRef.current = stream;
+      const mimeType = recorderMimeType();
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      chunksRef.current = [];
+      discardRef.current = false;
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) chunksRef.current.push(event.data);
+      };
+      recorder.onstop = () => {
+        const discard = discardRef.current;
+        discardRef.current = false;
+        releaseStream();
+        setRecording(false);
+        setRecordSeconds(0);
+        const type = recorder.mimeType || mimeType || "video/webm";
+        const ext = type.includes("mp4") ? "mp4" : "webm";
+        const file = new File(chunksRef.current, `recording.${ext}`, { type });
+        chunksRef.current = [];
+        recorderRef.current = null;
+        if (!discard && file.size > 0) acceptVideoFile(file, { recorded: true });
+      };
+      recorderRef.current = recorder;
+      const startedAt = Date.now();
+      recorder.start(250);
+      setRecording(true);
+      setRecordSeconds(0);
+      timerRef.current = window.setInterval(() => {
+        const elapsed = Date.now() - startedAt;
+        setRecordSeconds(Math.min(MAX_VIDEO_SECONDS, Math.floor(elapsed / 1000)));
+        if (elapsed >= MAX_VIDEO_SECONDS * 1000) stopRecording();
+      }, 200);
+    } catch {
+      releaseStream();
+      setRecording(false);
+      setError("Allow camera access to record, or choose a video of 45 seconds or less.");
+    }
+  };
+
+  const leaveStep = (index) => {
+    if (recorderRef.current && recorderRef.current.state === "recording") {
+      discardRef.current = true;
+      stopRecording();
+    }
+    setPicked(null);
+    setActiveIndex(index);
   };
 
   return (
@@ -222,10 +405,7 @@ export default function ServiceReportStepsPage() {
                 <button
                   type="button"
                   disabled={locked}
-                  onClick={() => {
-                    setPicked(null);
-                    setActiveIndex(index);
-                  }}
+                  onClick={() => leaveStep(index)}
                   className="flex w-full items-center gap-3 px-4 py-3 text-left disabled:cursor-not-allowed"
                 >
                   <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${
@@ -247,38 +427,64 @@ export default function ServiceReportStepsPage() {
 
                     {step.kind === "video" && (
                       <div className="space-y-3">
-                        {(picked?.preview || data.steps[step.key]) && (
+                        <p className="text-xs text-gray-500">
+                          Maximum length is 45 seconds. Recording stops automatically at 45 seconds.
+                        </p>
+                        {recording ? (
                           <video
-                            key={picked?.preview || data.steps[step.key]}
-                            src={picked?.preview || data.steps[step.key]}
-                            controls
+                            ref={liveRef}
+                            autoPlay
+                            muted
+                            playsInline
                             className="max-h-72 w-full rounded-lg bg-black"
                           />
+                        ) : (
+                          (picked?.preview || data.steps[step.key]) && (
+                            <video
+                              key={picked?.preview || data.steps[step.key]}
+                              src={picked?.preview || data.steps[step.key]}
+                              controls
+                              className="max-h-72 w-full rounded-lg bg-black"
+                            />
+                          )
                         )}
-                        <div className="grid grid-cols-2 gap-2">
-                          <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-blue-300 bg-blue-50 px-3 py-5 text-sm text-blue-800 hover:bg-blue-100">
-                            <Video className="h-5 w-5" />
-                            Record video
-                            <input
-                              type="file"
-                              accept="video/*"
-                              capture="environment"
-                              className="hidden"
-                              onChange={onPickFile}
-                            />
-                          </label>
-                          <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-blue-300 bg-blue-50 px-3 py-5 text-sm text-blue-800 hover:bg-blue-100">
-                            <Video className="h-5 w-5" />
-                            Choose video
-                            <input
-                              type="file"
-                              accept="video/*"
-                              className="hidden"
-                              onChange={onPickFile}
-                            />
-                          </label>
-                        </div>
-                        {picked && (
+                        {recording ? (
+                          <div className="space-y-2">
+                            <p className="text-center text-sm font-medium text-red-700">
+                              Recording {formatClock(recordSeconds)} / 0:45
+                            </p>
+                            <button
+                              type="button"
+                              onClick={stopRecording}
+                              className="w-full rounded-lg bg-red-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-red-700"
+                            >
+                              Stop
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-2 gap-2">
+                            <button
+                              type="button"
+                              onClick={startRecording}
+                              disabled={Boolean(busyKey)}
+                              className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-blue-300 bg-blue-50 px-3 py-5 text-sm text-blue-800 hover:bg-blue-100 disabled:opacity-60"
+                            >
+                              <Video className="h-5 w-5" />
+                              Record video
+                            </button>
+                            <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-blue-300 bg-blue-50 px-3 py-5 text-sm text-blue-800 hover:bg-blue-100">
+                              <Video className="h-5 w-5" />
+                              Choose video
+                              <input
+                                type="file"
+                                accept="video/*"
+                                className="hidden"
+                                onChange={onPickFile}
+                              />
+                            </label>
+                          </div>
+                        )}
+                        {picked && !recording && (
                           <button
                             type="button"
                             disabled={Boolean(busyKey)}
