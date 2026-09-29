@@ -139,7 +139,7 @@ export default function PaymentPendingReport() {
   };
 
   const exportToCSV = () => {
-    const headers = ["Order ID", "Customer Name", "Company", "Contact", "Employee", "Total Amount", "Paid Amount", "Remaining Amount", "Due Date", "Tag", "Next Followup"];
+    const headers = ["Order ID", "Customer Name", "Company", "Contact", "Employee", "Total Amount", "Paid Amount", "Remaining Amount", "Due Date", "Tag", "Next Followup", "Last Remark"];
     const csvData = filteredOrders.map(order => [
       order.order_id,
       order.client_name,
@@ -151,7 +151,8 @@ export default function PaymentPendingReport() {
       order.remaining_amount.toFixed(2),
       dayjs(order.due_date).format("DD/MM/YYYY"),
       order.latest_deduction || "",
-      order.next_followup_date ? dayjs(order.next_followup_date).format("DD/MM/YYYY hh:mm A") : ""
+      order.next_followup_date ? dayjs(order.next_followup_date).format("DD/MM/YYYY hh:mm A") : "",
+      order.latest_remark || ""
     ]);
 
     const csvContent = [
@@ -223,6 +224,7 @@ export default function PaymentPendingReport() {
       <td className="px-4 py-3 border-b"><div className="h-4 bg-gray-300 rounded w-20"></div></td>
       <td className="px-4 py-3 border-b"><div className="h-4 bg-gray-300 rounded w-16"></div></td>
       <td className="px-4 py-3 border-b"><div className="h-4 bg-gray-300 rounded w-24"></div></td>
+      <td className="px-4 py-3 border-b"><div className="h-4 bg-gray-300 rounded w-48"></div></td>
       <td className="px-4 py-3 border-b"><div className="h-8 bg-gray-300 rounded w-28"></div></td>
     </tr>
   );
@@ -426,6 +428,12 @@ export default function PaymentPendingReport() {
                 >
                   Next Followup <SortIcon columnKey="next_followup_date" />
                 </th>
+                <th
+                  className="px-4 py-3 text-left font-semibold cursor-pointer hover:bg-gray-700 transition-colors"
+                  onClick={() => handleSort('latest_remark')}
+                >
+                  Last Remark <SortIcon columnKey="latest_remark" />
+                </th>
                 <th className="px-4 py-3 text-center font-semibold">Actions</th>
               </tr>
             </thead>
@@ -492,6 +500,15 @@ export default function PaymentPendingReport() {
                         {order.next_followup_date
                           ? dayjs(order.next_followup_date).format("DD/MM/YYYY hh:mm A")
                           : "-"}
+                      </td>
+                      <td className="px-4 py-3 border-b text-sm text-gray-700 min-w-xs">
+                        {order.latest_remark ? (
+                          <div className="line-clamp-3 hover:line-clamp-none hover:whitespace-normal cursor-help" title={order.latest_remark}>
+                            {order.latest_remark}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-gray-400">—</span>
+                        )}
                       </td>
                       <td className="px-4 py-3 border-b">
                         <div className="flex items-center justify-center gap-2">
