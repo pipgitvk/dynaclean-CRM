@@ -74,6 +74,9 @@ export async function PATCH(request) {
       );
     }
 
+    console.log(`[Attendance Regularization] Action: ${action}, ID: ${id}, Remark: "${acknowledgement_remark}"`);
+
+
     const conn = await getDbConnection();
     try {
       await conn.execute(
@@ -203,8 +206,8 @@ export async function PATCH(request) {
     }
 
     const comment =
-      reviewer_comment && String(reviewer_comment).trim()
-        ? String(reviewer_comment).trim()
+      (acknowledgement_remark || reviewer_comment) && String(acknowledgement_remark || reviewer_comment).trim()
+        ? String(acknowledgement_remark || reviewer_comment).trim()
         : null;
 
     if (action === "reject") {
@@ -213,17 +216,36 @@ export async function PATCH(request) {
           status = 'rejected',
           reviewed_by = ?,
           reviewed_at = NOW(),
-          reviewer_comment = ?
+          reviewer_comment = ?,
+          acknowledgement_remark = ?
          WHERE id = ?`,
-        [payload.username, comment, id]
+        [payload.username, comment, acknowledgement_remark || null, id]
       );
       return NextResponse.json({ success: true, message: "Request rejected." });
     }
 
-    const [logRows] = await conn.execute(
-      `SELECT * FROM attendance_logs WHERE username = ? AND date = ? LIMIT 1`,
-      [reqRow.username, reqRow.log_date]
+    await conn.execute(
+      `UPDATE attendance_regularization_requests SET
+        status = 'approved',
+        reviewed_by = ?,
+        reviewed_at = NOW(),
+        reviewer_comment = ?,
+        acknowledgement_remark = ?
+       WHERE id = ?`,
+      [payload.username, comment, acknowledgement_remark || null, id]
     );
+
+    console.log(`[Attendance] Approval saved for ID ${id}: status='approved', remark="${acknowledgement_remark || 'null'}"`);
+
+    // Log before updating attendance logs
+    console.log(`[Attendance] Now updating attendance logs for request ID ${id}...`);
+
+    // THEN: Update attendance logs (optional, doesn't affect remark)
+    try {
+      const [logRows] = await conn.execute(
+        `SELECT * FROM attendance_logs WHERE username = ? AND date = ? LIMIT 1`,
+        [reqRow.username, reqRow.log_date]
+      );
 
     let checkoutLat = logRows[0]?.checkout_latitude;
     let checkoutLon = logRows[0]?.checkout_longitude;
@@ -305,17 +327,12 @@ export async function PATCH(request) {
         ]
       );
     }
+    } catch (err) {
+      console.error(`[Attendance] Error updating attendance_logs for ID ${id}:`, err.message);
+      // Don't throw - approval already saved above
+    }
 
-    await conn.execute(
-      `UPDATE attendance_regularization_requests SET
-        status = 'approved',
-        reviewed_by = ?,
-        reviewed_at = NOW(),
-        reviewer_comment = ?
-       WHERE id = ?`,
-      [payload.username, comment, id]
-    );
-
+    console.log(`[Attendance] Request ID ${id} approved with remark: "${acknowledgement_remark || 'none'}"`);
     return NextResponse.json({ success: true, message: "Attendance updated and request approved." });
   } catch (error) {
     console.error("admin attendance-regularization PATCH:", error);

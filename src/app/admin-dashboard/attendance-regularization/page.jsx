@@ -68,6 +68,7 @@ export default function AdminAttendanceRegularizationPage() {
   const [showAcknowledgeModal, setShowAcknowledgeModal] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [acknowledgementRemark, setAcknowledgementRemark] = useState("");
+  const [modalAction, setModalAction] = useState(null);
 
   // Filter states
   const [statusFilter, setStatusFilter] = useState("all");
@@ -104,21 +105,34 @@ export default function AdminAttendanceRegularizationPage() {
       };
       const label = labels[action] || "Action";
       
-      if (action !== "acknowledge" && !confirm(`${label} request #${id}?`)) return;
+      // For approve/reject/acknowledge, show modal instead of confirming
+      if ((action === "approve" || action === "reject" || action === "acknowledge") && !remark) {
+        const req = requests.find(r => r.id === id);
+        setSelectedRequest(req);
+        setModalAction(action);
+        setShowAcknowledgeModal(true);
+        setAcknowledgementRemark("");
+        return;
+      }
+      
+      if (action === "revert" && !confirm(`${label} request #${id}?`)) return;
       
       setActionLoading(`${id}-${action}`);
       try {
+        console.log(`[Attendance] Sending action: ${action}, remark: "${remark}", id: ${id}`);
         const res = await fetch("/api/admin/attendance-regularization", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ id, action, acknowledgement_remark: remark }),
         });
         const data = await res.json().catch(() => ({}));
+        console.log(`[Attendance] Response:`, data);
         if (!res.ok) throw new Error(data.message || "Action failed");
         toast.success(data.message || `${label}ed successfully`);
         setShowAcknowledgeModal(false);
         setSelectedRequest(null);
         setAcknowledgementRemark("");
+        setModalAction(null);
         await load();
       } catch (e) {
         toast.error(e.message);
@@ -126,7 +140,7 @@ export default function AdminAttendanceRegularizationPage() {
         setActionLoading(null);
       }
     },
-    [load]
+    [load, requests]
   );
 
   useEffect(() => {
@@ -383,11 +397,7 @@ export default function AdminAttendanceRegularizationPage() {
                             {actionLoading === `${req.id}-reject` ? "…" : "Reject"}
                           </button>
                           <button
-                            onClick={() => {
-                              setSelectedRequest(req);
-                              setShowAcknowledgeModal(true);
-                              setAcknowledgementRemark("");
-                            }}
+                            onClick={() => handleAction(req.id, "acknowledge")}
                             disabled={actionLoading !== null}
                             className="px-2 py-1 text-xs font-medium rounded bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
                           >
@@ -405,11 +415,7 @@ export default function AdminAttendanceRegularizationPage() {
                             {actionLoading === `${req.id}-revert` ? "…" : "Revert"}
                           </button>
                           <button
-                            onClick={() => {
-                              setSelectedRequest(req);
-                              setShowAcknowledgeModal(true);
-                              setAcknowledgementRemark("");
-                            }}
+                            onClick={() => handleAction(req.id, "acknowledge")}
                             disabled={actionLoading !== null}
                             className="px-2 py-1 text-xs font-medium rounded bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
                           >
@@ -433,11 +439,23 @@ export default function AdminAttendanceRegularizationPage() {
         <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
             <div className="p-6 border-b border-gray-200 flex items-center gap-3">
-              <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center">
-                <BadgeCheck className="w-5 h-5 text-indigo-600" />
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                modalAction === "reject" ? "bg-red-100" :
+                modalAction === "approve" ? "bg-green-100" :
+                "bg-indigo-100"
+              }`}>
+                <BadgeCheck className={`w-5 h-5 ${
+                  modalAction === "reject" ? "text-red-600" :
+                  modalAction === "approve" ? "text-green-600" :
+                  "text-indigo-600"
+                }`} />
               </div>
               <div>
-                <h2 className="text-xl font-bold text-gray-800">Acknowledge Request</h2>
+                <h2 className="text-xl font-bold text-gray-800">
+                  {modalAction === "reject" ? "Reject Request" :
+                   modalAction === "approve" ? "Approve Request" :
+                   "Acknowledge Request"}
+                </h2>
                 <p className="text-xs text-gray-500 mt-0.5">
                   {selectedRequest.username} - {formatLogDate(selectedRequest.log_date)}
                 </p>
@@ -463,7 +481,11 @@ export default function AdminAttendanceRegularizationPage() {
                 <textarea
                   value={acknowledgementRemark}
                   onChange={(e) => setAcknowledgementRemark(e.target.value)}
-                  placeholder="Enter your remark or comment about this attendance request..."
+                  placeholder={
+                    modalAction === "reject" ? "Explain why you are rejecting this request..." :
+                    modalAction === "approve" ? "Add any notes about the approval..." :
+                    "Enter your remark or comment about this attendance request..."
+                  }
                   rows={4}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 />
@@ -477,6 +499,7 @@ export default function AdminAttendanceRegularizationPage() {
                   setShowAcknowledgeModal(false);
                   setAcknowledgementRemark("");
                   setSelectedRequest(null);
+                  setModalAction(null);
                 }}
                 disabled={actionLoading !== null}
                 className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50"
@@ -484,11 +507,18 @@ export default function AdminAttendanceRegularizationPage() {
                 Cancel
               </button>
               <button
-                onClick={() => handleAction(selectedRequest.id, "acknowledge", acknowledgementRemark)}
+                onClick={() => handleAction(selectedRequest.id, modalAction, acknowledgementRemark)}
                 disabled={actionLoading !== null}
-                className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+                className={`flex-1 px-4 py-2 text-white rounded-lg disabled:opacity-50 ${
+                  modalAction === "reject" ? "bg-red-600 hover:bg-red-700" :
+                  modalAction === "approve" ? "bg-green-600 hover:bg-green-700" :
+                  "bg-indigo-600 hover:bg-indigo-700"
+                }`}
               >
-                {actionLoading === `${selectedRequest.id}-acknowledge` ? "Processing..." : "Acknowledge"}
+                {actionLoading === `${selectedRequest.id}-${modalAction}` ? "Processing..." : 
+                 modalAction === "reject" ? "Reject" :
+                 modalAction === "approve" ? "Approve" :
+                 "Acknowledge"}
               </button>
             </div>
           </div>

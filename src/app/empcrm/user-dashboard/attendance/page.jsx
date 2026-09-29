@@ -538,8 +538,16 @@ const AttendancePage = () => {
       const k = new Date(log.date).toLocaleDateString("en-CA");
       return dayKindByDateKey.get(k) === "halfDay";
     } else if (filterStatus === "regularize") {
-      // Only show logs that need regularization (excluding unpaid leaves)
-      if (!rowNeedsRegularization(log)) return false;
+      // Show logs that need regularization OR have a regularization request (pending/approved/rejected)
+      const dateKey = new Date(log.date).toLocaleDateString("en-CA");
+      const hasPendingReq = pendingRegByDate.has(dateKey);
+      const hasRejectedReq = rejectedRegByDate.has(dateKey);
+      const hasApprovedReq = approvedRegByDate.has(dateKey);
+      
+      // Show if: needs regularization, OR has any regularization request
+      if (!rowNeedsRegularization(log) && !hasPendingReq && !hasRejectedReq && !hasApprovedReq) {
+        return false;
+      }
       return true;
     }
 
@@ -925,7 +933,7 @@ const AttendancePage = () => {
                                   <RegStatusBadge status="rejected" acknowledgedAt={rejectedReq.acknowledged_at} />
                                   <button
                                     type="button"
-                                    onClick={() => showRejectionRemarks(rejectedReq.reviewer_comment)}
+                                    onClick={() => showRejectionRemarks(rejectedReq.acknowledgement_remark || rejectedReq.reviewer_comment)}
                                     className="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50"
                                     title="View rejection remarks"
                                   >
@@ -956,7 +964,7 @@ const AttendancePage = () => {
                                   <RegStatusBadge status="approved" acknowledgedAt={approvedReq.acknowledged_at} />
                                   <button
                                     type="button"
-                                    onClick={() => showApprovalRemarks(approvedReq.reviewer_comment)}
+                                    onClick={() => showApprovalRemarks(approvedReq.acknowledgement_remark || approvedReq.reviewer_comment)}
                                     className="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50"
                                     title="View approval remarks"
                                   >
@@ -1163,7 +1171,7 @@ const AttendancePage = () => {
                                       <RegStatusBadge status="rejected" acknowledgedAt={rReq.acknowledged_at} />
                                       <button
                                         type="button"
-                                        onClick={() => showRejectionRemarks(rReq.reviewer_comment)}
+                                        onClick={() => showRejectionRemarks(rReq.acknowledgement_remark || rReq.reviewer_comment)}
                                         className="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50"
                                         title="View rejection remarks"
                                       >
@@ -1188,7 +1196,7 @@ const AttendancePage = () => {
                                       <RegStatusBadge status="approved" acknowledgedAt={aReq.acknowledged_at} />
                                       <button
                                         type="button"
-                                        onClick={() => showApprovalRemarks(aReq.reviewer_comment)}
+                                        onClick={() => showApprovalRemarks(aReq.acknowledgement_remark || aReq.reviewer_comment)}
                                         className="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50"
                                         title="View approval remarks"
                                       >
@@ -1309,7 +1317,7 @@ const AttendancePage = () => {
                                       <RegStatusBadge status="rejected" acknowledgedAt={rReq.acknowledged_at} />
                                       <button
                                         type="button"
-                                        onClick={() => showRejectionRemarks(rReq.reviewer_comment)}
+                                        onClick={() => showRejectionRemarks(rReq.acknowledgement_remark || rReq.reviewer_comment)}
                                         className="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50"
                                         title="View rejection remarks"
                                       >
@@ -1334,7 +1342,7 @@ const AttendancePage = () => {
                                       <RegStatusBadge status="approved" acknowledgedAt={aReq.acknowledged_at} />
                                       <button
                                         type="button"
-                                        onClick={() => showApprovalRemarks(aReq.reviewer_comment)}
+                                        onClick={() => showApprovalRemarks(aReq.acknowledgement_remark || aReq.reviewer_comment)}
                                         className="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50"
                                         title="View approval remarks"
                                       >
@@ -1414,7 +1422,7 @@ const AttendancePage = () => {
                                       <RegStatusBadge status="rejected" acknowledgedAt={rReq.acknowledged_at} />
                                       <button
                                         type="button"
-                                        onClick={() => showRejectionRemarks(rReq.reviewer_comment)}
+                                        onClick={() => showRejectionRemarks(rReq.acknowledgement_remark || rReq.reviewer_comment)}
                                         className="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50"
                                         title="View rejection remarks"
                                       >
@@ -1439,7 +1447,7 @@ const AttendancePage = () => {
                                       <RegStatusBadge status="approved" acknowledgedAt={aReq.acknowledged_at} />
                                       <button
                                         type="button"
-                                        onClick={() => showApprovalRemarks(aReq.reviewer_comment)}
+                                        onClick={() => showApprovalRemarks(aReq.acknowledgement_remark || aReq.reviewer_comment)}
                                         className="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50"
                                         title="View approval remarks"
                                       >
