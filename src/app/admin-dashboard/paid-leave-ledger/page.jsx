@@ -278,14 +278,14 @@ export default function PaidLeaveLedger() {
                 <Plus className="w-4 h-4 text-green-500" />
                 <p className="text-xs text-green-600 font-medium">Paid Added</p>
               </div>
-              <p className="text-2xl font-bold text-green-800">{summary.totalCredit}</p>
+              <p className="text-2xl font-bold text-green-800">{Number(summary.totalCredit).toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</p>
             </div>
             <div className="bg-red-50 border border-red-200 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-1">
                 <Minus className="w-4 h-4 text-red-500" />
                 <p className="text-xs text-red-600 font-medium">Paid Used</p>
               </div>
-              <p className="text-2xl font-bold text-red-800">{summary.totalDebit}</p>
+              <p className="text-2xl font-bold text-red-800">{Number(summary.totalDebit).toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</p>
             </div>
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-1">
@@ -293,7 +293,7 @@ export default function PaidLeaveLedger() {
                 <p className="text-xs text-blue-600 font-medium">Paid Balance</p>
               </div>
               <p className={`text-2xl font-bold ${summary.balance >= 0 ? "text-blue-800" : "text-red-800"}`}>
-                {summary.balance}
+                {Number(summary.balance).toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
               </p>
             </div>
             <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
@@ -301,7 +301,7 @@ export default function PaidLeaveLedger() {
                 <AlertCircle className="w-4 h-4 text-orange-500" />
                 <p className="text-xs text-orange-600 font-medium">Unpaid Total</p>
               </div>
-              <p className="text-2xl font-bold text-orange-800">{unpaidSummary.totalDays}</p>
+              <p className="text-2xl font-bold text-orange-800">{Number(unpaidSummary.totalDays).toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</p>
             </div>
             <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-1">

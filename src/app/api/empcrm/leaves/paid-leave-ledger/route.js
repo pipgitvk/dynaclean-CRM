@@ -146,10 +146,13 @@ export async function GET(request) {
         ? `Paid Leave added by ${leave.created_by}`
         : `Paid Leave taken`;
       
+      // Calculate actual days used - if it's a half-day, it's 0.5, otherwise use total_days
+      const daysUsed = (leave.is_half_day == 1) ? 0.5 : Number(leave.total_days || 1);
+      
       ledgerEntries.push({
         type: "debit",
         date: leave.from_date,
-        days: leave.total_days,
+        days: daysUsed,
         is_half_day: leave.is_half_day,
         half_day_type: leave.half_day_type,
         description,
@@ -163,21 +166,26 @@ export async function GET(request) {
     });
 
     // Build unpaid leave ledger entries (debit only - no accrual)
-    const unpaidLedgerEntries = unpaidLeaves.map(leave => ({
-      type: "debit",
-      date: leave.from_date,
-      to_date: leave.to_date,
-      days: leave.total_days,
-      is_half_day: leave.is_half_day,
-      half_day_type: leave.half_day_type,
-      description: `Unpaid Leave (${leave.status})`,
-      leaveId: leave.id,
-      entryType: "usage",
-      reason: leave.reason,
-      leave_type: "unpaid",
-      status: leave.status,
-      rejection_reason: leave.rejection_reason
-    }));
+    const unpaidLedgerEntries = unpaidLeaves.map(leave => {
+      // Calculate actual days used - if it's a half-day, it's 0.5, otherwise use total_days
+      const daysUsed = (leave.is_half_day == 1) ? 0.5 : Number(leave.total_days || 1);
+      
+      return {
+        type: "debit",
+        date: leave.from_date,
+        to_date: leave.to_date,
+        days: daysUsed,
+        is_half_day: leave.is_half_day,
+        half_day_type: leave.half_day_type,
+        description: `Unpaid Leave (${leave.status})`,
+        leaveId: leave.id,
+        entryType: "usage",
+        reason: leave.reason,
+        leave_type: "unpaid",
+        status: leave.status,
+        rejection_reason: leave.rejection_reason
+      };
+    });
 
     // Calculate unpaid leave summary
     const unpaidSummary = {
