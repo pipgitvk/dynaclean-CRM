@@ -32,48 +32,9 @@ export default function PaidLeaveLedger() {
     totalDays: 0
   });
   const [accrualStartDate, setAccrualStartDate] = useState(null);
-  const [userRole, setUserRole] = useState("");
-  const [accessDenied, setAccessDenied] = useState(false);
 
   useEffect(() => {
-    const normalizeRole = (r) => String(r || "").trim().replace(/\s+/g, " ").toUpperCase();
-
-    const isAccountingRole = (roleStr) => {
-      const k = normalizeRole(roleStr);
-      if (k === "ACCOUNTANT") return true;
-      return /\bACCOUNTANT\b/.test(k);
-    };
-
-    const checkAccess = async () => {
-      try {
-        const res = await fetch("/api/me");
-        const data = await res.json();
-        const role = data?.userRole || data?.role || "";
-        setUserRole(role);
-        const roleNorm = normalizeRole(role);
-
-        const isHrRole =
-          roleNorm === "HR HEAD" ||
-          roleNorm === "HR" ||
-          roleNorm === "HR EXECUTIVE" ||
-          roleNorm === "JUNIOR HR EXECUTIVE" ||
-          roleNorm === "HR RECRUITER";
-
-        const superAdmin = roleNorm === "SUPERADMIN" || roleNorm === "DIRECTOR";
-
-        if (!superAdmin && !isHrRole && !isAccountingRole(role)) {
-          setAccessDenied(true);
-          return;
-        }
-
-        fetchEmployees();
-      } catch (e) {
-        console.error("Error checking user role:", e);
-        setAccessDenied(true);
-      }
-    };
-
-    checkAccess();
+    fetchEmployees();
   }, []);
 
   const fetchEmployees = async () => {
@@ -211,18 +172,6 @@ export default function PaidLeaveLedger() {
     }
   };
 
-  if (accessDenied) {
-    return (
-      <div className="p-6 max-w-7xl mx-auto">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
-          <AlertCircle className="w-12 h-12 text-red-600 mx-auto mb-3" />
-          <p className="text-red-800 font-medium text-lg">Access Denied</p>
-          <p className="text-red-600 mt-2">You don't have permission to view this page. Only HR, Accountants, and Superadmins can access the Paid Leave Ledger.</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="p-6 max-w-7xl mx-auto">
       {/* Header */}
@@ -278,14 +227,14 @@ export default function PaidLeaveLedger() {
                 <Plus className="w-4 h-4 text-green-500" />
                 <p className="text-xs text-green-600 font-medium">Paid Added</p>
               </div>
-              <p className="text-2xl font-bold text-green-800">{Number(summary.totalCredit).toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</p>
+              <p className="text-2xl font-bold text-green-800">{summary.totalCredit}</p>
             </div>
             <div className="bg-red-50 border border-red-200 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-1">
                 <Minus className="w-4 h-4 text-red-500" />
                 <p className="text-xs text-red-600 font-medium">Paid Used</p>
               </div>
-              <p className="text-2xl font-bold text-red-800">{Number(summary.totalDebit).toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</p>
+              <p className="text-2xl font-bold text-red-800">{summary.totalDebit}</p>
             </div>
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-1">
@@ -293,7 +242,7 @@ export default function PaidLeaveLedger() {
                 <p className="text-xs text-blue-600 font-medium">Paid Balance</p>
               </div>
               <p className={`text-2xl font-bold ${summary.balance >= 0 ? "text-blue-800" : "text-red-800"}`}>
-                {Number(summary.balance).toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                {summary.balance}
               </p>
             </div>
             <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
@@ -301,7 +250,7 @@ export default function PaidLeaveLedger() {
                 <AlertCircle className="w-4 h-4 text-orange-500" />
                 <p className="text-xs text-orange-600 font-medium">Unpaid Total</p>
               </div>
-              <p className="text-2xl font-bold text-orange-800">{Number(unpaidSummary.totalDays).toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</p>
+              <p className="text-2xl font-bold text-orange-800">{unpaidSummary.totalDays}</p>
             </div>
             <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-1">
@@ -392,9 +341,6 @@ export default function PaidLeaveLedger() {
                           Days
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Half-Day
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Description / Reason
                         </th>
                         <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -435,23 +381,9 @@ export default function PaidLeaveLedger() {
                           <td className="px-6 py-4 text-center font-semibold text-gray-900">
                             {entry.days}
                           </td>
-                          <td className="px-6 py-4">
-                            {entry.is_half_day ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-700 border border-orange-200">
-                                🌗 {entry.half_day_type === '1st_half' ? '1st Half' : '2nd Half'}
-                              </span>
-                            ) : (
-                              <span className="text-gray-400">Full Day</span>
-                            )}
-                          </td>
                           <td className="px-6 py-4 text-sm text-gray-600">
                             <div>
                               <div>{entry.description}</div>
-                              {entry.created_by && (
-                                <div className="text-xs mt-1 px-2 py-1 bg-indigo-50 border border-indigo-200 rounded text-indigo-700 inline-block">
-                                  Added by: <span className="font-medium">{entry.created_by}</span>
-                                </div>
-                              )}
                               {entry.reason && (
                                 <div className="text-xs text-gray-500 mt-1">Reason: {entry.reason.substring(0, 100)}</div>
                               )}
@@ -554,9 +486,6 @@ export default function PaidLeaveLedger() {
                           Days
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Half-Day
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Reason
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -586,15 +515,6 @@ export default function PaidLeaveLedger() {
                                             entry.status === 'pending' ? 'text-amber-600' : 'text-red-600'}>
                               {entry.days}
                             </span>
-                          </td>
-                          <td className="px-6 py-4 text-sm">
-                            {entry.is_half_day ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-700 border border-orange-200">
-                                🌗 {entry.half_day_type === '1st_half' ? '1st Half' : '2nd Half'}
-                              </span>
-                            ) : (
-                              <span className="text-gray-400">Full Day</span>
-                            )}
                           </td>
                           <td className="px-6 py-4 text-sm text-gray-600 max-w-xs">
                             <div className="line-clamp-2">
