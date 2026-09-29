@@ -59,7 +59,7 @@ async function runMigration() {
     
     connection = await mysql.createConnection({
       host,
-      user: process.env.DB_USER,
+      user: process.env.DB_USRE,
       password: process.env.DB_PASSWORD,
       database: process.env.DB_NAME,
       waitForConnections: true,
