@@ -179,7 +179,7 @@ export default function EditPaymentPage() {
                     </div>
                 )}
 
-                <form onSubmit={handleSubmit} className="space-y-6">
+                <div>
                     {/* Customer Information */}
                     <div className="border-b border-gray-200 pb-6">
                         <h2 className="text-lg font-semibold text-gray-700 mb-4">
@@ -194,7 +194,7 @@ export default function EditPaymentPage() {
                                     type="text"
                                     name="customer_name"
                                     value={formData.customer_name}
-                                    onChange={handleChange}
+                                    disabled
                                     required
                                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 />
@@ -208,7 +208,7 @@ export default function EditPaymentPage() {
                                     type="text"
                                     name="customer_phone"
                                     value={formData.customer_phone}
-                                    onChange={handleChange}
+                                    disabled
                                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 />
                             </div>
@@ -221,7 +221,7 @@ export default function EditPaymentPage() {
                                     type="email"
                                     name="customer_email"
                                     value={formData.customer_email}
-                                    onChange={handleChange}
+                                    disabled
                                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 />
                             </div>
@@ -242,7 +242,7 @@ export default function EditPaymentPage() {
                                     type="number"
                                     name="amount"
                                     value={formData.amount}
-                                    onChange={handleChange}
+                                    disabled
                                     step="0.01"
                                     min="0"
                                     required
@@ -257,7 +257,7 @@ export default function EditPaymentPage() {
                                 <select
                                     name="payment_type"
                                     value={formData.payment_type}
-                                    onChange={handleChange}
+                                    disabled
                                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 >
                                     <option value="advance">Advance</option>
@@ -274,7 +274,7 @@ export default function EditPaymentPage() {
                                 <select
                                     name="payment_method"
                                     value={formData.payment_method}
-                                    onChange={handleChange}
+                                    disabled
                                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 >
                                     <option value="cash">Cash</option>
@@ -294,7 +294,7 @@ export default function EditPaymentPage() {
                                     type="text"
                                     name="reference_number"
                                     value={formData.reference_number}
-                                    onChange={handleChange}
+                                    disabled
                                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 />
                             </div>
@@ -307,7 +307,7 @@ export default function EditPaymentPage() {
                                     type="date"
                                     name="payment_date"
                                     value={formData.payment_date}
-                                    onChange={handleChange}
+                                    disabled
                                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 />
                             </div>
@@ -320,7 +320,7 @@ export default function EditPaymentPage() {
                                     type="date"
                                     name="due_date"
                                     value={formData.due_date}
-                                    onChange={handleChange}
+                                    disabled
                                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 />
                             </div>
@@ -332,7 +332,7 @@ export default function EditPaymentPage() {
                                 <select
                                     name="status"
                                     value={formData.status}
-                                    onChange={handleChange}
+                                    disabled
                                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 >
                                     <option value="pending">Pending</option>
@@ -345,8 +345,8 @@ export default function EditPaymentPage() {
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
                                     Invoice File
                                 </label>
-                                {currentInvoice && !removeInvoice && !newInvoiceFile && (
-                                    <div className="mb-2 p-2 bg-gray-50 border border-gray-200 rounded flex items-center justify-between">
+                                {currentInvoice && !removeInvoice && (
+                                    <div className="mb-2 p-2 bg-gray-50 border border-gray-200 rounded">
                                         <a
                                             href={manualPaymentInvoiceHref(currentInvoice)}
                                             target="_blank"
@@ -355,33 +355,10 @@ export default function EditPaymentPage() {
                                         >
                                             View Current Invoice
                                         </a>
-                                        <button
-                                            type="button"
-                                            onClick={handleRemoveInvoice}
-                                            className="text-red-600 hover:text-red-800 text-sm font-medium"
-                                        >
-                                            Remove
-                                        </button>
                                     </div>
                                 )}
-                                {(removeInvoice || !currentInvoice) && (
-                                    <input
-                                        type="file"
-                                        onChange={handleFileChange}
-                                        accept=".pdf,.jpg,.jpeg,.png"
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
-                                )}
-                                {!removeInvoice && currentInvoice && (
-                                    <input
-                                        type="file"
-                                        onChange={handleFileChange}
-                                        accept=".pdf,.jpg,.jpeg,.png"
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
-                                )}
                                 <p className="text-xs text-gray-500 mt-1">
-                                    Upload new file to replace current invoice
+                                    Invoice upload is disabled.
                                 </p>
                             </div>
 
@@ -392,7 +369,7 @@ export default function EditPaymentPage() {
                                 <textarea
                                     name="remarks"
                                     value={formData.remarks}
-                                    onChange={handleChange}
+                                    disabled
                                     rows="3"
                                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 ></textarea>
@@ -407,17 +384,10 @@ export default function EditPaymentPage() {
                             onClick={() => router.back()}
                             className="px-6 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium"
                         >
-                            Cancel
-                        </button>
-                        <button
-                            type="submit"
-                            disabled={submitting}
-                            className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            {submitting ? "Updating..." : "Update Payment Entry"}
+                            ← Back
                         </button>
                     </div>
-                </form>
+                </div>
             </div>
         </div>
     );
