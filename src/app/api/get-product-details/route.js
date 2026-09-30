@@ -61,10 +61,7 @@
 
 // app/api/get-product-details/route.js
 import { getDbConnection } from "@/lib/db";
-import {
-  getApprovedSpecialPrice,
-  resolveQuotationItemByCode,
-} from "@/lib/getApprovedSpecialPrice";
+import { log } from "console";
 
 export const dynamic = "force-dynamic";
 
@@ -72,7 +69,6 @@ export async function GET(req) {
   const { searchParams } = new URL(req.url);
   const code = searchParams.get("code")?.trim();
   const mode = searchParams.get("mode") || "full"; // 'suggestion' or 'full'
-  const customerId = searchParams.get("customerId")?.trim() || "";
 
   if (!code) {
     return new Response(JSON.stringify({ error: "Missing product code" }), {
@@ -114,57 +110,31 @@ export async function GET(req) {
         [likeCode, likeCode, likeCode, likeCode]
       );
     } else {
-      // Full product fetch (exact code, then case-insensitive item_code / product_number)
+      // Full product fetch
+      // First, try to get the product from the products_list table
       [rows] = await conn.execute(
         `
         SELECT
-          p.id,
           p.item_code,
           p.item_name,
-          p.product_number,
           p.hsn_sac,
           p.specification,
           p.unit,
           p.price_per_unit,
           p.gst_rate,
           p.last_negotiation_price,
-          p.product_image as image_path,
-          'product' AS item_type
+          p.product_image as image_path
         FROM
           products_list p
+        LEFT JOIN
+          product_images pi ON p.item_code = pi.item_code
         WHERE
           p.item_code = ?
         LIMIT 1`,
         [code]
       );
 
-      if (rows.length === 0) {
-        const codeLower = code.toLowerCase();
-        [rows] = await conn.execute(
-          `
-          SELECT
-            p.id,
-            p.item_code,
-            p.item_name,
-            p.product_number,
-            p.hsn_sac,
-            p.specification,
-            p.unit,
-            p.price_per_unit,
-            p.gst_rate,
-            p.last_negotiation_price,
-            p.product_image as image_path,
-            'product' AS item_type
-          FROM
-            products_list p
-          WHERE
-            LOWER(TRIM(p.item_code)) = ?
-            OR CAST(p.product_number AS CHAR) = ?
-          LIMIT 1`,
-          [codeLower, codeLower]
-        );
-      }
-
+      // If no product is found, try to get it from the spare_list table
       if (rows.length === 0) {
         [rows] = await conn.execute(
           `
@@ -174,51 +144,21 @@ export async function GET(req) {
             '84798999' AS hsn_sac,
             T1.specification,
             'Nos' AS unit,
-            COALESCE(T1.sale_price, T1.price) AS price_per_unit,
+            T1.sale_price AS price_per_unit,
             T1.tax AS gst_rate,
             T1.last_negotiation_price,
-            T1.image AS image_path,
-            'spare' AS item_type
+            T1.image AS image_path
           FROM
             spare_list AS T1
           WHERE
-            CAST(T1.spare_number AS CHAR) = ?
-            OR LOWER(TRIM(CAST(T1.spare_number AS CHAR))) = ?
+            T1.spare_number = ?
           LIMIT 1`,
-          [code, code.toLowerCase()]
+          [code]
         );
       }
     }
 
-    if (mode !== "suggestion" && customerId && rows.length > 0) {
-      try {
-        const row = rows[0];
-        const quotationItem = await resolveQuotationItemByCode(
-          conn,
-          row.item_code || code
-        );
-        const specialPrice = await getApprovedSpecialPrice(
-          conn,
-          customerId,
-          quotationItem?.itemId ?? null,
-          quotationItem?.itemCode ?? row.item_code ?? code,
-          quotationItem?.itemType ?? row.item_type ?? null
-        );
-        if (specialPrice != null) {
-          rows[0] = {
-            ...row,
-            item_type: quotationItem?.itemType ?? row.item_type ?? "product",
-            special_price: specialPrice,
-            original_price: row.price_per_unit,
-          };
-        } else if (quotationItem?.itemType) {
-          rows[0] = { ...row, item_type: quotationItem.itemType };
-        }
-      } catch (specialErr) {
-        console.error("❌ Special price lookup skipped:", specialErr);
-      }
-    }
-
+    // await conn.end();
     console.log("Fetched rows:", rows);
     return new Response(JSON.stringify(rows), { status: 200 });
   } catch (err) {
