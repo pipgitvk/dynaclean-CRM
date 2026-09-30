@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { ArrowLeft, Save, Calculator, AlertCircle, Download, CalendarDays, Lock } from "lucide-react";
 import toast from "react-hot-toast";
 import {
@@ -40,10 +40,6 @@ function payrollAttendanceFallbackRows(b) {
 
 const GenerateSalaryPage = () => {
     const router = useRouter();
-    const pathname = usePathname();
-    const salaryHome = String(pathname || "").startsWith("/accounts-dashboard")
-        ? "/accounts-dashboard/salary"
-        : "/empcrm/admin-dashboard/salary";
 
     // User Role State
     const [userRole, setUserRole] = useState("");
@@ -72,30 +68,8 @@ const GenerateSalaryPage = () => {
         status: 'draft'
     });
 
-    /**
-     * Record is locked only when BOTH conditions are true:
-     * - status is approved/paid  AND
-     * - edit deadline has already passed (after 10th of following month)
-     * Within the deadline window, even approved salaries can be updated.
-     */
-    const isApprovedOrPaid = ["approved", "paid"].includes((formData.status || "").toLowerCase());
-
-    /**
-     * Salary updates are only allowed up to the 10th of the month FOLLOWING the salary month.
-     * e.g. July salary → editable until 10th August.
-     * Returns true when today is past that deadline.
-     */
-    const isAfterEditDeadline = useMemo(() => {
-        if (!selectedMonth) return false;
-        const [year, month] = selectedMonth.split("-").map(Number); // month is 1-indexed
-        if (!year || !month) return false;
-        // Deadline: 10th of the next calendar month
-        const deadline = new Date(year, month, 10, 23, 59, 59); // month (0-indexed) = next month
-        return new Date() > deadline;
-    }, [selectedMonth]);
-
-    /** Locked = approved/paid AND deadline has passed. Within deadline, editing is always allowed. */
-    const isLocked = isApprovedOrPaid && isAfterEditDeadline;
+    /** true when the loaded record is approved/paid — all editing locked */
+    const isLocked = ["approved", "paid"].includes((formData.status || "").toLowerCase());
 
     // Calculated State
     const [calculation, setCalculation] = useState(null);
@@ -226,9 +200,6 @@ const GenerateSalaryPage = () => {
                         present: presN,
                         totalPunchedDays: totalPunched,
                         halfDay: Number(empAtt.half_day_count) || 0,
-                        halfDayPaid: Number(empAtt.half_day_paid_count) || 0,
-                        halfDayUnpaid: Number(empAtt.half_day_unpaid_count) || 0,
-                        unpaidLeave: Number(empAtt.unpaid_leave_count) || 0,
                         lateDay: lateN,
                         weekendOff: Number(empAtt.weekend_off_count) || 0,
                         holiday: Number(empAtt.holiday_count) || 0,
@@ -241,14 +212,6 @@ const GenerateSalaryPage = () => {
                             empAtt.pay_period_days !== ""
                                 ? {
                                       periodDays: Number(empAtt.pay_period_days),
-                                      salaryPeriodCap:
-                                          empAtt.pay_salary_period_cap != null &&
-                                          empAtt.pay_salary_period_cap !== ""
-                                              ? Number(empAtt.pay_salary_period_cap)
-                                              : Math.min(
-                                                    30,
-                                                    Number(empAtt.pay_period_days) || 0
-                                                ),
                                       sundaysInPeriod: Number(empAtt.pay_sundays_in_period) || 0,
                                       sundaysInPeriodDates: empAtt.pay_sundays_in_period_dates || [],
                                       holidayWeekdaysInPeriod:
@@ -260,19 +223,12 @@ const GenerateSalaryPage = () => {
                                       payDaysBase:
                                           empAtt.pay_days_base != null && empAtt.pay_days_base !== ""
                                               ? Number(empAtt.pay_days_base)
-                                              : Math.min(
-                                                    30,
-                                                    Number(empAtt.pay_period_days) || 0
-                                                ) - (Number(empAtt.pay_deduction_days) || 0),
+                                              : Number(empAtt.pay_period_days) -
+                                                (Number(empAtt.pay_deduction_days) || 0),
                                       sundaysUnpaidWholeWeekOff:
                                           empAtt.pay_sundays_unpaid_whole_week_off != null &&
                                           empAtt.pay_sundays_unpaid_whole_week_off !== ""
                                               ? Number(empAtt.pay_sundays_unpaid_whole_week_off)
-                                              : 0,
-                                      sundayWorkCredits:
-                                          empAtt.pay_sunday_work_credits != null &&
-                                          empAtt.pay_sunday_work_credits !== ""
-                                              ? Number(empAtt.pay_sunday_work_credits)
                                               : 0,
                                       salaryFullDays: presN,
                                       salaryHalfDays: Number(empAtt.half_day_count) || 0,
@@ -648,11 +604,6 @@ const GenerateSalaryPage = () => {
     const handleSave = async () => {
         if (!selectedEmployee || !selectedMonth) return;
 
-        if (isAfterEditDeadline) {
-            toast.error(`Salary update deadline has passed. ${formatMonthHeading(selectedMonth)} salary can only be updated up to the 10th of the following month.`);
-            return;
-        }
-
         setLoading(true);
         try {
             const payload = {
@@ -670,7 +621,7 @@ const GenerateSalaryPage = () => {
             const data = await response.json();
             if (response.ok) {
                 toast.success("Salary saved successfully!");
-                router.push(salaryHome);
+                router.push("/empcrm/admin-dashboard/salary");
             } else {
                 toast.error(data.message || "Failed to save salary");
             }
@@ -781,19 +732,6 @@ const GenerateSalaryPage = () => {
 
                     {salaryStructure ? (
                         <div className="space-y-4 pt-4 border-t border-gray-200">
-
-                            {/* Deadline banner — past 10th of following month */}
-                            {isAfterEditDeadline && (
-                                <div className="flex items-start gap-2 px-3 py-2.5 bg-red-50 border border-red-300 rounded-md text-red-800 text-sm font-medium">
-                                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                                    <span>
-                                        Salary update deadline has passed. Records for{" "}
-                                        <span className="font-semibold">{formatMonthHeading(selectedMonth)}</span>{" "}
-                                        can only be updated up to the{" "}
-                                        <span className="font-semibold">10th of the following month</span>.
-                                    </span>
-                                </div>
-                            )}
 
                             {/* Lock banner for approved/paid records */}
                             {isLocked && (
@@ -1004,33 +942,7 @@ const GenerateSalaryPage = () => {
                                         </span>
                                     </li>
                                     <li>
-                                        Salary period cap (for payout) = min(30, period days) ={" "}
-                                        <span className="font-semibold tabular-nums">
-                                            {formatPayCalcNumber(
-                                                attendanceDisplayAllZero
-                                                    ? 0
-                                                    : attendanceBreakdown.payCalc.salaryPeriodCap
-                                            )}
-                                        </span>
-                                    </li>
-                                    <li>
-                                        Pay days (before weekly-off rule) = salary cap − deduction ={" "}
-                                        <span className="font-semibold tabular-nums">
-                                            {formatPayCalcNumber(
-                                                attendanceDisplayAllZero
-                                                    ? 0
-                                                    : attendanceBreakdown.payCalc.salaryPeriodCap
-                                            )}
-                                        </span>{" "}
-                                        −{" "}
-                                        <span className="font-semibold tabular-nums">
-                                            {formatPayCalcNumber(
-                                                attendanceDisplayAllZero
-                                                    ? 0
-                                                    : attendanceBreakdown.payCalc.deductionDays
-                                            )}
-                                        </span>{" "}
-                                        ={" "}
+                                        Pay days (before weekly-off rule) = period − deduction ={" "}
                                         <span className="font-semibold tabular-nums">
                                             {formatPayCalcNumber(
                                                 attendanceDisplayAllZero
@@ -1055,85 +967,40 @@ const GenerateSalaryPage = () => {
                                             </span>
                                         </li>
                                     )}
-                                    {(attendanceDisplayAllZero
-                                        ? 0
-                                        : Number(attendanceBreakdown.payCalc.sundayWorkCredits) ||
-                                          0) > 0 && (
-                                        <li>
-                                            Sunday work bonus (worked on weekly off) ={" "}
-                                            <span className="font-semibold tabular-nums text-emerald-800">
-                                                +{formatPayCalcNumber(
-                                                    attendanceDisplayAllZero
-                                                        ? 0
-                                                        : attendanceBreakdown.payCalc
-                                                              .sundayWorkCredits
-                                                )}
-                                            </span>
-                                            {sundaysWorked.length > 0 && (
-                                                <span className="text-slate-500">
-                                                    {" "}
-                                                    (
-                                                    {sundaysWorked
-                                                        .map((d) => formatDate(d))
-                                                        .join(", ")}
-                                                    )
-                                                </span>
-                                            )}
-                                        </li>
-                                    )}
                                     <li className="pt-1 border-t border-purple-200/80 text-slate-800">
                                         Pay days (for salary) ={" "}
                                         {(attendanceDisplayAllZero
                                             ? 0
                                             : Number(attendanceBreakdown.payCalc.sundaysUnpaidWholeWeekOff) ||
-                                              0) > 0 ||
-                                        (attendanceDisplayAllZero
-                                            ? 0
-                                            : Number(attendanceBreakdown.payCalc.sundayWorkCredits) ||
                                               0) > 0 ? (
                                             <>
-                                                {Number(attendanceBreakdown.payCalc.sundaysUnpaidWholeWeekOff) > 0 ? (
-                                                    <>
-                                                        pay days before rule − weekly-off unpaid ={" "}
-                                                        <span className="font-semibold tabular-nums">
-                                                            {formatPayCalcNumber(
-                                                                attendanceDisplayAllZero
-                                                                    ? 0
-                                                                    : attendanceBreakdown.payCalc.payDaysBase
-                                                            )}
-                                                        </span>{" "}
-                                                        −{" "}
-                                                        <span className="font-semibold tabular-nums">
-                                                            {formatPayCalcNumber(
-                                                                attendanceDisplayAllZero
-                                                                    ? 0
-                                                                    : attendanceBreakdown.payCalc
-                                                                          .sundaysUnpaidWholeWeekOff
-                                                            )}
-                                                        </span>
-                                                        {Number(attendanceBreakdown.payCalc.sundayWorkCredits) > 0
-                                                            ? " + Sunday work"
-                                                            : ""}{" "}
-                                                        ={" "}
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        min(30, period) − deduction
-                                                        {Number(attendanceBreakdown.payCalc.sundayWorkCredits) > 0
-                                                            ? " + Sunday work"
-                                                            : ""}{" "}
-                                                        ={" "}
-                                                    </>
-                                                )}
-                                            </>
-                                        ) : (
-                                            <>
-                                                min(30, period) − deduction ={" "}
+                                                pay days before rule − weekly-off unpaid ={" "}
                                                 <span className="font-semibold tabular-nums">
                                                     {formatPayCalcNumber(
                                                         attendanceDisplayAllZero
                                                             ? 0
-                                                            : attendanceBreakdown.payCalc.salaryPeriodCap
+                                                            : attendanceBreakdown.payCalc.payDaysBase
+                                                    )}
+                                                </span>{" "}
+                                                −{" "}
+                                                <span className="font-semibold tabular-nums">
+                                                    {formatPayCalcNumber(
+                                                        attendanceDisplayAllZero
+                                                            ? 0
+                                                            : attendanceBreakdown.payCalc
+                                                                  .sundaysUnpaidWholeWeekOff
+                                                    )}
+                                                </span>{" "}
+                                                ={" "}
+                                            </>
+                                        ) : (
+                                            <>
+                                                period − deduction ={" "}
+                                                <span className="font-semibold tabular-nums">
+                                                    {formatPayCalcNumber(
+                                                        attendanceDisplayAllZero
+                                                            ? 0
+                                                            : attendanceBreakdown.payCalc.periodDays
                                                     )}
                                                 </span>{" "}
                                                 −{" "}
@@ -1199,22 +1066,6 @@ const GenerateSalaryPage = () => {
                                                     {z(c.sundays)}
                                                 </dd>
                                             </div>
-                                            {!attendanceDisplayAllZero &&
-                                                Number(attendanceBreakdown.payCalc?.sundayWorkCredits) > 0 && (
-                                                <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
-                                                    <dt className="text-slate-600">
-                                                        Sunday work bonus
-                                                        {sundaysWorked.length > 0 && (
-                                                            <span className="block text-[11px] text-slate-400 leading-snug">
-                                                                {sundaysWorked.map((d) => formatDate(d)).join(", ")}
-                                                            </span>
-                                                        )}
-                                                    </dt>
-                                                    <dd className="font-semibold text-emerald-600 tabular-nums shrink-0">
-                                                        +{formatPayCalcNumber(attendanceBreakdown.payCalc.sundayWorkCredits)}
-                                                    </dd>
-                                                </div>
-                                            )}
                                             <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
                                                 <dt className="text-slate-600">Holidays</dt>
                                                 <dd className="font-semibold text-indigo-600 tabular-nums">
@@ -1229,39 +1080,6 @@ const GenerateSalaryPage = () => {
                                                         : attendanceBreakdown.cards
                                                         ? attendanceBreakdown.cards.halfDays
                                                         : attendanceBreakdown.halfDay}
-                                                </dd>
-                                            </div>
-                                            <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
-                                                <dt className="text-slate-600">
-                                                    <span className="text-xs block">Paid Half-Days</span>
-                                                    <span className="text-[11px] text-slate-500">(paid leave + punch-based)</span>
-                                                </dt>
-                                                <dd className="font-semibold text-emerald-600 tabular-nums">
-                                                    {attendanceDisplayAllZero
-                                                        ? 0
-                                                        : attendanceBreakdown.halfDayPaid}
-                                                </dd>
-                                            </div>
-                                            <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
-                                                <dt className="text-slate-600">
-                                                    <span className="text-xs block">Unpaid Half-Days</span>
-                                                    <span className="text-[11px] text-slate-500">(unpaid leave)</span>
-                                                </dt>
-                                                <dd className="font-semibold text-red-600 tabular-nums">
-                                                    {attendanceDisplayAllZero
-                                                        ? 0
-                                                        : attendanceBreakdown.halfDayUnpaid}
-                                                </dd>
-                                            </div>
-                                            <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
-                                                <dt className="text-slate-600">
-                                                    <span className="text-xs block">Unpaid Full Days</span>
-                                                    <span className="text-[11px] text-slate-500">(unpaid leave)</span>
-                                                </dt>
-                                                <dd className="font-semibold text-red-700 tabular-nums font-bold">
-                                                    {attendanceDisplayAllZero
-                                                        ? 0
-                                                        : attendanceBreakdown.unpaidLeave}
                                                 </dd>
                                             </div>
                                             <div className="flex justify-between gap-2 pt-2 items-baseline">
@@ -1293,33 +1111,6 @@ const GenerateSalaryPage = () => {
                                             <dt className="text-slate-600">Half days</dt>
                                             <dd className="font-semibold text-amber-700 tabular-nums">
                                                 {fz(v.halfDays)}
-                                            </dd>
-                                        </div>
-                                        <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
-                                            <dt className="text-slate-600">
-                                                <span className="text-xs block">Paid Half-Days</span>
-                                                <span className="text-[11px] text-slate-500">(paid leave + punch-based)</span>
-                                            </dt>
-                                            <dd className="font-semibold text-emerald-600 tabular-nums">
-                                                {fz(attendanceBreakdown.halfDayPaid)}
-                                            </dd>
-                                        </div>
-                                        <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
-                                            <dt className="text-slate-600">
-                                                <span className="text-xs block">Unpaid Half-Days</span>
-                                                <span className="text-[11px] text-slate-500">(unpaid leave)</span>
-                                            </dt>
-                                            <dd className="font-semibold text-red-600 tabular-nums">
-                                                {fz(attendanceBreakdown.halfDayUnpaid)}
-                                            </dd>
-                                        </div>
-                                        <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
-                                            <dt className="text-slate-600">
-                                                <span className="text-xs block">Unpaid Full Days</span>
-                                                <span className="text-[11px] text-slate-500">(unpaid leave)</span>
-                                            </dt>
-                                            <dd className="font-semibold text-red-700 tabular-nums font-bold">
-                                                {fz(attendanceBreakdown.unpaidLeave)}
                                             </dd>
                                         </div>
                                         <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
@@ -1453,40 +1244,6 @@ const GenerateSalaryPage = () => {
                                         </div>
                                     </div>
                                 </div>
-
-                                {/* Unpaid Leaves Section */}
-                                {calculation.processedDeductions.filter(
-                                    (d) => d.deduction_code?.includes('UNPAID_LEAVE') ||
-                                           d.deduction_name?.toLowerCase().includes('unpaid leave')
-                                ).length > 0 && (
-                                    <div className="bg-orange-50 rounded-lg p-5 shadow-sm">
-                                        <h4 className="font-semibold text-orange-800 mb-3 flex items-center">
-                                            <Calculator className="w-4 h-4 mr-2" /> Unpaid Leaves
-                                        </h4>
-                                        <div className="space-y-2 text-sm">
-                                            {calculation.processedDeductions
-                                                .filter((d) => d.deduction_code?.includes('UNPAID_LEAVE') ||
-                                                               d.deduction_name?.toLowerCase().includes('unpaid leave'))
-                                                .map((d, i) => (
-                                                    <div key={`unpaid-${i}`} className="flex justify-between">
-                                                        <span>{d.deduction_name}</span>
-                                                        <span>{formatCurrency(d.calculatedAmount)}</span>
-                                                    </div>
-                                                ))}
-                                            <div className="border-t border-orange-200 mt-2 pt-2 flex justify-between font-bold text-orange-900">
-                                                <span>Subtotal</span>
-                                                <span>
-                                                    {formatCurrency(
-                                                        calculation.processedDeductions
-                                                            .filter((d) => d.deduction_code?.includes('UNPAID_LEAVE') ||
-                                                                           d.deduction_name?.toLowerCase().includes('unpaid leave'))
-                                                            .reduce((sum, d) => sum + (Number(d.calculatedAmount) || 0), 0)
-                                                    )}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
                             </div>
 
                             <div className="flex justify-end gap-3 pt-4 flex-wrap">
@@ -1509,11 +1266,6 @@ const GenerateSalaryPage = () => {
                                     <div className="flex items-center gap-2 px-6 py-3 bg-gray-100 text-gray-500 rounded-lg border border-gray-300 text-sm font-medium cursor-not-allowed select-none">
                                         <Lock className="w-4 h-4" />
                                         Record Locked
-                                    </div>
-                                ) : isAfterEditDeadline ? (
-                                    <div className="flex items-center gap-2 px-6 py-3 bg-red-50 text-red-500 rounded-lg border border-red-300 text-sm font-medium cursor-not-allowed select-none">
-                                        <Lock className="w-4 h-4" />
-                                        Edit Deadline Passed (10th of following month)
                                     </div>
                                 ) : (
                                     <button

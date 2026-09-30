@@ -98,7 +98,7 @@ const iconMap = {
 
 function isDashboardRootPath(path) {
   const normalized = String(path || "").replace(/\/+$/, "");
-  return /^\/(?:(?:empcrm\/)?(?:sales|user|admin|service-head|accounts|hr|digital-marketing|director)-dashboard)$/.test(
+  return /^\/(?:(?:empcrm\/)?(?:sales|user|admin|service-head|accounts|hr|digital-marketing)-dashboard)$/.test(
     normalized.replace(/^\/+/, "/")
   );
 }
@@ -133,6 +133,10 @@ export default function SalesSidebar({
       .catch(() => {});
   }, []);
 
+  const toggleMenu = (name) => {
+    setOpenMenus((prev) => ({ ...prev, [name]: !prev[name] }));
+  };
+
   const handleLinkClick = () => {
     if (
       typeof window !== "undefined" &&
@@ -153,26 +157,14 @@ export default function SalesSidebar({
         const childActive = item.children.some((child) =>
           isPathActive(pathname, child.path)
         );
-        const isSubOpen =
-          openMenus[item.name] !== undefined
-            ? openMenus[item.name]
-            : childActive;
+        const isSubOpen = openMenus[item.name] ?? childActive;
         const groupActive = childActive;
 
         return (
           <li key={itemKey}>
             <button
               type="button"
-              onClick={() => {
-                const currentlyOpen =
-                  openMenus[item.name] !== undefined
-                    ? openMenus[item.name]
-                    : childActive;
-                setOpenMenus((prev) => ({
-                  ...prev,
-                  [item.name]: !currentlyOpen,
-                }));
-              }}
+              onClick={() => toggleMenu(item.name)}
               className={clsx(
                 "flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                 groupActive

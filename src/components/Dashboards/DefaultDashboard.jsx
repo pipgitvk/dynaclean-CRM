@@ -1,39 +1,60 @@
 // components/Dashboards/DefaultDashboard.jsx
+import ProfilePicUploader from "@/app/user-dashboard/ProfilePicUploader";
+import AttendanceTracker from "@/components/AttendanceTracker";
 import UpcomingTasks from "@/components/task/UpcomingTasks";
 import UpcomingLeads from "@/components/Leads/UpcommingLeads";
 import HrTargetVsCompletedChart from "@/components/empcrm/HrTargetVsCompletedChart";
 import HiringCandidatesFollowUpSection from "@/components/empcrm/hiring/HiringCandidatesFollowUpSection";
 import { canAccessHiringModule, canViewHrTargetChart } from "@/lib/hrTargetEligibleRoles";
+import FastCardsWidget from "@/components/FastCardsWidget";
 import TodayReportButton from "@/components/TodayReportButton";
+import HrTodayReportButton from "@/components/HrTodayReportButton";
 import LeaveApprovalButton from "@/components/LeaveApprovalButton";
-import ExpenseApprovalButton from "@/components/ExpenseApprovalButton";
 import UpcomingFollowupsWidget from "@/components/service/UpcomingFollowupsWidget";
-import DigitalMarketingQuickCards from "@/components/DigitalMarketingQuickCards";
-import TopBacklinksKeywordsCards from "@/components/digital-marketing/TopBacklinksKeywordsCards";
-import ScheduleVisitCard from "@/components/scheduleVisit/ScheduleVisitCard";
-import TeamProspectsQuickCard from "@/components/prospects/TeamProspectsQuickCard";
 
-const salesCard =
-  "flex min-h-0 flex-col rounded-xl border border-slate-100 bg-white p-4 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.08),0_2px_4px_-2px_rgba(0,0,0,0.05)] md:p-5";
-
-export default function DefaultDashboard({ user, reportingManager, counts }) {
+export default function DefaultDashboard({ user, counts }) {
   const showHrTargetChart = canViewHrTargetChart(user?.userRole);
   const showHrCandidatesFollowUp = canAccessHiringModule(user?.userRole);
-  const roleNorm = String(user?.userRole || "").trim().toUpperCase();
-  const isDigitalRole =
-    roleNorm.includes("DIGITAL") || roleNorm.includes("MARKETER");
+  const isHrRole = String(user?.userRole || "").trim() === "HR";
   const isEaRole = String(user?.userRole || "").trim() === "EA";
-  const isDesignEngineer = roleNorm === "DESIGN ENGINEER";
+  const welcomeNameClass = isHrRole ? "text-sky-600" : "text-green-700";
 
   return (
     <div className="space-y-4 md:space-y-6">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-6">
-        <TodayReportButton variant="sales" />
-        <LeaveApprovalButton variant="sales" />
-        <ExpenseApprovalButton variant="sales" />
-        <ScheduleVisitCard variant="sales" href="/user-dashboard/schedule-visits" />
-        {isDigitalRole && <DigitalMarketingQuickCards username={user.username} />}
-        <TeamProspectsQuickCard />
+      {/* Welcome, Attendance & Fast Cards */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
+        <div className="lg:col-span-2 bg-white rounded-xl shadow-md p-4 md:p-6">
+          <div className="flex flex-col gap-4">
+            {/* Profile pic + name */}
+            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+              <ProfilePicUploader user={user} />
+              <div className="space-y-2 flex-1">
+                <h1 className="text-3xl font-semibold">
+                  Welcome, <span className={welcomeNameClass}>{user.username}</span>
+                </h1>
+                <p className="text-gray-500 text-sm">Role: {user.userRole}</p>
+              </div>
+            </div>
+
+            {/* Buttons row - separate on mobile */}
+            <div className="flex flex-row gap-2 justify-start sm:justify-end">
+              <TodayReportButton />
+              <LeaveApprovalButton />
+            </div>
+
+            {/* Fast Cards */}
+            <div className="mt-4">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Fast Cards</p>
+              <FastCardsWidget />
+            </div>
+          </div>
+        </div>
+
+        <div
+          className={`bg-white rounded-xl shadow-md p-4 md:p-6 min-w-0 ${showHrTargetChart ? "" : "lg:col-span-1"}`}
+        >
+          <AttendanceTracker username={user.username} role={user.userRole} />
+        </div>
       </div>
 
       {showHrTargetChart && (
@@ -48,54 +69,20 @@ export default function DefaultDashboard({ user, reportingManager, counts }) {
         </div>
       )}
 
-      {isDigitalRole ? (
-        <div className="space-y-5">
-          <TopBacklinksKeywordsCards username={user.username} />
-          <div className={`${salesCard} min-h-[280px]`}>
-            <UpcomingTasks
-              leadSource={user.username}
-              compact
-              variant="sales"
-              dashboardPrefix="/digital-marketing-dashboard"
-            />
-          </div>
-        </div>
-      ) : (
-        <>
-          {/* Enquiry + Tasks grid - Enquiry hidden for Design Engineer */}
-          <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-12">
-            {!isDesignEngineer && (
-              <div className={`${salesCard} min-h-[380px] xl:col-span-8`}>
-                <UpcomingLeads
-                  leadSource={user.username}
-                  userRole={user.userRole}
-                  compact
-                  variant="sales"
-                  dashboardPrefix="/user-dashboard"
-                />
-              </div>
-            )}
-            <div className={`${salesCard} min-h-[280px] ${isDesignEngineer ? "xl:col-span-12" : "xl:col-span-4"}`}>
-              <UpcomingTasks
-                leadSource={user.username}
-                compact
-                variant="sales"
-                dashboardPrefix="/user-dashboard"
-              />
-            </div>
-          </div>
+      {/* Tasks */}
+      <div className="bg-white rounded-xl shadow-md">
+        <UpcomingTasks leadSource={user.username} />
+      </div>
 
-          {/* Upcoming Follow-ups - Hidden for EA role and Design Engineer */}
-          {!isEaRole && !isDesignEngineer && (
-            <UpcomingFollowupsWidget
-              username={user.username}
-              userRole={user.userRole}
-              variant="sales"
-              dashboardPrefix="/user-dashboard"
-            />
-          )}
-        </>
+      {/* Upcoming Follow-ups - Hidden for EA role */}
+      {!isEaRole && (
+        <UpcomingFollowupsWidget username={user.username} userRole={user.userRole} />
       )}
+
+      {/* Leads */}
+      <div className="bg-white rounded-xl shadow-md">
+        <UpcomingLeads leadSource={user.username} userRole={user.userRole} />
+      </div>
 
     </div>
   );

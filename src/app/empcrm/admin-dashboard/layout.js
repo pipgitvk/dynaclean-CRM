@@ -3,7 +3,7 @@ import getEmpCrmAdminSidebarMenuItems, {
   getShowBackToUserCrmForEmpCrmAdmin,
   getEmpCrmAdminBackButtonPath,
 } from "@/lib/getEmpCrmAdminSidebarMenuItems";
-import SalesLayoutShell from "@/components/layouts/SalesLayoutShell";
+import UserLayoutShell from "@/components/layouts/UserAdminLayoutShell";
 import IpGuard from "@/components/IpGuard";
 
 export default async function EmpCrmLayout({ children }) {
@@ -12,7 +12,7 @@ export default async function EmpCrmLayout({ children }) {
   const backButtonPath = await getEmpCrmAdminBackButtonPath();
 
   return (
-    <SalesLayoutShell
+    <UserLayoutShell
       menuItems={menuItems}
       // HR: only show “Back to user CRM” (hide “Back to CRM” to avoid 2 buttons)
       showBackButton={!showBackToUserCrm}
@@ -21,6 +21,6 @@ export default async function EmpCrmLayout({ children }) {
     >
       <IpGuard />
       {children}
-    </SalesLayoutShell>
+    </UserLayoutShell>
   );
 }

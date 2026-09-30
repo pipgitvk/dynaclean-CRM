@@ -86,7 +86,27 @@ export default function ExpenseTable({ rows, role, activeEmployeesList }) {
     return matchesSearch && matchesEmployee && matchesStatus && matchesDateRange;
   });
 
-  const isDirector = (role || "").toUpperCase() === "DIRECTOR";
+  const calculateTotals = (data) => {
+    let totalAmount = 0;
+    let approvedAmount = 0;
+
+    data.forEach((row) => {
+      totalAmount +=
+        Number(row.TicketCost || 0) +
+        Number(row.HotelCost || 0) +
+        Number(row.MealsCost || 0) +
+        Number(row.OtherExpenses || 0);
+      const isRejected = row.approval_status === "Rejected";
+      const rowApproved = Number(row.approved_amount || 0);
+      if (!isRejected && rowApproved > 0) {
+        approvedAmount += rowApproved;
+      }
+    });
+
+    return { totalAmount, approvedAmount };
+  };
+
+  const { totalAmount, approvedAmount } = calculateTotals(filteredRows);
 
   const getRowTotal = (row) =>
     Number(row.TicketCost || 0) +
@@ -96,81 +116,6 @@ export default function ExpenseTable({ rows, role, activeEmployeesList }) {
 
   const getApprovedValue = (row) =>
     row.approval_status === "Rejected" ? 0 : Number(row.approved_amount || 0);
-
-  const isBlankAmount = (value) =>
-    value == null || value === "" || Number.isNaN(Number(value)) || Number(value) <= 0;
-
-  const isBlankDate = (value) => !value || value === "0000-00-00";
-
-  const statusOf = (row) => (row.approval_status || "").toLowerCase();
-
-  const calculateTotals = (data) => {
-    const summary = {
-      totalAmount: 0,
-      totalCount: 0,
-      rejectedAmount: 0,
-      rejectedCount: 0,
-      approvedAmount: 0,
-      approvedCount: 0,
-      pendingApprovalAmount: 0,
-      pendingApprovalCount: 0,
-      pendingPaymentAmount: 0,
-      pendingPaymentCount: 0,
-      paidAmount: 0,
-      paidCount: 0,
-    };
-
-    data.forEach((row) => {
-      const uploaded = getRowTotal(row);
-      const approvedAmt = Number(row.approved_amount || 0);
-      const status = statusOf(row);
-
-      summary.totalAmount += uploaded;
-      summary.totalCount += 1;
-
-      if (status === "rejected") {
-        summary.rejectedAmount += uploaded;
-        summary.rejectedCount += 1;
-      }
-
-      if (status === "approved") {
-        summary.approvedAmount += approvedAmt > 0 ? approvedAmt : uploaded;
-        summary.approvedCount += 1;
-      }
-
-      if (status === "pending" && isBlankAmount(row.approved_amount)) {
-        summary.pendingApprovalAmount += uploaded;
-        summary.pendingApprovalCount += 1;
-      }
-
-      if (status === "approved" && isBlankDate(row.payment_date)) {
-        summary.pendingPaymentAmount += approvedAmt > 0 ? approvedAmt : uploaded;
-        summary.pendingPaymentCount += 1;
-      }
-
-      if (status === "approved" && !isBlankDate(row.payment_date)) {
-        summary.paidAmount += approvedAmt > 0 ? approvedAmt : uploaded;
-        summary.paidCount += 1;
-      }
-    });
-
-    return summary;
-  };
-
-  const {
-    totalAmount,
-    totalCount,
-    rejectedAmount,
-    rejectedCount,
-    approvedAmount,
-    approvedCount,
-    pendingApprovalAmount,
-    pendingApprovalCount,
-    pendingPaymentAmount,
-    pendingPaymentCount,
-    paidAmount,
-    paidCount,
-  } = calculateTotals(filteredRows);
 
   const handleSort = (key) => {
     setSortConfig((prev) =>
@@ -323,39 +268,19 @@ export default function ExpenseTable({ rows, role, activeEmployeesList }) {
   return (
     <div className="space-y-4">
       {/* Summary Cards */}
-      <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 ${isDirector ? "xl:grid-cols-6" : "xl:grid-cols-5"} gap-4 mb-4`}>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
         <div className="bg-white p-4 rounded-lg shadow border-l-4 border-blue-600">
-          <div className="text-sm text-gray-500 font-medium uppercase tracking-wider">Total</div>
+          <div className="text-sm text-gray-500 font-medium uppercase tracking-wider">Total Amount</div>
           <div className="text-2xl font-bold text-gray-800">₹{totalAmount.toFixed(2)}</div>
-          <div className="text-xs text-gray-500 mt-1">{totalCount} uploaded by employees</div>
-        </div>
-        <div className="bg-white p-4 rounded-lg shadow border-l-4 border-red-600">
-          <div className="text-sm text-gray-500 font-medium uppercase tracking-wider">Rejected</div>
-          <div className="text-2xl font-bold text-gray-800">₹{rejectedAmount.toFixed(2)}</div>
-          <div className="text-xs text-gray-500 mt-1">{rejectedCount} rejected</div>
         </div>
         <div className="bg-white p-4 rounded-lg shadow border-l-4 border-green-600">
-          <div className="text-sm text-gray-500 font-medium uppercase tracking-wider">Approved</div>
+          <div className="text-sm text-gray-500 font-medium uppercase tracking-wider">Approved Amount</div>
           <div className="text-2xl font-bold text-gray-800">₹{approvedAmount.toFixed(2)}</div>
-          <div className="text-xs text-gray-500 mt-1">{approvedCount} approved</div>
         </div>
         <div className="bg-white p-4 rounded-lg shadow border-l-4 border-yellow-600">
-          <div className="text-sm text-gray-500 font-medium uppercase tracking-wider">Pending approval</div>
-          <div className="text-2xl font-bold text-gray-800">₹{pendingApprovalAmount.toFixed(2)}</div>
-          <div className="text-xs text-gray-500 mt-1">{pendingApprovalCount} pending, amount blank</div>
+          <div className="text-sm text-gray-500 font-medium uppercase tracking-wider">Pending Amount</div>
+          <div className="text-2xl font-bold text-gray-800">₹{(totalAmount - approvedAmount).toFixed(2)}</div>
         </div>
-        <div className="bg-white p-4 rounded-lg shadow border-l-4 border-orange-600">
-          <div className="text-sm text-gray-500 font-medium uppercase tracking-wider">Pending to payment</div>
-          <div className="text-2xl font-bold text-gray-800">₹{pendingPaymentAmount.toFixed(2)}</div>
-          <div className="text-xs text-gray-500 mt-1">{pendingPaymentCount} approved, not paid</div>
-        </div>
-        {isDirector && (
-          <div className="bg-white p-4 rounded-lg shadow border-l-4 border-teal-600">
-            <div className="text-sm text-gray-500 font-medium uppercase tracking-wider">Paid</div>
-            <div className="text-2xl font-bold text-gray-800">₹{paidAmount.toFixed(2)}</div>
-            <div className="text-xs text-gray-500 mt-1">{paidCount} paid</div>
-          </div>
-        )}
         {selectedExpenseIds.size > 0 && (
           <div className="bg-white p-4 rounded-lg shadow border-l-4 border-purple-600">
             <div className="flex justify-between items-start">
@@ -461,7 +386,6 @@ export default function ExpenseTable({ rows, role, activeEmployeesList }) {
               <th onClick={() => handleSort("Tolocation")} className="p-3 cursor-pointer select-none">To<SortIcon column="Tolocation" /></th>
               <th onClick={() => handleSort("Total")} className="p-3 cursor-pointer select-none">Total<SortIcon column="Total" /></th>
               <th onClick={() => handleSort("approved_amount")} className="p-3 cursor-pointer select-none">Approved Amt<SortIcon column="approved_amount" /></th>
-              <th className="p-3">Approved By</th>
               <th onClick={() => handleSort("payment_date")} className="p-3 cursor-pointer select-none">Payment Date<SortIcon column="payment_date" /></th>
               <th onClick={() => handleSort("approval_status")} className="p-3 cursor-pointer select-none">Status<SortIcon column="approval_status" /></th>
               <th className="p-3">Linked Statements</th>
@@ -504,7 +428,6 @@ export default function ExpenseTable({ rows, role, activeEmployeesList }) {
                         ? "-"
                         : `₹${Number(row.approved_amount).toFixed(2)}`}
                     </td>
-                    <td className="p-3">{row.approved_by || "-"}</td>
                     <td className="p-3">
                       {row.payment_date && row.payment_date !== "0000-00-00"
                         ? dayjs(row.payment_date).format("DD MMM YYYY")
@@ -643,9 +566,6 @@ export default function ExpenseTable({ rows, role, activeEmployeesList }) {
                 !(Number(row.approved_amount) > 0)
                   ? "-"
                   : `₹${Number(row.approved_amount).toFixed(2)}`}
-              </div>
-              <div>
-                <strong>Approved By:</strong> {row.approved_by || "-"}
               </div>
               <div>
                 <strong>Payment Date:</strong>{" "}

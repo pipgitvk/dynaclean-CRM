@@ -1,5 +1,4 @@
 import { getDbConnection } from "@/lib/db";
-import { buildGemCustomerScopeWhere } from "@/lib/dataScope";
 import { NextResponse } from "next/server";
 
 export async function GET(request) {
@@ -13,15 +12,13 @@ export async function GET(request) {
   try {
     const connection = await getDbConnection();
 
-    const gemScope = buildGemCustomerScopeWhere({ username, tableAlias: "c" });
-
-    // Count new status leads (same scope as GEM customers page)
+    // Count new status leads
     const [newStatusRows] = await connection.execute(
       `SELECT COUNT(*) as count
       FROM customers c
-      WHERE ${gemScope.sql}
+      WHERE (c.lead_source = ? OR c.sales_representative = ? OR c.assigned_to = ?)
         AND TRIM(LOWER(c.status)) = 'new'`,
-      gemScope.params
+      [username, username, username]
     );
 
     const newStatusCount = newStatusRows[0]?.count || 0;
@@ -37,10 +34,10 @@ export async function GET(request) {
               FROM customers_followup 
               WHERE customer_id = c.customer_id
           )
-      WHERE ${gemScope.sql}
+      WHERE (c.lead_source = ? OR c.sales_representative = ? OR c.assigned_to = ?)
         AND c.status != 'DENIED'
       ORDER BY cf.next_followup_date ASC`,
-      gemScope.params
+      [username, username, username]
     );
 
     return NextResponse.json({

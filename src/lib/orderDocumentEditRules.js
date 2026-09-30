@@ -2,13 +2,6 @@ export const MAX_FILES_PER_ORDER_FIELD = 5;
 
 const HOURS_24_MS = 24 * 60 * 60 * 1000;
 
-export function countStoredOrderFiles(currentFileValue = "") {
-  return String(currentFileValue || "")
-    .split(",")
-    .map((url) => url.trim())
-    .filter(Boolean).length;
-}
-
 export function isBeforeDispatch(order) {
   return Number(order?.dispatch_status) !== 1;
 }
@@ -35,17 +28,12 @@ export function canEditDeliveryProof(order) {
   return Date.now() - deliveredAt.getTime() <= HOURS_24_MS;
 }
 
-export function canEditOrderDocumentField(order, fieldKey, currentFileValue = "") {
+export function canEditOrderDocumentField(order, fieldKey) {
   switch (fieldKey) {
     case "ewaybill_file":
     case "einvoice_file":
     case "report_file":
-      // Allow adding more files until max (even after dispatch)
-      return (
-        countStoredOrderFiles(currentFileValue) <
-        getMaxFilesForField(fieldKey)
-      );
-      
+      return isBeforeDispatch(order);
     case "deliverchallan":
       return isBeforeDelivered(order);
     case "delivery_proof":
@@ -58,20 +46,14 @@ export function canEditOrderDocumentField(order, fieldKey, currentFileValue = ""
   }
 }
 
-export function getOrderDocumentEditBlockReason(order, fieldKey, currentFileValue = "") {
-  if (canEditOrderDocumentField(order, fieldKey, currentFileValue)) return null;
+export function getOrderDocumentEditBlockReason(order, fieldKey) {
+  if (canEditOrderDocumentField(order, fieldKey)) return null;
 
   switch (fieldKey) {
     case "ewaybill_file":
     case "einvoice_file":
-    case "report_file": {
-      const max = getMaxFilesForField(fieldKey);
-      if (countStoredOrderFiles(currentFileValue) >= max) {
-        return `Maximum ${max} files allowed for this document.`;
-      }
-      return "Upload not allowed.";
-    }
-      
+    case "report_file":
+      return "Cannot edit after dispatch.";
     case "deliverchallan":
       return "Cannot edit after delivery is marked complete.";
     case "delivery_proof":

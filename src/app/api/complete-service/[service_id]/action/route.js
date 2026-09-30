@@ -230,14 +230,18 @@ export async function POST(request, context) {
       ];
 
       const placeholders = upsertColumns.map(() => "?").join(", ");
+      const updateSet = upsertColumns
+        .filter((c) => c !== "service_id")
+        .map((c) => `${c} = VALUES(${c})`)
+        .join(", ");
 
-      console.log("🛠️ Inserting new service_reports row", { service_id: serviceId, serviceDate });
+      console.log("🛠️ Upserting into service_reports", { service_id: serviceId, serviceDate });
 
-      const [reportInsert] = await conn.execute(
-        `INSERT INTO service_reports (${upsertColumns.join(", ")}) VALUES (${placeholders})`,
+      await conn.execute(
+        `INSERT INTO service_reports (${upsertColumns.join(", ")}) VALUES (${placeholders}) ON DUPLICATE KEY UPDATE ${updateSet}`,
         upsertValues
       );
-      console.log("✅ service_reports inserted successfully | report id:", reportInsert.insertId);
+      console.log("✅ service_reports upserted successfully");
 
       // Mark installation report flag when it's an installation submission
       if (serviceType === "INSTALLATION" && status === "COMPLETED") {

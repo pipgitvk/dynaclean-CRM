@@ -2,7 +2,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
-import { dbExecute } from "@/lib/db";
+import { dbExecute, isDbConnectionError } from "@/lib/db";
 import { cacheGetOrSet, cacheDelete } from "@/lib/cache";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret";
@@ -55,7 +55,9 @@ export async function GET() {
 
     return NextResponse.json(userData);
   } catch (err) {
-    console.error("JWT decode or DB error:", err);
+    if (!isDbConnectionError(err)) {
+      console.error("JWT decode or DB error:", err);
+    }
     return NextResponse.json({ error: "Invalid token" }, { status: 401 });
   }
 }
