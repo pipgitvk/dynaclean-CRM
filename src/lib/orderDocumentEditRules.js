@@ -2,6 +2,13 @@ export const MAX_FILES_PER_ORDER_FIELD = 5;
 
 const HOURS_24_MS = 24 * 60 * 60 * 1000;
 
+export function countStoredOrderFiles(currentFileValue = "") {
+  return String(currentFileValue || "")
+    .split(",")
+    .map((url) => url.trim())
+    .filter(Boolean).length;
+}
+
 export function isBeforeDispatch(order) {
   return Number(order?.dispatch_status) !== 1;
 }
@@ -29,18 +36,15 @@ export function canEditDeliveryProof(order) {
 }
 
 export function canEditOrderDocumentField(order, fieldKey, currentFileValue = "") {
-  // Check if files are already uploaded
-  const hasFiles = String(currentFileValue || "").trim().length > 0;
-  
   switch (fieldKey) {
     case "ewaybill_file":
     case "einvoice_file":
     case "report_file":
-      // If file is already uploaded, cannot edit (non-editable once uploaded)
-      if (hasFiles) return false;
-      
-      // If file is not uploaded yet, can always upload (even after dispatch)
-      return true;
+      // Allow adding more files until max (even after dispatch)
+      return (
+        countStoredOrderFiles(currentFileValue) <
+        getMaxFilesForField(fieldKey)
+      );
       
     case "deliverchallan":
       return isBeforeDelivered(order);
@@ -57,17 +61,16 @@ export function canEditOrderDocumentField(order, fieldKey, currentFileValue = ""
 export function getOrderDocumentEditBlockReason(order, fieldKey, currentFileValue = "") {
   if (canEditOrderDocumentField(order, fieldKey, currentFileValue)) return null;
 
-  const hasFiles = String(currentFileValue || "").trim().length > 0;
-
   switch (fieldKey) {
     case "ewaybill_file":
     case "einvoice_file":
-    case "report_file":
-      // Only reason for blocking: file is already uploaded
-      if (hasFiles) {
-        return "Cannot edit once uploaded.";
+    case "report_file": {
+      const max = getMaxFilesForField(fieldKey);
+      if (countStoredOrderFiles(currentFileValue) >= max) {
+        return `Maximum ${max} files allowed for this document.`;
       }
       return "Upload not allowed.";
+    }
       
     case "deliverchallan":
       return "Cannot edit after delivery is marked complete.";

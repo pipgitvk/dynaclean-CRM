@@ -218,7 +218,7 @@ export default function OrderDetails({ data }) {
       {/* File Downloads */}
       <div className="mt-8">
         <p className="text-xs text-gray-500 mb-3">
-          E-way bill, e-invoice & invoice editable before dispatch (up to 5 invoice PDFs).
+          Invoice, e-way bill & e-invoice: up to 5 files each — add more anytime until limit.
           Delivery challan before delivered. Delivery proof within 24 hours of delivery.
         </p>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
