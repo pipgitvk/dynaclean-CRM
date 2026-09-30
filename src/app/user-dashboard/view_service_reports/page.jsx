@@ -3,6 +3,7 @@
 import { getDbConnection } from "@/lib/db"; // DB connection utility
 import ServiceTable from "@/components/services/ServiceTable"; // Import the new Table Component
 import { getSessionPayload } from "@/lib/auth";
+import { ensureServiceReportStepsTable } from "@/lib/ensureServiceReportStepsTable";
 
 // ✅ Disable caching to always fetch fresh data from database
 export const revalidate = 0;
@@ -21,10 +22,15 @@ export default async function UserViewServiceReportsPage() {
   console.log("User dashboard - role: ", role);
 
   try {
+    await ensureServiceReportStepsTable();
     const conn = await getDbConnection();
     const sql = `
       SELECT
         sr.*,
+        srs.video_360,
+        srs.video_problem,
+        srs.video_damaged,
+        srs.video_completion,
         wp.customer_name AS customer_name_from_wp,
         wp.contact_person AS contact_person_from_wp,
         wp.installed_address AS installed_address_from_wp,
@@ -47,6 +53,7 @@ export default async function UserViewServiceReportsPage() {
           ELSE 0
         END AS view_status
       FROM service_records sr
+      LEFT JOIN service_report_steps srs ON srs.service_id = sr.service_id
       LEFT JOIN warranty_products wp ON TRIM(sr.serial_number) COLLATE utf8mb4_unicode_ci = TRIM(wp.serial_number) COLLATE utf8mb4_unicode_ci
       ORDER BY sr.service_id DESC;
     `;

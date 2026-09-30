@@ -250,7 +250,8 @@ export default function ServiceTable({ serviceRecords, role }) {
     { key: "video_completion", label: "Completion" },
   ];
 
-  const showStepVideos = dashboardPath === "admin-dashboard";
+  const showStepVideos =
+    dashboardPath === "admin-dashboard" || dashboardPath === "user-dashboard";
 
   const renderStepVideos = (record) => {
     if (String(record.service_type || "").trim().toUpperCase() !== "COMPLAINT") {
