@@ -2,14 +2,35 @@ import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { ensureAddedAccessoryDispatchRows } from "@/lib/seedAddedAccessoryDispatch";
+import { isSalesRole } from "@/lib/isSalesRole";
+
+const DISPATCH_VIEW_ROLES = [
+  "WAREHOUSE INCHARGE",
+  "SUPERADMIN",
+  "TEAM LEADER",
+  "ADMIN",
+  "DIRECTOR",
+  "ACCOUNTANT",
+  "BACK OFFICE",
+  "GEM PORTAL",
+];
+
+function canViewDispatchData(role) {
+  const roleUpper = String(role || "").toUpperCase();
+  return (
+    DISPATCH_VIEW_ROLES.includes(roleUpper) ||
+    isSalesRole(role) ||
+    roleUpper === "GEM" ||
+    roleUpper.includes("GEM")
+  );
+}
 
 export async function GET(req) {
   try {
     const tokenPayload = await getSessionPayload();
     if (!tokenPayload) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const role = tokenPayload.role;
-    const roleUpperDispatch = String(role).toUpperCase();
-    if (!["WAREHOUSE INCHARGE", "SUPERADMIN", "TEAM LEADER", "ADMIN", "DIRECTOR", "ACCOUNTANT"].includes(roleUpperDispatch)) {
+    if (!canViewDispatchData(role)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

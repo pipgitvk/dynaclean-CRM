@@ -667,12 +667,12 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                 </Link>
               </>
             )}
-            {(isWarehouse || isAdmin || isTeamLeader) &&
+            {canViewSales &&
               hasBooking &&
               dispatchStatus === 1 && (
                 <>
                   <Link
-                    href={`/user-dashboard/order/dispatch/view/${r.order_id}`}
+                    href={`/sales-dashboard/order/dispatch/view/${r.order_id}`}
                     className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
                     title="View Dispatch"
                     onClick={(e) => e.stopPropagation()}

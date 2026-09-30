@@ -2712,7 +2712,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                 onOpen={() => setPhotosOpen(true)}
               />
             )}
-            {(isWarehouse || canManageReturns) &&
+            {(isWarehouse || canManageReturns || canViewSales) &&
               hasBooking &&
               dispatchStatus === 1 && (
                 <>

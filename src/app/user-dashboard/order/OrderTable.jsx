@@ -20,6 +20,7 @@ import dayjs from "dayjs";
 import DeleteButton from "@/components/accounts/DeleteButton";
 import toast from "react-hot-toast";
 import ReturnInitiateMenuItem from "@/components/orders/ReturnInitiateMenuItem";
+import { isSalesRole } from "@/lib/isSalesRole";
 
 // 👻 A sleek skeleton loader for a modern feel
 const SkeletonLoader = () => (
@@ -696,16 +697,18 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
   const popRef = useRef(null);
   const role = (userRole || "").toString().trim().toLowerCase();
   const isGem = role.includes("gem");
-  const canViewSales = [
-    "back office",
-    "accountant",
-    "admin",
-    "sales",
-    "warehouse incharge",
-    "gem portal",
-    "team leader",
-    "service head",
-  ].includes(role) || isGem;
+  const canViewSales =
+    isSalesRole(userRole) ||
+    [
+      "back office",
+      "accountant",
+      "admin",
+      "warehouse incharge",
+      "gem portal",
+      "team leader",
+      "service head",
+    ].includes(role) ||
+    isGem;
   const isAdmin = role === "admin";
   const isAccountant = role.includes("accountant");
   const isTeamLeader = role === "team leader";
@@ -768,6 +771,17 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
               <ClipboardList size={16} />
               <span>View Sales</span>
             </Link>
+            {hasBooking && dispatchStatus === 1 && (
+              <Link
+                href={`/user-dashboard/order/dispatch/view/${r.order_id}`}
+                className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700 w-full block"
+                title="View Dispatch"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <Search size={16} />
+                <span>View Dispatch</span>
+              </Link>
+            )}
             {!isGem && (
               <>
                 {["accountant", "admin", "team leader"].includes(role) &&
@@ -841,19 +855,6 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                     <span>Dispatch</span>
                   </Link>
                 )}
-                {(isWarehouse || canManageReturns) &&
-                  hasBooking &&
-                  dispatchStatus === 1 && (
-                    <Link
-                      href={`/user-dashboard/order/dispatch/view/${r.order_id}`}
-                      className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700 w-full block"
-                      title="View Dispatch"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <Search size={16} />
-                      <span>View Dispatch</span>
-                    </Link>
-                  )}
                 {["accountant", "admin"].includes(role) && r.report_file && (
                   <div className="px-3 py-2 w-full block" onClick={(e) => e.stopPropagation()}>
                     <EditPaymentButton order={r} />
