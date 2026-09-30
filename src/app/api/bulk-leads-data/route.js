@@ -55,6 +55,10 @@ export async function GET(request) {
         c.stage,
         c.tags,
         c.lead_source,
+        c.service_lead_source,
+        c.gem_lead_source,
+        c.assigned_to,
+        c.sales_representative,
         c.lead_campaign,
         c.products_interest,
         c.date_created

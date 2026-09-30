@@ -1,8 +1,48 @@
 "use client";
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { format } from "date-fns";
 import { Loader2, Users, CheckSquare, Square, ChevronDown, Search } from "lucide-react";
 import { NOTES_LANGUAGE_OPTIONS } from "@/constants/notesLanguageOptions";
+
+const LEAD_TYPE_OPTIONS = [
+    { key: "all", label: "Select", field: null },
+    { key: "sales", label: "Sales", field: "lead_source" },
+    { key: "service", label: "Service", field: "service_lead_source" },
+    { key: "gem", label: "GEM", field: "gem_lead_source" },
+];
+
+function hasLeadValue(value) {
+    return value != null && String(value).trim() !== "";
+}
+
+function getLeadSourceDisplay(customer, leadType) {
+    const config = LEAD_TYPE_OPTIONS.find((t) => t.key === leadType);
+    if (!config?.field) {
+        const parts = [];
+        if (hasLeadValue(customer.lead_source)) parts.push(`Sales: ${String(customer.lead_source).trim()}`);
+        if (hasLeadValue(customer.service_lead_source)) parts.push(`Service: ${String(customer.service_lead_source).trim()}`);
+        if (hasLeadValue(customer.gem_lead_source)) parts.push(`GEM: ${String(customer.gem_lead_source).trim()}`);
+        return parts.length ? parts.join(" | ") : "—";
+    }
+    const value = customer[config.field];
+    return hasLeadValue(value) ? String(value).trim() : "—";
+}
+
+function getCustomerLeadTypes(customer) {
+    const types = [];
+    if (hasLeadValue(customer.lead_source)) types.push("sales");
+    if (hasLeadValue(customer.service_lead_source)) types.push("service");
+    if (hasLeadValue(customer.gem_lead_source)) types.push("gem");
+    return types;
+}
+
+function customerMatchesLeadType(customer, leadType) {
+    if (leadType === "all") {
+        return getCustomerLeadTypes(customer).length > 0;
+    }
+    const config = LEAD_TYPE_OPTIONS.find((t) => t.key === leadType);
+    return config?.field ? hasLeadValue(customer[config.field]) : false;
+}
 
 // Searchable Dropdown Component
 function SearchableDropdown({ options, value, onChange, placeholder, className = "" }) {
@@ -60,7 +100,7 @@ function SearchableDropdown({ options, value, onChange, placeholder, className =
                             />
                         </div>
                     </div>
-                    
+
                     <div className="max-h-48 overflow-y-auto">
                         <div
                             className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-gray-500"
@@ -90,46 +130,116 @@ function SearchableDropdown({ options, value, onChange, placeholder, className =
 }
 
 export default function BulkReassignTable() {
-    const [customers, setCustomers] = useState([]);
-    const [employees, setEmployees] = useState([]);
+    const [allCustomers, setAllCustomers] = useState([]);
     const [selectedCustomers, setSelectedCustomers] = useState(new Set());
     const [loading, setLoading] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [focusedIndex, setFocusedIndex] = useState(0);
     const tableRef = useRef(null);
 
-    // Filters
+    const [hasApplied, setHasApplied] = useState(false);
+    const [leadTypeFilter, setLeadTypeFilter] = useState("all");
+    const [leadSourceFilter, setLeadSourceFilter] = useState("");
+    const [appliedLeadType, setAppliedLeadType] = useState("all");
+    const [appliedLeadSource, setAppliedLeadSource] = useState("");
+
     const [filters, setFilters] = useState({
         status: "",
         tags: "",
         stage: "",
-        lead_source: "",
         lead_campaign: "",
         products_interest: "",
         notes_language: "",
     });
 
-    // Target employee for reassignment
+    const [employees, setEmployees] = useState([]);
     const [targetEmployee, setTargetEmployee] = useState("");
+    const [bulkLeadType, setBulkLeadType] = useState("sales");
 
-    // Fetch employees on mount
-    useEffect(() => {
-        fetchEmployees();
-    }, []);
+    const activeLeadTypeConfig = LEAD_TYPE_OPTIONS.find((t) => t.key === leadTypeFilter) || LEAD_TYPE_OPTIONS[0];
+    const appliedLeadTypeConfig = LEAD_TYPE_OPTIONS.find((t) => t.key === appliedLeadType) || LEAD_TYPE_OPTIONS[0];
+    const bulkType = appliedLeadType === "all" ? bulkLeadType : appliedLeadType;
 
-    const fetchEmployees = async () => {
-        try {
-            const response = await fetch("/api/lead-sources");
-            const data = await response.json();
-            if (data.success) {
-                setEmployees(data.employees);
-            }
-        } catch (error) {
-            console.error("Error fetching employees:", error);
+    // All: one row per assignment (Sales / Service / GEM). Other filters: one row if that column is set.
+    const displayRows = useMemo(() => {
+        if (!hasApplied) return [];
+
+        const rows = [];
+
+        if (appliedLeadType === "all") {
+            allCustomers.forEach((customer) => {
+                getCustomerLeadTypes(customer).forEach((typeKey) => {
+                    rows.push({
+                        customer,
+                        typeKey,
+                        rowKey: `${customer.customer_id}-${typeKey}`,
+                    });
+                });
+            });
+            return rows;
         }
-    };
 
-    const fetchCustomers = async () => {
+        const sourceField = appliedLeadTypeConfig.field;
+        allCustomers.forEach((customer) => {
+            if (!customerMatchesLeadType(customer, appliedLeadType)) return;
+            if (appliedLeadSource && sourceField) {
+                const value = customer[sourceField];
+                if (!hasLeadValue(value) || String(value).trim() !== appliedLeadSource) return;
+            }
+            rows.push({
+                customer,
+                typeKey: appliedLeadType,
+                rowKey: `${customer.customer_id}-${appliedLeadType}`,
+            });
+        });
+        return rows;
+    }, [allCustomers, appliedLeadType, appliedLeadSource, appliedLeadTypeConfig.field, hasApplied]);
+
+    const visibleCustomerIds = useMemo(
+        () => [...new Set(displayRows.map((row) => row.customer.customer_id))],
+        [displayRows],
+    );
+
+    const allVisibleSelected =
+        visibleCustomerIds.length > 0 &&
+        visibleCustomerIds.every((id) => selectedCustomers.has(id));
+
+    const [filterLeadSources, setFilterLeadSources] = useState([]);
+
+    useEffect(() => {
+        const fetchLeadSources = async (type) => {
+            try {
+                const response = await fetch(`/api/lead-sources?type=${type}`);
+                const data = await response.json();
+                if (data.success) return data.employees || [];
+            } catch (error) {
+                console.error("Error fetching lead sources:", error);
+            }
+            return [];
+        };
+
+        if (leadTypeFilter === "all") {
+            setFilterLeadSources([]);
+        } else {
+            fetchLeadSources(leadTypeFilter).then(setFilterLeadSources);
+        }
+    }, [leadTypeFilter]);
+
+    useEffect(() => {
+        const fetchEmployees = async () => {
+            try {
+                const response = await fetch(`/api/lead-sources?type=${bulkType}`);
+                const data = await response.json();
+                if (data.success) setEmployees(data.employees || []);
+            } catch (error) {
+                console.error("Error fetching employees:", error);
+            }
+        };
+        fetchEmployees();
+        setTargetEmployee("");
+    }, [bulkType]);
+
+    const handleApplyFilters = async () => {
         setLoading(true);
         try {
             const params = new URLSearchParams();
@@ -141,8 +251,11 @@ export default function BulkReassignTable() {
             const data = await response.json();
 
             if (data.success) {
-                setCustomers(data.customers);
-                setSelectedCustomers(new Set()); // Clear selection on new fetch
+                setAllCustomers(data.customers || []);
+                setAppliedLeadType(leadTypeFilter);
+                setAppliedLeadSource(leadSourceFilter);
+                setHasApplied(true);
+                setSelectedCustomers(new Set());
                 setFocusedIndex(0);
             }
         } catch (error) {
@@ -153,11 +266,15 @@ export default function BulkReassignTable() {
         }
     };
 
+    useEffect(() => {
+        setLeadSourceFilter("");
+    }, [leadTypeFilter]);
+
     const handleSelectAll = () => {
-        if (selectedCustomers.size === customers.length) {
+        if (allVisibleSelected) {
             setSelectedCustomers(new Set());
         } else {
-            setSelectedCustomers(new Set(customers.map(c => c.customer_id)));
+            setSelectedCustomers(new Set(visibleCustomerIds));
         }
     };
 
@@ -172,12 +289,12 @@ export default function BulkReassignTable() {
     };
 
     const handleKeyDown = useCallback((e) => {
-        if (customers.length === 0) return;
+        if (displayRows.length === 0) return;
 
         switch (e.key) {
             case "ArrowDown":
                 e.preventDefault();
-                setFocusedIndex(prev => Math.min(prev + 1, customers.length - 1));
+                setFocusedIndex(prev => Math.min(prev + 1, displayRows.length - 1));
                 break;
             case "ArrowUp":
                 e.preventDefault();
@@ -185,8 +302,8 @@ export default function BulkReassignTable() {
                 break;
             case " ":
                 e.preventDefault();
-                if (customers[focusedIndex]) {
-                    toggleCustomerSelection(customers[focusedIndex].customer_id);
+                if (displayRows[focusedIndex]) {
+                    toggleCustomerSelection(displayRows[focusedIndex].customer.customer_id);
                 }
                 break;
             case "a":
@@ -196,7 +313,7 @@ export default function BulkReassignTable() {
                 }
                 break;
         }
-    }, [customers, focusedIndex]);
+    }, [displayRows, focusedIndex]);
 
     useEffect(() => {
         const table = tableRef.current;
@@ -217,8 +334,9 @@ export default function BulkReassignTable() {
             return;
         }
 
+        const typeLabel = LEAD_TYPE_OPTIONS.find((t) => t.key === bulkType)?.label || "Sales";
         const confirmed = confirm(
-            `Are you sure you want to reassign ${selectedCustomers.size} lead(s) to ${targetEmployee}?`
+            `Are you sure you want to reassign ${selectedCustomers.size} ${typeLabel} lead(s) to ${targetEmployee}?`
         );
 
         if (!confirmed) return;
@@ -231,6 +349,7 @@ export default function BulkReassignTable() {
                 body: JSON.stringify({
                     customer_ids: Array.from(selectedCustomers),
                     employee_username: targetEmployee,
+                    lead_type: bulkType,
                 }),
             });
 
@@ -238,8 +357,7 @@ export default function BulkReassignTable() {
 
             if (data.success) {
                 alert(data.message);
-                // Refresh the customer list
-                fetchCustomers();
+                handleApplyFilters();
                 setTargetEmployee("");
             } else {
                 alert(`Error: ${data.error}`);
@@ -252,9 +370,12 @@ export default function BulkReassignTable() {
         }
     };
 
+    const leadSourceColumnLabel = appliedLeadType === "all"
+        ? "Lead Source"
+        : `${appliedLeadTypeConfig.label} Lead Source`;
+
     return (
         <div className="space-y-6">
-            {/* Filter Section */}
             <div className="bg-white p-6 rounded-lg shadow-md">
                 <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                     <Users className="w-5 h-5" />
@@ -262,6 +383,21 @@ export default function BulkReassignTable() {
                 </h3>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Lead Type</label>
+                        <select
+                            value={leadTypeFilter}
+                            onChange={(e) => setLeadTypeFilter(e.target.value)}
+                            className="border rounded px-3 py-2 w-full"
+                        >
+                            {LEAD_TYPE_OPTIONS.map((option) => (
+                                <option key={option.key} value={option.key}>
+                                    {option.label}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
                     <select
                         value={filters.status}
                         onChange={(e) => setFilters({ ...filters, status: e.target.value })}
@@ -339,17 +475,23 @@ export default function BulkReassignTable() {
                         ))}
                     </select>
 
-                    <SearchableDropdown
-                        options={employees}
-                        value={filters.lead_source}
-                        onChange={(value) => setFilters({ ...filters, lead_source: value })}
-                        placeholder="All Lead Sources"
-                        className="w-full"
-                    />
+                    {leadTypeFilter !== "all" ? (
+                        <SearchableDropdown
+                            options={filterLeadSources}
+                            value={leadSourceFilter}
+                            onChange={setLeadSourceFilter}
+                            placeholder={`All ${activeLeadTypeConfig.label} Lead Sources`}
+                            className="w-full"
+                        />
+                    ) : (
+                        <select disabled className="border rounded px-3 py-2 text-gray-400 w-full">
+                            <option>Select Sales / Service / GEM to filter lead source</option>
+                        </select>
+                    )}
                 </div>
 
                 <button
-                    onClick={fetchCustomers}
+                    onClick={handleApplyFilters}
                     disabled={loading}
                     className="w-full md:w-auto px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
                 >
@@ -358,15 +500,34 @@ export default function BulkReassignTable() {
                 </button>
             </div>
 
-            {/* Bulk Action Section */}
-            {customers.length > 0 && (
+            {hasApplied && displayRows.length > 0 && (
                 <div className="bg-white p-6 rounded-lg shadow-md">
                     <h3 className="text-lg font-semibold mb-4">Bulk Reassignment</h3>
 
                     <div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
+                        {appliedLeadType === "all" && (
+                            <div className="flex-1">
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Lead Type to Change
+                                </label>
+                                <select
+                                    value={bulkLeadType}
+                                    onChange={(e) => {
+                                        setBulkLeadType(e.target.value);
+                                        setTargetEmployee("");
+                                    }}
+                                    className="w-full border rounded px-3 py-2"
+                                >
+                                    <option value="sales">Sales</option>
+                                    <option value="service">Service</option>
+                                    <option value="gem">GEM</option>
+                                </select>
+                            </div>
+                        )}
+
                         <div className="flex-1">
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Select Target Employee
+                                New {LEAD_TYPE_OPTIONS.find((t) => t.key === bulkType)?.label} Lead Source
                             </label>
                             <SearchableDropdown
                                 options={employees}
@@ -379,7 +540,7 @@ export default function BulkReassignTable() {
 
                         <div className="flex-1">
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Selected: {selectedCustomers.size} / {customers.length}
+                                Selected: {selectedCustomers.size} / {visibleCustomerIds.length}
                             </label>
                             <button
                                 onClick={handleBulkReassign}
@@ -403,8 +564,7 @@ export default function BulkReassignTable() {
                 </div>
             )}
 
-            {/* Customer Table */}
-            {customers.length > 0 && (
+            {hasApplied && displayRows.length > 0 && (
                 <div
                     ref={tableRef}
                     tabIndex={0}
@@ -415,15 +575,15 @@ export default function BulkReassignTable() {
                             onClick={handleSelectAll}
                             className="flex items-center gap-2 px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded transition-colors"
                         >
-                            {selectedCustomers.size === customers.length ? (
+                            {allVisibleSelected ? (
                                 <CheckSquare className="w-5 h-5" />
                             ) : (
                                 <Square className="w-5 h-5" />
                             )}
-                            {selectedCustomers.size === customers.length ? "Deselect All" : "Select All"}
+                            {allVisibleSelected ? "Deselect All" : "Select All"}
                         </button>
                         <span className="text-sm text-gray-600">
-                            Total: {customers.length} leads
+                            Showing: {displayRows.length} rows ({visibleCustomerIds.length} customers) / {allCustomers.length} loaded
                         </span>
                     </div>
 
@@ -438,7 +598,10 @@ export default function BulkReassignTable() {
                                         Customer
                                     </th>
                                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">
-                                        Assigned To
+                                        Lead Type
+                                    </th>
+                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">
+                                        {leadSourceColumnLabel}
                                     </th>
                                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">
                                         Status
@@ -455,9 +618,14 @@ export default function BulkReassignTable() {
                                 </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200">
-                                {customers.map((customer, index) => (
+                                {displayRows.map((row, index) => {
+                                    const customer = row.customer;
+                                    const typeLabel =
+                                        LEAD_TYPE_OPTIONS.find((t) => t.key === row.typeKey)?.label || row.typeKey;
+
+                                    return (
                                     <tr
-                                        key={customer.customer_id}
+                                        key={row.rowKey}
                                         className={`
                       cursor-pointer transition-colors
                       ${selectedCustomers.has(customer.customer_id) ? "bg-blue-50" : "hover:bg-gray-50"}
@@ -479,11 +647,17 @@ export default function BulkReassignTable() {
                                                 {customer.first_name} {customer.last_name}
                                             </div>
                                             <div className="text-sm text-gray-500">{customer.phone}</div>
+                                            <div className="text-xs text-gray-400">ID: {customer.customer_id}</div>
                                             {customer.email && (
                                                 <div className="text-xs text-gray-400">{customer.email}</div>
                                             )}
                                         </td>
-                                        <td className="px-4 py-3 text-sm">{customer.lead_source}</td>
+                                        <td className="px-4 py-3 text-sm font-medium text-gray-800">
+                                            {typeLabel}
+                                        </td>
+                                        <td className="px-4 py-3 text-sm text-blue-700">
+                                            {getLeadSourceDisplay(customer, row.typeKey)}
+                                        </td>
                                         <td className="px-4 py-3">
                                             <span className="px-2 py-1 text-xs font-medium rounded-full bg-gray-100">
                                                 {customer.status}
@@ -497,16 +671,29 @@ export default function BulkReassignTable() {
                                                 : "—"}
                                         </td>
                                     </tr>
-                                ))}
+                                    );
+                                })}
                             </tbody>
                         </table>
                     </div>
                 </div>
             )}
 
-            {!loading && customers.length === 0 && (
+            {!loading && !hasApplied && (
                 <div className="bg-white p-12 rounded-lg shadow-md text-center text-gray-500">
-                    <p className="text-lg">No customers found. Apply filters to load leads.</p>
+                    <p className="text-lg">Apply filters to load leads.</p>
+                </div>
+            )}
+
+            {!loading && hasApplied && allCustomers.length === 0 && (
+                <div className="bg-white p-12 rounded-lg shadow-md text-center text-gray-500">
+                    <p className="text-lg">No customers found for selected filters.</p>
+                </div>
+            )}
+
+            {!loading && hasApplied && allCustomers.length > 0 && displayRows.length === 0 && (
+                <div className="bg-white p-12 rounded-lg shadow-md text-center text-gray-500">
+                    <p className="text-lg">No leads found for selected lead type.</p>
                 </div>
             )}
         </div>
