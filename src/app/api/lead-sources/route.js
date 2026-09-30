@@ -15,25 +15,44 @@ export async function GET(request) {
     const connection = await getDbConnection();
     let employees = [];
 
-    if (type === "service") {
+    if (type === "all") {
       const [rows] = await connection.execute(
-        `SELECT username, username AS name
+        `SELECT username, username AS name, 'sales' AS leadType
          FROM rep_list
-         WHERE userRole IN ('SERVICE HEAD', 'SERVICE SUPPORT') AND status = 1
+         WHERE status = 1
+           AND userRole IN ('SALES', 'SALES CUM BACKOFFICE', 'SALES HEAD', 'SALES EXECUTIVE', 'SALES REPRESENTATIVE')
+         UNION ALL
+         SELECT username, username AS name, 'service' AS leadType
+         FROM rep_list
+         WHERE status = 1
+           AND TRIM(userRole) IN ('SERVICE HEAD', 'SERVICE SUPPORT')
+         UNION ALL
+         SELECT username, username AS name, 'gem' AS leadType
+         FROM rep_list
+         WHERE status = 1
+           AND TRIM(userRole) = 'GEM'
+         ORDER BY leadType ASC, username ASC`,
+      );
+      employees = rows;
+    } else if (type === "service") {
+      const [rows] = await connection.execute(
+        `SELECT username, username AS name, 'service' AS leadType
+         FROM rep_list
+         WHERE TRIM(userRole) IN ('SERVICE HEAD', 'SERVICE SUPPORT') AND status = 1
          ORDER BY username ASC`,
       );
       employees = rows;
     } else if (type === "gem") {
       const [rows] = await connection.execute(
-        `SELECT username, username AS name
+        `SELECT username, username AS name, 'gem' AS leadType
          FROM rep_list
-         WHERE userRole = 'GEM' AND status = 1
+         WHERE TRIM(userRole) = 'GEM' AND status = 1
          ORDER BY username ASC`,
       );
       employees = rows;
     } else {
       const [rows] = await connection.execute(
-        `SELECT username, username AS name
+        `SELECT username, username AS name, 'sales' AS leadType
          FROM rep_list
          WHERE userRole IN ('SALES', 'SALES CUM BACKOFFICE', 'SALES HEAD', 'SALES EXECUTIVE', 'SALES REPRESENTATIVE')
            AND status = 1

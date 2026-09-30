@@ -5,11 +5,18 @@ import { Loader2, Users, CheckSquare, Square, ChevronDown, Search } from "lucide
 import { NOTES_LANGUAGE_OPTIONS } from "@/constants/notesLanguageOptions";
 
 const LEAD_TYPE_OPTIONS = [
-    { key: "all", label: "Select", field: null },
+    { key: "all", label: "All", field: null },
     { key: "sales", label: "Sales", field: "lead_source" },
     { key: "service", label: "Service", field: "service_lead_source" },
     { key: "gem", label: "GEM", field: "gem_lead_source" },
 ];
+
+const LEAD_SOURCE_GROUP_ORDER = ["sales", "service", "gem"];
+const LEAD_SOURCE_GROUP_LABELS = {
+    sales: "Sales",
+    service: "Service",
+    gem: "GEM",
+};
 
 function hasLeadValue(value) {
     return value != null && String(value).trim() !== "";
@@ -45,14 +52,25 @@ function customerMatchesLeadType(customer, leadType) {
 }
 
 // Searchable Dropdown Component
-function SearchableDropdown({ options, value, onChange, placeholder, className = "" }) {
+function SearchableDropdown({ options, value, onChange, placeholder, className = "", grouped = false }) {
     const [isOpen, setIsOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
     const dropdownRef = useRef(null);
 
-    const filteredOptions = options.filter(option =>
-        option.username.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredOptions = options.filter((option) => {
+        const q = searchTerm.toLowerCase();
+        const username = String(option.username || "").toLowerCase();
+        const groupLabel = String(LEAD_SOURCE_GROUP_LABELS[option.leadType] || "").toLowerCase();
+        return username.includes(q) || groupLabel.includes(q);
+    });
+
+    const groupedSections = grouped
+        ? LEAD_SOURCE_GROUP_ORDER.map((type) => ({
+            type,
+            label: LEAD_SOURCE_GROUP_LABELS[type],
+            options: filteredOptions.filter((option) => option.leadType === type),
+        })).filter((section) => section.options.length > 0)
+        : [];
 
     useEffect(() => {
         function handleClickOutside(event) {
@@ -108,15 +126,34 @@ function SearchableDropdown({ options, value, onChange, placeholder, className =
                         >
                             {placeholder}
                         </div>
-                        {filteredOptions.map((option) => (
-                            <div
-                                key={option.username}
-                                className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
-                                onClick={() => handleSelect(option.username)}
-                            >
-                                {option.username}
-                            </div>
-                        ))}
+                        {grouped ? (
+                            groupedSections.map((section) => (
+                                <div key={section.type}>
+                                    <div className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-gray-500 bg-gray-50 border-y border-gray-100">
+                                        {section.label}
+                                    </div>
+                                    {section.options.map((option) => (
+                                        <div
+                                            key={`${section.type}-${option.username}`}
+                                            className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
+                                            onClick={() => handleSelect(option.username)}
+                                        >
+                                            {option.username}
+                                        </div>
+                                    ))}
+                                </div>
+                            ))
+                        ) : (
+                            filteredOptions.map((option) => (
+                                <div
+                                    key={option.username}
+                                    className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
+                                    onClick={() => handleSelect(option.username)}
+                                >
+                                    {option.username}
+                                </div>
+                            ))
+                        )}
                         {filteredOptions.length === 0 && searchTerm && (
                             <div className="px-3 py-2 text-gray-500 text-sm">
                                 No results found
@@ -169,6 +206,13 @@ export default function BulkReassignTable() {
         if (appliedLeadType === "all") {
             allCustomers.forEach((customer) => {
                 getCustomerLeadTypes(customer).forEach((typeKey) => {
+                    const typeConfig = LEAD_TYPE_OPTIONS.find((t) => t.key === typeKey);
+                    if (appliedLeadSource && typeConfig?.field) {
+                        const value = customer[typeConfig.field];
+                        if (!hasLeadValue(value) || String(value).trim() !== appliedLeadSource) {
+                            return;
+                        }
+                    }
                     rows.push({
                         customer,
                         typeKey,
@@ -218,11 +262,7 @@ export default function BulkReassignTable() {
             return [];
         };
 
-        if (leadTypeFilter === "all") {
-            setFilterLeadSources([]);
-        } else {
-            fetchLeadSources(leadTypeFilter).then(setFilterLeadSources);
-        }
+        fetchLeadSources(leadTypeFilter).then(setFilterLeadSources);
     }, [leadTypeFilter]);
 
     useEffect(() => {
@@ -475,19 +515,18 @@ export default function BulkReassignTable() {
                         ))}
                     </select>
 
-                    {leadTypeFilter !== "all" ? (
-                        <SearchableDropdown
-                            options={filterLeadSources}
-                            value={leadSourceFilter}
-                            onChange={setLeadSourceFilter}
-                            placeholder={`All ${activeLeadTypeConfig.label} Lead Sources`}
-                            className="w-full"
-                        />
-                    ) : (
-                        <select disabled className="border rounded px-3 py-2 text-gray-400 w-full">
-                            <option>Select Sales / Service / GEM to filter lead source</option>
-                        </select>
-                    )}
+                    <SearchableDropdown
+                        options={filterLeadSources}
+                        value={leadSourceFilter}
+                        onChange={setLeadSourceFilter}
+                        grouped={leadTypeFilter === "all"}
+                        placeholder={
+                            leadTypeFilter === "all"
+                                ? "All Lead Sources"
+                                : `All ${activeLeadTypeConfig.label} Lead Sources`
+                        }
+                        className="w-full"
+                    />
                 </div>
 
                 <button
