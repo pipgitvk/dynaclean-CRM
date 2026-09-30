@@ -1,7 +1,6 @@
 // /app/api/installations/upcoming/route.js
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
-import { UNREGISTERED_PRODUCT_ORDER_SQL, IS_PRODUCT_DISPATCH_ITEM_SQL } from "@/lib/pendingProductRegistrationCount";
 
 /**
  * API route for upcoming installations.
@@ -9,22 +8,21 @@ import { UNREGISTERED_PRODUCT_ORDER_SQL, IS_PRODUCT_DISPATCH_ITEM_SQL } from "@/
  *  - quotations (to get model(s) and item_name) via quote_number
  *
  * Highlights installations within 10 days and past expected delivery dates.
- * Query parameters:
- *   ?type=products|spares|all
- *   ?registration=unregistered  (orders with at least one unregistered product)
+ * Query parameter: ?type=products|spares|all
  */
 export async function GET(req) {
   try {
     const { searchParams } = new URL(req.url);
-    const registration = searchParams.get("registration");
-    const type =
-      registration === "unregistered"
-        ? "products"
-        : searchParams.get("type") || "products";
+    const type = searchParams.get("type") || "products"; // Default to products
 
     let typeFilter = "";
     if (type === "products") {
-      typeFilter = `AND ${IS_PRODUCT_DISPATCH_ITEM_SQL("d")}`;
+      typeFilter = `
+        AND EXISTS (
+          SELECT 1 FROM products_list pl 
+          WHERE pl.item_code = d.item_code
+        )
+      `;
     } else if (type === "spares") {
       typeFilter = `
         AND EXISTS (
@@ -34,9 +32,6 @@ export async function GET(req) {
       `;
     }
     // If type === "all", no filter needed
-
-    const registrationFilter =
-      registration === "unregistered" ? `AND ${UNREGISTERED_PRODUCT_ORDER_SQL}` : "";
 
     const query = `
       SELECT
@@ -59,15 +54,7 @@ export async function GET(req) {
           WHEN no.delivery_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 10 DAY) THEN 'upcoming'
           ELSE 'scheduled'
         END AS installation_status,
-        DATEDIFF(no.delivery_date, CURDATE()) AS days_until_installation,
-        CASE
-          WHEN EXISTS (
-            SELECT 1 FROM warranty_products wp
-            WHERE TRIM(wp.serial_number) COLLATE utf8mb4_unicode_ci
-                = TRIM(d.serial_no) COLLATE utf8mb4_unicode_ci
-          ) THEN 1
-          ELSE 0
-        END AS warranty_registered
+        DATEDIFF(no.delivery_date, CURDATE()) AS days_until_installation
       FROM neworder no
        JOIN dispatch d ON d.quote_number COLLATE utf8mb4_unicode_ci = no.quote_number COLLATE utf8mb4_unicode_ci
        LEFT JOIN quotation_items qi ON qi.quote_number COLLATE utf8mb4_unicode_ci = no.quote_number COLLATE utf8mb4_unicode_ci
@@ -78,7 +65,6 @@ export async function GET(req) {
        AND no.delivery_date IS NOT NULL
        AND no.dispatch_status = 1
       ${typeFilter}
-      ${registrationFilter}
       GROUP BY no.id
       ORDER BY days_until_installation ASC;
     `;
