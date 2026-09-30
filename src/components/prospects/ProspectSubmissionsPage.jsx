@@ -1,11 +1,27 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc";
 import { FileText, ExternalLink, Loader2, X } from "lucide-react";
 import toast from "react-hot-toast";
 
-const formatDT = (val) => (val ? dayjs(val).format("DD MMM YYYY, hh:mm A") : "—");
+dayjs.extend(utc);
+
+/** MySQL NOW()/CURRENT_TIMESTAMP is UTC. Show India time on the page. */
+const IST_OFFSET_MINUTES = 330;
+
+const formatDT = (val) => {
+  if (!val) return "—";
+  const s = String(val).trim();
+  if (!s) return "—";
+  const hasExplicitTz = /Z$/i.test(s) || /[+-]\d{2}:?\d{2}$/.test(s);
+  const parsed = hasExplicitTz
+    ? dayjs(s)
+    : dayjs.utc(s.includes("T") ? s : s.replace(" ", "T"));
+  if (!parsed.isValid()) return "—";
+  return parsed.utcOffset(IST_OFFSET_MINUTES).format("DD MMM YYYY, hh:mm A");
+};
 
 function isAcknowledged(status) {
   const s = String(status || "").toLowerCase();
@@ -30,6 +46,8 @@ export default function ProspectSubmissionsPage({ defaultScope = "team" }) {
   const [ackNotes, setAckNotes] = useState("");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const [employeeFilter, setEmployeeFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
 
   const fetchRows = useCallback(async () => {
     setLoading(true);
@@ -118,6 +136,34 @@ export default function ProspectSubmissionsPage({ defaultScope = "team" }) {
       ? "Team Prospect Submissions"
       : "My Prospect Submissions";
   const canAcknowledge = (isSuperAdmin || hasReportees) && scope !== "mine";
+  const showAdminFilters = roleNorm === "SUPERADMIN";
+
+  const employees = useMemo(() => {
+    return [...new Set(rows.map((row) => String(row.submitted_by || "").trim()).filter(Boolean))].sort(
+      (a, b) => a.localeCompare(b),
+    );
+  }, [rows]);
+
+  const filteredRows = useMemo(() => {
+    return rows.filter((row) => {
+      if (
+        showAdminFilters &&
+        employeeFilter &&
+        String(row.submitted_by || "").trim() !== employeeFilter
+      ) {
+        return false;
+      }
+      if (showAdminFilters && statusFilter === "pending" && isAcknowledged(row.status)) return false;
+      if (showAdminFilters && statusFilter === "acknowledged" && !isAcknowledged(row.status)) {
+        return false;
+      }
+      return true;
+    });
+  }, [rows, employeeFilter, statusFilter, showAdminFilters]);
+
+  const hasFilters = Boolean(
+    fromDate || toDate || (showAdminFilters && (employeeFilter || statusFilter)),
+  );
 
   return (
     <div className="container mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
@@ -178,16 +224,53 @@ export default function ProspectSubmissionsPage({ defaultScope = "team" }) {
             className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
           />
         </div>
-        {(fromDate || toDate) && (
+        {showAdminFilters && (
+          <>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-600">
+                Employee
+              </label>
+              <select
+                value={employeeFilter}
+                onChange={(e) => setEmployeeFilter(e.target.value)}
+                className="min-w-[160px] rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+              >
+                <option value="">All employees</option>
+                {employees.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-600">
+                Status
+              </label>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="min-w-[160px] rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+              >
+                <option value="">All</option>
+                <option value="pending">Pending</option>
+                <option value="acknowledged">Acknowledged</option>
+              </select>
+            </div>
+          </>
+        )}
+        {hasFilters && (
           <button
             type="button"
             onClick={() => {
               setFromDate("");
               setToDate("");
+              setEmployeeFilter("");
+              setStatusFilter("");
             }}
             className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
           >
-            Clear dates
+            Clear filters
           </button>
         )}
       </div>
@@ -197,9 +280,11 @@ export default function ProspectSubmissionsPage({ defaultScope = "team" }) {
           <Loader2 className="h-5 w-5 animate-spin" />
           Loading submissions...
         </div>
-      ) : rows.length === 0 ? (
+      ) : filteredRows.length === 0 ? (
         <div className="rounded-xl border border-dashed border-gray-300 bg-white p-10 text-center text-gray-500">
-          No prospect submissions found.
+          {rows.length === 0
+            ? "No prospect submissions found."
+            : "No prospect submissions match these filters."}
         </div>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
@@ -217,7 +302,7 @@ export default function ProspectSubmissionsPage({ defaultScope = "team" }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {rows.map((row) => (
+              {filteredRows.map((row) => (
                 <tr key={row.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 font-medium text-gray-900">{row.submitted_by}</td>
                   <td className="px-4 py-3">{row.reporting_manager || "—"}</td>

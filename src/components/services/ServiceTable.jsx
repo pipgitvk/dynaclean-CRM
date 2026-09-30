@@ -243,6 +243,40 @@ export default function ServiceTable({ serviceRecords, role }) {
     </>
   );
 
+  const STEP_VIDEOS = [
+    { key: "video_360", label: "360°" },
+    { key: "video_problem", label: "Problem" },
+    { key: "video_damaged", label: "Damaged" },
+    { key: "video_completion", label: "Completion" },
+  ];
+
+  const showStepVideos = dashboardPath === "admin-dashboard";
+
+  const renderStepVideos = (record) => {
+    if (String(record.service_type || "").trim().toUpperCase() !== "COMPLAINT") {
+      return <span className="text-gray-400">—</span>;
+    }
+    const videos = STEP_VIDEOS.filter((step) => record[step.key]);
+    if (!videos.length) {
+      return <span className="text-gray-400">No videos</span>;
+    }
+    return (
+      <div className="flex flex-col gap-1 min-w-[110px]">
+        {videos.map((step) => (
+          <a
+            key={step.key}
+            href={record[step.key]}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-600 hover:underline"
+          >
+            {step.label}
+          </a>
+        ))}
+      </div>
+    );
+  };
+
   const renderReportCell = (record) => (
     <div className="min-w-[80px]">
       {renderReportLinks(record)}
@@ -254,7 +288,7 @@ export default function ServiceTable({ serviceRecords, role }) {
     </div>
   );
 
-  const tableColSpan = role === "ADMIN" ? 12 : 11;
+  const tableColSpan = (role === "ADMIN" ? 12 : 11) + (showStepVideos ? 1 : 0);
 
   // Helper: format dates safely
   const formatDate = (value) => {
@@ -762,6 +796,9 @@ export default function ServiceTable({ serviceRecords, role }) {
                 >
                   Complete Date {getSortIndicator("completed_date")}
                 </th>
+                {showStepVideos && (
+                  <th className="px-6 py-3 text-left">Step Videos</th>
+                )}
                 <th className="px-6 py-3 text-left">Reports</th>
                 {role === "ADMIN" && (
                   <th className="px-6 py-3 text-left">Company Cost</th>
@@ -884,6 +921,9 @@ export default function ServiceTable({ serviceRecords, role }) {
                           formatDate={formatDate}
                         />
                       </td>
+                      {showStepVideos && (
+                        <td className="px-6 py-3">{renderStepVideos(record)}</td>
+                      )}
                       <td className="px-6 py-3">{renderReportCell(record)}</td>
 
                       {role === "ADMIN" && (
@@ -1079,6 +1119,14 @@ export default function ServiceTable({ serviceRecords, role }) {
                       </span>{" "}
                       {record.installed_address}
                     </p>
+                    {showStepVideos && (
+                      <div className="text-gray-500 mt-1">
+                        <span className="font-semibold text-gray-700">
+                          Step Videos:
+                        </span>
+                        <div className="mt-0.5">{renderStepVideos(record)}</div>
+                      </div>
+                    )}
                     <div className="text-gray-500 mt-1">
                       <span className="font-semibold text-gray-700">
                         Reports:

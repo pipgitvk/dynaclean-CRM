@@ -93,9 +93,9 @@ export async function GET(req) {
          ps.status,
          ps.acknowledgment_notes,
          ps.acknowledged_by,
-         ps.acknowledged_at,
-         ps.created_at,
-         ps.updated_at
+         DATE_FORMAT(ps.acknowledged_at, '%Y-%m-%d %H:%i:%s') AS acknowledged_at,
+         DATE_FORMAT(ps.created_at, '%Y-%m-%d %H:%i:%s') AS created_at,
+         DATE_FORMAT(ps.updated_at, '%Y-%m-%d %H:%i:%s') AS updated_at
        FROM prospect_submissions ps
        WHERE ${whereSql}
        ORDER BY ps.created_at DESC`,
