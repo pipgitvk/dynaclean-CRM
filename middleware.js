@@ -237,6 +237,7 @@ export async function middleware(request) {
         
         const isServiceSupportReport = pathname.startsWith("/admin-dashboard/service-support-report");
         const isServiceHead = roleNorm === "SERVICE HEAD";
+        const isServiceSupport = roleNorm === "SERVICE SUPPORT";
 
         if (
           !(roleNorm === "EA" && isEaAllowed) &&
@@ -244,6 +245,7 @@ export async function middleware(request) {
           !(isSales && (isDeniedLeadsRoute || isViewCustomerRoute || isBulkReassignRoute)) &&
           !(isSalesCumBackoffice && (isBulkReassignRoute || isManualPaymentsRoute || isSalesDashboardManualPaymentsRoute)) &&
           !(isServiceHead && isServiceSupportReport) &&
+          !(isServiceSupport && isServiceSupportReport) &&
           !(roleNorm === "EA" && isServiceSupportReport) &&
           !isEveryoneAllowedRoute
         ) {
@@ -256,8 +258,17 @@ export async function middleware(request) {
       // Allow EA to access service reports, service-followups, and amc-cmc in user-dashboard
       if (pathname.startsWith("/user-dashboard/view_service_reports") || 
           pathname.startsWith("/user-dashboard/service-followups") ||
+          pathname.startsWith("/user-dashboard/service-support-report") ||
+          pathname.startsWith("/service-head-dashboard/service-support-report") ||
           pathname.startsWith("/user-dashboard/amc-cmc")) {
-        if (roleNorm === "EA" || role === "SUPERADMIN" || roleNorm === "DIRECTOR") {
+        if (
+          roleNorm === "EA" ||
+          role === "SUPERADMIN" ||
+          roleNorm === "DIRECTOR" ||
+          roleNorm === "SERVICE HEAD" ||
+          roleNorm === "SERVICE SUPPORT" ||
+          roleNorm === "ADMIN"
+        ) {
           return NextResponse.next();
         }
       }

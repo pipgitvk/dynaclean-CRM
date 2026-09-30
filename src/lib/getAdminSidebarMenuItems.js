@@ -440,7 +440,7 @@ const allMenuItems = [
   {
       name: "Service & After-Sales",
       moduleKey: "service-after-sales",
-      roles: ["SUPERADMIN", "SERVICE SUPPORT"],
+      roles: ["SUPERADMIN", "SERVICE SUPPORT", "SERVICE HEAD", "EA", "ADMIN", "DIRECTOR"],
       icon: "ShieldCheck",
       children: [
         {
@@ -461,6 +461,13 @@ const allMenuItems = [
           accessKey: "service-followups",
           roles: ["SUPERADMIN", "SERVICE SUPPORT"],
           icon: "Calendar",
+        },
+        {
+          path: "/admin-dashboard/service-support-report",
+          name: "Service Support Report",
+          moduleKey: "service-support-report",
+          roles: ["SUPERADMIN", "SERVICE SUPPORT", "SERVICE HEAD", "DIRECTOR", "EA", "ADMIN"],
+          icon: "Headset",
         },
         {
           path: "/admin-dashboard/view_service_reports",

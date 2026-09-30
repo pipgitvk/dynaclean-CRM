@@ -494,6 +494,13 @@ const allMenuItems = [
         icon: "Calendar",
       },
       {
+        path: "/user-dashboard/service-support-report",
+        name: "Service Support Report",
+        moduleKey: "service-support-report",
+        roles: ["ALL"],
+        icon: "Headset",
+      },
+      {
         path: "/user-dashboard/view_service_reports",
         name: "Service Records",
         moduleKey: "service-records",

@@ -40,6 +40,18 @@ export function canViewAllEmployeeDailyReports(role) {
   return k === "SUPERADMIN" || k === "ADMIN" || k === "DIRECTOR";
 }
 
+/** Service Support Report: admins/managers see all; SERVICE SUPPORT is self-only. */
+export function canViewAllServiceSupportReport(role) {
+  const k = normalizeRoleKey(role || "");
+  return (
+    k === "SUPERADMIN" ||
+    k === "ADMIN" ||
+    k === "DIRECTOR" ||
+    k === "SERVICE HEAD" ||
+    k === "EA"
+  );
+}
+
 export function getScopedUsername(payload) {
   const u = String(payload?.username ?? "").trim();
   return u || null;
