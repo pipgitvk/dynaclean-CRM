@@ -205,8 +205,70 @@ export async function POST(request) {
 
         values.push(item_code);
 
+        // Get old values BEFORE update for logging
+        const [oldProduct] = await db.execute(
+          'SELECT item_name, product_number, min_qty, price_per_unit, gst_rate, specification FROM products_list WHERE item_code = ?',
+          [item_code]
+        );
+        const oldData = oldProduct[0] || {};
+
         const query = `UPDATE products_list SET ${updates.join(', ')} WHERE item_code = ?`;
         await db.execute(query, values);
+
+        // Log edit history for any changed fields
+        try {
+          // Get username from token
+          let username = "Unknown";
+          try {
+            const { payload } = await jwtVerify(token, secret);
+            username = payload.username || "Unknown";
+          } catch (e) {
+            // Continue with Unknown username
+          }
+
+          const productName = item_name || oldData.item_name;
+          const changes = [];
+
+          // Track what actually changed
+          if (product_number !== null && product_number !== undefined && String(oldData.product_number) !== String(product_number)) {
+            changes.push(`Product No: ${oldData.product_number} → ${product_number}`);
+          }
+          if (min_qty !== null && min_qty !== undefined && Number(oldData.min_qty) !== Number(min_qty)) {
+            changes.push(`Min Qty: ${oldData.min_qty} → ${min_qty}`);
+          }
+          if (price_per_unit !== null && price_per_unit !== undefined && Number(oldData.price_per_unit) !== Number(price_per_unit)) {
+            changes.push(`Price: ${oldData.price_per_unit} → ${price_per_unit}`);
+          }
+          if (gst_rate !== null && gst_rate !== undefined && Number(oldData.gst_rate) !== Number(gst_rate)) {
+            changes.push(`GST Rate: ${oldData.gst_rate} → ${gst_rate}`);
+          }
+          if (specification !== null && specification !== undefined && String(oldData.specification) !== String(specification)) {
+            changes.push(`Specification changed`);
+          }
+          if (item_name !== null && item_name !== undefined && String(oldData.item_name) !== String(item_name)) {
+            changes.push(`Item Name: ${oldData.item_name} → ${item_name}`);
+          }
+
+          // Only log if there are actual changes
+          if (changes.length > 0) {
+            const changeDesc = changes.join('; ');
+            
+            await db.execute(
+              `INSERT INTO product_stock_edit_history 
+                (product_code, item_name, edited_by, change_description, edited_at)
+               VALUES (?, ?, ?, ?, NOW())`,
+              [
+                item_code,
+                productName,
+                username,
+                changeDesc
+              ]
+            );
+          }
+        } catch (historyError) {
+          console.warn("Failed to log edit history:", historyError.message);
+          // Continue anyway - don't fail the update if history logging fails
+        }
 
         // Handle image update separately - add to product_images table
         if (imagePath) {

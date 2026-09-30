@@ -1,5 +1,6 @@
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
+import { ensurePreBookingRemarkColumns } from "@/lib/ensurePreBookingRemarkColumns";
 import { redirect } from "next/navigation";
 import PreBookingListClient from "./PreBookingListClient";
 
@@ -27,6 +28,7 @@ export default async function PreBookingPage({ searchParams }) {
   const offset = (currentPage - 1) * pageSize;
 
   const conn = await getDbConnection();
+  await ensurePreBookingRemarkColumns(conn);
 
   // Build query to fetch pre-bookings with customer details
   let query = `

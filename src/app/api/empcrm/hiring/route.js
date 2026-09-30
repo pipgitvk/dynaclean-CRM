@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
-import { canAccessHiringModule } from "@/lib/hrTargetEligibleRoles";
+import { canAccessHiringModule, isEmpCrmHrAdmin } from "@/lib/hrTargetEligibleRoles";
 import { normalizeRoleKey } from "@/lib/roleKeyUtils";
 import { logHiringCreated, logHiringNoteUpdate, logHiringStatusChange } from "@/lib/hiringStatusHistory";
 import { parseHiringPayload, toMysqlDatetime } from "@/lib/hiringPayload";
@@ -48,7 +48,7 @@ export async function GET(req) {
     if (denied) return denied;
 
     const role = normalizeRoleKey(payload.role ?? payload.userRole ?? "");
-    const isSuperadmin = role === "SUPERADMIN";
+    const isSuperadmin = isEmpCrmHrAdmin(role);
 
     const { searchParams } = new URL(req.url);
     const entryIdParam = searchParams.get("entryId");
@@ -261,7 +261,7 @@ export async function POST(request) {
     if (denied) return denied;
 
     const role = normalizeRoleKey(payload.role ?? payload.userRole ?? "");
-    const isSuperadmin = role === "SUPERADMIN";
+    const isSuperadmin = isEmpCrmHrAdmin(role);
 
     const body = await request.json();
     const parsed = parseHiringPayload(body);
@@ -368,7 +368,7 @@ export async function PATCH(request) {
     if (denied) return denied;
 
     const role = normalizeRoleKey(payload.role ?? payload.userRole ?? "");
-    const isSuperadmin = role === "SUPERADMIN";
+    const isSuperadmin = isEmpCrmHrAdmin(role);
 
     const body = await request.json();
     const id = parseInt(body.id, 10);

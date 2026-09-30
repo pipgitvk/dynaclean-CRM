@@ -1,10 +1,17 @@
 // app/user-dashboard/view-customer/[customerId]/page.tsx
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
+import { ensureCustomersFollowupNotesText } from "@/lib/ensureCustomersFollowupNotesText";
 import dayjs from "dayjs";
 import FollowUpHistory from "@/components/Leads/FollowUpHistory";
 import CustomerContactsModal from "@/components/Customers/CustomerContactsModal";
 import ViewCustomerQuotationsLink from "@/components/Customers/ViewCustomerQuotationsLink";
+import CustomerPerformaInvoiceButton from "@/components/invoice/CustomerPerformaInvoiceButton";
+import ScheduleVisitModal from "@/components/scheduleVisit/ScheduleVisitModal";
+import { canShowScheduleVisitOnCustomerProfile } from "@/lib/scheduleVisitScope";
+import { isSalesRole } from "@/lib/isSalesRole";
+import { isGemRole } from "@/lib/isGemRole";
+import { userHasModuleKey } from "@/lib/userModuleAccessServer";
 import Link from "next/link";
 import axios from "axios";
 import { notFound } from "next/navigation";
@@ -12,15 +19,20 @@ import { notFound } from "next/navigation";
 export default async function CustomerPage({ params }) {
   const { customerId } = await params;
   const conn = await getDbConnection();
+  await ensureCustomersFollowupNotesText(conn);
 
   // Fetch current user info
   const payload = await getSessionPayload();
   const userRole = payload?.role || "";
-  const isRestrictedRole = userRole === "SERVICE SUPPORT" || userRole === "GEM";
+  const username = payload?.username || "";
+  const isRestrictedRole = userRole === "SERVICE SUPPORT" || isGemRole(userRole);
+  const hideServiceLeadSource = isSalesRole(userRole);
+  const hideLeadSource = userRole === "SERVICE SUPPORT";
+  const showScheduleVisitBtn = canShowScheduleVisitOnCustomerProfile(userRole);
 
   // Explicitly select all columns including service_lead_source
   const [custs] = await conn.execute(
-    `SELECT c.customer_id, c.first_name, c.last_name, c.email, c.phone, c.company, c.address, c.tags, c.status, c.stage, c.lead_source, c.service_lead_source, c.lead_campaign, c.date_created, c.notes, c.parent_customer_id,
+    `SELECT c.customer_id, c.first_name, c.last_name, c.email, c.phone, c.company, c.address, c.tags, c.status, c.stage, c.lead_source, c.assigned_to, c.service_lead_source, c.lead_campaign, c.date_created, c.notes, c.parent_customer_id,
       p.customer_id AS parent_id,
       CONCAT(TRIM(p.first_name), ' ', TRIM(COALESCE(p.last_name, ''))) AS parent_name,
       p.phone AS parent_phone,
@@ -37,13 +49,84 @@ export default async function CustomerPage({ params }) {
     notFound();
   }
 
+  const customerDisplayName = [customer.first_name, customer.last_name]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+
   // Fetch followup history
-  const [fups] = await conn.execute(
-    `SELECT next_followup_date, service_next_followup, followed_date, followed_by, notes, comm_mode 
-     FROM customers_followup
-     WHERE customer_id = ?
-     ORDER BY time_stamp DESC`,
-    [customerId],
+  // SERVICE SUPPORT: only their own followups
+  // GEM / GEM PORTAL: all followups for this customer
+  // Sales roles: hide SERVICE SUPPORT follow-ups
+  const hideServiceSupportFollowups = isSalesRole(userRole);
+  const followupSelect = `SELECT next_followup_date, service_next_followup, gem_next_followup, followed_date, followed_by, notes, comm_mode, time_stamp`;
+
+  let followupSql = `${followupSelect}
+         FROM customers_followup
+         WHERE customer_id = ?
+         ORDER BY time_stamp DESC`;
+  let followupParams = [customerId];
+
+  if (userRole === "SERVICE SUPPORT") {
+    followupSql = `${followupSelect}
+         FROM customers_followup
+         WHERE customer_id = ? AND followed_by = ? AND followed_by IS NOT NULL AND followed_by != ''
+         ORDER BY time_stamp DESC`;
+    followupParams = [customerId, username];
+  } else if (hideServiceSupportFollowups) {
+    followupSql = `${followupSelect}
+         FROM customers_followup cf
+         WHERE cf.customer_id = ?
+           AND (
+             cf.followed_by IS NULL
+             OR cf.followed_by = ''
+             OR NOT EXISTS (
+               SELECT 1
+               FROM rep_list rl
+               WHERE rl.username = cf.followed_by
+                 AND UPPER(TRIM(rl.userRole)) = 'SERVICE SUPPORT'
+             )
+           )
+         ORDER BY cf.time_stamp DESC`;
+    followupParams = [customerId];
+  }
+
+  const [fups] = await conn.execute(followupSql, followupParams);
+
+  // Fetch orders count for this customer
+  // SUPERADMIN/DIRECTOR: see all orders for customer
+  // Assigned user (assigned_to) or lead_source = username: also see all orders for customer
+  // Others: only their own orders (created_by = username)
+  const isPrivilegedRole = ["SUPERADMIN", "DIRECTOR"].includes(String(userRole).toUpperCase());
+  const isAssignedOrLeadSourceOwner =
+    customer.assigned_to === username || customer.lead_source === username;
+  const canSeeAllOrders = isPrivilegedRole || isAssignedOrLeadSourceOwner;
+  const orderCountQuery = canSeeAllOrders
+    ? `SELECT COUNT(*) AS orderCount FROM neworder WHERE customer_id = ?`
+    : `SELECT COUNT(*) AS orderCount FROM neworder WHERE customer_id = ? AND created_by = ?`;
+  const orderCountParams = canSeeAllOrders ? [customerId] : [customerId, username];
+  const [[{ orderCount }]] = await conn.execute(orderCountQuery, orderCountParams);
+
+  let latestQuoteNumber = "";
+  try {
+    const [quoteRows] = await conn.execute(
+      `SELECT quote_number
+       FROM quotations_records
+       WHERE customer_id = ?
+       ORDER BY quote_date DESC, quote_number DESC
+       LIMIT 1`,
+      [customerId],
+    );
+    latestQuoteNumber = quoteRows[0]?.quote_number
+      ? String(quoteRows[0].quote_number).trim()
+      : "";
+  } catch {
+    latestQuoteNumber = "";
+  }
+  const canCreatePerformaInvoice = await userHasModuleKey(
+    username,
+    userRole,
+    "performa-invoices",
   );
 
   let cust_analysis_external = {};
@@ -65,6 +148,53 @@ export default async function CustomerPage({ params }) {
     } catch {
       // Optional external service — page must still render for sales/ops if API is down or returns an error
     }
+  }
+
+  const roleUpper = String(userRole).toUpperCase().trim();
+  const canSeeMachineFollowup =
+    roleUpper === "SALES" ||
+    roleUpper === "SALES HEAD" ||
+    roleUpper === "SALES CUM BACKOFFICE";
+
+  // Fetch child contacts (members under this customer)
+  const [childContacts] = await conn.execute(
+    `SELECT customer_id, first_name, last_name, phone 
+     FROM customers 
+     WHERE parent_customer_id = ?
+     ORDER BY first_name ASC`,
+    [customerId],
+  );
+  console.log(`[View Customer] Fetched ${childContacts?.length || 0} child contacts for customer ${customerId}:`, childContacts);
+
+  // Also fetch parent and siblings if this customer has a parent
+  let parentContact = null;
+  let siblingContacts = [];
+  const [selfRows] = await conn.execute(
+    `SELECT customer_id, first_name, last_name, phone, parent_customer_id
+     FROM customers
+     WHERE customer_id = ?`,
+    [customerId],
+  );
+  const selfData = selfRows?.[0];
+  if (selfData?.parent_customer_id) {
+    const [parentRows] = await conn.execute(
+      `SELECT customer_id, first_name, last_name, phone
+       FROM customers
+       WHERE customer_id = ?`,
+      [selfData.parent_customer_id],
+    );
+    parentContact = parentRows?.[0];
+    
+    // Fetch siblings (other children of the same parent)
+    const [siblingRows] = await conn.execute(
+      `SELECT customer_id, first_name, last_name, phone
+       FROM customers
+       WHERE parent_customer_id = ? AND customer_id != ?
+       ORDER BY first_name ASC`,
+      [selfData.parent_customer_id, customerId],
+    );
+    siblingContacts = siblingRows || [];
+    console.log(`[View Customer] Customer ${customerId} has parent ${selfData.parent_customer_id}, ${siblingContacts.length} siblings`);
   }
 
   // await conn.end();
@@ -135,19 +265,23 @@ export default async function CustomerPage({ params }) {
       </div>
 
       {/* Row 4 */}
-      <div>
-        <dt className="text-sm font-medium text-gray-500">Lead Source</dt>
-        <dd className="mt-1 text-gray-800">
-          {customer.lead_source || "-"}
-        </dd>
-      </div>
+      {!hideLeadSource && (
+        <div>
+          <dt className="text-sm font-medium text-gray-500">Lead Source</dt>
+          <dd className="mt-1 text-gray-800">
+            {customer.lead_source || "-"}
+          </dd>
+        </div>
+      )}
 
-      <div>
-        <dt className="text-sm font-medium text-gray-500">Service Lead Source</dt>
-        <dd className="mt-1 text-gray-800">
-          {customer.service_lead_source || "-"}
-        </dd>
-      </div>
+      {!hideServiceLeadSource && (
+        <div>
+          <dt className="text-sm font-medium text-gray-500">Service Lead Source</dt>
+          <dd className="mt-1 text-gray-800">
+            {customer.service_lead_source || "-"}
+          </dd>
+        </div>
+      )}
 
       <div>
         <dt className="text-sm font-medium text-gray-500">
@@ -233,6 +367,85 @@ export default async function CustomerPage({ params }) {
       </p>
 
     </div>
+
+    {/* Contact Hierarchy Section */}
+    <div className="p-2 rounded-xl h-fit max-h-96 overflow-y-auto">
+      <h3 className="text-lg font-semibold text-gray-800 mb-3">
+        Contact Hierarchy
+      </h3>
+      <div className="space-y-2">
+        {/* Parent */}
+        {parentContact && (
+          <div className="p-3 bg-blue-50 rounded border border-blue-200">
+            <p className="text-xs text-blue-600 font-medium mb-2">Parent:</p>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-800">
+                  {[parentContact.first_name, parentContact.last_name].filter(Boolean).join(" ") || "—"}
+                </p>
+                <p className="text-sm text-gray-600">{parentContact.phone || "—"}</p>
+              </div>
+              <Link
+                href={`/user-dashboard/view-customer/${parentContact.customer_id}/follow-up`}
+                className="ml-2 px-3 py-1 text-xs whitespace-nowrap bg-green-600 text-white rounded hover:bg-green-700 transition"
+              >
+                Follow
+              </Link>
+            </div>
+          </div>
+        )}
+
+        {/* Siblings */}
+        {siblingContacts && siblingContacts.length > 0 && (
+          <>
+            <p className="text-xs text-gray-600 font-medium">Siblings ({siblingContacts.length}):</p>
+            {siblingContacts.map((contact) => (
+              <div key={contact.customer_id} className="flex items-center justify-between p-3 bg-gray-50 rounded border border-gray-200">
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-gray-800">
+                    {[contact.first_name, contact.last_name].filter(Boolean).join(" ") || "—"}
+                  </p>
+                  <p className="text-sm text-gray-600">{contact.phone || "—"}</p>
+                </div>
+                <Link
+                  href={`/user-dashboard/view-customer/${contact.customer_id}/follow-up`}
+                  className="ml-2 px-3 py-1 text-xs whitespace-nowrap bg-green-600 text-white rounded hover:bg-green-700 transition"
+                >
+                  Follow
+                </Link>
+              </div>
+            ))}
+          </>
+        )}
+
+        {/* Children */}
+        {childContacts && childContacts.length > 0 && (
+          <>
+            <p className="text-xs text-gray-600 font-medium">Members ({childContacts.length}):</p>
+            {childContacts.map((contact) => (
+              <div key={contact.customer_id} className="flex items-center justify-between p-3 bg-purple-50 rounded border border-purple-200">
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-gray-800">
+                    {[contact.first_name, contact.last_name].filter(Boolean).join(" ") || "—"}
+                  </p>
+                  <p className="text-sm text-gray-600">{contact.phone || "—"}</p>
+                </div>
+                <Link
+                  href={`/user-dashboard/view-customer/${contact.customer_id}/follow-up`}
+                  className="ml-2 px-3 py-1 text-xs whitespace-nowrap bg-green-600 text-white rounded hover:bg-green-700 transition"
+                >
+                  Follow
+                </Link>
+              </div>
+            ))}
+          </>
+        )}
+
+        {!parentContact && (!childContacts || childContacts.length === 0) && (!siblingContacts || siblingContacts.length === 0) && (
+          <p className="text-sm text-gray-600">No contact hierarchy available.</p>
+        )}
+      </div>
+    </div>
   </div>
   
 
@@ -291,6 +504,14 @@ export default async function CustomerPage({ params }) {
               add Quotation
             </Link>
 
+            {canCreatePerformaInvoice && (
+              <CustomerPerformaInvoiceButton
+                quotationNumber={latestQuoteNumber}
+                href={`/user-dashboard/invoices/performa?quotation_number=${encodeURIComponent(latestQuoteNumber)}`}
+                className="btn text-white bg-purple-600 hover:bg-purple-700 py-2 px-4 rounded-md w-full md:w-auto text-center transition duration-300"
+              />
+            )}
+
             {/* Special Price - visible to all */}
             <Link
               href={`/user-dashboard/special-pricing/${customerId}`}
@@ -299,13 +520,44 @@ export default async function CustomerPage({ params }) {
               Special Price
             </Link>
 
-            {/* View Ledger - visible to all */}
-            <Link
-              href={`/admin-dashboard/accounting/ledger?customerId=${customerId}`}
-              className="btn text-white bg-indigo-600 hover:bg-indigo-700 py-2 px-4 rounded-md w-full md:w-auto text-center transition duration-300"
-            >
-              View Ledger
-            </Link>
+            {/* View Ledger - hidden for SERVICE SUPPORT */}
+            {userRole !== "SERVICE SUPPORT" && (
+              <Link
+                href={`/admin-dashboard/accounting/ledger?customerId=${customerId}`}
+                className="btn text-white bg-indigo-600 hover:bg-indigo-700 py-2 px-4 rounded-md w-full md:w-auto text-center transition duration-300"
+              >
+                View Ledger
+              </Link>
+            )}
+
+            {showScheduleVisitBtn && (
+              <ScheduleVisitModal
+                customerId={customerId}
+                customerName={customerDisplayName}
+                contact={customer.phone}
+                address={customer.address}
+                buttonLabel="Schedule Visit"
+                prefillVisitAddress={false}
+              />
+            )}
+
+            {/* Orders button - visible only if customer has orders */}
+            {orderCount > 0 && (
+              <Link
+                href={`/user-dashboard/view-customer/${customerId}/orders`}
+                className="btn text-white bg-teal-600 hover:bg-teal-700 py-2 px-4 rounded-md w-full md:w-auto text-center transition duration-300"
+              >
+                Orders ({orderCount})
+              </Link>
+            )}
+            {canSeeMachineFollowup && (
+              <Link
+                href={`/user-dashboard/view-customer/${customerId}/machine-followup`}
+                className="btn text-white bg-purple-600 hover:bg-purple-700 py-2 px-4 rounded-md w-full md:w-auto text-center transition duration-300"
+              >
+                Machine Follow-up
+              </Link>
+            )}
           </div>
 
           <section>

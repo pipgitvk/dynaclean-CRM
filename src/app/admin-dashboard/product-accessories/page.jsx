@@ -32,6 +32,8 @@ export default function ProductAccessoriesPage() {
         description: "",
         is_mandatory: false,
         qty: 1,
+        spare_id: null,
+        package_status: "available",
     });
 
     // Edit state
@@ -41,6 +43,8 @@ export default function ProductAccessoriesPage() {
         description: "",
         is_mandatory: false,
         qty: 1,
+        spare_id: null,
+        package_status: "available",
     });
 
     useEffect(() => {
@@ -109,8 +113,8 @@ export default function ProductAccessoriesPage() {
     const handleSpareQueryChange = (e) => {
         const val = e.target.value;
         setSpareQuery(val);
-        setSpareSelected(false); // user is typing manually — not a valid selection
-        setNewAccessory((prev) => ({ ...prev, accessory_name: val }));
+        setSpareSelected(false);
+        setNewAccessory((prev) => ({ ...prev, accessory_name: val, spare_id: null }));
         // debounce 300ms
         if (spareDebounceRef.current) clearTimeout(spareDebounceRef.current);
         spareDebounceRef.current = setTimeout(() => searchSpares(val), 300);
@@ -119,8 +123,12 @@ export default function ProductAccessoriesPage() {
     const handleSelectSpare = (spare) => {
         const label = `${spare.item_name} (${spare.spare_number})`;
         setSpareQuery(label);
-        setSpareSelected(true); // valid selection from dropdown
-        setNewAccessory((prev) => ({ ...prev, accessory_name: label }));
+        setSpareSelected(true);
+        setNewAccessory((prev) => ({
+            ...prev,
+            accessory_name: label,
+            spare_id: spare.id,
+        }));
         setSpareSuggestions([]);
         setShowSpareSuggestions(false);
     };
@@ -140,7 +148,7 @@ export default function ProductAccessoriesPage() {
             alert("Accessory name is required");
             return;
         }
-        if (!spareSelected) {
+        if (!spareSelected || !newAccessory.spare_id) {
             alert("Please select a spare part from the search results. Manual entry is not allowed.");
             return;
         }
@@ -159,7 +167,14 @@ export default function ProductAccessoriesPage() {
             const json = await res.json();
             if (json.success) {
                 alert("Accessory added successfully");
-                setNewAccessory({ accessory_name: "", description: "", is_mandatory: false });
+                setNewAccessory({
+                    accessory_name: "",
+                    description: "",
+                    is_mandatory: false,
+                    qty: 1,
+                    spare_id: null,
+                    package_status: "available",
+                });
                 setSpareQuery("");
                 setSpareSelected(false);
                 setSpareSuggestions([]);
@@ -230,12 +245,21 @@ export default function ProductAccessoriesPage() {
             description: accessory.description || "",
             is_mandatory: accessory.is_mandatory === 1,
             qty: accessory.qty || 1,
+            spare_id: accessory.spare_id || null,
+            package_status: accessory.package_status || "available",
         });
     };
 
     const cancelEdit = () => {
         setEditingId(null);
-        setEditForm({ accessory_name: "", description: "", is_mandatory: false, qty: 1 });
+        setEditForm({
+            accessory_name: "",
+            description: "",
+            is_mandatory: false,
+            qty: 1,
+            spare_id: null,
+            package_status: "available",
+        });
     };
 
     const filteredProducts = products.filter((p) =>
@@ -387,6 +411,19 @@ export default function ProductAccessoriesPage() {
                                             }
                                         />
                                     </div>
+                                    <div>
+                                        <label className="block text-sm font-medium mb-1">Package Status</label>
+                                        <select
+                                            className="w-full px-3 py-2 text-sm border rounded"
+                                            value={newAccessory.package_status}
+                                            onChange={(e) =>
+                                                setNewAccessory({ ...newAccessory, package_status: e.target.value })
+                                            }
+                                        >
+                                            <option value="available">Available (in package - checklist only)</option>
+                                            <option value="added">Added (separate dispatch - auto added to dispatch)</option>
+                                        </select>
+                                    </div>
                                     <button
                                         type="submit"
                                         disabled={saving}
@@ -451,9 +488,11 @@ export default function ProductAccessoriesPage() {
                                                 <thead>
                                                     <tr className="bg-gray-100">
                                                         <th className="p-2 border text-left">Name</th>
+                                                        <th className="p-2 border text-left">Spare ID</th>
                                                         <th className="p-2 border text-left">Description</th>
                                                         <th className="p-2 border text-center">Qty</th>
-                                                        <th className="p-2 border text-left">Type</th>
+                                                        <th className="p-2 border text-left">Mandatory</th>
+                                                        <th className="p-2 border text-left">Package</th>
                                                         <th className="p-2 border text-center">Actions</th>
                                                     </tr>
                                                 </thead>
@@ -471,6 +510,9 @@ export default function ProductAccessoriesPage() {
                                                                                 setEditForm({ ...editForm, accessory_name: e.target.value })
                                                                             }
                                                                         />
+                                                                    </td>
+                                                                    <td className="p-2 border text-gray-600">
+                                                                        {editForm.spare_id || "-"}
                                                                     </td>
                                                                     <td className="p-2 border">
                                                                         <textarea
@@ -505,6 +547,18 @@ export default function ProductAccessoriesPage() {
                                                                             <span className="text-xs">Mandatory</span>
                                                                         </label>
                                                                     </td>
+                                                                    <td className="p-2 border">
+                                                                        <select
+                                                                            className="w-full px-2 py-1 text-sm border rounded"
+                                                                            value={editForm.package_status}
+                                                                            onChange={(e) =>
+                                                                                setEditForm({ ...editForm, package_status: e.target.value })
+                                                                            }
+                                                                        >
+                                                                            <option value="available">Available</option>
+                                                                            <option value="added">Added</option>
+                                                                        </select>
+                                                                    </td>
                                                                     <td className="p-2 border text-center">
                                                                         <div className="flex gap-2 justify-center">
                                                                             <button
@@ -526,6 +580,7 @@ export default function ProductAccessoriesPage() {
                                                             ) : (
                                                                 <>
                                                                     <td className="p-2 border font-medium">{acc.accessory_name}</td>
+                                                                    <td className="p-2 border text-gray-600">{acc.spare_id || "-"}</td>
                                                                     <td className="p-2 border text-gray-600 max-w-xs truncate">
                                                                         {acc.description || "-"}
                                                                     </td>
@@ -538,6 +593,17 @@ export default function ProductAccessoriesPage() {
                                                                         ) : (
                                                                             <span className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded">
                                                                                 Optional
+                                                                            </span>
+                                                                        )}
+                                                                    </td>
+                                                                    <td className="p-2 border">
+                                                                        {acc.package_status === "added" ? (
+                                                                            <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded">
+                                                                                Added
+                                                                            </span>
+                                                                        ) : (
+                                                                            <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">
+                                                                                Available
                                                                             </span>
                                                                         )}
                                                                     </td>
@@ -609,6 +675,16 @@ export default function ProductAccessoriesPage() {
                                                                 />
                                                                 <span>Mandatory</span>
                                                             </label>
+                                                            <select
+                                                                className="w-full px-2 py-1 text-sm border rounded"
+                                                                value={editForm.package_status}
+                                                                onChange={(e) =>
+                                                                    setEditForm({ ...editForm, package_status: e.target.value })
+                                                                }
+                                                            >
+                                                                <option value="available">Available</option>
+                                                                <option value="added">Added</option>
+                                                            </select>
                                                             <div className="flex gap-2">
                                                                 <button
                                                                     onClick={() => handleUpdateAccessory(acc.id)}
@@ -643,7 +719,14 @@ export default function ProductAccessoriesPage() {
                                                                 <p className="text-xs text-gray-600 mb-2">{acc.description}</p>
                                                             )}
                                                             <div className="text-xs text-gray-600 mb-2">
+                                                                <span className="font-medium">Spare ID:</span> {acc.spare_id || "-"}
+                                                            </div>
+                                                            <div className="text-xs text-gray-600 mb-2">
                                                                 <span className="font-medium">Qty:</span> {acc.qty || 1}
+                                                            </div>
+                                                            <div className="text-xs text-gray-600 mb-2">
+                                                                <span className="font-medium">Package:</span>{" "}
+                                                                {acc.package_status === "added" ? "Added" : "Available"}
                                                             </div>
                                                             <div className="flex gap-2 pt-2 border-t">
                                                                 <button

@@ -2,6 +2,8 @@
 import { getDbConnection } from "@/lib/db";
 import ViewOrderDetails from "./ViewOrderDetails";
 import { notFound } from "next/navigation";
+import { getSessionPayload } from "@/lib/auth";
+import { canEditOrderBooking } from "@/lib/getOrderForBookingUpload";
 
 export const dynamic = "force-dynamic";
 
@@ -70,5 +72,15 @@ export default async function Page({ params }) {
   const { order_id } = await params;
   const data = await getOrderData(order_id);
   if (!data) return notFound();
-  return <ViewOrderDetails data={data} />;
+
+  const payload = await getSessionPayload();
+  const canEditBooking = canEditOrderBooking(payload?.role ?? payload?.userRole);
+
+  return (
+    <ViewOrderDetails
+      data={data}
+      orderBasePath="/admin-dashboard/order"
+      canEditBooking={canEditBooking}
+    />
+  );
 }

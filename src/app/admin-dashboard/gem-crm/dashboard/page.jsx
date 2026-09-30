@@ -128,7 +128,7 @@ export default function GemCrmDashboard() {
           value={stats.activeRA}
           icon={Timer}
           color="bg-purple-500"
-          subtitle="RA period active"
+          subtitle="Within 1 week"
           onClick={() => router.push('/admin-dashboard/gem-crm/bids?activeRA=true')}
           isEndingSoon={false}
           isActiveRA={true}

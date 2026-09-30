@@ -92,10 +92,68 @@ const noStoreHeaders = {
   Pragma: "no-cache",
 };
 
+function mergeServiceReportRow(serviceRecord, reportRow) {
+  if (!reportRow) return serviceRecord;
+
+  const pickStr = (a, b) => {
+    const ta = a != null && String(a).trim() !== "" ? String(a).trim() : "";
+    const tb = b != null && String(b).trim() !== "" ? String(b).trim() : "";
+    return ta || tb || null;
+  };
+
+  return {
+    ...serviceRecord,
+    report_db_id: reportRow.id,
+    checklist: pickStr(reportRow.checklist, serviceRecord.checklist),
+    nature_of_complaints: pickStr(
+      reportRow.nature_of_complaint,
+      serviceRecord.nature_of_complaints
+    ),
+    observation: pickStr(reportRow.observation, serviceRecord.observation),
+    action_taken: pickStr(reportRow.action_taken, serviceRecord.action_taken),
+    replaced: pickStr(reportRow.spare_replaced, serviceRecord.replaced),
+    to_be_replaced: pickStr(
+      reportRow.spare_to_be_replaced,
+      serviceRecord.to_be_replaced
+    ),
+    service_rate: pickStr(reportRow.service_rating, serviceRecord.service_rate),
+    feedback: pickStr(reportRow.customer_feedback, serviceRecord.feedback),
+    authorised_person_name: pickStr(
+      reportRow.authorized_person_name,
+      serviceRecord.authorised_person_name
+    ),
+    authorised_person_sign: pickStr(
+      reportRow.authorized_person_sign,
+      serviceRecord.authorised_person_sign
+    ),
+    authorised_person_designation: pickStr(
+      reportRow.authorized_person_designation,
+      serviceRecord.authorised_person_designation
+    ),
+    authorised_person_mobile: pickStr(
+      reportRow.authorized_person_mobile,
+      serviceRecord.authorised_person_mobile
+    ),
+    customer_name: pickStr(reportRow.customer_name, serviceRecord.customer_name),
+    customer_sign: pickStr(reportRow.customer_sign, serviceRecord.customer_sign),
+    customer_designation: pickStr(
+      reportRow.customer_designation,
+      serviceRecord.customer_designation
+    ),
+    customer_mobile: pickStr(reportRow.customer_mobile, serviceRecord.customer_mobile),
+    completed_date: pickStr(reportRow.service_date, serviceRecord.completed_date),
+    final_report_path: pickStr(
+      reportRow.final_report_path,
+      serviceRecord.final_report_path
+    ),
+  };
+}
+
 export async function GET(request, context) {
   try {
     const { params } = await context;
     const serviceId = (await params).service_id;
+    const reportId = request.nextUrl.searchParams.get("reportId");
 
     if (!serviceId) {
       return NextResponse.json(
@@ -128,30 +186,28 @@ export async function GET(request, context) {
 
     const installationData = installationRows.length > 0 ? installationRows[0] : null;
 
-    const [reportRows] = await db.query(
-      `SELECT authorized_person_sign, customer_sign
-       FROM service_reports WHERE service_id = ? LIMIT 1`,
-      [serviceId]
-    );
-    const reportRow = reportRows[0] || null;
+    let reportRow = null;
+    if (reportId) {
+      const [specificReportRows] = await db.query(
+        `SELECT * FROM service_reports WHERE id = ? AND service_id = ? LIMIT 1`,
+        [reportId, serviceId]
+      );
+      reportRow = specificReportRows[0] || null;
+      if (!reportRow) {
+        return NextResponse.json(
+          { error: "Service report not found" },
+          { status: 404, headers: noStoreHeaders }
+        );
+      }
+    } else {
+      const [latestReportRows] = await db.query(
+        `SELECT * FROM service_reports WHERE service_id = ? ORDER BY id DESC LIMIT 1`,
+        [serviceId]
+      );
+      reportRow = latestReportRows[0] || null;
+    }
 
-    const pickStr = (a, b) => {
-      const ta = a != null && String(a).trim() !== "" ? String(a).trim() : "";
-      const tb = b != null && String(b).trim() !== "" ? String(b).trim() : "";
-      return ta || tb || null;
-    };
-
-    const mergedRecord = {
-      ...serviceRecord,
-      authorised_person_sign: pickStr(
-        reportRow?.authorized_person_sign,
-        serviceRecord.authorised_person_sign
-      ),
-      customer_sign: pickStr(
-        reportRow?.customer_sign,
-        serviceRecord.customer_sign
-      ),
-    };
+    const mergedRecord = mergeServiceReportRow(serviceRecord, reportRow);
 
     // ✅ Get warranty product details using serial number
     const serialNumber = serviceRecord.serial_number;

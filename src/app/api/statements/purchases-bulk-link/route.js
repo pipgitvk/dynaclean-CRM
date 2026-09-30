@@ -177,6 +177,23 @@ export async function PATCH(req) {
         );
       }
 
+      // Keep product_stock_request.linked_statement_ids in sync with statement links
+      for (const purchaseId of purchase_ids) {
+        const linkedTransIds = [];
+        for (const stmt of updatedStatements) {
+          const tokens = parseLinkedPurchaseTokens(stmt.linked_purchase_ids);
+          if (tokens.includes(`PP${purchaseId}`) && stmt.trans_id) {
+            if (!linkedTransIds.includes(stmt.trans_id)) {
+              linkedTransIds.push(stmt.trans_id);
+            }
+          }
+        }
+        await conn.execute(
+          "UPDATE product_stock_request SET linked_statement_ids = ? WHERE id = ?",
+          [linkedTransIds.length > 0 ? JSON.stringify(linkedTransIds) : null, purchaseId]
+        );
+      }
+
       await conn.commit();
       return new Response(JSON.stringify({ ok: true }), {
         status: 200,

@@ -60,13 +60,14 @@ function submissionBelongsToSessionRow(sub, session) {
 function isEmpcrmProfileAdmin(session) {
   if (!session?.role) return false;
   const r = String(session.role).trim();
-  return ["SUPERADMIN", "HR HEAD", "HR", "HR Executive", "JUNIOR HR EXECUTIVE", "HR RECRUITER"].some((a) => a.toLowerCase() === r.toLowerCase());
+  return ["SUPERADMIN", "DIRECTOR", "HR HEAD", "HR", "HR Executive", "JUNIOR HR EXECUTIVE", "HR RECRUITER"].some((a) => a.toLowerCase() === r.toLowerCase());
 }
 
-/** Final profile publish (merge into employee_profiles) — Super Admin only */
+/** Final profile publish (merge into employee_profiles) — Super Admin / Director */
 function isSuperAdmin(session) {
   if (!session?.role) return false;
-  return String(session.role).trim().toUpperCase() === "SUPERADMIN";
+  const r = String(session.role).trim().toUpperCase();
+  return r === "SUPERADMIN" || r === "DIRECTOR";
 }
 
 function isHrHead(session) {

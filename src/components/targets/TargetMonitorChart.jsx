@@ -66,7 +66,7 @@ const TargetMonitorChart = ({ rows, periodLabel, filterMonth, filterYear }) => {
               month: String(filterMonth),
               year: String(filterYear),
             });
-            return fetch(`/api/target-completion?${params.toString()},`).then((res) => {
+            return fetch(`/api/target-completion?${params.toString()}`).then((res) => {
               if (!res.ok) throw new Error("Failed to load");
               return res.json();
             });

@@ -7,6 +7,13 @@ import { updateSpecialPrice, deleteSpecialPrice } from "./_actions";
 import SpecialPriceApproveRejectButtons from "@/components/specialPrice/SpecialPriceApproveRejectButtons";
 import SpecialPricingSearch from "./SpecialPricingSearch";
 import StatusFilter from "./StatusFilter";
+import TypeFilter from "./TypeFilter";
+import {
+  isDealerPricePending,
+  resolveSpecialPriceTerm,
+  resolveSpecialPriceType,
+  SPECIAL_PRICE_PENDING_CONDITION,
+} from "@/lib/specialPriceDefaults";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +35,7 @@ export default async function AdminSpecialPricingPage({ searchParams }) {
   const currentPage = pageParam < 1 ? 1 : pageParam;
   const searchQuery = String(searchParamsResolved?.search || "").trim();
   const statusFilter = String(searchParamsResolved?.status || "").toLowerCase().trim();
+  const typeFilter = String(searchParamsResolved?.type || "").toLowerCase().trim();
 
   const conn = await getDbConnection();
 
@@ -42,29 +50,44 @@ export default async function AdminSpecialPricingPage({ searchParams }) {
     conditions.push(`(
       c.first_name LIKE ? OR
       c.last_name LIKE ? OR
-      p.item_name LIKE ? OR
+      CASE 
+        WHEN sp.item_type = 'product' THEN p.item_name
+        ELSE sl.item_name
+      END LIKE ? OR
       sp.product_code LIKE ? OR
       sp.status LIKE ?
     )`);
     whereParams.push(like, like, like, like, like);
   }
 
-  if (statusFilter && ["approved", "rejected", "pending"].includes(statusFilter)) {
+  if (statusFilter === "pending") {
+    conditions.push(SPECIAL_PRICE_PENDING_CONDITION);
+  } else if (statusFilter && ["approved", "rejected"].includes(statusFilter)) {
     conditions.push("LOWER(TRIM(sp.status)) = ?");
     whereParams.push(statusFilter);
+  }
+
+  if (typeFilter && ["product", "spare"].includes(typeFilter)) {
+    conditions.push("sp.item_type = ?");
+    whereParams.push(typeFilter);
   }
 
   if (conditions.length > 0) {
     whereClause = `WHERE ${conditions.join(" AND ")}`;
   }
 
+  // ✅ Fetch all items from unified special_price table
+  // spare_id is stored in product_id column, item_type differentiates them
   const listSqlBase = `
     SELECT
       sp.id,
       sp.customer_id,
+      sp.item_type,
       sp.product_id,
       sp.product_code,
       sp.special_price,
+      sp.price_type,
+      sp.price_term,
       sp.status,
       sp.set_by,
       sp.set_date,
@@ -73,12 +96,28 @@ export default async function AdminSpecialPricingPage({ searchParams }) {
       NOTE_PLACEHOLDER
       c.first_name,
       c.last_name,
-      p.item_name,
-      p.price_per_unit,
-      p.product_image
+      CASE 
+        WHEN sp.item_type = 'spare' THEN sl.item_name
+        ELSE p.item_name
+      END AS item_name,
+      CASE 
+        WHEN sp.item_type = 'spare' THEN sl.sale_price
+        ELSE p.price_per_unit
+      END AS price_per_unit,
+      CASE 
+        WHEN sp.item_type = 'spare' THEN sl.last_negotiation_price
+        ELSE p.last_negotiation_price
+      END AS last_negotiation_price,
+      CASE 
+        WHEN sp.item_type = 'spare' THEN sl.image
+        ELSE p.product_image
+      END AS product_image,
+      u.username AS set_by_name
     FROM special_price sp
     JOIN customers c ON sp.customer_id = c.customer_id
-    JOIN products_list p ON sp.product_id = p.id
+    LEFT JOIN products_list p ON sp.item_type = 'product' AND sp.product_id = p.id
+    LEFT JOIN spare_list sl ON sp.item_type = 'spare' AND sp.product_id = sl.id
+    LEFT JOIN rep_list u ON BINARY sp.set_by = BINARY u.username
     ${whereClause}
     ORDER BY sp.set_date DESC
     LIMIT ? OFFSET ?
@@ -100,12 +139,14 @@ export default async function AdminSpecialPricingPage({ searchParams }) {
     rows = result[0];
   }
 
+  // ✅ Get total count
   const [countRows] = await conn.execute(
     `
       SELECT COUNT(*) AS total
       FROM special_price sp
       JOIN customers c ON sp.customer_id = c.customer_id
-      JOIN products_list p ON sp.product_id = p.id
+      LEFT JOIN products_list p ON sp.item_type = 'product' AND sp.product_id = p.id
+      LEFT JOIN spare_list sl ON sp.item_type = 'spare' AND sp.product_id = sl.id
       ${whereClause}
     `,
     whereParams,
@@ -113,21 +154,21 @@ export default async function AdminSpecialPricingPage({ searchParams }) {
   const totalCount = Number(countRows[0]?.total || 0);
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
+  // Same pending rule as the admin dashboard card: visible rows that are not approved/rejected.
   const [statusRows] = await conn.execute(
-    `SELECT status, COUNT(*) AS count FROM special_price GROUP BY status`,
+    `SELECT
+       SUM(CASE WHEN LOWER(TRIM(IFNULL(sp.status, ''))) = 'approved' THEN 1 ELSE 0 END) AS approved,
+       SUM(CASE WHEN LOWER(TRIM(IFNULL(sp.status, ''))) = 'rejected' THEN 1 ELSE 0 END) AS rejected,
+       SUM(CASE WHEN ${SPECIAL_PRICE_PENDING_CONDITION} THEN 1 ELSE 0 END) AS pending
+     FROM special_price sp
+     JOIN customers c ON sp.customer_id = c.customer_id`,
   );
 
-  const statusCounts = statusRows.reduce(
-    (acc, row) => {
-      const key = String(row.status || "").toLowerCase();
-      const count = Number(row.count || 0);
-      if (key === "approved") acc.approved += count;
-      else if (key === "rejected") acc.rejected += count;
-      else if (key === "pending") acc.pending += count;
-      return acc;
-    },
-    { approved: 0, rejected: 0, pending: 0 },
-  );
+  const statusCounts = {
+    approved: Number(statusRows[0]?.approved || 0),
+    rejected: Number(statusRows[0]?.rejected || 0),
+    pending: Number(statusRows[0]?.pending || 0),
+  };
 
   return (
     <div className="p-4 sm:p-6 space-y-4 overflow-x-hidden min-w-0">
@@ -170,6 +211,7 @@ export default async function AdminSpecialPricingPage({ searchParams }) {
           }))}
         />
         <StatusFilter initialStatus={statusFilter} />
+        <TypeFilter initialType={typeFilter} />
       </div>
 
       <div className="bg-white shadow rounded-lg overflow-hidden min-w-0">
@@ -177,14 +219,18 @@ export default async function AdminSpecialPricingPage({ searchParams }) {
           className="overflow-x-scroll w-full min-w-0 touch-pan-x"
           style={{ WebkitOverflowScrolling: "touch" }}
         >
-          <table className="min-w-[900px] w-full border-collapse text-sm">
+          <table className="min-w-[1000px] w-full border-collapse text-sm">
             <thead className="bg-gray-100">
               <tr>
+                <th className="p-3 text-left">Type</th>
                 <th className="p-3 text-left">Customer</th>
                 <th className="p-3 text-left">Image</th>
-                <th className="p-3 text-left">Product</th>
+                <th className="p-3 text-left">Product/Spare</th>
                 <th className="p-3 text-right">Original Price</th>
+                <th className="p-3 text-right">Last Neg. Price</th>
                 <th className="p-3 text-right">Special Price</th>
+                <th className="p-3 text-left">Price Type</th>
+                <th className="p-3 text-left">Price Term</th>
                 <th className="p-3 text-center">Status</th>
                 <th className="p-3 text-left">Set By</th>
                 <th className="p-3 text-left">Set Date</th>
@@ -195,10 +241,10 @@ export default async function AdminSpecialPricingPage({ searchParams }) {
               {rows.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={9}
+                    colSpan={13}
                     className="p-4 text-center text-gray-500 text-sm"
                   >
-                    {searchQuery || statusFilter ? "No data found" : "No special prices found."}
+                    {searchQuery || statusFilter || typeFilter ? "No data found" : "No special prices found."}
                   </td>
                 </tr>
               ) : (
@@ -230,7 +276,17 @@ export default async function AdminSpecialPricingPage({ searchParams }) {
                       : null;
 
                   return (
-                    <tr key={row.id} className="border-t">
+                    <tr key={`${row.item_type}-${row.id}`} className="border-t">
+                      {/* Type Badge */}
+                      <td className="p-3">
+                        <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                          row.item_type === 'product' 
+                            ? 'bg-blue-100 text-blue-700' 
+                            : 'bg-purple-100 text-purple-700'
+                        }`}>
+                          {row.item_type === 'product' ? 'Product' : 'Spare'}
+                        </span>
+                      </td>
                       <td className="p-3">
                         {row.first_name} {row.last_name || ""}
                         <div className="text-xs text-gray-500">
@@ -242,7 +298,7 @@ export default async function AdminSpecialPricingPage({ searchParams }) {
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
                             src={row.product_image}
-                            alt={row.item_name || "Product"}
+                            alt={row.item_name || "Item"}
                             className="w-10 h-10 object-cover rounded"
                           />
                         ) : (
@@ -258,8 +314,23 @@ export default async function AdminSpecialPricingPage({ searchParams }) {
                       <td className="p-3 text-right text-gray-600">
                         ₹ {row.price_per_unit}
                       </td>
+                      <td className="p-3 text-right text-gray-600">
+                        ₹ {row.last_negotiation_price ?? 0}
+                      </td>
                       <td className="p-3 text-right font-semibold">
-                        ₹ {row.special_price}
+                        {isDealerPricePending(row) ? (
+                          <span className="text-gray-400 italic text-sm font-normal">
+                            Enter on approve
+                          </span>
+                        ) : (
+                          `₹ ${row.special_price}`
+                        )}
+                      </td>
+                      <td className="p-3 text-sm capitalize">
+                        {resolveSpecialPriceType(row.price_type)}
+                      </td>
+                      <td className="p-3 text-sm capitalize">
+                        {resolveSpecialPriceTerm(row.price_term)}
                       </td>
                       <td className="p-3 text-center">
                         <div className="flex flex-col items-center gap-1">
@@ -301,12 +372,15 @@ export default async function AdminSpecialPricingPage({ searchParams }) {
                           <SpecialPriceDetailsModal
                             details={{
                               id: row.id,
+                              itemType: row.item_type,
                               customerId: row.customer_id,
                               customerName: `${row.first_name || ""} ${row.last_name || ""}`.trim(),
                               productName: row.item_name,
                               productCode: row.product_code,
                               originalPrice: row.price_per_unit,
                               specialPrice: row.special_price,
+                              priceType: row.price_type,
+                              priceTerm: row.price_term,
                               status: row.status,
                               setBy: row.set_by,
                               setDate: row.set_date,
@@ -319,7 +393,11 @@ export default async function AdminSpecialPricingPage({ searchParams }) {
                           />
                         </div>
                         {!isApproved && !isRejected && (
-                          <SpecialPriceApproveRejectButtons id={row.id} />
+                          <SpecialPriceApproveRejectButtons
+                            id={row.id}
+                            itemType={row.item_type}
+                            needsDealerPrice={isDealerPricePending(row)}
+                          />
                         )}
                       </td>
                     </tr>
@@ -340,6 +418,7 @@ export default async function AdminSpecialPricingPage({ searchParams }) {
                 href={`/admin-dashboard/special-pricing?${new URLSearchParams({
                   ...(searchQuery && { search: searchQuery }),
                   ...(statusFilter && { status: statusFilter }),
+                  ...(typeFilter && { type: typeFilter }),
                   page: String(currentPage - 1),
                 }).toString()}`}
                 className="px-3 py-1.5 border rounded hover:bg-gray-50"
@@ -352,6 +431,7 @@ export default async function AdminSpecialPricingPage({ searchParams }) {
                 href={`/admin-dashboard/special-pricing?${new URLSearchParams({
                   ...(searchQuery && { search: searchQuery }),
                   ...(statusFilter && { status: statusFilter }),
+                  ...(typeFilter && { type: typeFilter }),
                   page: String(currentPage + 1),
                 }).toString()}`}
                 className="px-3 py-1.5 border rounded hover:bg-gray-50"

@@ -21,7 +21,6 @@ export async function GET(req) {
     //   [quotationNumber],
     // );
 
-    // Use named placeholders when mysql2 namedPlaceholders is enabled on the pool.
     const [quotationRows] = await conn.execute(
       `
   SELECT 
@@ -32,10 +31,10 @@ export async function GET(req) {
   FROM quotations_records q
   LEFT JOIN customers c 
     ON q.customer_id = c.customer_id
-  WHERE q.quote_number = :quotationNumber
+  WHERE q.quote_number = ?
   LIMIT 1
   `,
-      { quotationNumber },
+      [quotationNumber],
     );
 
     if (quotationRows.length === 0) {

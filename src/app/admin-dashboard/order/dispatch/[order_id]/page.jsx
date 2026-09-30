@@ -224,6 +224,15 @@ export default function DispatchFormPage({ params }) {
       if (hasLowStockIssues) {
         throw new Error("Please resolve all stock warnings before completing dispatch");
       }
+
+      for (const row of rows) {
+        const alreadyPersisted =
+          initialSerialNos.has(row.id) || savedIds.has(row.id);
+        if (!alreadyPersisted) {
+          await uploadForRow(row);
+        }
+      }
+
       // mark order dispatch complete
       const doneRes = await fetch("/api/dispatch/complete", {
         method: "POST",

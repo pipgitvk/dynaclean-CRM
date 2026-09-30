@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   FileText,
@@ -22,8 +23,6 @@ import {
   Timer,
 } from "lucide-react";
 import toast from "react-hot-toast";
-import ProfilePicUploader from "@/app/user-dashboard/ProfilePicUploader";
-import AttendanceTracker from "@/components/AttendanceTracker";
 import { getGradientColor } from "@/utils/getGradientColor";
 
 const StatCard = ({ title, value, icon: Icon, color, subtitle, onClick, isEndingSoon, isActiveRA }) => (
@@ -195,33 +194,14 @@ export default function GemCrmDashboard() {
           value={stats.activeRA}
           icon={Timer}
           color="bg-purple-500"
-          subtitle="RA period active"
+          subtitle="Within 1 week"
           onClick={() => router.push('/gem-dashboard/gem-crm/bids?activeRA=true')}
           isEndingSoon={false}
           isActiveRA={true}
         />
       </div>
 
-      {/* Welcome, Profile Pic & Attendance */}
-      {currentUser && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100">
-            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-              <ProfilePicUploader user={currentUser} />
-              <div className="space-y-2 flex-1">
-                <h1 className="text-3xl font-semibold">
-                  Welcome, <span className="text-blue-600">{currentUser.username}</span>
-                </h1>
-                <p className="text-gray-500 text-sm">Role: {currentUser.userRole || currentUser.role}</p>
-              </div>
-            </div>
-          </div>
 
-          <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100">
-            <AttendanceTracker username={currentUser.username} role={currentUser.userRole || currentUser.role} />
-          </div>
-        </div>
-      )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -457,12 +437,15 @@ export default function GemCrmDashboard() {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <h3 className="text-lg font-semibold text-gray-900">Upcoming Enquiry</h3>
-            <div className="flex items-center gap-2">
+            <Link
+              href="/user-dashboard/customers?status=New"
+              className="flex items-center gap-2 transition hover:opacity-80"
+            >
               <span className="text-sm font-semibold text-gray-600">New Leads</span>
               <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-full bg-red-500 px-3 text-sm font-bold text-white shadow">
                 {newLeadsCount}
               </span>
-            </div>
+            </Link>
           </div>
           <a href="/user-dashboard/customers" className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 transition-colors flex items-center gap-2">
             View All

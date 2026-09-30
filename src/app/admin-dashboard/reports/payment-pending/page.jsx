@@ -1,10 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
 import dayjs from "dayjs";
-import { Download, Search, Calendar, DollarSign, ArrowUp, ArrowDown, Trash2, X, PhoneCall, History, Loader2 } from "lucide-react";
+import { Download, Search, Calendar, DollarSign, ArrowUp, ArrowDown, Trash2, X, PhoneCall, History, Loader2, MinusCircle, List } from "lucide-react";
 
 export default function PaymentPendingReport() {
+  const router = useRouter();
   const [orders, setOrders] = useState([]);
   const [filteredOrders, setFilteredOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -18,18 +21,20 @@ export default function PaymentPendingReport() {
   const [dueDateFrom, setDueDateFrom] = useState("");
   const [dueDateTo, setDueDateTo] = useState("");
   const [statusFilter, setStatusFilter] = useState("all"); // all, due, no-due
+  const [completionFilter, setCompletionFilter] = useState("pending"); // pending, completed, all
   const [followupModalOpen, setFollowupModalOpen] = useState(false);
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const canAddDeduction = ["ACCOUNTANT", "PRODUCTION ACCOUNTANT", "ADMIN", "SUPERADMIN"].includes(userRole);
 
   useEffect(() => {
     fetchReport();
-  }, []);
+  }, [completionFilter]);
 
   const fetchReport = async () => {
     try {
       setLoading(true);
-      const res = await fetch("/api/reports/payment-pending");
+      const res = await fetch(`/api/reports/payment-pending?completion=${completionFilter}`);
       const data = await res.json();
       
       if (data.success) {
@@ -55,6 +60,7 @@ export default function PaymentPendingReport() {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(order => 
         order.order_id?.toLowerCase().includes(query) ||
+        order.quote_number?.toLowerCase().includes(query) ||
         order.client_name?.toLowerCase().includes(query) ||
         order.company_name?.toLowerCase().includes(query) ||
         order.contact?.toLowerCase().includes(query) ||
@@ -103,7 +109,7 @@ export default function PaymentPendingReport() {
           bVal = dayjs(bVal).unix();
         }
         // Handle numeric sorting
-        else if (['total_amount', 'paid_amount', 'remaining_amount'].includes(sortConfig.key)) {
+        else if (['total_amount', 'paid_amount', 'remaining_amount', 'deduction_amount'].includes(sortConfig.key)) {
           aVal = parseFloat(aVal) || 0;
           bVal = parseFloat(bVal) || 0;
         }
@@ -137,7 +143,7 @@ export default function PaymentPendingReport() {
   };
 
   const exportToCSV = () => {
-    const headers = ["Order ID", "Customer Name", "Company", "Contact", "Employee", "Total Amount", "Paid Amount", "Remaining Amount", "Due Date", "Tag", "Next Followup"];
+    const headers = ["Order ID", "Customer Name", "Company", "Contact", "Employee", "Total Amount", "Paid Amount", "Deduction Amount", "Remaining Amount", "Due Date", "Tag", "Next Followup", "Last Remark"];
     const csvData = filteredOrders.map(order => [
       order.order_id,
       order.client_name,
@@ -146,10 +152,12 @@ export default function PaymentPendingReport() {
       order.created_by,
       order.total_amount.toFixed(2),
       order.paid_amount.toFixed(2),
+      Number(order.deduction_amount || 0).toFixed(2),
       order.remaining_amount.toFixed(2),
       dayjs(order.due_date).format("DD/MM/YYYY"),
       order.latest_deduction || "",
-      order.next_followup_date ? dayjs(order.next_followup_date).format("DD/MM/YYYY hh:mm A") : ""
+      order.next_followup_date ? dayjs(order.next_followup_date).format("DD/MM/YYYY hh:mm A") : "",
+      order.latest_remark || ""
     ]);
 
     const csvContent = [
@@ -221,155 +229,150 @@ export default function PaymentPendingReport() {
       <td className="px-4 py-3 border-b"><div className="h-4 bg-gray-300 rounded w-20"></div></td>
       <td className="px-4 py-3 border-b"><div className="h-4 bg-gray-300 rounded w-16"></div></td>
       <td className="px-4 py-3 border-b"><div className="h-4 bg-gray-300 rounded w-24"></div></td>
+      <td className="px-4 py-3 border-b"><div className="h-4 bg-gray-300 rounded w-48"></div></td>
       <td className="px-4 py-3 border-b"><div className="h-8 bg-gray-300 rounded w-28"></div></td>
     </tr>
   );
 
   return (
-    <div className="w-full max-w-full p-6 overflow-hidden">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-800 mb-2">Payment Pending Report</h1>
-        <p className="text-gray-600">
-          Track orders with pending payments
-          {userRole === "SALES" && " (Your orders only)"}
-        </p>
-      </div>
+    <div className="w-full max-w-full p-3 overflow-hidden">
+    
 
-      {/* Summary Card with Filters */}
-      <div className="mb-6 flex flex-col lg:flex-row gap-4">
-        {/* Summary Card */}
-        <div className="w-80 bg-gradient-to-br from-teal-50 to-cyan-50 rounded-lg shadow-lg p-4 border-l-4 border-teal-500">
-          <h2 className="text-xs font-bold text-teal-600 tracking-widest mb-1">AMOUNT SUMMARY</h2>
-          <p className="text-teal-600 text-xs mb-3">All orders overview</p>
-          
-          <div className="space-y-3">
-            {/* Total Orders */}
-            <div
-              className="cursor-pointer hover:bg-white/50 p-2 rounded transition-colors"
-              onClick={handleTotalOrdersCardClick}
-            >
-              <p className="text-xs text-teal-600 font-semibold mb-1">Total Orders</p>
-              <p className="text-xl font-bold text-gray-800">{filteredOrders.length}</p>
+      {/* Single Row: Stats Card + Filters */}
+      <div className="mb-4 bg-white rounded-lg shadow p-3">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-center">
+          {/* Left Side: Combined Stats Card */}
+          <div className="bg-gradient-to-r from-gray-50 to-blue-50 rounded border p-2">
+            <div className="grid grid-cols-3 divide-x divide-gray-300">
+              {/* Total Orders */}
+              <div 
+                className="text-center cursor-pointer hover:bg-white/50 transition-colors px-2"
+                onClick={handleTotalOrdersCardClick}
+              >
+                <p className="text-xs text-teal-600 font-semibold">Total Orders</p>
+                <p className="text-lg font-bold text-gray-800">{filteredOrders.length}</p>
+              </div>
+              
+              {/* Pending Amount */}
+              <div className="text-center px-2">
+                <p className="text-xs text-red-600 font-semibold">Pending Amount</p>
+                <p className="text-lg font-bold text-red-600">₹{(totalPending / 100000).toFixed(1)}L</p>
+              </div>
+              
+              {/* Total Amount */}
+              <div className="text-center px-2">
+                <p className="text-xs text-blue-600 font-semibold">Total Amount</p>
+                <p className="text-lg font-bold text-gray-800">₹{(totalAmount / 100000).toFixed(1)}L</p>
+              </div>
             </div>
 
-            <hr className="border-teal-200" />
-
-            {/* Total Amount */}
-            <div className="p-2 rounded">
-              <p className="text-xs text-teal-600 font-semibold mb-1">Total Amount</p>
-              <p className="text-xl font-bold text-gray-800">₹{totalAmount.toFixed(2)}</p>
-            </div>
-
-            <hr className="border-teal-200" />
-
-            {/* Pending Amount */}
-            <div className="p-2 rounded">
-              <p className="text-xs text-blue-600 font-semibold mb-1">Pending Amount</p>
-              <p className="text-xl font-bold text-blue-600">₹{totalPending.toFixed(2)}</p>
-            </div>
+            {totalOrdersCardClicks >= 8 && (
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  handleDeleteAllData();
+                }}
+                disabled={deletingAll}
+                className="mt-2 w-full inline-flex items-center justify-center gap-1 rounded bg-red-600 px-2 py-1 text-xs font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <Trash2 size={10} />
+                {deletingAll ? "Deleting..." : "Delete All"}
+              </button>
+            )}
           </div>
 
-        {/* Delete All Data Button */}
-        {totalOrdersCardClicks >= 8 && (
-          <div className="mt-6 pt-6 border-t border-teal-200">
-            <button
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation();
-                handleDeleteAllData();
-              }}
-              disabled={deletingAll}
-              className="inline-flex items-center gap-2 rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <Trash2 size={14} />
-              {deletingAll ? "Deleting..." : "Delete All Data"}
-            </button>
-          </div>
-        )}
-        </div>
-
-        {/* Filters Section */}
-        <div className="w-full lg:w-[500px] flex flex-col gap-4">
-          {/* Search Box */}
-          <div className="bg-white rounded-lg shadow p-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+          {/* Right Side: Search and Filters */}
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-2 items-center">
+            {/* Search Box */}
+            <div className="relative md:col-span-2">
+              <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400" size={12} />
               <input
                 type="text"
-                placeholder="Search by order ID, customer, company..."
+                placeholder="Search..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                className="w-full pl-6 pr-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
             </div>
-          </div>
 
-          {/* Date and Status Filters */}
-          <div className="bg-white rounded-lg shadow p-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Due Date From */}
-              <div className="flex flex-col">
-                <label className="text-xs font-semibold text-gray-700 mb-1">Due Date From</label>
-                <input
-                  type="date"
-                  value={dueDateFrom}
-                  onChange={(e) => setDueDateFrom(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                />
-              </div>
+            {/* Due Date From */}
+            <input
+              type="date"
+              value={dueDateFrom}
+              onChange={(e) => setDueDateFrom(e.target.value)}
+              className="px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+              title="From Date"
+            />
 
-              {/* Due Date To */}
-              <div className="flex flex-col">
-                <label className="text-xs font-semibold text-gray-700 mb-1">Due Date To</label>
-                <input
-                  type="date"
-                  value={dueDateTo}
-                  onChange={(e) => setDueDateTo(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                />
-              </div>
+            {/* Due Date To */}
+            <input
+              type="date"
+              value={dueDateTo}
+              onChange={(e) => setDueDateTo(e.target.value)}
+              className="px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+              title="To Date"
+            />
 
-              {/* Status Filter */}
-              <div className="flex flex-col">
-                <label className="text-xs font-semibold text-gray-700 mb-1">Payment Status</label>
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                >
-                  <option value="all">All Orders</option>
-                  <option value="due">Due (Overdue)</option>
-                  <option value="no-due">Not Due</option>
-                </select>
-              </div>
-
-              {/* Clear Filters Button */}
-              <div className="flex flex-col justify-end">
-                {(dueDateFrom || dueDateTo || statusFilter !== "all" || searchQuery) && (
-                  <button
-                    onClick={() => {
-                      setDueDateFrom("");
-                      setDueDateTo("");
-                      setStatusFilter("all");
-                      setSearchQuery("");
-                    }}
-                    className="flex items-center justify-center gap-2 bg-gray-500 hover:bg-gray-600 text-white px-3 py-2 rounded-lg transition-colors duration-200 text-sm"
-                  >
-                    <X size={14} />
-                    Clear
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Export CSV Button */}
-            <button
-              onClick={exportToCSV}
-              className="w-full mt-3 flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors duration-200 text-sm font-semibold"
+            {/* Payment Completion Filter */}
+            <select
+              value={completionFilter}
+              onChange={(e) => setCompletionFilter(e.target.value)}
+              className="px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
             >
-              <Download size={16} />
-              Export CSV
-            </button>
+              <option value="pending">Pending</option>
+              <option value="completed">Completed</option>
+              <option value="all">All</option>
+            </select>
+
+            {/* Status Filter + Action Buttons */}
+            <div className="flex gap-1">
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+              >
+                <option value="all">All</option>
+                <option value="due">Overdue</option>
+                <option value="no-due">Not Due</option>
+              </select>
+
+              {/* Clear Button */}
+              {(dueDateFrom || dueDateTo || statusFilter !== "all" || completionFilter !== "pending" || searchQuery) && (
+                <button
+                  onClick={() => {
+                    setDueDateFrom("");
+                    setDueDateTo("");
+                    setStatusFilter("all");
+                    setCompletionFilter("pending");
+                    setSearchQuery("");
+                  }}
+                  className="flex items-center justify-center bg-gray-500 hover:bg-gray-600 text-white px-1.5 py-1.5 rounded text-xs transition-colors"
+                  title="Clear Filters"
+                >
+                  <X size={12} />
+                </button>
+              )}
+
+              {/* CSV Export Button */}
+              <button
+                onClick={exportToCSV}
+                className="flex items-center justify-center bg-green-600 hover:bg-green-700 text-white px-1.5 py-1.5 rounded text-xs transition-colors"
+                title="Export to CSV"
+              >
+                <Download size={12} />
+              </button>
+
+              {canAddDeduction && (
+                <Link
+                  href="/admin-dashboard/reports/deductions"
+                  className="flex items-center justify-center bg-orange-600 hover:bg-orange-700 text-white px-1.5 py-1.5 rounded text-xs transition-colors"
+                  title="View Deductions"
+                >
+                  <List size={12} />
+                </Link>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -440,6 +443,12 @@ export default function PaymentPendingReport() {
                 >
                   Next Followup <SortIcon columnKey="next_followup_date" />
                 </th>
+                <th
+                  className="px-4 py-3 text-left font-semibold cursor-pointer hover:bg-gray-700 transition-colors"
+                  onClick={() => handleSort('latest_remark')}
+                >
+                  Last Remark <SortIcon columnKey="latest_remark" />
+                </th>
                 <th className="px-4 py-3 text-center font-semibold">Actions</th>
               </tr>
             </thead>
@@ -452,7 +461,16 @@ export default function PaymentPendingReport() {
                   return (
                     <tr key={index} className="hover:bg-gray-50 transition-colors">
                       <td className="px-4 py-3 border-b font-medium text-gray-800">
-                        {order.order_id}
+                        <div>{order.order_id}</div>
+                        {order.quote_number && (
+                          <Link
+                            href={`/admin-dashboard/quotations/${encodeURIComponent(order.quote_number)}`}
+                            className="text-[11px] font-medium text-blue-600 hover:text-blue-800 hover:underline mt-0.5 inline-block"
+                            title="View Quotation"
+                          >
+                            {order.quote_number}
+                          </Link>
+                        )}
                       </td>
                       <td className="px-4 py-3 border-b">
                         <div className="text-xs">
@@ -469,7 +487,12 @@ export default function PaymentPendingReport() {
                         ₹{order.paid_amount.toFixed(2)}
                       </td>
                       <td className="px-4 py-3 border-b text-right font-semibold text-red-600">
-                        ₹{order.remaining_amount.toFixed(2)}
+                        <div>₹{order.remaining_amount.toFixed(2)}</div>
+                        {Number(order.deduction_amount || 0) > 0 && (
+                          <div className="text-[11px] font-medium text-orange-600">
+                            Deducted ₹{Number(order.deduction_amount).toFixed(2)}
+                          </div>
+                        )}
                       </td>
                       <td className="px-4 py-3 border-b text-center">
                         <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
@@ -498,6 +521,15 @@ export default function PaymentPendingReport() {
                           ? dayjs(order.next_followup_date).format("DD/MM/YYYY hh:mm A")
                           : "-"}
                       </td>
+                      <td className="px-4 py-3 border-b text-sm text-gray-700 min-w-xs">
+                        {order.latest_remark ? (
+                          <div className="line-clamp-3 hover:line-clamp-none hover:whitespace-normal cursor-help" title={order.latest_remark}>
+                            {order.latest_remark}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-gray-400">—</span>
+                        )}
+                      </td>
                       <td className="px-4 py-3 border-b">
                         <div className="flex items-center justify-center gap-2">
                           <button
@@ -522,6 +554,20 @@ export default function PaymentPendingReport() {
                             <History size={14} />
                             History
                           </button>
+                          {canAddDeduction && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                router.push(
+                                  `/admin-dashboard/reports/deductions?order_id=${encodeURIComponent(order.order_id)}`
+                                );
+                              }}
+                              className="inline-flex items-center gap-2 rounded-md bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-700"
+                            >
+                              <MinusCircle size={14} />
+                              Deduction
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

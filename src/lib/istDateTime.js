@@ -106,6 +106,40 @@ export function parseAttendanceClockMinutes(value) {
 }
 
 /**
+ * Parse attendance DATETIME from DB as an instant (naive IST wall-clock).
+ * @param {string|Date|null|undefined} value
+ * @returns {Date|null}
+ */
+export function parseAttendanceDateTime(value) {
+  if (value == null || value === "") return null;
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value;
+  }
+
+  const s = String(value).trim();
+  const hasExplicitTz = /Z$/i.test(s) || /[+-]\d{2}:?\d{2}$/.test(s);
+  if (hasExplicitTz) {
+    const d = new Date(s);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if (m) {
+    const iso = `${m[1]}-${m[2]}-${m[3]}T${pad2(m[4])}:${pad2(m[5])}:${pad2(m[6] ?? "0")}+05:30`;
+    const d = new Date(iso);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/** Minutes from midnight in IST for "now". */
+export function getNowISTClockMinutes() {
+  return parseAttendanceClockMinutes(new Date());
+}
+
+/**
  * Display attendance DATETIME in UI.
  * - Naive MySQL strings are rendered as wall-clock by default.
  * - Set NEXT_PUBLIC_ATTENDANCE_DB_NAIVE_IS_UTC=1 to treat naive values as UTC.

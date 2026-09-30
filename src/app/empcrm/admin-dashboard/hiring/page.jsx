@@ -2,9 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Eye, Filter, Loader2, Pencil, UserPlus, X } from "lucide-react";
 import { HR_SCORE_RATING_OPTIONS, HIRING_TAG_OPTIONS as TAG_OPTIONS, HAVE_NOT_TALKED_REASONS } from "@/lib/hiringPayload";
 import { HR_TARGET_ALLOWED_DESIGNATIONS, mergeDesignationOptions, normalizeDesignationKey, resolveCanonicalDesignation } from "@/lib/designationDedupe";
+import { getDirectorHrHiringBase } from "@/lib/directorHrPaths";
 
 /** Shared field styles */
 const fieldClass =
@@ -141,6 +143,8 @@ function StatusChip({ status, tag }) {
 }
 
 export default function HiringPage() {
+  const pathname = usePathname();
+  const hiringBase = getDirectorHrHiringBase(pathname);
   const [candidate_name, setCandidateName] = useState("");
   const [emp_contact, setEmpContact] = useState("");
   const [designation, setDesignation] = useState("");
@@ -823,14 +827,14 @@ export default function HiringPage() {
                       <td className="px-3 py-2.5 text-right sm:px-4">
                         <div className="inline-flex flex-wrap items-center justify-end gap-1.5">
                           <Link
-                            href={`/empcrm/admin-dashboard/hiring/${row.id}/view`}
+                            href={`${hiringBase}/${row.id}/view`}
                             className="inline-flex items-center gap-1 rounded-lg border border-indigo-200/90 bg-indigo-50/90 px-2 py-1 text-xs font-medium text-indigo-800 transition hover:bg-indigo-100"
                           >
                             <Eye className="h-3.5 w-3.5 shrink-0" />
                             View
                           </Link>
                           <Link
-                            href={`/empcrm/admin-dashboard/hiring/${row.id}/edit`}
+                            href={`${hiringBase}/${row.id}/edit`}
                             className="inline-flex items-center gap-1 rounded-lg border border-emerald-200/80 bg-emerald-50/80 px-2 py-1 text-xs font-medium text-emerald-800 transition hover:bg-emerald-100"
                           >
                             <Pencil className="h-3.5 w-3.5 shrink-0" />

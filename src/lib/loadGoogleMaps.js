@@ -21,43 +21,58 @@ export function loadGoogleMaps() {
     return Promise.resolve();
   }
 
-  // Already loaded
-  if (window.google?.maps) {
+  // Already fully loaded — window.google.maps.Map is a constructor
+  if (window.google?.maps?.Map) {
     return Promise.resolve();
   }
 
-  // Script already in DOM (loading or loaded) - wait for it
-  const existingScript = document.getElementById(SCRIPT_ID);
-  if (existingScript) {
-    if (!loadPromise) {
-      loadPromise = new Promise((resolve, reject) => {
-        const resolveWhenReady = () => {
-          if (window.google?.maps) {
-            resolve();
-            return;
-          }
-          if (existingScript.readyState === "complete" || existingScript.readyState === "loaded") {
-            resolve();
-            return;
-          }
-          existingScript.addEventListener("load", resolve);
-          existingScript.addEventListener("error", reject);
-        };
-        resolveWhenReady();
-      });
-    }
+  // Return existing in-flight promise
+  if (loadPromise) {
     return loadPromise;
   }
 
-  // First load - create script and promise
   loadPromise = new Promise((resolve, reject) => {
+    // Script tag already in DOM (maybe injected by something else) — poll until ready
+    const existingScript = document.getElementById(SCRIPT_ID);
+    if (existingScript) {
+      const poll = setInterval(() => {
+        if (window.google?.maps?.Map) {
+          clearInterval(poll);
+          resolve();
+        }
+      }, 50);
+      existingScript.addEventListener("error", () => {
+        clearInterval(poll);
+        reject(new Error("Google Maps script failed to load"));
+      });
+      return;
+    }
+
+    // First load — inject the script tag (classic loader, no loading=async)
     const script = document.createElement("script");
     script.id = SCRIPT_ID;
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${API_KEY}&libraries=marker&loading=async`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${API_KEY}&libraries=places,marker`;
     script.async = true;
     script.defer = true;
-    script.onload = resolve;
-    script.onerror = reject;
+    script.onload = () => {
+      // Sanity-check that the constructor is actually available
+      if (window.google?.maps?.Map) {
+        resolve();
+      } else {
+        // Rare edge case: poll a bit more
+        const poll = setInterval(() => {
+          if (window.google?.maps?.Map) {
+            clearInterval(poll);
+            resolve();
+          }
+        }, 50);
+        setTimeout(() => {
+          clearInterval(poll);
+          reject(new Error("Google Maps loaded but Map constructor not available"));
+        }, 5000);
+      }
+    };
+    script.onerror = () => reject(new Error("Failed to load Google Maps script"));
     document.head.appendChild(script);
   });
 

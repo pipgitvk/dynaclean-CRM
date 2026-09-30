@@ -1,248 +1,200 @@
 @page {
-  size: A4;
-  margin: 0;
+  size: A4 portrait;
+  margin: 6mm;
+}
+
+/* Layout helpers */
+#print-root .print-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem 1.5rem;
+}
+
+#print-root .print-checklist-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.25rem 1rem;
+}
+
+.print-photos-page {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 2px solid #e5e7eb;
+}
+
+.print-photos-title {
+  text-align: center;
+  font-size: 1.125rem;
+  font-weight: 700;
+  margin: 0 0 0.25rem;
+  color: #1f2937;
+}
+
+.print-photos-meta {
+  text-align: center;
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin: 0 0 1rem;
+}
+
+.print-photos-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.print-photo-section h3 {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin: 0 0 0.5rem;
+  padding: 0.375rem 0.5rem;
+  background: #f3f4f6;
+  border: 1px solid #d1d5db;
+  border-radius: 0.375rem;
+  text-align: center;
+}
+
+.print-photo-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.5rem;
+}
+
+.print-photo-frame {
+  border: 1px solid #d1d5db;
+  border-radius: 0.375rem;
+  min-height: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: #fafafa;
+}
+
+.print-photo-frame img {
+  width: 100%;
+  max-height: 140px;
+  object-fit: contain;
+  display: block;
+}
+
+.print-photo-placeholder {
+  width: 100%;
+  min-height: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  color: #6b7280;
+  padding: 0.5rem;
+  text-align: center;
+  word-break: break-all;
+  box-sizing: border-box;
+}
+
+.print-photo-item figcaption {
+  font-size: 0.65rem;
+  margin-top: 0.25rem;
+  text-align: center;
+  word-break: break-all;
+  color: #374151;
+}
+
+.print-photo-empty {
+  font-size: 0.75rem;
+  font-style: italic;
+  text-align: center;
+  padding: 0.5rem;
+  border: 1px dashed #d1d5db;
+  border-radius: 0.375rem;
+  color: #6b7280;
 }
 
 @media print {
+  html,
   body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+    width: 100% !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
-    margin: 0;
-    padding: 0;
-    font-size: 10px;
-    line-height: 1.2;
-    font-family: Arial, sans-serif;
+  }
+
+  /* Hide everything except the report card */
+  body * {
+    visibility: hidden !important;
+  }
+
+  .print-page-wrapper,
+  .print-page-wrapper * {
+    visibility: visible !important;
+  }
+
+  .no-print,
+  .no-print * {
+    visibility: hidden !important;
+    display: none !important;
+  }
+
+  nav,
+  aside,
+  .fixed,
+  [class*="ThemeSwitcher"] {
+    display: none !important;
+  }
+
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+  }
+
+  .print-page-wrapper {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    min-height: auto !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: white !important;
+    display: block !important;
+  }
+
+  .print-card {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    background: white !important;
+  }
+
+  #print-root {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
   }
 
   #print-content {
-    width: 210mm;
-    height: 297mm;
-    padding: 6mm;
-    box-sizing: border-box;
-    border: 1px solid #333;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    transform: scale(0.95);
-    transform-origin: top left;
-  }
-
-  /* --- Header --- */
-  header {
-    display: flex !important;
-    flex-direction: row !important;
-    align-items: center !important;
-    justify-content: space-between !important;
-    gap: 1rem !important;
-    flex-wrap: nowrap !important;
-  }
-
-  header > div:first-child {
-    flex: 0 0 auto !important;
-    margin: 0 !important;
-  }
-
-  header > div:last-child {
-    flex: 1 1 auto !important;
     width: 100% !important;
-    text-align: right !important;
-    margin-top: -5rem !important;
+    box-sizing: border-box !important;
   }
 
-  header img {
-    width: 5rem !important;
-  }
-
-  h1, h2, h3 {
-    margin: 0 !important;
-    font-size: 14px !important;
-    font-weight: bold;
-  }
-
-  h2 {
-    text-align: center;
-    border-bottom: 1px solid #333;
-    padding-bottom: 2px;
-  }
-
-  address, .text-sm {
-    font-size: 9px !important;
-  }
-
-  /* --- Info Grid as Table --- */
-  .info-table {
-    display: table !important;
-    width: 100% !important;
-    border-collapse: collapse !important;
-    font-size: 9px !important;
-    margin: 2px 0 !important;
-  }
-
-  .info-table > div {
-    display: table-row !important;
-  }
-
-  .info-table > div > * {
-    display: table-cell !important;
-    border: 1px solid #333 !important;
-    padding: 2px 4px !important;
-    vertical-align: top;
-  }
-
-  .info-table label {
-    font-weight: bold !important;
-    white-space: nowrap;
-  }
-
-  /* --- Checklist --- */
-  .checklist-table {
-    display: table !important;
-    width: 100% !important;
-    border-collapse: collapse !important;
-    font-size: 9px !important;
-    border: 1px solid #333 !important;
-    margin: 2px 0 !important;
-  }
-
-  .checklist-table h3 {
-    display: table-caption !important;
-    caption-side: top !important;
-    text-align: center !important;
-    font-size: 10px !important;
-    border-bottom: 1px solid #333 !important;
-    padding: 2px;
-  }
-
-  .checklist-table .grid {
-    display: table-row-group !important;
-  }
-
-  .checklist-table .grid > div {
-    display: table-cell !important;
-    border: 1px solid #333 !important;
-    padding: 2px 4px !important;
-    vertical-align: middle;
-  }
-
-  .checklist-table input {
-    transform: scale(0.7);
-    margin-right: 2px;
-  }
-
-  /* --- Service Rendered --- */
-  .service-rendered {
-    display: table !important;
-    width: 100% !important;
-    border-collapse: collapse !important;
-    font-size: 9px !important;
-    margin: 2px 0 !important;
-  }
-
-  .service-rendered > div {
-    display: table-row !important;
-  }
-
-  .service-rendered > div > * {
-    display: table-cell !important;
-    border: 1px solid #333 !important;
-    padding: 2px 4px !important;
-    vertical-align: top !important;
-  }
-
-  /* --- Spare Parts --- */
-  table {
-    font-size: 9px !important;
-    border-collapse: collapse !important;
-    width: 100% !important;
-    margin: 2px 0;
-  }
-
-  table th,
-  table td {
-    padding: 2px 3px !important;
-    border: 1px solid #333 !important;
-  }
-
-  /* --- Feedback (inline row) --- */
-  .feedback-table {
-    display: table !important;
-    width: 100% !important;
-    border-collapse: collapse !important;
-    font-size: 9px !important;
-    margin: 2px 0 !important;
-    border: 1px solid #333 !important;
-  }
-
-  .feedback-table > div {
-    display: table-row !important;
-  }
-
-  .feedback-table > div > * {
-    display: table-cell !important;
-    border: 1px solid #333 !important;
-    padding: 2px 4px !important;
-  }
-
-  /* --- Signature Section (Updated) --- */
-    /* --- Signature Section (Final Table Layout for Print) --- */
-  .signature-wrapper {
-    display: table !important;
-    width: 100% !important;
-    border-collapse: collapse !important;
-    margin-top: 6px !important;
-    font-size: 9px !important;
-    table-layout: fixed !important;
-  }
-
-  .signature-wrapper > div {
-    display: table-cell !important;
-    width: 50% !important;
-    vertical-align: top !important;
-    border: 1px solid #333 !important;
-    padding: 8px !important;
-  }
-
-  .signature-wrapper h3 {
-    font-size: 11px !important;
-    margin-bottom: 6px !important;
-    border-bottom: 1px solid #333 !important;
-    width: 100% !important;
-    text-align: center !important;
+  #print-root a {
+    color: inherit !important;
+    text-decoration: none !important;
   }
 
   .signature-wrapper img {
     max-height: 80px !important;
-    width: auto !important;
     object-fit: contain !important;
-    margin-bottom: 8px !important;
-    border: 1px solid #333 !important;
-    display: block !important;
   }
 
-  /* Label + Value inline rows inside each signature cell */
-  .signature-wrapper .read-row {
-    display: flex !important;
-    flex-direction: row !important;
-    justify-content: flex-start !important;
-    gap: 4px !important;
-    margin: 2px 0 !important;
-    font-size: 9px !important;
-  }
-
-  .signature-wrapper .read-row label {
-    font-weight: bold !important;
-    white-space: nowrap !important;
-  }
-
-  .signature-wrapper .read-row span {
-    flex: 1 !important;
-    display: inline-block !important;
-    text-align: left !important;
-  }
-
-
-  /* --- Hide print button --- */
-  .no-print {
-    display: none !important;
+  .print-photo-frame img {
+    max-height: 120px !important;
   }
 }

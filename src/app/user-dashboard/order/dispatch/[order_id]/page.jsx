@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useAsyncClick } from "@/lib/useAsyncClick";
 import { useParams, useRouter } from "next/navigation";
+import { isSpare1110 } from "@/lib/isSpare1110";
 
 export default function DispatchFormPage({ params }) {
   const router = useRouter();
@@ -12,9 +13,10 @@ export default function DispatchFormPage({ params }) {
   const [savedIds, setSavedIds] = useState(new Set());
   const [initialSerialNos, setInitialSerialNos] = useState(new Set());
   const [stockInfo, setStockInfo] = useState({});
-  const [lowStockWarnings, setLowStockWarnings] = useState({});
+  const [zeroStockWarnings, setZeroStockWarnings] = useState({});
   const [accessories, setAccessories] = useState({}); // { item_code: [accessories] }
   const [accessoriesChecked, setAccessoriesChecked] = useState({}); // { rowId: { accessoryId: boolean } }
+  const [accessoryStockInfo, setAccessoryStockInfo] = useState({}); // { rowId: { accessoryId: { stock_count } } }
 
   useEffect(() => {
     const load = async () => {
@@ -58,6 +60,17 @@ export default function DispatchFormPage({ params }) {
             }
           });
           setAccessoriesChecked(checkedState);
+
+          data.forEach((row) => {
+            if (row.godown && row.quote_number && row.item_code) {
+              fetchStockForRow(
+                row.id,
+                row.quote_number,
+                row.godown,
+                row.item_code,
+              );
+            }
+          });
         }
       } finally {
         setLoading(false);
@@ -68,10 +81,61 @@ export default function DispatchFormPage({ params }) {
 
   console.log("check data : ", rows);
 
+  const fetchAccessoryStockForRow = async (rowId, godown, itemCode, productAccessories) => {
+    if (!itemCode) {
+      setAccessoryStockInfo((prev) => ({ ...prev, [rowId]: null }));
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/stock/check-accessories", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          godown: godown || null,
+          product_code: itemCode,
+          accessories: productAccessories?.length
+            ? productAccessories.map((acc) => ({
+                id: acc.id,
+                accessory_name: acc.accessory_name,
+                spare_id: acc.spare_id || acc.resolved_spare_id,
+              }))
+            : [{ id: 0 }],
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setAccessoryStockInfo((prev) => ({
+          ...prev,
+          [rowId]: data.stockMap || {},
+        }));
+      } else {
+        setAccessoryStockInfo((prev) => ({ ...prev, [rowId]: null }));
+      }
+    } catch (err) {
+      console.error("Failed to fetch accessory stock:", err);
+      setAccessoryStockInfo((prev) => ({ ...prev, [rowId]: null }));
+    }
+  };
+
+  const applyStockFromAccessoryList = (rowId, accessoryList) => {
+    if (!accessoryList?.length) return;
+    const stockMap = {};
+    accessoryList.forEach((acc) => {
+      stockMap[acc.id] = {
+        stock_count: acc.stock_count,
+        matched: acc.stock_matched ?? acc.stock_count != null,
+      };
+    });
+    setAccessoryStockInfo((prev) => ({ ...prev, [rowId]: stockMap }));
+  };
+
   const fetchStockForRow = async (rowId, quoteNumber, godown, itemCode) => {
     if (!quoteNumber || !godown || !itemCode) {
       setStockInfo((prev) => ({ ...prev, [rowId]: null }));
-      setLowStockWarnings((prev) => ({ ...prev, [rowId]: "" }));
+      setZeroStockWarnings((prev) => ({ ...prev, [rowId]: false }));
+      setAccessoryStockInfo((prev) => ({ ...prev, [rowId]: null }));
       return;
     }
 
@@ -90,40 +154,83 @@ export default function DispatchFormPage({ params }) {
         const data = await res.json();
         setStockInfo((prev) => ({ ...prev, [rowId]: data.stockResults }));
 
-        // Check for low stock warnings
-        let warningMessage = "";
-        data.stockResults.forEach((item) => {
-          if (
-            item.stock_count !== null &&
-            item.min_qty !== null &&
-            item.stock_count < item.min_qty
-          ) {
-            warningMessage += `Warning: The stock for "${item.item_name}" is currently below the minimum required quantity. Please replenish the stock in the selected godown.\n`;
-          }
-        });
-        setLowStockWarnings((prev) => ({ ...prev, [rowId]: warningMessage }));
+        // Check if any item has 0 or null stock (spare 1110 is allowed at 0 stock)
+        const hasZeroStock =
+          !data.allowZeroStock &&
+          !isSpare1110(itemCode) &&
+          data.stockResults.some(
+            (item) => !item.stock_count || item.stock_count <= 0,
+          );
+        setZeroStockWarnings((prev) => ({ ...prev, [rowId]: hasZeroStock }));
       } else {
         const { error } = await res.json();
         console.error("Stock check error:", error);
         setStockInfo((prev) => ({ ...prev, [rowId]: null }));
-        setLowStockWarnings((prev) => ({ ...prev, [rowId]: "" }));
+        setZeroStockWarnings((prev) => ({ ...prev, [rowId]: false }));
       }
+
+      const productAccessories =
+        accessories[itemCode]?.length > 0
+          ? accessories[itemCode]
+          : await fetch(
+              `/api/product-accessories?product_code=${itemCode}&package_status=available`,
+            )
+              .then((r) => (r.ok ? r.json() : null))
+              .then((j) => j?.data || [])
+              .catch(() => []);
+
+      fetchAccessoryStockForRow(rowId, godown, itemCode, productAccessories);
     } catch (err) {
       console.error("Failed to fetch stock:", err);
       setStockInfo((prev) => ({ ...prev, [rowId]: null }));
-      setLowStockWarnings((prev) => ({ ...prev, [rowId]: "" }));
+      setZeroStockWarnings((prev) => ({ ...prev, [rowId]: false }));
+      setAccessoryStockInfo((prev) => ({ ...prev, [rowId]: null }));
     }
   };
 
-  const loadAccessoriesForProduct = async (itemCode) => {
+  const loadAccessoriesForProduct = async (itemCode, godown = null) => {
     try {
-      const res = await fetch(
-        `/api/product-accessories?product_code=${itemCode}`,
-      );
+      const params = new URLSearchParams({
+        product_code: itemCode,
+        package_status: "available",
+        resolve_product: "1",
+      });
+      if (godown) params.set("godown", godown);
+
+      const res = await fetch(`/api/product-accessories?${params.toString()}`);
       if (res.ok) {
         const json = await res.json();
         if (json.success) {
-          setAccessories((prev) => ({ ...prev, [itemCode]: json.data || [] }));
+          const accessoryList = json.data || [];
+          const resolvedProductCode =
+            accessoryList[0]?.product_code || itemCode;
+
+          setAccessories((prev) => {
+            const next = { ...prev, [itemCode]: accessoryList };
+            if (resolvedProductCode !== itemCode) {
+              next[resolvedProductCode] = accessoryList;
+            }
+            return next;
+          });
+
+          setRows((currentRows) => {
+            currentRows.forEach((row) => {
+              const rowCodes = [row.item_code, resolvedProductCode].filter(Boolean);
+              if (rowCodes.includes(itemCode) || rowCodes.includes(resolvedProductCode)) {
+                if (godown && accessoryList.some((a) => a.stock_count != null)) {
+                  applyStockFromAccessoryList(row.id, accessoryList);
+                } else {
+                  fetchAccessoryStockForRow(
+                    row.id,
+                    row.godown || godown,
+                    row.item_code || itemCode,
+                    accessoryList,
+                  );
+                }
+              }
+            });
+            return currentRows;
+          });
         }
       }
     } catch (err) {
@@ -141,12 +248,12 @@ export default function DispatchFormPage({ params }) {
       const row = rows.find((r) => r.id === id);
       if (row && row.quote_number && row.item_code) {
         if (value) {
-          // Godown selected - fetch stock for this specific item
           fetchStockForRow(id, row.quote_number, value, row.item_code);
+          loadAccessoriesForProduct(row.item_code, value);
         } else {
-          // Godown cleared - clear stock info
           setStockInfo((prev) => ({ ...prev, [id]: null }));
-          setLowStockWarnings((prev) => ({ ...prev, [id]: "" }));
+          setZeroStockWarnings((prev) => ({ ...prev, [id]: false }));
+          setAccessoryStockInfo((prev) => ({ ...prev, [id]: null }));
         }
       }
     }
@@ -173,7 +280,7 @@ export default function DispatchFormPage({ params }) {
     if (row.godown) form.append("godown", row.godown);
 
     // Build accessories checklist JSON
-    const productAccessories = accessories[row.item_code] || [];
+    const productAccessories = getAccessoriesForRow(row);
     const checkedAccessories = productAccessories.filter(
       (acc) => accessoriesChecked[row.id]?.[acc.id],
     );
@@ -208,10 +315,10 @@ export default function DispatchFormPage({ params }) {
       throw new Error("Please select a godown before saving.");
     }
 
-    // Check for low stock warning
-    if (lowStockWarnings[row.id]) {
+    // Block dispatch if stock is 0 in selected godown (except spare 1110)
+    if (zeroStockWarnings[row.id] && !isSpare1110(row.item_code)) {
       throw new Error(
-        "Please add stock to the selected godown before dispatching this item.",
+        "Stock is 0 in the selected godown. Cannot dispatch this item.",
       );
     }
 
@@ -253,13 +360,25 @@ export default function DispatchFormPage({ params }) {
           "Please select godowns for all items before completing dispatch",
         );
       }
-      // Check if any items have low stock warnings
-      const hasLowStockIssues = rows.some((r) => lowStockWarnings[r.id]);
-      if (hasLowStockIssues) {
+      // Block if any item has 0 stock in selected godown
+      const hasZeroStock = rows.some(
+        (r) => zeroStockWarnings[r.id] && !isSpare1110(r.item_code),
+      );
+      if (hasZeroStock) {
         throw new Error(
-          "Please resolve all stock warnings before completing dispatch",
+          "Stock is 0 for one or more items in the selected godown. Please resolve before completing dispatch.",
         );
       }
+
+      // Persist godown/serial/stock deduction before marking dispatch complete
+      for (const row of rows) {
+        const alreadyPersisted =
+          initialSerialNos.has(row.id) || savedIds.has(row.id);
+        if (!alreadyPersisted) {
+          await uploadForRow(row);
+        }
+      }
+
       // mark order dispatch complete
       const doneRes = await fetch("/api/dispatch/complete", {
         method: "POST",
@@ -277,6 +396,13 @@ export default function DispatchFormPage({ params }) {
       setSaving(false);
     }
   };
+
+  const getAccessoriesForRow = (row) =>
+    accessories[row.item_code] ||
+    Object.values(accessories).find((list) =>
+      list.some((acc) => acc.product_code === row.item_code),
+    ) ||
+    [];
 
   if (loading) return <div className="p-4">Loading...</div>;
 
@@ -391,35 +517,33 @@ export default function DispatchFormPage({ params }) {
                           key={item.item_code}
                           className="text-sm text-green-700"
                         >
-                          {item.item_name || item.item_code}: {item.stock_count}{" "}
-                          (Min Qty: {item.min_qty || 0})
+                          {item.item_name || item.item_code}: {item.stock_count}
                         </p>
                       ))}
                     </div>
                   </div>
                 )}
 
-                {/* Low Stock Warning */}
-                {lowStockWarnings[r.id] && (
+                {/* Zero Stock Warning */}
+                {zeroStockWarnings[r.id] && !isSpare1110(r.item_code) && (
                   <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-md">
-                    <h4 className="text-sm font-medium text-red-800 mb-2">
-                      ⚠️ Stock Warning:
+                    <h4 className="text-sm font-medium text-red-800 mb-1">
+                      ⚠️ Stock Not Available:
                     </h4>
-                    <p className="text-sm text-red-700 whitespace-pre-line">
-                      {lowStockWarnings[r.id]}
+                    <p className="text-sm text-red-700">
+                      Stock is 0 in <strong>{r.godown}</strong>. Cannot dispatch this item.
                     </p>
                   </div>
                 )}
 
                 {/* Accessories Checklist */}
-                {accessories[r.item_code] &&
-                  accessories[r.item_code].length > 0 && (
+                {getAccessoriesForRow(r).length > 0 && (
                     <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-md">
                       <h4 className="text-sm font-medium text-blue-800 mb-2">
                         Accessories Checklist:
                       </h4>
                       <div className="space-y-1">
-                        {accessories[r.item_code].map((acc) => (
+                        {getAccessoriesForRow(r).map((acc) => (
                           <label
                             key={acc.id}
                             className="flex items-center gap-2 text-sm cursor-pointer hover:bg-blue-100 p-1 rounded"
@@ -449,6 +573,49 @@ export default function DispatchFormPage({ params }) {
                                 </span>
                               )}
                             </span>
+                            {r.godown ? (
+                              <span
+                                className={`text-xs font-medium whitespace-nowrap ${
+                                  accessoryStockInfo[r.id]?.[acc.id]
+                                    ?.stock_count > 0
+                                    ? "text-green-700"
+                                    : accessoryStockInfo[r.id]?.[acc.id]
+                                          ?.matched === false
+                                      ? "text-gray-500"
+                                      : "text-red-600"
+                                }`}
+                              >
+                                Stock ({r.godown.split(" - ")[0]}):{" "}
+                                {accessoryStockInfo[r.id]?.[acc.id] == null
+                                  ? "..."
+                                  : accessoryStockInfo[r.id]?.[acc.id]
+                                        ?.matched === false
+                                    ? "N/A"
+                                    : accessoryStockInfo[r.id]?.[acc.id]
+                                        ?.stock_count ?? 0}
+                              </span>
+                            ) : (
+                              <span
+                                className={`text-xs font-medium whitespace-nowrap ${
+                                  accessoryStockInfo[r.id]?.[acc.id]
+                                    ?.stock_count > 0
+                                    ? "text-green-700"
+                                    : accessoryStockInfo[r.id]?.[acc.id]
+                                          ?.matched === false
+                                      ? "text-gray-500"
+                                      : "text-red-600"
+                                }`}
+                              >
+                                Total Stock:{" "}
+                                {accessoryStockInfo[r.id]?.[acc.id] == null
+                                  ? "..."
+                                  : accessoryStockInfo[r.id]?.[acc.id]
+                                        ?.matched === false
+                                    ? "N/A"
+                                    : accessoryStockInfo[r.id]?.[acc.id]
+                                        ?.stock_count ?? 0}
+                              </span>
+                            )}
                             {acc.description && (
                               <span className="text-xs text-gray-600 italic">
                                 {acc.description}
@@ -470,7 +637,9 @@ export default function DispatchFormPage({ params }) {
                       hasSerialNo={r.serial_no && r.serial_no.trim() !== ""}
                       hasGodown={r.godown && r.godown.trim() !== ""}
                       isLocked={false}
-                      hasLowStockWarning={!!lowStockWarnings[r.id]}
+                      hasZeroStock={
+                        !!zeroStockWarnings[r.id] && !isSpare1110(r.item_code)
+                      }
                       isProduct={isProductItem(r.item_code)}
                     />
                   )}
@@ -501,8 +670,10 @@ export default function DispatchFormPage({ params }) {
             !rows
               .filter((r) => isProductItem(r.item_code))
               .every((r) => r.serial_no && r.serial_no.trim() !== "") ||
-            // No pending low stock warnings
-            rows.some((r) => lowStockWarnings[r.id])
+            // Block if any item has 0 stock
+            rows.some(
+              (r) => zeroStockWarnings[r.id] && !isSpare1110(r.item_code),
+            )
           }
           saving={saving}
         />
@@ -519,7 +690,7 @@ function RowSaveButton({
   hasSerialNo,
   hasGodown,
   isLocked,
-  hasLowStockWarning,
+  hasZeroStock,
   isProduct,
 }) {
   const [handleClick, isLoading] = useAsyncClick(async () => {
@@ -534,7 +705,7 @@ function RowSaveButton({
   const serialRequired = isProduct;
 
   // Locked rows (stock already deducted): allow updating photos/accessories anytime
-  // Unlocked rows: require serial no (for products), godown, no low stock warning, and not already saved
+  // Unlocked rows: require serial no (for products), godown, stock > 0, and not already saved
   const isDisabled = isLocked
     ? globalSaving || isLoading
     : globalSaving ||
@@ -542,7 +713,7 @@ function RowSaveButton({
       isSaved ||
       (serialRequired && !hasSerialNo) ||
       !hasGodown ||
-      hasLowStockWarning;
+      hasZeroStock;
 
   return (
     <button

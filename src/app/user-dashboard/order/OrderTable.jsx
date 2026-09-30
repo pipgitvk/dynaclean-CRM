@@ -12,6 +12,7 @@ import {
   MoreVertical,
   Truck,
   ArrowUp,
+  Pencil,
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import dayjs from "dayjs";
@@ -142,8 +143,8 @@ export default function OrderTable({ orders, userRole }) {
       if (Number(order.warehouse_in_done) === 1) {
         return {
           text: "Return Completed",
-          bg: "bg-teal-100",
-          textCol: "text-teal-800",
+          bg: "bg-orange-100",
+          textCol: "text-orange-800",
           icon: <CheckCircle size={14} className="mr-1" />,
         };
       }
@@ -710,6 +711,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
   const isTeamLeader = role === "team leader";
   const isWarehouse = role === "warehouse incharge";
   const canManageReturns = isAdmin || isAccountant || isTeamLeader;
+  const canEditBooking = isAdmin || role === "superadmin";
   const hasBooking =
     r.booking_id !== undefined &&
     r.booking_id !== null &&
@@ -795,18 +797,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                       </div>
                     </div>
                   ))}
-                {(canManageReturns) &&
-                  (hasBooking ? (
-                    <Link
-                      href={`/user-dashboard/order/view-booking/${r.order_id}`}
-                      className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700 w-full block"
-                      title="View Booking"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <FileCheck size={16} />
-                      <span>View Booking</span>
-                    </Link>
-                  ) : (
+                {(canManageReturns) && !hasBooking && (
                     <Link
                       href={`/user-dashboard/order/upload-booking/${r.order_id}`}
                       className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-green-700 w-full block"
@@ -816,8 +807,30 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                       <UploadCloud size={16} />
                       <span>Create Booking</span>
                     </Link>
-                  ))}
-                {isWarehouse && hasBooking && dispatchStatus === 0 && (
+                  )}
+                {canEditBooking && hasBooking && dispatchStatus === 0 && (
+                  <Link
+                    href={`/user-dashboard/order/upload-booking/${r.order_id}`}
+                    className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-blue-700 w-full block"
+                    title="Edit Booking"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Pencil size={16} />
+                    <span>Edit Booking</span>
+                  </Link>
+                )}
+                {(canManageReturns) && hasBooking && (
+                    <Link
+                      href={`/user-dashboard/order/view-booking/${r.order_id}`}
+                      className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700 w-full block"
+                      title="View Booking"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <FileCheck size={16} />
+                      <span>View Booking</span>
+                    </Link>
+                  )}
+                {(isWarehouse || isAdmin) && hasBooking && dispatchStatus === 0 && (
                   <Link
                     href={`/user-dashboard/order/dispatch/${r.order_id}`}
                     className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700 w-full block"

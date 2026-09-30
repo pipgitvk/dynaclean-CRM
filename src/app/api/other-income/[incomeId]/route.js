@@ -56,15 +56,8 @@ export async function GET(req, { params }) {
   } catch (err) {
     console.error("[other-income-api] ERROR:", err?.message || err);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
-  } finally {
-    if (conn) {
-      try {
-        await conn.end();
-      } catch (e) {
-        console.error("[other-income-api] Error closing connection:", e);
-      }
-    }
   }
+  // Note: Do NOT call conn.end() here - the pool is global and shared across requests
 }
 
 // PATCH - Update other income entry
@@ -176,15 +169,8 @@ export async function PATCH(req, { params }) {
   } catch (err) {
     console.error("[other-income-api] ERROR:", err?.message || err);
     return NextResponse.json({ error: "Server error", details: err.message }, { status: 500 });
-  } finally {
-    if (conn) {
-      try {
-        await conn.end();
-      } catch (e) {
-        console.error("[other-income-api] Error closing connection:", e);
-      }
-    }
   }
+  // Note: Do NOT call conn.end() here - the pool is global and shared across requests
 }
 
 // DELETE - Delete other income entry
@@ -220,13 +206,6 @@ export async function DELETE(req, { params }) {
   } catch (err) {
     console.error("[other-income-api] ERROR:", err?.message || err);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
-  } finally {
-    if (conn) {
-      try {
-        await conn.end();
-      } catch (e) {
-        console.error("[other-income-api] Error closing connection:", e);
-      }
-    }
   }
+  // Note: Do NOT call conn.end() here - the pool is global and shared across requests
 }

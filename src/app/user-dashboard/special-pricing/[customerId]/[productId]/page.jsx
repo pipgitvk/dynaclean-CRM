@@ -3,6 +3,10 @@ import { getSessionPayload } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { deleteSpecialPrice, updateSpecialPrice } from "../../_actions";
+import {
+  resolveSpecialPriceTerm,
+  resolveSpecialPriceType,
+} from "@/lib/specialPriceDefaults";
 
 export const dynamic = "force-dynamic";
 
@@ -10,9 +14,9 @@ export const dynamic = "force-dynamic";
    PAGE
 ========================= */
 export default async function ProductSpecialPrice({ params }) {
-  const { customerId, productId } = await params;
+  const { customerId, productId: productIdParam } = await params;
 
-  if (!customerId || !productId) {
+  if (!customerId || !productIdParam) {
     return <div className="p-6 text-red-500">Invalid URL</div>;
   }
 
@@ -21,24 +25,81 @@ export default async function ProductSpecialPrice({ params }) {
 
   const conn = await getDbConnection();
 
-  const [rows] = await conn.execute(
-    `
-    SELECT 
-      sp.special_price,
-      sp.status,
-      c.first_name,
-      c.last_name,
-      p.item_name,
-      p.price_per_unit,
-      p.gst_rate
-    FROM special_price sp
-    JOIN customers c ON sp.customer_id = c.customer_id
-    JOIN products_list p ON sp.product_id = p.id
-    WHERE sp.customer_id = ? AND sp.product_id = ?
-    LIMIT 1
-    `,
-    [Number(customerId), Number(productId)]
-  );
+  // Support both old format (numeric productId) and new format (product-{id} or spare-{id})
+  let spId, itemType;
+  if (String(productIdParam).includes("-")) {
+    const parts = String(productIdParam).split("-");
+    itemType = parts[0]; // "product" or "spare"
+    spId = Number(parts[1]); // special_price.id
+  } else {
+    // Legacy: productIdParam is the product_id
+    itemType = "product";
+    spId = null;
+  }
+
+  let rows;
+  if (spId) {
+    // New format: query by special_price.id
+    [rows] = await conn.execute(
+      `
+      SELECT 
+        sp.id,
+        sp.special_price,
+        sp.price_type,
+        sp.price_term,
+        sp.status,
+        sp.item_type,
+        sp.product_id,
+        c.first_name,
+        c.last_name,
+        CASE 
+          WHEN sp.item_type = 'spare' THEN sl.item_name
+          ELSE p.item_name
+        END AS item_name,
+        CASE 
+          WHEN sp.item_type = 'spare' THEN sl.sale_price
+          ELSE p.price_per_unit
+        END AS price_per_unit,
+        CASE 
+          WHEN sp.item_type = 'spare' THEN sl.tax
+          ELSE p.gst_rate
+        END AS gst_rate
+      FROM special_price sp
+      JOIN customers c ON sp.customer_id = c.customer_id
+      LEFT JOIN products_list p ON sp.item_type = 'product' AND sp.product_id = p.id
+      LEFT JOIN spare_list sl ON sp.item_type = 'spare' AND sp.product_id = sl.id
+      WHERE sp.id = ? AND sp.customer_id = ?
+      LIMIT 1
+      `,
+      [spId, Number(customerId)]
+    );
+  } else {
+    // Legacy format: query by product_id
+    [rows] = await conn.execute(
+      `
+      SELECT 
+        sp.id,
+        sp.special_price,
+        sp.price_type,
+        sp.price_term,
+        sp.status,
+        sp.item_type,
+        sp.product_id,
+        sp.spare_id,
+        c.first_name,
+        c.last_name,
+        p.item_name,
+        p.price_per_unit,
+        p.gst_rate
+      FROM special_price sp
+      JOIN customers c ON sp.customer_id = c.customer_id
+      JOIN products_list p ON sp.product_id = p.id
+      WHERE sp.customer_id = ? AND sp.product_id = ?
+      LIMIT 1
+      `,
+      [Number(customerId), Number(productIdParam)]
+    );
+  }
 
   const data = rows[0];
 
@@ -68,6 +129,8 @@ export default async function ProductSpecialPrice({ params }) {
         <p><strong>Customer:</strong> {data.first_name} {data.last_name}</p>
         <p><strong>Product:</strong> {data.item_name}</p>
         <p><strong>Original Price:</strong> ₹ {data.price_per_unit}</p>
+        <p><strong>Price Type:</strong> {resolveSpecialPriceType(data.price_type)}</p>
+        <p><strong>Price Term:</strong> {resolveSpecialPriceTerm(data.price_term)}</p>
         <p><strong>GST:</strong> {data.gst_rate}%</p>
         <p>
           <strong>Status:</strong>{" "}
@@ -93,8 +156,8 @@ export default async function ProductSpecialPrice({ params }) {
         <>
           {/* UPDATE FORM */}
           <form action={updateSpecialPrice} className="space-y-4">
+            <input type="hidden" name="id" value={data.id} />
             <input type="hidden" name="customer_id" value={customerId} />
-            <input type="hidden" name="product_id" value={productId} />
 
             <div>
               <label className="block font-medium mb-1">
@@ -120,8 +183,8 @@ export default async function ProductSpecialPrice({ params }) {
 
           {/* DELETE */}
           <form action={deleteSpecialPrice} className="mt-6">
+            <input type="hidden" name="id" value={data.id} />
             <input type="hidden" name="customer_id" value={customerId} />
-            <input type="hidden" name="product_id" value={productId} />
 
             <button
               type="submit"

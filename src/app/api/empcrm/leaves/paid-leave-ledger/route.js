@@ -22,9 +22,9 @@ export async function GET(request) {
       );
     }
 
-    // Check authorization - only admin or the user themselves
-    const isAdmin = ["SUPERADMIN", "HR HEAD", "HR", "HR Executive"].includes(session.role);
-    if (username !== session.username && !isAdmin) {
+    // Check authorization - only admin, accountant, or the user themselves
+    const isAuthorized = ["SUPERADMIN", "HR HEAD", "HR", "HR Executive", "ACCOUNTANT"].includes(session.role);
+    if (username !== session.username && !isAuthorized) {
       return NextResponse.json(
         { success: false, error: "Unauthorized" },
         { status: 403 }
@@ -72,9 +72,12 @@ export async function GET(request) {
         el.from_date,
         el.to_date,
         el.total_days,
+        el.is_half_day,
+        el.half_day_type,
         el.status,
         el.reason,
-        el.created_at
+        el.created_at,
+        el.created_by
       FROM employee_leaves el
       WHERE el.username = ? AND el.leave_type = 'paid' AND el.status = 'approved'
       AND el.from_date >= ?
@@ -92,6 +95,8 @@ export async function GET(request) {
         el.from_date,
         el.to_date,
         el.total_days,
+        el.is_half_day,
+        el.half_day_type,
         el.status,
         el.reason,
         el.created_at,
@@ -137,33 +142,50 @@ export async function GET(request) {
 
     // Add debit (used) entries for paid leaves
     leavesUsed.forEach(leave => {
+      const description = leave.created_by 
+        ? `Paid Leave added by ${leave.created_by}`
+        : `Paid Leave taken`;
+      
+      // Calculate actual days used - if it's a half-day, it's 0.5, otherwise use total_days
+      const daysUsed = (leave.is_half_day == 1) ? 0.5 : Number(leave.total_days || 1);
+      
       ledgerEntries.push({
         type: "debit",
         date: leave.from_date,
-        days: leave.total_days,
-        description: `Paid Leave taken`,
+        days: daysUsed,
+        is_half_day: leave.is_half_day,
+        half_day_type: leave.half_day_type,
+        description,
         leaveId: leave.id,
         entryType: "usage",
         reason: leave.reason,
         leave_type: "paid",
-        status: leave.status
+        status: leave.status,
+        created_by: leave.created_by
       });
     });
 
     // Build unpaid leave ledger entries (debit only - no accrual)
-    const unpaidLedgerEntries = unpaidLeaves.map(leave => ({
-      type: "debit",
-      date: leave.from_date,
-      to_date: leave.to_date,
-      days: leave.total_days,
-      description: `Unpaid Leave (${leave.status})`,
-      leaveId: leave.id,
-      entryType: "usage",
-      reason: leave.reason,
-      leave_type: "unpaid",
-      status: leave.status,
-      rejection_reason: leave.rejection_reason
-    }));
+    const unpaidLedgerEntries = unpaidLeaves.map(leave => {
+      // Calculate actual days used - if it's a half-day, it's 0.5, otherwise use total_days
+      const daysUsed = (leave.is_half_day == 1) ? 0.5 : Number(leave.total_days || 1);
+      
+      return {
+        type: "debit",
+        date: leave.from_date,
+        to_date: leave.to_date,
+        days: daysUsed,
+        is_half_day: leave.is_half_day,
+        half_day_type: leave.half_day_type,
+        description: `Unpaid Leave (${leave.status})`,
+        leaveId: leave.id,
+        entryType: "usage",
+        reason: leave.reason,
+        leave_type: "unpaid",
+        status: leave.status,
+        rejection_reason: leave.rejection_reason
+      };
+    });
 
     // Calculate unpaid leave summary
     const unpaidSummary = {
