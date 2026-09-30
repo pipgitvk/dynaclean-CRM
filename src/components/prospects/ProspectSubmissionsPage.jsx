@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import { FileText, ExternalLink, Loader2, X } from "lucide-react";
@@ -62,7 +62,10 @@ export default function ProspectSubmissionsPage({ defaultScope = "team" }) {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [employeeFilter, setEmployeeFilter] = useState("");
+  const [employeeSearch, setEmployeeSearch] = useState("");
+  const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false);
   const [statusFilter, setStatusFilter] = useState("");
+  const employeeDropdownRef = useRef(null);
 
   const fetchRows = useCallback(async () => {
     setLoading(true);
@@ -159,6 +162,23 @@ export default function ProspectSubmissionsPage({ defaultScope = "team" }) {
     );
   }, [rows]);
 
+  const filteredEmployees = useMemo(() => {
+    if (!employeeSearch.trim()) return employees;
+    const search = employeeSearch.toLowerCase();
+    return employees.filter((name) => name.toLowerCase().includes(search));
+  }, [employees, employeeSearch]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (employeeDropdownRef.current && !employeeDropdownRef.current.contains(event.target)) {
+        setShowEmployeeDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   const filteredRows = useMemo(() => {
     return rows.filter((row) => {
       if (
@@ -241,22 +261,58 @@ export default function ProspectSubmissionsPage({ defaultScope = "team" }) {
         </div>
         {showAdminFilters && (
           <>
-            <div>
+            <div ref={employeeDropdownRef} className="relative">
               <label className="mb-1 block text-xs font-medium text-gray-600">
                 Employee
               </label>
-              <select
-                value={employeeFilter}
-                onChange={(e) => setEmployeeFilter(e.target.value)}
-                className="min-w-[160px] rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
-              >
-                <option value="">All employees</option>
-                {employees.map((name) => (
-                  <option key={name} value={name}>
-                    {name}
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={employeeFilter || employeeSearch}
+                  onChange={(e) => {
+                    setEmployeeSearch(e.target.value);
+                    setShowEmployeeDropdown(true);
+                    if (!e.target.value) {
+                      setEmployeeFilter("");
+                    }
+                  }}
+                  onFocus={() => setShowEmployeeDropdown(true)}
+                  placeholder="Search employee..."
+                  className="min-w-[160px] rounded-lg border border-gray-300 px-3 py-2 pr-8 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                />
+                {employeeFilter && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEmployeeFilter("");
+                      setEmployeeSearch("");
+                    }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    <X size={16} />
+                  </button>
+                )}
+              </div>
+              {showEmployeeDropdown && filteredEmployees.length > 0 && (
+                <div className="absolute z-50 mt-1 max-h-60 w-full overflow-y-auto rounded-lg border border-gray-300 bg-white shadow-lg">
+                  {filteredEmployees.map((name) => (
+                    <button
+                      key={name}
+                      type="button"
+                      onClick={() => {
+                        setEmployeeFilter(name);
+                        setEmployeeSearch("");
+                        setShowEmployeeDropdown(false);
+                      }}
+                      className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-100 ${
+                        employeeFilter === name ? "bg-blue-50 font-medium text-blue-700" : ""
+                      }`}
+                    >
+                      {name}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-gray-600">
@@ -281,6 +337,7 @@ export default function ProspectSubmissionsPage({ defaultScope = "team" }) {
               setFromDate("");
               setToDate("");
               setEmployeeFilter("");
+              setEmployeeSearch("");
               setStatusFilter("");
             }}
             className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
