@@ -221,6 +221,13 @@ const allMenuItems = [
         icon: "FileText",
       },
       {
+        path: "/user-dashboard/service-support-report",
+        name: "Service Support Report",
+        moduleKey: "service-support-report",
+        roles: ["ALL"],
+        icon: "Headset",
+      },
+      {
         path: "/user-dashboard/lead-reports",
         name: "Lead Reports",
         moduleKey: "lead-reports",
@@ -492,13 +499,6 @@ const allMenuItems = [
         moduleKey: "service-followups",
         roles: ["ALL"],
         icon: "Calendar",
-      },
-      {
-        path: "/user-dashboard/service-support-report",
-        name: "Service Support Report",
-        moduleKey: "service-support-report",
-        roles: ["ALL"],
-        icon: "Headset",
       },
       {
         path: "/user-dashboard/view_service_reports",
