@@ -13,6 +13,10 @@ import { userHasModuleKey } from "@/lib/userModuleAccessServer";
 import Link from "next/link";
 import axios from "axios";
 import { notFound } from "next/navigation";
+import {
+  collectHierarchyCustomerIds,
+  fetchCustomerFollowupHistory,
+} from "@/lib/customerHierarchyFollowups";
 
 export default async function CustomerPage({ params }) {
   const { customerId } = await params;
@@ -89,13 +93,17 @@ export default async function CustomerPage({ params }) {
     siblingContacts = siblingRows || [];
     console.log(`[View Customer] Customer ${customerId} has parent ${selfData.parent_customer_id}, ${siblingContacts.length} siblings`);
   }
-  const [fups] = await conn.execute(
-    `SELECT next_followup_date, service_next_followup, gem_next_followup, followed_date, followed_by, notes, comm_mode, time_stamp 
-     FROM customers_followup
-     WHERE customer_id = ?
-     ORDER BY time_stamp DESC`,
-    [customerId],
-  );
+  const hierarchyCustomerIds = collectHierarchyCustomerIds({
+    customerId,
+    parentContact,
+    siblingContacts,
+    childContacts,
+  });
+  const fups = await fetchCustomerFollowupHistory(conn, {
+    customerIds: hierarchyCustomerIds,
+    userRole,
+    username,
+  });
 
   // Fetch orders count for this customer
   // SUPERADMIN/DIRECTOR: see all orders for customer

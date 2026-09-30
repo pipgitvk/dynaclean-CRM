@@ -263,6 +263,7 @@
 // }
 
 "use client";
+import { useMemo, useState } from "react";
 import {
   formatCrmDatetimeForISTDisplay,
   getCrmDateKeyIST,
@@ -308,11 +309,42 @@ export default function FollowUpHistory({
       .filter(Boolean),
   );
 
-  const followupRows = [...entries].sort(
-    (a, b) =>
-      getCrmInstantMs(b.time_stamp || b.followed_date) -
-      getCrmInstantMs(a.time_stamp || a.followed_date),
+  const showNameColumn = entries.some(
+    (entry) => entry.contact_name || entry.contact_label,
   );
+
+  const nameOptions = useMemo(() => {
+    const map = new Map();
+    for (const entry of entries) {
+      const id = entry.customer_id;
+      if (!id) continue;
+      const name = String(entry.contact_name || entry.contact_label || "").trim();
+      if (!name) continue;
+      map.set(String(id), name.replace(/\s*\(ID:\s*\d+\)\s*$/i, "").trim() || name);
+    }
+    return [...map.entries()]
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [entries]);
+
+  const [nameFilter, setNameFilter] = useState("all");
+
+  const followupRows = useMemo(
+    () =>
+      [...entries].sort(
+        (a, b) =>
+          getCrmInstantMs(b.time_stamp || b.followed_date) -
+          getCrmInstantMs(a.time_stamp || a.followed_date),
+      ),
+    [entries],
+  );
+
+  const visibleFollowupRows = useMemo(() => {
+    if (nameFilter === "all") return followupRows;
+    return followupRows.filter(
+      (entry) => String(entry.customer_id || "") === nameFilter,
+    );
+  }, [followupRows, nameFilter]);
 
   const uploadOnlyRows = uploads
     .filter((upload) => {
@@ -325,7 +357,8 @@ export default function FollowUpHistory({
       (a, b) => getCrmInstantMs(b.datetime) - getCrmInstantMs(a.datetime),
     );
 
-  const totalColumns = hasUploads ? 9 : 5;
+  const totalColumns = (hasUploads ? 9 : 5) + (showNameColumn ? 1 : 0);
+  const showUploadOnlyRows = nameFilter === "all";
 
   const getRowUploads = (entry) => {
     if (!hasUploads || !entry?.followed_date) return [];
@@ -335,13 +368,18 @@ export default function FollowUpHistory({
 
   return (
     <div className="overflow-x-auto bg-white shadow rounded w-full">
-      <table className="w-full table-fixed divide-y divide-gray-200 text-sm">
+      <table
+        className={`w-full divide-y divide-gray-200 text-sm ${
+          showNameColumn ? "table-auto" : "table-fixed"
+        }`}
+      >
         <colgroup>
-          <col className={hasUploads ? "w-[11%]" : "w-[14%]"} />
-          <col className={hasUploads ? "w-[9%]" : "w-[12%]"} />
-          <col className={hasUploads ? "w-[11%]" : "w-[14%]"} />
-          <col className={hasUploads ? "w-[7%]" : "w-[10%]"} />
-          <col className={hasUploads ? "w-[38%]" : "w-[50%]"} />
+          {showNameColumn && <col className={hasUploads ? "w-[12%]" : "w-[14%]"} />}
+          <col className={hasUploads ? "w-[10%]" : "w-[12%]"} />
+          <col className={hasUploads ? "w-[8%]" : "w-[10%]"} />
+          <col className={hasUploads ? "w-[10%]" : "w-[12%]"} />
+          <col className={hasUploads ? "w-[6%]" : "w-[8%]"} />
+          <col className={hasUploads ? "w-[30%]" : "w-[44%]"} />
           {hasUploads && (
             <>
               <col className="w-[8%]" />
@@ -353,24 +391,42 @@ export default function FollowUpHistory({
         </colgroup>
         <thead className="bg-gray-100 text-gray-700 uppercase text-xs tracking-wide">
           <tr>
-            <th className="px-4 py-3 text-left">{nextFollowupLabel}</th>
-            <th className="px-4 py-3 text-left">Followed By</th>
-            <th className="px-4 py-3 text-left">Followed Date</th>
-            <th className="px-4 py-3 text-left">Mode</th>
-            <th className="px-4 py-3 text-left">Remarks</th>
+            {showNameColumn && (
+              <th className="px-3 py-2 text-left normal-case">
+                <select
+                  value={nameFilter}
+                  onChange={(e) => setNameFilter(e.target.value)}
+                  className="w-full min-w-[120px] max-w-[180px] rounded border border-gray-300 bg-white px-2 py-1 text-xs font-medium text-gray-700 normal-case"
+                  aria-label="Filter by name"
+                >
+                  <option value="all">All Names</option>
+                  {nameOptions.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.name}
+                    </option>
+                  ))}
+                </select>
+              </th>
+            )}
+            <th className="px-3 py-2 text-left">{nextFollowupLabel}</th>
+            <th className="px-3 py-2 text-left">Followed By</th>
+            <th className="px-3 py-2 text-left">Followed Date</th>
+            <th className="px-3 py-2 text-left">Mode</th>
+            <th className="px-3 py-2 text-left">Remarks</th>
             {hasUploads && (
               <>
-                <th className="px-4 py-3 text-left">Date & Time</th>
-                <th className="px-4 py-3 text-left">User</th>
-                <th className="px-4 py-3 text-left">Summary</th>
-                <th className="px-4 py-3 text-left">Key Points</th>
+                <th className="px-3 py-2 text-left">Date & Time</th>
+                <th className="px-3 py-2 text-left">User</th>
+                <th className="px-3 py-2 text-left">Summary</th>
+                <th className="px-3 py-2 text-left">Key Points</th>
               </>
             )}
           </tr>
         </thead>
 
         <tbody className="bg-white divide-y divide-gray-200">
-          {followupRows.length === 0 && uploadOnlyRows.length === 0 ? (
+          {visibleFollowupRows.length === 0 &&
+          (!showUploadOnlyRows || uploadOnlyRows.length === 0) ? (
             <tr>
               <td colSpan={totalColumns} className="text-center py-4 text-gray-500">
                 No Data Available
@@ -378,33 +434,38 @@ export default function FollowUpHistory({
             </tr>
           ) : (
             <>
-              {followupRows.map((entry, index) => {
+              {visibleFollowupRows.map((entry, index) => {
                 const rowUploads = getRowUploads(entry);
                 const nextFollowup = pickNextFollowupField(entry, userRole);
                 const rowKey = `${entry.time_stamp || entry.followed_date || "f"}-${index}`;
 
                 return (
                   <tr key={rowKey} className="align-top">
-                    <td className="px-4 py-3">
+                    {showContactColumn && (
+                      <td className="px-3 py-2 text-gray-700 align-top">
+                        {entry.contact_label || "-"}
+                      </td>
+                    )}
+                    <td className="px-3 py-2 align-top">
                       {nextFollowup
                         ? formatCrmDatetimeForISTDisplay(nextFollowup)
                         : "-"}
                     </td>
-                    <td className="px-4 py-3">{entry.followed_by || "-"}</td>
-                    <td className="px-4 py-3">
+                    <td className="px-3 py-2 align-top">{entry.followed_by || "-"}</td>
+                    <td className="px-3 py-2 align-top">
                       {entry.followed_date
                         ? formatCrmDatetimeForISTDisplay(entry.followed_date)
                         : "-"}
                     </td>
-                    <td className="px-4 py-3">{entry.comm_mode || "-"}</td>
-                    <td className="px-4 py-3 min-w-0">
-                      <div className="whitespace-pre-wrap break-words [overflow-wrap:anywhere] leading-relaxed text-gray-800">
+                    <td className="px-3 py-2 align-top">{entry.comm_mode || "-"}</td>
+                    <td className="px-3 py-2 min-w-0 align-top">
+                      <div className="whitespace-pre-wrap break-words [overflow-wrap:anywhere] leading-snug text-gray-800">
                         {entry.notes || "-"}
                       </div>
                     </td>
                     {hasUploads && (
                       <>
-                        <td className="px-4 py-3">
+                        <td className="px-3 py-2 align-top">
                           {rowUploads.length > 0
                             ? rowUploads.map((upload, uploadIndex) => (
                                 <div key={uploadIndex} className="mb-2 last:mb-0">
@@ -415,7 +476,7 @@ export default function FollowUpHistory({
                               ))
                             : "-"}
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-3 py-2 align-top">
                           {rowUploads.length > 0
                             ? rowUploads.map((upload, uploadIndex) => (
                                 <div key={uploadIndex} className="mb-2 last:mb-0">
@@ -424,7 +485,7 @@ export default function FollowUpHistory({
                               ))
                             : "-"}
                         </td>
-                        <td className="px-4 py-3 min-w-0">
+                        <td className="px-3 py-2 min-w-0 align-top">
                           {rowUploads.length > 0
                             ? rowUploads.map((upload, uploadIndex) => (
                                 <div
@@ -436,7 +497,7 @@ export default function FollowUpHistory({
                               ))
                             : "-"}
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-3 py-2 align-top">
                           {rowUploads.length > 0
                             ? rowUploads.map((upload, uploadIndex) => (
                                 <div key={uploadIndex} className="mb-2 last:mb-0">
@@ -461,23 +522,24 @@ export default function FollowUpHistory({
 
               {uploadOnlyRows.map((upload, index) => (
                 <tr key={`upload-${upload.datetime || index}`} className="align-top">
-                  <td className="px-4 py-3">-</td>
-                  <td className="px-4 py-3">-</td>
-                  <td className="px-4 py-3">-</td>
-                  <td className="px-4 py-3">-</td>
-                  <td className="px-4 py-3">-</td>
-                  <td className="px-4 py-3">
+                  {showContactColumn && <td className="px-3 py-2">-</td>}
+                  <td className="px-3 py-2">-</td>
+                  <td className="px-3 py-2">-</td>
+                  <td className="px-3 py-2">-</td>
+                  <td className="px-3 py-2">-</td>
+                  <td className="px-3 py-2">-</td>
+                  <td className="px-3 py-2">
                     {upload.datetime
                       ? formatCrmDatetimeForISTDisplay(upload.datetime)
                       : "-"}
                   </td>
-                  <td className="px-4 py-3">{upload.user_name || "-"}</td>
-                  <td className="px-4 py-3 min-w-0">
+                  <td className="px-3 py-2">{upload.user_name || "-"}</td>
+                  <td className="px-3 py-2 min-w-0">
                     <div className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
                       {upload.summary || "-"}
                     </div>
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-3 py-2">
                     {upload.keypoints?.length > 0 ? (
                       <ul className="list-disc list-inside space-y-1">
                         {upload.keypoints.map((point, pointIndex) => (

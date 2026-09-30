@@ -10,6 +10,10 @@ import CustomerPerformaInvoiceButton from "@/components/invoice/CustomerPerforma
 import ScheduleVisitModal from "@/components/scheduleVisit/ScheduleVisitModal";
 import { canShowScheduleVisitOnCustomerProfile } from "@/lib/scheduleVisitScope";
 import { isSalesRole } from "@/lib/isSalesRole";
+import {
+  collectHierarchyCustomerIds,
+  fetchCustomerFollowupHistory,
+} from "@/lib/customerHierarchyFollowups";
 import { isGemRole } from "@/lib/isGemRole";
 import { userHasModuleKey } from "@/lib/userModuleAccessServer";
 import Link from "next/link";
@@ -53,45 +57,6 @@ export default async function CustomerPage({ params }) {
     .filter(Boolean)
     .join(" ")
     .trim();
-
-  // Fetch followup history
-  // SERVICE SUPPORT: only their own followups
-  // GEM / GEM PORTAL: all followups for this customer
-  // Sales roles: hide SERVICE SUPPORT follow-ups
-  const hideServiceSupportFollowups = isSalesRole(userRole);
-  const followupSelect = `SELECT next_followup_date, service_next_followup, gem_next_followup, followed_date, followed_by, notes, comm_mode, time_stamp`;
-
-  let followupSql = `${followupSelect}
-         FROM customers_followup
-         WHERE customer_id = ?
-         ORDER BY time_stamp DESC`;
-  let followupParams = [customerId];
-
-  if (userRole === "SERVICE SUPPORT") {
-    followupSql = `${followupSelect}
-         FROM customers_followup
-         WHERE customer_id = ? AND followed_by = ? AND followed_by IS NOT NULL AND followed_by != ''
-         ORDER BY time_stamp DESC`;
-    followupParams = [customerId, username];
-  } else if (hideServiceSupportFollowups) {
-    followupSql = `${followupSelect}
-         FROM customers_followup cf
-         WHERE cf.customer_id = ?
-           AND (
-             cf.followed_by IS NULL
-             OR cf.followed_by = ''
-             OR NOT EXISTS (
-               SELECT 1
-               FROM rep_list rl
-               WHERE rl.username = cf.followed_by
-                 AND UPPER(TRIM(rl.userRole)) = 'SERVICE SUPPORT'
-             )
-           )
-         ORDER BY cf.time_stamp DESC`;
-    followupParams = [customerId];
-  }
-
-  const [fups] = await conn.execute(followupSql, followupParams);
 
   // Fetch orders count for this customer
   // SUPERADMIN/DIRECTOR: see all orders for customer
@@ -196,6 +161,18 @@ export default async function CustomerPage({ params }) {
     siblingContacts = siblingRows || [];
     console.log(`[View Customer] Customer ${customerId} has parent ${selfData.parent_customer_id}, ${siblingContacts.length} siblings`);
   }
+
+  const hierarchyCustomerIds = collectHierarchyCustomerIds({
+    customerId,
+    parentContact,
+    siblingContacts,
+    childContacts,
+  });
+  const fups = await fetchCustomerFollowupHistory(conn, {
+    customerIds: hierarchyCustomerIds,
+    userRole,
+    username,
+  });
 
   // await conn.end();
 
