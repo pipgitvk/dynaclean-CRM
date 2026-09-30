@@ -33,10 +33,10 @@ import {
 ChartJS.register(ArcElement, Tooltip, Legend);
 
 import DeleteButton from "@/components/accounts/DeleteButton";
-import {
-  DispatchPhotosMenuButton,
-  DispatchPhotosModal,
-} from "@/components/orders/DispatchPhotosModal";
+// import {
+//   DispatchPhotosMenuButton,
+//   DispatchPhotosModal,
+// } from "@/components/orders/DispatchPhotosModal";
 import toast from "react-hot-toast";
 
 function parseOrderLineItems(order) {
@@ -2524,7 +2524,7 @@ function ReturnInitiateMenuItem({ order }) {
 
 function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
   const popRef = useRef(null);
-  const [photosOpen, setPhotosOpen] = useState(false);
+  // const [photosOpen, setPhotosOpen] = useState(false);
   const role = (userRole || "").toString().trim().toLowerCase();
   const canViewSales = [
     "back office",
@@ -2549,14 +2549,14 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
     String(r.booking_id).trim() !== "" &&
     String(r.booking_id) !== "0";
   const dispatchStatus = Number(r.dispatch_status);
-  const canViewDispatchPhotos = [
-    "warehouse incharge",
-    "superadmin",
-    "team leader",
-    "admin",
-    "director",
-    "accountant",
-  ].includes(role) || role.includes("accountant");
+  // const canViewDispatchPhotos = [
+  //   "warehouse incharge",
+  //   "superadmin",
+  //   "team leader",
+  //   "admin",
+  //   "director",
+  //   "accountant",
+  // ].includes(role) || role.includes("accountant");
 
   useEffect(() => {
     if (!isOpen) return;
@@ -2588,12 +2588,14 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
 
   return (
     <div className="relative inline-block text-left">
+      {/* View Dispatch Photos — hidden on admin order list
       {photosOpen && (
         <DispatchPhotosModal
           orderId={r.order_id}
           onClose={() => setPhotosOpen(false)}
         />
       )}
+      */}
       <button
         onClick={toggleMenu}
         className="p-2 rounded-full hover:bg-gray-200 transition-colors duration-150"
@@ -2706,12 +2708,14 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                   </Link>
                 </>
               )}
+            {/* View Dispatch Photos — hidden on admin order list
             {dispatchStatus === 1 && canViewDispatchPhotos && (
               <DispatchPhotosMenuButton
                 orderId={r.order_id}
                 onOpen={() => setPhotosOpen(true)}
               />
             )}
+            */}
             {(isWarehouse || canManageReturns || canViewSales) &&
               hasBooking &&
               dispatchStatus === 1 && (
