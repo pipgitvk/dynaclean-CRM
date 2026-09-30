@@ -28,6 +28,21 @@ function isAcknowledged(status) {
   return s === "acknowledged" || s === "reviewed";
 }
 
+function prospectFileHref(row) {
+  const url = String(row?.pdf_path || "");
+  if (!url) return "";
+  const name = String(row?.pdf_original_name || "");
+  const isCloudinaryPdf =
+    url.includes("res.cloudinary.com") &&
+    (name.toLowerCase().endsWith(".pdf") || url.includes("/raw/upload/"));
+  if (!isCloudinaryPdf) return url;
+  const filename = name.toLowerCase().endsWith(".pdf")
+    ? name
+    : `${name.replace(/\.[^.]+$/, "") || "prospect"}.pdf`;
+  const params = new URLSearchParams({ url, filename });
+  return `/api/cloudinary-proxy?${params.toString()}`;
+}
+
 function buildProspectQuery(scope, fromDate, toDate) {
   const params = new URLSearchParams({ scope });
   if (fromDate) params.set("fromDate", fromDate);
@@ -312,7 +327,7 @@ export default function ProspectSubmissionsPage({ defaultScope = "team" }) {
                   <td className="px-4 py-3">
                     {row.pdf_path ? (
                       <a
-                        href={row.pdf_path}
+                        href={prospectFileHref(row)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-1 text-blue-600 hover:underline"
