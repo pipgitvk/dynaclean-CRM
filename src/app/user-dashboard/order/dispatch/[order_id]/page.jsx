@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useAsyncClick } from "@/lib/useAsyncClick";
+import { buildChecklistAccessoriesUrl } from "@/lib/dispatchChecklistAccessories";
 import { useParams, useRouter } from "next/navigation";
 import { isSpare1110 } from "@/lib/isSpare1110";
 
@@ -36,11 +37,15 @@ export default function DispatchFormPage({ params }) {
           setInitialSerialNos(idsWithSerialNo);
           setSavedIds(idsWithSerialNo);
 
-          // Load accessories for each unique item_code
-          const uniqueItemCodes = [
-            ...new Set(data.map((r) => r.item_code).filter(Boolean)),
+          // Load in-package accessories checklist only for product rows (not spare dispatch rows)
+          const uniqueProductCodes = [
+            ...new Set(
+              data
+                .map((r) => r.item_code)
+                .filter((code) => code && /[a-zA-Z]/.test(code)),
+            ),
           ];
-          for (const itemCode of uniqueItemCodes) {
+          for (const itemCode of uniqueProductCodes) {
             loadAccessoriesForProduct(itemCode);
           }
 
@@ -172,9 +177,7 @@ export default function DispatchFormPage({ params }) {
       const productAccessories =
         accessories[itemCode]?.length > 0
           ? accessories[itemCode]
-          : await fetch(
-              `/api/product-accessories?product_code=${itemCode}&package_status=available`,
-            )
+          : await fetch(buildChecklistAccessoriesUrl(itemCode, godown))
               .then((r) => (r.ok ? r.json() : null))
               .then((j) => j?.data || [])
               .catch(() => []);
@@ -190,14 +193,7 @@ export default function DispatchFormPage({ params }) {
 
   const loadAccessoriesForProduct = async (itemCode, godown = null) => {
     try {
-      const params = new URLSearchParams({
-        product_code: itemCode,
-        package_status: "available",
-        resolve_product: "1",
-      });
-      if (godown) params.set("godown", godown);
-
-      const res = await fetch(`/api/product-accessories?${params.toString()}`);
+      const res = await fetch(buildChecklistAccessoriesUrl(itemCode, godown));
       if (res.ok) {
         const json = await res.json();
         if (json.success) {
@@ -249,7 +245,9 @@ export default function DispatchFormPage({ params }) {
       if (row && row.quote_number && row.item_code) {
         if (value) {
           fetchStockForRow(id, row.quote_number, value, row.item_code);
-          loadAccessoriesForProduct(row.item_code, value);
+          if (isProductItem(row.item_code)) {
+            loadAccessoriesForProduct(row.item_code, value);
+          }
         } else {
           setStockInfo((prev) => ({ ...prev, [id]: null }));
           setZeroStockWarnings((prev) => ({ ...prev, [id]: false }));
@@ -536,11 +534,11 @@ export default function DispatchFormPage({ params }) {
                   </div>
                 )}
 
-                {/* Accessories Checklist */}
-                {getAccessoriesForRow(r).length > 0 && (
+                {/* In-package accessories checklist (package_status=available only) */}
+                {isProductItem(r.item_code) && getAccessoriesForRow(r).length > 0 && (
                     <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-md">
                       <h4 className="text-sm font-medium text-blue-800 mb-2">
-                        Accessories Checklist:
+                        In-package accessories (checklist only):
                       </h4>
                       <div className="space-y-1">
                         {getAccessoriesForRow(r).map((acc) => (

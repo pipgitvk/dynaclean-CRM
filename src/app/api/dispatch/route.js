@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
+import { ensureAddedAccessoryDispatchRows } from "@/lib/seedAddedAccessoryDispatch";
 
 export async function GET(req) {
   try {
@@ -31,6 +32,14 @@ export async function GET(req) {
 
     if (!quoteNumber) {
       return NextResponse.json({ success: true, data: [] });
+    }
+
+    if (orderId) {
+      try {
+        await ensureAddedAccessoryDispatchRows(conn, quoteNumber);
+      } catch (seedErr) {
+        console.error("Dispatch GET ensure added accessories:", seedErr);
+      }
     }
 
     const [dispatchRows] = await conn.execute(

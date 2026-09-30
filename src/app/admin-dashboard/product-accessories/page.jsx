@@ -420,8 +420,12 @@ export default function ProductAccessoriesPage() {
                                                 setNewAccessory({ ...newAccessory, package_status: e.target.value })
                                             }
                                         >
-                                            <option value="available">Available (in package - checklist only)</option>
-                                            <option value="added">Added (separate dispatch - auto added to dispatch)</option>
+                                            <option value="available">
+                                              Available — Already included in package / No separate dispatch
+                                            </option>
+                                            <option value="added">
+                                              Added — Not included in package / Dispatch separately
+                                            </option>
                                         </select>
                                     </div>
                                     <button
@@ -555,8 +559,12 @@ export default function ProductAccessoriesPage() {
                                                                                 setEditForm({ ...editForm, package_status: e.target.value })
                                                                             }
                                                                         >
-                                                                            <option value="available">Available</option>
-                                                                            <option value="added">Added</option>
+                                                                            <option value="available">
+                                                                              Available — In package
+                                                                            </option>
+                                                                            <option value="added">
+                                                                              Added — Dispatch separately
+                                                                            </option>
                                                                         </select>
                                                                     </td>
                                                                     <td className="p-2 border text-center">
@@ -682,8 +690,12 @@ export default function ProductAccessoriesPage() {
                                                                     setEditForm({ ...editForm, package_status: e.target.value })
                                                                 }
                                                             >
-                                                                <option value="available">Available</option>
-                                                                <option value="added">Added</option>
+                                                                <option value="available">
+                                                                  Available — In package
+                                                                </option>
+                                                                <option value="added">
+                                                                  Added — Dispatch separately
+                                                                </option>
                                                             </select>
                                                             <div className="flex gap-2">
                                                                 <button

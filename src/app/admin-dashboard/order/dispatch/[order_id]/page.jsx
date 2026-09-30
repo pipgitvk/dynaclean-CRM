@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useAsyncClick } from "@/lib/useAsyncClick";
+import { buildChecklistAccessoriesUrl } from "@/lib/dispatchChecklistAccessories";
 import { useRouter } from "next/navigation";
 import { use } from "react";
 
@@ -109,17 +110,25 @@ export default function DispatchFormPage({ params }) {
     }
   };
 
-  const loadAccessoriesForProduct = async (itemCode) => {
+  const loadAccessoriesForProduct = async (itemCode, godown = null) => {
     try {
-      const res = await fetch(`/api/product-accessories?product_code=${itemCode}`);
+      const res = await fetch(buildChecklistAccessoriesUrl(itemCode, godown));
       if (res.ok) {
         const json = await res.json();
         if (json.success) {
-          setAccessories(prev => ({ ...prev, [itemCode]: json.data || [] }));
+          const accessoryList = json.data || [];
+          const resolvedProductCode = accessoryList[0]?.product_code || itemCode;
+          setAccessories((prev) => {
+            const next = { ...prev, [itemCode]: accessoryList };
+            if (resolvedProductCode !== itemCode) {
+              next[resolvedProductCode] = accessoryList;
+            }
+            return next;
+          });
         }
       }
     } catch (err) {
-      console.error('Failed to load accessories:', err);
+      console.error("Failed to load accessories:", err);
     }
   };
 
@@ -133,6 +142,9 @@ export default function DispatchFormPage({ params }) {
         if (value) {
           // Godown selected - fetch stock for this specific item
           fetchStockForRow(id, row.quote_number, value, row.item_code);
+          if (isProductItem(row.item_code)) {
+            loadAccessoriesForProduct(row.item_code, value);
+          }
         } else {
           // Godown cleared - clear stock info
           setStockInfo(prev => ({ ...prev, [id]: null }));
@@ -350,7 +362,7 @@ export default function DispatchFormPage({ params }) {
                 {accessories[r.item_code] && accessories[r.item_code].length > 0 && (
                   <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-md">
                     <h4 className="text-sm font-medium text-blue-800 mb-2">
-                      Accessories Checklist:
+                      In-package accessories (checklist only):
                     </h4>
                     <div className="space-y-1">
                       {accessories[r.item_code].map((acc) => (

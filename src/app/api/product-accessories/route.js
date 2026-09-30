@@ -5,6 +5,7 @@ import {
   getAccessoryStockMap,
   resolveProductCodes,
 } from "@/lib/resolveAccessorySpareId";
+import { ensureProductAccessoriesColumns } from "@/lib/ensureProductAccessoriesColumns";
 
 export async function GET(req) {
     try {
@@ -20,6 +21,7 @@ export async function GET(req) {
         const resolveProduct = searchParams.get("resolve_product") === "1";
 
         const conn = await getDbConnection();
+        await ensureProductAccessoriesColumns(conn);
 
         let productCodes = [];
         if (productCode) {
