@@ -277,6 +277,14 @@ function pickNextFollowupField(entry, userRole) {
   return entry.next_followup_date;
 }
 
+function getContactDisplayName(entry) {
+  return (
+    String(entry.contact_name || entry.contact_label || "")
+      .replace(/\s*\(ID:\s*\d+\)\s*$/i, "")
+      .trim() || ""
+  );
+}
+
 export default function FollowUpHistory({
   entries = [],
   cust_analysis_external,
@@ -318,9 +326,9 @@ export default function FollowUpHistory({
     for (const entry of entries) {
       const id = entry.customer_id;
       if (!id) continue;
-      const name = String(entry.contact_name || entry.contact_label || "").trim();
+      const name = getContactDisplayName(entry);
       if (!name) continue;
-      map.set(String(id), name.replace(/\s*\(ID:\s*\d+\)\s*$/i, "").trim() || name);
+      map.set(String(id), name);
     }
     return [...map.entries()]
       .map(([id, name]) => ({ id, name }))
@@ -402,7 +410,7 @@ export default function FollowUpHistory({
                   <option value="all">All Names</option>
                   {nameOptions.map((option) => (
                     <option key={option.id} value={option.id}>
-                      {option.name}
+                      {option.name} ({option.id})
                     </option>
                   ))}
                 </select>
@@ -441,9 +449,16 @@ export default function FollowUpHistory({
 
                 return (
                   <tr key={rowKey} className="align-top">
-                    {showContactColumn && (
+                    {showNameColumn && (
                       <td className="px-3 py-2 text-gray-700 align-top">
-                        {entry.contact_label || "-"}
+                        <div className="font-medium text-gray-800">
+                          {getContactDisplayName(entry) || "-"}
+                        </div>
+                        {entry.customer_id ? (
+                          <div className="text-xs text-gray-500">
+                            ID: {entry.customer_id}
+                          </div>
+                        ) : null}
                       </td>
                     )}
                     <td className="px-3 py-2 align-top">
@@ -520,9 +535,10 @@ export default function FollowUpHistory({
                 );
               })}
 
-              {uploadOnlyRows.map((upload, index) => (
+              {showUploadOnlyRows &&
+                uploadOnlyRows.map((upload, index) => (
                 <tr key={`upload-${upload.datetime || index}`} className="align-top">
-                  {showContactColumn && <td className="px-3 py-2">-</td>}
+                  {showNameColumn && <td className="px-3 py-2">-</td>}
                   <td className="px-3 py-2">-</td>
                   <td className="px-3 py-2">-</td>
                   <td className="px-3 py-2">-</td>
