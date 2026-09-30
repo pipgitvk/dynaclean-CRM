@@ -82,6 +82,7 @@ function transformMenuItemPaths(item, roleKey) {
       "salary-slips": "/director-dashboard/salary-slips",
       "lead-distribution": "/director-dashboard/lead-distribution",
       "bulk-reassign": "/director-dashboard/bulk-reassign",
+      "prospect-submissions": "/director-dashboard/prospect-submissions",
     };
     if (item.moduleKey && directorModulePaths[item.moduleKey]) {
       return { ...item, path: directorModulePaths[item.moduleKey] };
@@ -389,6 +390,13 @@ const allMenuItems = [
         path: "/user-dashboard/demo-registrations",
         name: "Demo Followups",
         moduleKey: "demo-followups",
+        roles: ["ALL"],
+        icon: "FileText",
+      },
+      {
+        path: "/user-dashboard/prospect-submissions",
+        name: "Prospect Submissions",
+        moduleKey: "prospect-submissions",
         roles: ["ALL"],
         icon: "FileText",
       },
@@ -1117,8 +1125,12 @@ export default async function getSidebarMenuItems() {
           const children = item?.children?.length
             ? filterByModuleAccess(item.children)
             : [];
+          // Prospect submissions: keep visible with dashboard-home until a dedicated module key is granted.
           const allowed = item?.moduleKey
-            ? isModuleKeyAllowed(item.moduleKey, allowedModules)
+            ? item.moduleKey === "prospect-submissions"
+              ? isModuleKeyAllowed("prospect-submissions", allowedModules) ||
+                isModuleKeyAllowed("dashboard-home", allowedModules)
+              : isModuleKeyAllowed(item.moduleKey, allowedModules)
             : item?.path
               ? false
               : true;

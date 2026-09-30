@@ -6,7 +6,6 @@ import Sidebar from "@/components/user/Sidebar";
 import { UserProvider } from "@/context/UserContext";
 import { ThemeProvider, useTheme } from "@/context/ThemeContext";
 import ThemeSwitcher from "@/components/ThemeSwitcher";
-
 function LayoutContent({ children, menuItems, showBackButton, backButtonPath }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const { theme } = useTheme();
@@ -31,7 +30,9 @@ function LayoutContent({ children, menuItems, showBackButton, backButtonPath }) 
       <div className="flex flex-col flex-1 transition-all duration-300 overflow-hidden">
         <Navbar onToggleSidebar={() => setSidebarOpen((prev) => !prev)} />
         <UserProvider>
-          <main className={`p-2 sm:p-3 md:p-4 overflow-auto ${theme.body.text}`}>{children}</main>
+          <main className={`p-2 sm:p-3 md:p-4 overflow-auto ${theme.body.text}`}>
+            {children}
+          </main>
         </UserProvider>
       </div>
       <ThemeSwitcher />

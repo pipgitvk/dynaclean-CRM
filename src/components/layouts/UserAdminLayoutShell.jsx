@@ -6,7 +6,6 @@ import Sidebar from "@/components/user/Sidebar";
 import { UserProvider } from "@/context/UserContext";
 import { ThemeProvider, useTheme } from "@/context/ThemeContext";
 import ThemeSwitcher from "@/components/ThemeSwitcher";
-
 function LayoutContent({
   children,
   menuItems,

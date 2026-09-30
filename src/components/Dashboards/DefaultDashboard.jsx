@@ -11,6 +11,7 @@ import UpcomingFollowupsWidget from "@/components/service/UpcomingFollowupsWidge
 import DigitalMarketingQuickCards from "@/components/DigitalMarketingQuickCards";
 import TopBacklinksKeywordsCards from "@/components/digital-marketing/TopBacklinksKeywordsCards";
 import ScheduleVisitCard from "@/components/scheduleVisit/ScheduleVisitCard";
+import TeamProspectsQuickCard from "@/components/prospects/TeamProspectsQuickCard";
 
 const salesCard =
   "flex min-h-0 flex-col rounded-xl border border-slate-100 bg-white p-4 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.08),0_2px_4px_-2px_rgba(0,0,0,0.05)] md:p-5";
@@ -32,6 +33,7 @@ export default function DefaultDashboard({ user, reportingManager, counts }) {
         <ExpenseApprovalButton variant="sales" />
         <ScheduleVisitCard variant="sales" href="/user-dashboard/schedule-visits" />
         {isDigitalRole && <DigitalMarketingQuickCards username={user.username} />}
+        <TeamProspectsQuickCard />
       </div>
 
       {showHrTargetChart && (

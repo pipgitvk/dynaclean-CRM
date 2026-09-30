@@ -4,18 +4,16 @@ import UpcomingFollowupsWidget from "@/components/service/UpcomingFollowupsWidge
 import PendingProductRegistrationCard from "@/components/service/PendingProductRegistrationCard";
 import UpcomingLeads from "@/components/Leads/UpcommingLeads";
 import ServiceSupportTodayReportCard from "@/components/service/ServiceSupportTodayReportCard";
+import TeamProspectsQuickCard from "@/components/prospects/TeamProspectsQuickCard";
 
 export default function ServiceSupportDashboard({ user }) {
   return (
     <div className="space-y-4 md:space-y-6">
 
-      <div className="flex flex-wrap gap-3">
-        <div className="w-full max-w-[280px]">
-          <ServiceSupportTodayReportCard />
-        </div>
-        <div className="w-full max-w-[280px]">
-          <PendingProductRegistrationCard />
-        </div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-6">
+        <ServiceSupportTodayReportCard />
+        <PendingProductRegistrationCard />
+        <TeamProspectsQuickCard />
       </div>
 
       {/* Upcoming Enquiry (leads followups) */}

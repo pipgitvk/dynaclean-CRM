@@ -11,6 +11,7 @@ import PaymentPendingButton from "@/components/PaymentPendingCircle";
 // import SalesAchievedQuickCard from "@/components/targets/SalesAchievedQuickCard";
 import ScheduleVisitCard from "@/components/scheduleVisit/ScheduleVisitCard";
 import ManualPaymentUpcomingFollowups from "@/components/manual-payments/ManualPaymentUpcomingFollowups";
+import TeamProspectsQuickCard from "@/components/prospects/TeamProspectsQuickCard";
 
 const salesCard =
   "flex min-h-0 flex-col rounded-xl border border-slate-100 bg-white p-4 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.08),0_2px_4px_-2px_rgba(0,0,0,0.05)] md:p-5";
@@ -19,7 +20,7 @@ export default function SalesDashboard({ user }) {
   return (
     <div className="mx-auto w-full max-w-[1600px] space-y-5">
       {/* Top stats — full width */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-6">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-7">
         <TodaysReportingButton variant="sales" />
         <PaymentPendingButton variant="sales" monthly />
         <TodayReportButton variant="sales" />
@@ -34,6 +35,7 @@ export default function SalesDashboard({ user }) {
           href="/sales-dashboard/order"
           iconColor="border-purple-200"
         />
+        <TeamProspectsQuickCard />
         {/* <SalesAchievedQuickCard /> */}
       </div>
 

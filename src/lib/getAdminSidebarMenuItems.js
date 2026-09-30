@@ -377,6 +377,12 @@ const allMenuItems = [
         icon: "FileText",
       },
       {
+        path: "/admin-dashboard/prospect-submissions",
+        name: "Prospect Submissions",
+        roles: ["SUPERADMIN", "ADMIN", "EA"],
+        icon: "FileText",
+      },
+      {
         path: "/admin-dashboard/demo_details",
         name: "Demo Details",
         roles: ["SUPERADMIN"],

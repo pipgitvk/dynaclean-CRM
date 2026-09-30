@@ -7,6 +7,7 @@ import { useTheme } from "@/context/ThemeContext";
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import AttendanceStatusTracker from "@/components/AttendanceStatusTracker";
+import ProspectHeaderButton from "@/components/prospects/ProspectHeaderButton";
 
 export default function Navbar({ onToggleSidebar, showSalesMeta = false }) {
   const router = useRouter();
@@ -383,6 +384,7 @@ export default function Navbar({ onToggleSidebar, showSalesMeta = false }) {
       </div>
 
       <div className="flex flex-1 min-w-0 flex-col gap-2 min-[1100px]:flex-row min-[1100px]:items-center min-[1100px]:justify-end min-[1100px]:gap-4 min-[1100px]:overflow-visible overflow-x-auto">
+        <ProspectHeaderButton userRole={userRole} username={username} />
         {shouldShowAttendanceTracker && (
           <AttendanceStatusTracker username={username} />
         )}

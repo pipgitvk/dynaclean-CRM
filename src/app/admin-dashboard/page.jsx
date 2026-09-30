@@ -198,11 +198,12 @@ import ProfileApprovalsCard from "@/components/ProfileApprovalsCard";
 import ScheduleVisitCard from "@/components/scheduleVisit/ScheduleVisitCard";
 import OverduePaymentCard from "@/components/OverduePaymentCard";
 import KeywordPerformanceQuickCard from "@/components/keywords/KeywordPerformanceQuickCard";
-import { Package, BarChart3, Upload, DollarSign, Calendar, Plane, FileText, ClipboardList } from "lucide-react";
+import { Package, BarChart3, Upload, DollarSign, Calendar, Plane, FileText, ClipboardList, Users } from "lucide-react";
 import ServiceTeamReportCard from "@/components/service/ServiceTeamReportCard";
 import ServiceSupportQuotesOrdersCard from "@/components/service/ServiceSupportQuotesOrdersCard";
 import ServiceSupportTotalCard from "@/components/service/ServiceSupportTotalCard";
 import { SPECIAL_PRICE_PENDING_CONDITION } from "@/lib/specialPriceDefaults";
+import { getPendingProspectSubmissionsCount } from "@/lib/prospectSubmissionCounts";
 
 // import UpcomingLeads from "@/components/Leads/UpcommingLeads";
 
@@ -406,6 +407,13 @@ export default async function UserDashboardPage() {
       console.warn("today service support followup counts:", e.message);
     }
 
+    let pendingProspectSubmissionsCount = 0;
+    try {
+      pendingProspectSubmissionsCount = await getPendingProspectSubmissionsCount(connection);
+    } catch (e) {
+      console.warn("pending prospect submissions count:", e.message);
+    }
+
     if (!user) {
       return <p className="text-red-600">User not found</p>;
     }
@@ -541,6 +549,31 @@ export default async function UserDashboardPage() {
           <ServiceTeamReportCard rows={todayServiceTeamRows} />
           <ServiceSupportTotalCard {...serviceSupportTotals} />
           <ServiceSupportQuotesOrdersCard rows={todayServiceQuoteOrderRows} />
+
+          {/* All Prospect Submissions */}
+          <a
+            href="/admin-dashboard/prospect-submissions"
+            className="bg-white rounded-lg shadow-md p-4 text-black hover:shadow-lg transition-shadow h-full cursor-pointer block border-l-4 border-violet-500 min-h-[140px]"
+          >
+            <div className="flex flex-col h-full justify-between">
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <Users className="w-5 h-5 text-violet-500 shrink-0" />
+                  <h2 className="text-sm font-bold text-black leading-tight">
+                    All Prospect Submissions
+                  </h2>
+                </div>
+                <p
+                  className={`text-2xl font-bold mt-1 ${
+                    pendingProspectSubmissionsCount === 0 ? "text-green-600" : "text-red-600"
+                  }`}
+                >
+                  {pendingProspectSubmissionsCount}
+                </p>
+                <p className="text-xs text-gray-600 mt-0.5">Pending review</p>
+              </div>
+            </div>
+          </a>
         </div>
 
         {/* System Performance Dashboard - Featured Card */}
