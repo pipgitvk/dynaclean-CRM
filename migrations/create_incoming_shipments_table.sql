@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS incoming_shipments (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    shipment_id VARCHAR(50) UNIQUE NOT NULL,
+    product_code VARCHAR(100),
+    item_name VARCHAR(255),
+    qty INT NOT NULL DEFAULT 0,
+    supplier_name VARCHAR(255) NOT NULL,
+    transporter_name VARCHAR(255),
+    expected_arrival_date DATE,
+    status ENUM('Order Preparing', 'Paid', 'Sailed', 'Arrived at Port', 'Rail Out', 'Delivered') NOT NULL DEFAULT 'Order Preparing',
+    notes TEXT,
+    created_by VARCHAR(100),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_by VARCHAR(100),
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_shipment_id (shipment_id),
+    INDEX idx_status (status),
+    INDEX idx_expected_arrival_date (expected_arrival_date),
+    INDEX idx_created_at (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

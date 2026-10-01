@@ -1,8 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Eye, Search, ArrowRightLeft, History, X, PackageX, AlertTriangle } from "lucide-react";
+import { Eye, Search, ArrowRightLeft, History, X, PackageX, AlertTriangle, Plus, Edit } from "lucide-react";
 import Link from "next/link";
+import IncomingShipmentsTable from "./IncomingShipmentsTable";
+import AddIncomingShipment from "./AddIncomingShipment";
+import EditIncomingShipment from "./EditIncomingShipment";
 
 function ProductStockList() {
   const [rows, setRows] = useState([]);
@@ -13,7 +16,7 @@ function ProductStockList() {
   const [stockSummaryData, setStockSummaryData] = useState([]);
   const [transactionsStatusFilter, setTransactionsStatusFilter] = useState(null);
   const [summarySearch, setSummarySearch] = useState("");
-  const [summaryStatusFilter, setSummaryStatusFilter] = useState(null);
+  const [summaryStatusFilter, setSummaryStatusFilter] = useState(null); 
   const [transactionsSearch, setTransactionsSearch] = useState("");
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
@@ -25,7 +28,7 @@ function ProductStockList() {
   const [selectedProductForHistory, setSelectedProductForHistory] = useState(null);
   const [transferHistoryData, setTransferHistoryData] = useState([]);
   const [loadingTransferHistory, setLoadingTransferHistory] = useState(false);
-  const [purchasePriceData, setPurchasePriceData] = useState([]);
+  const [purchasePriceData, setPurchasePriceData] = useState([]); 
   const [showSparesModal, setShowSparesModal] = useState(false);
   const [selectedProductSpares, setSelectedProductSpares] = useState([]);
   const [allSpares, setAllSpares] = useState([]);
@@ -33,6 +36,14 @@ function ProductStockList() {
   const [lowStockProducts, setLowStockProducts] = useState([]);
   const [showZeroStockCard, setShowZeroStockCard] = useState(true);
   const [preBookingData, setPreBookingData] = useState([]);
+  
+  // Incoming Shipments State
+  const [incomingShipments, setIncomingShipments] = useState([]);
+  const [loadingShipments, setLoadingShipments] = useState(false);
+  const [showAddShipmentModal, setShowAddShipmentModal] = useState(false);
+  const [showEditShipmentModal, setShowEditShipmentModal] = useState(false);
+  const [selectedShipmentForEdit, setSelectedShipmentForEdit] = useState(null);
+  const [isShipmentViewOnly, setIsShipmentViewOnly] = useState(false);
 
   const handleViewSpares = (product) => {
     // Filter spares based on product/machine compatibility
@@ -99,6 +110,7 @@ function ProductStockList() {
     fetchAllSpares();
     fetchStockAlerts();
     fetchPreBookingData();
+    fetchIncomingShipments();
   }, []);
 
   const fetchAllSpares = async () => {
@@ -188,12 +200,99 @@ function ProductStockList() {
     }
   };
 
+  const fetchIncomingShipments = async () => {
+    try {
+      setLoadingShipments(true);
+      const res = await fetch("/api/incoming-shipments");
+      const data = await res.json();
+      setIncomingShipments(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Error fetching incoming shipments:", err);
+      setIncomingShipments([]);
+    } finally {
+      setLoadingShipments(false);
+    }
+  };
+
   const getPreBookedQuantity = (itemName) => {
     if (!itemName) return 0;
     const preBooking = preBookingData.find(
       (pb) => pb.product_name && String(pb.product_name).toLowerCase() === String(itemName).toLowerCase()
     );
     return preBooking ? preBooking.pre_booked_quantity : 0;
+  };
+
+  // Incoming Shipments Handlers
+  const handleAddShipment = async (formData) => {
+    try {
+      const res = await fetch("/api/incoming-shipments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData)
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || data.success === false) {
+        alert(data.error || "Failed to add shipment");
+        return;
+      }
+
+      alert("Shipment added successfully!");
+      setShowAddShipmentModal(false);
+      await fetchIncomingShipments();
+    } catch (error) {
+      console.error("Error adding shipment:", error);
+      alert("Error adding shipment. Please try again.");
+    }
+  };
+
+  const handleEditShipment = async (formData) => {
+    if (!selectedShipmentForEdit) return;
+
+    try {
+      const res = await fetch(`/api/incoming-shipments/${selectedShipmentForEdit.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData)
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || data.success === false) {
+        alert(data.error || "Failed to update shipment");
+        return;
+      }
+
+      alert("Shipment updated successfully!");
+      setShowEditShipmentModal(false);
+      setSelectedShipmentForEdit(null);
+      await fetchIncomingShipments();
+    } catch (error) {
+      console.error("Error updating shipment:", error);
+      alert("Error updating shipment. Please try again.");
+    }
+  };
+
+  const handleDeleteShipment = async (shipmentId) => {
+    try {
+      const res = await fetch(`/api/incoming-shipments/${shipmentId}`, {
+        method: "DELETE"
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || data.success === false) {
+        alert(data.error || "Failed to delete shipment");
+        return;
+      }
+
+      alert("Shipment deleted successfully!");
+      await fetchIncomingShipments();
+    } catch (error) {
+      console.error("Error deleting shipment:", error);
+      alert("Error deleting shipment. Please try again.");
+    }
   };
 
   const openTransferModal = (product) => {
@@ -455,6 +554,21 @@ function ProductStockList() {
               </span>
             )}
           </button>
+          <button
+            onClick={() => setOpenSection("incoming")}
+            className={`text-xs sm:text-sm px-3 sm:px-4 py-1.5 sm:py-2 rounded text-white flex items-center gap-1.5 ${openSection === "incoming"
+              ? "bg-violet-600 hover:bg-violet-700"
+              : "bg-gray-500 hover:bg-gray-600"
+              }`}
+          >
+            <Plus size={14} />
+            Incoming Shipments
+            {incomingShipments.length > 0 && (
+              <span className="bg-white/25 px-1.5 py-0.5 rounded text-[10px] font-bold">
+                {incomingShipments.length}
+              </span>
+            )}
+          </button>
         </div>
       </div>
 
@@ -559,12 +673,13 @@ function ProductStockList() {
                   <th className="px-5 py-2 text-left font-semibold">Pre-booked</th>
                   <th className="px-5 py-2 text-left font-semibold">Net Qty</th>
                   <th className="px-5 py-2 text-left font-semibold">Status</th>
+                  <th className="px-5 py-2 text-left font-semibold">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {allLowStockItems.length === 0 ? (
                   <tr>
-                    <td colSpan="10" className="px-5 py-8 text-center text-gray-500">
+                    <td colSpan="11" className="px-5 py-8 text-center text-gray-500">
                       No low stock products found
                     </td>
                   </tr>
@@ -595,6 +710,47 @@ function ProductStockList() {
                           <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${isZero ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}`}>
                             {isZero ? "Zero Stock" : "Low Stock"}
                           </span>
+                        </td>
+                        <td className="px-5 py-3 whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            {(() => {
+                              const relatedShipment = incomingShipments.find(ship => 
+                                (ship.product_code && ship.product_code === p.product_code) ||
+                                (ship.item_name && ship.item_name.toLowerCase() === (p.item_name || '').toLowerCase())
+                              );
+                              
+                              if (!relatedShipment) {
+                                return <span className="text-gray-400 text-xs">—</span>;
+                              }
+                              
+                              return (
+                                <>
+                                  <button
+                                    onClick={() => {
+                                      setSelectedShipmentForEdit(relatedShipment);
+                                      setIsShipmentViewOnly(false);
+                                      setShowEditShipmentModal(true);
+                                    }}
+                                    className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
+                                    title="Edit related incoming shipment"
+                                  >
+                                    <Edit size={16} />
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setSelectedShipmentForEdit(relatedShipment);
+                                      setIsShipmentViewOnly(true);
+                                      setShowEditShipmentModal(true);
+                                    }}
+                                    className="p-1 text-green-600 hover:bg-green-100 rounded transition-colors"
+                                    title="View incoming shipment details"
+                                  >
+                                    <Eye size={16} />
+                                  </button>
+                                </>
+                              );
+                            })()}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -1183,6 +1339,59 @@ function ProductStockList() {
         </div>
       )}
 
+      {/* Incoming Shipments Section */}
+      {openSection === "incoming" && (
+        <div>
+          <div className="flex justify-between items-center mb-4">
+            <button
+              onClick={() => setShowAddShipmentModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <Plus size={18} />
+              Add New Shipment
+            </button>
+          </div>
+          <IncomingShipmentsTable
+            shipments={incomingShipments}
+            loading={loadingShipments}
+            onEdit={(shipment) => {
+              setSelectedShipmentForEdit(shipment);
+              setShowEditShipmentModal(true);
+            }}
+            onDelete={handleDeleteShipment}
+            onView={(shipment) => {
+              setSelectedShipmentForEdit(shipment);
+              setIsShipmentViewOnly(true);
+              setShowEditShipmentModal(true);
+            }}
+          />
+        </div>
+      )}
+
+      {/* Add Incoming Shipment Modal */}
+      <AddIncomingShipment
+        isOpen={showAddShipmentModal}
+        onClose={() => setShowAddShipmentModal(false)}
+        onSubmit={handleAddShipment}
+        loading={loadingShipments}
+        products={rows}
+      />
+
+      {/* Edit Incoming Shipment Modal */}
+      <EditIncomingShipment
+        isOpen={showEditShipmentModal}
+        onClose={() => {
+          setShowEditShipmentModal(false);
+          setSelectedShipmentForEdit(null);
+          setIsShipmentViewOnly(false);
+        }}
+        onSubmit={handleEditShipment}
+        loading={loadingShipments}
+        shipment={selectedShipmentForEdit}
+        products={rows}
+        readonly={isShipmentViewOnly}
+      />
+
       {/* Spares Modal */}
       {showSparesModal && (
         <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-50 p-2">
@@ -1253,3 +1462,4 @@ function ProductStockList() {
 export default function ProductStockPage() {
   return <ProductStockList />;
 }
+
