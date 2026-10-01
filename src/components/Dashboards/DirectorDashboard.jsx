@@ -48,6 +48,21 @@ import ScheduleVisitCard from "@/components/scheduleVisit/ScheduleVisitCard";
 
 // Simple card component like admin dashboard
 const SimpleCard = ({ title, value, icon: Icon, borderColor, onClick, subtext, multiValues }) => {
+  // Helper function to get numeric value from value prop
+  const getNumericValue = (val) => {
+    if (typeof val === 'number') return val;
+    if (typeof val === 'string') {
+      // Extract number from currency format like "₹100"
+      const numMatch = val.match(/\d+/);
+      return numMatch ? parseInt(numMatch[0]) : 0;
+    }
+    return 0;
+  };
+
+  // Determine text color based on value
+  const numValue = getNumericValue(value);
+  const textColor = numValue === 0 ? 'text-green-600' : 'text-red-600';
+
   return (
     <a 
       onClick={onClick}
@@ -63,16 +78,19 @@ const SimpleCard = ({ title, value, icon: Icon, borderColor, onClick, subtext, m
         
         {multiValues ? (
           <div className="grid grid-cols-3 gap-1 sm:gap-2 mt-2">
-            {multiValues.map((item, idx) => (
-              <div key={idx} className="text-center">
-                <p className="text-xs text-gray-500 uppercase font-semibold mb-0.5">{item.label}</p>
-                <p className="text-lg sm:text-xl font-bold text-gray-900">{item.value}</p>
-              </div>
-            ))}
+            {multiValues.map((item, idx) => {
+              const itemValue = item.value === 0 ? 'text-green-600' : 'text-red-600';
+              return (
+                <div key={idx} className="text-center">
+                  <p className="text-xs text-gray-500 uppercase font-semibold mb-0.5">{item.label}</p>
+                  <p className={`text-lg sm:text-xl font-bold ${itemValue}`}>{item.value}</p>
+                </div>
+              );
+            })}
           </div>
         ) : (
           <>
-            <p className="text-xl sm:text-2xl font-bold mt-1 text-gray-900 line-clamp-2">
+            <p className={`text-xl sm:text-2xl font-bold mt-1 ${textColor} line-clamp-2`}>
               {value}
             </p>
             {subtext && (
