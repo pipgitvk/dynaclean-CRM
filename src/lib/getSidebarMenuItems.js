@@ -2,8 +2,8 @@
 import { getSessionPayload } from "./auth";
 import { normalizeRoleKey } from "@/lib/adminAttendanceRulesAuth";
 import {
-  parseModuleAccess,
-  isSectionAllowed,
+  resolveModuleAccess,
+  isModuleKeyAllowed,
   applySuperadminOnlyModuleRestrictions,
   applyRoleDenyModuleRestrictions,
   SUPERADMIN_ONLY_MODULE_KEYS,
@@ -13,6 +13,8 @@ import { getDbConnection } from "@/lib/db";
 // Role to dashboard prefix mapping
 function getDashboardPrefix(roleKey) {
   const role = String(roleKey || "").toUpperCase();
+  // Director keeps user-dashboard for most CRM routes; specific modules use director-dashboard copies.
+  if (role === "DIRECTOR") return "/user-dashboard";
   if (role.includes("SALES")) return "/sales-dashboard";
   if (role.includes("SERVICE") && role.includes("HEAD")) return "/service-head-dashboard";
   if (role.includes("HR")) return "/hr-dashboard";
@@ -32,7 +34,93 @@ function transformMenuItemPaths(item, roleKey) {
   }
 
   if (roleUpper === "SALES CUM BACKOFFICE" && item.moduleKey === "payment-pending") {
-    return { ...item, path: "/admin-dashboard/reports/payment-pending" };
+    return { ...item, path: "/sales-dashboard/reports/payment-pending" };
+  }
+
+  if (roleUpper === "SALES CUM BACKOFFICE" && item.moduleKey === "backlinks-excel-data") {
+    return { ...item, path: "/sales-dashboard/backlinks-excel" };
+  }
+
+  if (dashboardPrefix === "/sales-dashboard" && item.moduleKey) {
+    const salesDashboardModulePaths = {
+      "prospects-view": "/sales-dashboard/prospects",
+      "prospects-add": "/sales-dashboard/prospects/add-manual",
+      "prospects-new": "/sales-dashboard/prospects/new",
+    };
+    if (salesDashboardModulePaths[item.moduleKey]) {
+      return { ...item, path: salesDashboardModulePaths[item.moduleKey] };
+    }
+  }
+
+  if (roleUpper === "DIRECTOR") {
+    const directorModulePaths = {
+      "dashboard-home": "/director-dashboard",
+      "keywords-management": "/director-dashboard/keywords",
+      "backlinks-management": "/director-dashboard/backlinks",
+      "employee-list": "/director-dashboard/employees",
+      "client-expenses": "/director-dashboard/client-expenses/cards",
+      statements: "/director-dashboard/statements",
+      "attendance-rules": "/director-dashboard/attendance-rules",
+      "hr-daily-report": "/director-dashboard/hr-today-report",
+      "all-hr-report": "/director-dashboard/all-hr-report",
+      "paid-leave-ledger": "/director-dashboard/paid-leave-ledger",
+      "prospects-view": "/director-dashboard/prospects",
+      "prospects-add": "/director-dashboard/prospects/add-manual",
+      "prospects-new": "/director-dashboard/prospects/new",
+      "hr-designation-targets": "/director-dashboard/hr-designation-targets",
+      "sales-target": "/director-dashboard/monitor-targets",
+      "import-suppliers": "/director-dashboard/import-crm/suppliers",
+      "import-shipments": "/director-dashboard/import-crm/shipments",
+      "import-agents": "/director-dashboard/import-crm/agents",
+      "import-quote-submissions": "/director-dashboard/import-crm/quote-submissions",
+      "import-award-followups": "/director-dashboard/import-crm/award-followups",
+      "import-billing": "/director-dashboard/import-crm/billing",
+      "gem-crm-bids": "/director-dashboard/gem-crm/bids",
+      "gem-crm-reports": "/director-dashboard/gem-crm/reports",
+      "hiring-process": "/director-dashboard/hiring",
+      "final-profile-approval": "/director-dashboard/final-profile-approval",
+      "salary-slips": "/director-dashboard/salary-slips",
+      "lead-distribution": "/director-dashboard/lead-distribution",
+      "bulk-reassign": "/director-dashboard/bulk-reassign",
+      "prospect-submissions": "/director-dashboard/prospect-submissions",
+    };
+    if (item.moduleKey && directorModulePaths[item.moduleKey]) {
+      return { ...item, path: directorModulePaths[item.moduleKey] };
+    }
+  }
+
+  const accountsProcurementPaths = {
+    "purchase-products": "/accounts-dashboard/purchase-products",
+    "delivery-challan": "/accounts-dashboard/delivery-challan",
+  };
+
+  if (roleUpper === "ADMIN") {
+    if (item.moduleKey && accountsProcurementPaths[item.moduleKey]) {
+      return { ...item, path: accountsProcurementPaths[item.moduleKey] };
+    }
+  }
+
+  if (roleUpper === "ACCOUNTANT" || roleUpper.includes("ACCOUNTANT")) {
+    const accountantModulePaths = {
+      "client-expenses": "/accounts-dashboard/client-expenses/cards",
+      "delivery-challan": "/accounts-dashboard/delivery-challan",
+      "purchase-products": "/accounts-dashboard/purchase-products",
+      statements: "/accounts-dashboard/statements",
+      "bank-management": "/accounts-dashboard/bank-masters",
+      ledger: "/accounts-dashboard/ledger",
+      parties: "/accounts-dashboard/parties",
+      "paid-leave-ledger": "/accounts-dashboard/paid-leave-ledger",
+      "salary-slips": "/accounts-dashboard/salary-slips",
+      "salary-management": "/accounts-dashboard/salary",
+      "add-paid-leaves": "/accounts-dashboard/add-paid-leave",
+    };
+    if (item.moduleKey && accountantModulePaths[item.moduleKey]) {
+      return { ...item, path: accountantModulePaths[item.moduleKey] };
+    }
+  }
+
+  if (item.moduleKey === "denied-leads") {
+    return { ...item, path: "/sales-dashboard/denied-leads" };
   }
 
   // Don't transform admin-dashboard, accounts-dashboard or empcrm paths
@@ -88,8 +176,10 @@ function filterByRole(list, roleKey) {
   return (list || [])
     .map((item) => {
       const children = item?.children?.length ? filterByRole(item.children, roleKey) : [];
-      const keepSelf = item?.moduleKey ? true : roleMatches(item?.roles, roleKey);
-      if (children.length > 0) return { ...item, children };
+      const keepSelf = roleMatches(item?.roles, roleKey);
+      if (item?.children?.length) {
+        return children.length > 0 ? { ...item, children } : null;
+      }
       return keepSelf ? item : null;
     })
     .filter(Boolean);
@@ -130,6 +220,13 @@ const allMenuItems = [
         moduleKey: "daily-report",
         roles: ["ALL"],
         icon: "FileText",
+      },
+      {
+        path: "/user-dashboard/service-support-report",
+        name: "Service Support Report",
+        moduleKey: "service-support-report",
+        roles: ["ALL"],
+        icon: "Headset",
       },
       {
         path: "/user-dashboard/lead-reports",
@@ -257,8 +354,15 @@ const allMenuItems = [
         path: "/digital-marketing-dashboard/backlinks-excel",
         name: "Backlinks Excel",
         moduleKey: "backlinks-excel-data",
-        roles: ["SUPERADMIN", "DIGITAL MARKETER"],
+        roles: ["SUPERADMIN", "DIGITAL MARKETER", "SALES CUM BACKOFFICE"],
         icon: "FileText",
+      },
+      {
+        path: "/digital-marketing-dashboard/meta-credentials/add",
+        name: "Meta Credentials",
+        moduleKey: "meta-credentials-add",
+        roles: ["DIGITAL MARKETER"],
+        icon: "ShieldCheck",
       },
     ],
   },
@@ -290,6 +394,13 @@ const allMenuItems = [
         icon: "FileText",
       },
       {
+        path: "/user-dashboard/prospect-submissions",
+        name: "Prospect Submissions",
+        moduleKey: "prospect-submissions",
+        roles: ["ALL"],
+        icon: "FileText",
+      },
+      {
         path: "/user-dashboard/demo_details",
         name: "Demo Details",
         moduleKey: "demo-details",
@@ -310,69 +421,48 @@ const allMenuItems = [
         ],
         icon: "PlayCircle",
       },
+      {
+        path: "/user-dashboard/schedule-visits",
+        name: "Schedule Visits",
+        moduleKey: "schedule-visits",
+        roles: ["ALL"],
+        icon: "MapPin",
+      },
     ],
   },
   {
     name: "Sales",
     moduleKey: "tl-management",
-    roles: [
-      "SALES",
-      "SALES HEAD",
-      "SALES_HEAD",
-      "ADMIN",
-      "SERVICE HEAD",
-      "BACK OFFICE",
-      "DIGITAL MARKETER",
-      "GEM PORTAL",
-      "ACCOUNTANT",
-      "TEAM LEADER",
-    ],
+    /* Visibility driven by module_access; keep role list open so granted keys are not stripped first. */
+    roles: ["ALL"],
     icon: "FileSignature",
     children: [
       {
         path: "/user-dashboard/quotations",
         name: "Quotation",
         moduleKey: "quotations",
-        roles: [
-          "SALES",
-          "SALES HEAD",
-          "SALES_HEAD",
-          "ADMIN",
-          "SERVICE HEAD",
-          "BACK OFFICE",
-          "DIGITAL MARKETER",
-          "GEM PORTAL",
-          "ACCOUNTANT",
-          "TEAM LEADER",
-        ],
+        roles: ["ALL"],
         icon: "FileSignature",
       },
       {
         path: "/user-dashboard/invoices",
         name: "Invoices",
         moduleKey: "invoices",
-        roles: ["ACCOUNTANT"],
+        roles: ["ALL"],
+        icon: "FileText",
+      },
+      {
+        path: "/user-dashboard/performa-invoices",
+        name: "Performa Invoices",
+        moduleKey: "performa-invoices",
+        roles: ["ALL"],
         icon: "FileText",
       },
       {
         path: "/user-dashboard/order",
         name: "Order Process",
         moduleKey: "orders-process",
-        roles: [
-          "SALES",
-          "SALES HEAD",
-          "SALES_HEAD",
-          "ADMIN",
-          "SUPERADMIN",
-          "TEAM LEADER",
-          "SERVICE HEAD",
-          "BACK OFFICE",
-          "DIGITAL MARKETER",
-          "GEM PORTAL",
-          "ACCOUNTANT",
-          "WAREHOUSE INCHARGE",
-          "HR",
-        ],
+        roles: ["ALL"],
         icon: "ListOrdered",
       },
       {
@@ -413,7 +503,7 @@ const allMenuItems = [
       },
       {
         path: "/user-dashboard/service-followups",
-        name: "Service Follow-ups",
+        name: "Machine Follow-ups",
         moduleKey: "service-followups",
         roles: ["ALL"],
         icon: "Calendar",
@@ -465,58 +555,29 @@ const allMenuItems = [
   {
     name: "Products & Inventory",
     moduleKey: "products",
-    roles: [
-      "ADMIN",
-      "ACCOUNTANT",
-      "WAREHOUSE INCHARGE",
-      "DIGITAL MARKETER",
-      "TEAM LEADER",
-      "SALES HEAD",
-      "SALES_HEAD",
-      "SERVICE SUPPORT",
-      "EA",
-    ],
+    /* Visibility driven by module_access; keep role list open so granted keys are not stripped first. */
+    roles: ["ALL"],
     icon: "Grid3x3",
     children: [
       {
         path: "/user-dashboard/product-stock",
         name: "Price List",
         moduleKey: "product-stock",
-        roles: [
-          "ADMIN",
-          "ACCOUNTANT",
-          "WAREHOUSE INCHARGE",
-          "DIGITAL MARKETER",
-          "TEAM LEADER",
-          "SALES",
-          "SALES HEAD",
-          "SALES_HEAD",
-          "SERVICE SUPPORT",
-        ],
+        roles: ["ALL"],
         icon: "FileText",
       },
       {
         path: "/user-dashboard/product-accessories",
         name: "Product Accessories",
         moduleKey: "product-accessories",
-        roles: ["ADMIN", "ACCOUNTANT", "WAREHOUSE INCHARGE"],
+        roles: ["ALL"],
         icon: "ClipboardList",
       },
       {
         path: "/user-dashboard/spare",
         name: "Spare Parts",
         moduleKey: "spare-parts",
-        roles: [
-          "ADMIN",
-          "ACCOUNTANT",
-          "WAREHOUSE INCHARGE",
-          "DIGITAL MARKETER",
-          "TEAM LEADER",
-          "SALES HEAD",
-          "SALES_HEAD",
-          "SERVICE SUPPORT",
-          "EA",
-        ],
+        roles: ["ALL"],
         icon: "FileText",
       },
     ],
@@ -524,13 +585,27 @@ const allMenuItems = [
   {
     name: "Procurement",
     moduleKey: "products",
-    roles: ["ADMIN", "ACCOUNTANT", "WAREHOUSE INCHARGE", "SERVICE SUPPORT"],
+    roles: ["ALL"],
     icon: "ShoppingCart",
     children: [
       {
+        path: "/admin-dashboard/parties",
+        name: "Parties",
+        moduleKey: "parties",
+        roles: ["ALL"],
+        icon: "Users",
+      },
+      {
+        path: "/admin-dashboard/purchase-products",
+        name: "Purchase Billings",
+        moduleKey: "purchase-products",
+        roles: ["ALL"],
+        icon: "ShoppingBag",
+      },
+      {
         name: "Purchase – Products",
         moduleKey: "products",
-        roles: ["ADMIN", "ACCOUNTANT", "WAREHOUSE INCHARGE", "SERVICE SUPPORT"],
+        roles: ["ALL"],
         icon: "ShoppingCart",
         children: [
           {
@@ -573,7 +648,7 @@ const allMenuItems = [
       {
         name: "Purchase – Spares",
         moduleKey: "products",
-        roles: ["ADMIN", "ACCOUNTANT", "WAREHOUSE INCHARGE", "SERVICE SUPPORT"],
+        roles: ["ALL"],
         icon: "ShoppingCart",
         children: [
           {
@@ -611,21 +686,21 @@ const allMenuItems = [
   {
     name: "Production",
     moduleKey: "products",
-    roles: ["ADMIN", "ACCOUNTANT", "WAREHOUSE INCHARGE", "DESIGN ENGINEER", "SERVICE SUPPORT"],
+    roles: ["ADMIN", "ACCOUNTANT", "WAREHOUSE INCHARGE", "DESIGN ENGINEER", "SERVICE SUPPORT", "PRODUCTION ENGINEER", "MACHINE OPERATOR"],
     icon: "PackageCheck",
     children: [
       {
         path: "/user-dashboard/productions/status",
         name: "Production Status",
         moduleKey: "production-status",
-        roles: ["ADMIN", "ACCOUNTANT", "WAREHOUSE INCHARGE", "DESIGN ENGINEER", "SERVICE SUPPORT"],
+        roles: ["ADMIN", "ACCOUNTANT", "WAREHOUSE INCHARGE", "DESIGN ENGINEER", "SERVICE SUPPORT", "PRODUCTION ENGINEER", "MACHINE OPERATOR"],
         icon: "ListOrdered",
       },
       {
         path: "/user-dashboard/productions/bom-list",
         name: "BOM List",
         moduleKey: "bom-list",
-        roles: ["ADMIN", "ACCOUNTANT", "WAREHOUSE INCHARGE", "DESIGN ENGINEER", "SERVICE SUPPORT"],
+        roles: ["ADMIN", "ACCOUNTANT", "WAREHOUSE INCHARGE", "DESIGN ENGINEER", "SERVICE SUPPORT", "PRODUCTION ENGINEER", "MACHINE OPERATOR"],
         icon: "ClipboardList",
       },
     ],
@@ -698,29 +773,37 @@ const allMenuItems = [
   {
     name: "Main Expenses",
     moduleKey: "tally-payments",
-    roles: ["SUPERADMIN", "ACCOUNTANT", "PRODUCTION ACCOUNTANT"],
+    /* Visibility driven by module_access; keep role list open so granted keys are not stripped first. */
+    roles: ["ALL"],
     icon: "Receipt",
     children: [
       {
         path: "/admin-dashboard/client-expenses/cards",
         name: "Main Expenses",
         moduleKey: "client-expenses",
-        roles: ["SUPERADMIN", "ACCOUNTANT", "PRODUCTION ACCOUNTANT"],
+        roles: ["ALL"],
         icon: "FileText",
       },
       {
         path: "/admin-dashboard/delivery-challan",
         name: "Delivery Challan",
         moduleKey: "delivery-challan",
-        roles: ["SUPERADMIN", "ACCOUNTANT", "PRODUCTION ACCOUNTANT"],
+        roles: ["ALL"],
         icon: "Package",
       },
       {
         path: "/admin-dashboard/statements",
         name: "Statement",
         moduleKey: "statements",
-        roles: ["SUPERADMIN", "ACCOUNTANT", "PRODUCTION ACCOUNTANT"],
+        roles: ["ALL"],
         icon: "Receipt",
+      },
+      {
+        path: "/admin-dashboard/bank-masters",
+        name: "Bank Management",
+        moduleKey: "bank-management",
+        roles: ["ALL"],
+        icon: "Landmark",
       },
     ],
   },
@@ -800,6 +883,20 @@ const allMenuItems = [
         moduleKey: "all-hr-report",
         roles: ["SUPERADMIN"],
         icon: "FileText",
+      },
+      {
+        path: "/empcrm/user-dashboard/add-paid-leave",
+        name: "Add Paid Leave Request",
+        moduleKey: "add-paid-leaves",
+        roles: ["ALL"],
+        icon: "Calendar",
+      },
+      {
+        path: "/admin-dashboard/paid-leave-ledger",
+        name: "Paid Leave Ledger",
+        moduleKey: "paid-leave-ledger",
+        roles: ["ALL"],
+        icon: "Book",
       },
     ],
   },
@@ -906,70 +1003,42 @@ const allMenuItems = [
         path: "/user-dashboard/installation-videos",
         name: "Installation Videos",
         moduleKey: "installation-videos",
-        roles: [
-          "ADMIN",
-          "SERVICE HEAD",
-          "TEAM LEADER",
-          "GRAPHIC DESIGNER",
-          "ACCOUNTANT",
-          "WAREHOUSE INCHARGE",
-          "SALES",
-          "SALES HEAD",
-          "SALES_HEAD",
-        ],
+        roles: ["ALL"],
         icon: "PlayCircle",
       },
       {
         path: "/user-dashboard/installation-videos/manage",
         name: "Manage Video Links",
         moduleKey: "installation-videos-manage",
-        roles: [
-          "ADMIN",
-          "SERVICE HEAD",
-          "TEAM LEADER",
-          "GRAPHIC DESIGNER",
-          "ACCOUNTANT",
-          "WAREHOUSE INCHARGE",
-        ],
+        roles: ["ALL"],
         icon: "FilePlus2",
       },
       {
         path: "/user-dashboard/assets-management",
         name: "Assets",
         moduleKey: "assets",
-        roles: ["ADMIN", "ACCOUNTANT", "SALES", "SALES HEAD", "SALES_HEAD"],
+        roles: ["ALL"],
         icon: "FileText",
       },
       {
         path: "/user-dashboard/qa",
         name: "Knowledge Base",
         moduleKey: "qa",
-        roles: [
-          "ADMIN",
-          "SUPERADMIN",
-          "TEAM LEADER",
-          "SERVICE HEAD",
-          "BACK OFFICE",
-          "DIGITAL MARKETER",
-          "GEM PORTAL",
-          "ACCOUNTANT",
-          "WAREHOUSE INCHARGE",
-          "HR",
-        ],
+        roles: ["ALL"],
         icon: "BookOpen",
       },
       {
         path: "/user-dashboard/company-documents",
         name: "Company Documents",
         moduleKey: "company-documents",
-        roles: ["SUPERADMIN", "ADMIN", "ACCOUNTANT"],
+        roles: ["ALL"],
         icon: "FileText",
       },
       {
         path: "/user-dashboard/email-templates",
         name: "Email Templates",
         moduleKey: "email-templates",
-        roles: ["ADMIN", "GRAPHIC DESIGNER", "SERVICE HEAD", "DIGITAL MARKETER"],
+        roles: ["ALL"],
         icon: "Mail",
       },
     ],
@@ -1005,23 +1074,22 @@ const allMenuItems = [
   },
 ];
 
-async function getUserModuleAccess(username) {
-  if (!username) return null;
+async function getUserModuleAccess(username, roleKey) {
+  if (!username) return resolveModuleAccess(null, roleKey);
   try {
     const conn = await getDbConnection();
     const [rows] = await conn.execute(
-      "SELECT module_access FROM rep_list WHERE username = ? LIMIT 1",
+      "SELECT module_access, userRole FROM rep_list WHERE username = ? LIMIT 1",
       [username],
     );
-    if (!rows.length) return []; // unknown user → show nothing (fail closed)
-    return parseModuleAccess(rows[0].module_access ?? null);
+    if (!rows.length) return [];
+    const role = roleKey || rows[0].userRole;
+    return resolveModuleAccess(rows[0].module_access ?? null, role);
   } catch (err) {
     const msg = String(err?.message || "").toLowerCase();
-    // Backward-compat: if column isn't present yet, allow all.
     if (msg.includes("unknown column") && msg.includes("module_access")) {
-      return null;
+      return resolveModuleAccess(null, roleKey);
     }
-    // Any other DB error: do NOT leak modules.
     return [];
   }
 }
@@ -1038,44 +1106,42 @@ export default async function getSidebarMenuItems() {
   // Hard deny SUPERADMIN-only modules even when module_access is NULL (backward compat).
   items = stripSuperadminOnlyMenuItems(items, roleKey);
 
-  // Step 2: filter by module_access (SUPERADMIN and EA bypass this — see everything)
+  // Step 2: filter by module_access (SUPERADMIN and EA bypass — see everything)
   if (roleKey !== "SUPERADMIN" && roleKey !== "EA") {
-    const allowedModulesRaw = await getUserModuleAccess(username);
-    const allowedModules1 = applySuperadminOnlyModuleRestrictions(
-      allowedModulesRaw,
+    const allowedModulesRaw = await getUserModuleAccess(username, roleKey);
+    const allowedModules = applyRoleDenyModuleRestrictions(
+      applySuperadminOnlyModuleRestrictions(allowedModulesRaw, roleKey) ?? [],
       roleKey,
-    );
-    const allowedModules2 = applyRoleDenyModuleRestrictions(allowedModules1, roleKey);
-    const allowedModules = allowedModules2;
-    // allowedModules === null means column not set yet → show all (backward compat)
-    if (allowedModules !== null) {
-      const filterByModuleAccess = (list) =>
-        (list || [])
-          .map((item) => {
-            const children = item?.children?.length
-              ? filterByModuleAccess(item.children)
-              : [];
-            // When module_access is configured, a leaf link MUST have a moduleKey to be shown.
-            // Otherwise older menu entries would "leak" through and ignore module_access.
-            // My Leads is accessible to anyone who has the my-leads module key in their module_access
-            const allowed = item?.moduleKey
-              ? isSectionAllowed(item.moduleKey, allowedModules)
-              : item?.path
-                ? false
-                : true;
-            // If it originally has children, keep it only if any child remains.
-            // This prevents "empty groups" (e.g. Orders) from showing just because
-            // a broad parent moduleKey like "dashboard" is allowed.
-            if (item?.children?.length) {
-              return children.length > 0 ? { ...item, children } : null;
-            }
-            // Leaf: keep only if allowed.
-            return allowed ? item : null;
-          })
-          .filter(Boolean);
-
-      items = filterByModuleAccess(items);
+    ) ?? [];
+    if (roleKey === "ACCOUNTANT" && Array.isArray(allowedModules)) {
+      for (const key of ["salary-management", "add-paid-leaves"]) {
+        if (!allowedModules.includes(key)) allowedModules.push(key);
+      }
     }
+
+    const filterByModuleAccess = (list) =>
+      (list || [])
+        .map((item) => {
+          const children = item?.children?.length
+            ? filterByModuleAccess(item.children)
+            : [];
+          // Prospect submissions: keep visible with dashboard-home until a dedicated module key is granted.
+          const allowed = item?.moduleKey
+            ? item.moduleKey === "prospect-submissions"
+              ? isModuleKeyAllowed("prospect-submissions", allowedModules) ||
+                isModuleKeyAllowed("dashboard-home", allowedModules)
+              : isModuleKeyAllowed(item.moduleKey, allowedModules)
+            : item?.path
+              ? false
+              : true;
+          if (item?.children?.length) {
+            return children.length > 0 ? { ...item, children } : null;
+          }
+          return allowed ? item : null;
+        })
+        .filter(Boolean);
+
+    items = filterByModuleAccess(items);
   }
 
   // Transform paths based on role-specific dashboard

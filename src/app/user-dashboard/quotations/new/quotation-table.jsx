@@ -1,11 +1,46 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Image from "next/image";
+
+async function resolvePriceWithSpecial(customerId, productCode, basePrice, itemType = null) {
+  if (!customerId || !productCode) {
+    return { finalPrice: basePrice, specialPrice: null };
+  }
+
+  try {
+    const specialRes = await fetch("/api/special-price/check", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        customer_id: Number(customerId) || customerId,
+        product_code: productCode,
+        item_type: itemType || undefined,
+      }),
+    });
+
+    const specialData = await specialRes.json();
+    if (specialRes.ok && specialData?.special_price != null && specialData.special_price !== "") {
+      const specialPrice = parseFloat(specialData.special_price);
+      if (Number.isFinite(specialPrice)) {
+        return { finalPrice: specialPrice, specialPrice };
+      }
+    }
+  } catch (err) {
+    console.error("❌ Special price fetch error", err);
+  }
+
+  return { finalPrice: basePrice, specialPrice: null };
+}
 
 export default function QuotationTable({ items, setItems, customerId }) {
   const [productSuggestions, setProductSuggestions] = useState([]);
   const [activeRowIndex, setActiveRowIndex] = useState(null);
+  const itemsRef = useRef(items);
+
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
 
   const handleChange = (index, field, value) => {
     setItems(prev => {
@@ -34,13 +69,21 @@ export default function QuotationTable({ items, setItems, customerId }) {
     });
   };
 
-  const fetchProductDetails = async (code, index, isSuggestion = false) => {
+  const fetchProductDetails = async (code, index, isSuggestion = false, itemType = null) => {
     try {
+      const customerParam = customerId
+        ? `&customerId=${encodeURIComponent(customerId)}`
+        : "";
       const res = await fetch(
-        `/api/get-product-details?code=${code}&mode=${isSuggestion ? "suggestion" : "full"}`
+        `/api/get-product-details?code=${encodeURIComponent(code)}&mode=${isSuggestion ? "suggestion" : "full"}${customerParam}`
       );
       const data = await res.json();
-      if (!data || data.length === 0) return;
+      if (!res.ok || !Array.isArray(data) || data.length === 0) {
+        if (!res.ok) {
+          console.error("❌ Product fetch failed:", data);
+        }
+        return;
+      }
 
       if (isSuggestion) {
         setProductSuggestions(data);
@@ -49,27 +92,29 @@ export default function QuotationTable({ items, setItems, customerId }) {
       }
 
       const item = data[0];
-      let finalPrice = parseFloat(item.price_per_unit) || 0;
+      const resolvedCode = item.item_code || code;
+      const resolvedType = itemType || item.item_type || item.source || "product";
+      const basePrice = parseFloat(item.price_per_unit) || 0;
+
+      // Live price from special_price table (product + spare)
       let specialPrice = null;
-
-      try {
-        const specialRes = await fetch("/api/special-price/check", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            customer_id: customerId,
-            product_code: item.item_code || code,
-          }),
-        });
-
-        const specialData = await specialRes.json();
-        if (specialData?.special_price) {
-          specialPrice = parseFloat(specialData.special_price);
-          finalPrice = specialPrice;
-        }
-      } catch (err) {
-        console.error("❌ Special price fetch error", err);
+      if (customerId) {
+        const resolved = await resolvePriceWithSpecial(
+          customerId,
+          resolvedCode,
+          basePrice,
+          resolvedType
+        );
+        specialPrice = resolved.specialPrice;
+      } else if (item.special_price != null) {
+        const parsed = parseFloat(item.special_price);
+        if (Number.isFinite(parsed)) specialPrice = parsed;
       }
+
+      const finalPrice =
+        specialPrice != null && Number.isFinite(specialPrice)
+          ? specialPrice
+          : basePrice;
 
       const imageUrl = item.image_path || "";
 
@@ -77,13 +122,17 @@ export default function QuotationTable({ items, setItems, customerId }) {
         const updated = [...prev];
         updated[index] = {
           ...updated[index],
-          productCode: item.item_code || code,
+          productCode: resolvedCode,
+          item_type: resolvedType,
           name: item.item_name || "",
           hsn: item.hsn_sac || "",
           specification: item.specification || "",
           unit: item.unit || "",
           price: finalPrice,
-          original_price: parseFloat(item.price_per_unit) || 0,
+          original_price:
+            parseFloat(item.original_price) ||
+            parseFloat(item.price_per_unit) ||
+            0,
           special_price: specialPrice,
           last_negotiation_price: parseFloat(item.last_negotiation_price) || 0,
           gst: parseFloat(item.gst_rate) || 18,
@@ -96,6 +145,36 @@ export default function QuotationTable({ items, setItems, customerId }) {
       console.error("❌ Product fetch error", err);
     }
   };
+
+  const reapplySpecialPrices = useCallback(async () => {
+    if (!customerId) return;
+
+    const prev = itemsRef.current;
+    if (!prev.some((i) => String(i.productCode ?? "").trim())) return;
+
+    const next = await Promise.all(
+      prev.map(async (row) => {
+        const code = String(row.productCode ?? "").trim();
+        if (!code) return row;
+        const base =
+          parseFloat(row.original_price) || parseFloat(row.price) || 0;
+        const { specialPrice } = await resolvePriceWithSpecial(
+          customerId,
+          code,
+          base,
+          row.item_type || null
+        );
+        if (specialPrice == null) return row;
+        return { ...row, price: specialPrice, special_price: specialPrice };
+      })
+    );
+
+    setItems(next);
+  }, [customerId, setItems]);
+
+  useEffect(() => {
+    reapplySpecialPrices();
+  }, [customerId, reapplySpecialPrices]);
 
   const addRow = () => {
     setItems(prev => [
@@ -192,14 +271,28 @@ export default function QuotationTable({ items, setItems, customerId }) {
                         <ul className="absolute z-10 bg-white border rounded shadow-sm mt-1 max-h-40 overflow-y-auto w-48 text-xs">
                           {productSuggestions.map((p, i) => (
                             <li
-                              key={i}
+                              key={`${p.source || "product"}-${p.item_code}-${i}`}
                               onClick={() => {
                                 handleChange(idx, "productCode", p.item_code);
-                                fetchProductDetails(p.item_code, idx);
+                                fetchProductDetails(
+                                  p.item_code,
+                                  idx,
+                                  false,
+                                  p.source || "product"
+                                );
                                 setProductSuggestions([]);
                               }}
                               className="px-2 py-1 cursor-pointer hover:bg-emerald-100"
                             >
+                              <span
+                                className={`mr-1 px-1 rounded text-[10px] font-semibold ${
+                                  p.source === "spare"
+                                    ? "bg-purple-100 text-purple-700"
+                                    : "bg-blue-100 text-blue-700"
+                                }`}
+                              >
+                                {p.source === "spare" ? "Spare" : "Product"}
+                              </span>
                               <span className="font-semibold">
                                 {p.item_code}
                               </span>{" "}
@@ -287,7 +380,7 @@ export default function QuotationTable({ items, setItems, customerId }) {
           onClick={addRow}
           className="bg-green-600 text-white px-4 py-1 rounded hover:bg-green-700 text-sm"
         >
-          + Add Product
+          + Add Product / Spare
         </button>
       </div>
     </div>

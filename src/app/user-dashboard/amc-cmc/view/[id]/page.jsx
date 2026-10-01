@@ -115,6 +115,10 @@ export default function ViewUserAMCCMCPage() {
             <h2 className="text-xl font-semibold mb-4 pb-2 border-b">Product Information</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
+                <p className="text-sm text-gray-600">Contract Type</p>
+                <p className="text-lg font-semibold">{record.contract_type || "AMC"}</p>
+              </div>
+              <div>
                 <p className="text-sm text-gray-600">Serial Number</p>
                 <p className="text-lg font-semibold">{record.serial_number}</p>
               </div>

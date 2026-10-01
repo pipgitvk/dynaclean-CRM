@@ -3,17 +3,30 @@
 import { useEffect, useMemo, useState } from "react";
 import QuotationViewModal from "@/components/Quotation/QuotationViewModal";
 
-export default function QuotationTableClient({ username, customerId, role }) {
+function currentMonthRange() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = now.getMonth();
+  const from = `${y}-${String(m + 1).padStart(2, "0")}-01`;
+  const lastDay = new Date(y, m + 1, 0).getDate();
+  const to = `${y}-${String(m + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+  return { from, to };
+}
+
+export default function QuotationTableClient({ username, customerId, role, serviceSupportOnly = false }) {
   const isSuperAdmin = role === "SUPERADMIN";
+  const monthRange = useMemo(() => currentMonthRange(), []);
   const [quotations, setQuotations] = useState([]);
   const [filtered, setFiltered] = useState([]);
   const [modalQuote, setModalQuote] = useState(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [fromDate, setFromDate] = useState("");
-  const [toDate, setToDate] = useState("");
+  const [fromDate, setFromDate] = useState(monthRange.from);
+  const [toDate, setToDate] = useState(monthRange.to);
   const [employeeFilter, setEmployeeFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 25;
 
   const employeeOptions = useMemo(() => {
     const names = new Set();
@@ -37,6 +50,7 @@ export default function QuotationTableClient({ username, customerId, role }) {
     if (employeeFilter) url += `&emp_name=${encodeURIComponent(employeeFilter)}`;
     if (customerId)
       url += `&customer_id=${encodeURIComponent(String(customerId))}`;
+    if (serviceSupportOnly) url += `&ss=1`;
 
     try {
       const res = await fetch(url);
@@ -57,7 +71,7 @@ export default function QuotationTableClient({ username, customerId, role }) {
 
   useEffect(() => {
     fetchData(); // Load data initially
-  }, [username, fromDate, toDate, employeeFilter, customerId]);
+  }, [username, fromDate, toDate, employeeFilter, customerId, serviceSupportOnly]);
 
   useEffect(() => {
     const keyword = search.trim().toLowerCase();
@@ -89,15 +103,77 @@ export default function QuotationTableClient({ username, customerId, role }) {
     });
 
     setFiltered(filteredData);
+    setCurrentPage(1);
   }, [search, quotations, employeeFilter, statusFilter]);
 
   const handleReset = () => {
-    setFromDate("");
-    setToDate("");
+    setFromDate(monthRange.from);
+    setToDate(monthRange.to);
     setSearch("");
     setEmployeeFilter("");
     setStatusFilter("");
+    setCurrentPage(1);
   };
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paginatedRows = filtered.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE
+  );
+
+  const PaginationBar = () => (
+    <div className="flex items-center justify-between px-2 py-3 border-t mt-2 text-sm text-gray-600">
+      <span>
+        Showing {filtered.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filtered.length)} of {filtered.length}
+      </span>
+      <div className="flex items-center gap-1">
+        <button
+          onClick={() => setCurrentPage(1)}
+          disabled={currentPage === 1}
+          className="px-2 py-1 rounded border disabled:opacity-40 hover:bg-gray-100"
+        >«</button>
+        <button
+          onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+          disabled={currentPage === 1}
+          className="px-2 py-1 rounded border disabled:opacity-40 hover:bg-gray-100"
+        >‹</button>
+        {Array.from({ length: totalPages }, (_, i) => i + 1)
+          .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 2)
+          .reduce((acc, p, i, arr) => {
+            if (i > 0 && p - arr[i - 1] > 1) acc.push("...");
+            acc.push(p);
+            return acc;
+          }, [])
+          .map((p, i) =>
+            p === "..." ? (
+              <span key={`ellipsis-${i}`} className="px-2">…</span>
+            ) : (
+              <button
+                key={p}
+                onClick={() => setCurrentPage(p)}
+                className={`px-2.5 py-1 rounded border text-xs ${
+                  p === currentPage
+                    ? "bg-blue-600 text-white border-blue-600"
+                    : "hover:bg-gray-100"
+                }`}
+              >
+                {p}
+              </button>
+            )
+          )}
+        <button
+          onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+          disabled={currentPage === totalPages}
+          className="px-2 py-1 rounded border disabled:opacity-40 hover:bg-gray-100"
+        >›</button>
+        <button
+          onClick={() => setCurrentPage(totalPages)}
+          disabled={currentPage === totalPages}
+          className="px-2 py-1 rounded border disabled:opacity-40 hover:bg-gray-100"
+        >»</button>
+      </div>
+    </div>
+  );
 
   return (
     <div className="bg-white rounded shadow p-4">
@@ -186,7 +262,7 @@ export default function QuotationTableClient({ username, customerId, role }) {
                 </td>
               </tr>
             ) : filtered.length > 0 ? (
-              filtered.map((q) => (
+              paginatedRows.map((q) => (
                 <tr key={q.quote_number} className="border-t hover:bg-gray-50">
                   <td className="px-4 py-2">{q.quote_number}</td>
                   <td className="px-4 py-2">{q.company_name}</td>
@@ -211,21 +287,23 @@ export default function QuotationTableClient({ username, customerId, role }) {
                     )}
                   </td>
                   <td className="px-4 py-2 text-center">
-                    <button
-                      type="button"
-                      onClick={() => setModalQuote(q.quote_number)}
-                      className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 inline-block"
-                    >
-                      View
-                    </button>
-                    {isSuperAdmin && (
-                      <a
-                        href={`/admin-dashboard/quotations/${encodeURIComponent(q.quote_number)}/edit`}
-                        className="ml-2 bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 inline-block"
+                    <div className="flex flex-wrap items-center justify-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setModalQuote(q.quote_number)}
+                        className="bg-green-600 text-white px-4 py-2 rounded font-medium text-sm hover:bg-green-700 transition-colors duration-200"
                       >
-                        Edit
-                      </a>
-                    )}
+                        View
+                      </button>
+                      {isSuperAdmin && (
+                        <a
+                          href={`/admin-dashboard/quotations/${encodeURIComponent(q.quote_number)}/edit`}
+                          className="bg-blue-600 text-white px-4 py-2 rounded font-medium text-sm hover:bg-blue-700 transition-colors duration-200 inline-block"
+                        >
+                          Edit
+                        </a>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))
@@ -241,6 +319,7 @@ export default function QuotationTableClient({ username, customerId, role }) {
             )}
           </tbody>
         </table>
+        <PaginationBar />
       </div>
 
       {/* Cards - Visible on small screens */}
@@ -248,7 +327,7 @@ export default function QuotationTableClient({ username, customerId, role }) {
         {loading ? (
           <div className="text-center py-4 text-gray-500">Loading...</div>
         ) : filtered.length > 0 ? (
-          filtered.map((q) => (
+          paginatedRows.map((q) => (
             <div
               key={q.quote_number}
               className="bg-white p-4 rounded-lg shadow-md border border-gray-200"
@@ -290,18 +369,18 @@ export default function QuotationTableClient({ username, customerId, role }) {
                     Pending
                   </span>
                 )}
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                   <button
                     type="button"
                     onClick={() => setModalQuote(q.quote_number)}
-                    className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 text-sm"
+                    className="bg-green-600 text-white px-4 py-2 rounded font-medium text-sm hover:bg-green-700 transition-colors duration-200 flex-1 sm:flex-none"
                   >
                     View
                   </button>
                   {isSuperAdmin && (
                     <a
                       href={`/admin-dashboard/quotations/${encodeURIComponent(q.quote_number)}/edit`}
-                      className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm"
+                      className="bg-blue-600 text-white px-4 py-2 rounded font-medium text-sm hover:bg-blue-700 transition-colors duration-200 flex-1 sm:flex-none text-center inline-block"
                     >
                       Edit
                     </a>
@@ -315,6 +394,7 @@ export default function QuotationTableClient({ username, customerId, role }) {
             No quotations found.
           </div>
         )}
+        <PaginationBar />
       </div>
     </div>
   );

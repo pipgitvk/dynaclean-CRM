@@ -3,6 +3,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import toast from "react-hot-toast";
+import { Sun, BadgeCheck } from "lucide-react";
 import {
   DEFAULT_ATTENDANCE_RULES,
   getCheckinStatus as checkinStatusFromRules,
@@ -13,7 +14,36 @@ import {
 } from "@/lib/attendanceRulesEngine";
 import { rowHasMeaningfulCheckinOrCheckout } from "@/lib/attendanceMeaningfulPunch";
 import { formatAttendanceTimeForDisplay as formatTime } from "@/lib/istDateTime";
+import { getAttendanceRegularizationAttachmentHref } from "@/lib/attendanceRegularizationAttachmentHref";
 import AttendanceRegularizeModal from "@/app/user-dashboard/attendance/AttendanceRegularizeModal";
+
+function statusBadgeClass(status) {
+  const s = String(status || "").toLowerCase();
+  if (s === "pending") return "bg-amber-100 text-amber-900 border border-amber-200";
+  if (s === "approved") return "bg-green-100 text-green-900 border border-green-200";
+  if (s === "rejected") return "bg-red-50 text-red-800 border border-red-200";
+  return "bg-gray-100 text-gray-800 border border-gray-200";
+}
+
+function RegStatusBadge({ status, acknowledgedAt }) {
+  const cls = statusBadgeClass(status);
+  const display = status || "—";
+  const statusEl = (
+    <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium capitalize ${cls}`}>
+      {display}
+    </span>
+  );
+  if (!acknowledgedAt) return statusEl;
+  return (
+    <div className="flex flex-col gap-1 items-start">
+      {statusEl}
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-indigo-100 text-indigo-700 border border-indigo-200">
+        <BadgeCheck className="w-3 h-3" />
+        Acknowledged
+      </span>
+    </div>
+  );
+}
 
 const AttendancePage = () => {
   const [logs, setLogs] = useState([]);
@@ -32,6 +62,16 @@ const AttendancePage = () => {
   const [showRemarksModal, setShowRemarksModal] = useState(false);
   const [selectedRemarks, setSelectedRemarks] = useState("");
   const [reportingManager, setReportingManager] = useState(null);
+
+  // Edit pending regularization request
+  const [editRegModal, setEditRegModal] = useState(false);
+  const [editRegRequest, setEditRegRequest] = useState(null); // the pending request row
+  const [editCheckin, setEditCheckin] = useState("");
+  const [editCheckout, setEditCheckout] = useState("");
+  const [editReason, setEditReason] = useState("");
+  const [editFile, setEditFile] = useState(null);
+  const [editFileKey, setEditFileKey] = useState(0);
+  const [editSaving, setEditSaving] = useState(false);
 
   const fetchAttendance = async () => {
     setLoading(true);
@@ -97,6 +137,14 @@ const AttendancePage = () => {
     log?.date ? new Date(log.date).toLocaleDateString("en-CA") : "";
 
   const rowNeedsRegularization = (log) => {
+    // If there's an approved unpaid leave on this date, don't show regularize button
+    const dateKey = new Date(log.date).toLocaleDateString("en-CA");
+    const leaveOnDate = leaveMap.get(dateKey);
+    if (leaveOnDate && leaveOnDate.leave_type === "unpaid") {
+      return false;
+    }
+    
+    // Only "present" type logs can be regularized
     if (log.type !== "present") return false;
     const checkinOk = getCheckinStatus(log.checkin_time) === "onTime";
     const checkoutOk = getCheckoutStatus(log.checkout_time) === "onTime";
@@ -161,6 +209,73 @@ const AttendancePage = () => {
     setShowRemarksModal(true);
   };
 
+  const showApprovalRemarks = (remarks) => {
+    setSelectedRemarks(remarks);
+    setShowRemarksModal(true);
+  };
+
+  const openEditRegModal = (pendingReq) => {
+    setEditRegRequest(pendingReq);
+    // pre-fill with the current proposed times
+    setEditCheckin(
+      pendingReq.proposed_checkin_time
+        ? String(pendingReq.proposed_checkin_time).trim().replace(" ", "T").slice(0, 16)
+        : ""
+    );
+    setEditCheckout(
+      pendingReq.proposed_checkout_time
+        ? String(pendingReq.proposed_checkout_time).trim().replace(" ", "T").slice(0, 16)
+        : ""
+    );
+    setEditReason(pendingReq.reason || "");
+    setEditFile(null);
+    setEditFileKey((k) => k + 1);
+    setEditRegModal(true);
+  };
+
+  const submitEditReg = async (e) => {
+    e.preventDefault();
+    if (!editReason.trim()) {
+      toast.error("Reason is required.");
+      return;
+    }
+    const hasExistingAttachment = editRegRequest?.attachment_url;
+    if (!editFile && !hasExistingAttachment) {
+      toast.error("Please attach screenshot with date/time.");
+      return;
+    }
+    setEditSaving(true);
+    try {
+      const toMysql = (v) => {
+        if (!v) return null;
+        const t = String(v).trim();
+        return t.includes("T") ? `${t.replace("T", " ")}:00` : `${t}:00`;
+      };
+      const fd = new FormData();
+      fd.append("id", editRegRequest.id);
+      fd.append("checkin_time", toMysql(editCheckin) ?? "");
+      fd.append("checkout_time", toMysql(editCheckout) ?? "");
+      fd.append("reason", editReason.trim());
+      if (editFile) {
+        fd.append("attachment", editFile);
+      }
+      const res = await fetch("/api/attendance/regularization", {
+        method: "PUT",
+        body: fd,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Update failed.");
+      toast.success(data.message || "Request updated.");
+      setEditRegModal(false);
+      setEditRegRequest(null);
+      refreshRegularization();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
   const fetchReportingManager = async () => {
     try {
       const res = await fetch("/api/user/reporting-manager");
@@ -205,6 +320,24 @@ const AttendancePage = () => {
     setToDate("");
   };
 
+  // Helper: derive half_day_type from start_time / end_time using standard lunch break (13:00).
+  // Used when DB-stored half_day_type is missing/null.
+  const deriveHalfDayType = (startTime, endTime) => {
+    const toMin = (t) => {
+      if (!t) return null;
+      const s = String(t).trim();
+      const m = s.match(/^(\d{1,2}):(\d{2})/);
+      if (!m) return null;
+      return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+    };
+    const LUNCH_MIN = 13 * 60; // 13:00 = standard lunch reference
+    const startMin = toMin(startTime);
+    const endMin = toMin(endTime);
+    if (startMin !== null) return startMin >= LUNCH_MIN ? "2nd_half" : "1st_half";
+    if (endMin !== null) return endMin <= LUNCH_MIN ? "1st_half" : "2nd_half";
+    return null;
+  };
+
   // Generate a list of all dates from the first log to the current date (or date range if specified)
   const allDates = [];
 
@@ -244,18 +377,68 @@ const AttendancePage = () => {
     }
   });
 
+  // Create a separate map of APPROVED half-day leaves for attendance page display
+  // Key: "yyyy-mm-dd" | Value: { is_half_day, half_day_type, leave_type, reason }
+  const halfDayLeaveMap = new Map();
+  leaves
+    .filter(leave => leave.is_half_day == 1 || leave.leave_type === 'half-day')
+    .forEach((leave) => {
+      const fromDate = new Date(leave.from_date);
+      const toDate = new Date(leave.to_date);
+      const derived = deriveHalfDayType(leave.start_time, leave.end_time);
+      for (let d = new Date(fromDate); d <= toDate; d.setDate(d.getDate() + 1)) {
+        halfDayLeaveMap.set(d.toLocaleDateString("en-CA"), {
+          is_half_day: leave.is_half_day,
+          half_day_type: leave.half_day_type || derived,
+          leave_type: leave.leave_type,
+          reason: leave.reason,
+        });
+      }
+    });
+
+  // Create a map of paid leaves (both full-day and half-day) — overrides timing when approved
+  const paidLeaveMap = new Map();
+  leaves
+    .filter(leave => leave.leave_type === 'paid')
+    .forEach((leave) => {
+      const fromD = new Date(leave.from_date);
+      const toD = new Date(leave.to_date);
+      for (let d = new Date(fromD); d <= toD; d.setDate(d.getDate() + 1)) {
+        paidLeaveMap.set(d.toLocaleDateString("en-CA"), leave);
+      }
+    });
+
   for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
     const dateString = d.toLocaleDateString("en-CA");
     const existingLog = dateMap.get(dateString);
     const isWeekend = d.getDay() === 0; // Sunday
     const isHoliday = holidayMap.has(dateString);
     const isOnLeave = leaveMap.has(dateString);
+    const approvedHalfDay = halfDayLeaveMap.get(dateString) || null;
+    const approvedPaidLeave = paidLeaveMap.get(dateString) || null;
 
     const hasRealPunch =
       existingLog && rowHasMeaningfulCheckinOrCheckout(existingLog);
 
-    if (hasRealPunch) {
-      allDates.push({ ...existingLog, type: "present" });
+    if (approvedPaidLeave) {
+      // Priority 1: Approved paid leave.
+      // If attendance logs exist for this date, treat as HALF-DAY leave on top of worked hours.
+      // If no attendance logs → FULL day leave.
+      const leaveIsHalfDay = approvedPaidLeave.is_half_day == 1 || approvedPaidLeave.leave_type === 'half-day';
+      const treatAsHalfDay = hasRealPunch || leaveIsHalfDay;
+      const derivedType = deriveHalfDayType(approvedPaidLeave.start_time, approvedPaidLeave.end_time);
+      const finalHalfType = approvedPaidLeave.half_day_type || derivedType || (hasRealPunch ? "1st_half" : "1st_half");
+      allDates.push({
+        date: d.toISOString(),
+        type: "paidleave",
+        leaveType: "Paid",
+        leaveReason: approvedPaidLeave.reason || null,
+        is_half_day: treatAsHalfDay ? 1 : 0,
+        half_day_type: treatAsHalfDay ? finalHalfType : null,
+        has_punch_on_leave: hasRealPunch ? 1 : 0,
+      });
+    } else if (hasRealPunch) {
+      allDates.push({ ...existingLog, type: "present", workedSunday: isWeekend, approvedHalfDay });
     } else {
       const base = existingLog ? { ...existingLog } : {};
       if (isWeekend) {
@@ -278,12 +461,20 @@ const AttendancePage = () => {
       } else if (isOnLeave) {
         const leaveInfo = leaveMap.get(dateString);
         const isUnpaid = leaveInfo?.leave_type === "unpaid";
+        // No attendance logs → treat leave exactly as stored.
+        // If logs existed, we'd be in hasRealPunch branch above.
+        const leaveIsHalfDay = leaveInfo?.is_half_day == 1 || leaveInfo?.leave_type === 'half-day';
+        const derivedType = deriveHalfDayType(leaveInfo?.start_time, leaveInfo?.end_time);
+        const finalHalfType = leaveInfo?.half_day_type || derivedType;
         allDates.push({
           ...base,
           date: d.toISOString(),
           type: isUnpaid ? "absent" : "leave",
           leaveType: leaveInfo?.leave_type || "Leave",
           leaveReason: leaveInfo?.reason || null,
+          is_half_day: leaveIsHalfDay ? 1 : 0,
+          half_day_type: leaveIsHalfDay ? finalHalfType : null,
+          has_punch_on_leave: 0,
         });
       } else {
         allDates.push({ ...base, date: d.toISOString(), type: "absent" });
@@ -294,7 +485,7 @@ const AttendancePage = () => {
 
   // Calculate summary statistics
   const { summary, dayKindByDateKey } = (() => {
-    const acc = { present: 0, absents: 0, leaves: 0, holidays: 0, sundays: 0, halfDays: 0, lateDays: 0 };
+    const acc = { present: 0, absents: 0, leaves: 0, holidays: 0, sundays: 0, halfDays: 0, paidHalfDays: 0, lateDays: 0 };
     const map = new Map();
     let graceHalfDaysUsed = 0;
     for (let i = allDates.length - 1; i >= 0; i--) {
@@ -302,7 +493,18 @@ const AttendancePage = () => {
       const k = new Date(log.date).toLocaleDateString("en-CA");
       map.set(k, log.type);
       if (log.type === "absent") acc.absents++;
-      if (log.type === "leave") acc.leaves++;
+      if (log.type === "leave" || log.type === "paidleave") {
+        if (log.is_half_day == 1) {
+          acc.halfDays++;
+          // Only leave-type half-days that are PAID count toward "Paid Half-Days" card.
+          // Attendance-based (late punch etc.) half-days are NOT paid — they stay only in Half-Days.
+          if (log.type === "paidleave" || log.leaveType === "Paid" || log.leave_type === "paid") {
+            acc.paidHalfDays++;
+          }
+        } else {
+          acc.leaves++;
+        }
+      }
       if (log.type === "holiday") acc.holidays++;
       if (log.type === "sunday") acc.sundays++;
       if (log.type === "present") {
@@ -335,6 +537,18 @@ const AttendancePage = () => {
       if (log.type !== "present") return false;
       const k = new Date(log.date).toLocaleDateString("en-CA");
       return dayKindByDateKey.get(k) === "halfDay";
+    } else if (filterStatus === "regularize") {
+      // Show logs that need regularization OR have a regularization request (pending/approved/rejected)
+      const dateKey = new Date(log.date).toLocaleDateString("en-CA");
+      const hasPendingReq = pendingRegByDate.has(dateKey);
+      const hasRejectedReq = rejectedRegByDate.has(dateKey);
+      const hasApprovedReq = approvedRegByDate.has(dateKey);
+      
+      // Show if: needs regularization, OR has any regularization request
+      if (!rowNeedsRegularization(log) && !hasPendingReq && !hasRejectedReq && !hasApprovedReq) {
+        return false;
+      }
+      return true;
     }
 
     return true;
@@ -381,7 +595,7 @@ const AttendancePage = () => {
         </div>
 
         {/* Summary Statistics Section */}
-        <div className="grid grid-cols-2 md:grid-cols-7 gap-4 mb-8 text-center">
+        <div className="grid grid-cols-2 md:grid-cols-8 gap-4 mb-8 text-center">
           <div className="bg-white p-4 rounded-lg shadow-md">
             <p className="text-2xl font-bold text-green-600">{summary.present}</p>
             <p className="text-sm text-gray-500">Present</p>
@@ -411,6 +625,15 @@ const AttendancePage = () => {
               {summary.halfDays}
             </p>
             <p className="text-sm text-gray-500">Half-Days</p>
+          </div>
+          <div className="bg-white p-4 rounded-lg shadow-md flex flex-col items-center gap-1">
+            <div className="flex items-center gap-1">
+              <Sun className="w-5 h-5 text-amber-500" />
+              <p className="text-2xl font-bold text-amber-600">
+                {summary.paidHalfDays}
+              </p>
+            </div>
+            <p className="text-sm text-gray-500">Paid Half-Days</p>
           </div>
           <div className="bg-white p-4 rounded-lg shadow-md">
             <p className="text-2xl font-bold text-red-600">{summary.lateDays}</p>
@@ -526,21 +749,36 @@ const AttendancePage = () => {
                 key={index}
                 className={`rounded-lg shadow-md p-4 space-y-2 ${log.type === "absent"
                   ? "bg-orange-50"
-                  : log.type === "leave"
+                  : log.type === "leave" || log.type === "paidleave"
                     ? "bg-blue-50"
                     : log.type === "sunday"
                       ? "bg-purple-50"
                       : log.type === "holiday"
                         ? "bg-indigo-50"
-                        : "bg-white"
+                        : log.workedSunday
+                          ? "bg-pink-200"
+                          : "bg-white"
                   }`}
               >
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-semibold text-gray-900">
                     Date:
                   </span>
-                  <span className="text-sm text-gray-700">
-                    {new Date(log.date).toLocaleDateString()}
+                  <span className="text-sm text-gray-700 flex flex-col items-end gap-1.5">
+                    <span className="flex items-center gap-1.5">
+                      {new Date(log.date).toLocaleDateString()}
+                      {log.workedSunday && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-purple-100 text-purple-700 border border-purple-200">
+                          Working Sunday
+                        </span>
+                      )}
+                    </span>
+                    {log.approvedHalfDay && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-orange-100 text-orange-700 border border-orange-200">
+                        <Sun className="w-3 h-3" />
+                        Half-Day · {log.approvedHalfDay.half_day_type === "1st_half" ? "1st Half" : "2nd Half"}
+                      </span>
+                    )}
                   </span>
                 </div>
                 {log.type === "present" ? (
@@ -618,13 +856,33 @@ const AttendancePage = () => {
                   </>
                 ) : (
                   <div className="text-center py-4">
-                    <p className="text-lg font-bold">
-                      {log.type === "absent" ? "Absent" : log.type === "leave" ? "Leave" : log.type === "sunday" ? "Sunday" : "Holiday"}
-                    </p>
-                    {log.leaveType && (
+                    {(log.type === "leave" || log.type === "paidleave") ? (
+                      <>
+                        <p className={`text-lg font-bold ${log.is_half_day == 1 ? "text-orange-600" : ""}`}>
+                          {log.is_half_day == 1 ? "Half Day" : "Leave"}
+                        </p>
+                        {log.is_half_day == 1 && (
+                          <span className="inline-flex items-center gap-1 mt-2 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-orange-100 text-orange-700 border border-orange-200">
+                            <Sun className="w-3 h-3" />
+                            {log.half_day_type === "2nd_half" ? "2nd Half" : "1st Half"}
+                          </span>
+                        )}
+                        {log.leaveType && (
+                          <p className="text-sm text-gray-600 mt-2 capitalize">{log.leaveType} Leave</p>
+                        )}
+                      </>
+                    ) : (
+                      <p className="text-lg font-bold">
+                        {log.type === "absent" ? "Absent" : log.type === "sunday" ? "Sunday" : "Holiday"}
+                      </p>
+                    )}
+                    {!(log.type === "leave" || log.type === "paidleave") && log.leaveType && (
                       <p className="text-sm text-gray-600 mt-1 capitalize">{log.leaveType} Leave</p>
                     )}
-                    {log.leaveReason && (
+                    {(log.type === "leave" || log.type === "paidleave") && log.leaveReason && (
+                      <p className="text-xs text-gray-500 mt-2">{log.leaveReason}</p>
+                    )}
+                    {!(log.type === "leave" || log.type === "paidleave") && log.leaveReason && (
                       <p className="text-xs text-gray-500 mt-1">{log.leaveReason}</p>
                     )}
                     {log.holidayTitle && log.holidayTitle !== "Weekend" && log.holidayTitle !== "Sunday" && (
@@ -635,51 +893,111 @@ const AttendancePage = () => {
                     )}
                     {log.type === "absent" && (
                       <div className="mt-3">
-                        {pendingRegByDate.get(logDateKeyForReg(log)) ? (
-                          <span className="text-amber-700 font-medium text-sm">
-                            Pending approval
-                          </span>
-                        ) : rejectedRegByDate.get(logDateKeyForReg(log)) ? (
-                          <div className="flex items-center gap-2">
-                            <span className="text-red-600 font-medium text-sm">
-                              Request Rejected
-                            </span>
+                        {(() => {
+                          const key = logDateKeyForReg(log);
+                          const pendingReq = pendingRegByDate.get(key);
+                          const rejectedReq = rejectedRegByDate.get(key);
+                          const approvedReq = approvedRegByDate.get(key);
+                          if (pendingReq) {
+                            return (
+                              <div className="flex flex-col items-center gap-2">
+                                {!pendingReq.acknowledged_at && <RegStatusBadge status="pending" acknowledgedAt={pendingReq.acknowledged_at} />}
+                                {!pendingReq.acknowledged_at && (
+                                  <button
+                                    type="button"
+                                    onClick={() => openEditRegModal(pendingReq)}
+                                    className="px-2 py-1 rounded text-xs font-medium bg-amber-100 text-amber-800 hover:bg-amber-200 border border-amber-300"
+                                  >
+                                    Edit
+                                  </button>
+                                )}
+                                {pendingReq.acknowledged_at && (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-indigo-100 text-indigo-700 border border-indigo-200">
+                                    <BadgeCheck className="w-3 h-3" />
+                                    Acknowledged
+                                  </span>
+                                )}
+                                {pendingReq.acknowledgement_remark && (
+                                  <div className="mt-2 p-2 bg-indigo-50 border border-indigo-200 rounded text-xs text-indigo-700 max-w-xs">
+                                    <div className="font-medium text-indigo-800 mb-1">Remark:</div>
+                                    <p className="text-indigo-600">{pendingReq.acknowledgement_remark}</p>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          }
+                          if (rejectedReq) {
+                            return (
+                              <div className="flex flex-col items-center gap-2">
+                                <div className="flex items-center gap-2">
+                                  <RegStatusBadge status="rejected" acknowledgedAt={rejectedReq.acknowledged_at} />
+                                  <button
+                                    type="button"
+                                    onClick={() => showRejectionRemarks(rejectedReq.acknowledgement_remark || rejectedReq.reviewer_comment)}
+                                    className="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50"
+                                    title="View rejection remarks"
+                                  >
+                                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                                    </svg>
+                                  </button>
+                                </div>
+                                {rejectedReq.acknowledged_by && (
+                                  <div className="flex items-center gap-1 text-[11px] text-indigo-700">
+                                    <BadgeCheck className="w-3 h-3" />
+                                    <span>Acknowledged by {rejectedReq.acknowledged_by}</span>
+                                  </div>
+                                )}
+                                {rejectedReq.acknowledgement_remark && (
+                                  <div className="mt-2 p-2 bg-indigo-50 border border-indigo-200 rounded text-xs text-indigo-700 max-w-xs">
+                                    <div className="font-medium text-indigo-800 mb-1">Remark:</div>
+                                    <p className="text-indigo-600">{rejectedReq.acknowledgement_remark}</p>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          }
+                          if (approvedReq) {
+                            return (
+                              <div className="flex flex-col items-center gap-2">
+                                <div className="flex items-center gap-2">
+                                  <RegStatusBadge status="approved" acknowledgedAt={approvedReq.acknowledged_at} />
+                                  <button
+                                    type="button"
+                                    onClick={() => showApprovalRemarks(approvedReq.acknowledgement_remark || approvedReq.reviewer_comment)}
+                                    className="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50"
+                                    title="View approval remarks"
+                                  >
+                                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                                    </svg>
+                                  </button>
+                                </div>
+                                {approvedReq.acknowledged_by && (
+                                  <div className="flex items-center gap-1 text-[11px] text-indigo-700">
+                                    <BadgeCheck className="w-3 h-3" />
+                                    <span>Acknowledged by {approvedReq.acknowledged_by}</span>
+                                  </div>
+                                )}
+                                {approvedReq.acknowledgement_remark && (
+                                  <div className="mt-2 p-2 bg-indigo-50 border border-indigo-200 rounded text-xs text-indigo-700 max-w-xs">
+                                    <div className="font-medium text-indigo-800 mb-1">Remark:</div>
+                                    <p className="text-indigo-600">{approvedReq.acknowledgement_remark}</p>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          }
+                          return (
                             <button
                               type="button"
-                              onClick={() => showRejectionRemarks(rejectedRegByDate.get(logDateKeyForReg(log)).reviewer_comment)}
-                              className="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50"
-                              title="View rejection remarks"
+                              onClick={() => openRegularizeModal(log)}
+                              className="px-3 py-1.5 rounded-md text-xs font-medium bg-teal-600 text-white hover:bg-teal-700"
                             >
-                              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                              </svg>
+                              Regularize
                             </button>
-                          </div>
-                        ) : approvedRegByDate.get(logDateKeyForReg(log)) ? (
-                          <div className="flex items-center gap-2">
-                            <span className="text-green-600 font-medium text-sm">
-                              Request Approved
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => showApprovalRemarks(approvedRegByDate.get(logDateKeyForReg(log)).reviewer_comment)}
-                              className="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50"
-                              title="View approval remarks"
-                            >
-                              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                              </svg>
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => openRegularizeModal(log)}
-                            className="px-3 py-1.5 rounded-md text-xs font-medium bg-teal-600 text-white hover:bg-teal-700"
-                          >
-                            Regularize
-                          </button>
-                        )}
+                          );
+                        })()}
                       </div>
                     )}
                   </div>
@@ -728,10 +1046,21 @@ const AttendancePage = () => {
                 filteredLogs.map((log, index) => (
                   <tr
                     key={index}
-                    className="hover:bg-gray-50 transition-colors duration-150"
+                    className={`transition-colors duration-150 ${log.workedSunday ? "bg-pink-200 hover:bg-pink-300" : "hover:bg-gray-50"}`}
                   >
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       {new Date(log.date).toLocaleDateString()}
+                      {log.workedSunday && (
+                        <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-purple-100 text-purple-700 border border-purple-200">
+                          Working Sunday
+                        </span>
+                      )}
+                      {log.approvedHalfDay && (
+                        <span className="ml-2 mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-orange-100 text-orange-700 border border-orange-200">
+                          <Sun className="w-3 h-3" />
+                          Half-Day · {log.approvedHalfDay.half_day_type === "1st_half" ? "1st Half" : "2nd Half"}
+                        </span>
+                      )}
                     </td>
                     {log.type === "present" ? (
                       <>
@@ -800,45 +1129,104 @@ const AttendancePage = () => {
                         </td>
                         {filterStatus === "regularize" && (
                           <td className="px-6 py-4 whitespace-nowrap text-sm">
-                            {pendingRegByDate.get(logDateKeyForReg(log)) ? (
-                              <span className="text-amber-700 font-medium">Pending</span>
-                            ) : rejectedRegByDate.get(logDateKeyForReg(log)) ? (
-                              <div className="flex items-center gap-2">
-                                <span className="text-red-600 font-medium text-sm">Rejected</span>
-                                <button
-                                  type="button"
-                                  onClick={() => showRejectionRemarks(rejectedRegByDate.get(logDateKeyForReg(log)).reviewer_comment)}
-                                  className="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50"
-                                  title="View rejection remarks"
-                                >
-                                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                                  </svg>
-                                </button>
-                              </div>
-                            ) : approvedRegByDate.get(logDateKeyForReg(log)) ? (
-                              <div className="flex items-center gap-2">
-                                <span className="text-green-600 font-medium text-sm">Approved</span>
-                                <button
-                                  type="button"
-                                  onClick={() => showApprovalRemarks(approvedRegByDate.get(logDateKeyForReg(log)).reviewer_comment)}
-                                  className="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50"
-                                  title="View approval remarks"
-                                >
-                                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                                  </svg>
-                                </button>
-                              </div>
-                            ) : rowNeedsRegularization(log) ? (
-                              <button
-                                type="button"
-                                onClick={() => openRegularizeModal(log)}
-                                className="px-3 py-1.5 rounded-md text-xs font-medium bg-teal-600 text-white hover:bg-teal-700"
-                              >
-                                Regularize
-                              </button>
-                            ) : null}
+                            {(() => {
+                              const key = logDateKeyForReg(log);
+                              const pReq = pendingRegByDate.get(key);
+                              const rReq = rejectedRegByDate.get(key);
+                              const aReq = approvedRegByDate.get(key);
+                              if (pReq) {
+                                return (
+                                  <div className="flex flex-col items-start gap-1.5">
+                                    <div className="flex items-center gap-2">
+                                      {!pReq.acknowledged_at && <RegStatusBadge status="pending" acknowledgedAt={pReq.acknowledged_at} />}
+                                      {!pReq.acknowledged_at && (
+                                        <button
+                                          type="button"
+                                          onClick={() => openEditRegModal(pReq)}
+                                          className="px-2 py-1 rounded text-xs font-medium bg-amber-100 text-amber-800 hover:bg-amber-200 border border-amber-300"
+                                        >
+                                          Edit
+                                        </button>
+                                      )}
+                                    </div>
+                                    {pReq.acknowledged_at && (
+                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-indigo-100 text-indigo-700 border border-indigo-200">
+                                        <BadgeCheck className="w-3 h-3" />
+                                        Acknowledged
+                                      </span>
+                                    )}
+                                    {pReq.acknowledgement_remark && (
+                                      <div className="mt-2 p-2 bg-indigo-50 border border-indigo-200 rounded text-xs text-indigo-700 max-w-xs">
+                                        <div className="font-medium text-indigo-800 mb-1">Remark:</div>
+                                        <p className="text-indigo-600">{pReq.acknowledgement_remark}</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              }
+                              if (rReq) {
+                                return (
+                                  <div className="flex flex-col items-start gap-1.5">
+                                    <div className="flex items-center gap-2">
+                                      <RegStatusBadge status="rejected" acknowledgedAt={rReq.acknowledged_at} />
+                                      <button
+                                        type="button"
+                                        onClick={() => showRejectionRemarks(rReq.acknowledgement_remark || rReq.reviewer_comment)}
+                                        className="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50"
+                                        title="View rejection remarks"
+                                      >
+                                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                                        </svg>
+                                      </button>
+                                    </div>
+                                    {rReq.acknowledged_by && (
+                                      <div className="flex items-center gap-1 text-[11px] text-indigo-700">
+                                        <BadgeCheck className="w-3 h-3" />
+                                        <span>Acknowledged by {rReq.acknowledged_by}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              }
+                              if (aReq) {
+                                return (
+                                  <div className="flex flex-col items-start gap-1.5">
+                                    <div className="flex items-center gap-2">
+                                      <RegStatusBadge status="approved" acknowledgedAt={aReq.acknowledged_at} />
+                                      <button
+                                        type="button"
+                                        onClick={() => showApprovalRemarks(aReq.acknowledgement_remark || aReq.reviewer_comment)}
+                                        className="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50"
+                                        title="View approval remarks"
+                                      >
+                                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                                        </svg>
+                                      </button>
+                                    </div>
+                                    {aReq.acknowledged_by && (
+                                      <div className="flex items-center gap-1 text-[11px] text-indigo-700">
+                                        <BadgeCheck className="w-3 h-3" />
+                                        <span>Acknowledged by {aReq.acknowledged_by}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              }
+                              if (rowNeedsRegularization(log)) {
+                                return (
+                                  <button
+                                    type="button"
+                                    onClick={() => openRegularizeModal(log)}
+                                    className="px-3 py-1.5 rounded-md text-xs font-medium bg-teal-600 text-white hover:bg-teal-700"
+                                  >
+                                    Regularize
+                                  </button>
+                                );
+                              }
+                              return null;
+                            })()}
                           </td>
                         )}
                       </>
@@ -847,7 +1235,7 @@ const AttendancePage = () => {
                         colSpan={filterStatus === "regularize" ? 6 : 5}
                         className={`px-6 py-4 text-center ${log.type === "absent"
                           ? "bg-orange-50 text-orange-700"
-                          : log.type === "leave"
+                          : log.type === "leave" || log.type === "paidleave"
                             ? "bg-blue-50 text-blue-700"
                             : log.type === "sunday"
                               ? "bg-purple-50 text-purple-700"
@@ -855,10 +1243,26 @@ const AttendancePage = () => {
                           }`}
                       >
                         <p className="font-bold text-lg">
-                          {log.type === "absent" ? "Absent" : log.type === "leave" ? "Leave" : log.type === "sunday" ? "Sunday" : "Holiday"}
+                          {log.type === "absent"
+                            ? "Absent"
+                            : (log.type === "leave" || log.type === "paidleave")
+                              ? log.is_half_day == 1
+                                ? <span className="text-orange-600">Half Day</span>
+                                : "Leave"
+                              : log.type === "sunday"
+                                ? "Sunday"
+                                : "Holiday"}
                         </p>
+                        {(log.type === "leave" || log.type === "paidleave") && log.is_half_day == 1 && (
+                          <span className="inline-flex items-center gap-1 mt-2 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-orange-100 text-orange-700 border border-orange-200">
+                            <Sun className="w-3 h-3" />
+                            {log.half_day_type === "2nd_half" ? "2nd Half" : "1st Half"}
+                          </span>
+                        )}
                         {log.leaveType && (
-                          <p className="text-sm mt-1 capitalize">{log.leaveType} Leave</p>
+                          <p className={`text-sm mt-2 capitalize ${log.is_half_day == 1 ? "text-gray-600" : "mt-1"}`}>
+                            {log.leaveType} Leave
+                          </p>
                         )}
                         {log.leaveReason && (
                           <p className="text-xs text-gray-500 mt-1">{log.leaveReason}</p>
@@ -871,94 +1275,206 @@ const AttendancePage = () => {
                         )}
                         {log.type === "absent" && (
                           <div className="mt-3 flex justify-center">
-                            {pendingRegByDate.get(logDateKeyForReg(log)) ? (
-                              <span className="text-amber-700 font-medium text-sm">
-                                Pending approval
-                              </span>
-                            ) : rejectedRegByDate.get(logDateKeyForReg(log)) ? (
-                              <div className="flex items-center gap-2">
-                                <span className="text-red-600 font-medium text-sm">
-                                  Request Rejected
-                                </span>
+                            {(() => {
+                              const key = logDateKeyForReg(log);
+                              const pReq = pendingRegByDate.get(key);
+                              const rReq = rejectedRegByDate.get(key);
+                              const aReq = approvedRegByDate.get(key);
+                              if (pReq) {
+                                return (
+                                  <div className="flex flex-col items-center gap-2">
+                                    <div className="flex items-center gap-2">
+                                      {!pReq.acknowledged_at && <RegStatusBadge status="pending" acknowledgedAt={pReq.acknowledged_at} />}
+                                      {!pReq.acknowledged_at && (
+                                        <button
+                                          type="button"
+                                          onClick={() => openEditRegModal(pReq)}
+                                          className="px-2 py-1 rounded text-xs font-medium bg-amber-100 text-amber-800 hover:bg-amber-200 border border-amber-300"
+                                        >
+                                          Edit
+                                        </button>
+                                      )}
+                                    </div>
+                                    {pReq.acknowledged_at && (
+                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-indigo-100 text-indigo-700 border border-indigo-200">
+                                        <BadgeCheck className="w-3 h-3" />
+                                        Acknowledged
+                                      </span>
+                                    )}
+                                    {pReq.acknowledgement_remark && (
+                                      <div className="mt-2 p-2 bg-indigo-50 border border-indigo-200 rounded text-xs text-indigo-700 max-w-xs">
+                                        <div className="font-medium text-indigo-800 mb-1">Remark:</div>
+                                        <p className="text-indigo-600">{pReq.acknowledgement_remark}</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              }
+                              if (rReq) {
+                                return (
+                                  <div className="flex flex-col items-center gap-2">
+                                    <div className="flex items-center gap-2">
+                                      <RegStatusBadge status="rejected" acknowledgedAt={rReq.acknowledged_at} />
+                                      <button
+                                        type="button"
+                                        onClick={() => showRejectionRemarks(rReq.acknowledgement_remark || rReq.reviewer_comment)}
+                                        className="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50"
+                                        title="View rejection remarks"
+                                      >
+                                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                                        </svg>
+                                      </button>
+                                    </div>
+                                    {rReq.acknowledged_by && (
+                                      <div className="flex items-center gap-1 text-[11px] text-indigo-700">
+                                        <BadgeCheck className="w-3 h-3" />
+                                        <span>Acknowledged by {rReq.acknowledged_by}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              }
+                              if (aReq) {
+                                return (
+                                  <div className="flex flex-col items-center gap-2">
+                                    <div className="flex items-center gap-2">
+                                      <RegStatusBadge status="approved" acknowledgedAt={aReq.acknowledged_at} />
+                                      <button
+                                        type="button"
+                                        onClick={() => showApprovalRemarks(aReq.acknowledgement_remark || aReq.reviewer_comment)}
+                                        className="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50"
+                                        title="View approval remarks"
+                                      >
+                                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                                        </svg>
+                                      </button>
+                                    </div>
+                                    {aReq.acknowledged_by && (
+                                      <div className="flex items-center gap-1 text-[11px] text-indigo-700">
+                                        <BadgeCheck className="w-3 h-3" />
+                                        <span>Acknowledged by {aReq.acknowledged_by}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              }
+                              // Don't show Regularize button if this is an unpaid leave
+                              const dateKey = new Date(log.date).toLocaleDateString("en-CA");
+                              const leaveOnDate = leaveMap.get(dateKey);
+                              if (leaveOnDate && leaveOnDate.leave_type === "unpaid") {
+                                return null;
+                              }
+                              return (
                                 <button
                                   type="button"
-                                  onClick={() => showRejectionRemarks(rejectedRegByDate.get(logDateKeyForReg(log)).reviewer_comment)}
-                                  className="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50"
-                                  title="View rejection remarks"
+                                  onClick={() => openRegularizeModal(log)}
+                                  className="px-3 py-1.5 rounded-md text-xs font-medium bg-teal-600 text-white hover:bg-teal-700"
                                 >
-                                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                                  </svg>
+                                  Regularize
                                 </button>
-                              </div>
-                            ) : approvedRegByDate.get(logDateKeyForReg(log)) ? (
-                              <div className="flex items-center gap-2">
-                                <span className="text-green-600 font-medium text-sm">
-                                  Request Approved
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => showApprovalRemarks(approvedRegByDate.get(logDateKeyForReg(log)).reviewer_comment)}
-                                  className="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50"
-                                  title="View approval remarks"
-                                >
-                                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                                  </svg>
-                                </button>
-                              </div>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => openRegularizeModal(log)}
-                                className="px-3 py-1.5 rounded-md text-xs font-medium bg-teal-600 text-white hover:bg-teal-700"
-                              >
-                                Regularize
-                              </button>
-                            )}
+                              );
+                            })()}
                           </div>
                         )}
                         {filterStatus === "regularize" && (
                           <div className="mt-3 flex justify-center">
-                            {pendingRegByDate.get(logDateKeyForReg(log)) ? (
-                              <span className="text-amber-700 font-medium text-sm">Pending</span>
-                            ) : rejectedRegByDate.get(logDateKeyForReg(log)) ? (
-                              <div className="flex items-center gap-2">
-                                <span className="text-red-600 font-medium text-sm">Rejected</span>
+                            {(() => {
+                              const key = logDateKeyForReg(log);
+                              const pReq = pendingRegByDate.get(key);
+                              const rReq = rejectedRegByDate.get(key);
+                              const aReq = approvedRegByDate.get(key);
+                              if (pReq) {
+                                return (
+                                  <div className="flex flex-col items-center gap-2">
+                                    <div className="flex items-center gap-2">
+                                      {!pReq.acknowledged_at && <RegStatusBadge status="pending" acknowledgedAt={pReq.acknowledged_at} />}
+                                      {!pReq.acknowledged_at && (
+                                        <button
+                                          type="button"
+                                          onClick={() => openEditRegModal(pReq)}
+                                          className="px-2 py-1 rounded text-xs font-medium bg-amber-100 text-amber-800 hover:bg-amber-200 border border-amber-300"
+                                        >
+                                          Edit
+                                        </button>
+                                      )}
+                                    </div>
+                                    {pReq.acknowledged_at && (
+                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-indigo-100 text-indigo-700 border border-indigo-200">
+                                        <BadgeCheck className="w-3 h-3" />
+                                        Acknowledged
+                                      </span>
+                                    )}
+                                    {pReq.acknowledgement_remark && (
+                                      <div className="mt-2 p-2 bg-indigo-50 border border-indigo-200 rounded text-xs text-indigo-700 max-w-xs">
+                                        <div className="font-medium text-indigo-800 mb-1">Remark:</div>
+                                        <p className="text-indigo-600">{pReq.acknowledgement_remark}</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              }
+                              if (rReq) {
+                                return (
+                                  <div className="flex flex-col items-center gap-2">
+                                    <div className="flex items-center gap-2">
+                                      <RegStatusBadge status="rejected" acknowledgedAt={rReq.acknowledged_at} />
+                                      <button
+                                        type="button"
+                                        onClick={() => showRejectionRemarks(rReq.acknowledgement_remark || rReq.reviewer_comment)}
+                                        className="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50"
+                                        title="View rejection remarks"
+                                      >
+                                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                                        </svg>
+                                      </button>
+                                    </div>
+                                    {rReq.acknowledged_by && (
+                                      <div className="flex items-center gap-1 text-[11px] text-indigo-700">
+                                        <BadgeCheck className="w-3 h-3" />
+                                        <span>Acknowledged by {rReq.acknowledged_by}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              }
+                              if (aReq) {
+                                return (
+                                  <div className="flex flex-col items-center gap-2">
+                                    <div className="flex items-center gap-2">
+                                      <RegStatusBadge status="approved" acknowledgedAt={aReq.acknowledged_at} />
+                                      <button
+                                        type="button"
+                                        onClick={() => showApprovalRemarks(aReq.acknowledgement_remark || aReq.reviewer_comment)}
+                                        className="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50"
+                                        title="View approval remarks"
+                                      >
+                                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                                        </svg>
+                                      </button>
+                                    </div>
+                                    {aReq.acknowledged_by && (
+                                      <div className="flex items-center gap-1 text-[11px] text-indigo-700">
+                                        <BadgeCheck className="w-3 h-3" />
+                                        <span>Acknowledged by {aReq.acknowledged_by}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              }
+                              return (
                                 <button
                                   type="button"
-                                  onClick={() => showRejectionRemarks(rejectedRegByDate.get(logDateKeyForReg(log)).reviewer_comment)}
-                                  className="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50"
-                                  title="View rejection remarks"
+                                  onClick={() => openRegularizeModal(log)}
+                                  className="px-3 py-1.5 rounded-md text-xs font-medium bg-teal-600 text-white hover:bg-teal-700"
                                 >
-                                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                                  </svg>
+                                  Regularize
                                 </button>
-                              </div>
-                            ) : approvedRegByDate.get(logDateKeyForReg(log)) ? (
-                              <div className="flex items-center gap-2">
-                                <span className="text-green-600 font-medium text-sm">Approved</span>
-                                <button
-                                  type="button"
-                                  onClick={() => showApprovalRemarks(approvedRegByDate.get(logDateKeyForReg(log)).reviewer_comment)}
-                                  className="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50"
-                                  title="View approval remarks"
-                                >
-                                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                                  </svg>
-                                </button>
-                              </div>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => openRegularizeModal(log)}
-                                className="px-3 py-1.5 rounded-md text-xs font-medium bg-teal-600 text-white hover:bg-teal-700"
-                              >
-                                Regularize
-                              </button>
-                            )}
+                              );
+                            })()}
                           </div>
                         )}
                       </td>
@@ -1017,6 +1533,122 @@ const AttendancePage = () => {
                 ))}
               </ul>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Edit Pending Regularization Modal */}
+      {editRegModal && editRegRequest && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b px-4 py-3 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-900">Edit pending request</h2>
+              <button
+                type="button"
+                onClick={() => { setEditRegModal(false); setEditRegRequest(null); }}
+                className="text-gray-500 hover:text-gray-800 text-xl leading-none"
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+            <form onSubmit={submitEditReg} className="p-4 space-y-4">
+              <div className="bg-red-50 border border-red-200 rounded-md px-3 py-2">
+                <p className="text-xs font-semibold text-red-700">
+                  Note: Regularization is only for system issues, not for late arrived and early leave office.
+                </p>
+              </div>
+              <p className="text-sm text-gray-600">
+                Date:{" "}
+                <span className="font-medium text-gray-900">
+                  {new Date(editRegRequest.log_date).toLocaleDateString()}
+                </span>
+                . Update the proposed check-in / check-out times and reason. The request stays pending with your manager.
+              </p>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Check-in</label>
+                <input
+                  type="datetime-local"
+                  value={editCheckin}
+                  onChange={(e) => setEditCheckin(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Check-out</label>
+                <input
+                  type="datetime-local"
+                  value={editCheckout}
+                  onChange={(e) => setEditCheckout(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Reason <span className="text-red-600">*</span>
+                </label>
+                <select
+                  value={editReason}
+                  onChange={(e) => setEditReason(e.target.value)}
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-white"
+                >
+                  <option value="">Select a reason</option>
+                  <option value="software issue">Software issue</option>
+                  <option value="power outage">Power outage</option>
+                  <option value="wifi issue">Wifi issue</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Attach Screenshot with Date/Time <span className="text-red-600">*</span>
+                </label>
+                {editRegRequest?.attachment_url && (
+                  <div className="mb-2">
+                    <a
+                      href={getAttendanceRegularizationAttachmentHref(
+                        editRegRequest.attachment_url,
+                        editRegRequest.id,
+                      )}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-amber-700 hover:text-amber-900 underline"
+                    >
+                      View current attachment
+                    </a>
+                    <p className="text-[10px] text-gray-500 mt-0.5">
+                      Upload a new file below to replace, or keep the existing one.
+                    </p>
+                  </div>
+                )}
+                <input
+                  key={editFileKey}
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/*"
+                  onChange={(e) => setEditFile(e.target.files?.[0] ?? null)}
+                  className="w-full text-sm text-gray-700 file:mr-3 file:py-2 file:px-3 file:rounded-md file:border-0 file:bg-amber-50 file:text-amber-800"
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Attach screenshot with date/time — PDF, JPG, PNG, or WebP — max 5 MB
+                </p>
+              </div>
+              <div className="flex gap-2 justify-end pt-2">
+                <button
+                  type="button"
+                  onClick={() => { setEditRegModal(false); setEditRegRequest(null); }}
+                  className="px-4 py-2 rounded-md text-sm font-medium bg-gray-200 text-gray-800 hover:bg-gray-300"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={editSaving}
+                  className="px-4 py-2 rounded-md text-sm font-medium bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-50"
+                >
+                  {editSaving ? "Saving…" : "Update request"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

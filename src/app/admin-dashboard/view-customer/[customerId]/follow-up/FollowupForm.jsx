@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
+import { NOTES_LANGUAGE_OPTIONS } from "@/constants/notesLanguageOptions";
 
 export default function FollowupForm({ customerId }) {
   const router = useRouter();
@@ -21,6 +22,7 @@ export default function FollowupForm({ customerId }) {
   const [customerCreatedAt, setCustomerCreatedAt] = useState(null);
   const [isLoadingCustomer, setIsLoadingCustomer] = useState(true);
   const [hasOrder, setHasOrder] = useState(false);
+  const [notesLanguage, setNotesLanguage] = useState("");
 
   const statusList = ["Very Good", "Average", "Poor", "Denied", "Invalid"];
   const tagOptions = ["Demo", "Prime", "Repeat order", "Mail", "Running Orders", "N/A"];
@@ -128,15 +130,21 @@ export default function FollowupForm({ customerId }) {
   useEffect(() => {
     const fetchCustomerData = async () => {
       try {
-        const response = await fetch(`/api/customers/${customerId}`);
-        if (response.ok) {
-          const data = await response.json();
+        const customerResponse = await fetch(`/api/customers/${customerId}`);
+
+        if (customerResponse.ok) {
+          const data = await customerResponse.json();
           setCustomerCurrentStage(data.stage || "New");
           setCustomerCreatedAt(data.date_created || null);
           setHasOrder(data.has_order === 1 || data.has_order === true);
-          setFormData(prev => ({
+
+          if (data.notes_language) {
+            setNotesLanguage(data.notes_language);
+          }
+
+          setFormData((prev) => ({
             ...prev,
-            stage: data.stage || "New"
+            stage: data.stage || "New",
           }));
         }
       } catch (error) {
@@ -152,23 +160,7 @@ export default function FollowupForm({ customerId }) {
     }
   }, [customerId]);
 
-  // Filter stages based on customer's current stage from database
-  const getAvailableStages = (currentStage) => {
-    if (!currentStage) return stageOptions;
-
-    const stageOrder = stageOptions;
-    const currentIndex = stageOrder.indexOf(currentStage);
-
-    // For final stages, only allow staying in the same stage or going back
-    if (currentStage === "Won (Order Received)" || currentStage === "Lost" || currentStage === "Disqualified / Invalid Lead") {
-      return [currentStage];
-    }
-
-    // Show current stage and all stages after it (progressive flow)
-    return stageOrder.slice(currentIndex);
-  };
-
-  const availableStages = getAvailableStages(customerCurrentStage);
+  const availableStages = stageOptions;
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -229,6 +221,11 @@ export default function FollowupForm({ customerId }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    if (!notesLanguage) {
+      toast.error("Please select a language.");
+      return;
+    }
+
     // Final validation for next_followup_date before submitting
     if (formData.status !== "Denied" && formData.status !== "Invalid" && formData.next_followup_date) {
       const limits = getNextFollowupDateLimits();
@@ -251,7 +248,8 @@ export default function FollowupForm({ customerId }) {
       // ✅ Send datetime-local values directly (no UTC conversion)
       const payload = {
         ...formData,
-        multi_tag: formData.multi_tag.join(", "), // Convert array to comma-separated string
+        multi_tag: formData.multi_tag.join(", "),
+        notes_language: notesLanguage,
       };
 
       const res = await fetch(`/api/followup/${customerId}`, {
@@ -292,6 +290,25 @@ export default function FollowupForm({ customerId }) {
         <p className="mt-1 text-xs text-gray-500">
           You can only select dates from the last 24 hours
         </p>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700">
+          Language <span className="text-red-500">*</span>
+        </label>
+        <select
+          value={notesLanguage}
+          onChange={(e) => setNotesLanguage(e.target.value)}
+          className="w-full px-4 py-2 border rounded-lg"
+          required
+        >
+          <option value="">Select Language</option>
+          {NOTES_LANGUAGE_OPTIONS.map((lang) => (
+            <option key={lang.code} value={lang.code}>
+              {lang.name}
+            </option>
+          ))}
+        </select>
       </div>
 
       <div>

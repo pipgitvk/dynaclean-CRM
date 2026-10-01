@@ -58,8 +58,8 @@ export default function AdminSalarySlipsPage() {
   const [downloadingAll, setDownloadingAll] = useState(false);
   const [exportingExcel, setExportingExcel] = useState(false);
 
-  const canDelete = userRole === "SUPERADMIN" || userRole === "ADMIN";
-  const canApprove = userRole === "SUPERADMIN" || userRole === "ADMIN";
+  const canDelete = userRole === "SUPERADMIN" || userRole === "DIRECTOR" || userRole === "ADMIN";
+  const canApprove = userRole === "SUPERADMIN" || userRole === "DIRECTOR" || userRole === "ADMIN";
 
   const load = useCallback(async () => {
     setLoading(true);

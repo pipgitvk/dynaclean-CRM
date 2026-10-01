@@ -65,7 +65,7 @@ export default function TLCustomersTable({
   console.log("customer data ", customers);
 
   const basePath = isAdmin
-    ? "/admin-dashboard/tl-customers"
+    ? "/director-dashboard/tl-customers"
     : "/user-dashboard/tl-customers";
 
   // Use allCustomersForKPI for counts, or fallback to customers if not provided
@@ -1170,7 +1170,7 @@ export default function TLCustomersTable({
                           {latestquote?.quote_number && (
                             <div className="flex justify-end gap-2 mt-5">
                               <a
-                                href={`/admin-dashboard/quotations/${latestquote.quote_number}`}
+                                href={`/director-dashboard/quotations/${latestquote.quote_number}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"

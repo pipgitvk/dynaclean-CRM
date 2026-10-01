@@ -4,10 +4,14 @@ import { useState, useEffect } from "react";
 import { Pencil } from "lucide-react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
+import { NOTES_LANGUAGE_OPTIONS } from "@/constants/notesLanguageOptions";
 
 export default function EditCustomerForm({ initialData, userRole, dashboardBase = "user-dashboard" }) {
   const router = useRouter();
-  const [data, setData] = useState(initialData);
+  const [data, setData] = useState({
+    ...initialData,
+    notes_language: initialData?.notes_language || "",
+  });
   const [enabled, setEnabled] = useState({
     first_name: false,
     company: false,
@@ -25,6 +29,11 @@ export default function EditCustomerForm({ initialData, userRole, dashboardBase 
   // Use useEffect to update the 'enabled' state based on whether data exists
   // for the tags and status fields, allowing them to be edited by default.
   useEffect(() => {
+    setData((prev) => ({
+      ...prev,
+      ...initialData,
+      notes_language: initialData?.notes_language || "",
+    }));
     setEnabled((prev) => ({
       ...prev,
       tags: !!initialData.tags,
@@ -98,12 +107,12 @@ export default function EditCustomerForm({ initialData, userRole, dashboardBase 
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {["first_name", "company", "email", "tags", "status", "stage", "gstin", "address"]
+      {["first_name", "company", "email", "tags", "status", "stage", "notes_language", "gstin", "address"]
         .filter(field => !(userRole === "SERVICE SUPPORT" || userRole === "SERVICE HEAD") || !["tags", "status", "stage"].includes(field))
         .map((field) => (
         <div key={field} className="flex items-center space-x-2">
           <label className="w-24 font-medium capitalize">
-            {field.replace("_", " ")}:
+            {field === "notes_language" ? "Language" : field.replace("_", " ")}:
           </label>
           {field === "first_name" || field === "company" || field === "email" || field === "gstin" || field === "address" ? (
             <div className="relative flex-1">
@@ -176,6 +185,22 @@ export default function EditCustomerForm({ initialData, userRole, dashboardBase 
               >
                 <Pencil size={18} />
               </button>
+            </div>
+          ) : field === "notes_language" ? (
+            <div className="flex-1">
+              <select
+                name={field}
+                value={data[field] || ""}
+                onChange={handleChange}
+                className="w-full border border-blue-400 bg-white px-3 py-2 rounded"
+              >
+                <option value="">Select Language</option>
+                {NOTES_LANGUAGE_OPTIONS.map((opt) => (
+                  <option value={opt.code} key={opt.code}>
+                    {opt.name}
+                  </option>
+                ))}
+              </select>
             </div>
           ) : (
             // Select fields for status and stage

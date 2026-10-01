@@ -17,7 +17,14 @@ export async function PUT(req, { params }) {
 
         const { id } = await params;
         const body = await req.json();
-        const { accessory_name, description, is_mandatory, qty } = body;
+        const {
+            accessory_name,
+            description,
+            is_mandatory,
+            qty,
+            spare_id,
+            package_status,
+        } = body;
 
         if (!accessory_name) {
             return NextResponse.json(
@@ -26,13 +33,24 @@ export async function PUT(req, { params }) {
             );
         }
 
+        const normalizedPackageStatus =
+            package_status === "added" ? "added" : "available";
+
         const conn = await getDbConnection();
 
         await conn.execute(
             `UPDATE product_accessories 
-       SET accessory_name = ?, description = ?, is_mandatory = ?, qty = ? 
+       SET accessory_name = ?, description = ?, is_mandatory = ?, qty = ?, spare_id = ?, package_status = ?
        WHERE id = ?`,
-            [accessory_name, description || null, is_mandatory ? 1 : 0, qty || 1, id]
+            [
+                accessory_name,
+                description || null,
+                is_mandatory ? 1 : 0,
+                qty || 1,
+                spare_id || null,
+                normalizedPackageStatus,
+                id,
+            ]
         );
 
         return NextResponse.json({

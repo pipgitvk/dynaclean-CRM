@@ -6,6 +6,8 @@ import Image from "next/image";
 import toast from "react-hot-toast";
 import QuotationItemsTable from "@/app/admin-dashboard/quotations/new/quotation-table";
 import TaxAndSummary from "@/app/admin-dashboard/quotations/new/TaxAndSummary";
+import { LetterheadCompanyInfo, LetterheadBankLine, LetterheadSignatoryLine } from "@/components/invoice/InvoiceLetterheadSection";
+
 
 export default function QuotationEditForm({ quoteId }) {
   const router = useRouter();
@@ -31,6 +33,7 @@ export default function QuotationEditForm({ quoteId }) {
   const [roundOff, setRoundOff] = useState(0);
   const [isAutoRoundOff, setIsAutoRoundOff] = useState(true);
   const [editableTerms, setEditableTerms] = useState("");
+  const [originalSnapshot, setOriginalSnapshot] = useState(null);
 
   // State dropdown helpers (same as new form)
   const stateCodeToName = useMemo(
@@ -66,6 +69,24 @@ export default function QuotationEditForm({ quoteId }) {
 
   const SUPPLIER_STATE_CODE = "07";
 
+  const deepEqual = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+
+  const hasChanges = useMemo(() => {
+    if (!originalSnapshot) return false;
+    const currentSnapshot = {
+      form,
+      items,
+      quoteDate,
+      cgstRate,
+      sgstRate,
+      igstRate,
+      roundOff,
+      isAutoRoundOff,
+      editableTerms,
+    };
+    return !deepEqual(originalSnapshot, currentSnapshot);
+  }, [originalSnapshot, form, items, quoteDate, cgstRate, sgstRate, igstRate, roundOff, isAutoRoundOff, editableTerms]);
+
   const getStateFromGSTIN = (gstin) => {
     if (!gstin || gstin.length < 2) return null;
     const code = gstin.slice(0, 2);
@@ -94,8 +115,10 @@ export default function QuotationEditForm({ quoteId }) {
 
         const h = data.header;
         setQuoteNumber(h.quote_number);
-        setQuoteDate(h.quote_date ? h.quote_date.split("T")[0] : "");
-        setForm({
+        const origQuoteDate = h.quote_date ? h.quote_date.split("T")[0] : "";
+        setQuoteDate(origQuoteDate);
+        
+        const origForm = {
           company: h.company_name || "",
           company_location: h.company_address || "",
           gstin_no: h.gstin || "",
@@ -104,12 +127,21 @@ export default function QuotationEditForm({ quoteId }) {
           customer_id: h.customer_id || "",
           terms: h.term_con || "",
           payment_term_days: h.payment_term_days?.toString() || "",
-        });
-        setEditableTerms(h.term_con || "");
-        setCgstRate(parseFloat(h.cgst_rate) || 0);
-        setSgstRate(parseFloat(h.sgst_rate) || 0);
-        setIgstRate(parseFloat(h.igst_rate) || 0);
-        setRoundOff(parseFloat(h.round_off) || 0);
+        };
+        setForm(origForm);
+        
+        const origTerms = h.term_con || "";
+        setEditableTerms(origTerms);
+        
+        const origCgst = parseFloat(h.cgst_rate) || 0;
+        const origSgst = parseFloat(h.sgst_rate) || 0;
+        const origIgst = parseFloat(h.igst_rate) || 0;
+        const origRound = parseFloat(h.round_off) || 0;
+        
+        setCgstRate(origCgst);
+        setSgstRate(origSgst);
+        setIgstRate(origIgst);
+        setRoundOff(origRound);
 
         // Map DB items to form items shape
         const mappedItems = (data.items || []).map((item) => ({
@@ -123,9 +155,22 @@ export default function QuotationEditForm({ quoteId }) {
           price: parseFloat(item.price_per_unit) || 0,
           gst: parseFloat(item.gst) || 18,
         }));
-        setItems(mappedItems.length > 0 ? mappedItems : [
+        const finalItems = mappedItems.length > 0 ? mappedItems : [
           { productCode: "", imageUrl: "", name: "", hsn: "", specification: "", unit: "", quantity: 1, price: 0, gst: 18 }
-        ]);
+        ];
+        setItems(finalItems);
+
+        setOriginalSnapshot({
+          form: origForm,
+          items: finalItems,
+          quoteDate: origQuoteDate,
+          cgstRate: origCgst,
+          sgstRate: origSgst,
+          igstRate: origIgst,
+          roundOff: origRound,
+          isAutoRoundOff: true,
+          editableTerms: origTerms,
+        });
       } catch (err) {
         console.error("Error loading quotation:", err);
         toast.error("Failed to load quotation");
@@ -151,9 +196,17 @@ export default function QuotationEditForm({ quoteId }) {
 
     const isInterstate = (() => {
       const gstinValue = form.gstin_no?.trim();
-      if (!gstinValue) return false;
-      const code = gstinValue.slice(0, 2);
-      return code !== SUPPLIER_STATE_CODE;
+      if (gstinValue) {
+        const code = gstinValue.slice(0, 2);
+        return code !== SUPPLIER_STATE_CODE;
+      }
+      // No GSTIN → check state
+      const stateCode = parseCodeFromDisplay(form.state_name)
+        || Object.entries(stateCodeToName).find(
+            ([, name]) => name.toLowerCase() === form.state_name?.trim().toLowerCase()
+          )?.[0];
+      if (!stateCode) return false;
+      return stateCode !== SUPPLIER_STATE_CODE;
     })();
 
     const cgst = isInterstate ? 0 : totalTax / 2;
@@ -169,7 +222,7 @@ export default function QuotationEditForm({ quoteId }) {
 
     const grandTotal = totalBeforeRound + finalRoundOff;
     return { subtotal, cgst, sgst, igst, totalTax, grandTotal, finalRoundOff };
-  }, [items, roundOff, isAutoRoundOff, form.gstin_no]);
+  }, [items, roundOff, isAutoRoundOff, form.gstin_no, form.state_name]);
 
   useEffect(() => {
     if (isAutoRoundOff) {
@@ -189,11 +242,18 @@ export default function QuotationEditForm({ quoteId }) {
         return { ...item, taxable_amount: taxable, total_amount: total, IGSTamt: gstAmount };
       });
 
-      const isInterstate = igstRate > 0 || (() => {
-        const gstinValue = form.gstin_no?.trim();
-        if (!gstinValue) return false;
-        return gstinValue.slice(0, 2) !== SUPPLIER_STATE_CODE;
-      })();
+      const isInterstate = taxSummary.igst > 0;
+
+      // Derive effective rates from actual computed amounts
+      const effectiveIgstRate = taxSummary.subtotal > 0 && taxSummary.igst > 0
+        ? parseFloat(((taxSummary.igst / taxSummary.subtotal) * 100).toFixed(2))
+        : 0;
+      const effectiveCgstRate = taxSummary.subtotal > 0 && taxSummary.cgst > 0
+        ? parseFloat(((taxSummary.cgst / taxSummary.subtotal) * 100).toFixed(2))
+        : 0;
+      const effectiveSgstRate = taxSummary.subtotal > 0 && taxSummary.sgst > 0
+        ? parseFloat(((taxSummary.sgst / taxSummary.subtotal) * 100).toFixed(2))
+        : 0;
 
       const dataToSend = {
         ...form,
@@ -205,22 +265,29 @@ export default function QuotationEditForm({ quoteId }) {
         igst: taxSummary.igst,
         round_off: parseFloat(roundOff) || 0,
         grand_total: taxSummary.grandTotal,
-        cgstRate: isInterstate ? 0 : cgstRate,
-        sgstRate: isInterstate ? 0 : sgstRate,
-        igstRate: isInterstate ? igstRate : 0,
+        cgstRate: effectiveCgstRate,
+        sgstRate: effectiveSgstRate,
+        igstRate: effectiveIgstRate,
         terms: editableTerms,
+        has_changes: hasChanges,
       };
 
-      const res = await fetch(`/api/quotations/${encodeURIComponent(quoteId)}`, {
-        method: "PUT",
+      const res = await fetch(`/api/quotations/${encodeURIComponent(quoteId)}/admin-update`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(dataToSend),
       });
 
       const data = await res.json();
       if (data.success) {
-        toast.success("✅ Quotation updated successfully");
-        router.push("/admin-dashboard/quotations");
+        if (data.created_new) {
+          toast.success(`✅ New quotation created: ${data.new_quote_number}`);
+          router.push(`/admin-dashboard/quotations?customer_id=${encodeURIComponent(form.customer_id)}`);
+        } else {
+          toast.success("✅ No changes made");
+          router.push("/admin-dashboard/quotations");
+        }
+        router.refresh();
       } else {
         toast.error("Error: " + (data.message || "Update failed"));
       }
@@ -242,10 +309,18 @@ export default function QuotationEditForm({ quoteId }) {
 
   const isInterstate = (() => {
     const gstinValue = form.gstin_no?.trim();
-    if (!gstinValue) return false;
-    const gstState = getStateFromGSTIN(gstinValue);
-    const buyerCode = gstState?.code || parseCodeFromDisplay(form.state_name);
-    return buyerCode ? buyerCode !== SUPPLIER_STATE_CODE : false;
+    if (gstinValue) {
+      const gstState = getStateFromGSTIN(gstinValue);
+      const buyerCode = gstState?.code;
+      return buyerCode ? buyerCode !== SUPPLIER_STATE_CODE : false;
+    }
+    // No GSTIN → check state
+    const stateCode = parseCodeFromDisplay(form.state_name)
+      || Object.entries(stateCodeToName).find(
+          ([, name]) => name.toLowerCase() === form.state_name?.trim().toLowerCase()
+        )?.[0];
+    if (!stateCode) return false;
+    return stateCode !== SUPPLIER_STATE_CODE;
   })();
 
   return (
@@ -272,16 +347,8 @@ export default function QuotationEditForm({ quoteId }) {
           className="object-contain"
           unoptimized
         />
-        <div className="flex-1 text-sm text-gray-700">
-          <h2 className="text-xl font-bold text-red-600 mb-1">Dynaclean Industries Pvt Ltd</h2>
-          <p className="leading-relaxed">
-            <span className="block">1st Floor, 13-B, Kattabomman Street, Gandhi Nagar Main Road,</span>
-            <span className="block">Gandhi Nagar, Ganapathy, Coimbatore, Tamil Nadu, 641006</span>
-            <span className="block mt-1"><strong>Phone:</strong> 011-45143666, +91-7982456944</span>
-            <span className="block"><strong>Email:</strong> sales@dynacleanindustries.com</span>
-            <span className="block mt-1"><strong>GSTIN:</strong> 07AAKCD6495M1ZV | <strong>State:</strong> Tamil Nadu (33)</span>
-          </p>
-        </div>
+        <LetterheadCompanyInfo />
+        
       </div>
 
       {/* Quote Info */}
@@ -454,7 +521,6 @@ export default function QuotationEditForm({ quoteId }) {
         />
       </div>
 
-      {/* Submit */}
       <div className="flex gap-4 justify-end pb-8">
         <button
           type="button"
@@ -463,13 +529,23 @@ export default function QuotationEditForm({ quoteId }) {
         >
           Cancel
         </button>
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className="px-8 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-semibold"
-        >
-          {isSubmitting ? "Saving..." : "Save Changes"}
-        </button>
+        {hasChanges ? (
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="px-8 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-semibold"
+          >
+            {isSubmitting ? "Creating..." : "Save as New Quotation"}
+          </button>
+        ) : (
+          <button
+            type="button"
+            disabled
+            className="px-8 py-2 bg-gray-300 text-gray-500 rounded cursor-not-allowed font-semibold"
+          >
+            No Changes
+          </button>
+        )}
       </div>
     </form>
   );

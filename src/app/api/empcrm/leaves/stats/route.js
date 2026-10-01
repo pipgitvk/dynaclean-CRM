@@ -18,6 +18,18 @@ export async function GET(request) {
     
     const conn = await getDbConnection();
     
+    // Auto-migration: Ensure 'half-day' value exists in leave_type ENUM
+    try {
+      await conn.execute(`ALTER TABLE employee_leaves MODIFY COLUMN leave_type enum('sick','paid','casual','unpaid','half-day') NOT NULL`);
+    } catch (e) { /* ignore - already applied */ }
+    // Auto-migration: Add acknowledgment columns if not exists
+    try {
+      await conn.execute(`ALTER TABLE employee_leaves ADD COLUMN acknowledged_at timestamp NULL DEFAULT NULL COMMENT 'Acknowledgment timestamp (SuperAdmin/ReportingManager)'`);
+    } catch (e) { /* ignore */ }
+    try {
+      await conn.execute(`ALTER TABLE employee_leaves ADD COLUMN acknowledged_by varchar(255) DEFAULT NULL COMMENT 'Username who acknowledged the leave'`);
+    } catch (e) { /* ignore */ }
+    
     // Check if user is admin/HR
     const isAdmin = ["SUPERADMIN", "HR HEAD", "HR"].includes(session.role);
     
@@ -92,20 +104,23 @@ export async function GET(request) {
     };
 
     // Fetch leave statistics for current year
+    // is_half_day=0: full leaves grouped by leave_type
+    // is_half_day=1: half-day leaves (any leave_type) grouped separately
     const [stats] = await conn.execute(
       `SELECT 
         leave_type,
+        is_half_day,
         SUM(CASE WHEN status = 'approved' THEN total_days ELSE 0 END) as taken,
         SUM(CASE WHEN status = 'pending' THEN total_days ELSE 0 END) as pending,
         SUM(CASE WHEN status = 'rejected' THEN total_days ELSE 0 END) as rejected
        FROM employee_leaves 
        WHERE username = ? 
        AND YEAR(from_date) = YEAR(CURDATE())
-       GROUP BY leave_type`,
+       GROUP BY leave_type, is_half_day`,
       [username]
     );
 
-    // Build leave summary
+    // Build leave summary — only full-day (is_half_day=0) leaves count against type balance
     const leaveTypes = ['sick', 'paid', 'casual'];
     const leaveSummary = leaveTypes.map(type => {
       const allowedKey = `${type}_allowed`;
@@ -122,10 +137,11 @@ export async function GET(request) {
         type
       );
       
-      const statRecord = stats.find(s => s.leave_type === type);
-      const taken = statRecord ? statRecord.taken : 0;
-      const pending = statRecord ? statRecord.pending : 0;
-      const rejected = statRecord ? statRecord.rejected : 0;
+      // Only count full-day leaves (is_half_day=0) for the type balance
+      const statRecord = stats.find(s => s.leave_type === type && s.is_half_day == 0);
+      const taken = statRecord ? Number(statRecord.taken) : 0;
+      const pending = statRecord ? Number(statRecord.pending) : 0;
+      const rejected = statRecord ? Number(statRecord.rejected) : 0;
       const available = Math.max(0, accruedAllowed - taken);
       
       // Disable paid and sick leave during probation
@@ -142,14 +158,24 @@ export async function GET(request) {
       };
     });
 
-    // Count unpaid leaves
-    const unpaidStats = stats.find(s => s.leave_type === 'unpaid');
+    // Count unpaid leaves (full-day + half-day)
+    const unpaidRows = stats.filter(s => s.leave_type === "unpaid");
     const unpaidLeaves = {
-      type: 'unpaid',
+      type: "unpaid",
       enabled: true,
-      taken: unpaidStats ? unpaidStats.taken : 0,
-      pending: unpaidStats ? unpaidStats.pending : 0,
-      rejected: unpaidStats ? unpaidStats.rejected : 0
+      taken: unpaidRows.reduce((sum, s) => sum + Number(s.taken || 0), 0),
+      pending: unpaidRows.reduce((sum, s) => sum + Number(s.pending || 0), 0),
+      rejected: unpaidRows.reduce((sum, s) => sum + Number(s.rejected || 0), 0),
+    };
+
+    // Count half-day leaves — all rows where is_half_day=1, any leave_type
+    const halfDayRows = stats.filter(s => s.is_half_day == 1);
+    const halfDayLeaves = {
+      type: 'half-day',
+      enabled: true,
+      taken:   halfDayRows.reduce((sum, s) => sum + Number(s.taken),   0),
+      pending: halfDayRows.reduce((sum, s) => sum + Number(s.pending), 0),
+      rejected:halfDayRows.reduce((sum, s) => sum + Number(s.rejected),0),
     };
 
     return NextResponse.json({
@@ -158,6 +184,7 @@ export async function GET(request) {
       accrual_start_date: leavePolicy.accrual_start_date || null,
       leaveSummary,
       unpaidLeaves,
+      halfDayLeaves,
       totalApprovedDays: stats.reduce((sum, s) => sum + (s.taken || 0), 0),
       totalPendingDays: stats.reduce((sum, s) => sum + (s.pending || 0), 0)
     });

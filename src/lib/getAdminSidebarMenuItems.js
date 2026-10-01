@@ -152,9 +152,10 @@ import {
   normalizeRoleKey,
 } from "@/lib/adminAttendanceRulesAuth";
 import {
-  parseModuleAccess,
+  resolveModuleAccess,
   isSectionAllowed,
   applySuperadminOnlyModuleRestrictions,
+  applyRoleDenyModuleRestrictions,
 } from "@/lib/moduleAccess";
 
 const FINAL_PROFILE_APPROVAL_PATH =
@@ -219,6 +220,12 @@ const allMenuItems = [
         name: "Daily Report",
         roles: ["SUPERADMIN", "ADMIN"],
         icon: "FileText",
+      },
+      {
+        path: "/admin-dashboard/service-support-report",
+        name: "Service Support Report",
+        roles: ["SUPERADMIN", "DIRECTOR", "SERVICE HEAD", "EA"],
+        icon: "Headset",
       },
       {
         path: "/admin-dashboard/lead-reports",
@@ -370,10 +377,23 @@ const allMenuItems = [
         icon: "FileText",
       },
       {
+        path: "/admin-dashboard/prospect-submissions",
+        name: "Prospect Submissions",
+        roles: ["SUPERADMIN", "ADMIN", "EA"],
+        icon: "FileText",
+      },
+      {
         path: "/admin-dashboard/demo_details",
         name: "Demo Details",
         roles: ["SUPERADMIN"],
         icon: "PlayCircle",
+      },
+      {
+        path: "/admin-dashboard/schedule-visits",
+        name: "Schedule Visits",
+        accessKey: "schedule-visits",
+        roles: ["SUPERADMIN"],
+        icon: "MapPin",
       },
     ],
   },
@@ -393,6 +413,13 @@ const allMenuItems = [
         path: "/admin-dashboard/invoices/list",
         name: "Invoices",
         roles: ["SUPERADMIN"],
+        icon: "FileText",
+      },
+      {
+        path: "/admin-dashboard/performa-invoices",
+        name: "Performa Invoices",
+        accessKey: "performa-invoices",
+        roles: ["ALL"],
         icon: "FileText",
       },
       {
@@ -419,7 +446,7 @@ const allMenuItems = [
   {
       name: "Service & After-Sales",
       moduleKey: "service-after-sales",
-      roles: ["SUPERADMIN", "SERVICE SUPPORT"],
+      roles: ["SUPERADMIN", "SERVICE SUPPORT", "SERVICE HEAD", "EA", "ADMIN", "DIRECTOR"],
       icon: "ShieldCheck",
       children: [
         {
@@ -436,10 +463,17 @@ const allMenuItems = [
         },
         {
           path: "/admin-dashboard/service-followups",
-          name: "Service Follow-ups",
+          name: "Machine Follow-ups",
           accessKey: "service-followups",
           roles: ["SUPERADMIN", "SERVICE SUPPORT"],
           icon: "Calendar",
+        },
+        {
+          path: "/admin-dashboard/service-support-report",
+          name: "Service Support Report",
+          moduleKey: "service-support-report",
+          roles: ["SUPERADMIN", "SERVICE SUPPORT", "SERVICE HEAD", "DIRECTOR", "EA", "ADMIN"],
+          icon: "Headset",
         },
         {
           path: "/admin-dashboard/view_service_reports",
@@ -515,15 +549,24 @@ const allMenuItems = [
   {
     name: "Procurement",
     moduleKey: "products",
-    roles: ["SUPERADMIN"],
+    roles: ["ALL"],
     icon: "ShoppingCart",
     children: [
       {
-        name: "Purchase – Products",
-        roles: ["SUPERADMIN"],
-        icon: "ShoppingCart",
-        children: [
+        path: "/admin-dashboard/parties",
+        name: "Parties",
+        accessKey: "parties",
+        roles: ["ALL"],
+        icon: "Users",
+      },
           {
+            path: "/admin-dashboard/purchase/purchases",
+            name: "Purchases",
+            roles: ["SUPERADMIN"],
+            icon: "ShoppingBag",
+          },
+     
+       {
             path: "/admin-dashboard/purchase/direct-in",
             name: "Direct In",
             roles: ["SUPERADMIN"],
@@ -535,57 +578,11 @@ const allMenuItems = [
             roles: ["SUPERADMIN"],
             icon: "FilePlus",
           },
-          {
-            path: "/admin-dashboard/purchase/warehouse-in",
-            name: "Warehouse In",
-            roles: ["SUPERADMIN"],
-            icon: "PackageCheck",
-          },
-          {
-            path: "/admin-dashboard/purchase/purchases",
-            name: "Purchases",
-            roles: ["SUPERADMIN"],
-            icon: "ShoppingBag",
-          },
-          {
-            path: "/admin-dashboard/purchase/ledger",
-            name: "Purchase Ledger",
-            accessKey: "purchase-ledger",
-            roles: ["SUPERADMIN"],
-            icon: "ScrollText",
-          },
-        ],
-      },
       {
-        name: "Purchase – Spares",
+        path: "/admin-dashboard/purchase/warehouse-in",
+        name: "Warehouse In",
         roles: ["SUPERADMIN"],
-        icon: "ShoppingCart",
-        children: [
-          {
-            path: "/admin-dashboard/spare/purchase/direct-in",
-            name: "Direct In",
-            roles: ["SUPERADMIN"],
-            icon: "PackageCheck",
-          },
-          {
-            path: "/admin-dashboard/spare/purchase/generate-request",
-            name: "Generate Request",
-            roles: ["SUPERADMIN"],
-            icon: "FilePlus",
-          },
-          {
-            path: "/admin-dashboard/spare/purchase/warehouse-in",
-            name: "Warehouse In",
-            roles: ["SUPERADMIN"],
-            icon: "PackageCheck",
-          },
-          {
-            path: "/admin-dashboard/spare/purchase/purchases",
-            name: "Purchases",
-            roles: ["SUPERADMIN"],
-            icon: "ShoppingBag",
-          },
-        ],
+        icon: "PackageCheck",
       },
     ],
   },
@@ -663,25 +660,28 @@ const allMenuItems = [
   {
     name: "Main Expenses",
     moduleKey: "tally-payments",
-    roles: ["SUPERADMIN", "ACCOUNTANT", "PRODUCTION ACCOUNTANT"],
+    roles: ["ALL"],
     icon: "Receipt",
     children: [
       {
         path: "/admin-dashboard/client-expenses",
         name: "Main Expenses",
-        roles: ["SUPERADMIN", "ACCOUNTANT", "PRODUCTION ACCOUNTANT"],
+        accessKey: "client-expenses",
+        roles: ["ALL"],
         icon: "Receipt",
       },
       {
-        path: "/admin-dashboard/delivery-challan",
-        name: "Delivery Challan",
-        roles: ["SUPERADMIN", "ACCOUNTANT", "PRODUCTION ACCOUNTANT"],
-        icon: "Receipt",
+        path: "/admin-dashboard/bank-masters",
+        name: "Bank Management",
+        accessKey: "bank-management",
+        roles: ["ALL"],
+        icon: "Landmark",
       },
       {
         path: "/admin-dashboard/statements",
         name: "Statements",
-        roles: ["SUPERADMIN", "ACCOUNTANT", "PRODUCTION ACCOUNTANT"],
+        accessKey: "statements",
+        roles: ["ALL"],
         icon: "Receipt",
       },
     ],
@@ -715,7 +715,8 @@ const allMenuItems = [
       {
         path: "/admin-dashboard/paid-leave-ledger",
         name: "Paid Leave Ledger",
-        roles: ["SUPERADMIN", "HR", "HR HEAD"],
+        accessKey: "paid-leave-ledger",
+        roles: ["SUPERADMIN", "HR", "HR HEAD", "ACCOUNTANT"],
         icon: "Calendar",
       },
     ],
@@ -767,13 +768,13 @@ const allMenuItems = [
         roles: ["SUPERADMIN"],
         icon: "FileText",
       },
-      // {
-      //   path: "/user-dashboard/hr-today-report",
-      //   name: "HR Daily Report",
-      //   accessKey: "hr-daily-report",
-      //   roles: ["SUPERADMIN"],
-      //   icon: "FileText",
-      // },
+      {
+        path: "/admin-dashboard/hr-operations",
+        name: "Add Paid Leaves",
+        accessKey: "add-paid-leaves",
+        roles: ["SUPERADMIN"],
+        icon: "Calendar",
+      },
     ],
   },
   {
@@ -946,6 +947,7 @@ function filterMenuItemsByRole(items, roleKeyNormalized) {
       if (!roleOk) return null;
 
       if (!item.children?.length) {
+        if (!item.path) return null;
         return item;
       }
 
@@ -998,19 +1000,19 @@ async function getSessionUsername() {
  * Fetch module_access for the logged-in user from rep_list.
  * Returns parsed array of module keys, or null if column doesn't exist / user not found.
  */
-async function getUserModuleAccess(username) {
-  if (!username) return null;
+async function getUserModuleAccess(username, roleKey) {
+  if (!username) return resolveModuleAccess(null, roleKey);
   try {
     const conn = await getDbConnection();
     const [rows] = await conn.execute(
-      "SELECT module_access FROM rep_list WHERE username = ? LIMIT 1",
+      "SELECT module_access, userRole FROM rep_list WHERE username = ? LIMIT 1",
       [username],
     );
-    if (!rows.length) return null;
-    return parseModuleAccess(rows[0].module_access ?? null);
+    if (!rows.length) return [];
+    const role = rows[0].userRole ?? roleKey;
+    return resolveModuleAccess(rows[0].module_access ?? null, role);
   } catch {
-    // If column doesn't exist yet, allow all
-    return null;
+    return resolveModuleAccess(null, roleKey);
   }
 }
 
@@ -1040,8 +1042,8 @@ function filterMenuItemDeep(item, allowedModules) {
 }
 
 function filterMenuItemsByModuleAccess(items, allowedModules) {
-  if (!allowedModules) return items;
-  return items.map((item) => filterMenuItemDeep(item, allowedModules)).filter(Boolean);
+  const keys = allowedModules ?? [];
+  return items.map((item) => filterMenuItemDeep(item, keys)).filter(Boolean);
 }
 
 export default async function getSidebarMenuItems() {
@@ -1051,11 +1053,11 @@ export default async function getSidebarMenuItems() {
   // Apply module_access filtering for non-SUPERADMIN users
   if (roleKeyNormalized !== "SUPERADMIN") {
     const username = await getSessionUsername();
-    const allowedModulesRaw = await getUserModuleAccess(username);
-    const allowedModules = applySuperadminOnlyModuleRestrictions(
-      allowedModulesRaw,
+    const allowedModulesRaw = await getUserModuleAccess(username, roleKeyNormalized);
+    const allowedModules = applyRoleDenyModuleRestrictions(
+      applySuperadminOnlyModuleRestrictions(allowedModulesRaw, roleKeyNormalized) ?? [],
       roleKeyNormalized,
-    );
+    ) ?? [];
     items = filterMenuItemsByModuleAccess(items, allowedModules);
   }
 
@@ -1070,4 +1072,13 @@ export default async function getSidebarMenuItems() {
 export async function getShowBackToUserCrm() {
   const roleKeyNormalized = await getAdminRoleKeyNormalized();
   return roleKeyNormalized !== "SUPERADMIN";
+}
+
+/** Returns accounts-dashboard path for ACCOUNTANT role, null otherwise. */
+export async function getAccountantBackPath() {
+  const roleKeyNormalized = await getAdminRoleKeyNormalized();
+  if (String(roleKeyNormalized).toUpperCase().includes("ACCOUNTANT")) {
+    return "/accounts-dashboard";
+  }
+  return null;
 }

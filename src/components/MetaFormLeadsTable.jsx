@@ -204,7 +204,7 @@ export default function MetaFormLeadsTable({ formIds }) {
                         </thead>
                         <tbody>
                           {leads.map((lead) => (
-                            <tr key={lead.leadgen_id} className="border-t">
+                            <tr key={`${lead.id || lead.leadgen_id}-${lead.assigned_to}`} className="border-t">
                               <td className="p-2 border font-medium">
                                 {getLeadName(lead)}
                               </td>

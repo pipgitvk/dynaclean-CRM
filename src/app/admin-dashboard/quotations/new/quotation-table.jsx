@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 
-export default function QuotationTable({ items, setItems }) {
+export default function QuotationTable({ items, setItems, cgstRate = 9, sgstRate = 9, igstRate = 0 }) {
   const [productSuggestions, setProductSuggestions] = useState([]);
   const [activeRowIndex, setActiveRowIndex] = useState(null);
 

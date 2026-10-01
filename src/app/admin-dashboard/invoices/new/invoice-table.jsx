@@ -92,6 +92,7 @@ export default function InvoiceItemsTable({ items, setItems, isEditMode = false 
       updated[index] = {
         ...updated[index],
         item_code: item.item_code || code,
+        product_number: item.product_number || "",
         item_name: item.item_name || "",
         description: item.specification || "",
         hsn_code: item.hsn_sac || "",
@@ -119,6 +120,7 @@ export default function InvoiceItemsTable({ items, setItems, isEditMode = false 
       ...items,
       {
         item_code: "",
+        product_number: "",
         imageUrl: "",
         item_name: "",
         description: "",
@@ -174,6 +176,7 @@ export default function InvoiceItemsTable({ items, setItems, isEditMode = false 
             <th className="border px-2 py-2">Image</th>
             <th className="border px-2 py-2">Item Name</th>
             <th className="border px-2 py-2">Code</th>
+            <th className="border px-2 py-2">Product #</th>
             <th className="border px-2 py-2">HSN</th>
             <th className="border px-2 py-2">Description</th>
             <th className="border px-2 py-2">Qty</th>
@@ -211,18 +214,15 @@ export default function InvoiceItemsTable({ items, setItems, isEditMode = false 
                       type="text"
                       value={item.item_code || ""}
                       onChange={(e) => {
-                        if (!isEditMode) {
-                          handleChange(idx, "item_code", e.target.value);
-                          fetchProductDetails(e.target.value, idx, true);
-                        }
+                        handleChange(idx, "item_code", e.target.value);
+                        fetchProductDetails(e.target.value, idx, true);
                       }}
-                      className={`border p-1 w-24 text-xs rounded ${isEditMode ? "bg-gray-100 cursor-not-allowed" : ""}`}
-                      readOnly={isEditMode}
+                      className="border p-1 w-24 text-xs rounded"
                     />
-                    {/* Dropdown - only show if not edit mode */}
-                    {!isEditMode && activeRowIndex === idx &&
+                    {/* Dropdown - show in both create and edit modes */}
+                    {activeRowIndex === idx &&
                       productSuggestions.length > 0 && (
-                        <ul className="absolute z-10 bg-white border rounded shadow-sm mt-1 max-h-40 overflow-y-auto w-48 text-xs">
+                        <ul className="absolute z-10 bg-white border rounded shadow-sm mt-1 max-h-40 overflow-y-auto w-56 text-xs">
                           {productSuggestions.map((p, i) => (
                             <li
                               key={i}
@@ -231,18 +231,28 @@ export default function InvoiceItemsTable({ items, setItems, isEditMode = false 
                                 fetchProductDetails(p.item_code, idx);
                                 setProductSuggestions([]);
                               }}
-                              className="px-2 py-1 cursor-pointer hover:bg-emerald-100"
+                              className="px-2 py-1.5 cursor-pointer hover:bg-emerald-100 border-b"
                             >
-                              <span className="font-semibold">
-                                {p.item_code}
-                              </span>{" "}
-                              – {p.item_name}
+                              <div className="flex items-center justify-between gap-2">
+                                <div>
+                                  <span className="font-semibold">
+                                    {p.item_code}
+                                  </span>
+                                  <div className="text-gray-600 text-xs">
+                                    {p.item_name}
+                                  </div>
+                                </div>
+                                <span className={`text-xs px-2 py-0.5 rounded whitespace-nowrap ${p.source === 'spare' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
+                                  {p.source === 'spare' ? 'Spare' : 'Product'}
+                                </span>
+                              </div>
                             </li>
                           ))}
                         </ul>
                       )}
                   </div>
                 </td>
+                <td className="border px-2 py-2 bg-gray-50">{item.product_number || "-"}</td>
                 <td className="border px-2 py-2">{item.hsn_code || "-"}</td>
                 <td className="border px-2 py-2 align-top">
                   <textarea
@@ -259,14 +269,11 @@ export default function InvoiceItemsTable({ items, setItems, isEditMode = false 
                     type="number"
                     value={item.quantity ?? 1}
                     onChange={(e) => {
-                      if (!isEditMode) {
-                        handleChange(idx, "quantity", e.target.value);
-                      }
+                      handleChange(idx, "quantity", e.target.value);
                     }}
-                    className={`border p-1 w-16 text-xs rounded ${isEditMode ? "bg-gray-100 cursor-not-allowed" : ""}`}
+                    className="border p-1 w-16 text-xs rounded"
                     min="0"
                     step="0.01"
-                    readOnly={isEditMode}
                   />
                 </td>
                 <td className="border px-2 py-2">{item.unit || "-"}</td>
@@ -275,19 +282,14 @@ export default function InvoiceItemsTable({ items, setItems, isEditMode = false 
                     type="number"
                     value={item.rate ?? 0}
                     onChange={(e) => {
-                      if (!isEditMode) {
-                        handleChange(idx, "rate", e.target.value);
-                      }
+                      handleChange(idx, "rate", e.target.value);
                     }}
                     onBlur={(e) => {
-                      if (!isEditMode) {
-                        handleBlur(idx, "rate", e.target.value);
-                      }
+                      handleBlur(idx, "rate", e.target.value);
                     }}
-                    className={`border p-1 w-24 text-xs rounded ${isEditMode ? "bg-gray-100 cursor-not-allowed" : ""}`}
+                    className="border p-1 w-24 text-xs rounded"
                     min="0"
                     step="0.01"
-                    readOnly={isEditMode}
                   />
                 </td>
                 <td className="border px-2 py-2">
@@ -295,15 +297,12 @@ export default function InvoiceItemsTable({ items, setItems, isEditMode = false 
                     type="number"
                     value={item.discount_percent ?? 0}
                     onChange={(e) => {
-                      if (!isEditMode) {
-                        handleChange(idx, "discount_percent", e.target.value);
-                      }
+                      handleChange(idx, "discount_percent", e.target.value);
                     }}
-                    className={`border p-1 w-16 text-xs rounded ${isEditMode ? "bg-gray-100 cursor-not-allowed" : ""}`}
+                    className="border p-1 w-16 text-xs rounded"
                     min="0"
                     max="100"
                     step="0.01"
-                    readOnly={isEditMode}
                   />
                 </td>
                 <td className="border px-2 py-2">
@@ -311,14 +310,11 @@ export default function InvoiceItemsTable({ items, setItems, isEditMode = false 
                     type="number"
                     value={item.discount_amount ?? 0}
                     onChange={(e) => {
-                      if (!isEditMode) {
-                        handleChange(idx, "discount_amount", e.target.value);
-                      }
+                      handleChange(idx, "discount_amount", e.target.value);
                     }}
-                    className={`border p-1 w-20 text-xs rounded ${isEditMode ? "bg-gray-100 cursor-not-allowed" : ""}`}
+                    className="border p-1 w-20 text-xs rounded"
                     min="0"
                     step="0.01"
-                    readOnly={isEditMode}
                   />
                 </td>
                 <td className="border px-2 py-2">
@@ -340,7 +336,7 @@ export default function InvoiceItemsTable({ items, setItems, isEditMode = false 
           })}
 
           <tr className="font-semibold bg-gray-100">
-            <td className="border px-2 py-2 text-center" colSpan={6}>
+            <td className="border px-2 py-2 text-center" colSpan={7}>
               Total
             </td>
             <td className="border px-2 py-2">{totals.totalQty.toFixed(2)}</td>

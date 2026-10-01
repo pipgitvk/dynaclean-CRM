@@ -24,6 +24,19 @@ export async function PATCH(req) {
       const net_amount = formData.get('net_amount');
       const price_per_unit = formData.get('price_per_unit');
       let created_at = formData.get('created_at');
+
+      // Customer fields
+      const customer_id = formData.get('customer_id');
+      const client_name = formData.get('client_name');
+      const client_company_name = formData.get('client_company_name');
+      const client_number = formData.get('client_number');
+      const client_email = formData.get('client_email');
+      const client_gstin = formData.get('client_gstin');
+      const customer_address = formData.get('customer_address');
+
+      // Detect if this is a customer-only update
+      const isCustomerUpdate = customer_id || client_name || client_company_name || client_number || client_email || client_gstin || customer_address;
+
       // Convert date format (YYYY-MM-DD) to MySQL datetime format (YYYY-MM-DD HH:MM:SS)
       if (created_at && created_at.includes('-') && !created_at.includes(' ')) {
         created_at = created_at + ' 00:00:00';
@@ -41,13 +54,35 @@ export async function PATCH(req) {
         driver_name: formData.get('driver_name'),
         driver_number: formData.get('driver_number'),
       };
-      if (!id || !mode_of_transport) {
-        return NextResponse.json({ error: 'id and mode_of_transport required' }, { status: 400 });
+      if (!id || (!mode_of_transport && !isCustomerUpdate)) {
+        return NextResponse.json({ error: 'id and mode_of_transport (or customer fields) required' }, { status: 400 });
       }
       const quotation_upload = await saveFile(formData.get('quotation_upload'));
       const payment_proof_upload = await saveFile(formData.get('payment_proof_upload'));
       const invoice_upload = await saveFile(formData.get('invoice_upload'));
       const eway_bill = await saveFile(formData.get('eway_bill'));
+
+      // If customer-only update, skip transport field logic
+      if (isCustomerUpdate && !mode_of_transport) {
+        const db = await getDbConnection();
+        const setParts = [];
+        const values = [];
+        if (customer_id !== null && customer_id !== '') { setParts.push('customer_id = ?'); values.push(customer_id); }
+        if (client_name !== null && client_name !== '') { setParts.push('client_name = ?'); values.push(client_name); }
+        if (client_company_name !== null) { setParts.push('client_company_name = ?'); values.push(client_company_name); }
+        if (client_number !== null) { setParts.push('client_number = ?'); values.push(client_number); }
+        if (client_email !== null) { setParts.push('client_email = ?'); values.push(client_email); }
+        if (client_gstin !== null) { setParts.push('client_gstin = ?'); values.push(client_gstin); }
+        if (customer_address !== null) { setParts.push('customer_address = ?'); values.push(customer_address); }
+        if (setParts.length === 0) return NextResponse.json({ error: 'No fields to update' }, { status: 400 });
+        values.push(id);
+        const [result] = await db.execute(
+          `UPDATE spare_stock_request SET ${setParts.join(', ')} WHERE id = ?`,
+          values
+        );
+        if (result.affectedRows === 0) return NextResponse.json({ error: "Record not found" }, { status: 404 });
+        return NextResponse.json({ success: true });
+      }
 
       const upd = { mode_of_transport, ...fields };
       if (mode_of_transport === 'Self') {

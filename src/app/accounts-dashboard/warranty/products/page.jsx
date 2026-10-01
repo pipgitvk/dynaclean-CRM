@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
+import { useWarrantyProductFollowup } from "@/components/warranty/WarrantyProductFollowupControls";
 
 export default function WarrantyPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -155,6 +156,10 @@ export default function WarrantyPage() {
     "Actions",
   ];
 
+  const { ProductFollowupIcons, followupModals } = useWarrantyProductFollowup(() => {
+    fetchProducts(currentPage, searchQuery);
+  });
+
   const renderPagination = () => {
     const pages = [];
     const maxVisiblePages = 5;
@@ -272,6 +277,7 @@ export default function WarrantyPage() {
               >
                 <div className="flex justify-between items-start gap-2">
                   <div>
+                    <ProductFollowupIcons product={r} className="mb-1" />
                     <div className="font-semibold text-sm">{r.product_name}</div>
                     <div className="text-[11px] text-gray-600">
                       {r.model}  b7 {r.serial_number}
@@ -435,6 +441,7 @@ export default function WarrantyPage() {
                       className="odd:bg-white even:bg-gray-50 hover:bg-gray-100 transition-colors duration-150 ease-in-out"
                     >
                       <td className="p-3 border-b border-gray-200">
+                        <ProductFollowupIcons product={r} />
                         <div className="font-semibold">{r.product_name}</div>
                         {r.model && (
                           <div className="text-xs text-gray-600">Model: {r.model}</div>
@@ -634,6 +641,8 @@ export default function WarrantyPage() {
         {/* Pagination Controls */}
         {!loading && products.length > 0 && renderPagination()}
       </div>
+
+      {followupModals}
     </div>
   );
 }

@@ -34,6 +34,7 @@ export function buildEmploymentConfirmationEmail(data) {
       joining_date: data.joining_date || 'N/A',
       confirmation_date: data.confirmation_date || 'N/A',
       confirmation_letter_link: data.confirmation_letter_link || '#',
+      confirmation_letter_download_link: data.confirmation_letter_download_link || data.confirmation_letter_link || '#',
       current_year: data.current_year || new Date().getFullYear(),
     };
 

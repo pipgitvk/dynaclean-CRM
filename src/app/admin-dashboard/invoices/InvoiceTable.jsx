@@ -8,14 +8,24 @@ import MultiInvoiceLinkModal from "@/app/user-dashboard/invoices/MultiInvoiceLin
 const InvoiceEditModal = dynamic(() => import("./InvoiceEditModal"), { ssr: false });
 
 export default function InvoiceTable({ onSummaryUpdate }) {
-  // Get current month's start and end dates
-  const now = new Date();
-  const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-  
-  const formatDateForInput = (date) => {
-    return date.toISOString().split('T')[0];
+  const PAGE_SIZE = 100;
+  const SCROLL_THRESHOLD_PX = 160;
+
+  const getMonthStartEnd = () => {
+    const now = new Date();
+    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    return { firstDay, lastDay };
   };
+
+  const formatDateForInput = (date) => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const d = String(date.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  };
+
+  const { firstDay: firstDayOfMonth, lastDay: lastDayOfMonth } = getMonthStartEnd();
 
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -23,13 +33,14 @@ export default function InvoiceTable({ onSummaryUpdate }) {
   const [fromDate, setFromDate] = useState(formatDateForInput(firstDayOfMonth));
   const [toDate, setToDate] = useState(formatDateForInput(lastDayOfMonth));
   const [invoiceTypeFilter, setInvoiceTypeFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
 
-  // Single page — fetch all records
-  const [currentPage] = useState(1);
-  const limit = 10000;
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [meta, setMeta] = useState({
     page: 1,
-    limit: 10000,
+    limit: PAGE_SIZE,
     total: 0,
     totalPages: 1,
   });
@@ -45,133 +56,185 @@ export default function InvoiceTable({ onSummaryUpdate }) {
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState(new Set());
   const [selectedInvoices, setSelectedInvoices] = useState([]);
 
-  const fetchData = async () => {
-    setLoading(true);
+  const processInvoicesForView = (data) => {
+    // Filter out performa invoices
+    const filteredData = data.filter(invoice => invoice.type !== 'performa');
+    
+    const grouped = {};
+
+    filteredData.forEach((invoice) => {
+      if (invoice.parent_id) {
+        if (!grouped[invoice.parent_id]) {
+          grouped[invoice.parent_id] = { parent: null, children: [] };
+        }
+        grouped[invoice.parent_id].children.push(invoice);
+      } else {
+        if (!grouped[invoice.id]) {
+          grouped[invoice.id] = { parent: null, children: [] };
+        }
+        grouped[invoice.id].parent = invoice;
+      }
+    });
+
+    filteredData.forEach((inv) => {
+      inv.totalLinkedAmount =
+        inv.linkedStatements?.reduce(
+          (sum, stmt) => sum + Number(stmt.amount || 0),
+          0,
+        ) || 0;
+    });
+
+    const sortedData = [];
+    const processedIds = new Set();
+    const groupIds = Object.keys(grouped)
+      .map(Number)
+      .sort((a, b) => b - a);
+
+    groupIds.forEach((parentId) => {
+      const group = grouped[parentId];
+      if (group.parent && !processedIds.has(group.parent.id)) {
+        sortedData.push(group.parent);
+        processedIds.add(group.parent.id);
+      }
+      group.children
+        .sort((a, b) => a.id - b.id)
+        .forEach((child) => {
+          if (!processedIds.has(child.id)) {
+            sortedData.push(child);
+            processedIds.add(child.id);
+          }
+        });
+    });
+
+    return sortedData;
+  };
+
+  const fetchData = async ({ page = 1, append = false } = {}) => {
+    if (append) {
+      setLoadingMore(true);
+    } else {
+      setLoading(true);
+      setFetchError(null);
+    }
 
     const params = new URLSearchParams();
-    params.append("page", currentPage);
-    params.append("limit", limit);
+    params.append("page", page);
+    params.append("limit", PAGE_SIZE);
     params.append("sort", sortBy);
     params.append("order", sortOrder);
+    params.append("includeDetails", "1");
+    params.append("includeCount", "0");
 
     if (fromDate) params.append("fromDate", fromDate);
     if (toDate) params.append("toDate", toDate);
     if (search) params.append("search", search);
     if (invoiceTypeFilter) params.append("invoiceType", invoiceTypeFilter);
+    if (statusFilter) params.append("status", statusFilter);
 
     try {
-      setFetchError(null);
       const res = await fetch(`/api/invoice-table?${params.toString()}`);
       const response = await res.json();
       console.log("response data :", response);
 
       if (response.success) {
-        let data = response.data || [];
-        
-        // Group invoices by parent_id and sort so parent appears first, then children
-        const grouped = {};
-        
-        // First pass: organize by parent
-        data.forEach(invoice => {
-          if (invoice.parent_id) {
-            // This is a child
-            if (!grouped[invoice.parent_id]) {
-              grouped[invoice.parent_id] = { parent: null, children: [] };
-            }
-            grouped[invoice.parent_id].children.push(invoice);
-          } else {
-            // This is a standalone or parent
-            if (!grouped[invoice.id]) {
-              grouped[invoice.id] = { parent: null, children: [] };
-            }
-            grouped[invoice.id].parent = invoice;
-          }
-        });
-
-        // Calculate per invoice linked amount (for display only)
-        data.forEach(inv => {
-          inv.totalLinkedAmount = inv.linkedStatements?.reduce(
-            (sum, stmt) => sum + Number(stmt.amount || 0),
-            0
-          ) || 0;
-        });
-
-        // Build final sorted array: parent followed by its children
-        const sortedData = [];
-        const processedIds = new Set();
-
-        // Sort groups by parent id
-        const groupIds = Object.keys(grouped)
-          .map(Number)
-          .sort((a, b) => b - a); // Descending order (highest first)
-
-        groupIds.forEach(parentId => {
-          const group = grouped[parentId];
-          if (group.parent && !processedIds.has(group.parent.id)) {
-            sortedData.push(group.parent);
-            processedIds.add(group.parent.id);
-          }
-          // Add children sorted by id (ascending)
-          group.children.sort((a, b) => a.id - b.id).forEach(child => {
-            if (!processedIds.has(child.id)) {
-              sortedData.push(child);
-              processedIds.add(child.id);
+        const data = response.data || [];
+        const sortedData = processInvoicesForView(data);
+        setInvoices((prev) => {
+          if (!append) return sortedData;
+          const existing = new Set(prev.map((inv) => inv.id));
+          const merged = [...prev];
+          sortedData.forEach((inv) => {
+            if (!existing.has(inv.id)) {
+              existing.add(inv.id);
+              merged.push(inv);
             }
           });
+          return merged;
         });
-
-        setInvoices(sortedData);
         setMeta(response.meta);
-
-        // Calculate and update summary data
-        const summaryData = {
-          grandTotal: sortedData.reduce((sum, inv) => sum + Number(inv.grand_total || 0), 0),
-          balanceAmount: sortedData.reduce((sum, inv) => sum + Number(inv.balance_amount || 0), 0),
-          taxAmount: sortedData.reduce((sum, inv) => sum + Number(inv.tax_amount || 0), 0),
-          totalInvoices: sortedData.length,
-        };
-        
-        if (onSummaryUpdate) {
-          onSummaryUpdate(summaryData);
+        setCurrentPage(page);
+        if (typeof response.meta?.hasMore === "boolean") {
+          setHasMore(response.meta.hasMore);
+        } else {
+          setHasMore(data.length === PAGE_SIZE);
         }
       } else {
-        setInvoices([]);
-        setFetchError(response.detail || response.error || "Failed to load invoices");
-        if (onSummaryUpdate) {
-          onSummaryUpdate({ grandTotal: 0, balanceAmount: 0, taxAmount: 0, totalInvoices: 0 });
+        if (!append) {
+          setInvoices([]);
+          setFetchError(response.detail || response.error || "Failed to load invoices");
         }
       }
     } catch (err) {
       console.error("Fetch invoices failed:", err);
-      setInvoices([]);
-      setFetchError(err?.message || "Failed to load invoices");
-      if (onSummaryUpdate) {
-        onSummaryUpdate({ grandTotal: 0, balanceAmount: 0, taxAmount: 0, totalInvoices: 0 });
+      if (!append) {
+        setInvoices([]);
+        setFetchError(err?.message || "Failed to load invoices");
       }
     } finally {
-      setLoading(false);
+      if (append) {
+        setLoadingMore(false);
+      } else {
+        setLoading(false);
+      }
     }
   };
 
+  const resetAndFetch = () => {
+    setCurrentPage(1);
+    setHasMore(true);
+    fetchData({ page: 1, append: false });
+  };
+
+  const loadMore = () => {
+    if (loading || loadingMore || !hasMore) return;
+    fetchData({ page: currentPage + 1, append: true });
+  };
+
   useEffect(() => {
-    fetchData();
-  }, [fromDate, toDate, sortBy, sortOrder, invoiceTypeFilter]);
+    resetAndFetch();
+  }, [fromDate, toDate, sortBy, sortOrder, invoiceTypeFilter, statusFilter]);
 
   useEffect(() => {
     const t = setTimeout(() => {
-      fetchData();
+      resetAndFetch();
     }, 500);
     return () => clearTimeout(t);
   }, [search]);
 
+  useEffect(() => {
+    if (!onSummaryUpdate) return;
+    const filteredForSummary = invoices.filter(
+      (inv) => inv.type !== "performa" && inv.status !== "CANCELLED",
+    );
+    onSummaryUpdate({
+      grandTotal: filteredForSummary.reduce(
+        (sum, inv) => sum + Number(inv.grand_total || 0),
+        0,
+      ),
+      balanceAmount: filteredForSummary.reduce(
+        (sum, inv) => sum + Number(inv.balance_amount || 0),
+        0,
+      ),
+      taxAmount: filteredForSummary.reduce(
+        (sum, inv) => sum + Number(inv.tax_amount || 0),
+        0,
+      ),
+      totalInvoices: filteredForSummary.length,
+    });
+  }, [invoices, onSummaryUpdate]);
+
   const handleReset = () => {
+    const { firstDay, lastDay } = getMonthStartEnd();
     setSearch("");
-    setFromDate("");
-    setToDate("");
+    setFromDate(formatDateForInput(firstDay));
+    setToDate(formatDateForInput(lastDay));
     setInvoiceTypeFilter("");
+    setStatusFilter("");
     setSortBy("created_at");
     setSortOrder("desc");
     setFetchError(null);
+    setSelectedInvoiceIds(new Set());
+    setSelectedInvoices([]);
   };
 
   const handleSort = (column) => {
@@ -256,6 +319,22 @@ export default function InvoiceTable({ onSummaryUpdate }) {
   // State to track expanded invoices for showing linked statements
   const [expandedInvoiceId, setExpandedInvoiceId] = useState(null);
 
+  useEffect(() => {
+    const handleWindowScroll = () => {
+      if (loading || loadingMore || !hasMore) return;
+      const doc = document.documentElement;
+      const nearBottom =
+        window.innerHeight + window.scrollY >=
+        doc.scrollHeight - SCROLL_THRESHOLD_PX;
+      if (nearBottom) {
+        loadMore();
+      }
+    };
+
+    window.addEventListener("scroll", handleWindowScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleWindowScroll);
+  }, [loading, loadingMore, hasMore, currentPage]);
+
   return (
     <div className="bg-white rounded shadow p-4">
       {/* Filters and Link Payment Button */}
@@ -286,7 +365,16 @@ export default function InvoiceTable({ onSummaryUpdate }) {
           >
             <option value="">All Types</option>
             <option value="tax">Tax Invoice</option>
-            <option value="performa">Performa Invoice</option>
+          </select>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="border px-3 py-1 rounded"
+          >
+            <option value="">All Status</option>
+            <option value="PAID">Paid</option>
+            <option value="PARTIAL PAID">Partial Paid</option>
+            <option value="CANCELLED">Cancelled</option>
           </select>
         </div>
         <div className="flex flex-col sm:flex-row gap-2 items-center">
@@ -300,7 +388,13 @@ export default function InvoiceTable({ onSummaryUpdate }) {
           {selectedInvoiceIds.size > 0 && (
             <button
               onClick={handleLinkPaymentClick}
-              className="bg-blue-600 text-white px-4 py-1 rounded hover:bg-blue-700 whitespace-nowrap font-semibold"
+              disabled={selectedInvoices.some(inv => inv.type === 'performa')}
+              className={`px-4 py-1 rounded whitespace-nowrap font-semibold ${
+                selectedInvoices.some(inv => inv.type === 'performa')
+                  ? 'bg-gray-400 text-white cursor-not-allowed opacity-50'
+                  : 'bg-blue-600 text-white hover:bg-blue-700'
+              }`}
+              title={selectedInvoices.some(inv => inv.type === 'performa') ? 'Cannot link payments to Performa Invoices' : ''}
             >
               Link Payment ({selectedInvoiceIds.size})
             </button>
@@ -343,13 +437,15 @@ export default function InvoiceTable({ onSummaryUpdate }) {
               <th className="px-4 py-2">Buyer</th>
               <th className="px-4 py-2">Consignee GSTIN</th>
               <th className="px-4 py-2">Employee</th>
+              <th className="px-4 py-2">Created By</th>
               <th
-                onClick={() => handleSort("order_date")}
+                onClick={() => handleSort("invoice_date")}
                 className="px-4 py-2 cursor-pointer"
               >
-                Order Date <SortIcon column="order_date" />
+                Invoice Date <SortIcon column="invoice_date" />
               </th>
               <th className="px-4 py-2">Type</th>
+              <th className="px-4 py-2">Status</th>
               <th className="px-4 py-2">Tax</th>
               <th className="px-4 py-2">Grand Total</th>
               <th className="px-4 py-2">Balance Amount</th>
@@ -365,13 +461,13 @@ export default function InvoiceTable({ onSummaryUpdate }) {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan="14" className="text-center py-4">
+                <td colSpan="16" className="text-center py-4">
                   Loading...
                 </td>
               </tr>
             ) : fetchError ? (
               <tr>
-                <td colSpan="14" className="text-center py-6 text-red-600">
+                <td colSpan="16" className="text-center py-6 text-red-600">
                   {fetchError}
                 </td>
               </tr>
@@ -419,6 +515,7 @@ export default function InvoiceTable({ onSummaryUpdate }) {
                     <td className={`px-4 py-2 ${i.parent_id ? 'pl-8' : ''}`}>{i.buyer_name}</td>
                     <td className={`px-4 py-2 text-sm font-mono ${i.parent_id ? 'pl-8' : ''}`}>{i.gst_consignee || "-"}</td>
                     <td className={`px-4 py-2 ${i.parent_id ? 'pl-8' : ''}`}>{i.employee_name || "-"}</td>
+                    <td className={`px-4 py-2 ${i.parent_id ? 'pl-8' : ''}`}>{i.created_by || "-"}</td>
                     <td className="px-4 py-2">
                       {new Date(i.order_date).toLocaleDateString("en-IN")}
                     </td>
@@ -430,6 +527,24 @@ export default function InvoiceTable({ onSummaryUpdate }) {
                       }`}>
                         {i.type === 'performa' ? 'Performa Invoice' : 'Tax Invoice'}
                       </span>
+                    </td>
+                    <td className="px-4 py-2">
+                      <span className={`px-3 py-1 rounded text-sm font-semibold ${
+                        i.status === 'PAID'
+                          ? 'bg-green-100 text-green-800'
+                          : i.status === 'PARTIAL PAID' || i.status === 'PARTIAL'
+                            ? 'bg-yellow-100 text-yellow-800'
+                            : i.status === 'CANCELLED'
+                              ? 'bg-red-100 text-red-800'
+                              : 'bg-gray-100 text-gray-600'
+                      }`}>
+                        {i.status || '—'}
+                      </span>
+                      {i.order_id && (
+                        <div className="mt-1 text-xs text-gray-500">
+                          Ord: {i.order_id}
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-2">
                       ₹{Number(i.tax_amount).toLocaleString("en-IN")}
@@ -480,13 +595,13 @@ export default function InvoiceTable({ onSummaryUpdate }) {
                               setShowLinkModal(true);
                             }
                           }}
-                          disabled={selectedInvoiceIds.size > 0 && !selectedInvoiceIds.has(i.id)}
+                          disabled={i.type === 'performa' || (selectedInvoiceIds.size > 0 && !selectedInvoiceIds.has(i.id))}
                           className={`text-white px-3 py-1 rounded ${
-                            selectedInvoiceIds.size > 0 && !selectedInvoiceIds.has(i.id)
+                            i.type === 'performa' || (selectedInvoiceIds.size > 0 && !selectedInvoiceIds.has(i.id))
                               ? 'bg-gray-400 cursor-not-allowed opacity-50'
                               : 'bg-purple-600 hover:bg-purple-700'
                           }`}
-                          title={selectedInvoiceIds.size > 0 && !selectedInvoiceIds.has(i.id) ? 'Disabled: These invoices are linked to a payment' : ''}
+                          title={i.type === 'performa' ? 'Link Payment not available for Performa Invoices' : selectedInvoiceIds.size > 0 && !selectedInvoiceIds.has(i.id) ? 'Disabled: These invoices are linked to a payment' : ''}
                         >
                           Link Payment
                         </button>
@@ -495,7 +610,7 @@ export default function InvoiceTable({ onSummaryUpdate }) {
                   </tr>
                   {expandedInvoiceId === i.id && i.linkedStatements && i.linkedStatements.length > 0 && (
                     <tr>
-                      <td colSpan="14" className="px-8 py-4 bg-gray-50">
+                      <td colSpan="16" className="px-8 py-4 bg-gray-50">
                         <div className="flex justify-between items-center mb-3">
                           <h4 className="font-semibold text-gray-700">Linked Payments:</h4>
                           <div className="text-right">
@@ -554,7 +669,7 @@ export default function InvoiceTable({ onSummaryUpdate }) {
               ))
             ) : (
               <tr>
-                <td colSpan="14" className="text-center py-6 text-gray-500">
+                <td colSpan="16" className="text-center py-6 text-gray-500">
                   No invoices found
                 </td>
               </tr>
@@ -562,13 +677,27 @@ export default function InvoiceTable({ onSummaryUpdate }) {
           </tbody>
         </table>
       </div>
+      {!loading && invoices.length > 0 && (
+        <div className="mt-3 flex items-center justify-between text-xs text-gray-600">
+          <span>
+            Loaded {invoices.length}{meta.total != null ? ` of ${meta.total}` : ""} invoices
+          </span>
+          {loadingMore ? (
+            <span className="font-medium text-blue-600">Loading more...</span>
+          ) : hasMore ? (
+            <span>Scroll down to load more</span>
+          ) : (
+            <span>All invoices loaded</span>
+          )}
+        </div>
+      )}
 
       {editId != null && (
         <InvoiceEditModal
           open
           invoiceId={editId}
           onClose={() => setEditId(null)}
-          onSaved={fetchData}
+          onSaved={() => resetAndFetch()}
           viewHrefBase="/admin-dashboard/invoices"
         />
       )}
@@ -585,7 +714,7 @@ export default function InvoiceTable({ onSummaryUpdate }) {
           selectedGrandTotal={selectedInvoices.reduce((sum, inv) => sum + Number(inv.grand_total || 0), 0)}
           invoices={invoices}
           onLinkSuccess={() => {
-            fetchData();
+            resetAndFetch();
           }}
         />
       )}

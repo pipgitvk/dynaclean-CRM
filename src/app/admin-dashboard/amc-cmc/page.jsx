@@ -339,12 +339,14 @@ export default function AMCCMCPage() {
           <thead className="bg-gray-800 text-white">
             <tr>
               <th className="p-3 text-left">Serial #</th>
+              <th className="p-3 text-left">Type</th>
               <th className="p-3 text-left">Model</th>
               <th className="p-3 text-left">Company</th>
               <th className="p-3 text-left">Contact</th>
               <th className="p-3 text-left">AMC Period</th>
               <th className="p-3 text-left">Status</th>
               <th className="p-3 text-left">Created</th>
+              <th className="p-3 text-center">AMC/CMC Contract</th>
               <th className="p-3 text-center">Actions</th>
             </tr>
           </thead>
@@ -354,6 +356,12 @@ export default function AMCCMCPage() {
                 <tr key={i} className="border-b animate-pulse">
                   <td className="p-3">
                     <div className="h-4 bg-gray-300 rounded w-3/4"></div>
+                  </td>
+                  <td className="p-3">
+                    <div className="h-4 bg-gray-300 rounded w-1/2"></div>
+                  </td>
+                  <td className="p-3">
+                    <div className="h-4 bg-gray-300 rounded"></div>
                   </td>
                   <td className="p-3">
                     <div className="h-4 bg-gray-300 rounded"></div>
@@ -382,6 +390,17 @@ export default function AMCCMCPage() {
               records.map((record) => (
                 <tr key={record.id} className="border-b hover:bg-gray-50">
                   <td className="p-3 font-semibold">{record.serial_number}</td>
+                  <td className="p-3">
+                    <span
+                      className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                        record.contract_type === "CMC"
+                          ? "bg-purple-100 text-purple-800"
+                          : "bg-blue-100 text-blue-800"
+                      }`}
+                    >
+                      {record.contract_type || "AMC"}
+                    </span>
+                  </td>
                   <td className="p-3">{record.model || "—"}</td>
                   <td className="p-3">{record.company_name}</td>
                   <td className="p-3">{record.contact || "—"}</td>
@@ -400,6 +419,15 @@ export default function AMCCMCPage() {
                   </td>
                   <td className="p-3 text-sm">
                     {new Date(record.created_time).toLocaleDateString()}
+                  </td>
+                  <td className="p-3 text-center">
+                    <Link
+                      href={`/admin-dashboard/amc-cmc/contract/${record.id}`}
+                      target="_blank"
+                      className="inline-flex items-center rounded-md bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-800 hover:bg-slate-200"
+                    >
+                      {record.contract_type === "CMC" ? "CMC Contract" : "AMC Contract"}
+                    </Link>
                   </td>
                   <td className="p-3">
                     <div className="flex gap-2 justify-center flex-wrap">
@@ -462,7 +490,7 @@ export default function AMCCMCPage() {
               ))
             ) : (
               <tr>
-                <td colSpan="8" className="p-6 text-center text-gray-500">
+                <td colSpan="10" className="p-6 text-center text-gray-500">
                   No AMC/CMC records found
                 </td>
               </tr>

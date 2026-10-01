@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import dayjs from "dayjs";
 import { useState, useEffect } from "react";
 import { Eye, CreditCard, Download, ExternalLink, Pencil, Link2, Edit3 } from "lucide-react";
@@ -11,11 +12,13 @@ import autoTable from "jspdf-autotable";
 import ExcelJS from "exceljs";
 
 export default function ExpenseTable({ rows, role }) {
+  const searchParams = useSearchParams();
   const [searchQuery, setSearchQuery] = useState("");
   const [fromDate, setFromDate] = useState(dayjs().startOf("month").format("YYYY-MM-DD"));
   const [toDate, setToDate] = useState(dayjs().endOf("month").format("YYYY-MM-DD"));
   const [selectedEmployee, setSelectedEmployee] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("");
+  const [linkingFilter, setLinkingFilter] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
   const [selectedRow, setSelectedRow] = useState(null);
@@ -30,13 +33,32 @@ export default function ExpenseTable({ rows, role }) {
     const savedToDate = localStorage.getItem("toDate");
     const savedEmployee = localStorage.getItem("selectedEmployee");
     const savedStatus = localStorage.getItem("selectedStatus");
+    const savedLinkingFilter = localStorage.getItem("linkingFilter");
 
     if (savedSearchQuery) setSearchQuery(savedSearchQuery);
     if (savedFromDate) setFromDate(savedFromDate);
     if (savedToDate) setToDate(savedToDate);
     if (savedEmployee) setSelectedEmployee(savedEmployee);
     if (savedStatus) setSelectedStatus(savedStatus);
+    if (savedLinkingFilter) setLinkingFilter(savedLinkingFilter);
   }, []);
+
+  useEffect(() => {
+    const statusFromCard = searchParams.get("status");
+    const linkingFromCard = searchParams.get("linking");
+    const fromCard = searchParams.get("fromCard");
+
+    if (statusFromCard) setSelectedStatus(statusFromCard);
+    if (linkingFromCard === "unlinked") setLinkingFilter("unlinked");
+    if (linkingFromCard === "all") setLinkingFilter("");
+
+    if (fromCard === "1") {
+      setSearchQuery("");
+      setSelectedEmployee("");
+      setFromDate("");
+      setToDate("");
+    }
+  }, [searchParams]);
 
   // Save filter values to localStorage whenever they change
   useEffect(() => {
@@ -45,7 +67,8 @@ export default function ExpenseTable({ rows, role }) {
     if (toDate) localStorage.setItem("toDate", toDate);
     if (selectedEmployee) localStorage.setItem("selectedEmployee", selectedEmployee);
     if (selectedStatus) localStorage.setItem("selectedStatus", selectedStatus);
-  }, [searchQuery, fromDate, toDate, selectedEmployee, selectedStatus]);
+    if (linkingFilter) localStorage.setItem("linkingFilter", linkingFilter);
+  }, [searchQuery, fromDate, toDate, selectedEmployee, selectedStatus, linkingFilter]);
 
   // Get unique employees for the filter
   const employees = Array.from(new Set(rows.map((row) => row.username))).filter(Boolean).sort();
@@ -66,11 +89,21 @@ export default function ExpenseTable({ rows, role }) {
 
     const matchesStatus = !selectedStatus || row.approval_status === selectedStatus;
 
+    let hasLinkedStatements = false;
+    try {
+      const parsed = JSON.parse(row.linked_statement_ids || "[]");
+      hasLinkedStatements = Array.isArray(parsed) && parsed.length > 0;
+    } catch {
+      const raw = String(row.linked_statement_ids || "").trim();
+      hasLinkedStatements = raw !== "" && raw !== "[]";
+    }
+    const matchesLinking = linkingFilter !== "unlinked" || !hasLinkedStatements;
+
     const matchesDateRange =
       (!fromDate || dayjs(row.TravelDate).isAfter(dayjs(fromDate).subtract(1, "day"))) &&
       (!toDate || dayjs(row.TravelDate).isBefore(dayjs(toDate).add(1, "day")));
 
-    return matchesSearch && matchesEmployee && matchesStatus && matchesDateRange;
+    return matchesSearch && matchesEmployee && matchesStatus && matchesLinking && matchesDateRange;
   });
 
   const getRowTotal = (row) =>
@@ -166,6 +199,7 @@ export default function ExpenseTable({ rows, role }) {
     setSearchQuery("");
     setSelectedEmployee("");
     setSelectedStatus("");
+    setLinkingFilter("");
     const startOfMonth = dayjs().startOf("month").format("YYYY-MM-DD");
     const endOfMonth = dayjs().endOf("month").format("YYYY-MM-DD");
     setFromDate(startOfMonth);
@@ -174,6 +208,7 @@ export default function ExpenseTable({ rows, role }) {
     localStorage.removeItem("searchQuery");
     localStorage.removeItem("selectedEmployee");
     localStorage.removeItem("selectedStatus");
+    localStorage.removeItem("linkingFilter");
     localStorage.setItem("fromDate", startOfMonth);
     localStorage.setItem("toDate", endOfMonth);
   };
@@ -339,6 +374,14 @@ export default function ExpenseTable({ rows, role }) {
           <option value="Pending">Pending</option>
           <option value="Approved">Approved</option>
           <option value="Rejected">Rejected</option>
+        </select>
+        <select
+          value={linkingFilter}
+          onChange={(e) => setLinkingFilter(e.target.value)}
+          className="px-4 py-2 border rounded-lg w-full sm:w-auto focus:ring-blue-500 focus:border-blue-500"
+        >
+          <option value="">All Links</option>
+          <option value="unlinked">Unlinked to Statement</option>
         </select>
         <div className="flex items-center gap-2 w-full sm:w-auto">
           <span className="text-sm text-gray-500 hidden sm:inline">From:</span>

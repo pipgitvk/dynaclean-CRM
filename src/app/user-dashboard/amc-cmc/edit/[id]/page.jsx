@@ -6,6 +6,11 @@ import Link from "next/link";
 import toast from "react-hot-toast";
 import { ArrowLeft, Eye } from "lucide-react";
 
+function normalizeContractType(value) {
+  const t = String(value || "").trim().toUpperCase();
+  return t === "AMC" || t === "CMC" ? t : "";
+}
+
 export default function EditUserAMCCMCPage() {
   const params = useParams();
   const router = useRouter();
@@ -16,6 +21,7 @@ export default function EditUserAMCCMCPage() {
   const [serialSuggestions, setSerialSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [formData, setFormData] = useState({
+    contract_type: "",
     serial_number: "",
     model: "",
     company_name: "",
@@ -94,6 +100,7 @@ export default function EditUserAMCCMCPage() {
 
         setRecord(data);
         setFormData({
+          contract_type: normalizeContractType(data.contract_type),
           serial_number: data.serial_number || "",
           model: data.model || "",
           company_name: data.company_name || "",
@@ -229,6 +236,22 @@ export default function EditUserAMCCMCPage() {
           <section>
             <h2 className="text-xl font-semibold mb-4 pb-2 border-b">Product Information</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Type *</label>
+                <select
+                  name="contract_type"
+                  value={formData.contract_type}
+                  onChange={handleInputChange}
+                  required
+                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                >
+                  <option value="" disabled>
+                    Select
+                  </option>
+                  <option value="AMC">AMC</option>
+                  <option value="CMC">CMC</option>
+                </select>
+              </div>
               <div className="relative">
                 <label className="block text-sm font-medium mb-1">Serial Number *</label>
                 <input
