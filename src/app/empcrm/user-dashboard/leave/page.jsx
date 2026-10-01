@@ -294,12 +294,17 @@ export default function UserLeaveManagement() {
   const leaveTypeOptions = (
     <>
       <option value="">Select</option>
-      {stats && stats.leaveSummary.filter(l => l.enabled).map(leave => (
-        <option key={leave.type} value={leave.type}>
-          {leave.type.charAt(0).toUpperCase() + leave.type.slice(1)} Leave
-          {leave.available > 0 && ` (${leave.available} days available)`}
-        </option>
-      ))}
+      {stats && stats.leaveSummary.filter(l => l.enabled).map(leave => {
+        const netAvail = leave.available - leave.pending;
+        return (
+          <option key={leave.type} value={leave.type}>
+            {leave.type.charAt(0).toUpperCase() + leave.type.slice(1)} Leave
+            {netAvail >= 0
+              ? ` (${formatDays(netAvail)} days available)`
+              : ` (${formatDays(netAvail)} days)`}
+          </option>
+        );
+      })}
       <option value="unpaid">Unpaid Leave</option>
     </>
   );
@@ -351,8 +356,9 @@ export default function UserLeaveManagement() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             {stats.leaveSummary.map((leave) => {
               if (!leave.enabled) return null;
+              const netAvailable = leave.available - leave.pending;
               const utilizationPercent = leave.allowed > 0
-                ? ((leave.taken / leave.allowed) * 100).toFixed(0)
+                ? (((leave.taken + leave.pending) / leave.allowed) * 100).toFixed(0)
                 : 0;
               return (
                 <div key={leave.type} className="bg-white rounded-lg shadow-md border border-gray-200 p-6">
@@ -378,20 +384,15 @@ export default function UserLeaveManagement() {
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-gray-600 flex items-center gap-1">
-                        <TrendingUp className="w-4 h-4 text-green-500" />
+                        <TrendingUp className={`w-4 h-4 ${netAvailable >= 0 ? 'text-green-500' : 'text-red-500'}`} />
                         Available
                       </span>
-                      <span className="text-lg font-bold text-green-600">{formatDays(leave.available)} days</span>
+                      <span className={`text-lg font-bold ${netAvailable >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {netAvailable >= 0
+                          ? `${formatDays(netAvailable)} days`
+                          : `-${formatDays(Math.abs(netAvailable))} days`}
+                      </span>
                     </div>
-                    {leave.pending > 0 && (
-                      <div className="flex justify-between items-center pt-2 border-t border-gray-100">
-                        <span className="text-sm text-yellow-600 flex items-center gap-1">
-                          <Clock className="w-4 h-4" />
-                          Pending
-                        </span>
-                        <span className="text-sm font-semibold text-yellow-600">{formatDays(leave.pending)} days</span>
-                      </div>
-                    )}
                     <div className="pt-2">
                       <div className="flex justify-between text-xs text-gray-500 mb-1">
                         <span>Utilization</span>

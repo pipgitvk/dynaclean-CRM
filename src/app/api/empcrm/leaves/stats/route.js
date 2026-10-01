@@ -103,7 +103,7 @@ export async function GET(request) {
       return Math.max(0, accrued);
     };
 
-    // 🛠️ BACKFILL: Fix corrupt legacy records (approval bug stored total_days=0 for half-day leaves)
+    // 🛠️ BACKFILL: Fix corrupt half-day records (legacy bugs stored total_days=0 OR 1 instead of 0.5)
     // This permanently corrects DB rows so SUM(total_days) matches expected 0.5 per half-day record.
     try {
       const [fixedInfo] = await conn.execute(
@@ -111,11 +111,11 @@ export async function GET(request) {
          SET total_days = 0.5 
          WHERE username = ? 
            AND is_half_day = 1 
-           AND (total_days = 0 OR total_days IS NULL OR total_days < 0)`,
+           AND (total_days IS NULL OR total_days != 0.5)`,
         [username]
       );
       if (fixedInfo.affectedRows > 0) {
-        console.log(`[stats-backfill] Fixed ${fixedInfo.affectedRows} corrupt half-day records (total_days=0) for user ${username}`);
+        console.log(`[stats-backfill] Normalized ${fixedInfo.affectedRows} half-day records → total_days=0.5 for user ${username}`);
       }
     } catch (bfErr) {
       console.warn("[stats-backfill] Could not apply half-day total_days fix:", bfErr.message);
@@ -141,18 +141,28 @@ export async function GET(request) {
       [username]
     );
 
-    // 🔒 Display layer safety: half-day rows must contribute AT LEAST 0.5 per row per status,
-    // even if backfill UPDATE was blocked (permissions / read replica / etc.).
+    // 🔒 Display layer safety: For half-day groups, normalize SUM to row_count × 0.5
+    // regardless of what total_days is stored in DB. Ratio of taken/pending/rejected
+    // is preserved from the DB sums.
     const stats = rawStats.map(s => {
       const isHalf = s.is_half_day == 1;
       if (!isHalf) return s;
       const halfRowCount = Number(s.row_count || 0);
-      const minExpected = halfRowCount * 0.5;
+      const expectedTotal = halfRowCount * 0.5;
+      const dbTotal = Number(s.taken || 0) + Number(s.pending || 0) + Number(s.rejected || 0);
+
+      if (dbTotal <= 0) {
+        // No valid DB sums — fall back to assuming taken = expectedTotal (same as before)
+        return { ...s, taken: expectedTotal, pending: 0, rejected: 0 };
+      }
+
+      // Scale each status pro-rata so overall sum equals row_count × 0.5
+      const ratio = expectedTotal / dbTotal;
       return {
         ...s,
-        taken:    Math.max(Number(s.taken    || 0), minExpected),
-        pending:  Math.max(Number(s.pending  || 0), minExpected),
-        rejected: Math.max(Number(s.rejected || 0), 0), // reject count = 0 if no rejected rows
+        taken:    Number((Number(s.taken    || 0) * ratio).toFixed(2)),
+        pending:  Number((Number(s.pending  || 0) * ratio).toFixed(2)),
+        rejected: Number((Number(s.rejected || 0) * ratio).toFixed(2)),
       };
     });
 
