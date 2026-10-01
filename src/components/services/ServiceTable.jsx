@@ -161,10 +161,12 @@ export default function ServiceTable({ serviceRecords, role }) {
         )}
       <Link
         href={
-          (dashboardPath === "admin-dashboard" || dashboardPath === "user-dashboard") &&
-          String(record.service_type || "").trim().toUpperCase() === "COMPLAINT"
+          String(record.service_type || "").trim().toUpperCase() === "COMPLAINT" &&
+          (dashboardPath === "admin-dashboard" || dashboardPath === "user-dashboard" || dashboardPath === "accounts-dashboard")
             ? `/${dashboardPath}/service-report-steps/${record.service_id}`
-            : `/${dashboardPath}/complete-service/${record.service_id}`
+            : String(record.service_type || "").trim().toUpperCase() === "INSTALLATION"
+              ? `/${dashboardPath}/installation-completion-video/${record.service_id}`
+              : `/${dashboardPath}/complete-service/${record.service_id}`
         }
         title="+ Make Report"
         className={`${actionIconClass} bg-purple-500 hover:bg-purple-600`}
@@ -254,28 +256,50 @@ export default function ServiceTable({ serviceRecords, role }) {
     dashboardPath === "admin-dashboard" || dashboardPath === "user-dashboard";
 
   const renderStepVideos = (record) => {
-    if (String(record.service_type || "").trim().toUpperCase() !== "COMPLAINT") {
-      return <span className="text-gray-400">—</span>;
+    const serviceType = String(record.service_type || "").trim().toUpperCase();
+    
+    if (serviceType === "COMPLAINT") {
+      // Show complaint step videos
+      const videos = STEP_VIDEOS.filter((step) => record[step.key]);
+      if (!videos.length) {
+        return <span className="text-gray-400">No videos</span>;
+      }
+      return (
+        <div className="flex flex-col gap-1 min-w-[110px]">
+          {videos.map((step) => (
+            <a
+              key={step.key}
+              href={record[step.key]}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 hover:underline"
+            >
+              {step.label}
+            </a>
+          ))}
+        </div>
+      );
+    } else if (serviceType === "INSTALLATION") {
+      // Show installation completion video
+      if (record.video_completion) {
+        return (
+          <div className="flex flex-col gap-1 min-w-[110px]">
+            <a
+              href={record.video_completion}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 hover:underline"
+            >
+              Installation Video
+            </a>
+          </div>
+        );
+      } else {
+        return <span className="text-gray-400">No video</span>;
+      }
     }
-    const videos = STEP_VIDEOS.filter((step) => record[step.key]);
-    if (!videos.length) {
-      return <span className="text-gray-400">No videos</span>;
-    }
-    return (
-      <div className="flex flex-col gap-1 min-w-[110px]">
-        {videos.map((step) => (
-          <a
-            key={step.key}
-            href={record[step.key]}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-blue-600 hover:underline"
-          >
-            {step.label}
-          </a>
-        ))}
-      </div>
-    );
+    
+    return <span className="text-gray-400">—</span>;
   };
 
   const renderReportCell = (record) => (

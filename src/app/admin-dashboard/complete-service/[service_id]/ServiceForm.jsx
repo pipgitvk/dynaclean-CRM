@@ -547,7 +547,14 @@ export default function ServiceForm({ service }) {
         }
       );
 
-      if (!response.ok) throw new Error("Failed to save service record.");
+      let errorMsg = "Failed to save service record.";
+      if (!response.ok) {
+        try {
+          const errBody = await response.json();
+          if (errBody?.message) errorMsg = errBody.message;
+        } catch (_) {}
+        throw new Error(errorMsg);
+      }
 
       // Generate PDF after successful save
       try {
@@ -684,7 +691,7 @@ export default function ServiceForm({ service }) {
       router.push("/admin-dashboard/view_service_reports");
     } catch (error) {
       console.error("❌ Submission error:", error);
-      alert("Failed to save service record. Please try again.");
+      alert(`Error: ${error.message || "Failed to save service record. Please try again."}`);
     } finally {
       setIsLoading(false);
     }
@@ -707,18 +714,20 @@ export default function ServiceForm({ service }) {
          file:bg-blue-50 file:text-blue-700
          hover:file:bg-blue-100"
       />
-      {files[name] && files[name].length > 0 && (
+      {files[name] && files[name].length > 0 && !submitted && (
         <div className="mt-4 flex flex-wrap gap-4">
           {files[name].map((item, idx) => (
             <div
               key={idx}
               className="w-24 h-24 border border-gray-300 rounded overflow-hidden"
             >
-              <img
-                src={item.preview}
-                alt={`Preview ${idx}`}
-                className="object-cover w-full h-full"
-              />
+              {item.preview && (
+                <img
+                  src={item.preview}
+                  alt={`Preview ${idx}`}
+                  className="object-cover w-full h-full"
+                />
+              )}
             </div>
           ))}
         </div>
@@ -736,7 +745,7 @@ export default function ServiceForm({ service }) {
           }
         });
     };
-  }, [files]);
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-100 p-4 flex items-center justify-center ">
