@@ -1026,6 +1026,9 @@ export default function OrderTable({ orders, userRole }) {
     return ordersForStatCards.reduce(
       (acc, order) => {
         const taxable = getPaymentColumnAmount(order);
+        const totalOrder = getTotalAmount(order);
+        const paidOrder = getTotalPaidAmount(order);
+        const balanceOrder = Math.max(0, totalOrder - paidOrder);
         const approval = (order.approval_status || "")
           .toString()
           .trim()
@@ -1052,13 +1055,21 @@ export default function OrderTable({ orders, userRole }) {
             acc.pendingDispatch += 1;
             acc.pendingDispatchAmount += taxable;
           }
-          if (isOrderPaid(order)) {
+
+          const pmtStatus = (order.payment_status || "")
+            .toString()
+            .trim()
+            .toLowerCase()
+            .replace(/\s+/g, "");
+
+          if (pmtStatus === "paid") {
             acc.paid += 1;
-            acc.paidAmount += taxable;
           } else {
             acc.unpaid += 1;
-            acc.unpaidAmount += taxable;
           }
+
+          acc.paidAmount += paidOrder;
+          acc.unpaidAmount += balanceOrder;
         }
 
         return acc;
