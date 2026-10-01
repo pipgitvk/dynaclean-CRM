@@ -120,7 +120,7 @@ export async function GET(request) {
       [username]
     );
 
-    // Build leave summary — only full-day (is_half_day=0) leaves count against type balance
+    // Build leave summary — combine full-day (1 day each) + half-day (0.5 day each) leaves per type
     const leaveTypes = ['sick', 'paid', 'casual'];
     const leaveSummary = leaveTypes.map(type => {
       const allowedKey = `${type}_allowed`;
@@ -137,11 +137,11 @@ export async function GET(request) {
         type
       );
       
-      // Only count full-day leaves (is_half_day=0) for the type balance
-      const statRecord = stats.find(s => s.leave_type === type && s.is_half_day == 0);
-      const taken = statRecord ? Number(statRecord.taken) : 0;
-      const pending = statRecord ? Number(statRecord.pending) : 0;
-      const rejected = statRecord ? Number(statRecord.rejected) : 0;
+      // Count BOTH full-day AND half-day rows for the same leave_type
+      const typeRows = stats.filter(s => s.leave_type === type);
+      const taken    = typeRows.reduce((sum, s) => sum + Number(s.taken    || 0), 0);
+      const pending  = typeRows.reduce((sum, s) => sum + Number(s.pending  || 0), 0);
+      const rejected = typeRows.reduce((sum, s) => sum + Number(s.rejected || 0), 0);
       const available = Math.max(0, accruedAllowed - taken);
       
       // Disable paid and sick leave during probation

@@ -16,6 +16,11 @@ import {
   BadgeCheck
 } from "lucide-react";
 
+const formatDays = (val) => {
+  const n = Number(val) || 0;
+  return Number.isInteger(n) ? n : Number(n.toFixed(2));
+};
+
 export default function UserLeaveManagement() {
   const [leaves, setLeaves] = useState([]);
   const [stats, setStats] = useState(null);
@@ -32,7 +37,9 @@ export default function UserLeaveManagement() {
     half_day_type: "1st_half",
     has_time_range: false,
     start_time: "",
-    end_time: ""
+    end_time: "",
+    attachment: null,
+    attachmentFile: null
   });
 
   const [submitting, setSubmitting] = useState(false);
@@ -108,44 +115,91 @@ export default function UserLeaveManagement() {
       alert("Please fill Start Time and End Time when time range is enabled");
       return;
     }
+    // Validate attachment for sick leave
+    if (formData.leave_type === "sick" && !formData.attachmentFile) {
+      alert("Doctor prescription/test report is required for Sick Leave");
+      return;
+    }
     try {
       setSubmitting(true);
       const leaveDate = formData.from_date;
       const payload = {
-        ...formData,
+        leave_type: formData.leave_type,
+        from_date: formData.from_date,
         to_date: formData.is_half_day ? leaveDate : formData.to_date,
+        reason: formData.reason,
         is_half_day: formData.is_half_day,
         half_day_type: formData.is_half_day ? formData.half_day_type : null,
+        has_time_range: formData.has_time_range,
       };
       if (formData.has_time_range && formData.start_time && formData.end_time) {
         const endDate = formData.is_half_day ? leaveDate : formData.to_date;
         payload.start_date_time = leaveDate ? `${leaveDate}T${formData.start_time}` : null;
         payload.end_date_time   = endDate ? `${endDate}T${formData.end_time}` : null;
       }
-      const response = await fetch("/api/empcrm/leaves", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-      const data = await response.json();
-      if (data.success) {
-        alert("Leave application submitted successfully");
-        setShowApplicationForm(false);
-        setFormData({
-          leave_type: "",
-          from_date: "",
-          to_date: "",
-          reason: "",
-          is_half_day: false,
-          half_day_type: "1st_half",
-          has_time_range: false,
-          start_time: "",
-          end_time: "",
+
+      // Handle file upload separately
+      if (formData.attachmentFile) {
+        const formDataWithFile = new FormData();
+        Object.keys(payload).forEach(key => {
+          formDataWithFile.append(key, payload[key]);
         });
-        fetchLeaves();
-        fetchStats();
+        formDataWithFile.append("attachment", formData.attachmentFile);
+
+        const response = await fetch("/api/empcrm/leaves", {
+          method: "POST",
+          body: formDataWithFile
+        });
+        const data = await response.json();
+        if (data.success) {
+          alert("Leave application submitted successfully");
+          setShowApplicationForm(false);
+          setFormData({
+            leave_type: "",
+            from_date: "",
+            to_date: "",
+            reason: "",
+            is_half_day: false,
+            half_day_type: "1st_half",
+            has_time_range: false,
+            start_time: "",
+            end_time: "",
+            attachment: null,
+            attachmentFile: null
+          });
+          fetchLeaves();
+          fetchStats();
+        } else {
+          alert(data.error || "Failed to submit leave application");
+        }
       } else {
-        alert(data.error || "Failed to submit leave application");
+        const response = await fetch("/api/empcrm/leaves", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        const data = await response.json();
+        if (data.success) {
+          alert("Leave application submitted successfully");
+          setShowApplicationForm(false);
+          setFormData({
+            leave_type: "",
+            from_date: "",
+            to_date: "",
+            reason: "",
+            is_half_day: false,
+            half_day_type: "1st_half",
+            has_time_range: false,
+            start_time: "",
+            end_time: "",
+            attachment: null,
+            attachmentFile: null
+          });
+          fetchLeaves();
+          fetchStats();
+        } else {
+          alert(data.error || "Failed to submit leave application");
+        }
       }
     } catch (error) {
       console.error("Error submitting leave:", error);
@@ -502,20 +556,20 @@ export default function UserLeaveManagement() {
 
       {/* Full-Day Leave Application Modal */}
       {showApplicationForm && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full">
-            <div className="p-6 border-b border-gray-200">
-              <h2 className="text-2xl font-bold text-gray-800">Apply for Leave</h2>
+        <div className="fixed inset-0 flex items-center sm:items-center justify-center z-50 p-2 sm:p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[92vh] flex flex-col overflow-hidden">
+            <div className="p-4 sm:p-6 border-b border-gray-200 flex-shrink-0">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-800">Apply for Leave</h2>
             </div>
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+            <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 sm:space-y-5 overflow-y-auto">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
                   Leave Type <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={formData.leave_type}
                   onChange={(e) => setFormData({ ...formData, leave_type: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 sm:px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   required
                 >
                   {leaveTypeOptions}
@@ -523,10 +577,10 @@ export default function UserLeaveManagement() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
                   Duration <span className="text-red-500">*</span>
                 </label>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-2 sm:gap-3">
                   <button
                     type="button"
                     onClick={() =>
@@ -536,7 +590,7 @@ export default function UserLeaveManagement() {
                         to_date: formData.is_half_day ? "" : formData.to_date,
                       })
                     }
-                    className={`px-4 py-2 rounded-lg border text-sm font-medium transition-colors ${
+                    className={`px-2 sm:px-4 py-2 rounded-lg border text-xs sm:text-sm font-medium transition-colors ${
                       !formData.is_half_day
                         ? "bg-blue-600 text-white border-blue-600"
                         : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
@@ -553,7 +607,7 @@ export default function UserLeaveManagement() {
                         to_date: formData.from_date,
                       })
                     }
-                    className={`px-4 py-2 rounded-lg border text-sm font-medium transition-colors ${
+                    className={`px-2 sm:px-4 py-2 rounded-lg border text-xs sm:text-sm font-medium transition-colors ${
                       formData.is_half_day
                         ? "bg-orange-600 text-white border-orange-600"
                         : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
@@ -566,14 +620,14 @@ export default function UserLeaveManagement() {
 
               {formData.is_half_day && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
                     Half-Day Session <span className="text-red-500">*</span>
                   </label>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
                     <button
                       type="button"
                       onClick={() => setFormData({ ...formData, half_day_type: "1st_half" })}
-                      className={`px-4 py-2 rounded-lg border text-sm font-medium transition-colors ${
+                      className={`px-2 sm:px-4 py-2 rounded-lg border text-xs sm:text-sm font-medium transition-colors ${
                         formData.half_day_type === "1st_half"
                           ? "bg-orange-100 text-orange-800 border-orange-300"
                           : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
@@ -584,7 +638,7 @@ export default function UserLeaveManagement() {
                     <button
                       type="button"
                       onClick={() => setFormData({ ...formData, half_day_type: "2nd_half" })}
-                      className={`px-4 py-2 rounded-lg border text-sm font-medium transition-colors ${
+                      className={`px-2 sm:px-4 py-2 rounded-lg border text-xs sm:text-sm font-medium transition-colors ${
                         formData.half_day_type === "2nd_half"
                           ? "bg-orange-100 text-orange-800 border-orange-300"
                           : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
@@ -596,9 +650,9 @@ export default function UserLeaveManagement() {
                 </div>
               )}
 
-              <div className={formData.is_half_day ? "" : "grid grid-cols-2 gap-4"}>
+              <div className={formData.is_half_day ? "" : "grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4"}>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
                     {formData.is_half_day ? "Date" : "From Date"} <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -611,13 +665,13 @@ export default function UserLeaveManagement() {
                         to_date: formData.is_half_day ? e.target.value : formData.to_date,
                       })
                     }
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 sm:px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     required
                   />
                 </div>
                 {!formData.is_half_day && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
                       To Date <span className="text-red-500">*</span>
                     </label>
                     <input
@@ -625,7 +679,7 @@ export default function UserLeaveManagement() {
                       value={formData.to_date}
                       onChange={(e) => setFormData({ ...formData, to_date: e.target.value })}
                       min={formData.from_date}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-3 sm:px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       required
                     />
                   </div>
@@ -633,13 +687,13 @@ export default function UserLeaveManagement() {
               </div>
 
               {/* Time Range Toggle + Start/End Time */}
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 sm:p-4 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0">
+                  <div className="pr-0 sm:pr-4">
                     <p className="text-sm font-semibold text-gray-800">Specify Start & End Time</p>
                     <p className="text-xs text-gray-500">Turn on if leave duration is within a specific window of the day</p>
                   </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
+                  <label className="relative inline-flex items-center cursor-pointer self-start sm:self-auto flex-shrink-0">
                     <input
                       type="checkbox"
                       checked={formData.has_time_range}
@@ -657,28 +711,28 @@ export default function UserLeaveManagement() {
                 </div>
 
                 {formData.has_time_range && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 pt-1">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
                         From Date — Start Time <span className="text-red-500">*</span>
                       </label>
                       <input
                         type="time"
                         value={formData.start_time}
                         onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full px-3 sm:px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         required
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
                         To Date — End Time <span className="text-red-500">*</span>
                       </label>
                       <input
                         type="time"
                         value={formData.end_time}
                         onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full px-3 sm:px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         required
                       />
                     </div>
@@ -688,7 +742,7 @@ export default function UserLeaveManagement() {
 
               {totalDays > 0 && (
                 <div className={`border rounded-lg p-3 ${formData.is_half_day ? "bg-orange-50 border-orange-200" : "bg-blue-50 border-blue-200"}`}>
-                  <p className={`text-sm ${formData.is_half_day ? "text-orange-800" : "text-blue-800"}`}>
+                  <p className={`text-xs sm:text-sm ${formData.is_half_day ? "text-orange-800" : "text-blue-800"}`}>
                     Total Leave Days:{" "}
                     <span className="font-bold">
                       {formData.is_half_day ? "0.5 day (Half-Day)" : `${totalDays} days`}
@@ -697,38 +751,109 @@ export default function UserLeaveManagement() {
                 </div>
               )}
 
+              {/* Sick Leave Notice and Attachment */}
+              {formData.leave_type === "sick" && (
+                <div className="bg-blue-50 border border-blue-300 rounded-lg p-3 sm:p-4 space-y-3 sm:space-y-4">
+                  <div className="space-y-2">
+                    <div className="flex items-start gap-2">
+                      <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                      <div className="text-xs sm:text-sm text-blue-800">
+                        <p className="font-semibold mb-1">Sick Leave Guidelines:</p>
+                        <ul className="list-disc list-inside space-y-1 ml-0 sm:ml-2">
+                          <li className="break-words">Sick Leave is applicable on hospitalisation or as per doctor prescription with test report.</li>
+                          <li>Doctor prescription/test report is required.</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
+                      Upload Doctor Prescription / Test Report <span className="text-red-500">*</span>
+                    </label>
+                    <p className="text-xs text-gray-600 mb-2">Accepted formats: PDF, JPG, PNG (Max 5MB)</p>
+                    <div className="flex items-center justify-center w-full">
+                      <label className="flex flex-col items-center justify-center w-full h-28 sm:h-32 border-2 border-blue-300 border-dashed rounded-lg cursor-pointer bg-blue-50 hover:bg-blue-100 transition-colors">
+                        <div className="flex flex-col items-center justify-center p-3 sm:pt-5 sm:pb-6">
+                          {formData.attachment ? (
+                            <>
+                              <p className="text-xs sm:text-sm font-medium text-blue-800 text-center break-all line-clamp-2">
+                                ✓ File selected: {formData.attachment}
+                              </p>
+                              <p className="text-xs text-blue-600 mt-1">Click to change file</p>
+                            </>
+                          ) : (
+                            <>
+                              <svg className="w-7 h-7 sm:w-8 sm:h-8 text-blue-500 mb-1 sm:mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3v-6" />
+                              </svg>
+                              <p className="mb-1 sm:mb-2 text-xs sm:text-sm text-blue-700 text-center">
+                                <span className="font-semibold">Click to upload</span>
+                                <span className="hidden sm:inline"> or drag and drop</span>
+                              </p>
+                              <p className="text-[10px] sm:text-xs text-blue-600 text-center">PDF, JPG, PNG up to 5MB</p>
+                            </>
+                          )}
+                        </div>
+                        <input 
+                          type="file" 
+                          className="hidden" 
+                          accept=".pdf,.jpg,.jpeg,.png"
+                          onChange={(e) => {
+                            if (e.target.files && e.target.files[0]) {
+                              const file = e.target.files[0];
+                              if (file.size > 5 * 1024 * 1024) {
+                                alert("File size must be less than 5MB");
+                                return;
+                              }
+                              setFormData({ 
+                                ...formData, 
+                                attachment: file.name,
+                                attachmentFile: file
+                              });
+                            }
+                          }}
+                        />
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
                   Reason <span className="text-red-500">*</span>
                 </label>
                 <textarea
                   value={formData.reason}
                   onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
                   placeholder="Enter reason for leave..."
-                  rows={4}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  rows={3}
+                  className="w-full px-3 sm:px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   required
                 />
               </div>
 
-              <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+              <div className="flex flex-col sm:flex-row sm:justify-end gap-2 sm:gap-3 pt-3 sm:pt-4 border-t border-gray-200 flex-shrink-0">
                 <button
                   type="button"
                   onClick={() => {
                     setShowApplicationForm(false);
                     setFormData({
-          leave_type: "",
-          from_date: "",
-          to_date: "",
-          reason: "",
-          is_half_day: false,
-          half_day_type: "1st_half",
-          has_time_range: false,
-          start_time: "",
-          end_time: "",
-        });
+                      leave_type: "",
+                      from_date: "",
+                      to_date: "",
+                      reason: "",
+                      is_half_day: false,
+                      half_day_type: "1st_half",
+                      has_time_range: false,
+                      start_time: "",
+                      end_time: "",
+                      attachment: null,
+                      attachmentFile: null
+                    });
                   }}
-                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                  className="w-full sm:w-auto px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-medium"
                   disabled={submitting}
                 >
                   Cancel
@@ -736,7 +861,7 @@ export default function UserLeaveManagement() {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                  className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-medium"
                 >
                   {submitting ? "Submitting..." : "Submit Application"}
                 </button>

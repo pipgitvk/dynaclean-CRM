@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { getReportees } from "@/lib/reportingManager";
+import { writeFile, mkdir } from "fs/promises";
+import path from "path";
 
 // GET: Fetch leaves (admin sees all, users see only their own, reporting manager sees reportees only)
 export async function GET(request) {
@@ -133,8 +135,26 @@ export async function POST(request) {
       );
     }
 
-    const body = await request.json();
-    let { leave_type, from_date, to_date, reason, is_half_day, half_day_type, has_time_range, start_time, end_time, start_date_time, end_date_time } = body;
+    // Handle both JSON and FormData (for file uploads)
+    let body = {};
+    const contentType = request.headers.get('content-type') || '';
+    
+    if (contentType.includes('application/json')) {
+      body = await request.json();
+    } else if (contentType.includes('multipart/form-data')) {
+      const formData = await request.formData();
+      for (const [key, value] of formData.entries()) {
+        if (key === 'attachment' && value instanceof File) {
+          body[key] = value;
+        } else {
+          body[key] = value;
+        }
+      }
+    } else {
+      body = await request.json();
+    }
+
+    let { leave_type, from_date, to_date, reason, is_half_day, half_day_type, has_time_range, start_time, end_time, start_date_time, end_date_time, attachment } = body;
 
     // If combined datetime strings provided (e.g. "2026-09-10T14:30"), prefer them.
     // Unambiguous: time + date together. Extract date & time parts for DB columns.
@@ -159,6 +179,14 @@ export async function POST(request) {
     if (!leave_type || !from_date || !to_date || !reason) {
       return NextResponse.json(
         { success: false, error: "All fields are required" },
+        { status: 400 }
+      );
+    }
+
+    // Validate attachment for sick leave
+    if (leave_type === 'sick' && !attachment) {
+      return NextResponse.json(
+        { success: false, error: "Doctor prescription/test report is required for Sick Leave" },
         { status: 400 }
       );
     }
@@ -512,10 +540,41 @@ export async function POST(request) {
     const finalLeaveType = leave_type;
     const finalStartTime = has_time_range ? start_time : null;
     const finalEndTime = has_time_range ? end_time : null;
+
+    // Handle file attachment upload
+    let attachmentPath = null;
+    let attachmentFilename = null;
+    let attachmentMimeType = null;
+
+    if (attachment && attachment instanceof File) {
+      try {
+        const uploadDir = path.join(process.cwd(), 'public', 'empcrm', 'sick-leave-attachments', session.username);
+        await mkdir(uploadDir, { recursive: true });
+
+        const ext = path.extname(attachment.name);
+        const timestamp = Date.now();
+        const filename = `prescription_${timestamp}${ext}`;
+        const filepath = path.join(uploadDir, filename);
+
+        const buffer = await attachment.arrayBuffer();
+        await writeFile(filepath, Buffer.from(buffer));
+
+        attachmentPath = `/empcrm/sick-leave-attachments/${session.username}/${filename}`;
+        attachmentFilename = attachment.name;
+        attachmentMimeType = attachment.type;
+      } catch (uploadError) {
+        console.error("Error uploading attachment:", uploadError);
+        return NextResponse.json(
+          { success: false, error: "Failed to upload attachment" },
+          { status: 400 }
+        );
+      }
+    }
+
     const [result] = await conn.execute(
       `INSERT INTO employee_leaves 
-       (username, empId, full_name, leave_type, from_date, to_date, start_time, end_time, total_days, is_half_day, half_day_type, reason, created_by) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (username, empId, full_name, leave_type, from_date, to_date, start_time, end_time, total_days, is_half_day, half_day_type, reason, created_by, attachment_path, attachment_filename, attachment_mime_type, attachment_uploaded_at) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
       [
         session.username,
         empId,
@@ -529,7 +588,10 @@ export async function POST(request) {
         isHalfDay ? 1 : 0,
         isHalfDay ? resolvedHalfDayType : null,
         reason,
-        session.username
+        session.username,
+        attachmentPath,
+        attachmentFilename,
+        attachmentMimeType
       ]
     );
 
