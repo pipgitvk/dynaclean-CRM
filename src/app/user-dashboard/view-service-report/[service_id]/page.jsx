@@ -176,6 +176,7 @@ export default function ViewServiceReport({ params }) {
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [printMode, setPrintMode] = useState("withImages");
   const [isPrinting, setIsPrinting] = useState(false);
+  const [downloadMode, setDownloadMode] = useState(null); // "download" or "print"
   const autoPrintTriggered = useRef(false);
 
   const { service_id } = React.use(params);
@@ -340,8 +341,16 @@ export default function ViewServiceReport({ params }) {
     setShowPrintModal(true);
   };
 
-  const confirmPrint = () => {
-    handlePrint(printMode === "withImages");
+  const confirmPrint = async () => {
+    if (downloadMode === "download") {
+      // Download mode
+      setShowPrintModal(false);
+      await handleDownloadPDF();
+    } else {
+      // Print mode
+      handlePrint(printMode === "withImages");
+    }
+    setDownloadMode(null);
   };
 
   const handleImagesUpdated = (pre, after) => {
@@ -387,6 +396,41 @@ export default function ViewServiceReport({ params }) {
     if (!report || !product) return;
 
     setIsGeneratingPDF(true);
+    
+    const normalizeAttachmentPath = (filePath) => {
+      if (!filePath) return "";
+      let path = String(filePath).trim();
+      if (path.startsWith("http")) {
+        try {
+          path = new URL(path).pathname;
+        } catch {
+          // keep original path
+        }
+      }
+      path = path.replace(/^\/public\//, "/").replace(/^public\//, "");
+      if (!path.startsWith("/")) path = `/${path}`;
+      if (!path.includes("/completion_files/") && !path.includes("/attachments/")) {
+        const cleanPath = path.replace(/^\/+/, "");
+        path = `/completion_files/${cleanPath}`;
+      }
+      return path;
+    };
+
+    const resolveAttachmentUrl = async (filePath) => {
+      const pathOnly = normalizeAttachmentPath(filePath);
+      const fallback = `https://service.dynacleanindustries.com${pathOnly}`;
+      try {
+        const res = await fetch(
+          `/api/resolve-attachment?path=${encodeURIComponent(pathOnly)}`,
+          { cache: "no-store" }
+        );
+        const data = await res.json();
+        return data?.url || fallback;
+      } catch {
+        return fallback;
+      }
+    };
+
     try {
       // Resolve filenames for signatures (works for filename, path, or full URL)
       const engineerFilename = getFilename(report.authorised_person_sign);
@@ -496,13 +540,184 @@ export default function ViewServiceReport({ params }) {
         service_rate: report.service_rate,
       });
 
-      const pdf = await generateServiceReportPDF(
+      let pdf = await generateServiceReportPDF(
         pdfData,
         productData,
         installData,
         trainees,
         { isInstallationLayout: pdfInstallationLayout }
       );
+
+      // Add images if "with images" mode is selected
+      if (printMode === "withImages" && hasPhotos) {
+        const preImages = parseImageList(report?.pre_completion);
+        const postImages = parseImageList(report?.after_completion);
+        
+        console.log("📸 Image data:", { preImages, postImages, hasPhotos });
+
+        // Add photos page
+        if (preImages.length > 0 || postImages.length > 0) {
+          pdf.addPage();
+          
+          // Title for photos
+          const pageWidth = pdf.internal.pageSize.getWidth();
+          pdf.setFontSize(16);
+          pdf.text("SERVICE PHOTOS", pageWidth / 2, 15, { align: "center" });
+          
+          pdf.setFontSize(10);
+          pdf.text(`Service ID: ${report.service_id} | Serial: ${report.serial_number || "-"}`, pageWidth / 2, 22, { align: "center" });
+          
+          let yPosition = 30;
+          
+          // Pre-completion photos
+          if (preImages.length > 0) {
+            pdf.setFontSize(12);
+            pdf.setFont(undefined, "bold");
+            pdf.text("Pre-Completion Photos", 10, yPosition);
+            yPosition += 8;
+            
+            for (let i = 0; i < preImages.length; i++) {
+              const imgPath = preImages[i];
+              console.log(`Processing pre-image ${i}:`, imgPath);
+              
+              try {
+                // Use API proxy instead of direct URL
+                const response = await fetch(`/api/image-proxy?url=${encodeURIComponent(imgPath)}`);
+                if (!response.ok) {
+                  console.warn(`Failed to fetch image ${i} via proxy:`, response.status);
+                  continue;
+                }
+                
+                const blob = await response.blob();
+                console.log(`Fetched blob for image ${i}, size:`, blob.size);
+                
+                const reader = new FileReader();
+                
+                await new Promise((resolve) => {
+                  reader.onload = () => {
+                    try {
+                      const imgData = reader.result;
+                      const img = new Image();
+                      img.onload = () => {
+                        try {
+                          const imgWidth = 70;
+                          const imgHeight = (img.height * imgWidth) / img.width;
+                          
+                          console.log(`Image ${i} loaded, size: ${imgWidth}x${imgHeight}`);
+                          
+                          // Check if we need a new page
+                          if (yPosition + imgHeight > 270) {
+                            pdf.addPage();
+                            yPosition = 10;
+                          }
+                          
+                          pdf.addImage(imgData, "JPEG", 10, yPosition, imgWidth, imgHeight);
+                          yPosition += imgHeight + 5;
+                          resolve();
+                        } catch (e) {
+                          console.error("Error adding image to PDF:", e);
+                          resolve();
+                        }
+                      };
+                      img.onerror = () => {
+                        console.error("Failed to decode image");
+                        resolve();
+                      };
+                      img.src = imgData;
+                    } catch (e) {
+                      console.error("Error processing image data:", e);
+                      resolve();
+                    }
+                  };
+                  reader.onerror = () => {
+                    console.error("FileReader error");
+                    resolve();
+                  };
+                  reader.readAsDataURL(blob);
+                });
+              } catch (e) {
+                console.error(`Error processing pre-completion image ${i}:`, e);
+              }
+            }
+          }
+          
+          // Add space before post-completion
+          yPosition += 10;
+          
+          // Post-completion photos
+          if (postImages.length > 0) {
+            pdf.setFontSize(12);
+            pdf.setFont(undefined, "bold");
+            pdf.text("Post-Completion Photos", 10, yPosition);
+            yPosition += 8;
+            
+            for (let i = 0; i < postImages.length; i++) {
+              const imgPath = postImages[i];
+              console.log(`Processing post-image ${i}:`, imgPath);
+              
+              try {
+                // Use API proxy instead of direct URL
+                const response = await fetch(`/api/image-proxy?url=${encodeURIComponent(imgPath)}`);
+                if (!response.ok) {
+                  console.warn(`Failed to fetch image ${i} via proxy:`, response.status);
+                  continue;
+                }
+                
+                const blob = await response.blob();
+                console.log(`Fetched blob for image ${i}, size:`, blob.size);
+                
+                const reader = new FileReader();
+                
+                await new Promise((resolve) => {
+                  reader.onload = () => {
+                    try {
+                      const imgData = reader.result;
+                      const img = new Image();
+                      img.onload = () => {
+                        try {
+                          const imgWidth = 70;
+                          const imgHeight = (img.height * imgWidth) / img.width;
+                          
+                          console.log(`Image ${i} loaded, size: ${imgWidth}x${imgHeight}`);
+                          
+                          // Check if we need a new page
+                          if (yPosition + imgHeight > 270) {
+                            pdf.addPage();
+                            yPosition = 10;
+                          }
+                          
+                          pdf.addImage(imgData, "JPEG", 10, yPosition, imgWidth, imgHeight);
+                          yPosition += imgHeight + 5;
+                          resolve();
+                        } catch (e) {
+                          console.error("Error adding image to PDF:", e);
+                          resolve();
+                        }
+                      };
+                      img.onerror = () => {
+                        console.error("Failed to decode image");
+                        resolve();
+                      };
+                      img.src = imgData;
+                    } catch (e) {
+                      console.error("Error processing image data:", e);
+                      resolve();
+                    }
+                  };
+                  reader.onerror = () => {
+                    console.error("FileReader error");
+                    resolve();
+                  };
+                  reader.readAsDataURL(blob);
+                });
+              } catch (e) {
+                console.error(`Error processing post-completion image ${i}:`, e);
+              }
+            }
+          }
+        }
+      }
+
       const filename = pdfInstallationLayout
         ? `Installation_Report_${report.service_id}_${dayjs().format("YYYY-MM-DD")}.pdf`
         : `Service_Report_${report.service_id}_${dayjs().format("YYYY-MM-DD")}.pdf`;
@@ -1091,15 +1306,24 @@ export default function ViewServiceReport({ params }) {
         <div className="flex flex-col sm:flex-row gap-4 justify-center sm:justify-end mt-8 no-print">
           <button
             type="button"
-            onClick={openPrintModal}
+            onClick={() => {
+              setDownloadMode("print");
+              setPrintMode(hasPhotos ? "withImages" : "reportOnly");
+              setShowPrintModal(true);
+            }}
             disabled={isPrinting}
             className="w-full sm:w-auto px-6 py-3 bg-blue-600 text-white font-semibold rounded-md shadow-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-150 ease-in-out disabled:bg-gray-400 disabled:cursor-not-allowed"
           >
             {isPrinting ? "Preparing Print..." : "Print Report"}
           </button>
+        
           <button
             type="button"
-            onClick={handleDownloadPDF}
+            onClick={() => {
+              setDownloadMode("download");
+              setPrintMode(hasPhotos ? "withImages" : "reportOnly");
+              setShowPrintModal(true);
+            }}
             disabled={isGeneratingPDF}
             className="w-full sm:w-auto px-6 py-3 bg-green-600 text-white font-semibold rounded-md shadow-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition duration-150 ease-in-out disabled:bg-gray-400 disabled:cursor-not-allowed"
           >
@@ -1109,12 +1333,15 @@ export default function ViewServiceReport({ params }) {
 
         <ServiceReportPrintModal
           isOpen={showPrintModal}
-          onClose={() => setShowPrintModal(false)}
+          onClose={() => {
+            setShowPrintModal(false);
+            setDownloadMode(null);
+          }}
           printMode={printMode}
           setPrintMode={setPrintMode}
           hasPhotos={hasPhotos}
           onConfirm={confirmPrint}
-          isPrinting={isPrinting}
+          isPrinting={isPrinting || isGeneratingPDF}
           reportId={report?.report_db_id || reportId}
           reportDate={
             report?.completed_date
@@ -1125,6 +1352,8 @@ export default function ViewServiceReport({ params }) {
           preCompletion={report?.pre_completion}
           afterCompletion={report?.after_completion}
           onImagesUpdated={handleImagesUpdated}
+          downloadMode={downloadMode}
+          isGeneratingPDF={isGeneratingPDF}
         />
       </div>
     </div>
