@@ -118,7 +118,7 @@ export default function EmployeeCardsClient({ employees }) {
         {filteredEmployees.map((emp) => (
           <Link
                     key={emp.username}
-                    href={`/accounts-dashboard/all-expenses?username=${encodeURIComponent(emp.username)}`}
+                    href={`/admin-dashboard/all-expenses?username=${encodeURIComponent(emp.username)}`}
                     className="group relative flex flex-col bg-white rounded-2xl border border-gray-200 p-5 shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-1"
                   >
             <div className="flex items-start justify-between mb-4">
