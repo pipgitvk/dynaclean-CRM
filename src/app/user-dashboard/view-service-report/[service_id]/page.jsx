@@ -1304,6 +1304,8 @@ export default function ViewServiceReport({ params }) {
 
         {/* Print and Download Buttons */}
         <div className="flex flex-col sm:flex-row gap-4 justify-center sm:justify-end mt-8 no-print">
+          {/* Print Report button - commented out */}
+          {/* 
           <button
             type="button"
             onClick={() => {
@@ -1316,6 +1318,7 @@ export default function ViewServiceReport({ params }) {
           >
             {isPrinting ? "Preparing Print..." : "Print Report"}
           </button>
+          */}
         
           <button
             type="button"
