@@ -37,6 +37,7 @@ export const HR_TARGET_ALLOWED_DESIGNATIONS = [
   "Field Sales and Service Executive",
   "Graphic Designer",
   "Machine Operator",
+  "Business Development Officer",
 ];
 
 /**
