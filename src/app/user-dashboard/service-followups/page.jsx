@@ -80,6 +80,8 @@ export default function ServiceFollowupsPage() {
     notes: "",
     next_followup_date: "",
     image: null,
+    contact_mode: "",
+    purpose: "",
   });
   const [addSerialSearch, setAddSerialSearch] = useState("");
   const [addSuggestions, setAddSuggestions] = useState([]);
@@ -122,6 +124,8 @@ export default function ServiceFollowupsPage() {
       notes: "",
       next_followup_date: "",
       image: null,
+      contact_mode: "",
+      purpose: "",
     });
     setAddSerialSearch("");
     setAddModalOpen(true);
@@ -137,6 +141,8 @@ export default function ServiceFollowupsPage() {
     fd.append("product_model", addForm.product_model);
     fd.append("contact", addForm.contact);
     fd.append("followed_at", addForm.followed_at);
+    fd.append("contact_mode", addForm.contact_mode);
+    fd.append("purpose", addForm.purpose);
     fd.append("notes", addForm.notes);
     fd.append("next_followup_date", addForm.next_followup_date);
     if (addForm.image) fd.append("image", addForm.image);
@@ -369,6 +375,41 @@ export default function ServiceFollowupsPage() {
                   onChange={(e) => setAddForm((p) => ({ ...p, followed_at: e.target.value }))}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Contact Mode *</label>
+                <select
+                  value={addForm.contact_mode}
+                  onChange={(e) => setAddForm((p) => ({ ...p, contact_mode: e.target.value }))}
+                  required
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Select contact mode...</option>
+                  <option value="Call">Call</option>
+                  <option value="Email">Email</option>
+                  <option value="WhatsApp">WhatsApp</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Purpose *</label>
+                <select
+                  value={addForm.purpose}
+                  onChange={(e) => setAddForm((p) => ({ ...p, purpose: e.target.value }))}
+                  required
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Select purpose...</option>
+                  <option value="Feedback">Feedback</option>
+                  <option value="Service">Service</option>
+                  <option value="Complaint">Complaint</option>
+                  <option value="Installation">Installation</option>
+                  <option value="Preventive Maintenance">Preventive Maintenance</option>
+                  <option value="AMC">AMC</option>
+                  <option value="Spare Parts">Spare Parts</option>
+                  <option value="Consumables">Consumables</option>
+                </select>
               </div>
 
               <div>
