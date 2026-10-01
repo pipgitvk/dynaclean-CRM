@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 
+const cleanValue = (v) => (v === undefined ? null : v);
+
 // GET - Fetch all incoming shipments
 export async function GET(req) {
   try {
@@ -67,7 +69,7 @@ export async function POST(req) {
         expected_arrival_date || null,
         status || 'Order Preparing',
         notes || null,
-        payload.username || 'Unknown'
+        cleanValue(payload.username) || 'Unknown'
       ]
     );
 

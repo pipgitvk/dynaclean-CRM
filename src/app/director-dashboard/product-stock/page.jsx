@@ -673,13 +673,15 @@ function ProductStockList() {
                   <th className="px-5 py-2 text-left font-semibold">Pre-booked</th>
                   <th className="px-5 py-2 text-left font-semibold">Net Qty</th>
                   <th className="px-5 py-2 text-left font-semibold">Status</th>
+                  <th className="px-5 py-2 text-left font-semibold">Incoming Qty</th>
+                  <th className="px-5 py-2 text-left font-semibold">Expected Date</th>
                   <th className="px-5 py-2 text-left font-semibold">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {allLowStockItems.length === 0 ? (
                   <tr>
-                    <td colSpan="11" className="px-5 py-8 text-center text-gray-500">
+                    <td colSpan="13" className="px-5 py-8 text-center text-gray-500">
                       No low stock products found
                     </td>
                   </tr>
@@ -707,9 +709,43 @@ function ProductStockList() {
                         <td className="px-5 py-3 font-semibold text-orange-600">{getPreBookedQuantity(p.item_name)}</td>
                         <td className="px-5 py-3 font-semibold text-green-600">{totalQty - getPreBookedQuantity(p.item_name)}</td>
                         <td className="px-5 py-3">
-                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${isZero ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}`}>
-                            {isZero ? "Zero Stock" : "Low Stock"}
-                          </span>
+                          {p.latest_shipment_status ? (
+                            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                              p.latest_shipment_status === 'In Transit' 
+                                ? 'bg-blue-100 text-blue-700'
+                                : p.latest_shipment_status === 'Out for Delivery'
+                                ? 'bg-green-100 text-green-700'
+                                : 'bg-gray-100 text-gray-700'
+                            }`}>
+                              {p.latest_shipment_status}
+                            </span>
+                          ) : (
+                            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${isZero ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}`}>
+                              {isZero ? "Zero Stock" : "Low Stock"}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-5 py-3">
+                          {p.latest_shipment_qty ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold text-white bg-blue-500">
+                              {p.latest_shipment_qty}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400">—</span>
+                          )}
+                        </td>
+                        <td className="px-5 py-3 text-gray-600">
+                          {p.latest_shipment_expected_date ? (
+                            <span className="text-xs">
+                              {new Date(p.latest_shipment_expected_date).toLocaleDateString('en-IN', {
+                                day: '2-digit',
+                                month: 'short',
+                                year: 'numeric'
+                              })}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400">—</span>
+                          )}
                         </td>
                         <td className="px-5 py-3 whitespace-nowrap">
                           <div className="flex items-center gap-2">

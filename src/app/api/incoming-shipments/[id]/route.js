@@ -2,15 +2,18 @@ import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 
+const cleanValue = (v) => (v === undefined ? null : v);
+
 // GET - Fetch a single shipment
-export async function GET(req, { params }) {
+export async function GET(req, context) {
   try {
     const payload = await getSessionPayload();
     if (!payload) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { id } = params;
+    const { params } = await context;
+    const { id } = await params;
     const conn = await getDbConnection();
 
     const [shipment] = await conn.execute(
@@ -30,14 +33,15 @@ export async function GET(req, { params }) {
 }
 
 // PATCH - Update a shipment
-export async function PATCH(req, { params }) {
+export async function PATCH(req, context) {
   try {
     const payload = await getSessionPayload();
     if (!payload) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { id } = params;
+    const { params } = await context;
+    const { id } = await params;
     const updates = await req.json();
 
     // Validate at least one update field
@@ -75,7 +79,7 @@ export async function PATCH(req, { params }) {
     for (const [key, value] of Object.entries(updates)) {
       if (allowedFields.includes(key)) {
         updateFields.push(`${key} = ?`);
-        updateValues.push(value);
+        updateValues.push(cleanValue(value));
       }
     }
 
@@ -83,7 +87,7 @@ export async function PATCH(req, { params }) {
       return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
     }
 
-    updateValues.push(payload.username || 'Unknown');
+    updateValues.push(cleanValue(payload.username) || 'Unknown');
     updateValues.push(id);
 
     const query = `UPDATE incoming_shipments SET ${updateFields.join(', ')}, updated_by = ?, updated_at = NOW() WHERE id = ?`;
@@ -102,14 +106,15 @@ export async function PATCH(req, { params }) {
 }
 
 // DELETE - Delete a shipment
-export async function DELETE(req, { params }) {
+export async function DELETE(req, context) {
   try {
     const payload = await getSessionPayload();
     if (!payload) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { id } = params;
+    const { params } = await context;
+    const { id } = await params;
     const conn = await getDbConnection();
 
     // Check if shipment exists
