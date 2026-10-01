@@ -161,7 +161,7 @@ export default function ServiceTable({ serviceRecords, role }) {
         )}
       <Link
         href={
-          dashboardPath === "admin-dashboard" &&
+          (dashboardPath === "admin-dashboard" || dashboardPath === "user-dashboard") &&
           String(record.service_type || "").trim().toUpperCase() === "COMPLAINT"
             ? `/${dashboardPath}/service-report-steps/${record.service_id}`
             : `/${dashboardPath}/complete-service/${record.service_id}`
