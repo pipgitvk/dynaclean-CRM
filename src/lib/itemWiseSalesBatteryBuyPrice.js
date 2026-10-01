@@ -27,11 +27,10 @@ function toMoney(value) {
 }
 
 /**
- * Final unit buy price for one machine line.
- * Only battery accessories with package_status "added" are included.
+ * Battery buy amount added for one machine when package_status is "added".
+ * Available batteries contribute 0.
  */
-export function finalMachineBuyPrice(machineBuyPrice, accessories, priceBySpareKey) {
-  const base = toMoney(machineBuyPrice);
+export function batteryAddedAmount(accessories, priceBySpareKey) {
   const seen = new Set();
   let extra = 0;
 
@@ -54,7 +53,12 @@ export function finalMachineBuyPrice(machineBuyPrice, accessories, priceBySpareK
     extra += price * qty;
   }
 
-  return base + extra;
+  return extra;
+}
+
+/** Final unit buy price for one machine line. */
+export function finalMachineBuyPrice(machineBuyPrice, accessories, priceBySpareKey) {
+  return toMoney(machineBuyPrice) + batteryAddedAmount(accessories, priceBySpareKey);
 }
 
 export function rowMatchesBatterySpare(row, accessory) {

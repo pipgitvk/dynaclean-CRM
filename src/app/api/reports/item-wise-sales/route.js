@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { ensureProductAccessoriesColumns } from "@/lib/ensureProductAccessoriesColumns";
 import {
-  finalMachineBuyPrice,
+  batteryAddedAmount,
   isBatteryAccessory,
 } from "@/lib/itemWiseSalesBatteryBuyPrice";
 
@@ -78,12 +78,14 @@ export async function POST(req) {
 
         const conn = await getDbConnection();
         const [rows] = await conn.execute(sql, params);
-        const buyPriceByRow = await machineBuyPricesWithMandatoryBattery(conn, rows);
+        const pricingByRow = await machineBuyPricesWithMandatoryBattery(conn, rows);
 
         const processedRows = rows.map((row, index) => {
             const salePrice = parseFloat(row.sale_price_unit) || 0;
+            const pricing = pricingByRow[index];
             const purchasePrice =
-                buyPriceByRow[index] ?? (parseFloat(row.purchase_price_unit) || 0);
+                pricing?.buyPrice ?? (parseFloat(row.purchase_price_unit) || 0);
+            const batteryAmount = pricing?.batteryAmount || 0;
             const qty = parseInt(row.qty, 10) || 0;
             const taxPercent = parseFloat(row.tax_percent) || 0;
             const totalSale = salePrice * qty;
@@ -102,6 +104,7 @@ export async function POST(req) {
                 qty,
                 sale_price: salePrice,
                 purchase_price: purchasePrice,
+                battery_amount: batteryAmount,
                 tax,
                 profit_loss: profitLoss,
                 total_sale_amount: parseFloat(row.total_sale_amount) || totalSale,
@@ -146,7 +149,10 @@ async function queryIn(conn, sqlPrefix, values, sqlSuffix = "") {
  * package_status "available" is not added.
  */
 async function machineBuyPricesWithMandatoryBattery(conn, rows) {
-    const base = rows.map((row) => parseFloat(row.purchase_price_unit) || 0);
+    const base = rows.map((row) => ({
+        buyPrice: parseFloat(row.purchase_price_unit) || 0,
+        batteryAmount: 0,
+    }));
     if (!rows.length) return base;
 
     try {
@@ -243,14 +249,17 @@ async function machineBuyPricesWithMandatoryBattery(conn, rows) {
             return productByCode.get(code) || productByName.get(name) || productByName.get(code.toLowerCase()) || null;
         });
 
-        return base.map((machineBuyPrice, index) => {
+        return base.map((pricing, index) => {
             const productCode = productCodeForRow[index];
-            if (!productCode) return machineBuyPrice;
-            return finalMachineBuyPrice(
-                machineBuyPrice,
+            if (!productCode) return pricing;
+            const batteryAmount = batteryAddedAmount(
                 batteriesByProduct.get(productCode) || [],
                 priceBySpareKey,
             );
+            return {
+                buyPrice: pricing.buyPrice + batteryAmount,
+                batteryAmount,
+            };
         });
     } catch (error) {
         console.error("item-wise-sales battery buy price:", error);
