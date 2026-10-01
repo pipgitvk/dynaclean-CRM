@@ -367,21 +367,21 @@ export default function UserLeaveManagement() {
                   <div className="space-y-3">
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-gray-600">Allowed</span>
-                      <span className="text-lg font-bold text-gray-900">{leave.allowed} days</span>
+                      <span className="text-lg font-bold text-gray-900">{formatDays(leave.allowed)} days</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-gray-600 flex items-center gap-1">
                         <TrendingDown className="w-4 h-4 text-red-500" />
                         Taken
                       </span>
-                      <span className="text-lg font-bold text-red-600">{leave.taken} days</span>
+                      <span className="text-lg font-bold text-red-600">{formatDays(leave.taken)} days</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-gray-600 flex items-center gap-1">
                         <TrendingUp className="w-4 h-4 text-green-500" />
                         Available
                       </span>
-                      <span className="text-lg font-bold text-green-600">{leave.available} days</span>
+                      <span className="text-lg font-bold text-green-600">{formatDays(leave.available)} days</span>
                     </div>
                     {leave.pending > 0 && (
                       <div className="flex justify-between items-center pt-2 border-t border-gray-100">
@@ -389,7 +389,7 @@ export default function UserLeaveManagement() {
                           <Clock className="w-4 h-4" />
                           Pending
                         </span>
-                        <span className="text-sm font-semibold text-yellow-600">{leave.pending} days</span>
+                        <span className="text-sm font-semibold text-yellow-600">{formatDays(leave.pending)} days</span>
                       </div>
                     )}
                     <div className="pt-2">
@@ -422,7 +422,7 @@ export default function UserLeaveManagement() {
                 <p className="text-sm text-gray-600">No limit - always available</p>
                 <div className="flex justify-between items-center pt-2">
                   <span className="text-sm text-gray-600">Taken this year</span>
-                  <span className="text-lg font-bold text-gray-900">{stats.unpaidLeaves.taken} days</span>
+                  <span className="text-lg font-bold text-gray-900">{formatDays(stats.unpaidLeaves.taken)} days</span>
                 </div>
                 {stats.unpaidLeaves.pending > 0 && (
                   <div className="flex justify-between items-center pt-2 border-t border-gray-100">
@@ -430,7 +430,7 @@ export default function UserLeaveManagement() {
                       <Clock className="w-4 h-4" />
                       Pending
                     </span>
-                    <span className="text-sm font-semibold text-yellow-600">{stats.unpaidLeaves.pending} days</span>
+                    <span className="text-sm font-semibold text-yellow-600">{formatDays(stats.unpaidLeaves.pending)} days</span>
                   </div>
                 )}
               </div>

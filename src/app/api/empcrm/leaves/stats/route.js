@@ -103,13 +103,34 @@ export async function GET(request) {
       return Math.max(0, accrued);
     };
 
+    // 🛠️ BACKFILL: Fix corrupt legacy records (approval bug stored total_days=0 for half-day leaves)
+    // This permanently corrects DB rows so SUM(total_days) matches expected 0.5 per half-day record.
+    try {
+      const [fixedInfo] = await conn.execute(
+        `UPDATE employee_leaves 
+         SET total_days = 0.5 
+         WHERE username = ? 
+           AND is_half_day = 1 
+           AND (total_days = 0 OR total_days IS NULL OR total_days < 0)`,
+        [username]
+      );
+      if (fixedInfo.affectedRows > 0) {
+        console.log(`[stats-backfill] Fixed ${fixedInfo.affectedRows} corrupt half-day records (total_days=0) for user ${username}`);
+      }
+    } catch (bfErr) {
+      console.warn("[stats-backfill] Could not apply half-day total_days fix:", bfErr.message);
+    }
+
     // Fetch leave statistics for current year
     // is_half_day=0: full leaves grouped by leave_type
     // is_half_day=1: half-day leaves (any leave_type) grouped separately
-    const [stats] = await conn.execute(
+    // Note: total_days values are already backfilled above. As a display-level safety net,
+    // for every half-day row we still clamp per-day contribution to a minimum of 0.5.
+    const [rawStats] = await conn.execute(
       `SELECT 
         leave_type,
         is_half_day,
+        COUNT(*) AS row_count,
         SUM(CASE WHEN status = 'approved' THEN total_days ELSE 0 END) as taken,
         SUM(CASE WHEN status = 'pending' THEN total_days ELSE 0 END) as pending,
         SUM(CASE WHEN status = 'rejected' THEN total_days ELSE 0 END) as rejected
@@ -119,6 +140,21 @@ export async function GET(request) {
        GROUP BY leave_type, is_half_day`,
       [username]
     );
+
+    // 🔒 Display layer safety: half-day rows must contribute AT LEAST 0.5 per row per status,
+    // even if backfill UPDATE was blocked (permissions / read replica / etc.).
+    const stats = rawStats.map(s => {
+      const isHalf = s.is_half_day == 1;
+      if (!isHalf) return s;
+      const halfRowCount = Number(s.row_count || 0);
+      const minExpected = halfRowCount * 0.5;
+      return {
+        ...s,
+        taken:    Math.max(Number(s.taken    || 0), minExpected),
+        pending:  Math.max(Number(s.pending  || 0), minExpected),
+        rejected: Math.max(Number(s.rejected || 0), 0), // reject count = 0 if no rejected rows
+      };
+    });
 
     // Build leave summary — combine full-day (1 day each) + half-day (0.5 day each) leaves per type
     const leaveTypes = ['sick', 'paid', 'casual'];
@@ -142,7 +178,9 @@ export async function GET(request) {
       const taken    = typeRows.reduce((sum, s) => sum + Number(s.taken    || 0), 0);
       const pending  = typeRows.reduce((sum, s) => sum + Number(s.pending  || 0), 0);
       const rejected = typeRows.reduce((sum, s) => sum + Number(s.rejected || 0), 0);
-      const available = Math.max(0, accruedAllowed - taken);
+      // Allow negative available so user can see how far they've overdrawn (no Math.max(0,x))
+      const rawAvailable = accruedAllowed - taken;
+      const available = Number.isFinite(rawAvailable) ? Number(rawAvailable.toFixed(2)) : 0;
       
       // Disable paid and sick leave during probation
       const isDisabledDueToProbation = (type === 'paid' || type === 'sick') && profile.employment_status === 'probation';
@@ -173,9 +211,9 @@ export async function GET(request) {
     const halfDayLeaves = {
       type: 'half-day',
       enabled: true,
-      taken:   halfDayRows.reduce((sum, s) => sum + Number(s.taken),   0),
-      pending: halfDayRows.reduce((sum, s) => sum + Number(s.pending), 0),
-      rejected:halfDayRows.reduce((sum, s) => sum + Number(s.rejected),0),
+      taken:   halfDayRows.reduce((sum, s) => sum + Number(s.taken || 0),   0),
+      pending: halfDayRows.reduce((sum, s) => sum + Number(s.pending || 0), 0),
+      rejected:halfDayRows.reduce((sum, s) => sum + Number(s.rejected || 0),0),
     };
 
     return NextResponse.json({
@@ -185,8 +223,8 @@ export async function GET(request) {
       leaveSummary,
       unpaidLeaves,
       halfDayLeaves,
-      totalApprovedDays: stats.reduce((sum, s) => sum + (s.taken || 0), 0),
-      totalPendingDays: stats.reduce((sum, s) => sum + (s.pending || 0), 0)
+      totalApprovedDays: stats.reduce((sum, s) => sum + Number(s.taken || 0),   0),
+      totalPendingDays:  stats.reduce((sum, s) => sum + Number(s.pending || 0), 0)
     });
   } catch (error) {
     console.error("Error fetching leave stats:", error);

@@ -316,6 +316,10 @@ export async function POST(request) {
 
     // Calculate total days (half-day = 0.5 unless time range given, stored as decimal)
     let totalDays;
+    const fromDateRaw = new Date(from_date);
+    const toDateRaw   = new Date(to_date);
+    const dateDiffRaw = Math.ceil((toDateRaw - fromDateRaw) / (1000 * 60 * 60 * 24)) + 1;
+
     if (isHalfDay) {
       // If time range provided for half-day, calculate actual fraction
       if (has_time_range && start_time && end_time) {
@@ -349,7 +353,6 @@ export async function POST(request) {
               coveredMinutes = firstDayMin + lastDayMin + middleDays * workDayMinutes;
             }
             totalDays = parseFloat((coveredMinutes / workDayMinutes).toFixed(1));
-            totalDays = Math.max(0.5, Math.min(totalDays, dateDiff));
           } else {
             totalDays = 0.5;
           }
@@ -360,10 +363,7 @@ export async function POST(request) {
         totalDays = 0.5;
       }
     } else {
-      const fromDate = new Date(from_date);
-      const toDate = new Date(to_date);
-      const dateDiff = Math.ceil((toDate - fromDate) / (1000 * 60 * 60 * 24)) + 1;
-      if (dateDiff <= 0) {
+      if (dateDiffRaw <= 0) {
         return NextResponse.json(
           { success: false, error: "Invalid date range" },
           { status: 400 }
@@ -398,7 +398,7 @@ export async function POST(request) {
           const leaveEndMin   = timeToMinutes(end_time);   // end_time on to_date
 
           if (leaveStartMin !== null && leaveEndMin !== null && workDayMinutes > 0) {
-            if (dateDiff === 1) {
+            if (dateDiffRaw === 1) {
               // Same day: fraction = (leaveEnd - leaveStart) / workDay
               const coveredMin = Math.max(0, Math.min(leaveEndMin, workEnd) - Math.max(leaveStartMin, workStart));
               totalDays = parseFloat((coveredMin / workDayMinutes).toFixed(1));
@@ -409,26 +409,34 @@ export async function POST(request) {
               // Last day:  from workStart to leaveEnd
               const lastDayMin   = Math.max(0, Math.min(leaveEndMin, workEnd) - workStart);
               // Middle full days
-              const middleDays   = dateDiff - 2;
+              const middleDays   = dateDiffRaw - 2;
               const totalMinutes = firstDayMin + lastDayMin + middleDays * workDayMinutes;
               totalDays = parseFloat((totalMinutes / workDayMinutes).toFixed(1));
             }
-            // Safety: must be at least 0.5 and at most dateDiff
-            totalDays = Math.max(0.5, Math.min(totalDays, dateDiff));
+            // Safety: must be at least 0.5 and at most dateDiffRaw
+            totalDays = Math.max(0.5, Math.min(totalDays, dateDiffRaw));
           } else {
-            totalDays = dateDiff;
+            totalDays = dateDiffRaw;
           }
         } catch {
           // Non-fatal: fall back to date diff
-          totalDays = dateDiff;
+          totalDays = dateDiffRaw;
         }
       } else {
-        totalDays = dateDiff;
+        totalDays = dateDiffRaw;
       }
     }
 
-    // Skip validation for unpaid leave (always available) or half-day (0.5 day, minimal impact)
-    if (leave_type !== 'unpaid' && !isHalfDay) {
+    // 🔒 FINAL FLOOR GUARANTEE (POST create):
+    // Ensures totalDays never goes to 0 / NaN / negative on any edge path
+    const floorMinDays = isHalfDay ? 0.5 : 1;
+    const ceilMaxDays  = isHalfDay ? 0.5 : Math.max(1, dateDiffRaw);
+    if (!Number.isFinite(totalDays) || totalDays < floorMinDays) totalDays = floorMinDays;
+    if (totalDays > ceilMaxDays) totalDays = ceilMaxDays;
+
+    // Balance + policy validation for sick / paid / casual — INCLUDING half-day leaves
+    // (Unpaid is always available, so still skip)
+    if (leave_type !== 'unpaid') {
       // Check if leave type is enabled for this employee
       const leaveTypeKey = `${leave_type}_enabled`;
       if (!leavePolicy[leaveTypeKey]) {
@@ -843,8 +851,16 @@ export async function PATCH(request) {
     //   2. actual check-in in attendance_logs vs half_day_checkin_time
     // If leave_type is paid and balance is insufficient → convert to unpaid.
     let overrideLeaveType = leave.leave_type;
-    let overrideTotalDays = leave.is_half_day == 1 ? 0.5 : (Number(leave.total_days) || 1);
-    let overrideIsHalfDay = leave.is_half_day == 1 ? 1 : 0;
+
+    // SAFETY #1: Guarantee minimum floor value — never accept total_days = 0 or negative
+    // For explicitly marked half-day (is_half_day=1): minimum 0.5 days, even if DB stored 0 (legacy bug)
+    // For full-day: minimum 1 day
+    const explicitHalfDay = leave.is_half_day == 1;
+    const storedTotal = Number(leave.total_days) || 0;
+    let overrideTotalDays = explicitHalfDay
+      ? Math.max(storedTotal, 0.5)
+      : Math.max(storedTotal, 1);
+    let overrideIsHalfDay = explicitHalfDay ? 1 : (overrideTotalDays < 1 ? 1 : 0);
 
     const isApprovedNonUnpaid =
       status === "approved" &&
@@ -875,7 +891,9 @@ export async function PATCH(request) {
           return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
         };
 
-        let computedDays = overrideTotalDays; // start with original (POST-time calculated value)
+        // SAFETY #2: computedDays MUST start from the already-sanitised floor value above
+        // (never from storedTotal which could be 0 due to legacy bugs)
+        let computedDays = overrideTotalDays;
 
         const WORK_START_DEFAULT = 9 * 60;
         const WORK_END_DEFAULT = 18 * 60;
@@ -890,7 +908,7 @@ export async function PATCH(request) {
 
         // Smart heuristics (time-based + checkin-based) for single-day full leaves
         // NOT already marked as half-day in DB (user didn't explicitly select half-day)
-        if (isSingleDay && leave.is_half_day != 1) {
+        if (isSingleDay && !explicitHalfDay) {
           // ── A. start_time / end_time based calculation ──
           //    (runs even when attendance schedule is missing, using 13:00 lunch fallback)
           const startMin = timeToMinutes(leave.start_time);
@@ -947,8 +965,15 @@ export async function PATCH(request) {
           }
         }
 
-        // Clamp to at most the original requested days
-        computedDays = Math.min(computedDays, overrideTotalDays);
+        // SAFETY #3: Clamp carefully — computedDays must NOT go below its floor.
+        // - For EXPLICIT half-day (user chose Half Day button): floor = 0.5, ceil = 0.5 (fixed)
+        // - For full-day leaves heuristics may have reduced to 0.5, but never below 0.5
+        // - Multi-day: never exceed dateDiff, never below 1
+        const minAllowed = explicitHalfDay ? 0.5 : (isSingleDay ? 0.5 : 1);
+        const maxAllowed = explicitHalfDay ? 0.5 : dateDiff;
+        if (computedDays < minAllowed) computedDays = minAllowed;
+        if (computedDays > maxAllowed) computedDays = maxAllowed;
+
         overrideIsHalfDay = computedDays < 1 ? 1 : 0;
 
         // ── C. For paid leave: check balance ──
@@ -961,14 +986,19 @@ export async function PATCH(request) {
         overrideTotalDays = computedDays;
       } catch (smartErr) {
         console.error("Smart leave day calculation failed (non-fatal):", smartErr);
-        // Fall back to original values — don't block approval
+        // Fall back to already-sanitised values — don't block approval, never go back to 0
       }
     }
 
-    // Unpaid half-day: always keep 0.5 day and half-day flag after approval
-    if (status === "approved" && leave.leave_type === "unpaid" && leave.is_half_day == 1) {
-      overrideTotalDays = Number(leave.total_days) || 0.5;
-      overrideIsHalfDay = 1;
+    // Unpaid (full or half-day): sanitise total_days floor values on approval
+    // Prevents total_days = 0 corruption from showing bogus numbers in Unpaid card
+    if (status === "approved" && leave.leave_type === "unpaid") {
+      const unpaidHalfDay = leave.is_half_day == 1;
+      const unpaidStored = Number(leave.total_days) || 0;
+      overrideTotalDays = unpaidHalfDay
+        ? Math.max(unpaidStored, 0.5)
+        : Math.max(unpaidStored, 1);
+      overrideIsHalfDay = unpaidHalfDay ? 1 : (overrideTotalDays < 1 ? 1 : 0);
     }
     // ─────────────────────────────────────────────────────────────────────────────
 
