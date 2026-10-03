@@ -21,7 +21,7 @@ export default function MetaFormAssignments({ formIds, employees }) {
   const fetchAssignments = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('/api/meta-form-assignments');
+      const response = await axios.get('/api/meta-form/assignments');
       if (response.data.success) {
         const assignmentsMap = {};
         response.data.data.forEach(assignment => {

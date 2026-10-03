@@ -1,18 +1,11 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 import { Eye } from "lucide-react";
 
 export default function UpcomingInstallationsPage() {
-  const searchParams = useSearchParams();
-  const registrationFilter = searchParams.get("registration");
-  const showUnregisteredOnly = registrationFilter === "unregistered";
-
   const [searchQuery, setSearchQuery] = useState("");
-  const [typeFilter, setTypeFilter] = useState(
-    () => searchParams.get("type") || "products"
-  );
+  const [typeFilter, setTypeFilter] = useState("products"); // Default to "products"
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
@@ -49,14 +42,7 @@ export default function UpcomingInstallationsPage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({
-        type: showUnregisteredOnly ? "products" : typeFilter,
-      });
-      if (showUnregisteredOnly) {
-        params.set("registration", "unregistered");
-      }
-
-      const res = await fetch(`/api/installation/upcoming?${params.toString()}`);
+      const res = await fetch(`/api/installation/upcoming?type=${typeFilter}`);
       const data = await res.json();
 
       setRecords(data.installations || []);
@@ -69,7 +55,7 @@ export default function UpcomingInstallationsPage() {
     } finally {
       setLoading(false);
     }
-  }, [typeFilter, showUnregisteredOnly]);
+  }, [typeFilter]);
 
   useEffect(() => {
     fetchData();
@@ -97,38 +83,12 @@ export default function UpcomingInstallationsPage() {
       ? "Today"
       : `In ${days} days`;
 
-  // ========= FILTERED RECORDS ==========
-  const filteredRecords = records.filter((r) => {
-    const q = searchQuery.trim().toLowerCase();
-    if (!q) return true;
-    return (
-      String(r.model ?? "").toLowerCase().includes(q) ||
-      String(r.company_name ?? "").toLowerCase().includes(q) ||
-      String(r.emp_name ?? "").toLowerCase().includes(q) ||
-      String(r.name ?? "").toLowerCase().includes(q) ||
-      String(r.contact ?? "").toLowerCase().includes(q) ||
-      String(r.invoice_number ?? "").toLowerCase().includes(q) ||
-      String(r.order_id ?? "").toLowerCase().includes(q) ||
-      String(r.serial_number ?? "").toLowerCase().includes(q) ||
-      String(r.delivery_address ?? "").toLowerCase().includes(q)
-    );
-  });
-
   // ================= UI START ===================
   return (
     <div className="w-full max-w-full p-6">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <div>
-          <h2 className="text-3xl font-bold">
-            {showUnregisteredOnly ? "Pending Product Registration" : "Upcoming Installations"}
-          </h2>
-          {showUnregisteredOnly && (
-            <p className="text-sm text-amber-600 mt-1">
-              Showing only unregistered products
-            </p>
-          )}
-        </div>
+        <h2 className="text-3xl font-bold">Upcoming Installations</h2>
         <p className="text-sm text-gray-600">Total: {total} records</p>
       </div>
 
@@ -143,40 +103,38 @@ export default function UpcomingInstallationsPage() {
         />
 
         {/* Type Filter */}
-        {!showUnregisteredOnly && (
-          <div className="flex gap-3">
-            <button
-              onClick={() => setTypeFilter("all")}
-              className={`px-4 py-2 rounded font-medium transition ${
-                typeFilter === "all"
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-200 text-gray-800 hover:bg-gray-300"
-              }`}
-            >
-              All
-            </button>
-            <button
-              onClick={() => setTypeFilter("products")}
-              className={`px-4 py-2 rounded font-medium transition ${
-                typeFilter === "products"
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-200 text-gray-800 hover:bg-gray-300"
-              }`}
-            >
-              Products
-            </button>
-            <button
-              onClick={() => setTypeFilter("spares")}
-              className={`px-4 py-2 rounded font-medium transition ${
-                typeFilter === "spares"
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-200 text-gray-800 hover:bg-gray-300"
-              }`}
-            >
-              Spares
-            </button>
-          </div>
-        )}
+        <div className="flex gap-3">
+          <button
+            onClick={() => setTypeFilter("all")}
+            className={`px-4 py-2 rounded font-medium transition ${
+              typeFilter === "all"
+                ? "bg-blue-600 text-white"
+                : "bg-gray-200 text-gray-800 hover:bg-gray-300"
+            }`}
+          >
+            All
+          </button>
+          <button
+            onClick={() => setTypeFilter("products")}
+            className={`px-4 py-2 rounded font-medium transition ${
+              typeFilter === "products"
+                ? "bg-blue-600 text-white"
+                : "bg-gray-200 text-gray-800 hover:bg-gray-300"
+            }`}
+          >
+            Products
+          </button>
+          <button
+            onClick={() => setTypeFilter("spares")}
+            className={`px-4 py-2 rounded font-medium transition ${
+              typeFilter === "spares"
+                ? "bg-blue-600 text-white"
+                : "bg-gray-200 text-gray-800 hover:bg-gray-300"
+            }`}
+          >
+            Spares
+          </button>
+        </div>
 
         <div className="flex gap-6">
           <div className="flex items-center">
@@ -196,7 +154,7 @@ export default function UpcomingInstallationsPage() {
 
       {/** ================= MOBILE VIEW (CARDS) ================= */}
       <div className="md:hidden space-y-4">
-        {filteredRecords.map((r, i) => (
+        {records.map((r, i) => (
           <div
             key={i}
             className={`rounded-xl shadow p-4 border ${getRowClass(
@@ -239,14 +197,6 @@ export default function UpcomingInstallationsPage() {
               <p className={`${dateColor(r.installation_status)}`}>
                 <b>Days:</b> {formatDays(r.days_until_installation)}
               </p>
-              <p className="mt-1">
-                <b>Warranty:</b>{" "}
-                {Number(r.warranty_registered) === 1 ? (
-                  <span className="text-green-600 font-semibold">✔ Registered</span>
-                ) : (
-                  <span className="text-gray-400">Not Registered</span>
-                )}
-              </p>
             </div>
 
             {/* Actions */}
@@ -284,12 +234,11 @@ export default function UpcomingInstallationsPage() {
               <th className="p-3">Delivery</th>
               <th className="p-3">Delivery</th>
               <th className="p-3">Days</th>
-              <th className="p-3">Warranty</th>
               <th className="p-3">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {filteredRecords.map((r, i) => (
+            {records.map((r, i) => (
               <tr key={i} className={getRowClass(r.installation_status)}>
                 <td className="p-3 font-semibold">
                   <div className="space-y-1 text-xs">
@@ -309,18 +258,6 @@ export default function UpcomingInstallationsPage() {
                 </td>
                 <td className={`p-3 ${dateColor(r.installation_status)}`}>
                   {formatDays(r.days_until_installation)}
-                </td>
-                <td className="p-3 text-center">
-                  {Number(r.warranty_registered) === 1 ? (
-                    <span title="Registered in Warranty" className="inline-flex items-center gap-1 text-green-600 font-semibold text-xs">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
-                      Registered
-                    </span>
-                  ) : (
-                    <span className="text-gray-400 text-xs">—</span>
-                  )}
                 </td>
                 <td className="p-3">
                   <div className="flex flex-col gap-2 items-stretch">

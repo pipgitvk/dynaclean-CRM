@@ -10,7 +10,7 @@ export default async function PendingProductRegistrationCard() {
   return (
     <Link
       href="/user-dashboard/view_service_reports/upcoming-installation?registration=unregistered&type=products"
-      className="group flex min-h-[88px] w-full min-w-0 items-center gap-3 rounded-xl border border-slate-100 bg-white p-4 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.08),0_2px_4px_-2px_rgba(0,0,0,0.05)] transition hover:border-slate-200 hover:shadow-md"
+      className="group flex w-full max-w-[300px] min-h-[88px] items-center gap-3 rounded-xl border border-amber-100 bg-white p-4 shadow-sm transition hover:border-amber-200 hover:shadow-md"
     >
       <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-amber-500">
         <Package size={20} strokeWidth={2} className="text-white" />

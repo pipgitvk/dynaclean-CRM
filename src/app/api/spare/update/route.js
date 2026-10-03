@@ -6,7 +6,6 @@ import fs from 'fs/promises';
 import path from 'path';
 import heicConvert from 'heic-convert';
 import { v2 as cloudinary } from 'cloudinary';
-import { ensureCoveredInWarrantyColumn, normalizeWarrantyFlag } from '@/lib/spareWarranty';
 
 const secret = new TextEncoder().encode(process.env.JWT_SECRET);
 
@@ -105,7 +104,7 @@ export async function POST(request) {
             return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
         }
 
-        if (!['SUPERADMIN', 'DIRECTOR', 'ADMIN', 'DIGITAL MARKETER', 'WAREHOUSE INCHARGE', 'ACCOUNTANT', 'DESIGN ENGINEER', 'EA'].includes(String(role).toUpperCase())) {
+        if (!['SUPERADMIN', 'DIRECTOR', 'ADMIN', 'DIGITAL MARKETER', 'WAREHOUSE INCHARGE', 'ACCOUNTANT', 'DESIGN ENGINEER', 'SERVICE SUPPORT'].includes(String(role).toUpperCase())) {
             return NextResponse.json({ error: 'Forbidden: access denied' }, { status: 403 });
         }
 
@@ -125,7 +124,6 @@ export async function POST(request) {
         const sale_price = formData.get('sale_price');
         const last_negotiation_price = formData.get('last_negotiation_price');
         const specification = formData.get('specification');
-        const covered_in_warranty = formData.get('covered_in_warranty');
         const imageFile = formData.get('image');
 
         if (!id) {
@@ -133,7 +131,6 @@ export async function POST(request) {
         }
 
         const db = await getDbConnection();
-        await ensureCoveredInWarrantyColumn(db);
 
         // Get current spare details
         const [currentSpare] = await db.execute('SELECT * FROM spare_list WHERE id = ? LIMIT 1', [id]);
@@ -200,10 +197,6 @@ export async function POST(request) {
         if (specification !== null && specification !== undefined) {
             updates.push('specification = ?');
             values.push(specification);
-        }
-        if (covered_in_warranty !== null && covered_in_warranty !== undefined) {
-            updates.push('covered_in_warranty = ?');
-            values.push(normalizeWarrantyFlag(covered_in_warranty));
         }
         if (imagePath && imagePath !== existingSpare.image) {
             updates.push('image = ?');

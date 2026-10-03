@@ -7,7 +7,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import toast from "react-hot-toast";
 import { set } from "date-fns";
-import { LetterheadCompanyInfo, LetterheadBankLine, LetterheadSignatoryLine } from "@/components/invoice/InvoiceLetterheadSection";
 
 // Remove local generation - will fetch from API
 
@@ -24,8 +23,6 @@ export default function QuotationForm() {
   const [customerIdInput, setCustomerIdInput] = useState("");
   const [isLoadingCustomer, setIsLoadingCustomer] = useState(false);
   const [customerError, setCustomerError] = useState("");
-  const [modalSuggestions, setModalSuggestions] = useState([]);
-  const [showModalSuggestions, setShowModalSuggestions] = useState(false);
   const [originalCustomerData, setOriginalCustomerData] = useState(null);
   const [editableFields, setEditableFields] = useState({
     company: true,
@@ -231,17 +228,9 @@ export default function QuotationForm() {
     // Split tax into cgst/sgst or igst based on interstate flag
     const isInterstate = (() => {
       const gstinValue = form.gstin_no?.trim();
-      if (gstinValue) {
-        const code = gstinValue.slice(0, 2);
-        return code !== SUPPLIER_STATE_CODE;
-      }
-      // No GSTIN → check manually selected state
-      const stateCode = parseCodeFromDisplay(form.state_name)
-        || Object.entries(stateCodeToName).find(
-            ([, name]) => name.toLowerCase() === form.state_name?.trim().toLowerCase()
-          )?.[0];
-      if (!stateCode) return false;
-      return stateCode !== SUPPLIER_STATE_CODE;
+      if (!gstinValue) return false;
+      const code = gstinValue.slice(0, 2);
+      return code !== SUPPLIER_STATE_CODE;
     })();
 
     const cgst = isInterstate ? 0 : totalTax / 2;
@@ -258,7 +247,7 @@ export default function QuotationForm() {
     const grandTotal = totalBeforeRound + finalRoundOff;
 
     return { subtotal, cgst, sgst, igst, totalTax, grandTotal, finalRoundOff };
-  }, [items, roundOff, isAutoRoundOff, form.gstin_no, form.state_name]);
+  }, [items, roundOff, isAutoRoundOff, form.gstin_no]);
 
   useEffect(() => {
     if (isAutoRoundOff) {
@@ -300,32 +289,34 @@ export default function QuotationForm() {
   useEffect(() => {
     const gstinValue = form.gstin_no?.trim();
 
+    // Case 1: GSTIN is provided - use GSTIN to determine tax
     if (gstinValue) {
       const result = getStateFromGSTIN(gstinValue);
       if (result) {
         if (form.state_name !== result.display) {
           setForm((prev) => ({ ...prev, state_name: result.display }));
         }
+        // Set tax rates based on interstate vs intrastate
         if (result.code === SUPPLIER_STATE_CODE) {
-          setCgstRate(9); setSgstRate(9); setIgstRate(0);
+          // Same state → CGST+SGST, no IGST
+          setCgstRate(9);
+          setSgstRate(9);
+          setIgstRate(0);
         } else {
-          setCgstRate(0); setSgstRate(0); setIgstRate(18);
+          // Different state → IGST only
+          setCgstRate(0);
+          setSgstRate(0);
+          setIgstRate(18);
         }
       }
-    } else {
-      // No GSTIN → check state
-      const stateCode = parseCodeFromDisplay(form.state_name)
-        || Object.entries(stateCodeToName).find(
-            ([, name]) => name.toLowerCase() === form.state_name?.trim().toLowerCase()
-          )?.[0];
-
-      if (!stateCode || stateCode === SUPPLIER_STATE_CODE) {
-        setCgstRate(9); setSgstRate(9); setIgstRate(0);
-      } else {
-        setCgstRate(0); setSgstRate(0); setIgstRate(18);
-      }
     }
-  }, [form.gstin_no, form.state_name]);
+    // Case 2: No GSTIN - always use CGST+SGST (regardless of state)
+    else {
+      setCgstRate(9);
+      setSgstRate(9);
+      setIgstRate(0);
+    }
+  }, [form.gstin_no]);
 
   const handleCustomerSearch = async (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -503,31 +494,43 @@ Thanks for doing business with us!`,
       const totalGST = taxSummary.cgst + taxSummary.sgst + taxSummary.igst;
       const grandTotal = taxSummary.grandTotal;
 
-      // Derive effective rates from actual computed taxSummary amounts
-      const effectiveIgstRate = taxSummary.subtotal > 0 && taxSummary.igst > 0
-        ? parseFloat(((taxSummary.igst / taxSummary.subtotal) * 100).toFixed(2))
-        : 0;
-      const effectiveCgstRate = taxSummary.subtotal > 0 && taxSummary.cgst > 0
-        ? parseFloat(((taxSummary.cgst / taxSummary.subtotal) * 100).toFixed(2))
-        : 0;
-      const effectiveSgstRate = taxSummary.subtotal > 0 && taxSummary.sgst > 0
-        ? parseFloat(((taxSummary.sgst / taxSummary.subtotal) * 100).toFixed(2))
-        : 0;
+      // Calculate actual GST rates from items (for multi-rate quotations)
+      let finalCgstRate = 0, finalSgstRate = 0, finalIgstRate = 0;
+      
+      if (items.length > 0 && items[0].gst) {
+        // Get the GST rate from the first item (all items should have same rate ideally)
+        const itemGstRate = parseFloat(items[0].gst) || 0;
+        
+        // Determine if interstate or intrastate
+        const gstinValue = form.gstin_no?.trim();
+        let isInterstate = false;
+        if (gstinValue) {
+          const code = gstinValue.slice(0, 2);
+          isInterstate = code !== SUPPLIER_STATE_CODE;
+        }
+        
+        if (isInterstate) {
+          finalIgstRate = itemGstRate;
+        } else {
+          finalCgstRate = itemGstRate / 2;
+          finalSgstRate = itemGstRate / 2;
+        }
+      }
 
       const dataToSend = {
         ...form,
         quote_number: quoteNumber,
         quote_date: quoteDate,
-        items: itemsWithTotals,
+        items: itemsWithTotals, // Use the new array with totals
         subtotal,
         cgst: taxSummary.cgst,
         sgst: taxSummary.sgst,
         igst: taxSummary.igst,
         round_off: parseFloat(roundOff) || 0,
         grand_total: grandTotal,
-        cgstRate: effectiveCgstRate,
-        sgstRate: effectiveSgstRate,
-        igstRate: effectiveIgstRate,
+        cgstRate: finalCgstRate,
+        sgstRate: finalSgstRate,
+        igstRate: finalIgstRate,
         terms: editableTerms,
       };
 
@@ -544,7 +547,7 @@ Thanks for doing business with us!`,
       const data = await res.json();
       if (data.success) {
         toast.success("✅ Quotation added successfully");
-        router.push(`/user-dashboard/quotations?customer_id=${form.customer_id || ""}`);
+        router.push("/user-dashboard/quotations");
       } else {
         alert("Error: " + data.error);
       }
@@ -561,7 +564,7 @@ Thanks for doing business with us!`,
       {/* Customer ID Modal */}
       {showCustomerModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 overflow-visible">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
             <h2 className="text-2xl font-bold text-gray-900 mb-4">
               Enter Customer ID
             </h2>
@@ -574,33 +577,12 @@ Thanks for doing business with us!`,
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Customer ID *
                 </label>
-                <div className="relative">
                 <input
                   type="text"
                   value={customerIdInput}
-                  onChange={async (e) => {
-                    const val = e.target.value;
-                    setCustomerIdInput(val);
+                  onChange={(e) => {
+                    setCustomerIdInput(e.target.value);
                     setCustomerError("");
-
-                    if (val.trim().length === 0) {
-                      setModalSuggestions([]);
-                      setShowModalSuggestions(false);
-                      return;
-                    }
-
-                    try {
-                      const res = await fetch("/api/customer-suggestions", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ query: val }),
-                      });
-                      const data = await res.json();
-                      setModalSuggestions(Array.isArray(data) ? data : []);
-                      setShowModalSuggestions(true);
-                    } catch (err) {
-                      console.error("Suggestion fetch error", err);
-                    }
                   }}
                   onKeyPress={(e) => {
                     if (e.key === "Enter") {
@@ -608,36 +590,13 @@ Thanks for doing business with us!`,
                       handleFetchCustomer();
                     }
                   }}
-                  placeholder="Enter customer ID or name"
+                  placeholder="Enter customer ID"
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   disabled={isLoadingCustomer}
-                  autoComplete="off"
                 />
-                {showModalSuggestions && modalSuggestions.length > 0 && (
-                  <ul className="absolute z-50 bg-white border border-gray-200 rounded-lg shadow-lg mt-1 max-h-48 overflow-y-auto w-full text-sm">
-                    {modalSuggestions.map((s, i) => (
-                      <li
-                        key={i}
-                        className="px-4 py-2 hover:bg-blue-50 cursor-pointer border-b last:border-0"
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          setCustomerIdInput(String(s.customer_id));
-                          setShowModalSuggestions(false);
-                          setModalSuggestions([]);
-                          fetchCustomerById(String(s.customer_id));
-                        }}
-                      >
-                        <span className="font-semibold text-blue-700">#{s.customer_id}</span>
-                        {s.company ? ` — ${s.company}` : ""}
-                        {s.location ? <span className="text-gray-400 text-xs ml-1">({s.location})</span> : ""}
-                      </li>
-                    ))}
-                  </ul>
-                )}
                 {customerError && (
                   <p className="text-sm text-red-600 mt-2">{customerError}</p>
                 )}
-                </div>
               </div>
 
               <div className="flex gap-3">
@@ -676,8 +635,29 @@ Thanks for doing business with us!`,
             className="object-contain"
             unoptimized
           />
-          <LetterheadCompanyInfo />
-        
+          <div className="flex-1 text-sm text-gray-700">
+            <h2 className="text-xl font-bold text-red-600 mb-1">
+              Dynaclean Industries Pvt Ltd
+            </h2>
+            <p className="leading-relaxed">
+              <span className="block">
+                1st Floor, 13-B, Kattabomman Street, Gandhi Nagar Main Road,
+              </span>
+              <span className="block">
+                Gandhi Nagar, Ganapathy, Coimbatore, Tamil Nadu, 641006
+              </span>
+              <span className="block mt-1">
+                <strong>Phone:</strong> 011-45143666, +91-7982456944
+              </span>
+              <span className="block">
+                <strong>Email:</strong> sales@dynacleanindustries.com
+              </span>
+              <span className="block mt-1">
+                <strong>GSTIN:</strong> 07AAKCD6495M1ZV |{" "}
+                <strong>State:</strong> Delhi (07)
+              </span>
+            </p>
+          </div>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-gray-50 p-4 rounded">
           <div>
@@ -867,7 +847,7 @@ Thanks for doing business with us!`,
             </select>
           </div>
         </div>
-        <QuotationItemsTable items={items} setItems={setItems} customerId={form.customer_id || customerIdFromUrl} cgstRate={cgstRate} sgstRate={sgstRate} igstRate={igstRate} />
+        <QuotationItemsTable items={items} setItems={setItems} customerId={form.customer_id} cgstRate={cgstRate} sgstRate={sgstRate} igstRate={igstRate} />
         <TaxAndSummary
           items={items}
           subtotal={taxSummary.subtotal}
@@ -878,18 +858,13 @@ Thanks for doing business with us!`,
           grandTotal={taxSummary.grandTotal}
           interstate={(() => {
             const gstinValue = form.gstin_no?.trim();
-            if (gstinValue) {
-              const gstState = getStateFromGSTIN(gstinValue);
-              const buyerCode = gstState?.code;
-              return buyerCode ? buyerCode !== SUPPLIER_STATE_CODE : false;
-            }
-            // No GSTIN → check manually selected state
-            const stateCode = parseCodeFromDisplay(form.state_name)
-              || Object.entries(stateCodeToName).find(
-                  ([, name]) => name.toLowerCase() === form.state_name?.trim().toLowerCase()
-                )?.[0];
-            if (!stateCode) return false;
-            return stateCode !== SUPPLIER_STATE_CODE;
+            // If GSTIN is empty, default to intrastate (CGST+SGST)
+            if (!gstinValue) return false;
+
+            const gstState = getStateFromGSTIN(gstinValue);
+            const buyerCode =
+              gstState?.code || parseCodeFromDisplay(form.state_name);
+            return buyerCode ? buyerCode !== SUPPLIER_STATE_CODE : false;
           })()}
         />
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 mt-6">
@@ -912,7 +887,7 @@ Thanks for doing business with us!`,
           </div>
           <div className="lg:col-span-1 border p-4 rounded bg-gray-50 text-sm text-center flex flex-col justify-between">
             <div>
-              <LetterheadSignatoryLine />
+              <p>For Dynaclean Industries Pvt Ltd</p>
               <Image
                 src="/images/sign.png"
                 alt="Sign"

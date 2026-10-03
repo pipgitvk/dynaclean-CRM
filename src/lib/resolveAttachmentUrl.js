@@ -60,9 +60,7 @@ export async function resolveAttachmentTarget(request, pathInput) {
     !cleaned.includes("..") &&
     (cleaned.startsWith("attachments/") ||
       cleaned.startsWith("expense_attachments/") ||
-      cleaned.startsWith("completion_files/") ||
-      cleaned.startsWith("attendance_regularization/") ||
-      cleaned.startsWith("uploads/regularization/"));
+      cleaned.startsWith("completion_files/"));
 
   if (safeForLocal) {
     const localPath = join(process.cwd(), "public", cleaned);
@@ -87,13 +85,7 @@ export async function resolveAttachmentTarget(request, pathInput) {
       trailing.replace(/^expense_attachments\//, "") :
       null;
 
-  const folders = [
-    "completion_files",
-    "attachments",
-    "expense_attachments",
-    "attendance_regularization",
-    "uploads/regularization",
-  ];
+  const folders = ["completion_files", "attachments", "expense_attachments"];
   const pathsToTry = [];
 
   let localOrigin = "";

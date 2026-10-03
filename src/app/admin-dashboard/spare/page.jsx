@@ -5,17 +5,6 @@ import { Eye, Search, Pencil } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-function warrantyYn(value) {
-  const flag = String(value ?? "").trim().toUpperCase();
-  if (flag === "Y" || flag === "N") return flag;
-  return "-";
-}
-
-function warrantySelectValue(value) {
-  const flag = String(value ?? "").trim().toUpperCase();
-  return flag === "Y" || flag === "N" ? flag : "";
-}
-
 function SpareList({ userRole, previewImage, setPreviewImage }) {
   const [rows, setRows] = useState([]);
   const [stockTotals, setStockTotals] = useState({ totalQty: 0, totalValue: 0 });
@@ -96,7 +85,6 @@ function SpareList({ userRole, previewImage, setPreviewImage }) {
       formData.append('tax', editingSpare.tax || 0);
       formData.append('last_negotiation_price', editingSpare.last_negotiation_price);
       formData.append('specification', editingSpare.specification);
-      formData.append('covered_in_warranty', warrantySelectValue(editingSpare.covered_in_warranty));
       if (editingSpare.newImageFile) {
         formData.append('image', editingSpare.newImageFile);
       }
@@ -367,7 +355,6 @@ function SpareList({ userRole, previewImage, setPreviewImage }) {
             <tr>
               <th className="p-2 text-left">Image</th>
               <th className="p-2 text-left">Spare No</th>
-              <th className="p-2 text-left">Covered in Warranty</th>
               <th className="p-2 text-left">Name</th>
               <th className="p-2 text-left">Type</th>
               <th className="p-2 text-left">Make</th>
@@ -403,7 +390,6 @@ function SpareList({ userRole, previewImage, setPreviewImage }) {
                       )}
                     </td>
                     <td className="p-2">{r.spare_number}</td>
-                    <td className="p-2 font-medium">{warrantyYn(r.covered_in_warranty)}</td>
                     <td className="p-2">{r.item_name}</td>
                     <td className="p-2 text-xs bg-blue-50">{r.type || "-"}</td>
                     <td className="p-2 text-xs bg-green-50">{r.make || "-"}</td>
@@ -511,7 +497,7 @@ function SpareList({ userRole, previewImage, setPreviewImage }) {
 
             {view.length === 0 && (
               <tr>
-                <td className="p-2 text-gray-500" colSpan={16}>
+                <td className="p-2 text-gray-500" colSpan={15}>
                   No data
                 </td>
               </tr>
@@ -572,7 +558,6 @@ function SpareList({ userRole, previewImage, setPreviewImage }) {
               {/* DETAILS */}
               <div className="mt-2 text-xs text-gray-700 space-y-1">
                 <p><span className="font-semibold">Spare No:</span> {r.spare_number}</p>
-                <p><span className="font-semibold">Covered in Warranty:</span> {warrantyYn(r.covered_in_warranty)}</p>
                 <p><span className="font-semibold">Min Qty:</span> {r.min_qty}</p>
                 <div className="flex items-center gap-2">
                   <span className="font-semibold">Price:</span>
@@ -647,18 +632,6 @@ function SpareList({ userRole, previewImage, setPreviewImage }) {
                   onChange={(e) => setEditingSpare({ ...editingSpare, spare_number: e.target.value })}
                   className="w-full border rounded px-3 py-2 text-sm"
                 />
-              </div>
-              <div>
-                <label className="block text-sm text-gray-700 mb-1">Covered in Warranty</label>
-                <select
-                  value={warrantySelectValue(editingSpare.covered_in_warranty)}
-                  onChange={(e) => setEditingSpare({ ...editingSpare, covered_in_warranty: e.target.value })}
-                  className="w-full border rounded px-3 py-2 text-sm"
-                >
-                  <option value="">Select</option>
-                  <option value="Y">Y</option>
-                  <option value="N">N</option>
-                </select>
               </div>
               {/* Item Name */}
               <div>

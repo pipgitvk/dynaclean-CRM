@@ -1996,7 +1996,7 @@ const NewInvoice = ({ invoice }) => {
     terms: parseTerms(),
     notes: invoice.notes || "",
     bank: {
-      accountHolderName: "DYNACLEAN INDUSTRIES PRIVATE LIMITED",
+      accountHolderName: "Dynaclean Industries Private Limited",
       name: "ICICI Bank",
       accountNo: "343405500379",
       IFSC: "ICIC0003434",
@@ -2057,37 +2057,21 @@ const NewInvoice = ({ invoice }) => {
       "position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.8);color:white;padding:20px;border-radius:8px;z-index:9999;font-family:Arial,sans-serif;";
     document.body.appendChild(loadingDiv);
 
-    // Off-screen container: renders at full invoice width outside viewport so
-    // html2canvas captures the ENTIRE invoice height, not just what's visible.
-    const offscreenWrapper = document.createElement("div");
-    offscreenWrapper.style.cssText =
-      "position:fixed;left:-9999px;top:0;width:794px;background:#fff;z-index:-1;";
-    document.body.appendChild(offscreenWrapper);
-
-    let clonedEl = null;
+    let styleTag;
 
     try {
-      // Deep-clone the invoice element into the off-screen wrapper
-      clonedEl = el.cloneNode(true);
-      clonedEl.style.width = "794px";
-      clonedEl.style.maxWidth = "794px";
-      clonedEl.style.padding = "0";
-      clonedEl.style.border = "none";
-      clonedEl.style.overflow = "visible";
-      clonedEl.style.boxSizing = "border-box";
-      const borderedRoot = clonedEl.querySelector("[data-invoice-border-root]");
-      if (borderedRoot) {
-        borderedRoot.style.border = "1px solid rgb(0, 0, 0)";
-        borderedRoot.style.boxSizing = "border-box";
-        borderedRoot.style.overflow = "visible";
-      }
-      offscreenWrapper.appendChild(clonedEl);
+      const originalWidth = el.style.width;
+      const originalMaxWidth = el.style.maxWidth;
+      const originalPadding = el.style.padding;
+      const originalBorder = el.style.border;
 
-      // Let the browser reflow the cloned element at 794px width
-      await new Promise((r) => setTimeout(r, 300));
+      el.style.width = "794px";
+      el.style.maxWidth = "794px";
+      el.style.padding = "25px";
+      el.style.border = "none";
 
-      // Convert images to base64 in the cloned element
-      const images = clonedEl.querySelectorAll("img");
+      // Convert images to base64
+      const images = el.querySelectorAll("img");
       await Promise.all(
         Array.from(images).map(async (img) => {
           if (!img.src || img.src.startsWith("data:")) return;
@@ -2114,83 +2098,69 @@ const NewInvoice = ({ invoice }) => {
 
       await new Promise((r) => setTimeout(r, 200));
 
-      // Apply color overrides — avoid painting every cell white (can clip text in html2canvas).
-      clonedEl.querySelectorAll("*").forEach((elem) => {
-        elem.style.color = "rgb(0, 0, 0)";
-        elem.style.webkitTextFillColor = "rgb(0, 0, 0)";
-        elem.style.borderColor = "rgb(0, 0, 0)";
-        const tag = elem.tagName?.toLowerCase();
-        if (tag !== "img" && tag !== "td" && tag !== "th" && tag !== "tr" && tag !== "table") {
-          elem.style.backgroundColor = "rgb(255, 255, 255)";
-        }
-        if (tag !== "img") {
-          elem.style.overflow = "visible";
-          elem.style.overflowY = "visible";
-        }
-      });
-
-      // Improve footer text metrics before capture.
-      clonedEl.querySelectorAll("[data-pdf-footer-block]").forEach((block) => {
-        block.style.lineHeight = "1.55";
-        block.style.paddingTop = "1px";
-        block.style.paddingBottom = "1px";
-      });
-
-      // Force layout recalculation
-      await new Promise((r) => setTimeout(r, 100));
-      const finalHeight = Math.max(
-        clonedEl.scrollHeight,
-        clonedEl.offsetHeight,
-        clonedEl.getBoundingClientRect().height
-      );
-      clonedEl.style.minHeight = `${finalHeight}px`;
-
-      const rootRect = clonedEl.getBoundingClientRect();
-      const footerBlockKeys = ["tax-words", "terms", "bank"];
-      const footerBlockBoxes = {};
-      if (rootRect.width > 0 && rootRect.height > 0) {
-        for (const key of footerBlockKeys) {
-          const blockEl = clonedEl.querySelector(`[data-pdf-footer-block="${key}"]`);
-          if (!blockEl) continue;
-          const r = blockEl.getBoundingClientRect();
-          footerBlockBoxes[key] = {
-            relX: (r.left - rootRect.left) / rootRect.width,
-            relY: (r.top - rootRect.top) / rootRect.height,
-            relW: r.width / rootRect.width,
-            relH: r.height / rootRect.height,
-          };
-          blockEl.style.minHeight = `${r.height}px`;
-        }
+      // CRITICAL FIX: Override ALL color functions
+      styleTag = document.createElement("style");
+      styleTag.setAttribute("data-pdf-override", "true");
+      styleTag.innerHTML = `
+      [data-pdf-capture-root],
+      [data-pdf-capture-root] * {
+        color: rgb(0, 0, 0) !important;
+        background-color: rgb(255, 255, 255) !important;
+        border-color: rgb(0, 0, 0) !important;
+        outline-color: rgb(0, 0, 0) !important;
+        box-shadow: none !important;
+        text-shadow: none !important;
       }
 
-      // Hide footer text from html2canvas; redraw cleanly with jsPDF after capture.
-      clonedEl.querySelectorAll("[data-pdf-footer-block]").forEach((block) => {
-        block.style.color = "rgb(255,255,255)";
-        block.style.webkitTextFillColor = "rgb(255,255,255)";
-        block.querySelectorAll("*").forEach((child) => {
-          child.style.color = "rgb(255,255,255)";
-          child.style.webkitTextFillColor = "rgb(255,255,255)";
-        });
-      });
+      [data-pdf-capture-root] *::before,
+      [data-pdf-capture-root] *::after {
+        color: rgb(0, 0, 0) !important;
+        background-color: rgb(255, 255, 255) !important;
+        border-color: rgb(0, 0, 0) !important;
+      }
 
-      // Measure the FULL height of the off-screen cloned element after reflow
-      const captureWidth = clonedEl.scrollWidth || 794;
-      const captureHeight = clonedEl.scrollHeight || clonedEl.offsetHeight;
+      [data-pdf-capture-root] table {
+        border-collapse: collapse !important;
+      }
 
-      const canvas = await html2canvas(clonedEl, {
-        scale: 3,
+      [data-pdf-capture-root] td,
+      [data-pdf-capture-root] th {
+        page-break-inside: avoid !important;
+        overflow: visible !important;
+        vertical-align: top !important;
+      }
+    `;
+      document.head.appendChild(styleTag);
+
+      await new Promise((r) => setTimeout(r, 100));
+
+      const canvas = await html2canvas(el, {
+        scale: 2,
         useCORS: true,
         allowTaint: false,
         foreignObjectRendering: false,
         backgroundColor: "#ffffff",
         logging: false,
         imageTimeout: 15000,
-        width: captureWidth,
-        height: captureHeight,
-        windowWidth: captureWidth,
-        windowHeight: captureHeight,
-        x: 0,
-        y: 0,
+        onclone: (clonedDoc) => {
+          const root = clonedDoc.querySelector(
+            '[data-pdf-capture-root="true"]',
+          );
+          if (root) {
+            root.style.width = "794px";
+            root.style.maxWidth = "794px";
+            root.style.boxSizing = "border-box";
+            root.style.overflow = "visible";
+            const h = Math.max(root.scrollHeight, root.offsetHeight);
+            root.style.minHeight = `${Math.ceil(h + 4)}px`;
+
+            root.querySelectorAll("*").forEach((elem) => {
+              elem.style.color = "rgb(0, 0, 0)";
+              elem.style.backgroundColor = "rgb(255, 255, 255)";
+              elem.style.borderColor = "rgb(0, 0, 0)";
+            });
+          }
+        },
       });
 
       const imgData = canvas.toDataURL("image/png", 1.0);
@@ -2216,117 +2186,25 @@ const NewInvoice = ({ invoice }) => {
       const drawW = imgProps.width * scale;
       const drawH = imgProps.height * scale;
       const x = (pdfWidth - drawW) / 2;
-      const y = 1.5;
+      const y = (pdfHeight - drawH) / 2;
 
       pdf.addImage(imgData, "PNG", x, y, drawW, drawH, undefined, "FAST");
 
-      const ptToMm = 0.352778;
-      const toBlockRect = (box) => ({
-        left: x + drawW * box.relX,
-        top: y + drawH * box.relY,
-        width: drawW * box.relW,
-        height: drawH * box.relH,
-      });
-      const wipeBlock = (rect, maxRight = null) => {
-        const pad = 0.4;
-        let right = rect.left + rect.width;
-        if (maxRight != null) right = Math.min(right, maxRight);
-        pdf.setFillColor(255, 255, 255);
-        pdf.rect(
-          Math.max(0, rect.left - pad),
-          Math.max(0, rect.top - pad),
-          Math.max(0, right - rect.left + pad * 2),
-          rect.height + pad * 2,
-          "F",
-        );
-      };
-      const drawFlowParagraphs = ({
-        rect,
-        paragraphs,
-        startFontSize = 7,
-        title,
-        maxRight = null,
-      }) => {
-        wipeBlock(rect, maxRight);
-        pdf.setTextColor(0, 0, 0);
-
-        let cursorY = rect.top + startFontSize * ptToMm * 0.9;
-        const textWidth = Math.max(rect.width - 1, 20);
-
-        if (title) {
-          pdf.setFont("helvetica", "bold");
-          pdf.setFontSize(7.5);
-          pdf.text(title, rect.left, cursorY);
-          cursorY += 7.5 * ptToMm * 1.35;
-        }
-
-        const paragraphList = paragraphs;
-        for (const paragraph of paragraphList) {
-          pdf.setFont("helvetica", "normal");
-          pdf.setFontSize(startFontSize);
-          const wrapped = pdf.splitTextToSize(paragraph, textWidth);
-          const lineHeight = startFontSize * ptToMm * 1.45;
-          for (const line of wrapped) {
-            pdf.text(line, rect.left, cursorY);
-            cursorY += lineHeight;
-          }
-          cursorY += startFontSize * ptToMm * 0.35;
-        }
-      };
-
-      const pageRight = x + drawW - 1.5;
-
-      if (footerBlockBoxes["tax-words"]) {
-        const rect = toBlockRect(footerBlockBoxes["tax-words"]);
-        wipeBlock(rect);
-        pdf.setTextColor(0, 0, 0);
-        pdf.setFont("helvetica", "bold");
-        pdf.setFontSize(7.5);
-        pdf.text(
-          `Tax Amount (in words) : INR- ${numberToWords(data.taxAmount)}`,
-          rect.left,
-          rect.top + 7.5 * ptToMm * 0.9,
-          { maxWidth: rect.width },
-        );
-      }
-
-      if (footerBlockBoxes.terms) {
-        const termsParagraphs =
-          data.terms.length > 0
-            ? data.terms
-            : ["No terms and conditions specified."];
-        drawFlowParagraphs({
-          rect: toBlockRect(footerBlockBoxes.terms),
-          paragraphs: termsParagraphs,
-          title: "Terms & Condition",
-        });
-      }
-
-      if (footerBlockBoxes.bank) {
-        drawFlowParagraphs({
-          rect: toBlockRect(footerBlockBoxes.bank),
-          paragraphs: [
-            `A/C Holder Name : ${data.bank.accountHolderName}`,
-            `Bank Name : ${data.bank.name}`,
-            `A/c No. : ${data.bank.accountNo}`,
-            `Branch & IFSC Code: ${data.bank.IFSC}`,
-          ],
-          title: "Company's Bank Details",
-          maxRight: pageRight,
-        });
-      }
-
-      const pdfFileName = invoice.type === "performa"
+      const pdfFileName = invoice.type === "performa" 
         ? `Performa-Invoice-${data.invoice.number.replace(/[/\\]/g, "_")}.pdf`
         : `Invoice-${data.invoice.number.replace(/[/\\]/g, "_")}.pdf`;
       pdf.save(pdfFileName);
 
+      el.style.width = originalWidth;
+      el.style.maxWidth = originalMaxWidth;
+      el.style.padding = originalPadding;
+      el.style.border = originalBorder;
     } catch (err) {
       console.error("PDF generation failed:", err);
       alert("Failed to generate PDF. Check console for details.");
     } finally {
-      if (offscreenWrapper && offscreenWrapper.parentNode) {
-        document.body.removeChild(offscreenWrapper);
+      if (styleTag && styleTag.parentNode) {
+        document.head.removeChild(styleTag);
       }
       if (loadingDiv && loadingDiv.parentNode) {
         document.body.removeChild(loadingDiv);
@@ -2537,13 +2415,11 @@ const NewInvoice = ({ invoice }) => {
           </h1>
         </div>
         <div
-          data-invoice-border-root="true"
           style={{
             padding: "6mm",
             background: "#fff",
             backgroundColor: "#fff",
             border: "1px solid #000",
-            boxSizing: "border-box",
           }}
         >
         {/* Logo flush left; company block left of row but lines centre-aligned within block */}
@@ -2574,7 +2450,7 @@ const NewInvoice = ({ invoice }) => {
                     display: "flex",
                     flexDirection: "row",
                     alignItems: "flex-start",
-                    gap: "120px",
+                    gap: "44px",
                     width: "100%",
                     boxSizing: "border-box",
                   }}
@@ -2673,22 +2549,11 @@ const NewInvoice = ({ invoice }) => {
                     style={{
                       fontSize: "10px",
                       lineHeight: 1.45,
-                      marginBottom: "3px",
                       color: "#000",
                       fontWeight: 400,
                     }}
                   >
-                    GST: {INVOICE_LETTERHEAD.gstin}, State: {INVOICE_LETTERHEAD.state}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: "10px",
-                      lineHeight: 1.45,
-                      color: "#000",
-                      fontWeight: 400,
-                    }}
-                  >
-                    CIN: {INVOICE_LETTERHEAD.cin}
+                    GST: {INVOICE_LETTERHEAD.gstin}
                   </div>
                     </div>
                   </div>
@@ -2793,12 +2658,9 @@ const NewInvoice = ({ invoice }) => {
                   textAlign: "left",
                 }}
               >
-                <div style={{ fontWeight: "bold", lineHeight: "1.3" }}>
-                  Buyer's Order No. :
-                </div>
-                <div style={{ fontWeight: "normal", marginTop: "4px", lineHeight: "1.3" }}>
-                  {data.invoice.buyersOrderNo || "-"}
-                </div>
+                <b>Buyer's Order No. : <span style={{
+                  fontWeight: "normal",
+                }}>{data.invoice.buyersOrderNo}</span></b>
               </td>
               <td
                 style={{
@@ -3661,8 +3523,8 @@ const NewInvoice = ({ invoice }) => {
         </table>
 
         {/* Tax Amount in Words */}
-        <div style={{ marginBottom: "10px", fontSize: "9px", display: "flex", justifyContent: "space-between" }}>
-          <strong data-pdf-footer-block="tax-words" style={{ display: "block", lineHeight: 1.55 }}>
+        <div style={{ marginBottom: "15px", fontSize: "9px", display: "flex", justifyContent: "space-between" }}>
+          <strong>
             Tax Amount (in words) : INR- {numberToWords(data.taxAmount)}
           </strong>
           {data.roundOff !== 0 && (
@@ -3673,74 +3535,53 @@ const NewInvoice = ({ invoice }) => {
         </div>
 
         {/* Terms & Bank Details */}
-        <table
-          style={{
-            width: "100%",
-            borderCollapse: "collapse",
-            tableLayout: "fixed",
-            marginBottom: "10px",
-          }}
-        >
-          <tbody>
-            <tr>
-              <td
-                data-pdf-footer-block="terms"
-                style={{
-                  width: "58%",
-                  verticalAlign: "top",
-                  paddingRight: "16px",
-                  fontSize: "9px",
-                  lineHeight: 1.55,
-                }}
-              >
-                <div style={{ fontWeight: "bold", marginBottom: "5px" }}>
-                  Terms & Condition
+        <div style={{ display: "flex", gap: "20px", marginBottom: "15px" }}>
+          <div style={{ flex: "1", fontSize: "9px" }}>
+            <div style={{ fontWeight: "bold", marginBottom: "5px" }}>
+              Terms & Condition
+            </div>
+            {data.terms.length > 0 ? (
+              data.terms.map((term, index) => (
+                <div key={index} style={{ marginBottom: "3px" }}>
+                  {term}
                 </div>
-                {data.terms.length > 0 ? (
-                  data.terms.map((term, index) => (
-                    <div key={index} style={{ marginBottom: "4px" }}>
-                      {term}
-                    </div>
-                  ))
-                ) : (
-                  <div>No terms and conditions specified.</div>
-                )}
-              </td>
-              <td
-                data-pdf-footer-block="bank"
-                style={{
-                  width: "42%",
-                  verticalAlign: "top",
-                  paddingLeft: "8px",
-                  fontSize: "9px",
-                  lineHeight: 1.55,
-                }}
-              >
-                <div style={{ width: "100%" }}>
-                  <div style={{ fontWeight: "bold", marginBottom: "4px" }}>
-                    Company&apos;s Bank Details
-                  </div>
-                  <div style={{ marginBottom: "2px", wordBreak: "break-word" }}>
-                    A/C Holder Name : {data.bank.accountHolderName}
-                  </div>
-                  <div style={{ marginBottom: "2px" }}>
-                    Bank Name : {data.bank.name}
-                  </div>
-                  <div style={{ marginBottom: "2px" }}>
-                    A/c No. : {data.bank.accountNo}
-                  </div>
-                  <div>Branch &amp; IFSC Code: {data.bank.IFSC}</div>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+              ))
+            ) : (
+              <div>No terms and conditions specified.</div>
+            )}
+          </div>
+          <div
+            style={{
+              width: "250px",
+              display: "flex",
+              justifyContent: "flex-end",
+            }}
+          >
+            <div style={{ width: "100%", fontSize: "9px" }}>
+              <div style={{ fontWeight: "bold", marginBottom: "5px" }}>
+                Company's Bank Details
+              </div>
+              <div style={{ fontSize: "10px", marginBottom: "2px" }}>
+                A/C Holder Name : {data.bank.accountHolderName}
+              </div>
+              <div style={{ fontSize: "10px", marginBottom: "2px" }}>
+                Bank Name : {data.bank.name}
+              </div>
+              <div style={{ fontSize: "10px", marginBottom: "2px" }}>
+                A/c No. : {data.bank.accountNo}
+              </div>
+              <div style={{ fontSize: "10px", marginBottom: "2px" }}>
+                Branch & IFS Code: {data.bank.IFSC}
+              </div>
+            </div>
+          </div>
+        </div>
 
         {/* Signature */}
        <div
   style={{
     textAlign: "right",
-    marginTop: "24px",
+    marginTop: "40px",
     fontSize: "9px",
   }}
 >
@@ -3785,7 +3626,7 @@ const NewInvoice = ({ invoice }) => {
         <div
           style={{
             textAlign: "center",
-            marginTop: "12px",
+            marginTop: "20px",
             fontSize: "8px",
             fontStyle: "italic",
           }}

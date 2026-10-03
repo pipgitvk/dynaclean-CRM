@@ -1,26 +1,9 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
-import { normalizeRoleKey } from "@/lib/roleKeyUtils";
 
-const HR_SALARY_ROLES = ["SUPERADMIN", "DIRECTOR", "HR HEAD", "HR", "HR Executive", "JUNIOR HR EXECUTIVE", "HR RECRUITER", "ACCOUNTANT"];
-const DELETE_ALLOWED_ROLES = ["SUPERADMIN", "DIRECTOR", "ADMIN"];
-const APPROVE_ALLOWED_ROLES = ["SUPERADMIN", "DIRECTOR", "ADMIN"];
-
-function hasSalaryRole(payload) {
-  const role = normalizeRoleKey(payload?.role ?? payload?.userRole ?? "");
-  return HR_SALARY_ROLES.some((r) => normalizeRoleKey(r) === role);
-}
-
-function hasDeleteRole(payload) {
-  const role = normalizeRoleKey(payload?.role ?? payload?.userRole ?? "");
-  return DELETE_ALLOWED_ROLES.some((r) => normalizeRoleKey(r) === role);
-}
-
-function hasApproveRole(payload) {
-  const role = normalizeRoleKey(payload?.role ?? payload?.userRole ?? "");
-  return APPROVE_ALLOWED_ROLES.some((r) => normalizeRoleKey(r) === role);
-}
+const HR_SALARY_ROLES = ["SUPERADMIN", "HR HEAD", "HR", "HR Executive", "JUNIOR HR EXECUTIVE", "HR RECRUITER", "ACCOUNTANT"];
+const DELETE_ALLOWED_ROLES = ["SUPERADMIN", "ADMIN"];
 
 const DEFAULT_LIMIT = 200;
 const MAX_LIMIT = 500;
@@ -32,7 +15,7 @@ const MAX_LIMIT = 500;
 export async function GET(request) {
   try {
     const payload = await getSessionPayload();
-    if (!payload || !hasSalaryRole(payload)) {
+    if (!payload || !HR_SALARY_ROLES.includes(payload.role)) {
       return NextResponse.json({ message: "Unauthorized access." }, { status: 403 });
     }
 
@@ -119,6 +102,7 @@ export async function GET(request) {
   }
 }
 
+const APPROVE_ALLOWED_ROLES = ["SUPERADMIN", "ADMIN"];
 const VALID_STATUS_TRANSITIONS = ["approved", "paid", "pending", "draft"];
 
 /**
@@ -129,7 +113,7 @@ const VALID_STATUS_TRANSITIONS = ["approved", "paid", "pending", "draft"];
 export async function PATCH(request) {
   try {
     const payload = await getSessionPayload();
-    if (!payload || !hasApproveRole(payload)) {
+    if (!payload || !APPROVE_ALLOWED_ROLES.includes(payload.role)) {
       return NextResponse.json({ message: "Unauthorized. Only HR / SUPERADMIN can update records." }, { status: 403 });
     }
 
@@ -176,7 +160,7 @@ export async function PATCH(request) {
 export async function DELETE(request) {
   try {
     const payload = await getSessionPayload();
-    if (!payload || !hasDeleteRole(payload)) {
+    if (!payload || !DELETE_ALLOWED_ROLES.includes(payload.role)) {
       return NextResponse.json({ message: "Unauthorized. Only HR / SUPERADMIN can delete records." }, { status: 403 });
     }
 

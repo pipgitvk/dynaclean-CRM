@@ -126,28 +126,15 @@ export async function POST(request, context) {
     if (!existing) {
       return NextResponse.json({ message: "Service not found" }, { status: 404 });
     }
-
-    const formData = await request.formData();
-    const action = String(formData.get("action") || "");
-    
-    const isComplaintService = String(existing.service_type || "").trim().toUpperCase() === "COMPLAINT";
-    const isInstallationService = String(existing.service_type || "").trim().toUpperCase() === "INSTALLATION";
-    const isInstallationVideoAction = action === "installation_completion_video";
-    
-    if (isInstallationVideoAction && !isInstallationService) {
-      return NextResponse.json(
-        { message: "Installation completion video is only for installation services." },
-        { status: 400 },
-      );
-    }
-    
-    if (!isInstallationVideoAction && !isComplaintService) {
+    if (String(existing.service_type || "").trim().toUpperCase() !== "COMPLAINT") {
       return NextResponse.json(
         { message: "Video steps are only for complaint services." },
         { status: 400 },
       );
     }
-    
+
+    const formData = await request.formData();
+    const action = String(formData.get("action") || "");
     const current = payloadFromRow(existing).steps;
     const blocked = missingBefore(current, action);
     if (blocked) {
@@ -180,35 +167,6 @@ export async function POST(request, context) {
         `INSERT INTO service_report_steps (service_id, ${action})
          VALUES (?, ?)
          ON DUPLICATE KEY UPDATE ${action} = ?`,
-        [serviceId, videoUrl, videoUrl],
-      );
-    } else if (isInstallationVideoAction) {
-      const file = formData.get("file");
-      if (!file || typeof file === "string" || file.size <= 0) {
-        return NextResponse.json({ message: "Choose a video to upload." }, { status: 400 });
-      }
-      if (file.size > MAX_VIDEO_BYTES) {
-        return NextResponse.json({ message: "Video is too large. Maximum size is 200 MB." }, { status: 400 });
-      }
-      const ext = videoExtension(file);
-      if (!ext) {
-        return NextResponse.json({ message: "Upload a video file (mp4, mov, webm, or 3gp)." }, { status: 400 });
-      }
-      if (!isServiceVideoCloudinaryEnabled()) {
-        return NextResponse.json({ message: "Cloudinary is not configured." }, { status: 500 });
-      }
-
-      const videoUrl = await uploadServiceReportVideo(
-        Buffer.from(await file.arrayBuffer()),
-        serviceId,
-        "installation_completion_video",
-      );
-
-      // Store in video_completion field (reusing existing column for consistency)
-      await conn.execute(
-        `INSERT INTO service_report_steps (service_id, video_completion)
-         VALUES (?, ?)
-         ON DUPLICATE KEY UPDATE video_completion = ?`,
         [serviceId, videoUrl, videoUrl],
       );
     } else if (action === "work_start") {

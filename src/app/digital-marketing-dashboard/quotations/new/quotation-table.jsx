@@ -263,9 +263,14 @@ export default function QuotationItemsTable({ items, setItems ,customerId}) {
                 </td>
                 <td className="border px-2 py-2">{item.hsn || "-"}</td>
                 <td className="border px-2 py-2 align-top">
-                  <div className="w-full min-w-[180px] text-sm p-2 whitespace-pre-wrap">
-                    {item.specification || "-"}
-                  </div>
+                  <textarea
+                    value={item.specification || ""}
+                    onChange={(e) =>
+                      handleChange(idx, "specification", e.target.value)
+                    }
+                    className="w-full min-w-[180px] text-sm p-2 border rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    rows={4}
+                  />
                 </td>
                 <td className="border px-2 py-2">
                   <input

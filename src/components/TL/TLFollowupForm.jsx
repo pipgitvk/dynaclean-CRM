@@ -148,7 +148,27 @@ export default function TLFollowupForm({
     setModelSearchInput("");
   }, [latestfollowup]);
 
-  const availableStages = stageOptions;
+  // Filter stages based on customer's current stage from database
+  const getAvailableStages = (currentStage) => {
+    if (!currentStage) return stageOptions;
+
+    const stageOrder = stageOptions;
+    const currentIndex = stageOrder.indexOf(currentStage);
+
+    // For final stages, only allow staying in the same stage or going back
+    if (
+      currentStage === "Won (Order Received)" ||
+      currentStage === "Lost" ||
+      currentStage === "Disqualified / Invalid Lead"
+    ) {
+      return [currentStage];
+    }
+
+    // Show current stage and all stages after it (progressive flow)
+    return stageOrder.slice(currentIndex);
+  };
+
+  const availableStages = getAvailableStages(customerCurrentStage);
 
   const handleChange = (e) => {
     const { name, value } = e.target;

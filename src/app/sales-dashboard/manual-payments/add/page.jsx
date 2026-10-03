@@ -53,7 +53,7 @@ export default function AddPaymentPage() {
 
             if (data.success) {
                 alert("Payment entry created successfully!");
-                router.push("/sales-dashboard/manual-payments");
+                router.push("/user-dashboard/manual-payments");
             } else {
                 alert(`Error: ${data.error}`);
             }

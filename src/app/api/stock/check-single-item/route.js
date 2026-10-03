@@ -1,6 +1,5 @@
 // /api/stock/check-single-item/route.js
 import { getDbConnection } from "@/lib/db";
-import { isSpare1110 } from "@/lib/isSpare1110";
 
 export async function POST(req) {
   try {
@@ -17,7 +16,6 @@ export async function POST(req) {
     console.log("Stock check - godown:", godown, "locationColumn:", locationColumn, "item_code:", item_code);
 
     let stockResults = [];
-    let allowZeroStock = isSpare1110(item_code);
 
     // Check if item_code contains alphabets
     const containsAlphabets = /[a-zA-Z]/.test(item_code);
@@ -71,15 +69,12 @@ export async function POST(req) {
       let spare_id = item_code;
       
       const [spareMatch] = await conn.execute(
-        `SELECT id, spare_number FROM spare_list
-         WHERE CAST(spare_number AS CHAR) = ? OR CAST(id AS CHAR) = ?
-         LIMIT 1`,
-        [String(item_code), String(item_code)],
+        `SELECT id FROM spare_list WHERE spare_number = ? OR id = ? LIMIT 1`,
+        [item_code, item_code]
       );
-
+      
       if (spareMatch.length > 0) {
         spare_id = spareMatch[0].id;
-        allowZeroStock = isSpare1110(item_code, spareMatch[0].spare_number);
       }
       
       const query = `
@@ -107,19 +102,9 @@ export async function POST(req) {
     }
 
     if (stockResults.length > 0) {
-      return new Response(
-        JSON.stringify({ stockResults, allowZeroStock }),
-        { status: 200 },
-      );
+      return new Response(JSON.stringify({ stockResults }), { status: 200 });
     } else {
-      return new Response(
-        JSON.stringify({
-          stockResults: [],
-          allowZeroStock,
-          message: "No stock found for this item.",
-        }),
-        { status: 200 },
-      );
+      return new Response(JSON.stringify({ stockResults: [], message: "No stock found for this item." }), { status: 200 });
     }
   } catch (error) {
     console.error("API error:", error);
