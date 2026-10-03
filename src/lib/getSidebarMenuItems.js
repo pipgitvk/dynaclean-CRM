@@ -550,6 +550,13 @@ const allMenuItems = [
         roles: ["SERVICE SUPPORT", "ADMIN", "SERVICE HEAD", "EA"],
         icon: "ClipboardList",
       },
+      {
+        path: "/user-dashboard/third-party-engineers",
+        name: "Third Party Service Engineers",
+        moduleKey: "third-party-engineers",
+        roles: ["SUPERADMIN", "ADMIN", "SERVICE SUPPORT"],
+        icon: "UserCheck",
+      },
     ],
   },
   {

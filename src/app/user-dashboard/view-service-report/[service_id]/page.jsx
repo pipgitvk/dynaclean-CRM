@@ -903,6 +903,20 @@ export default function ViewServiceReport({ params }) {
           {/* Checklist (Responsive) */}
           {!installationLayout && (
             <div className="mb-6 p-4 border rounded-md bg-gray-50 print-section">
+              <h3 className="text-lg font-semibold mb-3">ASSIGNMENT DETAILS</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-2 gap-x-6">
+                <ReadRow 
+                  label="Assigned To Type" 
+                  value={report.assigned_to_type === 'third_party' ? 'Third Party Service Engineer' : 'Internal Employee'} 
+                />
+                <ReadRow label="Assigned To" value={report.assigned_to} />
+              </div>
+            </div>
+          )}
+
+          {/* Checklist (Responsive) */}
+          {!installationLayout && (
+            <div className="mb-6 p-4 border rounded-md bg-gray-50 print-section">
               <h3 className="text-lg font-semibold mb-3">
                 CHECKLIST
               </h3>
