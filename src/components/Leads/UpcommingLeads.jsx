@@ -2,6 +2,7 @@
 import { getDbConnection } from "@/lib/db";
 import TaskTable from "./TaskTable";
 import UpcomingLeadsCards from "./UpcomingLeadsCards";
+import UpcomingLeadsTable from "./UpcomingLeadsTable";
 import { Suspense } from "react";
 import Link from "next/link";
 
@@ -140,6 +141,19 @@ export default async function UpcomingLeads({
             dashboardPrefix={dashboardPrefix}
           />
         </Suspense>
+        
+        {/* Show table when we have date filters - only in compact/dashboard view */}
+        {compact && (
+          <Suspense
+            fallback={<div className="py-5">Loading filtered data...</div>}
+          >
+            <UpcomingLeadsTable
+              leadSource={leadSource}
+              userRole={userRole}
+              dashboardPrefix={dashboardPrefix}
+            />
+          </Suspense>
+        )}
       </div>
       {!compact && <TaskTable tasks={Tablerows} userRole={userRole} />}
     </div>

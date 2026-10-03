@@ -47,11 +47,14 @@ export default function UpcomingLeadsCards({
   const [tagFilter, setTagFilter] = useState(""); // empty or specific tag
   const isServiceSupport = userRole === "SERVICE SUPPORT";
 
-  // Functions to handle date changes and save to localStorage
   const handleStartDateChange = (newDate) => {
     setStartDate(newDate);
     if (typeof window !== 'undefined') {
       localStorage.setItem('upcomingLeads_startDate', newDate);
+      // Dispatch event to notify table of filter change
+      window.dispatchEvent(new CustomEvent('upcomingLeadsFilterChanged', { 
+        detail: { startDate: newDate, endDate }
+      }));
     }
   };
 
@@ -59,6 +62,10 @@ export default function UpcomingLeadsCards({
     setEndDate(newDate);
     if (typeof window !== 'undefined') {
       localStorage.setItem('upcomingLeads_endDate', newDate);
+      // Dispatch event to notify table of filter change
+      window.dispatchEvent(new CustomEvent('upcomingLeadsFilterChanged', { 
+        detail: { startDate, endDate: newDate }
+      }));
     }
   };
 
@@ -69,6 +76,10 @@ export default function UpcomingLeadsCards({
     if (typeof window !== 'undefined') {
       localStorage.setItem('upcomingLeads_startDate', today);
       localStorage.setItem('upcomingLeads_endDate', today);
+      // Dispatch event to notify table of filter change
+      window.dispatchEvent(new CustomEvent('upcomingLeadsFilterChanged', { 
+        detail: { startDate: today, endDate: today }
+      }));
     }
   };
 
