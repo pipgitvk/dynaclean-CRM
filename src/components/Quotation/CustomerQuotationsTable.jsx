@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import QuotationViewModal from "@/components/Quotation/QuotationViewModal";
 
 export default function CustomerQuotationsTable({ customerId, customerName, username, role }) {

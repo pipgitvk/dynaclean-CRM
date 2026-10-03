@@ -22,21 +22,25 @@ export default function UpcomingLeadsTable({
   const lastFetchRef = useRef({ startDate: '', endDate: '' });
 
   const fetchFilteredData = async (startDate, endDate) => {
-    if (!startDate && !endDate) return;
-    
     setLoading(true);
     try {
-      let url = `/api/upcoming-leads-table?leadSource=${leadSource}&userRole=${userRole}`;
+      let url;
       
-      if (startDate) url += `&startDate=${startDate}`;
-      if (endDate) url += `&endDate=${endDate}`;
+      if (startDate || endDate) {
+        // Date filter set hai - use table API (strict date filter)
+        url = `/api/upcoming-leads-table?leadSource=${leadSource}&userRole=${userRole}`;
+        if (startDate) url += `&startDate=${startDate}`;
+        if (endDate) url += `&endDate=${endDate}`;
+      } else {
+        // No date filter - use same API as cards (saara same data)
+        url = `/api/upcoming-leads?leadSource=${leadSource}&userRole=${userRole}`;
+      }
       
       const res = await fetch(url);
       const data = await res.json();
       
       let filtered = data.leads || [];
       
-      // Already filtered by API, just apply some client-side processing if needed
       const invalidStatuses = isServiceSupport
         ? ["invalid", "disqualified"]
         : ["invalid", "disqualified", "denied"];
@@ -49,7 +53,6 @@ export default function UpcomingLeadsTable({
         filtered = filtered.filter((cust) => cust.service_next_followup);
       }
 
-      // Already sorted by API, but ensure sorting
       filtered.sort((a, b) => {
         const dateField = isServiceSupport ? "service_next_followup" : "next_followup_date";
         const aTime = a[dateField] ? getCrmInstantMs(a[dateField]) : Infinity;
@@ -60,48 +63,34 @@ export default function UpcomingLeadsTable({
       setFilteredData(filtered);
       lastFetchRef.current = { startDate, endDate };
       
-      // Notify parent about count update
-      if (onCountChange) {
-        onCountChange(filtered.length);
-      }
-      // Also emit custom event for the header
+      if (onCountChange) onCountChange(filtered.length);
       window.dispatchEvent(new CustomEvent('tableCountUpdate', { detail: { count: filtered.length } }));
     } catch (err) {
-      console.error("Failed to fetch filtered leads", err);
+      console.error("Failed to fetch leads", err);
     } finally {
       setLoading(false);
     }
   };
 
-  // Listen for filter changes - only once on mount
+  // On mount: always fetch (with or without dates)
   useEffect(() => {
+    // Clear stale localStorage dates
     if (typeof window !== 'undefined') {
-      const startDate = localStorage.getItem('upcomingLeads_startDate') || '';
-      const endDate = localStorage.getItem('upcomingLeads_endDate') || '';
-      
-      if (startDate || endDate) {
-        setShowTable(true);
-        fetchFilteredData(startDate, endDate);
-      }
+      localStorage.removeItem('upcomingLeads_startDate');
+      localStorage.removeItem('upcomingLeads_endDate');
     }
+    
+    setShowTable(true);
+    fetchFilteredData('', '');
 
-    // Listen for filter change event from cards component
+    // Listen for filter changes from cards component
     const handleFilterChange = (event) => {
       const { startDate, endDate } = event.detail;
-      if (startDate || endDate) {
-        setShowTable(true);
-        fetchFilteredData(startDate, endDate);
-      } else {
-        setShowTable(false);
-        setFilteredData([]);
-      }
+      fetchFilteredData(startDate || '', endDate || '');
     };
 
     window.addEventListener('upcomingLeadsFilterChanged', handleFilterChange);
-
-    return () => {
-      window.removeEventListener('upcomingLeadsFilterChanged', handleFilterChange);
-    };
+    return () => window.removeEventListener('upcomingLeadsFilterChanged', handleFilterChange);
   }, []);
 
   // Filter by search
@@ -127,7 +116,9 @@ export default function UpcomingLeadsTable({
     setCurrentPage(1);
   }, [search]);
 
-  if (!showTable) return null;
+  if (loading && filteredData.length === 0) return (
+    <div className="mt-6 border-t border-slate-200 pt-4 text-sm text-gray-400">Loading leads...</div>
+  );
 
   return (
     <div className="mt-6 border-t border-slate-200 pt-6">

@@ -2,7 +2,7 @@ import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import CustomerQuotationsTable from "@/app/admin-dashboard/view-customer/[customerId]/quotations/CustomerQuotationsTable";
+import CustomerQuotationsTable from "@/components/Quotation/CustomerQuotationsTable";
 
 export const dynamic = "force-dynamic";
 

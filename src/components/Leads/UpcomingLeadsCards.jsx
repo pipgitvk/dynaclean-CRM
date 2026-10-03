@@ -22,169 +22,117 @@ export default function UpcomingLeadsCards({
 }) {
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [sortOrder, setSortOrder] = useState("soonest"); // soonest | latest | name
-  const [startDate, setStartDate] = useState(() => {
-    // For Service Support, default to empty (show all upcoming followups)
-    // For others, use today's date
-    if (typeof window !== 'undefined') {
-      const savedStartDate = localStorage.getItem('upcomingLeads_startDate');
-      if (savedStartDate) return savedStartDate;
-    }
-    // No default date filter - show all upcoming followups
-    return "";
-  });
-  const [endDate, setEndDate] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const savedEndDate = localStorage.getItem('upcomingLeads_endDate');
-      if (savedEndDate) return savedEndDate;
-    }
-    // No default date filter - show all upcoming followups
-    return "";
-  });
-  const [statusFilter, setStatusFilter] = useState("ALL"); // ALL or specific status
-  const [stageFilter, setStageFilter] = useState("ALL"); // ALL or specific stage
-  const [multiTagFilter, setMultiTagFilter] = useState("ALL"); // ALL or specific multi-tag
-  const [tagFilter, setTagFilter] = useState(""); // empty or specific tag
   const isServiceSupport = userRole === "SERVICE SUPPORT";
 
-  const handleStartDateChange = (newDate) => {
-    setStartDate(newDate);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('upcomingLeads_startDate', newDate);
-      // Dispatch event to notify table of filter change
-      window.dispatchEvent(new CustomEvent('upcomingLeadsFilterChanged', { 
-        detail: { startDate: newDate, endDate }
-      }));
-    }
-  };
+  // UI state (what user selects but not yet applied)
+  const [sortOrder, setSortOrder] = useState("soonest");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [statusFilter, setStatusFilter] = useState("ALL");
+  const [stageFilter, setStageFilter] = useState("ALL");
+  const [multiTagFilter, setMultiTagFilter] = useState("ALL");
+  const [tagFilter, setTagFilter] = useState("");
 
-  const handleEndDateChange = (newDate) => {
-    setEndDate(newDate);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('upcomingLeads_endDate', newDate);
-      // Dispatch event to notify table of filter change
-      window.dispatchEvent(new CustomEvent('upcomingLeadsFilterChanged', { 
-        detail: { startDate, endDate: newDate }
-      }));
-    }
-  };
+  // Applied state (what was last fetched with)
+  const [appliedFilters, setAppliedFilters] = useState({
+    sortOrder: "soonest",
+    startDate: "",
+    endDate: new Date().toISOString().split('T')[0],
+    statusFilter: "ALL",
+    stageFilter: "ALL",
+    multiTagFilter: "ALL",
+    tagFilter: "",
+  });
 
-  const resetToToday = () => {
-    const today = new Date().toISOString().split('T')[0];
-    setStartDate(today);
-    setEndDate(today);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('upcomingLeads_startDate', today);
-      localStorage.setItem('upcomingLeads_endDate', today);
-      // Dispatch event to notify table of filter change
-      window.dispatchEvent(new CustomEvent('upcomingLeadsFilterChanged', { 
-        detail: { startDate: today, endDate: today }
-      }));
+  async function fetchLeads(filters = appliedFilters) {
+    setLoading(true);
+    try {
+      let url = `/api/upcoming-leads?leadSource=${leadSource}&userRole=${userRole}`;
+      if (filters.startDate) url += `&startDate=${filters.startDate}`;
+      if (filters.endDate) url += `&endDate=${filters.endDate}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      setLeads(data.leads || []);
+    } catch (err) {
+      console.error("Failed to fetch leads", err);
+    } finally {
+      setLoading(false);
     }
-  };
+  }
 
+  // Initial load
   useEffect(() => {
-    async function fetchLeads() {
-      setLoading(true);
-      try {
-        let url = `/api/upcoming-leads?leadSource=${leadSource}&userRole=${userRole}`;
-        
-        // Add date parameters if they are set
-        if (startDate) url += `&startDate=${startDate}`;
-        if (endDate) url += `&endDate=${endDate}`;
-        
-        const res = await fetch(url);
-        const data = await res.json();
-        setLeads(data.leads || []);
-        console.log("Fetched leads:", data.leads);
-      } catch (err) {
-        console.error("Failed to fetch leads", err);
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchLeads();
-  }, [leadSource, userRole, startDate, endDate]);
+    fetchLeads({
+      sortOrder: "soonest",
+      startDate: "",
+      endDate: new Date().toISOString().split('T')[0],
+      statusFilter: "ALL",
+      stageFilter: "ALL",
+      multiTagFilter: "ALL",
+      tagFilter: "",
+    });
+  }, [leadSource, userRole]);
 
-  // Prepare filtered and sorted leads
+  const handleFetch = () => {
+    const newFilters = { sortOrder, startDate, endDate, statusFilter, stageFilter, multiTagFilter, tagFilter };
+    setAppliedFilters(newFilters);
+    fetchLeads(newFilters);
+
+    // Notify table
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('upcomingLeads_startDate', startDate);
+      localStorage.setItem('upcomingLeads_endDate', endDate);
+      window.dispatchEvent(new CustomEvent('upcomingLeadsFilterChanged', {
+        detail: { startDate, endDate }
+      }));
+    }
+  };
+
+  // Apply filters + sort on the fetched data
   const processedLeads = (() => {
     let filtered = [...leads];
 
-    // Exclude invalid statuses (like 'Invalid', 'Disqualified', 'Denied')
     const invalidStatuses = isServiceSupport
       ? ["invalid", "disqualified"]
       : ["invalid", "disqualified", "denied"];
-    filtered = filtered.filter((c) => {
-      const statusLower = (c.status || "").trim().toLowerCase();
-      return !invalidStatuses.includes(statusLower);
-    });
+    filtered = filtered.filter((c) => !invalidStatuses.includes((c.status || "").trim().toLowerCase()));
 
-    // For SERVICE SUPPORT, only show leads with service_next_followup set
     if (isServiceSupport) {
       filtered = filtered.filter((cust) => cust.service_next_followup);
     }
 
-    // Status filtering
-    if (statusFilter && statusFilter !== "ALL") {
-      const wanted = String(statusFilter).toLowerCase();
+    if (appliedFilters.statusFilter && appliedFilters.statusFilter !== "ALL") {
       filtered = filtered.filter((cust) =>
-        String(cust.status || "").toLowerCase() === wanted
+        String(cust.status || "").toLowerCase() === appliedFilters.statusFilter.toLowerCase()
       );
     }
 
-    // Stage filtering
-    if (stageFilter && stageFilter !== "ALL") {
-      const wantedStage = String(stageFilter).toLowerCase();
+    if (appliedFilters.stageFilter && appliedFilters.stageFilter !== "ALL") {
       filtered = filtered.filter((cust) =>
-        String(cust.stage || "").toLowerCase() === wantedStage
+        String(cust.stage || "").toLowerCase() === appliedFilters.stageFilter.toLowerCase()
       );
     }
 
-    // Multi-tag filtering
-    if (multiTagFilter && multiTagFilter !== "ALL") {
+    if (appliedFilters.multiTagFilter && appliedFilters.multiTagFilter !== "ALL") {
       filtered = filtered.filter((cust) => {
         const tags = String(cust.multi_tag || "").split(",").map(t => t.trim());
-        return tags.some(t => t === multiTagFilter);
+        return tags.some(t => t === appliedFilters.multiTagFilter);
       });
     }
 
-    // Tag filtering
-    if (tagFilter && tagFilter !== "") {
-      filtered = filtered.filter((cust) => {
-        return cust.tags === tagFilter;
-      });
+    if (appliedFilters.tagFilter && appliedFilters.tagFilter !== "") {
+      filtered = filtered.filter((cust) => cust.tags === appliedFilters.tagFilter);
     }
 
-    // Date filtering (now handled by API, so remove frontend filtering)
-    // if (startDate || endDate) {
-    //   const start = startDate ? new Date(`${startDate}T00:00:00`) : null;
-    //   const end = endDate ? new Date(`${endDate}T23:59:59`) : null;
-    //   const dateField = isServiceSupport ? "service_next_followup" : "next_followup_date";
-    //   filtered = filtered.filter((cust) => {
-    //     if (!cust[dateField]) return false; // hide if no date when filter applied
-    //     const ms = getCrmInstantMs(cust[dateField]);
-    //     if (!ms) return false;
-    //     const d = new Date(ms);
-    //     if (start && d < start) return false;
-    //     if (end && d > end) return false;
-    //     return true;
-    //   });
-    // }
-
-    // Sorting
     filtered.sort((a, b) => {
-      if (sortOrder === "name") {
+      if (appliedFilters.sortOrder === "name") {
         return (a.first_name || "").localeCompare(b.first_name || "");
       }
       const dateField = isServiceSupport ? "service_next_followup" : "next_followup_date";
-      const aTime = a[dateField]
-        ? getCrmInstantMs(a[dateField])
-        : Infinity;
-      const bTime = b[dateField]
-        ? getCrmInstantMs(b[dateField])
-        : Infinity;
-      if (sortOrder === "latest") return bTime - aTime; // latest first
-      return aTime - bTime; // default soonest first
+      const aTime = a[dateField] ? getCrmInstantMs(a[dateField]) : Infinity;
+      const bTime = b[dateField] ? getCrmInstantMs(b[dateField]) : Infinity;
+      if (appliedFilters.sortOrder === "latest") return bTime - aTime;
+      return aTime - bTime;
     });
 
     return filtered;
@@ -196,7 +144,6 @@ export default function UpcomingLeadsCards({
     ? "rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-violet-200"
     : "rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-1 focus:ring-violet-300";
 
-  // Scroll ref for arrow buttons
   const scrollRef = React.useRef(null);
   const scroll = (dir) => {
     if (scrollRef.current) {
@@ -206,11 +153,10 @@ export default function UpcomingLeadsCards({
 
   return (
     <div className={shellClass}>
-
       {/* ── Filter bar ── */}
       <div className="mb-3 flex flex-col gap-2">
 
-        {/* Row 1: Status, Stage, Multi-tag, Tags, Sort, Start date */}
+        {/* Row 1: Status, Stage, Multi-tag, Tags, Sort */}
         <div className="flex flex-wrap items-end gap-2">
           <div className="flex flex-col">
             <label className="mb-0.5 text-xs text-slate-500">Status</label>
@@ -262,30 +208,29 @@ export default function UpcomingLeadsCards({
               <option value="name">Customer name (A-Z)</option>
             </select>
           </div>
-          <div className="flex flex-col">
-            <label className="mb-0.5 text-xs text-slate-500">Start date</label>
-            <input type="date" className={controlClass} value={startDate} onChange={(e) => handleStartDateChange(e.target.value)} />
-          </div>
         </div>
 
-        {/* Row 2: End date + Reset */}
+        {/* Row 2: Start date, End date + Fetch */}
         <div className="flex flex-wrap items-end gap-2">
           <div className="flex flex-col">
+            <label className="mb-0.5 text-xs text-slate-500">Start date</label>
+            <input type="date" className={controlClass} value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+          </div>
+          <div className="flex flex-col">
             <label className="mb-0.5 text-xs text-slate-500">End date</label>
-            <input type="date" className={controlClass} value={endDate} onChange={(e) => handleEndDateChange(e.target.value)} />
+            <input type="date" className={controlClass} value={endDate} onChange={(e) => setEndDate(e.target.value)} />
           </div>
           <button
-            className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 transition"
-            onClick={resetToToday}
+            className="rounded-md bg-violet-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-violet-700 transition"
+            onClick={handleFetch}
           >
-            Reset to today
+            Fetch
           </button>
         </div>
       </div>
 
       {/* ── Cards + scroll arrows ── */}
       <div className="relative flex items-center">
-        {/* Left arrow */}
         <button
           onClick={() => scroll(-1)}
           className="absolute left-0 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-white shadow-md border border-gray-200 text-gray-500 hover:bg-gray-50 transition -translate-x-1/2"
@@ -294,7 +239,6 @@ export default function UpcomingLeadsCards({
           ‹
         </button>
 
-        {/* Scrollable card strip */}
         <div
           ref={scrollRef}
           className="w-full overflow-x-auto py-4 hide-scrollbar"
@@ -343,7 +287,6 @@ export default function UpcomingLeadsCards({
           </div>
         </div>
 
-        {/* Right arrow */}
         <button
           onClick={() => scroll(1)}
           className="absolute right-0 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-white shadow-md border border-gray-200 text-gray-500 hover:bg-gray-50 transition translate-x-1/2"
