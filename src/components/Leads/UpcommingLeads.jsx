@@ -2,7 +2,7 @@
 import { getDbConnection } from "@/lib/db";
 import TaskTable from "./TaskTable";
 import UpcomingLeadsCards from "./UpcomingLeadsCards";
-import UpcomingLeadsTable from "./UpcomingLeadsTable";
+import UpcomingLeadsTableWithHeader from "./UpcomingLeadsTableWithHeader";
 import { Suspense } from "react";
 import Link from "next/link";
 
@@ -79,18 +79,30 @@ export default async function UpcomingLeads({
 
   return (
     <div className={shellClass}>
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <h2
-          className={
-            variant === "sales"
-              ? "text-base font-bold text-violet-700"
-              : compact
-                ? "text-base font-semibold text-slate-800"
-                : "text-2xl font-bold text-violet-700"
-          }
-        >
-          Upcoming Enquiry
-        </h2>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2
+            className={
+              variant === "sales"
+                ? "text-base font-bold text-violet-700"
+                : compact
+                  ? "text-base font-semibold text-slate-800"
+                  : "text-2xl font-bold text-violet-700"
+            }
+          >
+            Upcoming Enquiry
+          </h2>
+          {compact && (
+            <Suspense fallback={<p className="text-xs text-slate-400 mt-0.5">Loading...</p>}>
+              <UpcomingLeadsTableWithHeader
+                leadSource={leadSource}
+                userRole={userRole}
+                dashboardPrefix={dashboardPrefix}
+                showHeaderOnly={true}
+              />
+            </Suspense>
+          )}
+        </div>
         <div className="flex items-center gap-2">
           {variant === "sales" ? (
             <Link
@@ -147,10 +159,11 @@ export default async function UpcomingLeads({
           <Suspense
             fallback={<div className="py-5">Loading filtered data...</div>}
           >
-            <UpcomingLeadsTable
+            <UpcomingLeadsTableWithHeader
               leadSource={leadSource}
               userRole={userRole}
               dashboardPrefix={dashboardPrefix}
+              showHeaderOnly={false}
             />
           </Suspense>
         )}

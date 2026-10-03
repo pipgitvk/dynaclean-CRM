@@ -209,9 +209,6 @@ export default function UpcomingLeadsCards({
 
       {/* ── Filter bar ── */}
       <div className="mb-3 flex flex-col gap-2">
-        <p className="text-sm text-slate-500">
-          Showing {processedLeads.length} of {leads.length} leads
-        </p>
 
         {/* Row 1: Status, Stage, Multi-tag, Tags, Sort, Start date */}
         <div className="flex flex-wrap items-end gap-2">

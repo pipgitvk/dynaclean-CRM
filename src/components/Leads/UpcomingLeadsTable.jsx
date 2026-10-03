@@ -10,6 +10,7 @@ export default function UpcomingLeadsTable({
   leadSource,
   userRole = "",
   dashboardPrefix = "/user-dashboard",
+  onCountChange = null,
 }) {
   const [filteredData, setFilteredData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -58,6 +59,13 @@ export default function UpcomingLeadsTable({
 
       setFilteredData(filtered);
       lastFetchRef.current = { startDate, endDate };
+      
+      // Notify parent about count update
+      if (onCountChange) {
+        onCountChange(filtered.length);
+      }
+      // Also emit custom event for the header
+      window.dispatchEvent(new CustomEvent('tableCountUpdate', { detail: { count: filtered.length } }));
     } catch (err) {
       console.error("Failed to fetch filtered leads", err);
     } finally {
@@ -124,9 +132,9 @@ export default function UpcomingLeadsTable({
   return (
     <div className="mt-6 border-t border-slate-200 pt-6">
       <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-slate-800">
-          Filtered Results ({filteredData.length} leads)
-        </h3>
+        <p className="text-sm text-slate-600">
+          Showing {searchFilteredData.length} of {filteredData.length} leads
+        </p>
         
         {/* Search Box */}
         <div className="flex items-center gap-2">
@@ -217,27 +225,20 @@ export default function UpcomingLeadsTable({
                           </span>
                         </td>
                         <td className="px-4 py-3">
-                          <div className="flex justify-center gap-1">
+                          <div className="flex justify-center gap-2">
                             <a
-                              href={`${dashboardPrefix}/customers/${lead.customer_id}`}
-                              className="text-blue-600 hover:text-blue-800 p-1"
+                              href={`${dashboardPrefix.replace('/sales-dashboard', '/user-dashboard')}/view-customer/${lead.customer_id}`}
+                              className="text-blue-600 hover:text-blue-800 p-1 inline-flex items-center gap-1 text-xs font-medium"
                               title="View"
                             >
-                              <Eye size={14} />
+                              <Eye size={14} /> View
                             </a>
                             <a
-                              href={`${dashboardPrefix}/customers/${lead.customer_id}/follow-up`}
-                              className="text-green-600 hover:text-green-800 p-1"
+                              href={`${dashboardPrefix.replace('/sales-dashboard', '/user-dashboard')}/view-customer/${lead.customer_id}/follow-up?source=upcoming`}
+                              className="text-green-600 hover:text-green-800 p-1 inline-flex items-center gap-1 text-xs font-medium"
                               title="Follow Up"
                             >
-                              <PenLine size={14} />
-                            </a>
-                            <a
-                              href={`${dashboardPrefix}/customers/${lead.customer_id}/edit`}
-                              className="text-purple-600 hover:text-purple-800 p-1"
-                              title="Edit"
-                            >
-                              <Repeat size={14} />
+                              <PenLine size={14} /> Follow
                             </a>
                           </div>
                         </td>
@@ -275,26 +276,20 @@ export default function UpcomingLeadsTable({
                         </h4>
                         <p className="text-xs text-gray-500">ID: {lead.customer_id}</p>
                       </div>
-                      <div className="flex gap-1">
-                        <a
-                          href={`${dashboardPrefix}/customers/${lead.customer_id}`}
-                          className="text-blue-600 hover:text-blue-800 p-1"
-                        >
-                          <Eye size={14} />
-                        </a>
-                        <a
-                          href={`${dashboardPrefix}/customers/${lead.customer_id}/follow-up`}
-                          className="text-green-600 hover:text-green-800 p-1"
-                        >
-                          <PenLine size={14} />
-                        </a>
-                        <a
-                          href={`${dashboardPrefix}/customers/${lead.customer_id}/edit`}
-                          className="text-purple-600 hover:text-purple-800 p-1"
-                        >
-                          <Repeat size={14} />
-                        </a>
-                      </div>
+                      <div className="flex gap-2 mt-3">
+                      <a
+                        href={`${dashboardPrefix.replace('/sales-dashboard', '/user-dashboard')}/view-customer/${lead.customer_id}`}
+                        className="text-blue-600 hover:text-blue-800 text-xs font-medium inline-flex items-center gap-1"
+                      >
+                        <Eye size={14} /> View
+                      </a>
+                      <a
+                        href={`${dashboardPrefix.replace('/sales-dashboard', '/user-dashboard')}/view-customer/${lead.customer_id}/follow-up?source=upcoming`}
+                        className="text-green-600 hover:text-green-800 text-xs font-medium inline-flex items-center gap-1"
+                      >
+                        <PenLine size={14} /> Follow
+                      </a>
+                    </div>
                     </div>
                     
                     <div className="space-y-1 text-sm text-gray-600">
