@@ -1,6 +1,8 @@
 import { getDbConnection } from "@/lib/db";
 import { NextResponse } from "next/server";
 import { getSessionPayload } from "@/lib/auth";
+import { canAccessPerformaInvoice } from "@/lib/performaInvoiceAccess";
+import { isPerformaInvoice } from "@/lib/ledgerInvoiceFilters";
 import {
   loadInvoiceWithItemsForPdf,
   sendInvoicePaymentNoticeEmail,
@@ -27,6 +29,10 @@ export async function GET(_req, context) {
     );
 
     if (!inv) {
+      return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+    }
+
+    if (!canAccessPerformaInvoice(payload, inv)) {
       return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
     }
 
@@ -153,6 +159,7 @@ export async function PATCH(req, context) {
       cgst_rate: bodyCgstRate = null,
       sgst_rate: bodySgstRate = null,
       igst_rate: bodyIgstRate = null,
+      status: bodyStatus = null,
     } = body;
 
     console.log("Invoice PATCH - Received gst_consignee:", gst_consignee);
@@ -235,12 +242,22 @@ export async function PATCH(req, context) {
         await conn.execute("ALTER TABLE invoice_items ADD COLUMN item_code VARCHAR(100) NULL");
       } catch (__) {}
     }
+    try {
+      await conn.execute("SELECT status FROM invoices LIMIT 1");
+    } catch (_) {
+      try {
+        await conn.execute("ALTER TABLE invoices ADD COLUMN status ENUM('PAID', 'PARTIAL PAID', 'CANCELLED') NULL DEFAULT NULL");
+      } catch (__) {}
+    }
 
     const [[existing]] = await conn.execute(
-      `SELECT id FROM invoices WHERE id = ? LIMIT 1`,
+      `SELECT id, type, created_by, employee_name FROM invoices WHERE id = ? LIMIT 1`,
       [invoiceId],
     );
     if (!existing) {
+      return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+    }
+    if (!canAccessPerformaInvoice(payload, existing)) {
       return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
     }
 
@@ -300,6 +317,7 @@ export async function PATCH(req, context) {
           buyers_order_no = ?, eway_bill_no = ?, delivery_challan_no = ?,
           customer_id = ?, linked_trans_ids = ?,
           cgst_rate = COALESCE(?, cgst_rate), sgst_rate = COALESCE(?, sgst_rate), igst_rate = COALESCE(?, igst_rate),
+          status = ?,
           created_at = ?
         WHERE id = ?`,
         [
@@ -339,6 +357,7 @@ export async function PATCH(req, context) {
           bodyCgstRate,
           bodySgstRate,
           bodyIgstRate,
+          bodyStatus,
           createdAtSql,
           invoiceId,
         ],
@@ -354,7 +373,8 @@ export async function PATCH(req, context) {
           amount_paid = ?, balance_amount = ?, payment_status = ?, notes = ?, terms_conditions = ?,
           buyers_order_no = ?, eway_bill_no = ?, delivery_challan_no = ?,
           customer_id = ?, linked_trans_ids = ?,
-          cgst_rate = COALESCE(?, cgst_rate), sgst_rate = COALESCE(?, sgst_rate), igst_rate = COALESCE(?, igst_rate)
+          cgst_rate = COALESCE(?, cgst_rate), sgst_rate = COALESCE(?, sgst_rate), igst_rate = COALESCE(?, igst_rate),
+          status = ?
         WHERE id = ?`,
         [
           quotation_id,
@@ -393,6 +413,7 @@ export async function PATCH(req, context) {
           bodyCgstRate,
           bodySgstRate,
           bodyIgstRate,
+          bodyStatus,
           invoiceId,
         ],
       );
@@ -460,6 +481,14 @@ export async function PATCH(req, context) {
       send_customer_payment_notice === "true";
     if (shouldNotifyCustomer) {
       try {
+        const invFull = await loadInvoiceWithItemsForPdf(pool, invoiceId);
+        if (invFull && isPerformaInvoice(invFull)) {
+          customerEmailNotice = {
+            sent: false,
+            skipped: true,
+            reason: "performa_invoice_no_email",
+          };
+        } else {
         const emailTrim =
           customer_email != null ? String(customer_email).trim() : "";
         if (!emailTrim) {
@@ -469,7 +498,6 @@ export async function PATCH(req, context) {
             reason: "missing_customer_email",
           };
         } else {
-          const invFull = await loadInvoiceWithItemsForPdf(pool, invoiceId);
           if (invFull) {
             customerEmailNotice =
               await sendInvoicePaymentNoticeEmail(invFull);
@@ -479,6 +507,7 @@ export async function PATCH(req, context) {
               error: "invoice_reload_failed",
             };
           }
+        }
         }
       } catch (emailErr) {
         console.error("Invoice PATCH customer email:", emailErr);

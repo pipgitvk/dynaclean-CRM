@@ -12,6 +12,7 @@ import {
   applySuperadminOnlyModuleRestrictions,
   applyRoleDenyModuleRestrictions,
 } from "@/lib/moduleAccess";
+import { getRoleDefaultModuleKeys } from "@/lib/roleDefaultModuleAccess";
 
 function uniqueStrings(arr) {
   return [...new Set((arr || []).map((v) => String(v || "").trim()).filter(Boolean))];
@@ -592,26 +593,7 @@ const QuickEditPage = () => {
 
   const setServiceHeadDefaults = () => {
     userEditedModulesRef.current = true;
-    const defaults = [
-      "dashboard-home",
-      "task-manager",
-      "add-customer",
-      "view-customers",
-      "employee-crm",
-      "quotations",
-      "orders-process",
-      "orders-delay",
-      "warranty-console",
-      "registered-products",
-      "service-followups",
-      "warranty-map",
-      "service-records",
-      "upcoming-installations",
-      "service-map",
-      "product-stock",
-      "spare-parts",
-      "installation-videos",
-    ]
+    const defaults = getRoleDefaultModuleKeys("SERVICE HEAD")
       .filter((k) => ALL_MODULE_KEYS.includes(k))
       .filter((k) => k !== "dm-fresh-leads");
 
@@ -621,26 +603,7 @@ const QuickEditPage = () => {
 
   const setServiceSupportDefaults = () => {
     userEditedModulesRef.current = true;
-    const defaults = [
-      "dashboard-home",
-      "task-manager",
-      "add-customer",
-      "view-customers",
-      "employee-crm",
-      "quotations",
-      "orders-process",
-      "orders-delay",
-      "warranty-console",
-      "registered-products",
-      "service-followups",
-      "warranty-map",
-      "service-records",
-      "upcoming-installations",
-      "service-map",
-      "product-stock",
-      "spare-parts",
-      "installation-videos",
-    ]
+    const defaults = getRoleDefaultModuleKeys("SERVICE SUPPORT")
       .filter((k) => ALL_MODULE_KEYS.includes(k))
       .filter((k) => k !== "dm-fresh-leads");
 

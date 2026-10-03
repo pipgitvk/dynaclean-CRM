@@ -6,8 +6,12 @@ import Modal from "@/components/ModalUser";
 import { Search, ArrowLeft } from "lucide-react";
 import dayjs from "dayjs";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { getDirectorDashboardHome } from "@/lib/directorHrPaths";
 
 export default function HrTodayReportPage() {
+  const pathname = usePathname();
+  const dashboardHome = getDirectorDashboardHome(pathname);
   const [data, setData] = useState({
     entries: [],
     stats: {
@@ -138,7 +142,7 @@ export default function HrTodayReportPage() {
   return (
     <div className="container mx-auto p-4 sm:p-6 lg:p-8 space-y-8">
       <div className="flex items-center gap-4 border-b-2 pb-2">
-        <Link href="/user-dashboard" className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+        <Link href={dashboardHome} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
           <ArrowLeft size={24} />
         </Link>
         <h1 className="text-3xl font-bold text-gray-800">

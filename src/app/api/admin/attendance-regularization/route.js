@@ -21,6 +21,17 @@ export async function GET() {
     }
 
     const conn = await getDbConnection();
+
+    try {
+      await conn.execute(
+        `ALTER TABLE attendance_regularization_requests
+         ADD COLUMN acknowledged_at DATETIME NULL,
+         ADD COLUMN acknowledged_by VARCHAR(255) NULL`
+      );
+    } catch (e) {
+      if (!String(e.message).includes("Duplicate column name")) throw e;
+    }
+
     const [rows] = await conn.execute(
       `SELECT *
        FROM attendance_regularization_requests
@@ -54,16 +65,37 @@ export async function PATCH(request) {
     }
 
     const body = await request.json();
-    const { id, action, reviewer_comment } = body;
+    const { id, action, reviewer_comment, acknowledgement_remark } = body;
 
-    if (!id || !["approve", "reject", "revert"].includes(action)) {
+    if (!id || !["approve", "reject", "revert", "acknowledge"].includes(action)) {
       return NextResponse.json(
-        { success: false, message: "id and action (approve|reject|revert) are required" },
+        { success: false, message: "id and action (approve|reject|revert|acknowledge) are required" },
         { status: 400 }
       );
     }
 
+    console.log(`[Attendance Regularization] Action: ${action}, ID: ${id}, Remark: "${acknowledgement_remark}"`);
+
+
     const conn = await getDbConnection();
+    try {
+      await conn.execute(
+        `ALTER TABLE attendance_regularization_requests
+         ADD COLUMN acknowledged_at DATETIME NULL,
+         ADD COLUMN acknowledged_by VARCHAR(255) NULL`
+      );
+    } catch (e) {
+      if (!String(e.message).includes("Duplicate column name")) throw e;
+    }
+    try {
+      await conn.execute(
+        `ALTER TABLE attendance_regularization_requests
+         ADD COLUMN acknowledgement_remark longtext DEFAULT NULL`
+      );
+    } catch (e) {
+      if (!String(e.message).includes("Duplicate column name")) throw e;
+    }
+
     const [reqRows] = await conn.execute(
       `SELECT * FROM attendance_regularization_requests WHERE id = ? LIMIT 1`,
       [id]
@@ -73,26 +105,96 @@ export async function PATCH(request) {
     }
 
     const reqRow = reqRows[0];
-    
-    // Handle revert action
-    if (action === "revert") {
-      if (!["approved", "rejected"].includes(reqRow.status)) {
+
+    // Handle acknowledge action - status stays the same, only acknowledged_at/by set
+    if (action === "acknowledge") {
+      if (reqRow.acknowledged_at) {
         return NextResponse.json(
-          { success: false, message: "Only approved or rejected requests can be reverted." },
+          { success: false, message: "This request is already acknowledged." },
           { status: 409 }
         );
       }
-      
+      await conn.execute(
+        `UPDATE attendance_regularization_requests SET
+          acknowledged_at = NOW(),
+          acknowledged_by = ?,
+          acknowledgement_remark = ?
+         WHERE id = ?`,
+        [payload.username, acknowledgement_remark || null, id]
+      );
+      return NextResponse.json({ success: true, message: "Request acknowledged." });
+    }
+    
+    // Handle revert action
+    if (action === "revert") {
+      // Allow reverting acknowledged requests OR approved/rejected requests
+      if (!["approved", "rejected"].includes(reqRow.status) && !reqRow.acknowledged_at) {
+        return NextResponse.json(
+          { success: false, message: "Only approved, rejected, or acknowledged requests can be reverted." },
+          { status: 409 }
+        );
+      }
+
+      // If it was approved, undo the attendance_logs change by restoring original times
+      if (reqRow.status === "approved") {
+        const [logRows] = await conn.execute(
+          `SELECT * FROM attendance_logs WHERE username = ? AND date = ? LIMIT 1`,
+          [reqRow.username, reqRow.log_date]
+        );
+
+        if (logRows.length > 0) {
+          const hadOriginalData =
+            reqRow.original_checkin_time != null ||
+            reqRow.original_checkout_time != null;
+
+          if (!hadOriginalData) {
+            await conn.execute(
+              `DELETE FROM attendance_logs WHERE username = ? AND date = ?`,
+              [reqRow.username, reqRow.log_date]
+            );
+          } else {
+            await conn.execute(
+              `UPDATE attendance_logs SET
+                checkin_time = ?,
+                checkout_time = ?,
+                break_morning_start = ?,
+                break_morning_end = ?,
+                break_lunch_start = ?,
+                break_lunch_end = ?,
+                break_evening_start = ?,
+                break_evening_end = ?
+               WHERE username = ? AND date = ?`,
+              [
+                reqRow.original_checkin_time ?? null,
+                reqRow.original_checkout_time ?? null,
+                reqRow.original_break_morning_start ?? null,
+                reqRow.original_break_morning_end ?? null,
+                reqRow.original_break_lunch_start ?? null,
+                reqRow.original_break_lunch_end ?? null,
+                reqRow.original_break_evening_start ?? null,
+                reqRow.original_break_evening_end ?? null,
+                reqRow.username,
+                reqRow.log_date,
+              ]
+            );
+          }
+        }
+      }
+
+      // Reset everything back to pending - clear acknowledgement and review fields
       await conn.execute(
         `UPDATE attendance_regularization_requests SET
           status = 'pending',
           reviewed_by = NULL,
           reviewed_at = NULL,
-          reviewer_comment = NULL
+          reviewer_comment = NULL,
+          acknowledged_at = NULL,
+          acknowledged_by = NULL,
+          acknowledgement_remark = NULL
          WHERE id = ?`,
         [id]
       );
-      
+
       return NextResponse.json({ success: true, message: "Request reverted to pending." });
     }
     
@@ -104,8 +206,8 @@ export async function PATCH(request) {
     }
 
     const comment =
-      reviewer_comment && String(reviewer_comment).trim()
-        ? String(reviewer_comment).trim()
+      (acknowledgement_remark || reviewer_comment) && String(acknowledgement_remark || reviewer_comment).trim()
+        ? String(acknowledgement_remark || reviewer_comment).trim()
         : null;
 
     if (action === "reject") {
@@ -114,17 +216,36 @@ export async function PATCH(request) {
           status = 'rejected',
           reviewed_by = ?,
           reviewed_at = NOW(),
-          reviewer_comment = ?
+          reviewer_comment = ?,
+          acknowledgement_remark = ?
          WHERE id = ?`,
-        [payload.username, comment, id]
+        [payload.username, comment, acknowledgement_remark || null, id]
       );
       return NextResponse.json({ success: true, message: "Request rejected." });
     }
 
-    const [logRows] = await conn.execute(
-      `SELECT * FROM attendance_logs WHERE username = ? AND date = ? LIMIT 1`,
-      [reqRow.username, reqRow.log_date]
+    await conn.execute(
+      `UPDATE attendance_regularization_requests SET
+        status = 'approved',
+        reviewed_by = ?,
+        reviewed_at = NOW(),
+        reviewer_comment = ?,
+        acknowledgement_remark = ?
+       WHERE id = ?`,
+      [payload.username, comment, acknowledgement_remark || null, id]
     );
+
+    console.log(`[Attendance] Approval saved for ID ${id}: status='approved', remark="${acknowledgement_remark || 'null'}"`);
+
+    // Log before updating attendance logs
+    console.log(`[Attendance] Now updating attendance logs for request ID ${id}...`);
+
+    // THEN: Update attendance logs (optional, doesn't affect remark)
+    try {
+      const [logRows] = await conn.execute(
+        `SELECT * FROM attendance_logs WHERE username = ? AND date = ? LIMIT 1`,
+        [reqRow.username, reqRow.log_date]
+      );
 
     let checkoutLat = logRows[0]?.checkout_latitude;
     let checkoutLon = logRows[0]?.checkout_longitude;
@@ -206,17 +327,12 @@ export async function PATCH(request) {
         ]
       );
     }
+    } catch (err) {
+      console.error(`[Attendance] Error updating attendance_logs for ID ${id}:`, err.message);
+      // Don't throw - approval already saved above
+    }
 
-    await conn.execute(
-      `UPDATE attendance_regularization_requests SET
-        status = 'approved',
-        reviewed_by = ?,
-        reviewed_at = NOW(),
-        reviewer_comment = ?
-       WHERE id = ?`,
-      [payload.username, comment, id]
-    );
-
+    console.log(`[Attendance] Request ID ${id} approved with remark: "${acknowledgement_remark || 'none'}"`);
     return NextResponse.json({ success: true, message: "Attendance updated and request approved." });
   } catch (error) {
     console.error("admin attendance-regularization PATCH:", error);

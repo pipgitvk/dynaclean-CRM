@@ -74,12 +74,24 @@ export async function POST(req) {
 
   try {
     switch (action) {
-      case 'checkin':
+      case 'checkin': {
+        const checkinLocationless =
+          latitude == null ||
+          latitude === "" ||
+          longitude == null ||
+          longitude === "";
+        if (checkinLocationless) {
+          return NextResponse.json(
+            { error: "Check-in requires GPS location." },
+            { status: 400 }
+          );
+        }
         await conn.execute(
           "INSERT INTO attendance_logs (username, date, checkin_time, checkin_latitude, checkin_longitude, checkin_address) VALUES (?, ?, ?, ?, ?, ?)",
           [username, today, now, latitude, longitude, locationAddress]
         );
         break;
+      }
 
       case 'break_morning':
         await conn.execute(

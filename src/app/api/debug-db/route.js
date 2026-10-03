@@ -38,8 +38,8 @@ export async function GET() {
       dbInfo: dbInfo[0],
       latest,
       sakshi,
-      envHost: process.env.DB_H0ST,
-      envDb: process.env.DB_NAEM,
+      envHost: process.env.DB_HOST,
+      envDb: process.env.DB_NAME,
       envUser: process.env.DB_USER,
     });
   } catch (error) {

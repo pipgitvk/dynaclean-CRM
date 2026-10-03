@@ -2,19 +2,27 @@ import { getDbConnection } from "@/lib/db";
 import { NextResponse } from "next/server";
 import { getSessionPayload } from "@/lib/auth";
 import { cookies } from "next/headers";
+import { ensureCustomersServiceColumns } from "@/lib/ensureCustomersServiceColumns";
+import { ensureCustomersGemColumns } from "@/lib/ensureCustomersGemColumns";
+import { ensureCustomerNotesLanguageColumn } from "@/lib/ensureCustomerNotesLanguageColumn";
+import { latestFollowupNotesLanguageSelectSql } from "@/lib/customerFollowupNotesLanguage";
 
 export async function GET(request, { params }) {
   const { customerId } = await params;
 
   try {
     const conn = await getDbConnection();
+    await ensureCustomersServiceColumns(conn);
+    await ensureCustomersGemColumns(conn);
+    await ensureCustomerNotesLanguageColumn(conn);
     const [rows] = await conn.execute(
       `SELECT c.*,
         IF(EXISTS (
           SELECT 1 FROM neworder no
           INNER JOIN quotations_records qr ON no.quote_number = qr.quote_number
           WHERE qr.customer_id = c.customer_id
-        ), 1, 0) AS has_order
+        ), 1, 0) AS has_order,
+        ${latestFollowupNotesLanguageSelectSql}
        FROM customers c
        WHERE c.customer_id = ?
        LIMIT 1`,
@@ -28,7 +36,8 @@ export async function GET(request, { params }) {
       );
     }
 
-    return NextResponse.json(rows[0]);
+    const customer = rows[0];
+    return NextResponse.json(customer);
   } catch (error) {
     console.error("Database query error:", error);
     return NextResponse.json(
@@ -46,9 +55,11 @@ export async function PATCH(request, { params }) {
   const userRole = payload?.role;
   const isServiceUser = userRole === "SERVICE SUPPORT" || userRole === "SERVICE HEAD";
   const isSuperAdminOrEA = userRole === "SUPERADMIN" || userRole === "EA";
+  const isSalesCumBackoffice = userRole === "SALES CUM BACKOFFICE";
+  const canUpdateAllLeadFields = isSuperAdminOrEA || isSalesCumBackoffice;
 
   // Basic validation
-  if (!isServiceUser && !isSuperAdminOrEA && !lead_source) {
+  if (!isServiceUser && !canUpdateAllLeadFields && !lead_source) {
     return NextResponse.json({ error: "Lead source is required." }, { status: 400 });
   }
 
@@ -74,8 +85,8 @@ export async function PATCH(request, { params }) {
 
     let result;
 
-    if (isSuperAdminOrEA) {
-      // SUPERADMIN / EA: update lead_source + service_lead_source + gem_lead_source all at once
+    if (canUpdateAllLeadFields) {
+      // SUPERADMIN / EA / SALES CUM BACKOFFICE: update lead_source + service_lead_source + gem_lead_source
       const newLeadSource = lead_source !== undefined ? lead_source : currentData.lead_source;
       const newServiceLeadSource = service_lead_source !== undefined
         ? (service_lead_source === '' ? null : service_lead_source)

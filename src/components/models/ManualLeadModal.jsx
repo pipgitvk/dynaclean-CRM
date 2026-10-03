@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { toast } from "react-hot-toast";
 import { useUser } from "../../context/UserContext";
+import SearchableSelect from "@/components/ui/SearchableSelect";
 
 export default function ManualLeadModal({ show, onClose }) {
   const [rawText, setRawText] = useState("");
@@ -9,14 +10,40 @@ export default function ManualLeadModal({ show, onClose }) {
   const [selectedSource, setSelectedSource] = useState("");
   const [leadCampaign, setLeadCampaign] = useState("");
   const [followupNotes, setFollowupNotes] = useState("");
+  const [salesReps, setSalesReps] = useState([]);
+  const [assignActiveTo, setAssignActiveTo] = useState("");
   const { user } = useUser();
 
   useEffect(() => {
     if (show) {
-      fetch("/api/lead/sources")
+      fetch("/api/lead-sources")
         .then((res) => res.json())
-        .then((data) => setLeadSources(data))
-        .catch(console.error);
+        .then((data) => {
+          if (data.success && data.employees) {
+            setLeadSources(data.employees.map(emp => emp.username));
+          } else {
+            setLeadSources([]);
+          }
+        })
+        .catch((error) => {
+          console.error("Error fetching lead sources:", error);
+          setLeadSources([]);
+        });
+
+      // Fetch sales reps from rep_list
+      fetch("/api/tl-assign-lead")
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success && data.employees) {
+            setSalesReps(data.employees.map(emp => emp.username));
+          } else {
+            setSalesReps([]);
+          }
+        })
+        .catch((error) => {
+          console.error("Error fetching sales reps:", error);
+          setSalesReps([]);
+        });
     }
   }, [show]);
 
@@ -97,6 +124,7 @@ export default function ManualLeadModal({ show, onClose }) {
     setSelectedSource("");
     setLeadCampaign("");
     setFollowupNotes("");
+    setAssignActiveTo("");
   };
 
   const submitLead = async () => {
@@ -108,13 +136,13 @@ export default function ManualLeadModal({ show, onClose }) {
       phone: analyzed.phone,
       address: analyzed.address,
       company: analyzed.company,
-      lead_source: selectedSource,
+      lead_source: selectedSource || assignActiveTo,
       lead_campaign: leadCampaign,
       status: "New",
       followup_notes: followupNotes,
       communication_history: "",
       products_interest: analyzed.product,
-      sales_representative: selectedSource,
+      sales_representative: assignActiveTo || selectedSource,
       assigned_to: user?.username || "",
       tags: "",
       notes: followupNotes,
@@ -263,15 +291,31 @@ export default function ManualLeadModal({ show, onClose }) {
               </label>
               <label className="block text-sm sm:text-base">
                 Assign To:
+                <div className="mt-1">
+                  <SearchableSelect
+                    value={selectedSource}
+                    onChange={setSelectedSource}
+                    placeholder="Select source"
+                    searchPlaceholder="Search employee..."
+                    options={leadSources.map((src) => ({
+                      value: src,
+                      label: src,
+                    }))}
+                  />
+                </div>
+              </label>
+              <label className="block text-sm sm:text-base">
+                Assign Active To: <span className="text-red-600">*</span>
                 <select
-                  value={selectedSource}
-                  onChange={(e) => setSelectedSource(e.target.value)}
-                  className="w-full border p-1 rounded text-sm sm:text-base"
+                  value={assignActiveTo}
+                  onChange={(e) => setAssignActiveTo(e.target.value)}
+                  className="w-full border p-1 rounded text-sm sm:text-base mt-1"
+                  required
                 >
-                  <option value="">Select source</option>
-                  {leadSources.map((src) => (
-                    <option key={src} value={src}>
-                      {src}
+                  <option value="">Select sales rep</option>
+                  {salesReps.map((rep) => (
+                    <option key={rep} value={rep}>
+                      {rep}
                     </option>
                   ))}
                 </select>
@@ -286,10 +330,10 @@ export default function ManualLeadModal({ show, onClose }) {
               </button>
               <button
                 onClick={submitLead}
-                disabled={!selectedSource || !leadCampaign}
+                disabled={!leadCampaign || !assignActiveTo}
                 className="bg-blue-600 text-white px-4 py-2 rounded shadow text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed order-1 sm:order-2"
               >
-                Send to {selectedSource || "..."}
+                Send to {selectedSource || assignActiveTo || "lead"}
               </button>
             </div>
           </>

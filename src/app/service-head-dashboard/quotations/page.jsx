@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import UserQuotationsListClient from "./UserQuotationsListClient";
+import { userHasModuleKey } from "@/lib/userModuleAccessServer";
 
 export const dynamic = "force-dynamic";
 
@@ -127,6 +128,7 @@ export default async function QuotationPage({ searchParams }) {
   };
 
   const quotations = await getQuotations(username, role, filters);
+  const canPerformaInvoice = await userHasModuleKey(username, role, "performa-invoices");
 
   return (
     <div className="max-w-7xl mx-auto p-6 space-y-4">
@@ -134,16 +136,26 @@ export default async function QuotationPage({ searchParams }) {
         <h1 className="text-2xl font-bold text-gray-800">
           Quotation Management
         </h1>
-        <Link
-          href={
-            filters.customer_id
-              ? `/user-dashboard/quotations/new?customerId=${encodeURIComponent(filters.customer_id)}`
-              : "/user-dashboard/quotations/new"
-          }
-          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-center"
-        >
-          + New Quotation
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link
+            href={
+              filters.customer_id
+                ? `/user-dashboard/quotations/new?customerId=${encodeURIComponent(filters.customer_id)}`
+                : "/user-dashboard/quotations/new"
+            }
+            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-center"
+          >
+            + New Quotation
+          </Link>
+          {canPerformaInvoice ? (
+            <Link
+              href="/service-head-dashboard/invoices/performa"
+              className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 text-center"
+            >
+              Performa Invoice
+            </Link>
+          ) : null}
+        </div>
       </div>
 
       <form

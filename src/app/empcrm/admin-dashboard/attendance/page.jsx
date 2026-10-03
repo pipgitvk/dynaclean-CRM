@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
-import { Loader2, Search, Info, Pencil } from "lucide-react";
+import { Loader2, Search, Info, Pencil, Sun } from "lucide-react";
 import ExcelJS from "exceljs";
 import {
   DEFAULT_ATTENDANCE_RULES,
@@ -52,11 +52,25 @@ function combineDateAndTimeForDb(dateYmd, timeHHmm) {
   return `${dateYmd} ${hh}:${mm}:00`;
 }
 
+function toYmd(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function currentMonthRange() {
+  const now = new Date();
+  const first = new Date(now.getFullYear(), now.getMonth(), 1);
+  return { from: toYmd(first), to: toYmd(now) };
+}
+
 const AttendancePage = () => {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [fromDate, setFromDate] = useState("");
-  const [toDate, setToDate] = useState("");
+  const initialRange = currentMonthRange();
+  const [fromDate, setFromDate] = useState(initialRange.from);
+  const [toDate, setToDate] = useState(initialRange.to);
   const [filterStatus, setFilterStatus] = useState("all");
   const [selectedUser, setSelectedUser] = useState("all");
   /** Set only after clicking Search; drives summary + table */
@@ -259,8 +273,9 @@ const AttendancePage = () => {
 
   const handleShowAll = () => {
     setFilterStatus("all");
-    setFromDate("");
-    setToDate("");
+    const { from, to } = currentMonthRange();
+    setFromDate(from);
+    setToDate(to);
   };
 
   const handleSearch = () => {
@@ -348,6 +363,23 @@ const AttendancePage = () => {
   const generateAttendanceTimeline = (userLogs, user) => {
     const allDates = [];
 
+    // Helper: derive half_day_type from start_time / end_time using standard lunch break (13:00).
+    const deriveHalfDayType = (startTime, endTime) => {
+      const toMin = (t) => {
+        if (!t) return null;
+        const s = String(t).trim();
+        const m = s.match(/^(\d{1,2}):(\d{2})/);
+        if (!m) return null;
+        return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+      };
+      const LUNCH_MIN = 13 * 60; // 13:00 = standard lunch reference
+      const startMin = toMin(startTime);
+      const endMin = toMin(endTime);
+      if (startMin !== null) return startMin >= LUNCH_MIN ? "2nd_half" : "1st_half";
+      if (endMin !== null) return endMin <= LUNCH_MIN ? "1st_half" : "2nd_half";
+      return null;
+    };
+
     // Determine end date: use toDate if specified, otherwise use today
     const endDate = toDate ? new Date(toDate) : new Date();
     endDate.setHours(0, 0, 0, 0);
@@ -386,18 +418,69 @@ const AttendancePage = () => {
       }
     });
 
+    // Create a separate map of APPROVED half-day leaves (attendance-page only display)
+    // Key: "yyyy-mm-dd" | Value: { is_half_day, half_day_type, leave_type, reason }
+    const halfDayLeaveMap = new Map();
+    leaves
+      .filter(leave => leave.username === user && (leave.is_half_day == 1 || leave.leave_type === 'half-day'))
+      .forEach((leave) => {
+        const fromDate = new Date(leave.from_date);
+        const toDate = new Date(leave.to_date);
+        const derived = deriveHalfDayType(leave.start_time, leave.end_time);
+        for (let d = new Date(fromDate); d <= toDate; d.setDate(d.getDate() + 1)) {
+          halfDayLeaveMap.set(d.toLocaleDateString("en-CA"), {
+            is_half_day: leave.is_half_day,
+            half_day_type: leave.half_day_type || derived,
+            leave_type: leave.leave_type,
+            reason: leave.reason,
+          });
+        }
+      });
+
+    // Create a map of paid leaves (both full-day and half-day) — used to override timing display
+    const paidLeaveMap = new Map();
+    leaves
+      .filter(leave => leave.username === user && leave.leave_type === 'paid')
+      .forEach((leave) => {
+        const fromD = new Date(leave.from_date);
+        const toD = new Date(leave.to_date);
+        for (let d = new Date(fromD); d <= toD; d.setDate(d.getDate() + 1)) {
+          paidLeaveMap.set(d.toLocaleDateString("en-CA"), leave);
+        }
+      });
+
     for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
       const dateString = d.toLocaleDateString("en-CA");
       const existingLog = dateMap.get(dateString);
       const isWeekend = d.getDay() === 0;
       const isHoliday = holidayMap.has(dateString);
       const isOnLeave = leaveMap.has(dateString);
+      const approvedHalfDay = halfDayLeaveMap.get(dateString) || null;
+      const approvedPaidLeave = paidLeaveMap.get(dateString) || null;
 
       const hasRealPunch =
         existingLog && rowHasMeaningfulCheckinOrCheckout(existingLog);
 
-      if (hasRealPunch) {
-        allDates.push({ ...existingLog, type: "present" });
+      // If paid leave exists for this date — display logic:
+      //   If attendance punch logs exist → Half-Day Leave (worked half-day + leave half).
+      //   No punches → Full leave as usual.
+      if (approvedPaidLeave) {
+        const leaveIsHalfDay = approvedPaidLeave.is_half_day == 1 || approvedPaidLeave.leave_type === 'half-day';
+        const treatAsHalfDay = hasRealPunch || leaveIsHalfDay;
+        const derivedType = deriveHalfDayType(approvedPaidLeave.start_time, approvedPaidLeave.end_time);
+        const finalHalfType = approvedPaidLeave.half_day_type || derivedType || (hasRealPunch ? "1st_half" : "1st_half");
+        allDates.push({
+          username: existingLog?.username || user,
+          date: d.toISOString(),
+          type: "paidleave",
+          leaveType: "Paid",
+          leaveReason: approvedPaidLeave.reason || null,
+          is_half_day: treatAsHalfDay ? 1 : 0,
+          half_day_type: treatAsHalfDay ? finalHalfType : null,
+          has_punch_on_leave: hasRealPunch ? 1 : 0,
+        });
+      } else if (hasRealPunch) {
+        allDates.push({ ...existingLog, type: "present", workedSunday: isWeekend, approvedHalfDay });
       } else {
         const base = existingLog
           ? { ...existingLog, username: existingLog.username || user }
@@ -434,12 +517,18 @@ const AttendancePage = () => {
         } else if (isOnLeave) {
           const leaveInfo = leaveMap.get(dateString);
           const isUnpaid = leaveInfo?.leave_type === "unpaid";
+          const leaveIsHalfDay = leaveInfo?.is_half_day == 1 || leaveInfo?.leave_type === 'half-day';
+          const derivedType = deriveHalfDayType(leaveInfo?.start_time, leaveInfo?.end_time);
+          const finalHalfType = leaveInfo?.half_day_type || derivedType;
           allDates.push({
             ...base,
             date: d.toISOString(),
             type: isUnpaid ? "absent" : "leave",
             leaveType: leaveInfo?.leave_type || "Leave",
             leaveReason: leaveInfo?.reason || null,
+            is_half_day: leaveIsHalfDay ? 1 : 0,
+            half_day_type: leaveIsHalfDay ? finalHalfType : null,
+            has_punch_on_leave: 0,
           });
         } else {
           allDates.push({
@@ -474,18 +563,26 @@ const AttendancePage = () => {
 
   // Apply filters to the complete timeline
   const filteredLogs = fullTimeline.filter((log) => {
-    // Date range filter is already applied in date generation
+    // 1) Date range: fromDate (inclusive) to toDate (inclusive) based on calendar inputs
+    if (fromDate) {
+      const logYmd = toYmd(new Date(log.date));
+      if (logYmd < fromDate) return false;
+    }
+    if (toDate) {
+      const logYmd = toYmd(new Date(log.date));
+      if (logYmd > toDate) return false;
+    }
+
+    // 2) Status filter
     let matchesFilter = true;
 
     if (filterStatus === "late") {
-      // Show only RED late status (09:46-09:59 or 18:14), NOT grace period or half day
       const checkinStatus = getCheckinStatus(log.checkin_time, log.username);
       const checkoutStatus = getCheckoutStatus(log.checkout_time, log.username);
       matchesFilter =
         log.type === "present" &&
         (checkinStatus === 'late' || checkoutStatus === 'late');
     } else if (filterStatus === "onTime") {
-      // Show green on time AND orange grace period (NOT red late or yellow half day)
       const checkinStatus = getCheckinStatus(log.checkin_time, log.username);
       const checkoutStatus = getCheckoutStatus(log.checkout_time, log.username);
       matchesFilter =
@@ -495,7 +592,6 @@ const AttendancePage = () => {
         checkoutStatus !== 'late' &&
         checkoutStatus !== 'halfDay';
     } else if (filterStatus === "halfDay") {
-      // Show half-days considering grace period logic (first 3 grace days not counted)
       matchesFilter = log.type === "present" && isHalfDay(log);
     } else if (filterStatus === "all") {
       matchesFilter = true;
@@ -512,12 +608,21 @@ const AttendancePage = () => {
   const summary = chronologicallySortedLogs.reduce(
     (acc, log) => {
       if (log.type === "absent") acc.absents++;
-      if (log.type === "leave") acc.leaves++;
+      if (log.type === "leave" || log.type === "paidleave") {
+        if (log.is_half_day == 1) {
+          acc.halfDays++;
+          // Only PAID leave half-days count toward "Paid Half-Days" separate card.
+          if (log.type === "paidleave" || log.leaveType === "Paid" || log.leave_type === "paid") {
+            acc.paidHalfDays++;
+          }
+        } else {
+          acc.leaves++;
+        }
+      }
       if (log.type === "holiday") acc.holidays++;
       if (log.type === "sunday") acc.sundays++;
       if (log.type === "present") {
         acc.present++;
-        // Use grace period logic: first 3 grace period days (15 min late) are NOT half-days
         const username = log.username;
         if (!acc.graceCounters[username]) {
           acc.graceCounters[username] = 0;
@@ -531,7 +636,7 @@ const AttendancePage = () => {
       }
       return acc;
     },
-    { present: 0, absents: 0, leaves: 0, holidays: 0, sundays: 0, halfDays: 0, lateDays: 0, graceCounters: {} }
+    { present: 0, absents: 0, leaves: 0, holidays: 0, sundays: 0, halfDays: 0, paidHalfDays: 0, lateDays: 0, graceCounters: {} }
   );
 
   const handleDownload = async () => {
@@ -668,7 +773,7 @@ const AttendancePage = () => {
             </p>
           ) : (
             <>
-          <div className="grid grid-cols-2 md:grid-cols-7 gap-4 mb-8 text-center">
+          <div className="grid grid-cols-2 md:grid-cols-8 gap-4 mb-8 text-center">
             <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
               <p className="text-2xl font-bold text-green-600">
                 {summary.present}
@@ -700,6 +805,15 @@ const AttendancePage = () => {
                 {summary.halfDays}
               </p>
               <p className="text-sm text-gray-500">Half-Days</p>
+            </div>
+            <div className="bg-gray-50 p-4 rounded-lg shadow-sm flex flex-col items-center gap-1">
+              <div className="flex items-center gap-1">
+                <Sun className="w-5 h-5 text-amber-500" />
+                <p className="text-2xl font-bold text-amber-600">
+                  {summary.paidHalfDays}
+                </p>
+              </div>
+              <p className="text-sm text-gray-500">Paid Half-Days</p>
             </div>
             <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
               <p className="text-2xl font-bold text-red-600">
@@ -744,7 +858,7 @@ const AttendancePage = () => {
             <div className="flex flex-wrap gap-2">
               <button
                 onClick={handleShowAll}
-                className={`px-4 py-2 rounded-md font-medium text-sm transition-colors duration-200 ${filterStatus === "all" && !fromDate && !toDate
+                className={`px-4 py-2 rounded-md font-medium text-sm transition-colors duration-200 ${filterStatus === "all"
                   ? "bg-blue-600 text-white shadow-md"
                   : "bg-gray-200 text-gray-700 hover:bg-gray-300"
                   }`}
@@ -814,21 +928,36 @@ const AttendancePage = () => {
                   key={index}
                   className={`rounded-lg shadow-md p-4 space-y-2 ${log.type === "absent"
                     ? "bg-orange-50"
-                    : log.type === "leave"
+                    : log.type === "leave" || log.type === "paidleave"
                       ? "bg-blue-50"
                       : log.type === "sunday"
                         ? "bg-purple-50"
                         : log.type === "holiday"
                           ? "bg-indigo-50"
-                          : "bg-white"
+                          : log.workedSunday
+                            ? "bg-pink-200"
+                            : "bg-white"
                     }`}
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-semibold text-gray-900">
                       Date:
                     </span>
-                    <span className="text-sm text-gray-700">
-                      {new Date(log.date).toLocaleDateString()}
+                    <span className="text-sm text-gray-700 flex flex-col items-end gap-1.5">
+                      <span className="flex items-center gap-1.5">
+                        {new Date(log.date).toLocaleDateString()}
+                        {log.workedSunday && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-purple-100 text-purple-700 border border-purple-200">
+                            Working Sunday
+                          </span>
+                        )}
+                      </span>
+                      {log.approvedHalfDay && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-orange-100 text-orange-700 border border-orange-200">
+                          <Sun className="w-3 h-3" />
+                          Half-Day · {log.approvedHalfDay.half_day_type === "1st_half" ? "1st Half" : "2nd Half"}
+                        </span>
+                      )}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
@@ -1007,13 +1136,33 @@ const AttendancePage = () => {
                     </>
                   ) : (
                     <div className="text-center py-4">
-                      <p className="text-lg font-bold">
-                        {log.type === "absent" ? "Absent" : log.type === "leave" ? "Leave" : log.type === "sunday" ? "Sunday" : "Holiday"}
-                      </p>
-                      {log.leaveType && (
+                      {(log.type === "leave" || log.type === "paidleave") ? (
+                        <>
+                          <p className={`text-lg font-bold ${log.is_half_day == 1 ? "text-orange-600" : ""}`}>
+                            {log.is_half_day == 1 ? "Half Day" : "Leave"}
+                          </p>
+                          {log.is_half_day == 1 && (
+                            <span className="inline-flex items-center gap-1 mt-2 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-orange-100 text-orange-700 border border-orange-200">
+                              <Sun className="w-3 h-3" />
+                              {log.half_day_type === "2nd_half" ? "2nd Half" : "1st Half"}
+                            </span>
+                          )}
+                          {log.leaveType && (
+                            <p className="text-sm text-gray-600 mt-2 capitalize">{log.leaveType} Leave</p>
+                          )}
+                        </>
+                      ) : (
+                        <p className="text-lg font-bold">
+                          {log.type === "absent" ? "Absent" : log.type === "sunday" ? "Sunday" : "Holiday"}
+                        </p>
+                      )}
+                      {!(log.type === "leave" || log.type === "paidleave") && log.leaveType && (
                         <p className="text-sm text-gray-600 mt-1 capitalize">{log.leaveType} Leave</p>
                       )}
-                      {log.leaveReason && (
+                      {(log.type === "leave" || log.type === "paidleave") && log.leaveReason && (
+                        <p className="text-xs text-gray-500 mt-2">{log.leaveReason}</p>
+                      )}
+                      {!(log.type === "leave" || log.type === "paidleave") && log.leaveReason && (
                         <p className="text-xs text-gray-500 mt-1">{log.leaveReason}</p>
                       )}
                       {log.holidayTitle && log.holidayTitle !== "Weekend" && log.holidayTitle !== "Sunday" && (
@@ -1089,10 +1238,21 @@ const AttendancePage = () => {
                   filteredLogs.map((log, index) => (
                     <tr
                       key={index}
-                      className="hover:bg-gray-50 transition-colors duration-150"
+                      className={`transition-colors duration-150 ${log.workedSunday ? "bg-pink-200 hover:bg-pink-300" : "hover:bg-gray-50"}`}
                     >
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                         {new Date(log.date).toLocaleDateString()}
+                        {log.workedSunday && (
+                          <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-purple-100 text-purple-700 border border-purple-200">
+                            Working Sunday
+                          </span>
+                        )}
+                        {log.approvedHalfDay && (
+                          <span className="ml-2 mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-orange-100 text-orange-700 border border-orange-200">
+                            <Sun className="w-3 h-3" />
+                            Half-Day · {log.approvedHalfDay.half_day_type === "1st_half" ? "1st Half" : "2nd Half"}
+                          </span>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {log.username}
@@ -1268,16 +1428,34 @@ const AttendancePage = () => {
                             ? "bg-orange-50 text-orange-700"
                             : log.type === "leave"
                               ? "bg-blue-50 text-blue-700"
+                              : log.type === "paidleave"
+                                ? "bg-blue-50 text-blue-700"
                               : log.type === "sunday"
                                 ? "bg-purple-50 text-purple-700"
                                 : "bg-indigo-50 text-indigo-700"
                             }`}
                         >
                           <p className="font-bold text-lg">
-                            {log.type === "absent" ? "Absent" : log.type === "leave" ? "Leave" : log.type === "sunday" ? "Sunday" : "Holiday"}
+                            {log.type === "absent"
+                              ? "Absent"
+                              : (log.type === "leave" || log.type === "paidleave")
+                                ? log.is_half_day == 1
+                                  ? <span className="text-orange-600">Half Day</span>
+                                  : "Leave"
+                                : log.type === "sunday"
+                                  ? "Sunday"
+                                  : "Holiday"}
                           </p>
+                          {(log.type === "leave" || log.type === "paidleave") && log.is_half_day == 1 && (
+                            <span className="inline-flex items-center gap-1 mt-2 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-orange-100 text-orange-700 border border-orange-200">
+                              <Sun className="w-3 h-3" />
+                              {log.half_day_type === "2nd_half" ? "2nd Half" : "1st Half"}
+                            </span>
+                          )}
                           {log.leaveType && (
-                            <p className="text-sm mt-1 capitalize">{log.leaveType} Leave</p>
+                            <p className={`text-sm capitalize ${log.is_half_day == 1 ? "mt-2 text-gray-600" : "mt-1"}`}>
+                              {log.leaveType} Leave
+                            </p>
                           )}
                           {log.leaveReason && (
                             <p className="text-xs text-gray-500 mt-1">{log.leaveReason}</p>

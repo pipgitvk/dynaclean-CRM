@@ -79,9 +79,12 @@ export default function UpcomingLeadsTable({
       localStorage.removeItem('upcomingLeads_startDate');
       localStorage.removeItem('upcomingLeads_endDate');
     }
-    
+
+    const today = new Date().toISOString().split('T')[0];
+
     setShowTable(true);
-    fetchFilteredData('', '');
+    // By default: show <= today (endDate-only filter) so future dates like 4 Oct don't appear
+    fetchFilteredData('', today);
 
     // Listen for filter changes from cards component
     const handleFilterChange = (event) => {

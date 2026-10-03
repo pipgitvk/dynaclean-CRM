@@ -12,6 +12,7 @@ import {
   applySuperadminOnlyModuleRestrictions,
   applyRoleDenyModuleRestrictions,
 } from "@/lib/moduleAccess";
+import { getRoleDefaultModuleKeys } from "@/lib/roleDefaultModuleAccess";
 
 function uniqueStrings(arr) {
   return [...new Set((arr || []).map((v) => String(v || "").trim()).filter(Boolean))];
@@ -592,26 +593,7 @@ const QuickEditPage = () => {
 
   const setServiceHeadDefaults = () => {
     userEditedModulesRef.current = true;
-    const defaults = [
-      "dashboard-home",
-      "task-manager",
-      "add-customer",
-      "view-customers",
-      "employee-crm",
-      "quotations",
-      "orders-process",
-      "orders-delay",
-      "warranty-console",
-      "registered-products",
-      "service-followups",
-      "warranty-map",
-      "service-records",
-      "upcoming-installations",
-      "service-map",
-      "product-stock",
-      "spare-parts",
-      "installation-videos",
-    ]
+    const defaults = getRoleDefaultModuleKeys("SERVICE HEAD")
       .filter((k) => ALL_MODULE_KEYS.includes(k))
       .filter((k) => k !== "dm-fresh-leads");
 
@@ -621,26 +603,7 @@ const QuickEditPage = () => {
 
   const setServiceSupportDefaults = () => {
     userEditedModulesRef.current = true;
-    const defaults = [
-      "dashboard-home",
-      "task-manager",
-      "add-customer",
-      "view-customers",
-      "employee-crm",
-      "quotations",
-      "orders-process",
-      "orders-delay",
-      "warranty-console",
-      "registered-products",
-      "service-followups",
-      "warranty-map",
-      "service-records",
-      "upcoming-installations",
-      "service-map",
-      "product-stock",
-      "spare-parts",
-      "installation-videos",
-    ]
+    const defaults = getRoleDefaultModuleKeys("SERVICE SUPPORT")
       .filter((k) => ALL_MODULE_KEYS.includes(k))
       .filter((k) => k !== "dm-fresh-leads");
 
@@ -845,13 +808,41 @@ const QuickEditPage = () => {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700">User Role</label>
-            <input
-              type="text"
+            <select
               name="userRole"
-              value={employee.userRole || ""}
+              value={(employee.userRole || "").trim()}
               onChange={handleInputChange}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-            />
+              className="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+            >
+              <option value="">-- Select Role --</option>
+              <option value="DIRECTOR">DIRECTOR</option>
+              <option value="ACCOUNTANT">ACCOUNTANT</option>
+              <option value="TEAM LEADER">TEAM LEADER</option>
+              <option value="SALES">SALES</option>
+              <option value="SALES CUM BACKOFFICE">SALES CUM BACKOFFICE</option>
+              <option value="SALES HEAD">SALES HEAD</option>
+              <option value="DIGITAL MARKETER">DIGITAL MARKETER</option>
+              <option value="ADMIN">ADMIN</option>
+              <option value="HR">HR</option>
+              <option value="HR HEAD">HR HEAD</option>
+              <option value="JUNIOR HR EXECUTIVE">JUNIOR HR EXECUTIVE</option>
+              <option value="HR EXECUTIVE">HR EXECUTIVE</option>
+              <option value="HR RECRUITER">HR RECRUITER</option>
+              <option value="GEM">GEM</option>
+              <option value="GRAPHIC DESIGNER">GRAPHIC DESIGNER</option>
+              <option value="DESIGN ENGINEER">DESIGN ENGINEER</option>
+              <option value="DEVELOPER">DEVELOPER</option>
+              <option value="SERVICE ENGINEER">SERVICE ENGINEER</option>
+              <option value="SERVICE TECHNICIAN">SERVICE TECHNICIAN</option>
+              <option value="SERVICE HEAD">SERVICE HEAD</option>
+              <option value="SERVICE SUPPORT">SERVICE SUPPORT</option>
+              <option value="WELDER">WELDER</option>
+              <option value="WELDER HELPER">WELDER HELPER</option>
+              <option value="WAREHOUSE INCHARGE">WAREHOUSE INCHARGE</option>
+              <option value="EA">EA</option>
+              <option value="MACHINE OPERATOR">MACHINE OPERATOR</option>
+              <option value="PRODUCTION ENGINEER">PRODUCTION ENGINEER</option>
+            </select>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700">Status</label>

@@ -1,8 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Eye, Search, ArrowRightLeft, History, X, PackageX, AlertTriangle } from "lucide-react";
+import { Eye, Search, ArrowRightLeft, History, X, PackageX, AlertTriangle, Plus, Edit } from "lucide-react";
 import Link from "next/link";
+import IncomingShipmentsTable from "./IncomingShipmentsTable";
+import AddIncomingShipment from "./AddIncomingShipment";
+import EditIncomingShipment from "./EditIncomingShipment";
 
 function ProductStockList() {
   const [rows, setRows] = useState([]);
@@ -13,7 +16,7 @@ function ProductStockList() {
   const [stockSummaryData, setStockSummaryData] = useState([]);
   const [transactionsStatusFilter, setTransactionsStatusFilter] = useState(null);
   const [summarySearch, setSummarySearch] = useState("");
-  const [summaryStatusFilter, setSummaryStatusFilter] = useState(null);
+  const [summaryStatusFilter, setSummaryStatusFilter] = useState(null); 
   const [transactionsSearch, setTransactionsSearch] = useState("");
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
@@ -25,7 +28,7 @@ function ProductStockList() {
   const [selectedProductForHistory, setSelectedProductForHistory] = useState(null);
   const [transferHistoryData, setTransferHistoryData] = useState([]);
   const [loadingTransferHistory, setLoadingTransferHistory] = useState(false);
-  const [purchasePriceData, setPurchasePriceData] = useState([]);
+  const [purchasePriceData, setPurchasePriceData] = useState([]); 
   const [showSparesModal, setShowSparesModal] = useState(false);
   const [selectedProductSpares, setSelectedProductSpares] = useState([]);
   const [allSpares, setAllSpares] = useState([]);
@@ -33,6 +36,14 @@ function ProductStockList() {
   const [lowStockProducts, setLowStockProducts] = useState([]);
   const [showZeroStockCard, setShowZeroStockCard] = useState(true);
   const [preBookingData, setPreBookingData] = useState([]);
+  
+  // Incoming Shipments State
+  const [incomingShipments, setIncomingShipments] = useState([]);
+  const [loadingShipments, setLoadingShipments] = useState(false);
+  const [showAddShipmentModal, setShowAddShipmentModal] = useState(false);
+  const [showEditShipmentModal, setShowEditShipmentModal] = useState(false);
+  const [selectedShipmentForEdit, setSelectedShipmentForEdit] = useState(null);
+  const [isShipmentViewOnly, setIsShipmentViewOnly] = useState(false);
 
   const handleViewSpares = (product) => {
     // Filter spares based on product/machine compatibility
@@ -99,6 +110,7 @@ function ProductStockList() {
     fetchAllSpares();
     fetchStockAlerts();
     fetchPreBookingData();
+    fetchIncomingShipments();
   }, []);
 
   const fetchAllSpares = async () => {
@@ -188,12 +200,99 @@ function ProductStockList() {
     }
   };
 
+  const fetchIncomingShipments = async () => {
+    try {
+      setLoadingShipments(true);
+      const res = await fetch("/api/incoming-shipments");
+      const data = await res.json();
+      setIncomingShipments(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Error fetching incoming shipments:", err);
+      setIncomingShipments([]);
+    } finally {
+      setLoadingShipments(false);
+    }
+  };
+
   const getPreBookedQuantity = (itemName) => {
     if (!itemName) return 0;
     const preBooking = preBookingData.find(
       (pb) => pb.product_name && String(pb.product_name).toLowerCase() === String(itemName).toLowerCase()
     );
     return preBooking ? preBooking.pre_booked_quantity : 0;
+  };
+
+  // Incoming Shipments Handlers
+  const handleAddShipment = async (formData) => {
+    try {
+      const res = await fetch("/api/incoming-shipments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData)
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || data.success === false) {
+        alert(data.error || "Failed to add shipment");
+        return;
+      }
+
+      alert("Shipment added successfully!");
+      setShowAddShipmentModal(false);
+      await fetchIncomingShipments();
+    } catch (error) {
+      console.error("Error adding shipment:", error);
+      alert("Error adding shipment. Please try again.");
+    }
+  };
+
+  const handleEditShipment = async (formData) => {
+    if (!selectedShipmentForEdit) return;
+
+    try {
+      const res = await fetch(`/api/incoming-shipments/${selectedShipmentForEdit.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData)
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || data.success === false) {
+        alert(data.error || "Failed to update shipment");
+        return;
+      }
+
+      alert("Shipment updated successfully!");
+      setShowEditShipmentModal(false);
+      setSelectedShipmentForEdit(null);
+      await fetchIncomingShipments();
+    } catch (error) {
+      console.error("Error updating shipment:", error);
+      alert("Error updating shipment. Please try again.");
+    }
+  };
+
+  const handleDeleteShipment = async (shipmentId) => {
+    try {
+      const res = await fetch(`/api/incoming-shipments/${shipmentId}`, {
+        method: "DELETE"
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || data.success === false) {
+        alert(data.error || "Failed to delete shipment");
+        return;
+      }
+
+      alert("Shipment deleted successfully!");
+      await fetchIncomingShipments();
+    } catch (error) {
+      console.error("Error deleting shipment:", error);
+      alert("Error deleting shipment. Please try again.");
+    }
   };
 
   const openTransferModal = (product) => {
@@ -385,12 +484,22 @@ function ProductStockList() {
     );
   }, [rows, q]);
 
+  const allLowStockItems = useMemo(() => {
+    const map = new Map();
+    [...lowStockProducts, ...zeroStockProducts].forEach((p) => {
+      if (p.product_code) map.set(p.product_code, p);
+    });
+    return Array.from(map.values()).sort(
+      (a, b) => (a.total_quantity ?? 0) - (b.total_quantity ?? 0)
+    );
+  }, [lowStockProducts, zeroStockProducts]);
+
   return (
     <div className="p-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
         <h1 className="text-2xl font-bold text-gray-800">Product Stock Management</h1>
         <div className="flex flex-wrap items-center gap-2">
-          <Link href="/admin-dashboard/add-assets" className="text-sm px-4 py-2 rounded text-white bg-blue-600 hover:bg-blue-700">
+          <Link href="/director-dashboard/add-assets" className="text-sm px-4 py-2 rounded text-white bg-blue-600 hover:bg-blue-700">
             Add New Product
           </Link>
           {/* Section Toggle Buttons */}
@@ -430,11 +539,41 @@ function ProductStockList() {
           >
             Stock Summary
           </button>
+          <button
+            onClick={() => setOpenSection("lowstock")}
+            className={`text-xs sm:text-sm px-3 sm:px-4 py-1.5 sm:py-2 rounded text-white flex items-center gap-1.5 ${openSection === "lowstock"
+              ? "bg-amber-600 hover:bg-amber-700"
+              : "bg-gray-500 hover:bg-gray-600"
+              }`}
+          >
+            <AlertTriangle size={14} />
+            Low Stock
+            {allLowStockItems.length > 0 && (
+              <span className="bg-white/25 px-1.5 py-0.5 rounded text-[10px] font-bold">
+                {allLowStockItems.length}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => setOpenSection("incoming")}
+            className={`text-xs sm:text-sm px-3 sm:px-4 py-1.5 sm:py-2 rounded text-white flex items-center gap-1.5 ${openSection === "incoming"
+              ? "bg-violet-600 hover:bg-violet-700"
+              : "bg-gray-500 hover:bg-gray-600"
+              }`}
+          >
+            <Plus size={14} />
+            Incoming Shipments
+            {incomingShipments.length > 0 && (
+              <span className="bg-white/25 px-1.5 py-0.5 rounded text-[10px] font-bold">
+                {incomingShipments.length}
+              </span>
+            )}
+          </button>
         </div>
       </div>
 
-      {/* ── Zero Stock Alert Card ─────────────────────────────────── */}
-      {showZeroStockCard && zeroStockProducts.length > 0 && (
+      {/* ── Zero Stock Alert Card (Commented Out) ─────────────────────────────────── */}
+      {false && showZeroStockCard && zeroStockProducts.length > 0 && (
         <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 shadow-sm overflow-hidden">
           {/* Card Header */}
           <div className="flex items-center justify-between px-5 py-4 bg-red-100 border-b border-red-200">
@@ -503,26 +642,23 @@ function ProductStockList() {
           </div>
         </div>
       )}
+      {/* End Zero Stock Alert Card Comment */}
 
-      {/* ── Low Stock Alert Card ──────────────────────────────────── */}
-      {lowStockProducts.filter(p => (p.total_quantity ?? 0) > 0).length > 0 && (
-        <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 shadow-sm overflow-hidden">
-          {/* Card Header */}
-          <div className="flex items-center gap-3 px-5 py-4 bg-amber-100 border-b border-amber-200">
+      {/* Low Stock Section */}
+      {openSection === "lowstock" && (
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center gap-3 mb-4">
             <div className="p-2 rounded-xl bg-amber-500 text-white">
               <AlertTriangle size={18} />
             </div>
             <div>
-              <h2 className="font-bold text-amber-800 text-sm uppercase tracking-wide">
-                Low Stock Warning
-              </h2>
-              <p className="text-xs text-amber-600 mt-0.5">
-                {lowStockProducts.filter(p => (p.total_quantity ?? 0) > 0).length} product{lowStockProducts.filter(p => (p.total_quantity ?? 0) > 0).length !== 1 ? "s" : ""} below minimum quantity
+              <h2 className="text-xl font-semibold text-gray-800">Low Stock Products</h2>
+              <p className="text-sm text-gray-500">
+                {allLowStockItems.length} product{allLowStockItems.length !== 1 ? "s" : ""} at or below minimum quantity (including zero stock)
               </p>
             </div>
           </div>
 
-          {/* Product List */}
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
               <thead>
@@ -530,38 +666,132 @@ function ProductStockList() {
                   <th className="px-5 py-2 text-left font-semibold">Product Code</th>
                   <th className="px-5 py-2 text-left font-semibold">Item Name</th>
                   <th className="px-5 py-2 text-left font-semibold">Product No.</th>
-                  <th className="px-5 py-2 text-left font-semibold">Current Qty</th>
+                  <th className="px-5 py-2 text-left font-semibold">Total Qty</th>
                   <th className="px-5 py-2 text-left font-semibold">Min Qty</th>
                   <th className="px-5 py-2 text-left font-semibold">Delhi</th>
                   <th className="px-5 py-2 text-left font-semibold">South</th>
                   <th className="px-5 py-2 text-left font-semibold">Pre-booked</th>
                   <th className="px-5 py-2 text-left font-semibold">Net Qty</th>
+                  <th className="px-5 py-2 text-left font-semibold">Status</th>
+                  <th className="px-5 py-2 text-left font-semibold">Incoming Qty</th>
+                  <th className="px-5 py-2 text-left font-semibold">Expected Date</th>
+                  <th className="px-5 py-2 text-left font-semibold">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {lowStockProducts
-                  .filter(p => (p.total_quantity ?? 0) > 0)
-                  .map((p, idx) => (
-                    <tr
-                      key={p.product_code || idx}
-                      className="border-t border-amber-100 hover:bg-amber-100/40 transition-colors"
-                    >
-                      <td className="px-5 py-3 font-bold text-amber-800">{p.product_code}</td>
-                      <td className="px-5 py-3 font-semibold text-gray-800">{p.item_name || "—"}</td>
-                      <td className="px-5 py-3 text-gray-600">{p.product_number || "—"}</td>
-                      <td className="px-5 py-3">
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-amber-500 text-white">
-                          <AlertTriangle size={11} />
-                          {p.total_quantity ?? 0}
-                        </span>
-                      </td>
-                      <td className="px-5 py-3 text-gray-600">{p.min_qty ?? "—"}</td>
-                      <td className="px-5 py-3 text-gray-700">{p.delhi ?? 0}</td>
-                      <td className="px-5 py-3 text-gray-700">{p.south ?? 0}</td>
-                      <td className="px-5 py-3 font-semibold text-orange-600">{getPreBookedQuantity(p.item_name)}</td>
-                      <td className="px-5 py-3 font-semibold text-green-600">{(p.total_quantity ?? 0) - getPreBookedQuantity(p.item_name)}</td>
-                    </tr>
-                  ))}
+                {allLowStockItems.length === 0 ? (
+                  <tr>
+                    <td colSpan="13" className="px-5 py-8 text-center text-gray-500">
+                      No low stock products found
+                    </td>
+                  </tr>
+                ) : (
+                  allLowStockItems.map((p, idx) => {
+                    const totalQty = p.total_quantity ?? 0;
+                    const isZero = totalQty <= 0;
+                    return (
+                      <tr
+                        key={p.product_code || idx}
+                        className={`border-t transition-colors ${isZero ? "border-red-100 hover:bg-red-50/40" : "border-amber-100 hover:bg-amber-100/40"}`}
+                      >
+                        <td className={`px-5 py-3 font-bold ${isZero ? "text-red-800" : "text-amber-800"}`}>{p.product_code}</td>
+                        <td className="px-5 py-3 font-semibold text-gray-800">{p.item_name || "—"}</td>
+                        <td className="px-5 py-3 text-gray-600">{p.product_number || "—"}</td>
+                        <td className="px-5 py-3">
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold text-white ${isZero ? "bg-red-500" : "bg-amber-500"}`}>
+                            {isZero ? <PackageX size={11} /> : <AlertTriangle size={11} />}
+                            {totalQty}
+                          </span>
+                        </td>
+                        <td className="px-5 py-3 text-gray-600">{p.min_qty ?? "—"}</td>
+                        <td className="px-5 py-3 text-gray-700">{p.delhi ?? 0}</td>
+                        <td className="px-5 py-3 text-gray-700">{p.south ?? 0}</td>
+                        <td className="px-5 py-3 font-semibold text-orange-600">{getPreBookedQuantity(p.item_name)}</td>
+                        <td className="px-5 py-3 font-semibold text-green-600">{totalQty - getPreBookedQuantity(p.item_name)}</td>
+                        <td className="px-5 py-3">
+                          {p.latest_shipment_status ? (
+                            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                              p.latest_shipment_status === 'In Transit' 
+                                ? 'bg-blue-100 text-blue-700'
+                                : p.latest_shipment_status === 'Out for Delivery'
+                                ? 'bg-green-100 text-green-700'
+                                : 'bg-gray-100 text-gray-700'
+                            }`}>
+                              {p.latest_shipment_status}
+                            </span>
+                          ) : (
+                            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${isZero ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}`}>
+                              {isZero ? "Zero Stock" : "Low Stock"}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-5 py-3">
+                          {p.latest_shipment_qty ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold text-white bg-blue-500">
+                              {p.latest_shipment_qty}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400">—</span>
+                          )}
+                        </td>
+                        <td className="px-5 py-3 text-gray-600">
+                          {p.latest_shipment_expected_date ? (
+                            <span className="text-xs">
+                              {new Date(p.latest_shipment_expected_date).toLocaleDateString('en-IN', {
+                                day: '2-digit',
+                                month: 'short',
+                                year: 'numeric'
+                              })}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400">—</span>
+                          )}
+                        </td>
+                        <td className="px-5 py-3 whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            {(() => {
+                              const relatedShipment = incomingShipments.find(ship => 
+                                (ship.product_code && ship.product_code === p.product_code) ||
+                                (ship.item_name && ship.item_name.toLowerCase() === (p.item_name || '').toLowerCase())
+                              );
+                              
+                              if (!relatedShipment) {
+                                return <span className="text-gray-400 text-xs">—</span>;
+                              }
+                              
+                              return (
+                                <>
+                                  <button
+                                    onClick={() => {
+                                      setSelectedShipmentForEdit(relatedShipment);
+                                      setIsShipmentViewOnly(false);
+                                      setShowEditShipmentModal(true);
+                                    }}
+                                    className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
+                                    title="Edit related incoming shipment"
+                                  >
+                                    <Edit size={16} />
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setSelectedShipmentForEdit(relatedShipment);
+                                      setIsShipmentViewOnly(true);
+                                      setShowEditShipmentModal(true);
+                                    }}
+                                    className="p-1 text-green-600 hover:bg-green-100 rounded transition-colors"
+                                    title="View incoming shipment details"
+                                  >
+                                    <Eye size={16} />
+                                  </button>
+                                </>
+                              );
+                            })()}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
               </tbody>
             </table>
           </div>
@@ -1145,6 +1375,59 @@ function ProductStockList() {
         </div>
       )}
 
+      {/* Incoming Shipments Section */}
+      {openSection === "incoming" && (
+        <div>
+          <div className="flex justify-between items-center mb-4">
+            <button
+              onClick={() => setShowAddShipmentModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <Plus size={18} />
+              Add New Shipment
+            </button>
+          </div>
+          <IncomingShipmentsTable
+            shipments={incomingShipments}
+            loading={loadingShipments}
+            onEdit={(shipment) => {
+              setSelectedShipmentForEdit(shipment);
+              setShowEditShipmentModal(true);
+            }}
+            onDelete={handleDeleteShipment}
+            onView={(shipment) => {
+              setSelectedShipmentForEdit(shipment);
+              setIsShipmentViewOnly(true);
+              setShowEditShipmentModal(true);
+            }}
+          />
+        </div>
+      )}
+
+      {/* Add Incoming Shipment Modal */}
+      <AddIncomingShipment
+        isOpen={showAddShipmentModal}
+        onClose={() => setShowAddShipmentModal(false)}
+        onSubmit={handleAddShipment}
+        loading={loadingShipments}
+        products={rows}
+      />
+
+      {/* Edit Incoming Shipment Modal */}
+      <EditIncomingShipment
+        isOpen={showEditShipmentModal}
+        onClose={() => {
+          setShowEditShipmentModal(false);
+          setSelectedShipmentForEdit(null);
+          setIsShipmentViewOnly(false);
+        }}
+        onSubmit={handleEditShipment}
+        loading={loadingShipments}
+        shipment={selectedShipmentForEdit}
+        products={rows}
+        readonly={isShipmentViewOnly}
+      />
+
       {/* Spares Modal */}
       {showSparesModal && (
         <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-50 p-2">
@@ -1215,3 +1498,4 @@ function ProductStockList() {
 export default function ProductStockPage() {
   return <ProductStockList />;
 }
+

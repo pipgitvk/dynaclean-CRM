@@ -99,7 +99,7 @@ const TargetTable = () => {
   const fetchTargets = async (silent = false) => {
     try {
       if (!silent) setLoading(true);
-      const response = await fetch("/api/monitor.target");
+      const response = await fetch("/api/monitor-target");
       if (!response.ok) {
         throw new Error("Failed to fetch targets");
       }

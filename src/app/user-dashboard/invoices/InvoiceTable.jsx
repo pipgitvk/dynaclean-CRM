@@ -8,14 +8,21 @@ import MultiInvoiceLinkModal from "./MultiInvoiceLinkModal";
 const InvoiceEditModal = dynamic(() => import("@/app/admin-dashboard/invoices/InvoiceEditModal"), { ssr: false });
 
 export default function InvoiceTable({ onSummaryUpdate }) {
-  // Get current month's start and end dates
-  const now = new Date();
-  const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  const getMonthStartEnd = () => {
+    const now = new Date();
+    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    return { firstDay, lastDay };
+  };
   
   const formatDateForInput = (date) => {
-    return date.toISOString().split('T')[0];
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
   };
+
+  const { firstDay: firstDayOfMonth, lastDay: lastDayOfMonth } = getMonthStartEnd();
 
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -23,6 +30,7 @@ export default function InvoiceTable({ onSummaryUpdate }) {
   const [fromDate, setFromDate] = useState(formatDateForInput(firstDayOfMonth));
   const [toDate, setToDate] = useState(formatDateForInput(lastDayOfMonth));
   const [invoiceTypeFilter, setInvoiceTypeFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
 
   // Single page — fetch all records
   const [currentPage] = useState(1);
@@ -58,6 +66,9 @@ export default function InvoiceTable({ onSummaryUpdate }) {
     if (toDate) params.append("toDate", toDate);
     if (search) params.append("search", search);
     if (invoiceTypeFilter) params.append("invoiceType", invoiceTypeFilter);
+    if (statusFilter) params.append("status", statusFilter);
+    params.append("includeDetails", "1");
+    params.append("includeCount", "0");
 
     try {
       setFetchError(null);
@@ -108,12 +119,15 @@ export default function InvoiceTable({ onSummaryUpdate }) {
         groupIds.forEach(parentId => {
           const group = grouped[parentId];
           if (group.parent && !processedIds.has(group.parent.id)) {
-            sortedData.push(group.parent);
-            processedIds.add(group.parent.id);
+            // Skip performa invoices
+            if (group.parent.type !== 'performa') {
+              sortedData.push(group.parent);
+              processedIds.add(group.parent.id);
+            }
           }
           // Add children sorted by id (ascending)
           group.children.sort((a, b) => a.id - b.id).forEach(child => {
-            if (!processedIds.has(child.id)) {
+            if (!processedIds.has(child.id) && child.type !== 'performa') {
               sortedData.push(child);
               processedIds.add(child.id);
             }
@@ -123,12 +137,15 @@ export default function InvoiceTable({ onSummaryUpdate }) {
         setInvoices(sortedData);
         setMeta(response.meta);
 
-        // Calculate and update summary data
+        // Calculate and update summary data - exclude performa and cancelled invoices
+        const filteredForSummary = sortedData.filter(
+          (inv) => inv.type !== "performa" && inv.status !== "CANCELLED",
+        );
         const summaryData = {
-          grandTotal: sortedData.reduce((sum, inv) => sum + Number(inv.grand_total || 0), 0),
-          balanceAmount: sortedData.reduce((sum, inv) => sum + Number(inv.balance_amount || 0), 0),
-          taxAmount: sortedData.reduce((sum, inv) => sum + Number(inv.tax_amount || 0), 0),
-          totalInvoices: sortedData.length,
+          grandTotal: filteredForSummary.reduce((sum, inv) => sum + Number(inv.grand_total || 0), 0),
+          balanceAmount: filteredForSummary.reduce((sum, inv) => sum + Number(inv.balance_amount || 0), 0),
+          taxAmount: filteredForSummary.reduce((sum, inv) => sum + Number(inv.tax_amount || 0), 0),
+          totalInvoices: filteredForSummary.length,
         };
         
         if (onSummaryUpdate) {
@@ -155,7 +172,7 @@ export default function InvoiceTable({ onSummaryUpdate }) {
 
   useEffect(() => {
     fetchData();
-  }, [fromDate, toDate, sortBy, sortOrder, invoiceTypeFilter]);
+  }, [fromDate, toDate, sortBy, sortOrder, invoiceTypeFilter, statusFilter]);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -165,10 +182,12 @@ export default function InvoiceTable({ onSummaryUpdate }) {
   }, [search]);
 
   const handleReset = () => {
+    const { firstDay, lastDay } = getMonthStartEnd();
     setSearch("");
-    setFromDate("");
-    setToDate("");
+    setFromDate(formatDateForInput(firstDay));
+    setToDate(formatDateForInput(lastDay));
     setInvoiceTypeFilter("");
+    setStatusFilter("");
     setSortBy("created_at");
     setSortOrder("desc");
     setFetchError(null);
@@ -284,7 +303,16 @@ export default function InvoiceTable({ onSummaryUpdate }) {
           >
             <option value="">All Types</option>
             <option value="tax">Tax Invoice</option>
-            <option value="performa">Performa Invoice</option>
+          </select>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="border px-3 py-1 rounded"
+          >
+            <option value="">All Status</option>
+            <option value="PAID">Paid</option>
+            <option value="PARTIAL PAID">Partial Paid</option>
+            <option value="CANCELLED">Cancelled</option>
           </select>
         </div>
         <div className="flex flex-col sm:flex-row gap-2 items-center">
@@ -298,7 +326,13 @@ export default function InvoiceTable({ onSummaryUpdate }) {
           {selectedInvoiceIds.size > 0 && (
             <button
               onClick={handleLinkPaymentClick}
-              className="bg-blue-600 text-white px-4 py-1 rounded hover:bg-blue-700 whitespace-nowrap font-semibold"
+              disabled={selectedInvoices.some(inv => inv.type === 'performa')}
+              className={`px-4 py-1 rounded whitespace-nowrap font-semibold ${
+                selectedInvoices.some(inv => inv.type === 'performa')
+                  ? 'bg-gray-400 text-white cursor-not-allowed opacity-50'
+                  : 'bg-blue-600 text-white hover:bg-blue-700'
+              }`}
+              title={selectedInvoices.some(inv => inv.type === 'performa') ? 'Cannot link payments to Performa Invoices' : ''}
             >
               Link Payment ({selectedInvoiceIds.size})
             </button>
@@ -336,7 +370,7 @@ export default function InvoiceTable({ onSummaryUpdate }) {
                 Invoice No <SortIcon column="invoice_number" />
               </th>
               <th className="px-4 py-2">Buyer</th>
-              <th className="px-4 py-2">Employee</th>
+              <th className="px-4 py-2">Created By</th>
               <th
                 onClick={() => handleSort("order_date")}
                 className="px-4 py-2 cursor-pointer"
@@ -344,6 +378,7 @@ export default function InvoiceTable({ onSummaryUpdate }) {
                 Order Date <SortIcon column="order_date" />
               </th>
               <th className="px-4 py-2">Type</th>
+              <th className="px-4 py-2">Status</th>
               <th className="px-4 py-2">Tax</th>
               <th className="px-4 py-2">Grand Total</th>
               <th className="px-4 py-2">Balance Amount</th>
@@ -359,13 +394,13 @@ export default function InvoiceTable({ onSummaryUpdate }) {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan="12" className="text-center py-4">
+                <td colSpan="13" className="text-center py-4">
                   Loading...
                 </td>
               </tr>
             ) : fetchError ? (
               <tr>
-                <td colSpan="12" className="text-center py-6 text-red-600">
+                <td colSpan="13" className="text-center py-6 text-red-600">
                   {fetchError}
                 </td>
               </tr>
@@ -420,6 +455,24 @@ export default function InvoiceTable({ onSummaryUpdate }) {
                       </span>
                     </td>
                     <td className="px-4 py-2">
+                      <span className={`px-3 py-1 rounded text-sm font-semibold ${
+                        i.status === 'PAID'
+                          ? 'bg-green-100 text-green-800'
+                          : i.status === 'PARTIAL PAID' || i.status === 'PARTIAL'
+                            ? 'bg-yellow-100 text-yellow-800'
+                            : i.status === 'CANCELLED'
+                              ? 'bg-red-100 text-red-800'
+                              : 'bg-gray-100 text-gray-600'
+                      }`}>
+                        {i.status || '—'}
+                      </span>
+                      {i.order_id && (
+                        <div className="mt-1 text-xs text-gray-500">
+                          Ord: {i.order_id}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-4 py-2">
                       ₹{Number(i.tax_amount).toLocaleString("en-IN")}
                     </td>
                     <td className="px-4 py-2 font-semibold">
@@ -468,13 +521,13 @@ export default function InvoiceTable({ onSummaryUpdate }) {
                               setShowLinkModal(true);
                             }
                           }}
-                          disabled={selectedInvoiceIds.size > 0 && !selectedInvoiceIds.has(i.id)}
+                          disabled={i.type === 'performa' || (selectedInvoiceIds.size > 0 && !selectedInvoiceIds.has(i.id))}
                           className={`text-white px-3 py-1 rounded ${
-                            selectedInvoiceIds.size > 0 && !selectedInvoiceIds.has(i.id)
+                            i.type === 'performa' || (selectedInvoiceIds.size > 0 && !selectedInvoiceIds.has(i.id))
                               ? 'bg-gray-400 cursor-not-allowed opacity-50'
                               : 'bg-purple-600 hover:bg-purple-700'
                           }`}
-                          title={selectedInvoiceIds.size > 0 && !selectedInvoiceIds.has(i.id) ? 'Disabled: These invoices are linked to a payment' : ''}
+                          title={i.type === 'performa' ? 'Link Payment not available for Performa Invoices' : selectedInvoiceIds.size > 0 && !selectedInvoiceIds.has(i.id) ? 'Disabled: These invoices are linked to a payment' : ''}
                         >
                           Link Payment
                         </button>
@@ -483,7 +536,7 @@ export default function InvoiceTable({ onSummaryUpdate }) {
                   </tr>
                   {expandedInvoiceId === i.id && i.linkedStatements && i.linkedStatements.length > 0 && (
                     <tr>
-                      <td colSpan="12" className="px-8 py-4 bg-gray-50">
+                      <td colSpan="13" className="px-8 py-4 bg-gray-50">
                         <div className="flex justify-between items-center mb-3">
                           <h4 className="font-semibold text-gray-700">Linked Payments:</h4>
                           <div className="text-right">
@@ -542,7 +595,7 @@ export default function InvoiceTable({ onSummaryUpdate }) {
               ))
             ) : (
               <tr>
-                <td colSpan="12" className="text-center py-6 text-gray-500">
+                <td colSpan="13" className="text-center py-6 text-gray-500">
                   No invoices found
                 </td>
               </tr>

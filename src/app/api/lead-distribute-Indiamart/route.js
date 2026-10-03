@@ -9,7 +9,7 @@ export async function POST(req) {
     const { fields } = await req.json();
     const now = new Date().toISOString().slice(0, 19).replace("T", " ");
     const next_followup_date = now;
-    const createdby = fields.lead_source || "manual";
+    const createdby = fields.lead_source || fields.sales_representative || "manual";
 
     const conn = await getDbConnection();
 
@@ -57,7 +57,7 @@ export async function POST(req) {
         fields.followup_notes || "",
         fields.communication_history || "",
         fields.products_interest,
-        createdby,
+        fields.sales_representative || createdby,
         fields.assigned_to,
         fields.tags,
         fields.notes,

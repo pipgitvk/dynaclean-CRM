@@ -11,7 +11,7 @@ export async function GET(req) {
 
     // Pagination
     const page = Math.max(parseInt(searchParams.get("page")) || 1, 1);
-    const limit = Math.min(parseInt(searchParams.get("limit")) || 20, 100);
+    const limit = Math.min(parseInt(searchParams.get("limit")) || 20, 10000);
     const offset = (page - 1) * limit;
 
     // Filters
@@ -48,12 +48,12 @@ export async function GET(req) {
     }
 
     if (fromDate) {
-      whereClause += " AND COALESCE(order_date, invoice_date) >= ?";
+      whereClause += " AND DATE(i.invoice_date) >= DATE(?)";
       values.push(fromDate);
     }
 
     if (toDate) {
-      whereClause += " AND COALESCE(order_date, invoice_date) <= ?";
+      whereClause += " AND DATE(i.invoice_date) <= DATE(?)";
       values.push(toDate);
     }
 
@@ -76,7 +76,8 @@ export async function GET(req) {
       SELECT DISTINCT
         i.id,
         i.invoice_number,
-        COALESCE(i.order_date, i.invoice_date) AS order_date,
+        i.invoice_date AS order_date,
+        i.invoice_date,
         i.customer_name as buyer_name,
         i.gst_number,
         i.employee_name,

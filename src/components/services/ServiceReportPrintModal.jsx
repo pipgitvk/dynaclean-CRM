@@ -17,6 +17,8 @@ export default function ServiceReportPrintModal({
   preCompletion,
   afterCompletion,
   onImagesUpdated,
+  downloadMode = null,
+  isGeneratingPDF = false,
 }) {
   const [showImagesModal, setShowImagesModal] = useState(false);
 
@@ -130,7 +132,7 @@ export default function ServiceReportPrintModal({
             disabled={isPrinting}
             className="px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-400"
           >
-            {isPrinting ? "Preparing..." : "Print"}
+            {isPrinting ? "Preparing..." : (downloadMode === "download" ? "Download PDF" : "Print")}
           </button>
         </div>
       </div>

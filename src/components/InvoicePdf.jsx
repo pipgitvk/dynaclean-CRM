@@ -375,7 +375,7 @@ const InvoicePDFDocument = ({ data, logoSrc, signatureSrc }) => {
     <Document>
       <Page size="A4" style={styles.page}>
         <View style={styles.invoiceTitleOutside}>
-          <Text style={styles.headerTitle}>Tax Invoice</Text>
+          <Text style={styles.headerTitle}>{data.invoiceTypeLabel || "Tax Invoice"}</Text>
         </View>
         <View style={styles.container}>
           {/* Logo + company (matches DesignInvoice: 25% / 75%) */}
@@ -1088,7 +1088,7 @@ const InvoicePDFDocument = ({ data, logoSrc, signatureSrc }) => {
               <Text style={{ fontSize: 8, lineHeight: 1.25 }}>A/C Holder Name : {data.bank.accountHolderName}</Text>
               <Text style={{ fontSize: 8, lineHeight: 1.25 }}>Bank Name : {data.bank.name}</Text>
               <Text style={{ fontSize: 8, lineHeight: 1.25 }}>A/c No. : {data.bank.accountNo}</Text>
-              <Text style={{ fontSize: 8, lineHeight: 1.25 }}>Branch & IFS Code: {data.bank.IFSC}</Text>
+              <Text style={{ fontSize: 8, lineHeight: 1.25 }}>Branch &amp; IFSC Code: {data.bank.IFSC}</Text>
             </View>
           </View>
 

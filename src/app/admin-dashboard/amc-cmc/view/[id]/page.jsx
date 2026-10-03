@@ -103,7 +103,9 @@ export default function ViewAMCCMCPage() {
         <div className="flex justify-between items-start mb-6">
           <div>
             <h1 className="text-3xl font-bold">AMC/CMC Record</h1>
-            <p className="text-gray-600 mt-1">Serial: {record.serial_number}</p>
+            <p className="text-gray-600 mt-1">
+              {record.contract_type || "AMC"} · Serial: {record.serial_number}
+            </p>
           </div>
           <span
             className={`px-4 py-2 rounded-full font-semibold ${getStatusColor(
@@ -119,6 +121,10 @@ export default function ViewAMCCMCPage() {
           <section>
             <h2 className="text-lg font-semibold mb-4">Product Information</h2>
             <div className="space-y-3">
+              <div>
+                <label className="text-sm font-medium text-gray-600">Contract Type</label>
+                <p className="text-gray-800 font-semibold">{record.contract_type || "AMC"}</p>
+              </div>
               <div>
                 <label className="text-sm font-medium text-gray-600">Serial Number</label>
                 <p className="text-gray-800">{record.serial_number}</p>

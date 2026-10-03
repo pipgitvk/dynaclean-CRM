@@ -7,6 +7,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import toast from "react-hot-toast";
 import { set } from "date-fns";
+import { LetterheadCompanyInfo, LetterheadBankLine, LetterheadSignatoryLine } from "@/components/invoice/InvoiceLetterheadSection";
+
 
 // Remove local generation - will fetch from API
 
@@ -23,6 +25,8 @@ export default function QuotationForm() {
   const [customerIdInput, setCustomerIdInput] = useState("");
   const [isLoadingCustomer, setIsLoadingCustomer] = useState(false);
   const [customerError, setCustomerError] = useState("");
+  const [modalSuggestions, setModalSuggestions] = useState([]);
+  const [showModalSuggestions, setShowModalSuggestions] = useState(false);
   const [originalCustomerData, setOriginalCustomerData] = useState(null);
   const [editableFields, setEditableFields] = useState({
     company: true,
@@ -61,7 +65,7 @@ export default function QuotationForm() {
   const [roundOff, setRoundOff] = useState(0);
   const [isAutoRoundOff, setIsAutoRoundOff] = useState(true);
 
-  // Supplier state is fixed (header shows: GSTIN: 07AAKCD6495M1ZV | State: Tamil Nadu (33))
+  // Supplier state is fixed (header shows: GSTIN: 07AAKCD6495M1ZV | State: Delhi (07))
   const SUPPLIER_STATE_CODE = "07";
   const SUPPLIER_STATE_NAME = "Delhi";
 
@@ -164,9 +168,15 @@ export default function QuotationForm() {
     // For compatibility with submit payload: split tax into cgst/sgst or igst based on interstate flag
     const isInterstate = (() => {
       const gstinValue = form.gstin_no?.trim();
-      if (!gstinValue) return false;
-      const code = gstinValue.slice(0, 2);
-      return code !== SUPPLIER_STATE_CODE;
+      if (gstinValue) {
+        // GSTIN provided → use its first 2 digits
+        const code = gstinValue.slice(0, 2);
+        return code !== SUPPLIER_STATE_CODE;
+      }
+      // No GSTIN → check manually selected state
+      const stateCode = parseCodeFromDisplay(form.state_name);
+      if (!stateCode) return false; // no state = intrastate default
+      return stateCode !== SUPPLIER_STATE_CODE;
     })();
 
     const cgst = isInterstate ? 0 : totalTax / 2;
@@ -183,7 +193,7 @@ export default function QuotationForm() {
     const grandTotal = totalBeforeRound + finalRoundOff;
 
     return { subtotal, cgst, sgst, igst, totalTax, grandTotal, finalRoundOff };
-  }, [items, roundOff, isAutoRoundOff, form.gstin_no]);
+  }, [items, roundOff, isAutoRoundOff, form.gstin_no, form.state_name]);
 
   useEffect(() => {
     if (isAutoRoundOff) {
@@ -225,34 +235,16 @@ export default function QuotationForm() {
   useEffect(() => {
     const gstinValue = form.gstin_no?.trim();
 
-    // Case 1: GSTIN is provided - use GSTIN to determine tax
     if (gstinValue) {
+      // GSTIN provided → use its first 2 digits to determine tax type
       const result = getStateFromGSTIN(gstinValue);
       if (result) {
         if (form.state_name !== result.display) {
           setForm((prev) => ({ ...prev, state_name: result.display }));
         }
-        // Set tax rates based on interstate vs intrastate
-        if (result.code === SUPPLIER_STATE_CODE) {
-          // Same state → CGST+SGST, no IGST
-          // Don't set fixed rates - let items define their own GST
-          setCgstRate(0);
-          setSgstRate(0);
-          setIgstRate(0);
-        } else {
-          // Different state → IGST only
-          setCgstRate(0);
-          setSgstRate(0);
-          setIgstRate(0);
-        }
       }
     }
-    // Case 2: No GSTIN - always use CGST+SGST (regardless of state)
-    else {
-      setCgstRate(0);
-      setSgstRate(0);
-      setIgstRate(0);
-    }
+    // No GSTIN → state determines tax type (handled by taxSummary + interstate prop)
   }, [form.gstin_no]);
 
   // shared handler
@@ -491,20 +483,32 @@ export default function QuotationForm() {
       const totalGST = taxSummary.cgst + taxSummary.sgst + taxSummary.igst;
       const grandTotal = taxSummary.grandTotal;
 
+      // Derive effective rates from actual taxSummary amounts
+      // taxSummary already correctly splits into cgst/sgst (intrastate) or igst (interstate)
+      const effectiveIgstRate = subtotal > 0 && taxSummary.igst > 0
+        ? parseFloat(((taxSummary.igst / subtotal) * 100).toFixed(2))
+        : 0;
+      const effectiveCgstRate = subtotal > 0 && taxSummary.cgst > 0
+        ? parseFloat(((taxSummary.cgst / subtotal) * 100).toFixed(2))
+        : 0;
+      const effectiveSgstRate = subtotal > 0 && taxSummary.sgst > 0
+        ? parseFloat(((taxSummary.sgst / subtotal) * 100).toFixed(2))
+        : 0;
+
       const dataToSend = {
         ...form,
         quote_number: quoteNumber,
         quote_date: quoteDate,
-        items: itemsWithTotals, // Use the new array with totals
+        items: itemsWithTotals,
         subtotal,
         cgst: taxSummary.cgst,
         sgst: taxSummary.sgst,
         igst: taxSummary.igst,
         round_off: parseFloat(roundOff) || 0,
         grand_total: grandTotal,
-        cgstRate,
-        sgstRate,
-        igstRate,
+        cgstRate: effectiveCgstRate,
+        sgstRate: effectiveSgstRate,
+        igstRate: effectiveIgstRate,
         terms: editableTerms,
       };
 
@@ -521,7 +525,7 @@ export default function QuotationForm() {
       const data = await res.json();
       if (data.success) {
         toast.success("✅ Quotation added successfully");
-        router.push("/admin-dashboard/quotations");
+        router.push(`/admin-dashboard/quotations?customer_id=${form.customer_id || ""}`);
       } else {
         alert("Error: " + data.error);
       }
@@ -538,7 +542,7 @@ export default function QuotationForm() {
       {/* Customer ID Modal */}
       {showCustomerModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 overflow-visible">
             <h2 className="text-2xl font-bold text-gray-900 mb-4">
               Enter Customer ID
             </h2>
@@ -552,12 +556,33 @@ export default function QuotationForm() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Customer ID *
                 </label>
+                <div className="relative">
                 <input
                   type="text"
                   value={customerIdInput}
-                  onChange={(e) => {
-                    setCustomerIdInput(e.target.value);
+                  onChange={async (e) => {
+                    const val = e.target.value;
+                    setCustomerIdInput(val);
                     setCustomerError("");
+
+                    if (val.trim().length === 0) {
+                      setModalSuggestions([]);
+                      setShowModalSuggestions(false);
+                      return;
+                    }
+
+                    try {
+                      const res = await fetch("/api/customer-suggestions", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ query: val }),
+                      });
+                      const data = await res.json();
+                      setModalSuggestions(Array.isArray(data) ? data : []);
+                      setShowModalSuggestions(true);
+                    } catch (err) {
+                      console.error("Suggestion fetch error", err);
+                    }
                   }}
                   onKeyPress={(e) => {
                     if (e.key === "Enter") {
@@ -565,13 +590,36 @@ export default function QuotationForm() {
                       handleFetchCustomer();
                     }
                   }}
-                  placeholder="Enter customer ID"
+                  placeholder="Enter customer ID or name"
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   disabled={isLoadingCustomer}
+                  autoComplete="off"
                 />
+                {showModalSuggestions && modalSuggestions.length > 0 && (
+                  <ul className="absolute z-50 bg-white border border-gray-200 rounded-lg shadow-lg mt-1 max-h-48 overflow-y-auto w-full text-sm">
+                    {modalSuggestions.map((s, i) => (
+                      <li
+                        key={i}
+                        className="px-4 py-2 hover:bg-blue-50 cursor-pointer border-b last:border-0"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          setCustomerIdInput(String(s.customer_id));
+                          setShowModalSuggestions(false);
+                          setModalSuggestions([]);
+                          fetchCustomerById(String(s.customer_id));
+                        }}
+                      >
+                        <span className="font-semibold text-blue-700">#{s.customer_id}</span>
+                        {s.company ? ` — ${s.company}` : ""}
+                        {s.location ? <span className="text-gray-400 text-xs ml-1">({s.location})</span> : ""}
+                      </li>
+                    ))}
+                  </ul>
+                )}
                 {customerError && (
                   <p className="text-sm text-red-600 mt-2">{customerError}</p>
                 )}
+                </div>
               </div>
 
               <div className="flex gap-3">
@@ -614,29 +662,8 @@ export default function QuotationForm() {
           />
 
           {/* Company Info */}
-          <div className="flex-1 text-sm text-gray-700">
-            <h2 className="text-xl font-bold text-red-600 mb-1">
-              Dynaclean Industries Pvt Ltd
-            </h2>
-            <p className="leading-relaxed">
-              <span className="block">
-                1st Floor, 13-B, Kattabomman Street, Gandhi Nagar Main Road,
-              </span>
-              <span className="block">
-                Gandhi Nagar, Ganapathy, Coimbatore, Tamil Nadu, 641006
-              </span>
-              <span className="block mt-1">
-                <strong>Phone:</strong> 011-45143666, +91-7982456944
-              </span>
-              <span className="block">
-                <strong>Email:</strong> sales@dynacleanindustries.com
-              </span>
-              <span className="block mt-1">
-                <strong>GSTIN:</strong> 07AAKCD6495M1ZV |{" "}
-                <strong>State:</strong> Tamil Nadu (33)
-              </span>
-            </p>
-          </div>
+          <LetterheadCompanyInfo />
+        
         </div>
 
         {/* Quote Info */}
@@ -859,13 +886,16 @@ export default function QuotationForm() {
           setIgstRate={setIgstRate}
           interstate={(() => {
             const gstinValue = form.gstin_no?.trim();
-            // If GSTIN is empty, default to intrastate (CGST+SGST)
-            if (!gstinValue) return false;
-
-            const gstState = getStateFromGSTIN(gstinValue);
-            const buyerCode =
-              gstState?.code || parseCodeFromDisplay(form.state_name);
-            return buyerCode ? buyerCode !== SUPPLIER_STATE_CODE : false;
+            if (gstinValue) {
+              // GSTIN provided → use its first 2 digits
+              const gstState = getStateFromGSTIN(gstinValue);
+              const buyerCode = gstState?.code;
+              return buyerCode ? buyerCode !== SUPPLIER_STATE_CODE : false;
+            }
+            // No GSTIN → use manually selected state
+            const stateCode = parseCodeFromDisplay(form.state_name);
+            if (!stateCode) return false;
+            return stateCode !== SUPPLIER_STATE_CODE;
           })()}
         />
 
@@ -887,7 +917,7 @@ export default function QuotationForm() {
           {/* Bank Details */}
           <div className="lg:col-span-1 border p-4 rounded bg-gray-50 text-sm">
             <h4 className="font-semibold mb-2">Bank Details</h4>
-            <p>A/C Holder Name : Dynaclean Industries Private Limited</p>
+            <LetterheadBankLine label="A/C Holder Name" />
             <p>Bank Name : ICICI Bank</p>
             <p>A/c no. : 343405500379</p>
             <p>Branch & IFS Code: ICIC0003434</p>
@@ -896,7 +926,7 @@ export default function QuotationForm() {
           {/* Signatory */}
           <div className="lg:col-span-1 border p-4 rounded bg-gray-50 text-sm text-center flex flex-col justify-between">
             <div>
-              <p>For Dynaclean Industries Pvt Ltd</p>
+              <LetterheadSignatoryLine />
               <Image
                 src="/images/sign.png"
                 alt="Sign"

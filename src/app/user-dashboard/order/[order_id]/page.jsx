@@ -2,8 +2,16 @@ import { getDbConnection } from "@/lib/db";
 import { notFound } from "next/navigation";
 import OrderDetailsClient from "./OrderDetailsClient";
 import dayjs from "dayjs";
+import { getSessionPayload } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
+
+function getOrderListPath(userRole) {
+  const role = String(userRole || "").toUpperCase();
+  if (role.includes("SALES")) return "/sales-dashboard/order";
+  if (role.includes("ACCOUNTANT")) return "/accounts-dashboard/order";
+  return "/user-dashboard/order";
+}
 
 async function fetchOrderData(orderId) {
   const conn = await getDbConnection();
@@ -62,6 +70,20 @@ export default async function Page({ params }) {
   const { orderDetails, items, statuses, gstin, quoteCustomerId } =
     await fetchOrderData(orderId);
 
+  let orderListPath = "/user-dashboard/order";
+  let canUploadDocuments = false;
+  const payload = await getSessionPayload();
+  if (payload?.username) {
+    const connAuth = await getDbConnection();
+    const [roleRows] = await connAuth.execute(
+      "SELECT userRole FROM rep_list WHERE username = ?",
+      [payload.username],
+    );
+    const userRole = roleRows[0]?.userRole || payload.role || "";
+    orderListPath = getOrderListPath(userRole);
+    canUploadDocuments = String(userRole).toUpperCase().includes("ACCOUNTANT");
+  }
+
   if (!orderDetails) {
     return (
       <div className="p-8 text-center text-red-600 text-xl">
@@ -98,6 +120,8 @@ export default async function Page({ params }) {
         orderId={orderId}
         gstin={gstin}
         quoteCustomerId={quoteCustomerId}
+        orderListPath={orderListPath}
+        canUploadDocuments={canUploadDocuments}
       />
     </div>
   );

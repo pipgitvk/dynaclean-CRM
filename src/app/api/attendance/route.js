@@ -71,12 +71,24 @@ export async function POST(req) {
   try {
     return await withPool(async (conn) => {
       switch (action) {
-        case 'checkin':
+        case 'checkin': {
+          const locationless =
+            latitude == null ||
+            latitude === "" ||
+            longitude == null ||
+            longitude === "";
+          if (locationless) {
+            return NextResponse.json(
+              { error: "Check-in requires GPS location." },
+              { status: 400 }
+            );
+          }
           await conn.execute(
             "INSERT INTO attendance_logs (username, date, checkin_time, checkin_latitude, checkin_longitude, checkin_address) VALUES (?, ?, ?, ?, ?, ?)",
             [username, today, now, latitude, longitude, locationAddress]
           );
           break;
+        }
 
         case 'break_morning':
           await conn.execute(
