@@ -26,7 +26,6 @@ export async function GET(request) {
     if (isServiceSupport) {
       // SERVICE SUPPORT: filter by service_lead_source, use service_next_followup for dates
       if (startDate && endDate) {
-        // With date filter - include past due followups + selected range
         sqlQuery = `
           SELECT *
           FROM (
@@ -47,14 +46,11 @@ export async function GET(request) {
           ) AS T
           WHERE T.rn = 1
             AND T.service_next_followup IS NOT NULL
-            AND (
-              DATE(T.service_next_followup) <= CURDATE() OR 
-              (DATE(T.service_next_followup) >= ? AND DATE(T.service_next_followup) <= ?)
-            )
+            AND DATE(T.service_next_followup) >= ?
+            AND DATE(T.service_next_followup) <= ?
         `;
         queryParams = [leadSource, startDate, endDate];
       } else {
-        // Without date filter - show all upcoming followups
         sqlQuery = `
           SELECT *
           FROM (
@@ -101,10 +97,8 @@ export async function GET(request) {
           ) AS T
           WHERE T.rn = 1
             AND T.next_followup_date IS NOT NULL
-            AND (
-              DATE(T.next_followup_date) <= CURDATE() OR 
-              (DATE(T.next_followup_date) >= ? AND DATE(T.next_followup_date) <= ?)
-            )
+            AND DATE(T.next_followup_date) >= ?
+            AND DATE(T.next_followup_date) <= ?
         `;
         queryParams = [leadSource, startDate, endDate];
       } else {

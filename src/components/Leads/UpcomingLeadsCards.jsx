@@ -124,6 +124,17 @@ export default function UpcomingLeadsCards({
       filtered = filtered.filter((cust) => cust.tags === appliedFilters.tagFilter);
     }
 
+    if (appliedFilters.startDate && appliedFilters.endDate) {
+      const dateField = isServiceSupport ? "service_next_followup" : "next_followup_date";
+      const sd = new Date(appliedFilters.startDate + "T00:00:00");
+      const ed = new Date(appliedFilters.endDate + "T23:59:59");
+      filtered = filtered.filter((cust) => {
+        if (!cust[dateField]) return false;
+        const leadDate = new Date(cust[dateField]);
+        return leadDate >= sd && leadDate <= ed;
+      });
+    }
+
     filtered.sort((a, b) => {
       if (appliedFilters.sortOrder === "name") {
         return (a.first_name || "").localeCompare(b.first_name || "");

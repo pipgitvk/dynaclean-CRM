@@ -38,13 +38,12 @@ export async function GET(request) {
           ) AS T
           WHERE T.rn = 1
             AND T.service_next_followup IS NOT NULL
-            AND DATE(T.service_next_followup) >= ? 
+            AND DATE(T.service_next_followup) >= ?
             AND DATE(T.service_next_followup) <= ?
           ORDER BY T.service_next_followup ASC
         `;
         queryParams = [leadSource, startDate, endDate];
       } else {
-        // No date filter - show all upcoming followups (saare followups)
         sqlQuery = `
           SELECT *
           FROM (
@@ -92,13 +91,12 @@ export async function GET(request) {
           ) AS T
           WHERE T.rn = 1
             AND T.next_followup_date IS NOT NULL
-            AND DATE(T.next_followup_date) >= ? 
+            AND DATE(T.next_followup_date) >= ?
             AND DATE(T.next_followup_date) <= ?
           ORDER BY T.next_followup_date ASC
         `;
         queryParams = [leadSource, startDate, endDate];
       } else {
-        // No date filter - show all upcoming followups (saare followups)
         sqlQuery = `
           SELECT *
           FROM (
