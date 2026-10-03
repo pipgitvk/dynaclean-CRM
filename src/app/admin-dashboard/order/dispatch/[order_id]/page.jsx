@@ -85,15 +85,15 @@ export default function DispatchFormPage({ params }) {
         const data = await res.json();
         setStockInfo(prev => ({ ...prev, [rowId]: data.stockResults }));
 
-        // Check for low stock warnings
+        // Check for stock availability (no minimum quantity check)
+        // Only prevent dispatch if no stock is available (stock_count <= 0)
         let warningMessage = "";
         data.stockResults.forEach((item) => {
           if (
             item.stock_count !== null &&
-            item.min_qty !== null &&
-            item.stock_count < item.min_qty
+            item.stock_count <= 0
           ) {
-            warningMessage += `Warning: The stock for "${item.item_name}" is currently below the minimum required quantity. Please replenish the stock in the selected godown.\n`;
+            warningMessage += `Warning: No stock available for "${item.item_name}" in the selected godown. Please add stock before dispatch.\n`;
           }
         });
         setLowStockWarnings(prev => ({ ...prev, [rowId]: warningMessage }));
@@ -199,7 +199,7 @@ export default function DispatchFormPage({ params }) {
       throw new Error("Please select a godown before saving.");
     }
 
-    // Check for low stock warning
+    // Check for stock availability warning
     if (lowStockWarnings[row.id]) {
       throw new Error("Please add stock to the selected godown before dispatching this item.");
     }
@@ -231,10 +231,10 @@ export default function DispatchFormPage({ params }) {
       if (!allGodownsSelected) {
         throw new Error("Please select godowns for all items before completing dispatch");
       }
-      // Check if any items have low stock warnings
-      const hasLowStockIssues = rows.some(r => lowStockWarnings[r.id]);
-      if (hasLowStockIssues) {
-        throw new Error("Please resolve all stock warnings before completing dispatch");
+      // Check if any items have no stock available
+      const hasStockIssues = rows.some(r => lowStockWarnings[r.id]);
+      if (hasStockIssues) {
+        throw new Error("Please resolve all stock availability issues before completing dispatch");
       }
 
       for (const row of rows) {
@@ -341,14 +341,14 @@ export default function DispatchFormPage({ params }) {
                     <div className="space-y-1">
                       {stockInfo[r.id].map((item) => (
                         <p key={item.item_code} className="text-sm text-green-700">
-                          {item.item_name || item.item_code}: {item.stock_count} (Min Qty: {item.min_qty || 0})
+                          {item.item_name || item.item_code}: {item.stock_count} available
                         </p>
                       ))}
                     </div>
                   </div>
                 )}
 
-                {/* Low Stock Warning */}
+                {/* Stock Warning */}
                 {lowStockWarnings[r.id] && (
                   <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-md">
                     <h4 className="text-sm font-medium text-red-800 mb-2">⚠️ Stock Warning:</h4>
@@ -422,7 +422,7 @@ export default function DispatchFormPage({ params }) {
             !rows
               .filter(r => isProductItem(r.item_code))
               .every(r => r.serial_no && r.serial_no.trim() !== "") ||
-            // No pending low stock warnings
+            // No stock availability issues
             rows.some(r => lowStockWarnings[r.id])
           }
           saving={saving}
@@ -446,8 +446,7 @@ function RowSaveButton({ r, uploadForRow, globalSaving, isSaved, hasSerialNo, ha
 
   const serialRequired = isProduct;
 
-  // Locked rows (stock already deducted): allow updating photos/accessories anytime
-  // Unlocked rows: require serial no (for products), godown, no low stock warning, and not already saved
+  // Unlocked rows: require serial no (for products), godown, no stock issues, and not already saved
   const isDisabled = isLocked
     ? globalSaving || isLoading
     : globalSaving ||
