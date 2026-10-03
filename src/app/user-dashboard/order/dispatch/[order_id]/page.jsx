@@ -144,6 +144,16 @@ export default function DispatchFormPage({ params }) {
       return;
     }
 
+    // Find the row to check if it's a service charge
+    const row = rows.find(r => r.id === rowId);
+    if (row && isServiceCharge(row.item_name, row.item_code)) {
+      // Service charges don't need stock check
+      setStockInfo((prev) => ({ ...prev, [rowId]: null }));
+      setZeroStockWarnings((prev) => ({ ...prev, [rowId]: false }));
+      setAccessoryStockInfo((prev) => ({ ...prev, [rowId]: null }));
+      return;
+    }
+
     try {
       const res = await fetch("/api/stock/check-single-item", {
         method: "POST",
@@ -244,7 +254,14 @@ export default function DispatchFormPage({ params }) {
       const row = rows.find((r) => r.id === id);
       if (row && row.quote_number && row.item_code) {
         if (value) {
-          fetchStockForRow(id, row.quote_number, value, row.item_code);
+          // Skip stock check for service charges
+          if (isServiceCharge(row.item_name, row.item_code)) {
+            setStockInfo((prev) => ({ ...prev, [id]: null }));
+            setZeroStockWarnings((prev) => ({ ...prev, [id]: false }));
+            setAccessoryStockInfo((prev) => ({ ...prev, [id]: null }));
+          } else {
+            fetchStockForRow(id, row.quote_number, value, row.item_code);
+          }
           if (isProductItem(row.item_code)) {
             loadAccessoriesForProduct(row.item_code, value);
           }
@@ -269,6 +286,25 @@ export default function DispatchFormPage({ params }) {
 
   // Treat items with any alphabet in item_code as "product"; others are spares
   const isProductItem = (itemCode) => /[a-zA-Z]/.test(itemCode || "");
+
+  // Check if item is a service charge (doesn't require stock check)
+  const isServiceCharge = (itemName, itemCode) => {
+    if (!itemName && !itemCode) return false;
+    const name = (itemName || "").toLowerCase();
+    const code = (itemCode || "").toLowerCase();
+    
+    // Service charges typically contain these keywords
+    return name.includes("camc") || 
+           name.includes("amc") || 
+           name.includes("charges") || 
+           name.includes("service") ||
+           name.includes("labour") ||
+           name.includes("installation") ||
+           code.includes("camc") ||
+           code.includes("amc") ||
+           code.includes("charges") ||
+           code.includes("service");
+  };
 
   const uploadForRow = async (row) => {
     const form = new FormData();
@@ -313,8 +349,10 @@ export default function DispatchFormPage({ params }) {
       throw new Error("Please select a godown before saving.");
     }
 
-    // Block dispatch if stock is 0 in selected godown (except spare 1110)
-    if (zeroStockWarnings[row.id] && !isSpare1110(row.item_code)) {
+    // Block dispatch if stock is 0 in selected godown (except spare 1110 and service charges)
+    if (zeroStockWarnings[row.id] && 
+        !isSpare1110(row.item_code) && 
+        !isServiceCharge(row.item_name, row.item_code)) {
       throw new Error(
         "Stock is 0 in the selected godown. Cannot dispatch this item.",
       );
@@ -358,9 +396,11 @@ export default function DispatchFormPage({ params }) {
           "Please select godowns for all items before completing dispatch",
         );
       }
-      // Block if any item has 0 stock in selected godown
+      // Block if any physical item (non-service charge) has 0 stock in selected godown
       const hasZeroStock = rows.some(
-        (r) => zeroStockWarnings[r.id] && !isSpare1110(r.item_code),
+        (r) => zeroStockWarnings[r.id] && 
+               !isSpare1110(r.item_code) && 
+               !isServiceCharge(r.item_name, r.item_code),
       );
       if (hasZeroStock) {
         throw new Error(

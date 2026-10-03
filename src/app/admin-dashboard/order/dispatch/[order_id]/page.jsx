@@ -70,6 +70,15 @@ export default function DispatchFormPage({ params }) {
       return;
     }
 
+    // Find the row to check if it's a service charge
+    const row = rows.find(r => r.id === rowId);
+    if (row && isServiceCharge(row.item_name, row.item_code)) {
+      // Service charges don't need stock check
+      setStockInfo(prev => ({ ...prev, [rowId]: null }));
+      setLowStockWarnings(prev => ({ ...prev, [rowId]: "" }));
+      return;
+    }
+
     try {
       const res = await fetch("/api/stock/check-single-item", {
         method: "POST",
@@ -140,8 +149,14 @@ export default function DispatchFormPage({ params }) {
       const row = rows.find(r => r.id === id);
       if (row && row.quote_number && row.item_code) {
         if (value) {
-          // Godown selected - fetch stock for this specific item
-          fetchStockForRow(id, row.quote_number, value, row.item_code);
+          // Skip stock check for service charges
+          if (isServiceCharge(row.item_name, row.item_code)) {
+            setStockInfo(prev => ({ ...prev, [id]: null }));
+            setLowStockWarnings(prev => ({ ...prev, [id]: "" }));
+          } else {
+            // Godown selected - fetch stock for this specific item
+            fetchStockForRow(id, row.quote_number, value, row.item_code);
+          }
           if (isProductItem(row.item_code)) {
             loadAccessoriesForProduct(row.item_code, value);
           }
@@ -166,6 +181,25 @@ export default function DispatchFormPage({ params }) {
 
   // Treat items with any alphabet in item_code as "product"; others are spares
   const isProductItem = (itemCode) => /[a-zA-Z]/.test(itemCode || "");
+
+  // Check if item is a service charge (doesn't require stock check)
+  const isServiceCharge = (itemName, itemCode) => {
+    if (!itemName && !itemCode) return false;
+    const name = (itemName || "").toLowerCase();
+    const code = (itemCode || "").toLowerCase();
+    
+    // Service charges typically contain these keywords
+    return name.includes("camc") || 
+           name.includes("amc") || 
+           name.includes("charges") || 
+           name.includes("service") ||
+           name.includes("labour") ||
+           name.includes("installation") ||
+           code.includes("camc") ||
+           code.includes("amc") ||
+           code.includes("charges") ||
+           code.includes("service");
+  };
 
   const uploadForRow = async (row) => {
     const form = new FormData();
@@ -199,8 +233,8 @@ export default function DispatchFormPage({ params }) {
       throw new Error("Please select a godown before saving.");
     }
 
-    // Check for stock availability warning
-    if (lowStockWarnings[row.id]) {
+    // Check for stock availability warning (skip for service charges)
+    if (!isServiceCharge(row.item_name, row.item_code) && lowStockWarnings[row.id]) {
       throw new Error("Please add stock to the selected godown before dispatching this item.");
     }
 
@@ -231,8 +265,10 @@ export default function DispatchFormPage({ params }) {
       if (!allGodownsSelected) {
         throw new Error("Please select godowns for all items before completing dispatch");
       }
-      // Check if any items have no stock available
-      const hasStockIssues = rows.some(r => lowStockWarnings[r.id]);
+      // Check if any physical items (non-service charges) have stock issues
+      const hasStockIssues = rows.some(r => 
+        !isServiceCharge(r.item_name, r.item_code) && lowStockWarnings[r.id]
+      );
       if (hasStockIssues) {
         throw new Error("Please resolve all stock availability issues before completing dispatch");
       }
@@ -276,7 +312,12 @@ export default function DispatchFormPage({ params }) {
               <div key={r.id} className="border rounded-lg p-3">
                 <div className="grid grid-cols-1 md:grid-cols-5 gap-3 items-center">
                   <div className="text-sm min-w-0">
-                    <div className="font-medium truncate" title={r.item_name}>{r.item_name}</div>
+                    <div className="font-medium truncate flex items-center gap-2" title={r.item_name}>
+                      {r.item_name}
+                      {isServiceCharge(r.item_name, r.item_code) && (
+                        <span className="text-xs bg-blue-100 text-blue-800 px-1 py-0.5 rounded">Service</span>
+                      )}
+                    </div>
                     <div className="text-gray-600 truncate" title={r.item_code}>{r.item_code}</div>
                   </div>
                   <div>
@@ -335,17 +376,26 @@ export default function DispatchFormPage({ params }) {
                 </div>
 
                 {/* Stock Information Display */}
-                {stockInfo[r.id] && stockInfo[r.id].length > 0 && (
-                  <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-md">
-                    <h4 className="text-sm font-medium text-green-800 mb-2">Current Stock in {r.godown}:</h4>
-                    <div className="space-y-1">
-                      {stockInfo[r.id].map((item) => (
-                        <p key={item.item_code} className="text-sm text-green-700">
-                          {item.item_name || item.item_code}: {item.stock_count} available
-                        </p>
-                      ))}
-                    </div>
+                {isServiceCharge(r.item_name, r.item_code) ? (
+                  <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                    <h4 className="text-sm font-medium text-blue-800 mb-2">Service Charge:</h4>
+                    <p className="text-sm text-blue-700">
+                      No stock check required for service charges.
+                    </p>
                   </div>
+                ) : (
+                  stockInfo[r.id] && stockInfo[r.id].length > 0 && (
+                    <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-md">
+                      <h4 className="text-sm font-medium text-green-800 mb-2">Current Stock in {r.godown}:</h4>
+                      <div className="space-y-1">
+                        {stockInfo[r.id].map((item) => (
+                          <p key={item.item_code} className="text-sm text-green-700">
+                            {item.item_name || item.item_code}: {item.stock_count} available
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+                  )
                 )}
 
                 {/* Stock Warning */}
@@ -398,7 +448,7 @@ export default function DispatchFormPage({ params }) {
                       hasSerialNo={r.serial_no && r.serial_no.trim() !== ""}
                       hasGodown={r.godown && r.godown.trim() !== ""}
                       isLocked={false}
-                      hasLowStockWarning={!!lowStockWarnings[r.id]}
+                      hasLowStockWarning={!isServiceCharge(r.item_name, r.item_code) && !!lowStockWarnings[r.id]}
                       isProduct={isProductItem(r.item_code)}
                     />
                   )}
@@ -422,8 +472,8 @@ export default function DispatchFormPage({ params }) {
             !rows
               .filter(r => isProductItem(r.item_code))
               .every(r => r.serial_no && r.serial_no.trim() !== "") ||
-            // No stock availability issues
-            rows.some(r => lowStockWarnings[r.id])
+            // No stock availability issues for physical items (service charges excluded)
+            rows.some(r => !isServiceCharge(r.item_name, r.item_code) && lowStockWarnings[r.id])
           }
           saving={saving}
         />
