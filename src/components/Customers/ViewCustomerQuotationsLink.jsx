@@ -12,7 +12,12 @@ export default function ViewCustomerQuotationsLink({
   className = "",
   variant = "admin",
 }) {
-  const href = `/${dashboardBase}/quotations?customer_id=${encodeURIComponent(String(customerId))}`;
+  // Admin: dedicated customer-quotations page (no date filter, shows all records)
+  // Other dashboards: fall back to the filtered quotations list
+  const href =
+    variant === "admin"
+      ? `/${dashboardBase}/view-customer/${encodeURIComponent(String(customerId))}/quotations`
+      : `/${dashboardBase}/quotations?customer_id=${encodeURIComponent(String(customerId))}`;
 
   const base =
     variant === "user"
