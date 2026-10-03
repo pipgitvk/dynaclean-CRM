@@ -86,6 +86,7 @@ export async function middleware(request) {
     pathname.startsWith("/hr-dashboard") ||
     pathname.startsWith("/digital-marketing-dashboard") ||
     pathname.startsWith("/accounts-dashboard") ||
+    pathname.startsWith("/accountant-dashboard") ||
     pathname.startsWith("/gem-dashboard")
   ) {
     if (!token) {
@@ -132,6 +133,17 @@ export async function middleware(request) {
           return NextResponse.next();
         }
         // If accountant/admin role not found, fall through to generic checks
+      }
+
+      // Allow accountants to access accountant-dashboard (all routes)
+      if (pathname.startsWith("/accountant-dashboard")) {
+        if (isJwtAccountingRole(role)) {
+          return NextResponse.next();
+        }
+        // Only accounting roles allowed on accountant-dashboard
+        const dest = new URL("/user-dashboard", request.url);
+        dest.search = request.nextUrl.search;
+        return NextResponse.redirect(dest);
       }
 
       // Prospects: sales roles use sales-dashboard copy; admin/director stay on admin.
@@ -368,6 +380,7 @@ export const config = {
     "/hr-dashboard/:path*",
     "/digital-marketing-dashboard/:path*",
     "/accounts-dashboard/:path*",
+    "/accountant-dashboard/:path*",
     "/api/schedule-visit",
     "/api/schedule-visit/:path*",
   ],
