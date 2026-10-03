@@ -204,6 +204,7 @@ const EmployeeCard = ({
   maskEmail,
   maskNumber,
   maskStatus,
+  onOpenIframe,
 }) => (
   <div className="bg-white shadow-md rounded-lg p-4 mb-4 border border-gray-200">
     <div className="mb-2">
@@ -250,29 +251,29 @@ const EmployeeCard = ({
         <span>Login</span>
       </button>
 
-      <Link
-        href={`/admin-dashboard/password/${employee.username}`}
+      <button
+        onClick={() => onOpenIframe(`/admin-dashboard/password/${employee.username}`, `Change Password — ${employee.username}`)}
         className="text-yellow-600 hover:text-yellow-900 font-medium flex items-center space-x-1 text-sm"
       >
         <Key size={16} />
         <span>Password</span>
-      </Link>
+      </button>
 
-      <Link
-        href={`/admin-dashboard/quick-edit/${employee.username}`}
+      <button
+        onClick={() => onOpenIframe(`/admin-dashboard/quick-edit/${employee.username}`, `Edit Employee — ${employee.username}`)}
         className="text-green-600 hover:text-green-900 font-medium flex items-center space-x-1 text-sm"
       >
         <Edit size={16} />
         <span>Edit</span>
-      </Link>
+      </button>
 
-      <Link
-        href={`/admin-dashboard/ip-restrictions/${employee.username}`}
+      <button
+        onClick={() => onOpenIframe(`/admin-dashboard/ip-restrictions/${employee.username}`, `IP Restrictions — ${employee.username}`)}
         className="text-purple-600 hover:text-purple-900 font-medium flex items-center space-x-1 text-sm"
       >
         <Shield size={16} />
         <span>IP</span>
-      </Link>
+      </button>
 
       <button
         onClick={() => handleOpenReportingManagerModal(employee)}
@@ -311,6 +312,7 @@ const EmpTable = ({ employees }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("active");
   const [isMobile, setIsMobile] = useState(false);
+  const [iframePopup, setIframePopup] = useState({ open: false, url: "", title: "" });
   const [showReportingManagerModal, setShowReportingManagerModal] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState("");
   const [selectedReportingManager, setSelectedReportingManager] = useState("");
@@ -667,6 +669,28 @@ const EmpTable = ({ employees }) => {
 
   return (
     <div className="bg-white shadow-md rounded-lg p-4 sm:p-6 overflow-hidden">
+
+      {/* Iframe Popup Modal */}
+      {iframePopup.open && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100] p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl flex flex-col" style={{ height: "90vh" }}>
+            <div className="flex justify-between items-center px-4 py-3 border-b">
+              <h2 className="text-base font-semibold text-gray-800">{iframePopup.title}</h2>
+              <button
+                onClick={() => setIframePopup({ open: false, url: "", title: "" })}
+                className="text-gray-500 hover:text-gray-700 p-1"
+              >
+                <X size={22} />
+              </button>
+            </div>
+            <iframe
+              src={iframePopup.url}
+              className="flex-1 w-full rounded-b-lg"
+              title={iframePopup.title}
+            />
+          </div>
+        </div>
+      )}
       {/* ⭐ KPI SECTION */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <div className="p-4 bg-blue-100 rounded shadow text-center">
@@ -973,6 +997,7 @@ const EmpTable = ({ employees }) => {
                 maskEmail={maskEmail}
                 maskNumber={maskNumber}
                 maskStatus={maskStatus}
+                onOpenIframe={(url, title) => setIframePopup({ open: true, url: url + "?embed=1", title })}
               />
             ))
           ) : (
@@ -1039,27 +1064,29 @@ const EmpTable = ({ employees }) => {
                           <LogIn size={20} />
                         </button>
 
-                        <Link
-                          href={`/admin-dashboard/password/${employee.username}`}
-                          className="text-yellow-600"
+                        <button
+                          onClick={() => setIframePopup({ open: true, url: `/admin-dashboard/password/${employee.username}?embed=1`, title: `Change Password — ${employee.username}` })}
+                          className="text-yellow-600 hover:text-yellow-800"
+                          title="Change Password"
                         >
                           <Key size={20} />
-                        </Link>
+                        </button>
 
-                        <Link
-                          href={`/admin-dashboard/quick-edit/${employee.username}`}
-                          className="text-green-600"
+                        <button
+                          onClick={() => setIframePopup({ open: true, url: `/admin-dashboard/quick-edit/${employee.username}?embed=1`, title: `Edit Employee — ${employee.username}` })}
+                          className="text-green-600 hover:text-green-800"
+                          title="Edit Employee"
                         >
                           <Edit size={20} />
-                        </Link>
+                        </button>
 
-                        <Link
-                          href={`/admin-dashboard/ip-restrictions/${employee.username}`}
-                          className="text-purple-600"
+                        <button
+                          onClick={() => setIframePopup({ open: true, url: `/admin-dashboard/ip-restrictions/${employee.username}?embed=1`, title: `IP Restrictions — ${employee.username}` })}
+                          className="text-purple-600 hover:text-purple-800"
                           title="IP Restriction Settings"
                         >
                           <Shield size={20} />
-                        </Link>
+                        </button>
 
                         <button
                           onClick={() => handleOpenReportingManagerModal(employee)}

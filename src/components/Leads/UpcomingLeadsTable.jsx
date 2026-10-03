@@ -161,7 +161,7 @@ export default function UpcomingLeadsTable({
                     Contact
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    {isServiceSupport ? "Service Next Follow-up" : "Next Follow-up"}
+                    Followed Date
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
@@ -178,8 +178,8 @@ export default function UpcomingLeadsTable({
                 {currentData.length > 0 ? (
                   currentData.map((lead) => {
                     const dateField = isServiceSupport ? "service_next_followup" : "next_followup_date";
-                    const nextFollowupDate = lead[dateField]
-                      ? formatCrmDatetimeForISTDisplay(lead[dateField])
+                    const nextFollowupDate = lead.followed_date
+                      ? formatCrmDatetimeForISTDisplay(lead.followed_date)
                       : "Not set";
                     return (
                       <tr
@@ -286,8 +286,7 @@ export default function UpcomingLeadsTable({
                     <div className="space-y-1 text-sm text-gray-600">
                       <div><strong>Company:</strong> {lead.company || "-"}</div>
                       <div><strong>Contact:</strong> {lead.phone || "-"}</div>
-                      <div>
-                        <strong>{isServiceSupport ? "Service Next Follow-up" : "Next Follow-up"}:</strong>{" "}
+                      <div><strong>Followed Date:</strong>{" "}
                         {nextFollowupDate}
                       </div>
                     </div>
