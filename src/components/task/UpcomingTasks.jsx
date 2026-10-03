@@ -78,6 +78,11 @@ export default async function UpcomingTasks({
   variant = "default",
   dashboardPrefix = "/user-dashboard",
 }) {
+  // view-task route only exists under user-dashboard and admin-dashboard
+  // sales-dashboard doesn't have its own view-task, so redirect there
+  const viewTaskPrefix = dashboardPrefix.includes("/sales-dashboard")
+    ? "/user-dashboard"
+    : dashboardPrefix;
   const connection = await getDbConnection();
 
   const [rows] = await connection.execute(
@@ -140,7 +145,7 @@ export default async function UpcomingTasks({
                   return (
                   <Link
                     key={task.task_id}
-                    href={`${dashboardPrefix}/view-task/${task.task_id}`}
+                    href={`${viewTaskPrefix}/view-task/${task.task_id}`}
                     className="relative block transition hover:opacity-90"
                   >
                     <div className="absolute -left-5 top-4 z-10 h-3.5 w-3.5 rounded-full border-2 border-slate-300 bg-white" />
@@ -165,7 +170,7 @@ export default async function UpcomingTasks({
               displayRows.map((task) => (
                 <Link
                   key={task.task_id}
-                  href={`${dashboardPrefix}/view-task/${task.task_id}`}
+                  href={`${viewTaskPrefix}/view-task/${task.task_id}`}
                   className="block transition hover:opacity-90"
                 >
                   <CompactTaskRow task={task} dashboardPrefix={dashboardPrefix} />
