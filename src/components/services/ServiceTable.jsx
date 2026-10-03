@@ -867,7 +867,7 @@ export default function ServiceTable({ serviceRecords, role }) {
                             model: record.model,
                             contact: record.contact,
                             email: record.email,
-                            includeCustomerFollowups: true,
+                            includeCustomerFollowups: false,
                           }}
                           className="mb-1"
                         />
@@ -1047,7 +1047,7 @@ export default function ServiceTable({ serviceRecords, role }) {
                           model: record.model,
                           contact: record.contact,
                           email: record.email,
-                          includeCustomerFollowups: true,
+                          includeCustomerFollowups: false,
                         }}
                         className="mb-1"
                       />
