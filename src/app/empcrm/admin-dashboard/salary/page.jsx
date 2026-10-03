@@ -20,7 +20,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import toast from "react-hot-toast";
-import { usePathname, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useMemo } from "react";
 import {
   getEffectiveGrossSalary,
@@ -79,10 +79,6 @@ const SalaryManagementPage = () => {
   const [editingDeduction, setEditingDeduction] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const router = useRouter();
-  const pathname = usePathname();
-  const salaryBase = String(pathname || "").startsWith("/accounts-dashboard")
-    ? "/accounts-dashboard/salary"
-    : "/empcrm/admin-dashboard/salary";
 
   // Salary history state
   const [showSalaryHistory, setShowSalaryHistory] = useState(false);
@@ -760,7 +756,7 @@ const SalaryManagementPage = () => {
 
           <div className="flex space-x-2">
             <button
-              onClick={() => router.push(`${salaryBase}/generate`)}
+              onClick={() => router.push('/empcrm/admin-dashboard/salary/generate')}
               className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 flex items-center"
             >
               <Calculator className="w-4 h-4 mr-2" />

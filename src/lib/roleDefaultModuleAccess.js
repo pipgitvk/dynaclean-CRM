@@ -73,7 +73,6 @@ export const ROLE_DEFAULT_MODULE_KEYS = {
     "spare-parts",
     "tl-customers",
     "attendance-log",
-    "third-party-engineers",
   ],
   "BACK OFFICE": [
     "dashboard-home",
@@ -343,7 +342,6 @@ export const ROLE_DEFAULT_MODULE_KEYS = {
     "warranty-console",
     "registered-products",
     "service-followups",
-    "service-support-report",
     "warranty-map",
     "service-records",
     "upcoming-installations",
@@ -365,7 +363,6 @@ export const ROLE_DEFAULT_MODULE_KEYS = {
     "warranty-console",
     "registered-products",
     "service-followups",
-    "service-support-report",
     "warranty-map",
     "service-records",
     "upcoming-installations",
@@ -374,7 +371,6 @@ export const ROLE_DEFAULT_MODULE_KEYS = {
     "spare-parts",
     "installation-videos",
     "return-products",
-    "third-party-engineers",
   ],
   "SALES CUM BACKOFFICE": [
     "dashboard-home",

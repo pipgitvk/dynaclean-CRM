@@ -2,18 +2,14 @@
 import { getDbConnection } from "@/lib/db";
 import { NextResponse } from "next/server";
 import { getSessionPayload } from "@/lib/auth";
-import { canViewAllServiceSupportReport } from "@/lib/dataScope";
 import { UNREGISTERED_PRODUCT_ORDER_SQL } from "@/lib/pendingProductRegistrationCount";
 
 const KPI_DETAIL_TYPES = new Set([
-  "clientFollowups",
   "complaintsReceived",
   "complaintsResolved",
-  "complaintsPending",
   "quotations",
   "ordersProcessed",
   "upcomingInstallations",
-  "overdueInstallations",
   "warrantyRegistered",
   "warrantyPending",
 ]);
@@ -29,16 +25,12 @@ function serializeRows(rows) {
 }
 
 /** Complaints received: service_records with type COMPLAINT and a complaint_date. */
-function buildComplaintReceivedFilter(startDate, endDate, assigneeFilter = null) {
+function buildComplaintReceivedFilter(startDate, endDate) {
   const conditions = [
     `UPPER(TRIM(sr.service_type)) = 'COMPLAINT'`,
     `sr.complaint_date IS NOT NULL`,
   ];
   const params = [];
-  if (assigneeFilter?.length) {
-    conditions.push(`sr.assigned_to IN (${assigneeFilter.map(() => "?").join(",")})`);
-    params.push(...assigneeFilter);
-  }
   if (startDate && endDate) {
     conditions.push(`sr.complaint_date BETWEEN ? AND ?`);
     params.push(startDate, endDate);
@@ -47,78 +39,21 @@ function buildComplaintReceivedFilter(startDate, endDate, assigneeFilter = null)
 }
 
 /** Complaints resolved: received complaints whose status is COMPLETED. */
-function buildComplaintResolvedFilter(startDate, endDate, assigneeFilter = null) {
-  const { conditions, params } = buildComplaintReceivedFilter(startDate, endDate, assigneeFilter);
+function buildComplaintResolvedFilter(startDate, endDate) {
+  const { conditions, params } = buildComplaintReceivedFilter(startDate, endDate);
   conditions.push(`UPPER(TRIM(sr.status)) = 'COMPLETED'`);
   return { conditions, params };
 }
 
-/** Complaints pending: received complaints not yet completed. */
-function buildComplaintPendingFilter(startDate, endDate, assigneeFilter = null) {
-  const { conditions, params } = buildComplaintReceivedFilter(startDate, endDate, assigneeFilter);
-  conditions.push(`UPPER(TRIM(COALESCE(sr.status, ''))) <> 'COMPLETED'`);
-  return { conditions, params };
-}
-
-function buildInstallBaseConditions(empPlaceholders) {
-  return [
-    `no.installation_status = 0`,
-    `(no.is_returned = 0 OR no.is_returned = 2 OR no.is_returned IS NULL)`,
-    `(no.is_cancelled = 0 OR no.is_cancelled IS NULL)`,
-    `no.delivery_date IS NOT NULL`,
-    `no.dispatch_status = 1`,
-    `no.created_by IN (${empPlaceholders})`,
-    `EXISTS (
-      SELECT 1 FROM dispatch d
-      WHERE d.quote_number = no.quote_number
-        AND d.serial_no IS NOT NULL AND d.serial_no <> ''
-    )`,
-  ];
-}
-
-async function fetchKpiDetails(conn, detailType, empFilter, startDate, endDate, complaintAssigneeFilter = null) {
-  const complaintTypes = ["complaintsReceived", "complaintsResolved", "complaintsPending"];
-  const needsEmpFilter = !complaintTypes.includes(detailType);
+async function fetchKpiDetails(conn, detailType, empFilter, startDate, endDate) {
+  const needsEmpFilter = !["complaintsReceived", "complaintsResolved"].includes(detailType);
   if (needsEmpFilter && !empFilter.length) return [];
-  if (complaintTypes.includes(detailType) && complaintAssigneeFilter && !complaintAssigneeFilter.length) {
-    return [];
-  }
 
   const empPlaceholders = empFilter.map(() => "?").join(",");
 
   switch (detailType) {
-    case "clientFollowups": {
-      const conditions = [`cf.followed_by IN (${empPlaceholders})`];
-      const params = [...empFilter];
-      if (startDate && endDate) {
-        conditions.push(`cf.followed_date BETWEEN ? AND ?`);
-        params.push(startDate, endDate);
-      }
-      const [rows] = await conn.execute(
-        `SELECT
-           cf.s_no,
-           cf.customer_id,
-           c.first_name AS customer_name,
-           c.phone AS customer_phone,
-           cf.followed_by,
-           cf.followed_date,
-           cf.comm_mode,
-           cf.notes,
-           cf.purpose,
-           cf.service_next_followup
-         FROM customers_followup cf
-         LEFT JOIN customers c ON c.customer_id = cf.customer_id
-         WHERE ${conditions.join(" AND ")}
-           AND cf.followed_by IS NOT NULL
-           AND cf.followed_by != ''
-         ORDER BY cf.followed_date DESC`,
-        params,
-      );
-      return rows;
-    }
-
     case "complaintsReceived": {
-      const { conditions, params } = buildComplaintReceivedFilter(startDate, endDate, complaintAssigneeFilter);
+      const { conditions, params } = buildComplaintReceivedFilter(startDate, endDate);
       const [rows] = await conn.execute(
         `SELECT
            sr.service_id,
@@ -142,31 +77,7 @@ async function fetchKpiDetails(conn, detailType, empFilter, startDate, endDate, 
     }
 
     case "complaintsResolved": {
-      const { conditions, params } = buildComplaintResolvedFilter(startDate, endDate, complaintAssigneeFilter);
-      const [rows] = await conn.execute(
-        `SELECT
-           sr.service_id,
-           sr.serial_number,
-           sr.service_type,
-           sr.assigned_to,
-           sr.status,
-           sr.complaint_summary,
-           sr.complaint_date,
-           sr.completed_date,
-           wp.customer_name,
-           wp.contact
-         FROM service_records sr
-         LEFT JOIN warranty_products wp
-           ON TRIM(sr.serial_number) COLLATE utf8mb4_unicode_ci = TRIM(wp.serial_number) COLLATE utf8mb4_unicode_ci
-         WHERE ${conditions.join(" AND ")}
-         ORDER BY sr.complaint_date DESC`,
-        params,
-      );
-      return rows;
-    }
-
-    case "complaintsPending": {
-      const { conditions, params } = buildComplaintPendingFilter(startDate, endDate, complaintAssigneeFilter);
+      const { conditions, params } = buildComplaintResolvedFilter(startDate, endDate);
       const [rows] = await conn.execute(
         `SELECT
            sr.service_id,
@@ -239,36 +150,24 @@ async function fetchKpiDetails(conn, detailType, empFilter, startDate, endDate, 
     }
 
     case "upcomingInstallations": {
-      const conditions = buildInstallBaseConditions(empPlaceholders);
+      const conditions = [
+        `no.installation_status = 0`,
+        `(no.is_returned = 0 OR no.is_returned = 2 OR no.is_returned IS NULL)`,
+        `(no.is_cancelled = 0 OR no.is_cancelled IS NULL)`,
+        `no.delivery_date IS NOT NULL`,
+        `no.dispatch_status = 1`,
+        `no.created_by IN (${empPlaceholders})`,
+        `EXISTS (
+          SELECT 1 FROM dispatch d
+          WHERE d.quote_number = no.quote_number
+            AND d.serial_no IS NOT NULL AND d.serial_no <> ''
+        )`,
+      ];
       const params = [...empFilter];
       if (startDate && endDate) {
         conditions.push(`no.delivery_date BETWEEN ? AND ?`);
         params.push(startDate, endDate);
       }
-      const [rows] = await conn.execute(
-        `SELECT DISTINCT
-           no.order_id,
-           no.quote_number,
-           no.client_name,
-           no.company_name,
-           no.contact,
-           no.created_by,
-           no.delivery_date,
-           no.installation_status
-         FROM neworder no
-         WHERE ${conditions.join(" AND ")}
-         ORDER BY no.delivery_date ASC`,
-        params,
-      );
-      return rows;
-    }
-
-    case "overdueInstallations": {
-      const conditions = [
-        ...buildInstallBaseConditions(empPlaceholders),
-        `no.delivery_date < CURDATE()`,
-      ];
-      const params = [...empFilter];
       const [rows] = await conn.execute(
         `SELECT DISTINCT
            no.order_id,
@@ -399,25 +298,16 @@ export async function GET(req) {
     const roleNorm = role.toUpperCase().trim();
 
     // Only SUPERADMIN, DIRECTOR, SERVICE HEAD can view this report
-    const allowed = [
-      "SUPERADMIN",
-      "ADMIN",
-      "DIRECTOR",
-      "SERVICE HEAD",
-      "SERVICE SUPPORT",
-      "EA",
-    ];
+    const allowed = ["SUPERADMIN", "DIRECTOR", "SERVICE HEAD", "EA"];
     if (!allowed.includes(roleNorm)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const { searchParams } = new URL(req.url);
-    const employeeParam = searchParams.get("employee") || "all";
+    const employee = searchParams.get("employee") || "all";
     const startDate = searchParams.get("startDate");
     const endDate = searchParams.get("endDate");
     const detailType = searchParams.get("detailType");
-    const username = String(payload.username || "").trim();
-    const canViewAll = canViewAllServiceSupportReport(roleNorm);
 
     // Fetch all SERVICE SUPPORT employees
     const [empRows] = await conn.execute(
@@ -425,48 +315,25 @@ export async function GET(req) {
     );
     const employees = empRows.map((r) => r.username);
 
-    // SERVICE SUPPORT: always self-only; admins may filter or view all
-    let empFilter;
-    let complaintAssigneeFilter = null;
-
-    if (!canViewAll) {
-      if (!username) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-      }
-      empFilter = [username];
-      complaintAssigneeFilter = [username];
-    } else if (employeeParam !== "all") {
-      const picked = String(employeeParam).trim();
-      if (!employees.includes(picked)) {
-        return NextResponse.json({ error: "Invalid employee" }, { status: 400 });
-      }
-      empFilter = [picked];
-      complaintAssigneeFilter = [picked];
-    } else {
-      empFilter = employees;
-      complaintAssigneeFilter = null;
-    }
-
+    // Build employee filter
+    const empFilter = employee !== "all" ? [employee] : employees;
     const empPlaceholders =
       empFilter.length > 0 ? empFilter.map(() => "?").join(",") : null;
 
     const emptySummary = {
-      clientFollowups: 0,
       complaintsReceived: 0,
       complaintsResolved: 0,
-      complaintsPending: 0,
       quotations: 0,
       ordersProcessed: 0,
       upcomingInstallations: 0,
-      overdueInstallations: 0,
       warrantyRegistered: 0,
       warrantyPending: 0,
     };
 
     let summary = { ...emptySummary };
 
-    // Complaints: all company complaints for admin "all"; scoped by assignee when filtered/self-only
-    const receivedFilter = buildComplaintReceivedFilter(startDate, endDate, complaintAssigneeFilter);
+    // 1–2) Complaints from service_records (all complaints in period, not filtered by SERVICE SUPPORT assignee)
+    const receivedFilter = buildComplaintReceivedFilter(startDate, endDate);
     const [complaintReceivedRows] = await conn.execute(
       `SELECT COUNT(*) AS count FROM service_records sr
        WHERE ${receivedFilter.conditions.join(" AND ")}`,
@@ -474,21 +341,13 @@ export async function GET(req) {
     );
     summary.complaintsReceived = Number(complaintReceivedRows[0]?.count ?? 0);
 
-    const resolvedFilter = buildComplaintResolvedFilter(startDate, endDate, complaintAssigneeFilter);
+    const resolvedFilter = buildComplaintResolvedFilter(startDate, endDate);
     const [complaintResolvedRows] = await conn.execute(
       `SELECT COUNT(*) AS count FROM service_records sr
        WHERE ${resolvedFilter.conditions.join(" AND ")}`,
       resolvedFilter.params,
     );
     summary.complaintsResolved = Number(complaintResolvedRows[0]?.count ?? 0);
-
-    const pendingFilter = buildComplaintPendingFilter(startDate, endDate, complaintAssigneeFilter);
-    const [complaintPendingRows] = await conn.execute(
-      `SELECT COUNT(*) AS count FROM service_records sr
-       WHERE ${pendingFilter.conditions.join(" AND ")}`,
-      pendingFilter.params,
-    );
-    summary.complaintsPending = Number(complaintPendingRows[0]?.count ?? 0);
 
     if (empFilter.length > 0 && empPlaceholders) {
       // 3) Quotations
@@ -519,8 +378,20 @@ export async function GET(req) {
       );
       summary.ordersProcessed = Number(orderRows[0]?.count ?? 0);
 
-      // 5) New installations received (pending install, dispatched, delivery in range)
-      const installConditions = buildInstallBaseConditions(empPlaceholders);
+      // 5) Upcoming installations (pending install, dispatched, delivery in range)
+      const installConditions = [
+        `no.installation_status = 0`,
+        `(no.is_returned = 0 OR no.is_returned = 2 OR no.is_returned IS NULL)`,
+        `(no.is_cancelled = 0 OR no.is_cancelled IS NULL)`,
+        `no.delivery_date IS NOT NULL`,
+        `no.dispatch_status = 1`,
+        `no.created_by IN (${empPlaceholders})`,
+        `EXISTS (
+          SELECT 1 FROM dispatch d
+          WHERE d.quote_number = no.quote_number
+            AND d.serial_no IS NOT NULL AND d.serial_no <> ''
+        )`,
+      ];
       const installParams = [...empFilter];
       if (startDate && endDate) {
         installConditions.push(`no.delivery_date BETWEEN ? AND ?`);
@@ -532,17 +403,6 @@ export async function GET(req) {
         installParams,
       );
       summary.upcomingInstallations = Number(installRows[0]?.count ?? 0);
-
-      const overdueConditions = [
-        ...buildInstallBaseConditions(empPlaceholders),
-        `no.delivery_date < CURDATE()`,
-      ];
-      const [overdueRows] = await conn.execute(
-        `SELECT COUNT(DISTINCT no.id) AS count FROM neworder no
-         WHERE ${overdueConditions.join(" AND ")}`,
-        [...empFilter],
-      );
-      summary.overdueInstallations = Number(overdueRows[0]?.count ?? 0);
 
       // 6) Products registered in warranty
       const warrantyRegConditions = [`wp.created_by IN (${empPlaceholders})`];
@@ -582,14 +442,7 @@ export async function GET(req) {
         return NextResponse.json({ error: "Invalid detailType" }, { status: 400 });
       }
       const details = serializeRows(
-        await fetchKpiDetails(
-          conn,
-          detailType,
-          empFilter,
-          startDate,
-          endDate,
-          complaintAssigneeFilter,
-        ),
+        await fetchKpiDetails(conn, detailType, empFilter, startDate, endDate),
       );
       return NextResponse.json({ details });
     }
@@ -597,8 +450,6 @@ export async function GET(req) {
     if (empFilter.length === 0) {
       return NextResponse.json({
         employees,
-        canSelectEmployee: canViewAll,
-        currentEmployee: canViewAll ? null : username,
         summary,
         customerFollowups: [],
         machineFollowups: [],
@@ -664,12 +515,8 @@ export async function GET(req) {
 
     const mfRows = await attachMachineStatus(conn, mfRowsRaw);
 
-    summary.clientFollowups = cfRows.length;
-
     return NextResponse.json({
       employees,
-      canSelectEmployee: canViewAll,
-      currentEmployee: canViewAll ? null : username,
       summary,
       customerFollowups: serializeRows(cfRows),
       machineFollowups: serializeRows(mfRows),

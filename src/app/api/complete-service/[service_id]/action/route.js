@@ -61,20 +61,6 @@ export async function POST(request, context) {
     const completedDate = formData.get("completed_date");
     const serviceType = formData.get("service_type");
 
-    // Validate required fields for COMPLETED status
-    if (status === "COMPLETED" && !completionRemark) {
-      return NextResponse.json(
-        { status: "error", message: "Completion remark is required for COMPLETED status" },
-        { status: 400 }
-      );
-    }
-    if (status === "COMPLETED" && !completedDate) {
-      return NextResponse.json(
-        { status: "error", message: "Completion date is required for COMPLETED status" },
-        { status: 400 }
-      );
-    }
-
     // --- Location fields
     const latitude = formData.get("latitude");
     const longitude = formData.get("longitude");
@@ -128,7 +114,7 @@ export async function POST(request, context) {
     };
     console.log("🧾 Report Fields:", reportFields);
 
-    // === Save files
+    // --- Save files
     const uploadDir = path.join(process.cwd(), "public", "completion_files");
     await mkdir(uploadDir, { recursive: true });
 
@@ -150,15 +136,9 @@ export async function POST(request, context) {
       }
     };
 
-    try {
-      await saveFiles(uploadedImageFiles, completionImagePaths, "completion");
-      await saveFiles(preCompletionFiles, preCompletionPaths, "pre-completion");
-      await saveFiles(afterCompletionFiles, afterCompletionPaths, "after-completion");
-      console.log("✅ All files saved successfully");
-    } catch (fileErr) {
-      console.error("❌ Error saving files:", fileErr);
-      // Continue anyway - files might be optional
-    }
+    await saveFiles(uploadedImageFiles, completionImagePaths, "completion");
+    await saveFiles(preCompletionFiles, preCompletionPaths, "pre-completion");
+    await saveFiles(afterCompletionFiles, afterCompletionPaths, "after-completion");
 
     const engineerSignPath = await saveSignature(
       reportFields.authorised_person_sign,
@@ -179,21 +159,15 @@ export async function POST(request, context) {
     );
     console.log("📄 Existing service_record:", existingRecord);
 
-    const safeExistingRecord = existingRecord || {
-      attachments: null,
-      pre_completion: null,
-      after_completion: null,
-    };
-
     const mergeList = (existing, newList) =>
       (existing ? existing.split(",") : [])
         .concat(newList)
         .filter(Boolean)
         .join(",");
 
-    const finalAttachments = mergeList(safeExistingRecord.attachments, completionImagePaths);
-    const finalPreCompletion = mergeList(safeExistingRecord.pre_completion, preCompletionPaths);
-    const finalAfterCompletion = mergeList(safeExistingRecord.after_completion, afterCompletionPaths);
+    const finalAttachments = mergeList(existingRecord.attachments, completionImagePaths);
+    const finalPreCompletion = mergeList(existingRecord.pre_completion, preCompletionPaths);
+    const finalAfterCompletion = mergeList(existingRecord.after_completion, afterCompletionPaths);
 
     console.log("📂 Final file paths:", {
       attachments: finalAttachments,
@@ -256,19 +230,18 @@ export async function POST(request, context) {
       ];
 
       const placeholders = upsertColumns.map(() => "?").join(", ");
-      const updateClause = upsertColumns
-        .filter(col => col !== "service_id")
-        .map(col => `${col} = VALUES(${col})`)
+      const updateSet = upsertColumns
+        .filter((c) => c !== "service_id")
+        .map((c) => `${c} = VALUES(${c})`)
         .join(", ");
 
-      console.log("🛠️ Upserting service_reports row", { service_id: serviceId, serviceDate });
+      console.log("🛠️ Upserting into service_reports", { service_id: serviceId, serviceDate });
 
-      const [reportInsert] = await conn.execute(
-        `INSERT INTO service_reports (${upsertColumns.join(", ")}) VALUES (${placeholders})
-         ON DUPLICATE KEY UPDATE ${updateClause}`,
+      await conn.execute(
+        `INSERT INTO service_reports (${upsertColumns.join(", ")}) VALUES (${placeholders}) ON DUPLICATE KEY UPDATE ${updateSet}`,
         upsertValues
       );
-      console.log("✅ service_reports upserted successfully | insertId:", reportInsert.insertId);
+      console.log("✅ service_reports upserted successfully");
 
       // Mark installation report flag when it's an installation submission
       if (serviceType === "INSTALLATION" && status === "COMPLETED") {
@@ -291,10 +264,6 @@ export async function POST(request, context) {
       }
     } catch (err) {
       console.error("❌ Upsert to service_reports failed:", err);
-      // Log detailed error info
-      console.error("Error code:", err.code);
-      console.error("Error message:", err.message);
-      console.error("Error sqlState:", err.sqlState);
     }
 
     if (status === "COMPLETED") {
@@ -422,141 +391,129 @@ export async function POST(request, context) {
 
     // === Installation-specific insert
     if (serviceType === "INSTALLATION") {
-      try {
-        console.log("🚀 INSTALLATION detected — preparing installation_reports insert...");
+      console.log("🚀 INSTALLATION detected — preparing installation_reports insert...");
 
-        let traineeNames = "";
-        let traineeDepartments = "";
-        let traineeContacts = "";
+      let traineeNames = "";
+      let traineeDepartments = "";
+      let traineeContacts = "";
 
-        if (reportFields.trainees) {
-          try {
-            const traineeArr = JSON.parse(reportFields.trainees);
-            console.log("👩‍💻 Parsed trainees array:", traineeArr);
+      if (reportFields.trainees) {
+        try {
+          const traineeArr = JSON.parse(reportFields.trainees);
+          console.log("👩‍💻 Parsed trainees array:", traineeArr);
 
-            traineeNames = traineeArr.map((t) => t.name).join(",");
-            traineeDepartments = traineeArr.map((t) => t.designation).join(",");
-            traineeContacts = traineeArr.map((t) => t.contact).join(",");
+          traineeNames = traineeArr.map((t) => t.name).join(",");
+          traineeDepartments = traineeArr.map((t) => t.designation).join(",");
+          traineeContacts = traineeArr.map((t) => t.contact).join(",");
 
-            console.log("📊 Trainee parsed values:", {
-              traineeNames,
-              traineeDepartments,
-              traineeContacts,
-            });
-          } catch (err) {
-            console.error("❌ Failed to parse trainees JSON:", err);
-          }
-        } else {
-          console.log("⚠️ No trainees provided in formData");
+          console.log("📊 Trainee parsed values:", {
+            traineeNames,
+            traineeDepartments,
+            traineeContacts,
+          });
+        } catch (err) {
+          console.error("❌ Failed to parse trainees JSON:", err);
         }
-
-        const customerNameValue = reportFields.customer_name || "N/A";
-
-        const installValues = [
-          serviceId,
-          new Date().toISOString().split("T")[0],
-          status,
-          reportFields.defects_on_inspection,
-          reportFields.engineer_remarks,
-          traineeNames,
-          traineeDepartments,
-          traineeContacts,
-          reportFields.service_rate,
-          reportFields.feedback,
-          reportFields.authorised_person_name,
-          engineerSignPath || "",
-          reportFields.authorised_person_designation,
-          reportFields.authorised_person_mobile,
-          customerNameValue,
-          customerNameValue,
-          customerSignPath || "",
-          reportFields.customer_designation,
-          reportFields.customer_mobile,
-        ];
-
-        console.log("🛠️ Inserting installation_reports with:", installValues);
-
-        const [installInsert] = await conn.execute(
-          `INSERT INTO installation_reports (
-              service_id,
-              installation_date,
-              status,
-              defects_on_inspection,
-              engineer_remarks,
-              trainee_names,
-              trainee_departments,
-              trainee_contacts,
-              service_rating,
-              customer_feedback,
-              authorized_person_name,
-              authorized_person_sign,
-              authorized_person_designation,
-              authorized_person_mobile,
-              customer_name,
-              customer_name1,
-              customer_sign,
-              customer_designation,
-              customer_mobile
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          installValues
-        );
-        console.log("✅ installation_reports inserted | Affected Rows:", installInsert.affectedRows);
-      } catch (installErr) {
-        console.error("❌ Error inserting installation_reports:", installErr);
-        console.error("Error code:", installErr.code);
-        console.error("Error message:", installErr.message);
-        console.error("Error sqlState:", installErr.sqlState);
+      } else {
+        console.log("⚠️ No trainees provided in formData");
       }
+
+      const installValues = [
+        serviceId,
+        new Date().toISOString().split("T")[0],
+        status,
+        reportFields.defects_on_inspection,
+        reportFields.engineer_remarks,
+        traineeNames,
+        traineeDepartments,
+        traineeContacts,
+        reportFields.service_rate,
+        reportFields.feedback,
+        reportFields.authorised_person_name,
+        engineerSignPath || "",
+        reportFields.authorised_person_designation,
+        reportFields.authorised_person_mobile,
+        reportFields.customer_name,
+        customerSignPath || "",
+        reportFields.customer_designation,
+        reportFields.customer_mobile,
+      ];
+
+      console.log("🛠️ Inserting installation_reports with:", installValues);
+
+      const [installInsert] = await conn.execute(
+        `INSERT INTO installation_reports (
+            service_id,
+            installation_date,
+            status,
+            defects_on_inspection,
+            engineer_remarks,
+            trainee_names,
+            trainee_departments,
+            trainee_contacts,
+            service_rating,
+            customer_feedback,
+            authorized_person_name,
+            authorized_person_sign,
+            authorized_person_designation,
+            authorized_person_mobile,
+            customer_name1,
+            customer_sign,
+            customer_designation,
+            customer_mobile
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        installValues
+      );
+      console.log("✅ installation_reports inserted | Affected Rows:", installInsert.affectedRows);
     }
 
     // === Email on completion
     if (status === "COMPLETED") {
-      try {
-        console.log("📧 Preparing completion email...");
+      console.log("📧 Preparing completion email...");
 
-        const [[customerData]] = await conn.execute(
-          `SELECT T1.serial_number, T2.email, T2.installed_address,T2.site_email,T2.site_contact,T2.site_person
-           FROM service_records T1
-           LEFT JOIN warranty_products T2 
-             ON T1.serial_number COLLATE utf8mb4_unicode_ci = T2.serial_number COLLATE utf8mb4_unicode_ci
-           WHERE T1.service_id = ?`,
-          [serviceId]
+      const [[customerData]] = await conn.execute(
+        `SELECT T1.serial_number, T2.email, T2.installed_address,T2.site_email,T2.site_contact,T2.site_person
+         FROM service_records T1
+         LEFT JOIN warranty_products T2 
+           ON T1.serial_number COLLATE utf8mb4_unicode_ci = T2.serial_number COLLATE utf8mb4_unicode_ci
+         WHERE T1.service_id = ?`,
+        [serviceId]
+      );
+
+      console.log("📨 Customer data for email:", customerData);
+
+      if (customerData?.email || customerData?.site_email) {
+        // Generate feedback link
+        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+        const feedbackLink = `${baseUrl}/feedback/${serviceId}`;
+
+        // Prepare template data
+        const templateData = {
+          service_id: serviceId,
+          serial_number: customerData.serial_number,
+          location: customerData.installed_address,
+          installed_address: customerData.installed_address,
+          completion_remark: completionRemark,
+          completed_date: completedDate,
+          feedback_link: feedbackLink,
+          current_year: new Date().getFullYear(),
+        };
+
+        // Send email using template system
+        await sendTemplatedEmail(
+          "SERVICE_COMPLETION",
+          templateData,
+          {
+            to: [customerData.email, customerData.site_email]
+              .filter(Boolean)
+              .join(","),
+            cc: "service@dynacleanindustries.com",
+          }
         );
 
-        console.log("📨 Customer data for email:", customerData);
-
-        if (customerData?.email || customerData?.site_email) {
-          const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-          const feedbackLink = `${baseUrl}/feedback/${serviceId}`;
-
-          const templateData = {
-            service_id: serviceId,
-            serial_number: customerData.serial_number,
-            location: customerData.installed_address,
-            installed_address: customerData.installed_address,
-            completion_remark: completionRemark,
-            completed_date: completedDate,
-            feedback_link: feedbackLink,
-            current_year: new Date().getFullYear(),
-          };
-
-          await sendTemplatedEmail(
-            "SERVICE_COMPLETION",
-            templateData,
-            {
-              to: [customerData.email, customerData.site_email]
-                .filter(Boolean)
-                .join(","),
-              cc: "service@dynacleanindustries.com",
-            }
-          );
-
-          console.log("✅ Completion email sent");
-        } else {
-          console.log("⚠️ No customer email found, skipping email");
-        }
-      } catch (emailErr) {
-        console.error("⚠️ Completion email failed (non-fatal):", emailErr);
+        console.log("✅ Completion email sent");
+      } else {
+        console.log("⚠️ No customer email found, skipping email");
       }
     }
 

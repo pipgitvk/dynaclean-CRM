@@ -1,5 +1,4 @@
 import { getDbConnection } from "@/lib/db";
-import { ensureManualPaymentReceivedTable } from "@/lib/ensureManualPaymentReceivedTable";
 import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 import { redirect } from "next/navigation";
@@ -42,17 +41,11 @@ export default async function ManualPaymentsPage() {
     }
 
     const conn = await getDbConnection();
-    await ensureManualPaymentReceivedTable();
 
-    // Fetch all payment entries with received totals
+    // Fetch all payment entries
     const [rows] = await conn.execute(`
-    SELECT
-      mpp.*,
-      COALESCE(SUM(mpr.amount), 0) AS total_received
-    FROM manual_payment_pending mpp
-    LEFT JOIN manual_payment_received mpr ON mpr.payment_id = mpp.id
-    GROUP BY mpp.id
-    ORDER BY mpp.created_at DESC
+    SELECT * FROM manual_payment_pending 
+    ORDER BY created_at DESC
   `);
 
     // Get statistics

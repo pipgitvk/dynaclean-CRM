@@ -4,7 +4,7 @@ import Link from "next/link";
 import dayjs from "dayjs";
 import { useState, useEffect } from "react";
 import { Eye, CreditCard, Download, ExternalLink, Pencil, Link2, Edit3 } from "lucide-react";
-import Modal from "../../user-dashboard/expenses/Model";
+import Modal from "../expenses/Model";
 import StatementLinkModal from "../../admin-dashboard/expenses/StatementLinkModal";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -25,11 +25,11 @@ export default function ExpenseTable({ rows, role }) {
 
   // Load filter values from localStorage if available
   useEffect(() => {
-    const savedSearchQuery = localStorage.getItem("director_searchQuery");
-    const savedFromDate = localStorage.getItem("director_fromDate");
-    const savedToDate = localStorage.getItem("director_toDate");
-    const savedEmployee = localStorage.getItem("director_selectedEmployee");
-    const savedStatus = localStorage.getItem("director_selectedStatus");
+    const savedSearchQuery = localStorage.getItem("searchQuery");
+    const savedFromDate = localStorage.getItem("fromDate");
+    const savedToDate = localStorage.getItem("toDate");
+    const savedEmployee = localStorage.getItem("selectedEmployee");
+    const savedStatus = localStorage.getItem("selectedStatus");
 
     if (savedSearchQuery) setSearchQuery(savedSearchQuery);
     if (savedFromDate) setFromDate(savedFromDate);
@@ -40,12 +40,15 @@ export default function ExpenseTable({ rows, role }) {
 
   // Save filter values to localStorage whenever they change
   useEffect(() => {
-    if (searchQuery) localStorage.setItem("director_searchQuery", searchQuery);
-    if (fromDate) localStorage.setItem("director_fromDate", fromDate);
-    if (toDate) localStorage.setItem("director_toDate", toDate);
-    if (selectedEmployee) localStorage.setItem("director_selectedEmployee", selectedEmployee);
-    if (selectedStatus) localStorage.setItem("director_selectedStatus", selectedStatus);
+    if (searchQuery) localStorage.setItem("searchQuery", searchQuery);
+    if (fromDate) localStorage.setItem("fromDate", fromDate);
+    if (toDate) localStorage.setItem("toDate", toDate);
+    if (selectedEmployee) localStorage.setItem("selectedEmployee", selectedEmployee);
+    if (selectedStatus) localStorage.setItem("selectedStatus", selectedStatus);
   }, [searchQuery, fromDate, toDate, selectedEmployee, selectedStatus]);
+
+  // Get unique employees for the filter
+  const employees = Array.from(new Set(rows.map((row) => row.username))).filter(Boolean).sort();
 
   // Filter rows based on the search query, employee, date range, and status
   const filteredRows = rows.filter((row) => {
@@ -69,22 +72,6 @@ export default function ExpenseTable({ rows, role }) {
 
     return matchesSearch && matchesEmployee && matchesStatus && matchesDateRange;
   });
-
-  // Get unique employees from filtered rows (without employee filter to show all employees in date range)
-  const employees = Array.from(
-    new Set(
-      rows
-        .filter((row) => {
-          const matchesDateRange =
-            (!fromDate || dayjs(row.TravelDate).isAfter(dayjs(fromDate).subtract(1, "day"))) &&
-            (!toDate || dayjs(row.TravelDate).isBefore(dayjs(toDate).add(1, "day")));
-          return matchesDateRange && row.username;
-        })
-        .map((row) => row.username)
-    )
-  )
-    .filter(Boolean)
-    .sort();
 
   const getRowTotal = (row) =>
     Number(row.TicketCost || 0) +
@@ -184,11 +171,11 @@ export default function ExpenseTable({ rows, role }) {
     setFromDate(startOfMonth);
     setToDate(endOfMonth);
 
-    localStorage.removeItem("director_searchQuery");
-    localStorage.removeItem("director_selectedEmployee");
-    localStorage.removeItem("director_selectedStatus");
-    localStorage.setItem("director_fromDate", startOfMonth);
-    localStorage.setItem("director_toDate", endOfMonth);
+    localStorage.removeItem("searchQuery");
+    localStorage.removeItem("selectedEmployee");
+    localStorage.removeItem("selectedStatus");
+    localStorage.setItem("fromDate", startOfMonth);
+    localStorage.setItem("toDate", endOfMonth);
   };
 
   const closeModal = () => {
@@ -475,7 +462,7 @@ export default function ExpenseTable({ rows, role }) {
                             <Pencil size={16} />
                           </Link>
                         )}
-                        {(role === "ACCOUNTANT" || role === "ADMIN" || role === "SUPERADMIN" || role === "DIRECTOR") && (
+                        {(role === "ACCOUNTANT" || role === "ADMIN" || role === "SUPERADMIN") && (
                           <button
                             onClick={() => handlePaymentClick(row)}
                             className="text-green-600 hover:text-green-800 cursor-pointer"
@@ -616,7 +603,7 @@ export default function ExpenseTable({ rows, role }) {
                         Edit <Pencil size={14} />
                       </Link>
                     )}
-                    {(role === "ACCOUNTANT" || role === "ADMIN" || role === "SUPERADMIN" || role === "DIRECTOR") && (
+                    {(role === "ACCOUNTANT" || role === "ADMIN" || role === "SUPERADMIN") && (
                       <button
                         onClick={() => handlePaymentClick(row)}
                         className="text-green-600 hover:text-green-800 flex items-center gap-1 text-sm font-semibold"

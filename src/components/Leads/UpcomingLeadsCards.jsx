@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import TaskCard from "./TaskCard";
 import { getGradientColor } from "@/utils/getGradientColor";
 import {
@@ -13,192 +13,187 @@ function SkeletonCard() {
   );
 }
 
-export default function UpcomingLeadsCards({
-  leadSource,
-  userRole = "",
-  compact = false,
-  variant = "default",
-  dashboardPrefix = "/user-dashboard",
-}) {
+export default function UpcomingLeadsCards({ leadSource, userRole = "" }) {
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [sortOrder, setSortOrder] = useState("soonest"); // soonest | latest | name
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [statusFilter, setStatusFilter] = useState("ALL"); // ALL or specific status
+  const [stageFilter, setStageFilter] = useState("ALL"); // ALL or specific stage
+  const [multiTagFilter, setMultiTagFilter] = useState("ALL"); // ALL or specific multi-tag
+  const [tagFilter, setTagFilter] = useState(""); // empty or specific tag
   const isServiceSupport = userRole === "SERVICE SUPPORT";
 
-  // UI state (what user selects but not yet applied)
-  const [sortOrder, setSortOrder] = useState("soonest");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState(() => new Date().toISOString().split('T')[0]);
-  const [statusFilter, setStatusFilter] = useState("ALL");
-  const [stageFilter, setStageFilter] = useState("ALL");
-  const [multiTagFilter, setMultiTagFilter] = useState("ALL");
-  const [tagFilter, setTagFilter] = useState("");
-
-  // Applied state (what was last fetched with)
-  const [appliedFilters, setAppliedFilters] = useState({
-    sortOrder: "soonest",
-    startDate: "",
-    endDate: new Date().toISOString().split('T')[0],
-    statusFilter: "ALL",
-    stageFilter: "ALL",
-    multiTagFilter: "ALL",
-    tagFilter: "",
-  });
-
-  async function fetchLeads(filters = appliedFilters) {
-    setLoading(true);
-    try {
-      let url = `/api/upcoming-leads?leadSource=${leadSource}&userRole=${userRole}`;
-      if (filters.startDate) url += `&startDate=${filters.startDate}`;
-      if (filters.endDate) url += `&endDate=${filters.endDate}`;
-      const res = await fetch(url);
-      const data = await res.json();
-      setLeads(data.leads || []);
-    } catch (err) {
-      console.error("Failed to fetch leads", err);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  // Initial load
   useEffect(() => {
-    fetchLeads({
-      sortOrder: "soonest",
-      startDate: "",
-      endDate: new Date().toISOString().split('T')[0],
-      statusFilter: "ALL",
-      stageFilter: "ALL",
-      multiTagFilter: "ALL",
-      tagFilter: "",
-    });
-  }, [leadSource, userRole]);
-
-  const handleFetch = () => {
-    const newFilters = { sortOrder, startDate, endDate, statusFilter, stageFilter, multiTagFilter, tagFilter };
-    setAppliedFilters(newFilters);
-    fetchLeads(newFilters);
-
-    // Notify table
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('upcomingLeads_startDate', startDate);
-      localStorage.setItem('upcomingLeads_endDate', endDate);
-      window.dispatchEvent(new CustomEvent('upcomingLeadsFilterChanged', {
-        detail: { startDate, endDate }
-      }));
+    async function fetchLeads() {
+      setLoading(true);
+      try {
+        const res = await fetch(`/api/upcoming-leads?leadSource:${leadSource}`);
+        const data = await res.json();
+        setLeads(data.leads || []);
+        console.log("Fetched leads:", data.leads);
+      } catch (err) {
+        console.error("Failed to fetch leads", err);
+      } finally {
+        setLoading(false);
+      }
     }
-  };
+    fetchLeads();
+  }, [leadSource]);
 
-  // Apply filters + sort on the fetched data
+  // Prepare filtered and sorted leads
   const processedLeads = (() => {
     let filtered = [...leads];
 
-    const invalidStatuses = isServiceSupport
-      ? ["invalid", "disqualified"]
-      : ["invalid", "disqualified", "denied"];
-    filtered = filtered.filter((c) => !invalidStatuses.includes((c.status || "").trim().toLowerCase()));
+    // Exclude invalid statuses (like 'Invalid', 'Disqualified', 'Denied')
+    const invalidStatuses = ["invalid", "disqualified", "denied"];
+    filtered = filtered.filter((c) => {
+      const statusLower = (c.status || "").trim().toLowerCase();
+      return !invalidStatuses.includes(statusLower);
+    });
 
+    // For SERVICE SUPPORT, only show leads with service_next_followup set
     if (isServiceSupport) {
       filtered = filtered.filter((cust) => cust.service_next_followup);
     }
 
-    if (appliedFilters.statusFilter && appliedFilters.statusFilter !== "ALL") {
+    // Status filtering
+    if (statusFilter && statusFilter !== "ALL") {
+      const wanted = String(statusFilter).toLowerCase();
       filtered = filtered.filter((cust) =>
-        String(cust.status || "").toLowerCase() === appliedFilters.statusFilter.toLowerCase()
+        String(cust.status || "").toLowerCase() === wanted
       );
     }
 
-    if (appliedFilters.stageFilter && appliedFilters.stageFilter !== "ALL") {
+    // Stage filtering
+    if (stageFilter && stageFilter !== "ALL") {
+      const wantedStage = String(stageFilter).toLowerCase();
       filtered = filtered.filter((cust) =>
-        String(cust.stage || "").toLowerCase() === appliedFilters.stageFilter.toLowerCase()
+        String(cust.stage || "").toLowerCase() === wantedStage
       );
     }
 
-    if (appliedFilters.multiTagFilter && appliedFilters.multiTagFilter !== "ALL") {
+    // Multi-tag filtering
+    if (multiTagFilter && multiTagFilter !== "ALL") {
       filtered = filtered.filter((cust) => {
         const tags = String(cust.multi_tag || "").split(",").map(t => t.trim());
-        return tags.some(t => t === appliedFilters.multiTagFilter);
+        return tags.some(t => t === multiTagFilter);
       });
     }
 
-    if (appliedFilters.tagFilter && appliedFilters.tagFilter !== "") {
-      filtered = filtered.filter((cust) => cust.tags === appliedFilters.tagFilter);
-    }
-
-    if (appliedFilters.startDate && appliedFilters.endDate) {
-      const dateField = isServiceSupport ? "service_next_followup" : "next_followup_date";
-      const sd = new Date(appliedFilters.startDate + "T00:00:00");
-      const ed = new Date(appliedFilters.endDate + "T23:59:59");
+    // Tag filtering
+    if (tagFilter && tagFilter !== "") {
       filtered = filtered.filter((cust) => {
-        if (!cust[dateField]) return false;
-        const leadDate = new Date(cust[dateField]);
-        return leadDate >= sd && leadDate <= ed;
+        return cust.tags === tagFilter;
       });
     }
 
+    // Date filtering (by next_followup_date or service_next_followup)
+    if (startDate || endDate) {
+      const start = startDate ? new Date(`${startDate}T00:00:00`) : null;
+      const end = endDate ? new Date(`${endDate}T23:59:59`) : null;
+      const dateField = isServiceSupport ? "service_next_followup" : "next_followup_date";
+      filtered = filtered.filter((cust) => {
+        if (!cust[dateField]) return false; // hide if no date when filter applied
+        const ms = getCrmInstantMs(cust[dateField]);
+        if (!ms) return false;
+        const d = new Date(ms);
+        if (start && d < start) return false;
+        if (end && d > end) return false;
+        return true;
+      });
+    }
+
+    // Sorting
     filtered.sort((a, b) => {
-      if (appliedFilters.sortOrder === "name") {
+      if (sortOrder === "name") {
         return (a.first_name || "").localeCompare(b.first_name || "");
       }
       const dateField = isServiceSupport ? "service_next_followup" : "next_followup_date";
-      const aTime = a[dateField] ? getCrmInstantMs(a[dateField]) : Infinity;
-      const bTime = b[dateField] ? getCrmInstantMs(b[dateField]) : Infinity;
-      if (appliedFilters.sortOrder === "latest") return bTime - aTime;
-      return aTime - bTime;
+      const aTime = a[dateField]
+        ? getCrmInstantMs(a[dateField])
+        : Infinity;
+      const bTime = b[dateField]
+        ? getCrmInstantMs(b[dateField])
+        : Infinity;
+      if (sortOrder === "latest") return bTime - aTime; // latest first
+      return aTime - bTime; // default soonest first
     });
 
     return filtered;
   })();
 
-  const isSales = variant === "sales";
-  const shellClass = compact || isSales ? "" : "";
-  const controlClass = isSales
-    ? "rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-violet-200"
-    : "rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-1 focus:ring-violet-300";
-
-  const scrollRef = React.useRef(null);
-  const scroll = (dir) => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollBy({ left: dir * 300, behavior: "smooth" });
-    }
-  };
-
   return (
-    <div className={shellClass}>
-      {/* ── Filter bar ── */}
-      <div className="mb-3 flex flex-col gap-2">
-
-        {/* Row 1: Status, Stage, Multi-tag, Tags, Sort */}
-        <div className="flex flex-wrap items-end gap-2">
+    <div className="bg-white lg:p-6 rounded-xl shadow-md mx-auto mt-2">
+      {/* Controls */}
+      <div className="flex flex-col lg:flex-row gap-3 lg:items-end lg:justify-between">
+        <p className="text-sm text-gray-500">
+          Showing {processedLeads.length} of {leads.length} leads
+        </p>
+        <div className="flex flex-wrap items-end gap-3">
           <div className="flex flex-col">
-            <label className="mb-0.5 text-xs text-slate-500">Status</label>
-            <select className={controlClass} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+            <label className="text-xs text-gray-600 mb-1">Status</label>
+            <select
+              className="border rounded-md px-3 py-2 text-sm"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+            >
               <option value="ALL">All statuses</option>
-              {[...new Set(leads.map((l) => l.status).filter(Boolean))].sort().map((s) => (
-                <option key={s} value={s}>{s}</option>
-              ))}
+              {[...new Set(leads.map((l) => l.status).filter(Boolean))]
+                .sort((a, b) => String(a).localeCompare(String(b)))
+                .map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
             </select>
           </div>
           <div className="flex flex-col">
-            <label className="mb-0.5 text-xs text-slate-500">Stage</label>
-            <select className={controlClass} value={stageFilter} onChange={(e) => setStageFilter(e.target.value)}>
+            <label className="text-xs text-gray-600 mb-1">Stage</label>
+            <select
+              className="border rounded-md px-3 py-2 text-sm"
+              value={stageFilter}
+              onChange={(e) => setStageFilter(e.target.value)}
+            >
               <option value="ALL">All stages</option>
-              {[...new Set(leads.map((l) => l.stage).filter(Boolean))].sort().map((s) => (
-                <option key={s} value={s}>{s}</option>
-              ))}
+              {[...new Set(leads.map((l) => l.stage).filter(Boolean))]
+                .sort((a, b) => String(a).localeCompare(String(b)))
+                .map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
             </select>
           </div>
           <div className="flex flex-col">
-            <label className="mb-0.5 text-xs text-slate-500">All Multi-tag</label>
-            <select className={controlClass} value={multiTagFilter} onChange={(e) => setMultiTagFilter(e.target.value)}>
+            <label className="text-xs text-gray-600 mb-1">All Multi-tag</label>
+            <select
+              className="border rounded-md px-3 py-2 text-sm"
+              value={multiTagFilter}
+              onChange={(e) => setMultiTagFilter(e.target.value)}
+            >
               <option value="ALL">All Multi-tags</option>
-              {[...new Set(leads.flatMap((l) => String(l.multi_tag || "").split(",").map(t => t.trim())).filter(Boolean))].sort().map((mt) => (
-                <option key={mt} value={mt}>{mt}</option>
-              ))}
+              {[...new Set(
+                leads
+                  .flatMap((l) => String(l.multi_tag || "").split(",").map(t => t.trim()))
+                  .filter(Boolean)
+              )]
+                .sort((a, b) => String(a).localeCompare(String(b)))
+                .map((mt) => (
+                  <option key={mt} value={mt}>
+                    {mt}
+                  </option>
+                ))}
             </select>
           </div>
           <div className="flex flex-col">
-            <label className="mb-0.5 text-xs text-slate-500">All Tags</label>
-            <select className={controlClass} value={tagFilter} onChange={(e) => setTagFilter(e.target.value)}>
+            <label className="text-xs text-gray-600 mb-1">All Tags</label>
+            <select
+              className="border rounded-md px-3 py-2 text-sm"
+              value={tagFilter}
+              onChange={(e) => setTagFilter(e.target.value)}
+            >
               <option value="">All Tags</option>
               <option value="Facilities Management Company">Facilities Management Company</option>
               <option value="Industrial Facilities">Industrial Facilities</option>
@@ -212,99 +207,93 @@ export default function UpcomingLeadsCards({
             </select>
           </div>
           <div className="flex flex-col">
-            <label className="mb-0.5 text-xs text-slate-500">Sort by</label>
-            <select className={controlClass} value={sortOrder} onChange={(e) => setSortOrder(e.target.value)}>
+            <label className="text-xs text-gray-600 mb-1">Sort by</label>
+            <select
+              className="border rounded-md px-3 py-2 text-sm"
+              value={sortOrder}
+              onChange={(e) => setSortOrder(e.target.value)}
+            >
               <option value="soonest">Due date: Soonest first</option>
               <option value="latest">Due date: Latest first</option>
               <option value="name">Customer name (A-Z)</option>
             </select>
           </div>
-        </div>
-
-        {/* Row 2: Start date, End date + Fetch */}
-        <div className="flex flex-wrap items-end gap-2">
           <div className="flex flex-col">
-            <label className="mb-0.5 text-xs text-slate-500">Start date</label>
-            <input type="date" className={controlClass} value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+            <label className="text-xs text-gray-600 mb-1">Start date</label>
+            <input
+              type="date"
+              className="border rounded-md px-3 py-2 text-sm"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+            />
           </div>
           <div className="flex flex-col">
-            <label className="mb-0.5 text-xs text-slate-500">End date</label>
-            <input type="date" className={controlClass} value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+            <label className="text-xs text-gray-600 mb-1">End date</label>
+            <input
+              type="date"
+              className="border rounded-md px-3 py-2 text-sm"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+            />
           </div>
-          <button
-            className="rounded-md bg-violet-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-violet-700 transition"
-            onClick={handleFetch}
-          >
-            Fetch
-          </button>
+          {(startDate || endDate) && (
+            <button
+              className="border rounded-md px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+              onClick={() => {
+                setStartDate("");
+                setEndDate("");
+              }}
+            >
+              Clear dates
+            </button>
+          )}
         </div>
       </div>
 
-      {/* ── Cards + scroll arrows ── */}
-      <div className="relative flex items-center">
-        <button
-          onClick={() => scroll(-1)}
-          className="absolute left-0 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-white shadow-md border border-gray-200 text-gray-500 hover:bg-gray-50 transition -translate-x-1/2"
-          aria-label="Scroll left"
-        >
-          ‹
-        </button>
-
-        <div
-          ref={scrollRef}
-          className="w-full overflow-x-auto py-4 hide-scrollbar"
-          style={{ scrollBehavior: "smooth" }}
-        >
-          <div className="flex flex-row flex-nowrap gap-4 px-4">
-            {loading ? (
-              [...Array(6)].map((_, i) => <SkeletonCard key={i} />)
-            ) : processedLeads.length > 0 ? (
-              processedLeads.map((cust) => {
-                const dateField = isServiceSupport ? "service_next_followup" : "next_followup_date";
-                const hours = cust[dateField]
-                  ? (getCrmInstantMs(cust[dateField]) - Date.now()) / 3600000
-                  : null;
-                const bgColor = cust[dateField]
-                  ? getGradientColor(hours)
-                  : "rgb(255, 165, 0)";
-                return (
-                  <div key={cust.customer_id} className="flex-shrink-0">
-                    <TaskCard
-                      customerId={cust.customer_id}
-                      name={cust.first_name}
-                      contact={cust.phone}
-                      company={cust.company}
-                      products_interest={cust.products_interest}
-                      stage={cust.stage}
-                      dueDate={
-                        cust[dateField]
-                          ? formatCrmDatetimeForISTDisplay(cust[dateField])
-                          : "Not set"
-                      }
-                      notes={cust.notes}
-                      status={cust.status}
-                      bgColor={bgColor}
-                      dashboardPrefix={dashboardPrefix}
-                      variant={isSales ? "sales" : "default"}
-                    />
-                  </div>
-                );
-              })
-            ) : (
-              <div className="py-6 text-sm text-gray-500">
-                No upcoming leads found.
-              </div>
-            )}
-          </div>
+      {/* Horizontal slider */}
+      <div className="w-full md:w-[77vw] lg:w-[71vw] overflow-x-scroll py-5 hide-scrollbar">
+        <div className="flex flex-row gap-4 flex-nowrap min-w-max">
+          {loading ? (
+            [...Array(6)].map((_, i) => <SkeletonCard key={i} />)
+          ) : processedLeads.length > 0 ? (
+            processedLeads.map((cust) => {
+              const dateField = isServiceSupport ? "service_next_followup" : "next_followup_date";
+              const hours = cust[dateField]
+                ? (getCrmInstantMs(cust[dateField]) - Date.now()) / 3600000
+                : null;
+              const bgColor = cust[dateField]
+                ? getGradientColor(hours)
+                : "rgb(255, 165, 0)";
+              return (
+                <div
+                  key={cust.customer_id}
+                  className="w-[300px] flex-shrink-0"
+                >
+                  <TaskCard
+                    customerId={cust.customer_id}
+                    name={cust.first_name}
+                    contact={cust.phone}
+                    company={cust.company}
+                    products_interest={cust.products_interest}
+                    stage={cust.stage}
+                    dueDate={
+                      cust[dateField]
+                        ? formatCrmDatetimeForISTDisplay(cust[dateField])
+                        : "Not set"
+                    }
+                    notes={cust.notes}
+                    status={cust.status}
+                    bgColor={bgColor}
+                  />
+                </div>
+              );
+            })
+          ) : (
+            <div className="text-center w-full text-gray-500">
+              No upcoming leads found.
+            </div>
+          )}
         </div>
-
-        <button
-          onClick={() => scroll(1)}
-          className="absolute right-0 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-white shadow-md border border-gray-200 text-gray-500 hover:bg-gray-50 transition translate-x-1/2"
-          aria-label="Scroll right"
-        >
-          ›
-        </button>
       </div>
     </div>
   );

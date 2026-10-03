@@ -6,22 +6,18 @@ import AssignServiceForm from "@/components/services/AssignServiceForm";
 // Server Action
 export async function updateServiceAssignment(formData) {
   const serviceIdToUpdate = formData.get("service_id");
-  const assigned_to_type = formData.get("assigned_to_type");
   const assigned_to = formData.get("assigned_to");
-  const assigned_to_id = formData.get("assigned_to_id") || null;
 
-  if (!serviceIdToUpdate || !assigned_to_type || !assigned_to) {
-    return { error: "Service ID, assignment type, and assigned user are required." };
+  if (!serviceIdToUpdate || !assigned_to) {
+    return { error: "Service ID and assigned user are required." };
   }
 
   let connection;
   try {
     connection = await getDbConnection();
-    
-    // Update both assigned_to (username for internal) and new fields for tracking type and third-party ID
     const [result] = await connection.execute(
-      "UPDATE service_records SET assigned_to = ?, assigned_to_type = ?, assigned_to_id = ? WHERE service_id = ?",
-      [assigned_to, assigned_to_type, assigned_to_id, serviceIdToUpdate]
+      "UPDATE service_records SET assigned_to = ? WHERE service_id = ?",
+      [assigned_to, serviceIdToUpdate]
     );
 
     if (result.affectedRows === 0) {
@@ -45,23 +41,14 @@ export default async function AssignServicePage({ params, searchParams }) {
   const { service_id } = await params;
   const message = searchParams?.message || "";
 
-  let internalEngineers = [];
-  let thirdPartyEngineers = [];
+  let engineers = [];
   let connection;
   try {
     connection = await getDbConnection();
-    
-    // Fetch internal engineers (SERVICE ENGINEER, SERVICE TECHNICIAN, SERVICE SUPPORT)
-    const [internalRows] = await connection.execute(
-      "SELECT username FROM rep_list WHERE userRole IN ('SERVICE ENGINEER', 'SERVICE TECHNICIAN', 'SERVICE SUPPORT ') AND status = 1"
+    const [rows] = await connection.execute(
+      "SELECT username FROM rep_list WHERE userRole IN ('SERVICE ENGINEER', 'SERVICE TECHNICIAN', 'SERVICE SUPPORT ')"
     );
-    internalEngineers = internalRows.map((row) => row.username);
-
-    // Fetch third-party engineers (active only)
-    const [thirdPartyRows] = await connection.execute(
-      "SELECT engineer_id, name FROM third_party_service_engineers WHERE status = 'active' ORDER BY name ASC"
-    );
-    thirdPartyEngineers = thirdPartyRows;
+    engineers = rows.map((row) => row.username);
   } catch (err) {
     console.error("Database query error:", err);
   } finally {
@@ -75,8 +62,7 @@ export default async function AssignServicePage({ params, searchParams }) {
       </h2>
       <div className="max-w-md mx-auto bg-white p-8 rounded-xl shadow-lg">
         <AssignServiceForm
-          internalEngineers={internalEngineers}
-          thirdPartyEngineers={thirdPartyEngineers}
+          engineers={engineers}
           serviceId={service_id}
           updateServiceAssignment={updateServiceAssignment}
           message={message}

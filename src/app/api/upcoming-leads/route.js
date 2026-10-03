@@ -2,136 +2,76 @@ import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 
 export async function GET(request) {
+  // 1. Log incoming URL and parameters
   const { searchParams } = new URL(request.url);
   const leadSource = searchParams.get("leadSource");
-  const userRole   = (searchParams.get("userRole") || "").toUpperCase();
-  const isServiceSupport = userRole === "SERVICE SUPPORT";
+  console.log("Fetching data for leadSource:", leadSource);
 
+  // sixHoursAhead needs to be defined
+  // For example, you can calculate it here
   function getISTTime() {
+    // Get current time in UTC
     const now = new Date();
+    // Get the IST offset in minutes (5 hours and 30 minutes)
     const istOffset = 5.5 * 60;
-    return new Date(now.getTime() + istOffset * 60 * 1000);
+    // Apply the offset to the current UTC time
+    const istTime = new Date(now.getTime() + istOffset * 60 * 1000);
+    return istTime;
   }
 
   const istNow = getISTTime();
-  const startDate = searchParams.get("startDate") || "";
-  const endDate   = searchParams.get("endDate") || "";
+  const sixHoursAhead = new Date(istNow.getTime() + 6 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 19)
+    .replace("T", " ");
 
   try {
     const connection = await getDbConnection();
+    console.log("Database connection established.");
 
-    let sqlQuery;
-    let queryParams;
-
-    if (isServiceSupport) {
-      // SERVICE SUPPORT: filter by service_lead_source, use service_next_followup for dates
-      if (startDate && endDate) {
-        sqlQuery = `
-          SELECT *
-          FROM (
-            SELECT
-              cf.*,
-              c.status,
-              c.stage,
-              c.first_name,
-              c.phone,
-              c.company,
-              c.products_interest,
-              ROW_NUMBER() OVER(PARTITION BY cf.customer_id ORDER BY cf.time_stamp DESC) AS rn
-            FROM customers_followup cf
-            INNER JOIN customers c ON cf.customer_id = c.customer_id
-            WHERE c.service_lead_source = ?
-              AND c.status NOT IN ('Invalid', 'Disqualified')
-              AND (c.stage IS NULL OR c.stage != 'Disqualified / Invalid Lead')
-          ) AS T
-          WHERE T.rn = 1
-            AND T.service_next_followup IS NOT NULL
-            AND DATE(T.service_next_followup) >= ?
-            AND DATE(T.service_next_followup) <= ?
-        `;
-        queryParams = [leadSource, startDate, endDate];
-      } else {
-        sqlQuery = `
-          SELECT *
-          FROM (
-            SELECT
-              cf.*,
-              c.status,
-              c.stage,
-              c.first_name,
-              c.phone,
-              c.company,
-              c.products_interest,
-              ROW_NUMBER() OVER(PARTITION BY cf.customer_id ORDER BY cf.time_stamp DESC) AS rn
-            FROM customers_followup cf
-            INNER JOIN customers c ON cf.customer_id = c.customer_id
-            WHERE c.service_lead_source = ?
-              AND c.status NOT IN ('Invalid', 'Disqualified')
-              AND (c.stage IS NULL OR c.stage != 'Disqualified / Invalid Lead')
-          ) AS T
-          WHERE T.rn = 1
-            AND T.service_next_followup IS NOT NULL
-        `;
-        queryParams = [leadSource];
-      }
-    } else {
-      // All other roles: filter by lead_source, use next_followup_date
-      if (startDate && endDate) {
-        sqlQuery = `
-          SELECT *
-          FROM (
-            SELECT
-              cf.*,
-              c.status,
-              c.stage,
-              c.first_name,
-              c.phone,
-              c.company,
-              c.products_interest,
-              ROW_NUMBER() OVER(PARTITION BY cf.customer_id ORDER BY cf.time_stamp DESC) AS rn
-            FROM customers_followup cf
-            INNER JOIN customers c ON cf.customer_id = c.customer_id
-            WHERE c.lead_source = ?
-              AND c.status NOT IN ('DENIED', 'Invalid', 'Disqualified')
-              AND (c.stage IS NULL OR c.stage != 'Disqualified / Invalid Lead')
-          ) AS T
-          WHERE T.rn = 1
-            AND T.next_followup_date IS NOT NULL
-            AND DATE(T.next_followup_date) >= ?
-            AND DATE(T.next_followup_date) <= ?
-        `;
-        queryParams = [leadSource, startDate, endDate];
-      } else {
-        sqlQuery = `
-          SELECT *
-          FROM (
-            SELECT
-              cf.*,
-              c.status,
-              c.stage,
-              c.first_name,
-              c.phone,
-              c.company,
-              c.products_interest,
-              ROW_NUMBER() OVER(PARTITION BY cf.customer_id ORDER BY cf.time_stamp DESC) AS rn
-            FROM customers_followup cf
-            INNER JOIN customers c ON cf.customer_id = c.customer_id
-            WHERE c.lead_source = ?
-              AND c.status NOT IN ('DENIED', 'Invalid', 'Disqualified')
-              AND (c.stage IS NULL OR c.stage != 'Disqualified / Invalid Lead')
-          ) AS T
-          WHERE T.rn = 1
-            AND T.next_followup_date IS NOT NULL
-        `;
-        queryParams = [leadSource];
-      }
-    }
+    // 2. Log the final SQL query and its parameters
+    const sqlQuery = `
+      SELECT *
+FROM (
+  SELECT
+    cf.*,
+    c.status,
+    c.stage,
+    c.first_name,
+    c.phone,
+    c.company,
+    c.products_interest,
+    ROW_NUMBER() OVER(PARTITION BY cf.customer_id ORDER BY cf.time_stamp DESC) AS rn
+  FROM customers_followup cf
+  INNER JOIN customers c ON cf.customer_id = c.customer_id
+  WHERE c.lead_source = ? 
+    AND c.status NOT IN ('DENIED', 'Invalid', 'Disqualified')
+    AND (c.stage IS NULL OR c.stage != 'Disqualified / Invalid Lead')
+) AS T
+WHERE T.rn = 1
+  AND (T.next_followup_date <= ? OR T.next_followup_date IS NULL);
+    `;
+    const queryParams = [leadSource, sixHoursAhead];
+    console.log("Executing SQL query:", sqlQuery);
+    console.log("With parameters:", queryParams);
 
     const [rows] = await connection.execute(sqlQuery, queryParams);
 
-    return NextResponse.json({ leads: rows });
+    // 3. Log the number of rows fetched
+    console.log("Query executed successfully. Fetched rows:", rows.length);
+
+
+    console.log("Database connection closed.");
+
+    return NextResponse.json({
+      leads: rows,
+    });
   } catch (error) {
-    console.error("Upcoming leads API error:", error);
-    return NextResponse.json({ error: "Failed to fetch leads" }, { status: 500 });
+    // 4. Log any errors that occur
+    console.error("An error occurred during API call:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch leads" },
+      { status: 500 }
+    );
   }
 }

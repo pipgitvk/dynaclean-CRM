@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useState, useMemo, useRef } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Eye, Search, Pencil, ArrowRightLeft, History, X } from "lucide-react";
 import Link from "next/link";
 import { pickProductImageUrl } from "@/lib/productImageUrl";
 
 
-function ProductAndSpareLists({ type, onOpenHistory }) {
+function ProductAndSpareLists({ type }) {
   const [rows, setRows] = useState([]);
   const [stockTotals, setStockTotals] = useState({ totalQty: 0, totalValue: 0 });
   const [q, setQ] = useState("");
@@ -29,10 +29,6 @@ function ProductAndSpareLists({ type, onOpenHistory }) {
   const [sparesTypeFilter, setSparesTypeFilter] = useState("all");
   const [showImageModal, setShowImageModal] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
-  const [showPreBookingModal, setShowPreBookingModal] = useState(false);
-  const [preBookingDetails, setPreBookingDetails] = useState([]);
-  const [loadingPreBookings, setLoadingPreBookings] = useState(false);
-  const [selectedProductForPreBooking, setSelectedProductForPreBooking] = useState(null);
   const [editFormData, setEditFormData] = useState({
     item_code: '',
     item_name: '',
@@ -50,37 +46,6 @@ function ProductAndSpareLists({ type, onOpenHistory }) {
     image: null,
     productImages: [] // To store all product images
   });
-
-  const handleViewPreBookings = async (row) => {
-    if (!row.item_name) return;
-    
-    setLoadingPreBookings(true);
-    setSelectedProductForPreBooking(row);
-    setShowPreBookingModal(true);
-    
-    try {
-      const params = new URLSearchParams();
-      params.append('product_name', row.item_name);
-      if (row.product_code) {
-        params.append('item_code', row.product_code);
-      }
-      
-      const response = await fetch(`/api/pre-booking-by-product?${params}`);
-      const data = await response.json();
-      
-      if (data.success) {
-        setPreBookingDetails(data.bookings || []);
-      } else {
-        console.error('Failed to fetch pre-bookings:', data.error);
-        setPreBookingDetails([]);
-      }
-    } catch (error) {
-      console.error('Error fetching pre-bookings:', error);
-      setPreBookingDetails([]);
-    } finally {
-      setLoadingPreBookings(false);
-    }
-  };
 
   const refreshProducts = () => {
     const url = type === 'product' ? '/api/products/list' : '/api/spare/list';
@@ -517,17 +482,31 @@ function ProductAndSpareLists({ type, onOpenHistory }) {
             <tr>
               {type === 'product' ? (
                 <>
-                  <th className="p-2 text-left">Product</th>
-                  <th className="p-2 text-left">Prices</th>
+                  <th className="p-2 text-left">Image</th>
+                  <th className="p-2 text-left">Code</th>
+                  <th className="p-2 text-left">Name</th>
+                  <th className="p-2 text-left">Product No</th>
+                  <th className="p-2 text-left">Min Qty</th>
+                  <th className="p-2 text-left">Price</th>
+                  <th className="p-2 text-left">GEM Price</th>
+                  <th className="p-2 text-left">GEM Last Neg. Price</th>
+                  <th className="p-2 text-left">Dealer Price</th>
+                  <th className="p-2 text-left">DP NO-warranty</th>
+                  <th className="p-2 text-left">DP</th>
                   <th className="p-2 text-left">GST Rate (%)</th>
+                  <th className="p-2 text-left">Last Neg. Price</th>
                   <th className="p-2 text-left">Specification</th>
                   <th className="p-2 text-left">Spares</th>
                   <th className="p-2 text-left">Actions</th>
                 </>
               ) : (
                 <>
-                  <th className="p-2 text-left">Spare</th>
-                  <th className="p-2 text-left">Prices</th>
+                  <th className="p-2 text-left">Image</th>
+                  <th className="p-2 text-left">Spare No</th>
+                  <th className="p-2 text-left">Name</th>
+                  <th className="p-2 text-left">Min Qty</th>
+                  <th className="p-2 text-left">Price</th>
+                  <th className="p-2 text-left">Last Neg. Price</th>
                   <th className="p-2 text-left">Specification</th>
                   <th className="p-2 text-left">Actions</th>
                 </>
@@ -544,144 +523,137 @@ function ProductAndSpareLists({ type, onOpenHistory }) {
                 <tr key={key} className="border-t">
                   <>
                     <td className="p-2">
-                      <div className="flex items-center gap-2">
-                        {imageUrl ? (
-                          <img 
-                            src={imageUrl} 
-                            className="w-12 h-12 object-cover rounded cursor-pointer hover:opacity-80 flex-shrink-0" 
-                            onClick={() => { setSelectedImage(imageUrl); setShowImageModal(true); }}
-                            alt="Product"
-                          />
-                        ) : (
-                          <span className="text-gray-400 text-xs w-12 h-12 flex items-center justify-center border rounded flex-shrink-0">No img</span>
-                        )}
-                        <div className="min-w-0">
-                          <div className="font-semibold text-xs">{r.item_code}</div>
-                          <div className="text-xs bg-green-100 text-green-800 px-1.5 py-0.5 rounded inline-block font-semibold mb-0.5">{r.product_number}</div>
-                          <div className="text-xs text-gray-800">{r.item_name}</div>
-                          <div className="text-xs text-gray-500">Min Qty: <span className="font-medium text-gray-800">{r.min_qty}</span></div>
-                        </div>
-                      </div>
+                      {imageUrl ? (
+                        <img 
+                          src={imageUrl} 
+                          className="w-12 h-12 object-cover rounded cursor-pointer hover:opacity-80" 
+                          onClick={() => { setSelectedImage(imageUrl); setShowImageModal(true); }}
+                          alt="Product"
+                        />
+                      ) : (
+                        <span className="text-gray-400">No image</span>
+                      )}
                     </td>
 
                     {type === "product" ? (
                       <>
-                        {/* All prices in one combined column */}
+                        <td className="p-2">{r.item_code}</td>
+                        <td className="p-2">{r.item_name}</td>
+                        <td className="p-2">{r.product_number}</td>
+                        <td className="p-2">{r.min_qty}</td>
                         <td className="p-2">
-                          <div className="space-y-1 min-w-[180px]">
-                            {/* Price */}
-                            <div className="flex items-center justify-between gap-2 group">
-                              <span className="text-gray-500 text-xs w-28 shrink-0">Price</span>
-                              {editingPrice.key === r.item_code && editingPrice.field === 'price' ? (
-                                <div className="flex gap-1 items-center">
-                                  <input type="number" className="w-20 border rounded px-1 text-xs" value={editingPrice.value} onChange={(e) => setEditingPrice(prev => ({ ...prev, value: e.target.value }))} />
-                                  <button disabled={savingPrice} onClick={() => handleSavePrice(r, 'price')} className="text-green-600 text-xs">Save</button>
-                                  <button disabled={savingPrice} onClick={() => setEditingPrice({ key: null, field: null, value: "" })} className="text-gray-500 text-xs">X</button>
-                                </div>
-                              ) : (
-                                <div className="flex items-center gap-1 group/p">
-                                  <span className="font-medium">{r.price_per_unit || 0}</span>
-                                  <Pencil className="w-3 h-3 text-gray-400 cursor-pointer opacity-0 group-hover/p:opacity-100" onClick={() => setEditingPrice({ key: r.item_code, field: 'price', value: r.price_per_unit || 0 })} />
-                                </div>
-                              )}
+                          {editingPrice.key === r.item_code && editingPrice.field === 'price' ? (
+                            <div className="flex gap-1 items-center">
+                              <input
+                                type="number"
+                                className="w-20 border rounded px-1 text-xs"
+                                value={editingPrice.value}
+                                onChange={(e) => setEditingPrice(prev => ({ ...prev, value: e.target.value }))}
+                              />
+                              <button disabled={savingPrice} onClick={() => handleSavePrice(r, 'price')} className="text-green-600 text-xs">Save</button>
+                              <button disabled={savingPrice} onClick={() => setEditingPrice({ key: null, field: null, value: "" })} className="text-gray-500 text-xs">X</button>
                             </div>
-                            {/* Last Neg. Price */}
-                            <div className="flex items-center justify-between gap-2 group">
-                              <span className="text-gray-500 text-xs w-28 shrink-0">Last Neg. Price</span>
-                              {editingPrice.key === r.item_code && editingPrice.field === 'last_negotiation_price' ? (
-                                <div className="flex gap-1 items-center">
-                                  <input type="number" className="w-20 border rounded px-1 text-xs" value={editingPrice.value} onChange={(e) => setEditingPrice(prev => ({ ...prev, value: e.target.value }))} />
-                                  <button disabled={savingPrice} onClick={() => handleSavePrice(r, 'last_negotiation_price')} className="text-green-600 text-xs">Save</button>
-                                  <button disabled={savingPrice} onClick={() => setEditingPrice({ key: null, field: null, value: "" })} className="text-gray-500 text-xs">X</button>
-                                </div>
-                              ) : (
-                                <div className="flex items-center gap-1 group/p">
-                                  <span className="font-medium">{r.last_negotiation_price || 0}</span>
-                                  <Pencil className="w-3 h-3 text-gray-400 cursor-pointer opacity-0 group-hover/p:opacity-100" onClick={() => setEditingPrice({ key: r.item_code, field: 'last_negotiation_price', value: r.last_negotiation_price || 0 })} />
-                                </div>
-                              )}
+                          ) : (
+                            <div className="flex items-center gap-2 group">
+                              <span>{r.price_per_unit || 0}</span>
+                              <Pencil className="w-3 h-3 text-gray-400 cursor-pointer opacity-0 group-hover:opacity-100" onClick={() => setEditingPrice({ key: r.item_code, field: 'price', value: r.price_per_unit || 0 })} />
                             </div>
-                            {/* GEM Price */}
-                            <div className="flex items-center justify-between gap-2 group">
-                              <span className="text-gray-500 text-xs w-28 shrink-0">GEM Price</span>
-                              {editingField.key === r.item_code && editingField.field === 'gem_price' ? (
-                                <div className="flex gap-1 items-center">
-                                  <input type="number" className="w-20 border rounded px-1 text-xs" value={editingField.value} onChange={(e) => setEditingField(prev => ({ ...prev, value: e.target.value }))} />
-                                  <button disabled={savingField} onClick={() => handleSaveField(r, 'gem_price')} className="text-green-600 text-xs">Save</button>
-                                  <button disabled={savingField} onClick={() => setEditingField({ key: null, field: null, value: "" })} className="text-gray-500 text-xs">X</button>
-                                </div>
-                              ) : (
-                                <div className="flex items-center gap-1 group/p">
-                                  <span className="font-medium">{parseFloat(r.gem_price) || 0}</span>
-                                  <Pencil className="w-3 h-3 text-gray-400 cursor-pointer opacity-0 group-hover/p:opacity-100" onClick={() => setEditingField({ key: r.item_code, field: 'gem_price', value: r.gem_price ?? '' })} />
-                                </div>
-                              )}
+                          )}
+                        </td>
+                        <td className="p-2">
+                          {editingField.key === r.item_code && editingField.field === 'gem_price' ? (
+                            <div className="flex gap-1 items-center">
+                              <input
+                                type="number"
+                                className="w-20 border rounded px-1 text-xs"
+                                value={editingField.value}
+                                onChange={(e) => setEditingField(prev => ({ ...prev, value: e.target.value }))}
+                              />
+                              <button disabled={savingField} onClick={() => handleSaveField(r, 'gem_price')} className="text-green-600 text-xs">Save</button>
+                              <button disabled={savingField} onClick={() => setEditingField({ key: null, field: null, value: "" })} className="text-gray-500 text-xs">X</button>
                             </div>
-                            {/* GEM Last Neg. Price */}
-                            <div className="flex items-center justify-between gap-2 group">
-                              <span className="text-gray-500 text-xs w-28 shrink-0">GEM Last Neg.</span>
-                              {editingField.key === r.item_code && editingField.field === 'gem_last_negotiation_price' ? (
-                                <div className="flex gap-1 items-center">
-                                  <input type="number" className="w-20 border rounded px-1 text-xs" value={editingField.value} onChange={(e) => setEditingField(prev => ({ ...prev, value: e.target.value }))} />
-                                  <button disabled={savingField} onClick={() => handleSaveField(r, 'gem_last_negotiation_price')} className="text-green-600 text-xs">Save</button>
-                                  <button disabled={savingField} onClick={() => setEditingField({ key: null, field: null, value: "" })} className="text-gray-500 text-xs">X</button>
-                                </div>
-                              ) : (
-                                <div className="flex items-center gap-1 group/p">
-                                  <span className="font-medium">{parseFloat(r.gem_last_negotiation_price) || 0}</span>
-                                  <Pencil className="w-3 h-3 text-gray-400 cursor-pointer opacity-0 group-hover/p:opacity-100" onClick={() => setEditingField({ key: r.item_code, field: 'gem_last_negotiation_price', value: r.gem_last_negotiation_price ?? '' })} />
-                                </div>
-                              )}
+                          ) : (
+                            <div className="flex items-center gap-2 group">
+                              <span>{parseFloat(r.gem_price) || 0}</span>
+                              <Pencil className="w-3 h-3 text-gray-400 cursor-pointer opacity-0 group-hover:opacity-100" onClick={() => setEditingField({ key: r.item_code, field: 'gem_price', value: r.gem_price !== undefined && r.gem_price !== null ? r.gem_price : '' })} />
                             </div>
-                            {/* Dealer Price */}
-                            <div className="flex items-center justify-between gap-2 group">
-                              <span className="text-gray-500 text-xs w-28 shrink-0">Dealer Price</span>
-                              {editingField.key === r.item_code && editingField.field === 'dealer_price' ? (
-                                <div className="flex gap-1 items-center">
-                                  <input type="number" className="w-20 border rounded px-1 text-xs" value={editingField.value} onChange={(e) => setEditingField(prev => ({ ...prev, value: e.target.value }))} />
-                                  <button disabled={savingField} onClick={() => handleSaveField(r, 'dealer_price')} className="text-green-600 text-xs">Save</button>
-                                  <button disabled={savingField} onClick={() => setEditingField({ key: null, field: null, value: "" })} className="text-gray-500 text-xs">X</button>
-                                </div>
-                              ) : (
-                                <div className="flex items-center gap-1 group/p">
-                                  <span className="font-medium">{parseFloat(r.dealer_price) || 0}</span>
-                                  <Pencil className="w-3 h-3 text-gray-400 cursor-pointer opacity-0 group-hover/p:opacity-100" onClick={() => setEditingField({ key: r.item_code, field: 'dealer_price', value: r.dealer_price ?? '' })} />
-                                </div>
-                              )}
+                          )}
+                        </td>
+                        <td className="p-2">
+                          {editingField.key === r.item_code && editingField.field === 'gem_last_negotiation_price' ? (
+                            <div className="flex gap-1 items-center">
+                              <input
+                                type="number"
+                                className="w-20 border rounded px-1 text-xs"
+                                value={editingField.value}
+                                onChange={(e) => setEditingField(prev => ({ ...prev, value: e.target.value }))}
+                              />
+                              <button disabled={savingField} onClick={() => handleSaveField(r, 'gem_last_negotiation_price')} className="text-green-600 text-xs">Save</button>
+                              <button disabled={savingField} onClick={() => setEditingField({ key: null, field: null, value: "" })} className="text-gray-500 text-xs">X</button>
                             </div>
-                            {/* DP No Warranty */}
-                            <div className="flex items-center justify-between gap-2 group">
-                              <span className="text-gray-500 text-xs w-28 shrink-0">DP No-Warranty</span>
-                              {editingField.key === r.item_code && editingField.field === 'dp_no_warranty' ? (
-                                <div className="flex gap-1 items-center">
-                                  <input type="text" className="w-20 border rounded px-1 text-xs" value={editingField.value} onChange={(e) => setEditingField(prev => ({ ...prev, value: e.target.value }))} />
-                                  <button disabled={savingField} onClick={() => handleSaveField(r, 'dp_no_warranty')} className="text-green-600 text-xs">Save</button>
-                                  <button disabled={savingField} onClick={() => setEditingField({ key: null, field: null, value: "" })} className="text-gray-500 text-xs">X</button>
-                                </div>
-                              ) : (
-                                <div className="flex items-center gap-1 group/p">
-                                  <span className="font-medium">{r.dp_no_warranty || '-'}</span>
-                                  <Pencil className="w-3 h-3 text-gray-400 cursor-pointer opacity-0 group-hover/p:opacity-100" onClick={() => setEditingField({ key: r.item_code, field: 'dp_no_warranty', value: r.dp_no_warranty || '' })} />
-                                </div>
-                              )}
+                          ) : (
+                            <div className="flex items-center gap-2 group">
+                              <span>{parseFloat(r.gem_last_negotiation_price) || 0}</span>
+                              <Pencil className="w-3 h-3 text-gray-400 cursor-pointer opacity-0 group-hover:opacity-100" onClick={() => setEditingField({ key: r.item_code, field: 'gem_last_negotiation_price', value: r.gem_last_negotiation_price !== undefined && r.gem_last_negotiation_price !== null ? r.gem_last_negotiation_price : '' })} />
                             </div>
-                            {/* DP */}
-                            <div className="flex items-center justify-between gap-2 group">
-                              <span className="text-gray-500 text-xs w-28 shrink-0">DP</span>
-                              {editingField.key === r.item_code && editingField.field === 'dp' ? (
-                                <div className="flex gap-1 items-center">
-                                  <input type="text" className="w-20 border rounded px-1 text-xs" value={editingField.value} onChange={(e) => setEditingField(prev => ({ ...prev, value: e.target.value }))} />
-                                  <button disabled={savingField} onClick={() => handleSaveField(r, 'dp')} className="text-green-600 text-xs">Save</button>
-                                  <button disabled={savingField} onClick={() => setEditingField({ key: null, field: null, value: "" })} className="text-gray-500 text-xs">X</button>
-                                </div>
-                              ) : (
-                                <div className="flex items-center gap-1 group/p">
-                                  <span className="font-medium">{r.dp || '-'}</span>
-                                  <Pencil className="w-3 h-3 text-gray-400 cursor-pointer opacity-0 group-hover/p:opacity-100" onClick={() => setEditingField({ key: r.item_code, field: 'dp', value: r.dp || '' })} />
-                                </div>
-                              )}
+                          )}
+                        </td>
+                        <td className="p-2">
+                          {editingField.key === r.item_code && editingField.field === 'dealer_price' ? (
+                            <div className="flex gap-1 items-center">
+                              <input
+                                type="number"
+                                className="w-20 border rounded px-1 text-xs"
+                                value={editingField.value}
+                                onChange={(e) => setEditingField(prev => ({ ...prev, value: e.target.value }))}
+                              />
+                              <button disabled={savingField} onClick={() => handleSaveField(r, 'dealer_price')} className="text-green-600 text-xs">Save</button>
+                              <button disabled={savingField} onClick={() => setEditingField({ key: null, field: null, value: "" })} className="text-gray-500 text-xs">X</button>
                             </div>
-                          </div>
+                          ) : (
+                            <div className="flex items-center gap-2 group">
+                              <span>{parseFloat(r.dealer_price) || 0}</span>
+                              <Pencil className="w-3 h-3 text-gray-400 cursor-pointer opacity-0 group-hover:opacity-100" onClick={() => setEditingField({ key: r.item_code, field: 'dealer_price', value: r.dealer_price !== undefined && r.dealer_price !== null ? r.dealer_price : '' })} />
+                            </div>
+                          )}
+                        </td>
+                        <td className="p-2">
+                          {editingField.key === r.item_code && editingField.field === 'dp_no_warranty' ? (
+                            <div className="flex gap-1 items-center">
+                              <input
+                                type="text"
+                                className="w-20 border rounded px-1 text-xs"
+                                value={editingField.value}
+                                onChange={(e) => setEditingField(prev => ({ ...prev, value: e.target.value }))}
+                              />
+                              <button disabled={savingField} onClick={() => handleSaveField(r, 'dp_no_warranty')} className="text-green-600 text-xs">Save</button>
+                              <button disabled={savingField} onClick={() => setEditingField({ key: null, field: null, value: "" })} className="text-gray-500 text-xs">X</button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2 group">
+                              <span>{r.dp_no_warranty || '-'}</span>
+                              <Pencil className="w-3 h-3 text-gray-400 cursor-pointer opacity-0 group-hover:opacity-100" onClick={() => setEditingField({ key: r.item_code, field: 'dp_no_warranty', value: r.dp_no_warranty || '' })} />
+                            </div>
+                          )}
+                        </td>
+                        <td className="p-2">
+                          {editingField.key === r.item_code && editingField.field === 'dp' ? (
+                            <div className="flex gap-1 items-center">
+                              <input
+                                type="text"
+                                className="w-20 border rounded px-1 text-xs"
+                                value={editingField.value}
+                                onChange={(e) => setEditingField(prev => ({ ...prev, value: e.target.value }))}
+                              />
+                              <button disabled={savingField} onClick={() => handleSaveField(r, 'dp')} className="text-green-600 text-xs">Save</button>
+                              <button disabled={savingField} onClick={() => setEditingField({ key: null, field: null, value: "" })} className="text-gray-500 text-xs">X</button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2 group">
+                              <span>{r.dp || '-'}</span>
+                              <Pencil className="w-3 h-3 text-gray-400 cursor-pointer opacity-0 group-hover:opacity-100" onClick={() => setEditingField({ key: r.item_code, field: 'dp', value: r.dp || '' })} />
+                            </div>
+                          )}
                         </td>
                         <td className="p-2">
                           {editingGst.key === r.item_code ? (
@@ -703,6 +675,25 @@ function ProductAndSpareLists({ type, onOpenHistory }) {
                             </div>
                           )}
                         </td>
+                        <td className="p-2">
+                          {editingPrice.key === r.item_code && editingPrice.field === 'last_negotiation_price' ? (
+                            <div className="flex gap-1 items-center">
+                              <input
+                                type="number"
+                                className="w-20 border rounded px-1 text-xs"
+                                value={editingPrice.value}
+                                onChange={(e) => setEditingPrice(prev => ({ ...prev, value: e.target.value }))}
+                              />
+                              <button disabled={savingPrice} onClick={() => handleSavePrice(r, 'last_negotiation_price')} className="text-green-600 text-xs">Save</button>
+                              <button disabled={savingPrice} onClick={() => setEditingPrice({ key: null, field: null, value: "" })} className="text-gray-500 text-xs">X</button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2 group">
+                              <span>{r.last_negotiation_price || 0}</span>
+                              <Pencil className="w-3 h-3 text-gray-400 cursor-pointer opacity-0 group-hover:opacity-100" onClick={() => setEditingPrice({ key: r.item_code, field: 'last_negotiation_price', value: r.last_negotiation_price || 0 })} />
+                            </div>
+                          )}
+                        </td>
                         <td className="p-2">{r.specification}</td>
                         <td className="p-2">
                           <button
@@ -721,13 +712,6 @@ function ProductAndSpareLists({ type, onOpenHistory }) {
                             >
                               Edit
                             </button>
-                            <button
-                              onClick={() => onOpenHistory(r)}
-                              className="px-2 py-1 bg-purple-600 text-white text-xs rounded hover:bg-purple-700"
-                              title="View transfer and edit history"
-                            >
-                              <History className="w-3 h-3" />
-                            </button>
                             {/* Delete product button hidden
                             {userRole === 'SUPERADMIN' && (
                               <button
@@ -744,60 +728,46 @@ function ProductAndSpareLists({ type, onOpenHistory }) {
                       </>
                     ) : (
                       <>
+                        <td className="p-2">{r.spare_number}</td>
+                        <td className="p-2">{r.item_name}</td>
+                        <td className="p-2">{r.min_qty}</td>
                         <td className="p-2">
-                          <div className="flex items-center gap-2">
-                            {imageUrl ? (
-                              <img 
-                                src={imageUrl} 
-                                className="w-12 h-12 object-cover rounded cursor-pointer hover:opacity-80 flex-shrink-0" 
-                                onClick={() => { setSelectedImage(imageUrl); setShowImageModal(true); }}
-                                alt="Spare"
+                          {editingPrice.key === r.id && editingPrice.field === 'price' ? (
+                            <div className="flex gap-1 items-center">
+                              <input
+                                type="number"
+                                className="w-20 border rounded px-1 text-xs"
+                                value={editingPrice.value}
+                                onChange={(e) => setEditingPrice(prev => ({ ...prev, value: e.target.value }))}
                               />
-                            ) : (
-                              <span className="text-gray-400 text-xs w-12 h-12 flex items-center justify-center border rounded flex-shrink-0">No img</span>
-                            )}
-                            <div className="min-w-0">
-                              <div className="font-semibold text-xs">{r.spare_number}</div>
-                              <div className="text-xs text-gray-800">{r.item_name}</div>
-                              <div className="text-xs text-gray-500">Min Qty: <span className="font-medium text-gray-800">{r.min_qty}</span></div>
+                              <button disabled={savingPrice} onClick={() => handleSavePrice(r, 'price')} className="text-green-600 text-xs">Save</button>
+                              <button disabled={savingPrice} onClick={() => setEditingPrice({ key: null, field: null, value: "" })} className="text-gray-500 text-xs">X</button>
                             </div>
-                          </div>
+                          ) : (
+                            <div className="flex items-center gap-2 group">
+                              <span>{r.price || 0}</span>
+                              <Pencil className="w-3 h-3 text-gray-400 cursor-pointer opacity-0 group-hover:opacity-100" onClick={() => setEditingPrice({ key: r.id, field: 'price', value: r.price || 0 })} />
+                            </div>
+                          )}
                         </td>
                         <td className="p-2">
-                          <div className="space-y-1 min-w-[160px]">
-                            {/* Price */}
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="text-gray-500 text-xs w-28 shrink-0">Price</span>
-                              {editingPrice.key === r.id && editingPrice.field === 'price' ? (
-                                <div className="flex gap-1 items-center">
-                                  <input type="number" className="w-20 border rounded px-1 text-xs" value={editingPrice.value} onChange={(e) => setEditingPrice(prev => ({ ...prev, value: e.target.value }))} />
-                                  <button disabled={savingPrice} onClick={() => handleSavePrice(r, 'price')} className="text-green-600 text-xs">Save</button>
-                                  <button disabled={savingPrice} onClick={() => setEditingPrice({ key: null, field: null, value: "" })} className="text-gray-500 text-xs">X</button>
-                                </div>
-                              ) : (
-                                <div className="flex items-center gap-1 group/p">
-                                  <span className="font-medium">{r.price || 0}</span>
-                                  <Pencil className="w-3 h-3 text-gray-400 cursor-pointer opacity-0 group-hover/p:opacity-100" onClick={() => setEditingPrice({ key: r.id, field: 'price', value: r.price || 0 })} />
-                                </div>
-                              )}
+                          {editingPrice.key === r.id && editingPrice.field === 'last_negotiation_price' ? (
+                            <div className="flex gap-1 items-center">
+                              <input
+                                type="number"
+                                className="w-20 border rounded px-1 text-xs"
+                                value={editingPrice.value}
+                                onChange={(e) => setEditingPrice(prev => ({ ...prev, value: e.target.value }))}
+                              />
+                              <button disabled={savingPrice} onClick={() => handleSavePrice(r, 'last_negotiation_price')} className="text-green-600 text-xs">Save</button>
+                              <button disabled={savingPrice} onClick={() => setEditingPrice({ key: null, field: null, value: "" })} className="text-gray-500 text-xs">X</button>
                             </div>
-                            {/* Last Neg. Price */}
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="text-gray-500 text-xs w-28 shrink-0">Last Neg. Price</span>
-                              {editingPrice.key === r.id && editingPrice.field === 'last_negotiation_price' ? (
-                                <div className="flex gap-1 items-center">
-                                  <input type="number" className="w-20 border rounded px-1 text-xs" value={editingPrice.value} onChange={(e) => setEditingPrice(prev => ({ ...prev, value: e.target.value }))} />
-                                  <button disabled={savingPrice} onClick={() => handleSavePrice(r, 'last_negotiation_price')} className="text-green-600 text-xs">Save</button>
-                                  <button disabled={savingPrice} onClick={() => setEditingPrice({ key: null, field: null, value: "" })} className="text-gray-500 text-xs">X</button>
-                                </div>
-                              ) : (
-                                <div className="flex items-center gap-1 group/p">
-                                  <span className="font-medium">{r.last_negotiation_price || 0}</span>
-                                  <Pencil className="w-3 h-3 text-gray-400 cursor-pointer opacity-0 group-hover/p:opacity-100" onClick={() => setEditingPrice({ key: r.id, field: 'last_negotiation_price', value: r.last_negotiation_price || 0 })} />
-                                </div>
-                              )}
+                          ) : (
+                            <div className="flex items-center gap-2 group">
+                              <span>{r.last_negotiation_price || 0}</span>
+                              <Pencil className="w-3 h-3 text-gray-400 cursor-pointer opacity-0 group-hover:opacity-100" onClick={() => setEditingPrice({ key: r.id, field: 'last_negotiation_price', value: r.last_negotiation_price || 0 })} />
                             </div>
-                          </div>
+                          )}
                         </td>
                         <td className="p-2">{r.specification}</td>
                         <td className="p-2">
@@ -807,13 +777,6 @@ function ProductAndSpareLists({ type, onOpenHistory }) {
                               className="px-2 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
                             >
                               Edit
-                            </button>
-                            <button
-                              onClick={() => onOpenHistory(r)}
-                              className="px-2 py-1 bg-purple-600 text-white text-xs rounded hover:bg-purple-700"
-                              title="View transfer and edit history"
-                            >
-                              <History className="w-3 h-3" />
                             </button>
                             {/* Delete spare button hidden
                             {userRole === 'SUPERADMIN' && (
@@ -837,7 +800,7 @@ function ProductAndSpareLists({ type, onOpenHistory }) {
 
             {view.length === 0 && (
               <tr>
-                <td className="p-2 text-gray-500" colSpan={type === "product" ? 6 : 4}>
+                <td className="p-2 text-gray-500" colSpan={type === "product" ? 14 : 8}>
                   No data
                 </td>
               </tr>
@@ -1016,13 +979,6 @@ function ProductAndSpareLists({ type, onOpenHistory }) {
                   >
                     Edit
                   </button>
-                  <button
-                    onClick={() => onOpenHistory(r)}
-                    className="px-3 py-1.5 bg-purple-600 text-white text-xs rounded hover:bg-purple-700 w-full flex items-center justify-center"
-                    title="View transfer and edit history"
-                  >
-                    <History className="w-4 h-4" />
-                  </button>
                   {/* Delete product button hidden
                   {type === 'product' && userRole === 'SUPERADMIN' && (
                     <button
@@ -1052,7 +1008,7 @@ function ProductAndSpareLists({ type, onOpenHistory }) {
 
       {/* EDIT MODAL */}
       {showEditModal && editingProduct && (
-        <div className="fixed inset-0 bg-transparent flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-4 border-b">
               <h3 className="text-lg font-semibold">Edit {type === 'product' ? 'Product' : 'Spare'}</h3>
@@ -1472,141 +1428,8 @@ export default function ProductStockForm() {
   const [selectedProductForHistory, setSelectedProductForHistory] = useState(null);
   const [transferHistoryData, setTransferHistoryData] = useState([]);
   const [loadingTransferHistory, setLoadingTransferHistory] = useState(false);
-  const [editHistoryData, setEditHistoryData] = useState([]);
-  const [loadingEditHistory, setLoadingEditHistory] = useState(false);
-  const [historyTab, setHistoryTab] = useState("edits"); // "edits" or "transfer"
-  const [showPreBookingModal, setShowPreBookingModal] = useState(false);
-  const [preBookingDetails, setPreBookingDetails] = useState([]);
-  const [loadingPreBookings, setLoadingPreBookings] = useState(false);
-  const [selectedProductForPreBooking, setSelectedProductForPreBooking] = useState(null);
-  const [editingCustomerIds, setEditingCustomerIds] = useState({});
-  const [savingCustomerIdFor, setSavingCustomerIdFor] = useState(null);
-  const [customerSuggestions, setCustomerSuggestions] = useState({});
-  const [activeSuggestionBookingId, setActiveSuggestionBookingId] = useState(null);
-  const [searchingCustomerFor, setSearchingCustomerFor] = useState(null);
-  const customerSearchTimerRef = useRef(null);
 
-  const resetPreBookingModal = () => {
-    setShowPreBookingModal(false);
-    setSelectedProductForPreBooking(null);
-    setPreBookingDetails([]);
-    setEditingCustomerIds({});
-    setSavingCustomerIdFor(null);
-    setCustomerSuggestions({});
-    setActiveSuggestionBookingId(null);
-    setSearchingCustomerFor(null);
-    if (customerSearchTimerRef.current) {
-      clearTimeout(customerSearchTimerRef.current);
-    }
-  };
 
-  const fetchCustomerSuggestions = async (bookingId, term) => {
-    setSearchingCustomerFor(bookingId);
-    setActiveSuggestionBookingId(bookingId);
-
-    try {
-      const response = await fetch(
-        `/api/customers/search?q=${encodeURIComponent(term)}&limit=10`,
-        { credentials: "include" },
-      );
-      const data = await response.json();
-      setCustomerSuggestions((prev) => ({
-        ...prev,
-        [bookingId]: data.success ? data.data || [] : [],
-      }));
-    } catch (error) {
-      console.error("Error fetching customer suggestions:", error);
-      setCustomerSuggestions((prev) => ({
-        ...prev,
-        [bookingId]: [],
-      }));
-    } finally {
-      setSearchingCustomerFor(null);
-    }
-  };
-
-  const handleCustomerIdChange = (bookingId, value) => {
-    setEditingCustomerIds((prev) => ({
-      ...prev,
-      [bookingId]: value,
-    }));
-
-    if (customerSearchTimerRef.current) {
-      clearTimeout(customerSearchTimerRef.current);
-    }
-
-    customerSearchTimerRef.current = setTimeout(() => {
-      fetchCustomerSuggestions(bookingId, value);
-    }, 300);
-  };
-
-  const handleCustomerIdFocus = (bookingId) => {
-    const term = editingCustomerIds[bookingId] ?? "";
-    fetchCustomerSuggestions(bookingId, term);
-  };
-
-  const handleSelectCustomerSuggestion = (bookingId, customer) => {
-    setEditingCustomerIds((prev) => ({
-      ...prev,
-      [bookingId]: String(customer.customer_id),
-    }));
-    setCustomerSuggestions((prev) => ({
-      ...prev,
-      [bookingId]: [],
-    }));
-    setActiveSuggestionBookingId(null);
-  };
-
-  const handleSaveCustomerId = async (booking) => {
-    const bookingId = booking.id;
-    const nextCustomerId = String(
-      editingCustomerIds[bookingId] ?? booking.customer_id ?? "",
-    ).trim();
-
-    if (!nextCustomerId) {
-      alert("Please enter a customer ID");
-      return;
-    }
-
-    if (String(booking.customer_id || "") === nextCustomerId) {
-      return;
-    }
-
-    setSavingCustomerIdFor(bookingId);
-
-    try {
-      const response = await fetch("/api/pre-booking", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: bookingId,
-          customer_id: nextCustomerId,
-        }),
-      });
-      const data = await response.json();
-
-      if (!response.ok || !data.success) {
-        alert(data.error || "Failed to update customer ID");
-        return;
-      }
-
-      if (data.booking) {
-        setPreBookingDetails((prev) =>
-          prev.map((item) => (item.id === bookingId ? data.booking : item)),
-        );
-        setEditingCustomerIds((prev) => {
-          const next = { ...prev };
-          delete next[bookingId];
-          return next;
-        });
-      }
-    } catch (error) {
-      console.error("Error updating pre-booking customer ID:", error);
-      alert("Failed to update customer ID");
-    } finally {
-      setSavingCustomerIdFor(null);
-    }
-  };
 
   // Fetch all data on component mount
   useEffect(() => {
@@ -1667,46 +1490,6 @@ export default function ProductStockForm() {
       console.error("Error updating location", e);
     } finally {
       setSavingLocation(false);
-    }
-  };
-
-  const handleViewPreBookings = async (row) => {
-    if (!row.item_name) return;
-    
-    setLoadingPreBookings(true);
-    setSelectedProductForPreBooking(row);
-    setShowPreBookingModal(true);
-    
-    try {
-      const params = new URLSearchParams();
-      params.append('product_name', row.item_name);
-      if (row.product_code) {
-        params.append('item_code', row.product_code);
-      }
-      
-      const response = await fetch(`/api/pre-booking-by-product?${params}`);
-      const data = await response.json();
-      
-      if (data.success) {
-        const bookings = data.bookings || [];
-        setPreBookingDetails(bookings);
-        setEditingCustomerIds(
-          bookings.reduce((acc, booking) => {
-            acc[booking.id] = booking.customer_id || "";
-            return acc;
-          }, {}),
-        );
-      } else {
-        console.error('Failed to fetch pre-bookings:', data.error);
-        setPreBookingDetails([]);
-        setEditingCustomerIds({});
-      }
-    } catch (error) {
-      console.error('Error fetching pre-bookings:', error);
-      setPreBookingDetails([]);
-      setEditingCustomerIds({});
-    } finally {
-      setLoadingPreBookings(false);
     }
   };
 
@@ -1808,31 +1591,7 @@ export default function ProductStockForm() {
   const openTransferHistoryModal = (product) => {
     setSelectedProductForHistory(product);
     setShowTransferHistoryModal(true);
-    setHistoryTab("edits");
-    const productCode = product.product_code || product.item_code;
-    fetchTransferHistory(productCode);
-    fetchEditHistory(productCode);
-  };
-
-  const fetchEditHistory = async (productCode) => {
-    try {
-      setLoadingEditHistory(true);
-      const res = await fetch(`/api/stock/edit-history?product_code=${productCode}`);
-      const data = await res.json();
-      
-      if (!res.ok || data.success === false) {
-        console.error("Failed to fetch edit history", data.error);
-        setEditHistoryData([]);
-        return;
-      }
-      
-      setEditHistoryData(data.history || []);
-    } catch (error) {
-      console.error("Error fetching edit history:", error);
-      setEditHistoryData([]);
-    } finally {
-      setLoadingEditHistory(false);
-    }
+    fetchTransferHistory(product.product_code);
   };
 
   // Filtered data for each section
@@ -1896,8 +1655,8 @@ export default function ProductStockForm() {
   }, [stockSummaryData, summarySearch, summaryStatusFilter]);
 
   return (
-    <div className="max-w-6xl mx-auto w-full py-4 sm:py-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 px-3 sm:px-6">
+    <div className="max-w-6xl mx-auto w-full px-3 sm:px-6 py-4 sm:py-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
         <h2 className="text-lg sm:text-xl font-semibold text-gray-800">Product Stock Management</h2>
         <div className="flex flex-wrap items-center gap-2">
           <Link href="/admin-dashboard/add-assets" className="text-sm px-4 py-2 rounded text-white bg-blue-600 hover:bg-blue-700">
@@ -1953,8 +1712,8 @@ export default function ProductStockForm() {
           <span className="text-xl sm:text-2xl font-bold text-gray-500">{openSection === "list" ? "−" : "+"}</span>
         </div>
         {openSection === "list" && (
-          <div className="pb-4 sm:pb-6 pt-0">
-            <ProductAndSpareLists type="product" onOpenHistory={openTransferHistoryModal} />
+          <div className="px-4 sm:px-6 pb-4 sm:pb-6 pt-0">
+            <ProductAndSpareLists type="product" />
           </div>
         )}
       </div>
@@ -2042,18 +1801,7 @@ export default function ProductStockForm() {
                       </div>
                       <div>
                         <p className="text-gray-500">Pre-booked</p>
-                        <div className="flex items-center gap-2">
-                          <p className="font-semibold text-orange-600">{row.pre_booked || 0}</p>
-                          {(row.pre_booked > 0) && (
-                            <button
-                              onClick={() => handleViewPreBookings(row)}
-                              className="text-blue-600 hover:text-blue-800 transition-colors"
-                              title="View pre-booking details"
-                            >
-                              <Eye className="w-4 h-4" />
-                            </button>
-                          )}
-                        </div>
+                        <p className="font-semibold text-orange-600">{row.pre_booked || 0}</p>
                       </div>
                       <div className="bg-yellow-200 rounded p-2">
                         <p className="text-gray-500">Net Qty</p>
@@ -2184,20 +1932,7 @@ export default function ProductStockForm() {
                         </td>
                         <td className="p-2 sm:p-3">{row.item_name}</td>
                         <td className="p-2 sm:p-3 font-semibold">{row.total}</td>
-                        <td className="p-2 sm:p-3">
-                          <div className="flex items-center gap-2">
-                            <span className="font-semibold text-orange-600">{row.pre_booked || 0}</span>
-                            {(row.pre_booked > 0) && (
-                              <button
-                                onClick={() => handleViewPreBookings(row)}
-                                className="text-blue-600 hover:text-blue-800 transition-colors"
-                                title="View pre-booking details"
-                              >
-                                <Eye className="w-4 h-4" />
-                              </button>
-                            )}
-                          </div>
-                        </td>
+                        <td className="p-2 sm:p-3 font-semibold text-orange-600">{row.pre_booked || 0}</td>
                         <td className="p-2 sm:p-3 font-semibold text-green-600 bg-yellow-200 rounded">{row.net_qty || 0}</td>
                         <td className="p-2 sm:p-3">{row.delhi}</td>
                         <td className="p-2 sm:p-3">{row.south}</td>
@@ -2834,19 +2569,17 @@ export default function ProductStockForm() {
         </div>
       )}
       
-      {/* Transfer & Edit History Modal */}
+      {/* Transfer History Modal */}
       {showTransferHistoryModal && selectedProductForHistory && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-transparent">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900 bg-opacity-60">
           <div className="bg-white p-6 rounded-lg max-w-4xl w-full mx-4 max-h-[80vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold text-gray-800">Stock History</h3>
+              <h3 className="text-lg font-semibold text-gray-800">Transfer History</h3>
               <button 
                 onClick={() => {
                   setShowTransferHistoryModal(false);
                   setSelectedProductForHistory(null);
                   setTransferHistoryData([]);
-                  setEditHistoryData([]);
-                  setHistoryTab("edits");
                 }}
                 className="text-gray-500 hover:text-gray-700"
               >
@@ -2858,301 +2591,59 @@ export default function ProductStockForm() {
               <p className="text-sm text-gray-600">Product Code</p>
               <p className="font-semibold">{selectedProductForHistory.product_code}</p>
             </div>
-            <div className="mb-6">
+            <div className="mb-4">
               <p className="text-sm text-gray-600">Item Name</p>
               <p className="font-medium">{selectedProductForHistory.item_name}</p>
             </div>
 
-            {/* History Tabs */}
-            <div className="flex gap-4 mb-6 border-b border-gray-200">
-              <button
-                onClick={() => setHistoryTab("edits")}
-                className={`px-4 py-2 font-medium text-sm ${
-                  historyTab === "edits"
-                    ? "text-blue-600 border-b-2 border-blue-600"
-                    : "text-gray-600 hover:text-gray-800"
-                }`}
-              >
-                Edit History
-              </button>
-              <button
-                onClick={() => setHistoryTab("transfer")}
-                className={`px-4 py-2 font-medium text-sm ${
-                  historyTab === "transfer"
-                    ? "text-blue-600 border-b-2 border-blue-600"
-                    : "text-gray-600 hover:text-gray-800"
-                }`}
-              >
-                Transfer History
-              </button>
-            </div>
-
-            {/* Edit History Tab */}
-            {historyTab === "edits" && (
-              <>
-                {loadingEditHistory ? (
-                  <div className="text-center py-8">
-                    <p className="text-gray-500">Loading edit history...</p>
-                  </div>
-                ) : editHistoryData.length === 0 ? (
-                  <div className="text-center py-8">
-                    <p className="text-gray-500">No edit history found for this product.</p>
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm border border-gray-200 rounded">
-                      <thead className="bg-gray-100 text-left">
-                        <tr>
-                          <th className="p-3 border-b font-semibold">Date</th>
-                          <th className="p-3 border-b font-semibold">Edited By</th>
-                          <th className="p-3 border-b font-semibold">Delhi (Old → New)</th>
-                          <th className="p-3 border-b font-semibold">South (Old → New)</th>
-                          <th className="p-3 border-b font-semibold">Min Qty (Old → New)</th>
-                          <th className="p-3 border-b font-semibold">Change Description</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {editHistoryData.map((record, idx) => (
-                          <tr key={idx} className="border-t hover:bg-gray-50">
-                            <td className="p-3">
-                              {record.edited_at ? 
-                                new Date(record.edited_at).toLocaleString('en-IN', {
-                                  timeZone: 'Asia/Kolkata',
-                                  year: 'numeric',
-                                  month: '2-digit',
-                                  day: '2-digit',
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                  second: '2-digit',
-                                  hour12: false
-                                }) : "--"
-                              }
-                            </td>
-                            <td className="p-3 font-medium">{record.edited_by || "--"}</td>
-                            <td className="p-3 text-xs">
-                              {record.old_delhi != null && record.new_delhi != null 
-                                ? `${record.old_delhi} → ${record.new_delhi}`
-                                : "--"
-                              }
-                            </td>
-                            <td className="p-3 text-xs">
-                              {record.old_south != null && record.new_south != null 
-                                ? `${record.old_south} → ${record.new_south}`
-                                : "--"
-                              }
-                            </td>
-                            <td className="p-3 text-xs">
-                              {record.old_min_qty != null && record.new_min_qty != null 
-                                ? `${record.old_min_qty} → ${record.new_min_qty}`
-                                : "--"
-                              }
-                            </td>
-                            <td className="p-3 max-w-xs truncate">{record.change_description || "--"}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </>
-            )}
-
-            {/* Transfer History Tab */}
-            {historyTab === "transfer" && (
-              <>
-                {loadingTransferHistory ? (
-                  <div className="text-center py-8">
-                    <p className="text-gray-500">Loading transfer history...</p>
-                  </div>
-                ) : transferHistoryData.length === 0 ? (
-                  <div className="text-center py-8">
-                    <p className="text-gray-500">No transfer history found for this product.</p>
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm border border-gray-200 rounded">
-                      <thead className="bg-gray-100 text-left">
-                        <tr>
-                          <th className="p-3 border-b font-semibold">Date</th>
-                          <th className="p-3 border-b font-semibold">Quantity</th>
-                          <th className="p-3 border-b font-semibold">From/To Godown</th>
-                          <th className="p-3 border-b font-semibold">Note</th>
-                          <th className="p-3 border-b font-semibold">Added By</th>
-                          <th className="p-3 border-b font-semibold">Stock After Transfer</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {transferHistoryData.map((record, idx) => (
-                          <tr key={idx} className="border-t hover:bg-gray-50">
-                            <td className="p-3">
-                              {record.added_date ? 
-                                new Date(record.added_date).toLocaleString('en-IN', {
-                                  timeZone: 'Asia/Kolkata',
-                                  year: 'numeric',
-                                  month: '2-digit',
-                                  day: '2-digit',
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                  second: '2-digit',
-                                  hour12: false
-                                }) : "--"
-                              }
-                            </td>
-                            <td className="p-3 font-semibold">{record.quantity}</td>
-                            <td className="p-3">{record.godown || "--"}</td>
-                            <td className="p-3 max-w-xs truncate">{record.note || "--"}</td>
-                            <td className="p-3">{record.added_by || "--"}</td>
-                            <td className="p-3">
-                              <div className="text-xs">
-                                <div>Total: {record.total}</div>
-                                <div>Delhi: {record.delhi}</div>
-                                <div>South: {record.south}</div>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        </div>
-      )}
-      
-      {/* Pre-Booking Details Modal */}
-      {showPreBookingModal && selectedProductForPreBooking && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={resetPreBookingModal}>
-          <div className="bg-white p-6 rounded-lg max-w-4xl w-full mx-4 max-h-[80vh] overflow-auto shadow-lg" onClick={(e) => e.stopPropagation()}>
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold text-gray-800">Pre-Booking Details</h3>
-              <button 
-                onClick={resetPreBookingModal}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="mb-4">
-              <p className="text-sm text-gray-600">Product Code</p>
-              <p className="font-semibold">{selectedProductForPreBooking.product_code}</p>
-            </div>
-            <div className="mb-4">
-              <p className="text-sm text-gray-600">Item Name</p>
-              <p className="font-medium">{selectedProductForPreBooking.item_name}</p>
-            </div>
-
-            {loadingPreBookings ? (
+            {loadingTransferHistory ? (
               <div className="text-center py-8">
-                <p className="text-gray-500">Loading pre-booking details...</p>
+                <p className="text-gray-500">Loading transfer history...</p>
               </div>
-            ) : preBookingDetails.length === 0 ? (
+            ) : transferHistoryData.length === 0 ? (
               <div className="text-center py-8">
-                <p className="text-gray-500">No pre-booking records found for this product.</p>
+                <p className="text-gray-500">No transfer history found for this product.</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm border border-gray-200 rounded">
                   <thead className="bg-gray-100 text-left">
                     <tr>
-                      <th className="p-3 border-b font-semibold">Customer ID</th>
-                      <th className="p-3 border-b font-semibold">Customer Name</th>
-                      <th className="p-3 border-b font-semibold">Company</th>
-                      <th className="p-3 border-b font-semibold">Phone</th>
+                      <th className="p-3 border-b font-semibold">Date</th>
                       <th className="p-3 border-b font-semibold">Quantity</th>
-                      <th className="p-3 border-b font-semibold">Expected Date</th>
-                      <th className="p-3 border-b font-semibold">Booking Date</th>
+                      <th className="p-3 border-b font-semibold">From/To Godown</th>
+                      <th className="p-3 border-b font-semibold">Note</th>
+                      <th className="p-3 border-b font-semibold">Added By</th>
+                      <th className="p-3 border-b font-semibold">Stock After Transfer</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {preBookingDetails.map((booking) => (
-                      <tr key={booking.id} className="border-t hover:bg-gray-50">
+                    {transferHistoryData.map((record, idx) => (
+                      <tr key={idx} className="border-t hover:bg-gray-50">
                         <td className="p-3">
-                          <div className="relative min-w-[220px]">
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="text"
-                                value={editingCustomerIds[booking.id] ?? booking.customer_id ?? ""}
-                                onChange={(e) => handleCustomerIdChange(booking.id, e.target.value)}
-                                onFocus={() => handleCustomerIdFocus(booking.id)}
-                                onBlur={() => {
-                                  setTimeout(() => setActiveSuggestionBookingId(null), 200);
-                                }}
-                                className="w-28 px-2 py-1 border border-gray-300 rounded text-sm"
-                                placeholder="Customer ID"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => handleSaveCustomerId(booking)}
-                                disabled={savingCustomerIdFor === booking.id}
-                                className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-                              >
-                                {savingCustomerIdFor === booking.id ? "Saving..." : "Save"}
-                              </button>
-                            </div>
-                            {activeSuggestionBookingId === booking.id && (
-                              <ul className="absolute left-0 top-full z-30 mt-1 w-72 max-h-48 overflow-y-auto rounded-md border border-gray-200 bg-white shadow-lg">
-                                {searchingCustomerFor === booking.id && (
-                                  <li className="px-3 py-2 text-xs text-gray-500">Searching...</li>
-                                )}
-                                {!searchingCustomerFor &&
-                                  (customerSuggestions[booking.id] || []).map((customer) => {
-                                    const name = [customer.first_name, customer.last_name]
-                                      .filter(Boolean)
-                                      .join(" ")
-                                      .trim() || customer.customer_name || "Unnamed";
-                                    return (
-                                      <li
-                                        key={customer.customer_id}
-                                        onMouseDown={(e) => {
-                                          e.preventDefault();
-                                          handleSelectCustomerSuggestion(booking.id, customer);
-                                        }}
-                                        className="cursor-pointer px-3 py-2 text-xs hover:bg-blue-50 border-b last:border-b-0"
-                                      >
-                                        <div className="font-semibold text-gray-800">
-                                          ID: {customer.customer_id}
-                                        </div>
-                                        <div className="text-gray-600">{name}</div>
-                                        <div className="text-gray-500">
-                                          {[customer.company, customer.phone].filter(Boolean).join(" • ")}
-                                        </div>
-                                      </li>
-                                    );
-                                  })}
-                                {!searchingCustomerFor &&
-                                  (customerSuggestions[booking.id] || []).length === 0 && (
-                                    <li className="px-3 py-2 text-xs text-gray-500">
-                                      No customers found
-                                    </li>
-                                  )}
-                              </ul>
-                            )}
+                          {record.added_date ? 
+                            new Date(record.added_date).toLocaleString('en-IN', {
+                              timeZone: 'Asia/Kolkata',
+                              year: 'numeric',
+                              month: '2-digit',
+                              day: '2-digit',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              second: '2-digit',
+                              hour12: false
+                            }) : "--"
+                          }
+                        </td>
+                        <td className="p-3 font-semibold">{record.quantity}</td>
+                        <td className="p-3">{record.godown || "--"}</td>
+                        <td className="p-3 max-w-xs truncate">{record.note || "--"}</td>
+                        <td className="p-3">{record.added_by || "--"}</td>
+                        <td className="p-3">
+                          <div className="text-xs">
+                            <div>Total: {record.total}</div>
+                            <div>Delhi: {record.delhi}</div>
+                            <div>South: {record.south}</div>
                           </div>
-                        </td>
-                        <td className="p-3 font-medium">{booking.customer_name || "--"}</td>
-                        <td className="p-3">{booking.company || "--"}</td>
-                        <td className="p-3">{booking.phone || "--"}</td>
-                        <td className="p-3 font-semibold text-center">{booking.quantity || 1}</td>
-                        <td className="p-3">
-                          {booking.expected_date ? 
-                            new Date(booking.expected_date).toLocaleDateString('en-IN', {
-                              year: 'numeric',
-                              month: '2-digit',
-                              day: '2-digit'
-                            }) : "--"
-                          }
-                        </td>
-                        <td className="p-3">
-                          {booking.created_at ? 
-                            new Date(booking.created_at).toLocaleDateString('en-IN', {
-                              year: 'numeric',
-                              month: '2-digit',
-                              day: '2-digit'
-                            }) : "--"
-                          }
                         </td>
                       </tr>
                     ))}

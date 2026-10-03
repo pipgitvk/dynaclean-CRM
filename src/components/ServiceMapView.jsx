@@ -2,8 +2,6 @@
 import { useEffect, useRef, useState, useMemo } from "react";
 import { loadGoogleMaps } from "@/lib/loadGoogleMaps";
 
-const DEFAULT_STATUS_FILTERS = ["PENDING", "PENDING FOR SPARES", "PENDING BY CUSTOMER"];
-
 export default function ServiceMapView({ services = [] }) {
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
@@ -13,7 +11,7 @@ export default function ServiceMapView({ services = [] }) {
   
   // Filter states
   const [serviceTypeFilter, setServiceTypeFilter] = useState("");
-  const [statusFilters, setStatusFilters] = useState(new Set(DEFAULT_STATUS_FILTERS));
+  const [statusFilter, setStatusFilter] = useState("");
 
   useEffect(() => {
     loadGoogleMaps().then(() => setIsLoading(false));
@@ -34,10 +32,10 @@ export default function ServiceMapView({ services = [] }) {
   const filteredServices = useMemo(() => {
     return services.filter(service => {
       const matchesType = !serviceTypeFilter || service.service_type === serviceTypeFilter;
-      const matchesStatus = statusFilters.size === 0 || statusFilters.has(service.status);
+      const matchesStatus = !statusFilter || service.status === statusFilter;
       return matchesType && matchesStatus;
     });
-  }, [services, serviceTypeFilter, statusFilters]);
+  }, [services, serviceTypeFilter, statusFilter]);
 
   // Helper function to get marker color and shape based on service type and status
   const getMarkerStyle = (service) => {
@@ -50,9 +48,7 @@ export default function ServiceMapView({ services = [] }) {
     } else if (service.status === "PENDING") {
       color = "#f59e0b"; // Orange
     } else if (service.status === "PENDING FOR SPARES") {
-      color = "#ffff00"; // Yellow
-    } else if (service.status === "PENDING BY CUSTOMER") {
-      color = "#3b82f6"; // Blue
+      color = "#ef4444"; // Red
     } else if (service.status === "IN PROGRESS") {
       color = "#6366f1"; // Indigo
     }
@@ -130,12 +126,8 @@ export default function ServiceMapView({ services = [] }) {
       });
 
       // Create info window content
-      const isPendingByCustomer = service.status && service.status.toUpperCase() === "PENDING BY CUSTOMER";
-      const isPendingForSpares = service.status && service.status.toUpperCase() === "PENDING FOR SPARES";
-      const showComplaintHighlight = isPendingByCustomer || isPendingForSpares;
-      
       const infoContent = `
-        <div style="min-width: 320px; font-family: system-ui, -apple-system, sans-serif;">
+        <div style="min-width: 280px; font-family: system-ui, -apple-system, sans-serif;">
           <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
             <h3 style="font-size: 16px; font-weight: 600; margin: 0; color: #1f2937;">
               ${service.product_name || "Service Record"}
@@ -147,7 +139,6 @@ export default function ServiceMapView({ services = [] }) {
           <div style="font-size: 13px; color: #4b5563; line-height: 1.6;">
             <p style="margin: 4px 0;"><strong>Service ID:</strong> ${service.service_id || "N/A"}</p>
             <p style="margin: 4px 0;"><strong>Serial:</strong> ${service.serial_number || "N/A"}</p>
-            <p style="margin: 4px 0;"><strong>Model:</strong> ${service.model || "N/A"}</p>
             <p style="margin: 4px 0;"><strong>Type:</strong> ${service.service_type || "N/A"}</p>
             <p style="margin: 4px 0;"><strong>Company:</strong> ${service.customer_name || "N/A"}</p>
             <p style="margin: 4px 0;"><strong>Address:</strong> ${service.installed_address || service.customer_address || "N/A"}</p>
@@ -155,30 +146,6 @@ export default function ServiceMapView({ services = [] }) {
             <p style="margin: 4px 0;"><strong>Assigned To:</strong> ${service.assigned_to || "N/A"}</p>
             ${service.completed_date ? `<p style="margin: 4px 0;"><strong>Completed:</strong> ${service.completed_date}</p>` : ''}
           </div>
-          ${showComplaintHighlight && service.complaint_summary ? `
-            <div style="margin-top: 10px; padding: 8px; background-color: ${isPendingByCustomer ? '#eff6ff' : '#fff7ed'}; border-left: 4px solid ${isPendingByCustomer ? '#3b82f6' : '#f59e0b'}; border-radius: 4px;">
-              <p style="margin: 0; font-size: 12px; font-weight: 600; color: ${isPendingByCustomer ? '#1d4ed8' : '#ea580c'}; margin-bottom: 4px;">
-                ${isPendingByCustomer ? '🔵' : '🟠'} Complaint Summary:
-              </p>
-              <p style="margin: 0; font-size: 12px; color: #374151; line-height: 1.4;">
-                ${service.complaint_summary}
-              </p>
-              ${service.status_description ? `
-                <p style="margin: 6px 0 0 0; font-size: 11px; color: #6b7280; font-style: italic;">
-                  <strong>Note:</strong> ${service.status_description}
-                </p>
-              ` : ''}
-            </div>
-          ` : service.complaint_summary ? `
-            <div style="margin-top: 10px; padding: 8px; background-color: #f9fafb; border-left: 4px solid #6b7280; border-radius: 4px;">
-              <p style="margin: 0; font-size: 12px; font-weight: 600; color: #374151; margin-bottom: 4px;">
-                Complaint Summary:
-              </p>
-              <p style="margin: 0; font-size: 12px; color: #4b5563; line-height: 1.4;">
-                ${service.complaint_summary}
-              </p>
-            </div>
-          ` : ''}
           <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #e5e7eb;">
             <a href="/user-dashboard/view_service_reports" 
                style="color: #3b82f6; text-decoration: none; font-size: 13px; font-weight: 500;">
@@ -277,40 +244,23 @@ export default function ServiceMapView({ services = [] }) {
         {/* Status Filter */}
         <div className="mb-3">
           <label className="block text-xs font-medium text-gray-700 mb-1">Status</label>
-          <div className="space-y-1 max-h-36 overflow-y-auto">
+          <select
+            className="w-full p-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+          >
+            <option value="">All Statuses</option>
             {uniqueStatuses.map((status) => (
-              <label key={status} className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer hover:text-gray-900">
-                <input
-                  type="checkbox"
-                  checked={statusFilters.has(status)}
-                  onChange={(e) => {
-                    setStatusFilters(prev => {
-                      const next = new Set(prev);
-                      e.target.checked ? next.add(status) : next.delete(status);
-                      return next;
-                    });
-                  }}
-                  className="w-3.5 h-3.5 accent-blue-600 cursor-pointer"
-                />
-                {status}
-              </label>
+              <option key={status} value={status}>{status}</option>
             ))}
-          </div>
-          {statusFilters.size > 0 && (
-            <button
-              onClick={() => setStatusFilters(new Set())}
-              className="mt-1 text-[11px] text-blue-600 hover:underline"
-            >
-              Clear all
-            </button>
-          )}
+          </select>
         </div>
         
         {/* Reset Button */}
         <button
           onClick={() => {
             setServiceTypeFilter("");
-            setStatusFilters(new Set(DEFAULT_STATUS_FILTERS));
+            setStatusFilter("");
           }}
           className="w-full px-3 py-2 text-sm bg-gray-200 hover:bg-gray-300 rounded-md transition-colors"
         >
@@ -330,12 +280,8 @@ export default function ServiceMapView({ services = [] }) {
               Pending
             </div>
             <div className="flex items-center text-xs text-gray-600">
-              <span className="inline-block w-3 h-3 rounded-full bg-yellow-300 mr-2"></span>
+              <span className="inline-block w-3 h-3 rounded-full bg-red-500 mr-2"></span>
               Pending for Spares
-            </div>
-            <div className="flex items-center text-xs text-gray-600">
-              <span className="inline-block w-3 h-3 rounded-full bg-blue-500 mr-2"></span>
-              Pending by Customer
             </div>
             <div className="flex items-center text-xs text-gray-600">
               <span className="inline-block w-3 h-3 rounded-full bg-indigo-500 mr-2"></span>
@@ -386,8 +332,7 @@ export default function ServiceMapView({ services = [] }) {
               <span className={`inline-block w-2 h-2 rounded-full mr-1 ${
                 status === "COMPLETED" ? "bg-green-500" :
                 status === "PENDING" ? "bg-orange-500" :
-                status === "PENDING FOR SPARES" ? "bg-yellow-300" :
-                status === "PENDING BY CUSTOMER" ? "bg-blue-500" :
+                status === "PENDING FOR SPARES" ? "bg-red-500" :
                 status === "IN PROGRESS" ? "bg-indigo-500" :
                 "bg-blue-500"
               }`}></span>
@@ -416,7 +361,6 @@ export default function ServiceMapView({ services = [] }) {
           </div>
           <div className="text-sm text-gray-600 space-y-1">
             <p><strong>Serial:</strong> {selectedService.serial_number}</p>
-            <p><strong>Model:</strong> {selectedService.model || "N/A"}</p>
             <p><strong>Company:</strong> {selectedService.customer_name}</p>
             <p><strong>Status:</strong> <span className={`font-semibold ${
               selectedService.status === "COMPLETED" ? "text-green-600" :

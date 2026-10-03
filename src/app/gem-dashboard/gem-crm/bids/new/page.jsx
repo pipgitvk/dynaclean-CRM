@@ -14,10 +14,8 @@ import {
   Calculator,
   AlertCircle,
   CheckCircle,
-  Trash2,
 } from "lucide-react";
 import toast from "react-hot-toast";
-import { BID_DOCUMENT_MAX_FILE_SIZE_MB } from "@/lib/bidDocuments";
 
 export default function NewBidPage() {
   const router = useRouter();
@@ -59,7 +57,7 @@ export default function NewBidPage() {
     assigned_employee_id: "",
     dd_id: "",
     remarks: "",
-    bid_document: [],
+    bid_document: null,
     ra_participated: "no",
     ra_start_date: "",
     ra_end_date: "",
@@ -127,11 +125,7 @@ export default function NewBidPage() {
   const handleChange = (e) => {
     const { name, value, type, files } = e.target;
     if (type === "file") {
-      if (name === "bid_document") {
-        setFormData((prev) => ({ ...prev, [name]: Array.from(files) }));
-      } else {
-        setFormData((prev) => ({ ...prev, [name]: files[0] }));
-      }
+      setFormData((prev) => ({ ...prev, [name]: files[0] }));
     } else {
       setFormData((prev) => ({ ...prev, [name]: value }));
       
@@ -156,12 +150,6 @@ export default function NewBidPage() {
     try {
       const formDataToSend = new FormData();
       Object.keys(formData).forEach((key) => {
-        if (key === "bid_document") {
-          (formData.bid_document || []).forEach((file) => {
-            formDataToSend.append("bid_document", file);
-          });
-          return;
-        }
         if (formData[key] !== null && formData[key] !== "") {
           formDataToSend.append(key, formData[key]);
         }
@@ -362,37 +350,11 @@ export default function NewBidPage() {
                     name="bid_document"
                     onChange={handleChange}
                     accept=".pdf,.doc,.docx"
-                    multiple
                     className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   />
                   <Upload className="w-5 h-5 text-gray-400" />
                 </div>
-                <p className="text-xs text-gray-500 mt-1">PDF, DOC, DOCX — you can select multiple files (Max {BID_DOCUMENT_MAX_FILE_SIZE_MB}MB each)</p>
-                {Array.isArray(formData.bid_document) && formData.bid_document.length > 0 && (
-                  <ul className="mt-2 space-y-1">
-                    {formData.bid_document.map((file, index) => (
-                      <li
-                        key={`${file.name}-${index}`}
-                        className="flex items-center justify-between text-sm bg-gray-50 px-3 py-2 rounded-lg"
-                      >
-                        <span className="truncate">{file.name}</span>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              bid_document: prev.bid_document.filter((_, i) => i !== index),
-                            }))
-                          }
-                          className="p-1 text-red-600 hover:bg-red-50 rounded"
-                          title="Remove"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
+                <p className="text-xs text-gray-500 mt-1">PDF, DOC, DOCX (Max 10MB)</p>
               </div>
             </div>
           </div>

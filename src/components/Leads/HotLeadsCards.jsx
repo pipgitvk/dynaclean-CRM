@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Phone, CalendarDays, Tag, Layers, Clock, Search } from "lucide-react";
+import { Phone, CalendarDays, Tag, Layers, Clock } from "lucide-react";
 import { formatCrmDatetimeForISTDisplay } from "@/lib/timezone";
 
 // Urgency color based on age: oldest (6d) = red, middle = light yellow, newest = light green
@@ -19,10 +19,7 @@ function getUrgencyLabel(ageHours) {
   return           { text: "Fresh",      bg: "bg-green-100 text-green-700" };
 }
 
-function HotLeadCard({ cust, dashboardPrefix = "/user-dashboard" }) {
-  const detailsBasePath = dashboardPrefix.includes("/sales-dashboard")
-    ? "/user-dashboard"
-    : dashboardPrefix;
+function HotLeadCard({ cust }) {
   const ageHours = cust.lead_age_hours || 0;
   const ageDays  = Math.floor(ageHours / 24);
   const ageLabel = ageDays === 0
@@ -105,13 +102,13 @@ function HotLeadCard({ cust, dashboardPrefix = "/user-dashboard" }) {
       {/* Actions */}
       <div className="px-4 pb-4 flex gap-2">
         <a
-          href={`${detailsBasePath}/view-customer/${cust.customer_id}`}
+          href={`/user-dashboard/view-customer/${cust.customer_id}`}
           className="flex-1 text-center text-xs font-medium border border-gray-200 text-gray-600 hover:bg-gray-50 rounded-lg py-2 transition-colors"
         >
           View
         </a>
         <a
-          href={`${detailsBasePath}/view-customer/${cust.customer_id}/follow-up`}
+          href={`/user-dashboard/view-customer/${cust.customer_id}/follow-up`}
           className="flex-1 text-center text-xs font-medium text-white rounded-lg py-2 transition-colors"
           style={{ backgroundColor: barColor }}
         >
@@ -140,11 +137,7 @@ function SkeletonCard() {
   );
 }
 
-export default function HotLeadsCards({
-  leadSource,
-  compact = false,
-  dashboardPrefix = "/user-dashboard",
-}) {
+export default function HotLeadsCards({ leadSource }) {
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("ALL");
@@ -155,7 +148,7 @@ export default function HotLeadsCards({
     async function fetchHotLeads() {
       setLoading(true);
       try {
-        const res = await fetch(`/api/fresh-leads?leadSource=${leadSource}`);
+        const res = await fetch(`/api/fresh-leads.?leadSource=${leadSource}`);
         const data = await res.json();
         setLeads(data.leads || []);
       } catch (err) {
@@ -238,106 +231,75 @@ export default function HotLeadsCards({
     return filtered;
   })();
 
-  const shellClass = compact
-    ? "flex h-full min-h-0 flex-col"
-    : "bg-white lg:p-6 rounded-xl shadow-md mx-auto mt-2";
-  const titleClass = compact
-    ? "text-base font-semibold text-slate-800"
-    : "text-2xl sm:text-3xl font-semibold text-gray-800";
-  const filterClass = compact
-    ? "rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-violet-200"
-    : "border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-gray-300";
-  const scrollClass = compact
-    ? "w-full overflow-x-auto py-2 hide-scrollbar"
-    : "w-full md:w-[77vw] lg:w-[71vw] overflow-x-scroll py-2 hide-scrollbar";
-
   return (
-    <div className={shellClass}>
-      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-        <div className="flex items-center gap-2">
-          {compact && <span aria-hidden>🔥</span>}
-          <h2 className={titleClass}>Hot Leads</h2>
+    <div className="bg-white lg:p-6 rounded-xl shadow-md mx-auto mt-2">
+
+      {/* Header */}
+      <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
+        <div className="flex items-center gap-3">
+          <div>
+            <h2 className="text-2xl sm:text-3xl font-semibold text-gray-800">
+              Hot Leads
+            </h2>
+          </div>
         </div>
 
+        {/* Filters */}
         <div className="flex flex-wrap items-end gap-3">
           <div className="flex flex-col">
-            <label className="mb-1 text-xs text-slate-500">From Date</label>
+            <label className="text-xs text-gray-500 mb-1">From Date</label>
             <input
               type="date"
-              className={filterClass}
+              className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-gray-300"
               value={dateFilter}
               onChange={(e) => setDateFilter(e.target.value)}
             />
           </div>
           <div className="flex flex-col">
-            <label className="mb-1 text-xs text-slate-500">Status</label>
+            <label className="text-xs text-gray-500 mb-1">Status</label>
             <select
-              className={filterClass}
+              className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-gray-300"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
             >
               <option value="ALL">All statuses</option>
               {[...new Set(leads.map((l) => l.status).filter(Boolean))]
                 .sort((a, b) => String(a).localeCompare(String(b)))
-                .map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
+                .map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
           <div className="flex flex-col">
-            <label className="mb-1 text-xs text-slate-500">Stage</label>
+            <label className="text-xs text-gray-500 mb-1">Stage</label>
             <select
-              className={filterClass}
+              className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-gray-300"
               value={stageFilter}
               onChange={(e) => setStageFilter(e.target.value)}
             >
               <option value="ALL">All stages</option>
               {[...new Set(leads.map((l) => l.stage).filter(Boolean))]
                 .sort((a, b) => String(a).localeCompare(String(b)))
-                .map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
+                .map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
         </div>
       </div>
 
-      <p className="mb-3 text-xs text-slate-400">
+      {/* Count */}
+      <p className="text-xs text-gray-400 mb-3">
         Showing {processedLeads.length} of {leads.length} leads
       </p>
 
-      <div className={`${scrollClass} ${compact ? "min-h-0 flex-1" : ""}`}>
-        <div
-          className={`flex min-w-max flex-row flex-nowrap gap-4 ${compact ? "h-full min-h-[220px]" : ""}`}
-        >
+      {/* Horizontal scroll */}
+      <div className="w-full md:w-[77vw] lg:w-[71vw] overflow-x-scroll py-2 hide-scrollbar">
+        <div className="flex flex-row gap-4 flex-nowrap min-w-max">
           {loading ? (
-            [...Array(compact ? 3 : 6)].map((_, i) => <SkeletonCard key={i} />)
+            [...Array(6)].map((_, i) => <SkeletonCard key={i} />)
           ) : processedLeads.length > 0 ? (
             processedLeads.map((cust) => (
-              <HotLeadCard
-                key={cust.customer_id}
-                cust={cust}
-                dashboardPrefix={dashboardPrefix}
-              />
+              <HotLeadCard key={cust.customer_id} cust={cust} />
             ))
-          ) : compact ? (
-            <div className="flex min-h-[220px] w-full flex-1 flex-col items-center justify-center py-10 text-center">
-              <div className="mb-3 grid h-16 w-16 place-items-center rounded-full bg-slate-100">
-                <Search size={28} className="text-slate-400" />
-              </div>
-              <p className="text-sm font-medium text-slate-600">
-                No hot leads found.
-              </p>
-              <p className="mt-1 text-xs text-slate-400">
-                Showing {processedLeads.length} of {leads.length} leads
-              </p>
-            </div>
           ) : (
-            <div className="px-4 py-8 text-sm text-gray-400">
+            <div className="text-gray-400 text-sm py-8 px-4">
               No hot leads found.
             </div>
           )}

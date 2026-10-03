@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import toast from "react-hot-toast";
 import { formatAttendanceTimeForDisplay as formatTime } from "@/lib/istDateTime";
-import { getAttendanceRegularizationAttachmentHref } from "@/lib/attendanceRegularizationAttachmentHref";
 
 const FIELDS = [
   { key: "checkin_time", label: "Check-in" },
@@ -136,10 +135,7 @@ export default function AttendanceRegularizationApprovalsPage() {
               {req.attachment_url ? (
                 <p className="text-sm mb-4">
                   <a
-                    href={getAttendanceRegularizationAttachmentHref(
-                      req.attachment_url,
-                      req.id,
-                    )}
+                    href={req.attachment_url}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="font-medium text-teal-700 underline hover:text-teal-900"

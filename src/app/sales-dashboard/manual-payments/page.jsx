@@ -1,27 +1,44 @@
 import { getDbConnection } from "@/lib/db";
+import { cookies } from "next/headers";
+import { jwtVerify } from "jose";
 import { redirect } from "next/navigation";
 import PaymentTable from "./PaymentTable";
-import { getManualPaymentsPageAccess } from "@/lib/manualPaymentsAccess";
+
+const JWT_SECRET = process.env.JWT_SECRET;
 
 export const dynamic = "force-dynamic";
 
 export default async function ManualPaymentsPage() {
-    const { payload, allowed } = await getManualPaymentsPageAccess();
-    if (!payload) {
+    const cookieStore = await cookies();
+    const token = cookieStore.get("token")?.value;
+
+    if (!token) {
         redirect("/login");
     }
-    if (!allowed) {
-        return (
-            <div className="p-6">
-                <p className="text-red-600">
-                    Access Denied. You do not have permission to view Manual Payments.
-                    Ask your admin to enable the Manual Payments module for your account.
-                </p>
-            </div>
-        );
-    }
 
-    const role = payload.role ?? payload.userRole ?? "";
+    let username = "";
+    let role = "";
+
+    try {
+        const { payload } = await jwtVerify(
+            token,
+            new TextEncoder().encode(JWT_SECRET)
+        );
+
+        username = payload.username;
+        role = payload.role;
+
+        // Check if user has access
+        if (!["ACCOUNTANT", "ADMIN", "SUPERADMIN", "SALES CUM BACKOFFICE"].includes(role)) {
+            return (
+                <div className="p-6">
+                    <p className="text-red-600">Access Denied. This page is only accessible to Accountant, Admin, Superadmin, and Sales Cum Backoffice roles.</p>
+                </div>
+            );
+        }
+    } catch (err) {
+        redirect("/login");
+    }
 
     const conn = await getDbConnection();
 
@@ -50,7 +67,7 @@ export default async function ManualPaymentsPage() {
                         Manual Payment Entries
                     </h1>
                     <a
-                        href="/sales-dashboard/manual-payments/add"
+                        href="/user-dashboard/manual-payments/add"
                         className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg shadow-md transition-colors text-center font-medium"
                     >
                         + Add New Payment

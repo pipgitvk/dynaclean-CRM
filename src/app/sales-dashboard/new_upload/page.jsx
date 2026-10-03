@@ -10,10 +10,6 @@ export default function LeadDistributionPage() {
   const [showModal, setShowModal] = useState(false);
   const [fromDate, setFromDate] = useState(""); // YYYY-MM-DD
   const [toDate, setToDate] = useState("");   // YYYY-MM-DD
-  const [assignedTo, setAssignedTo] = useState("");
-  const [assignedToOptions, setAssignedToOptions] = useState([]);
-  const [campaign, setCampaign] = useState("");
-  const [campaignOptions, setCampaignOptions] = useState([]);
   useEffect(() => {
     let isMounted = true;
     const load = async () => {
@@ -21,20 +17,12 @@ export default function LeadDistributionPage() {
         const params = new URLSearchParams();
         if (fromDate) params.set("from", fromDate);
         if (toDate) params.set("to", toDate);
-        // Don't filter by assignedTo in API - fetch all and filter frontend
         const qs = params.toString();
         const url = qs ? `/api/assigned-customers?${qs}` : "/api/assigned-customers";
         const res = await fetch(url, { cache: "no-store" });
         if (!res.ok) throw new Error("Failed to load");
         const data = await res.json();
-        if (isMounted) {
-          setCustomers(data.data || []);
-          const rows = data.data || [];
-          const uniqueAssignedTo = [...new Set(rows.map((c) => c.sales_representative).filter(Boolean))];
-          const uniqueCampaigns = [...new Set(rows.map((c) => c.lead_campaign).filter(Boolean))];
-          setAssignedToOptions(uniqueAssignedTo.sort());
-          setCampaignOptions(uniqueCampaigns.sort());
-        }
+        if (isMounted) setCustomers(data.data || []);
       } catch (e) {
         if (isMounted) setCustomers([]);
       } finally {
@@ -46,12 +34,6 @@ export default function LeadDistributionPage() {
       isMounted = false;
     };
   }, [fromDate, toDate]);
-
-  const filteredCustomers = customers.filter((c) => {
-    if (assignedTo && c.sales_representative !== assignedTo) return false;
-    if (campaign && c.lead_campaign !== campaign) return false;
-    return true;
-  });
 
   return (
     <>
@@ -90,36 +72,6 @@ export default function LeadDistributionPage() {
               className="border border-gray-300 rounded px-3 py-2"
             />
           </div>
-          <div className="flex flex-col">
-            <label className="text-xs text-gray-600 mb-1">Campaign</label>
-            <select
-              value={campaign}
-              onChange={(e) => setCampaign(e.target.value)}
-              className="border border-gray-300 rounded px-3 py-2 min-w-[160px]"
-            >
-              <option value="">All</option>
-              {campaignOptions.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="flex flex-col">
-            <label className="text-xs text-gray-600 mb-1">Assigned To</label>
-            <select
-              value={assignedTo}
-              onChange={(e) => setAssignedTo(e.target.value)}
-              className="border border-gray-300 rounded px-3 py-2"
-            >
-              <option value="">All</option>
-              {assignedToOptions.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-          </div>
           {/* <button
             onClick={() => {
               // Trigger useEffect by just toggling state (already bound to from/to)
@@ -129,15 +81,9 @@ export default function LeadDistributionPage() {
           >
             Apply
           </button> */}
-          {(fromDate || toDate || assignedTo || campaign) && (
+          {(fromDate || toDate) && (
             <button
-              onClick={() => {
-                setFromDate("");
-                setToDate("");
-                setAssignedTo("");
-                setCampaign("");
-                setIsLoading(true);
-              }}
+              onClick={() => { setFromDate(""); setToDate(""); setIsLoading(true); }}
               className="bg-gray-200 text-gray-800 px-4 py-2 rounded shadow"
             >
               Clear
@@ -164,8 +110,8 @@ export default function LeadDistributionPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {filteredCustomers.length > 0 ? (
-                  filteredCustomers.map((c, i) => (
+                {customers.length > 0 ? (
+                  customers.map((c, i) => (
                     <tr key={c.customer_id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-3 py-3 text-center">{i + 1}</td>
                       <td className="px-3 py-3">{new Date(c.date_created).toLocaleDateString()}</td>

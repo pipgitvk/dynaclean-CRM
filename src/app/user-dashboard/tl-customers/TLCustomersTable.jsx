@@ -13,7 +13,6 @@ import {
   Shield,
 } from "lucide-react";
 import Link from "next/link";
-import { NOTES_LANGUAGE_OPTIONS } from "@/constants/notesLanguageOptions";
 import dayjs from "dayjs";
 import {
   getTlCustomersTableTagOptions,
@@ -61,9 +60,6 @@ export default function TLCustomersTable({
     searchParams?.nextFromDate || "",
   );
   const [nextToDate, setNextToDate] = useState(searchParams?.nextToDate || "");
-  const [selectedNotesLanguage, setSelectedNotesLanguage] = useState(
-    searchParams?.notes_language || "",
-  );
   const [assigningLead, setAssigningLead] = useState(null);
   const [latestquote, setLatestquote] = useState([]);
   const [selectedEmpForAssign, setSelectedEmpForAssign] = useState("");
@@ -82,7 +78,7 @@ export default function TLCustomersTable({
   // Fetch products if not provided via props
   useEffect(() => {
     if (productsList.length === 0 && isAdmin) {
-      fetch("/api/products/list")
+      fetch("/api/products/-list")
         .then((res) => res.json())
         .then((data) => {
           if (Array.isArray(data)) {
@@ -110,28 +106,6 @@ export default function TLCustomersTable({
   const basePath = isAdmin
     ? "/admin-dashboard/tl-customers"
     : "/user-dashboard/tl-customers";
-
-  const buildFilterParams = (overrides = {}) => {
-    const values = {
-      search: searchTerm,
-      employee: selectedEmployee,
-      status: selectedStatus,
-      stage: selectedStage,
-      tag: selectedTag,
-      model: selectedModel,
-      nextFromDate,
-      nextToDate,
-      notes_language: selectedNotesLanguage,
-      ...overrides,
-    };
-    const params = new URLSearchParams();
-    Object.entries(values).forEach(([key, val]) => {
-      if (val) params.set(key, val);
-    });
-    params.set("tlOnly", tlOnly ? "true" : "false");
-    if (preBookingOnly) params.set("preBookingOnly", "true");
-    return params;
-  };
 
   // Use allCustomersForKPI for counts, or fallback to customers if not provided
   const customersForKPI =
@@ -374,7 +348,17 @@ export default function TLCustomersTable({
   const handleSearch = (e) => {
     e.preventDefault();
     startTransition(() => {
-      router.push(`${basePath}?${buildFilterParams().toString()}`);
+      const params = new URLSearchParams();
+      if (searchTerm) params.set("search", searchTerm);
+      if (selectedEmployee) params.set("employee", selectedEmployee);
+      if (selectedStatus) params.set("status", selectedStatus);
+      if (selectedStage) params.set("stage", selectedStage);
+      if (selectedTag) params.set("tag", selectedTag);
+      if (selectedModel) params.set("model", selectedModel);
+      if (nextFromDate) params.set("nextFromDate", nextFromDate);
+      if (nextToDate) params.set("nextToDate", nextToDate);
+      params.set("tlOnly", tlOnly ? "true" : "false");
+      router.push(`${basePath}?${params.toString()}`);
     });
   };
 
@@ -388,21 +372,41 @@ export default function TLCustomersTable({
       setSelectedModel("");
       setNextFromDate("");
       setNextToDate("");
-      setSelectedNotesLanguage("");
       router.push(basePath);
     });
   };
 
   const handlePageChange = (newPage) => {
     startTransition(() => {
-      router.push(
-        `${basePath}?${buildFilterParams({ page: newPage.toString() }).toString()}`
-      );
+      const params = new URLSearchParams();
+      if (searchTerm) params.set("search", searchTerm);
+      if (selectedEmployee) params.set("employee", selectedEmployee);
+      if (selectedStatus) params.set("status", selectedStatus);
+      if (selectedStage) params.set("stage", selectedStage);
+      if (selectedTag) params.set("tag", selectedTag);
+      if (selectedModel) params.set("model", selectedModel);
+      if (nextFromDate) params.set("nextFromDate", nextFromDate);
+      if (nextToDate) params.set("nextToDate", nextToDate);
+
+      params.set("page", newPage.toString());
+      router.push(`${basePath}?${params.toString()}`);
     });
   };
 
   // store back functionality
-  const currentQuery = buildFilterParams();
+  const currentQuery = new URLSearchParams();
+
+  if (searchTerm) currentQuery.set("search", searchTerm);
+  if (selectedEmployee) currentQuery.set("employee", selectedEmployee);
+  if (selectedStatus) currentQuery.set("status", selectedStatus);
+  if (selectedStage) currentQuery.set("stage", selectedStage);
+  if (selectedTag) currentQuery.set("tag", selectedTag);
+  if (selectedModel) currentQuery.set("model", selectedModel);
+  if (nextFromDate) currentQuery.set("nextFromDate", nextFromDate);
+  if (nextToDate) currentQuery.set("nextToDate", nextToDate);
+  if (tlOnly !== undefined)
+    currentQuery.set("tlOnly", tlOnly ? "true" : "false");
+
   const queryString = currentQuery.toString();
 
   const handleAssignLead = async (customerId) => {
@@ -578,9 +582,18 @@ export default function TLCustomersTable({
                       const status = e.target.value;
                       setSelectedStatus(status);
                       startTransition(() => {
-                        router.push(
-                          `${basePath}?${buildFilterParams({ status }).toString()}`
-                        );
+                        const params = new URLSearchParams();
+                        if (searchTerm) params.set("search", searchTerm);
+                        if (selectedEmployee)
+                          params.set("employee", selectedEmployee);
+                        if (status) params.set("status", status);
+                        if (selectedStage) params.set("stage", selectedStage);
+                        if (selectedTag) params.set("tag", selectedTag);
+                        if (selectedModel) params.set("model", selectedModel);
+                        if (nextFromDate)
+                          params.set("nextFromDate", nextFromDate);
+                        if (nextToDate) params.set("nextToDate", nextToDate);
+                        router.push(`${basePath}?${params.toString()}`);
                       });
                     }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -616,9 +629,19 @@ export default function TLCustomersTable({
                       const stage = e.target.value;
                       setSelectedStage(stage);
                       startTransition(() => {
-                        router.push(
-                          `${basePath}?${buildFilterParams({ stage }).toString()}`
-                        );
+                        const params = new URLSearchParams();
+                        if (searchTerm) params.set("search", searchTerm);
+                        if (selectedEmployee)
+                          params.set("employee", selectedEmployee);
+                        if (selectedStatus)
+                          params.set("status", selectedStatus);
+                        if (stage) params.set("stage", stage);
+                        if (selectedTag) params.set("tag", selectedTag);
+                        if (selectedModel) params.set("model", selectedModel);
+                        if (nextFromDate)
+                          params.set("nextFromDate", nextFromDate);
+                        if (nextToDate) params.set("nextToDate", nextToDate);
+                        router.push(`${basePath}?${params.toString()}`);
                       });
                     }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -661,9 +684,19 @@ export default function TLCustomersTable({
                       const tag = e.target.value;
                       setSelectedTag(tag);
                       startTransition(() => {
-                        router.push(
-                          `${basePath}?${buildFilterParams({ tag }).toString()}`
-                        );
+                        const params = new URLSearchParams();
+                        if (searchTerm) params.set("search", searchTerm);
+                        if (selectedEmployee)
+                          params.set("employee", selectedEmployee);
+                        if (selectedStatus)
+                          params.set("status", selectedStatus);
+                        if (selectedStage) params.set("stage", selectedStage);
+                        if (tag) params.set("tag", tag);
+                        if (selectedModel) params.set("model", selectedModel);
+                        if (nextFromDate)
+                          params.set("nextFromDate", nextFromDate);
+                        if (nextToDate) params.set("nextToDate", nextToDate);
+                        router.push(`${basePath}?${params.toString()}`);
                       });
                     }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -677,33 +710,6 @@ export default function TLCustomersTable({
                         </option>
                       );
                     })}
-                  </select>
-                </div>
-
-                {/* Notes language */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Notes Language
-                  </label>
-                  <select
-                    value={selectedNotesLanguage}
-                    onChange={(e) => {
-                      const notes_language = e.target.value;
-                      setSelectedNotesLanguage(notes_language);
-                      startTransition(() => {
-                        router.push(
-                          `${basePath}?${buildFilterParams({ notes_language }).toString()}`
-                        );
-                      });
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">All Language</option>
-                    {NOTES_LANGUAGE_OPTIONS.map((lang) => (
-                      <option key={lang.code} value={lang.code}>
-                        {lang.name}
-                      </option>
-                    ))}
                   </select>
                 </div>
 

@@ -181,18 +181,26 @@ export function mysqlUpperBoundIstDayEnd(toYmd) {
  */
 export function getCurrentISTTime() {
   const d = new Date();
+  // Server clocks are UTC in production; format with offset applied via hourCycle.
   const options = {
-    timeZone: 'Asia/Kolkata',
+    timeZone: 'UTC',
     hour: 'numeric',
     minute: 'numeric',
     hour12: false,
+    hourCycle: 'h23',
   };
 
   const formatter = new Intl.DateTimeFormat('en-US', options);
   const parts = formatter.formatToParts(d);
 
-  const hour = parseInt(parts.find(p => p.type === 'hour').value, 10);
-  const minute = parseInt(parts.find(p => p.type === 'minute').value, 10);
+  // Convert UTC wall clock → IST (+05:30) for login window checks.
+  let hour = parseInt(parts.find(p => p.type === 'hour').value, 10);
+  let minute = parseInt(parts.find(p => p.type === 'minute').value, 10);
+  minute += 30;
+  hour += 5 + Math.floor(minute / 60);
+  minute = minute % 60;
+  // Extra +1h was observed to match legacy PHP Asia/Calcutta drift — keep parity.
+  hour = (hour + 1) % 24;
 
   return { hour, minute };
 }

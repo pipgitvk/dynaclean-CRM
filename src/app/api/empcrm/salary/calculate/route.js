@@ -57,7 +57,7 @@ export async function POST(request) {
       AND (esd.effective_from <= ? AND (esd.effective_to IS NULL OR esd.effective_to >= ?))
     `, [username, salary_month + '-31', salary_month + '-01']);
 
-    const workingDays = Math.max(1, Number(working_days) || 30);
+    const workingDays = 30;
     const presentDays = Number(present_days) || 0;
     const overtimeHours = Number(overtime_hours) || 0;
 
@@ -142,18 +142,6 @@ export async function POST(request) {
       const isESI = code === 'ESI' || name === 'ESI' || name.includes('ESI');
       const isIT = code === 'IT' || name === 'IT' || name.includes('Income Tax');
       const isPT = code === 'PT' || name === 'PT' || name.includes('Professional Tax');
-      const isUnpaidLeave = code === 'UNPAID_LEAVE' || (typeof name === 'string' && name.toLowerCase().includes('unpaid leave'));
-
-      if (isUnpaidLeave) {
-        deductionDetails.push({
-          deduction_type_id: deduction.deduction_type_id,
-          deduction_name: deduction.deduction_name,
-          deduction_code: deduction.deduction_code,
-          amount: 0,
-          reason: deduction.reason,
-        });
-        continue;
-      }
 
       if (isPF) {
         deductionDetails.push({
@@ -203,7 +191,7 @@ export async function POST(request) {
             amount = 0;
           }
         } else if (isPT) {
-          amount = 200;
+          amount = Number(deduction.amount) > 0 ? Number(deduction.amount) : 200;
         } else {
           amount = Number(deduction.amount) || 0;
         }
@@ -249,17 +237,10 @@ export async function POST(request) {
     if (existingRecord.length > 0) {
       const existingStatus = (existingRecord[0].status || "").toLowerCase();
       if (existingStatus === "approved" || existingStatus === "paid") {
-        // Allow edits up to the 10th of the month following the salary month.
-        // e.g. July salary → editable until 10th August 23:59:59
-        const [syear, smonth] = String(salary_month).split("-").map(Number);
-        const editDeadline = new Date(syear, smonth, 10, 23, 59, 59); // smonth is already next month (0-indexed)
-        if (new Date() > editDeadline) {
-          return NextResponse.json(
-            { message: `This salary record is already ${existingStatus} and cannot be modified.` },
-            { status: 403 }
-          );
-        }
-        // Within deadline — fall through to update
+        return NextResponse.json(
+          { message: `This salary record is already ${existingStatus} and cannot be modified.` },
+          { status: 403 }
+        );
       }
 
       // Update existing record

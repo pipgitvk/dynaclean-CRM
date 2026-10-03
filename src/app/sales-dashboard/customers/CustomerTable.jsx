@@ -3,7 +3,6 @@
 import { useState, useMemo, useTransition } from "react";
 import { useEffect } from "react";
 import dayjs from "dayjs";
-import { formatCrmDatetimeForISTDisplay } from "@/lib/timezone";
 import { useRouter } from "next/navigation";
 import { Eye, Pencil, ArrowRightCircle, Loader2 } from "lucide-react";
 
@@ -14,28 +13,6 @@ const LEGACY_STATUS_SLUGS = {
   poor: "Poor",
   denied: "Denied",
 };
-
-const NOTES_LANGUAGE_OPTIONS = [
-  { code: "en", name: "English" },
-  { code: "as", name: "Assamese" },
-  { code: "bn", name: "Bengali" },
-  { code: "gu", name: "Gujarati" },
-  { code: "gom", name: "Konkani" },
-  { code: "hi", name: "Hindi" },
-  { code: "kn", name: "Kannada" },
-  { code: "mai", name: "Maithili" },
-  { code: "ml", name: "Malayalam" },
-  { code: "mr", name: "Marathi" },
-  { code: "ne", name: "Nepali" },
-  { code: "or", name: "Odia" },
-  { code: "pa", name: "Punjabi" },
-  { code: "sa", name: "Sanskrit" },
-  { code: "sd", name: "Sindhi" },
-  { code: "si", name: "Sinhala" },
-  { code: "ta", name: "Tamil" },
-  { code: "te", name: "Telugu" },
-  { code: "ur", name: "Urdu" },
-];
 
 function normalizeStatusFromParams(raw) {
   if (!raw) return "";
@@ -67,30 +44,11 @@ export default function CustomerTable({
     stage: searchParams.stage ?? "",
     lead_campaign: searchParams.lead_campaign ?? "",
     next_follow_date: searchParams.next_follow_date ?? "",
-    followed_date: searchParams.followed_date ?? "",
     employee: searchParams.employee ?? "",
     tags: searchParams.tags ?? "",
     tag_filter: searchParams.tag_filter ?? "",
-    notes_language: searchParams.notes_language ?? "",
   });
-  const [isNextFollowInputVisible, setIsNextFollowInputVisible] = useState(
-    !!(searchParams.next_follow_date ?? "")
-  );
-  const [isFollowedDateInputVisible, setIsFollowedDateInputVisible] = useState(
-    !!(searchParams.followed_date ?? "")
-  );
-  const urlFilter = searchParams.filter ?? "";
-  const isVeryGoodFollowupToday = urlFilter === "very_good_followup_today";
-
-  const buildQueryString = (filterValues, page) => {
-    const query = new URLSearchParams();
-    Object.entries(filterValues).forEach(([k, v]) => {
-      if (v !== "") query.set(k, v);
-    });
-    if (urlFilter) query.set("filter", urlFilter);
-    if (page) query.set("page", String(page));
-    return query.toString();
-  };
+  const [isInputVisible, setIsInputVisible] = useState(false);
 
   useEffect(() => {
     console.log("ROWS:", rows);
@@ -110,14 +68,10 @@ export default function CustomerTable({
       stage: searchParams.stage ?? "",
       lead_campaign: searchParams.lead_campaign ?? "",
       next_follow_date: searchParams.next_follow_date ?? "",
-      followed_date: searchParams.followed_date ?? "",
       employee: searchParams.employee ?? "",
       tags: searchParams.tags ?? "",
       tag_filter: searchParams.tag_filter ?? "",
-      notes_language: searchParams.notes_language ?? "",
     }));
-    setIsNextFollowInputVisible(!!(searchParams.next_follow_date ?? ""));
-    setIsFollowedDateInputVisible(!!(searchParams.followed_date ?? ""));
   }, [searchParams]);
 
   const resetFilters = () => {
@@ -132,14 +86,12 @@ export default function CustomerTable({
       stage: "",
       lead_campaign: "",
       next_follow_date: "",
-      followed_date: "",
       employee: "",
       tags: "",
       tag_filter: "",
-      notes_language: "",
     };
     setFilters(cleared);
-    router.push(urlFilter ? `?filter=${urlFilter}` : "?");
+    router.push("?");
   };
 
   const update = (key, value) => {
@@ -147,13 +99,27 @@ export default function CustomerTable({
     setFilters(updated);
 
     startTransition(() => {
-      router.push(`?${buildQueryString(updated)}`);
+      const query = new URLSearchParams();
+      Object.entries(updated).forEach(([k, v]) => {
+        if (v !== "") {
+          query.set(k, v);
+        }
+      });
+
+      router.push(`?${query.toString()}`);
     });
   };
 
   const handlePageChange = (newPage) => {
     startTransition(() => {
-      router.push(`?${buildQueryString(filters, newPage)}`);
+      const query = new URLSearchParams();
+      Object.entries(filters).forEach(([k, v]) => {
+        if (v !== "") {
+          query.set(k, v);
+        }
+      });
+      query.set("page", newPage.toString());
+      router.push(`?${query.toString()}`);
     });
   };
 
@@ -162,41 +128,19 @@ export default function CustomerTable({
     return rows;
   }, [rows]);
 
-  const handleNextFollowLabelClick = () => {
-    setIsNextFollowInputVisible((prev) => !prev);
+  const handleLabelClick = () => {
+    setIsInputVisible((prev) => !prev); // Toggle visibility
   };
 
-  const handleFollowedDateLabelClick = () => {
-    setIsFollowedDateInputVisible((prev) => !prev);
-  };
-
-  const handleNextFollowBlur = (e) => {
+  const handleBlur = (e) => {
+    // Hide the input if it's blurred and no date is selected
     if (!e.target.value) {
-      setIsNextFollowInputVisible(false);
-    }
-  };
-
-  const handleFollowedDateBlur = (e) => {
-    if (!e.target.value) {
-      setIsFollowedDateInputVisible(false);
+      setIsInputVisible(false);
     }
   };
 
   return (
     <div className="space-y-4">
-      {isVeryGoodFollowupToday && (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-          Showing customers marked <strong>Very Good</strong> in today&apos;s follow-up.
-          <button
-            type="button"
-            onClick={() => router.push("/sales-dashboard/customers")}
-            className="ml-3 font-medium text-emerald-700 underline hover:text-emerald-900"
-          >
-            Clear filter
-          </button>
-        </div>
-      )}
-
       {/* Filters */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-8 gap-2">
         <input
@@ -292,18 +236,6 @@ export default function CustomerTable({
           <option value="N/A">N/A</option>
         </select>
         <select
-          value={filters.notes_language}
-          onChange={(e) => update("notes_language", e.target.value)}
-          className="p-2 border rounded w-full"
-        >
-          <option value="">All Notes Languages</option>
-          {NOTES_LANGUAGE_OPTIONS.map((lang) => (
-            <option key={lang.code} value={lang.code}>
-              {lang.name}
-            </option>
-          ))}
-        </select>
-        <select
           value={filters.tag_filter}
           onChange={(e) => update("tag_filter", e.target.value)}
           className="p-2 border rounded w-full"
@@ -320,42 +252,25 @@ export default function CustomerTable({
           <option value="Transportation Companies">Transportation Companies</option>
         </select>
         <div className="relative">
+          {/* Label */}
           <label
             htmlFor="next_follow_date"
             className="cursor-pointer text-gray-600 text-sm border-b pb-1"
-            onClick={handleNextFollowLabelClick}
+            onClick={handleLabelClick}
           >
             Select Next Follow-up
           </label>
-          {isNextFollowInputVisible && (
+
+          {/* Input (conditionally rendered) */}
+          {isInputVisible && (
             <input
               id="next_follow_date"
               type="date"
               value={filters.next_follow_date}
               onChange={(e) => update("next_follow_date", e.target.value)}
-              onBlur={handleNextFollowBlur}
+              onBlur={handleBlur}
               className="p-2 border rounded w-full text-gray-700 mt-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200"
               placeholder="Next Follow-up"
-            />
-          )}
-        </div>
-        <div className="relative">
-          <label
-            htmlFor="followed_date"
-            className="cursor-pointer text-gray-600 text-sm border-b pb-1"
-            onClick={handleFollowedDateLabelClick}
-          >
-            Select Followed Date
-          </label>
-          {isFollowedDateInputVisible && (
-            <input
-              id="followed_date"
-              type="date"
-              value={filters.followed_date}
-              onChange={(e) => update("followed_date", e.target.value)}
-              onBlur={handleFollowedDateBlur}
-              className="p-2 border rounded w-full text-gray-700 mt-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200"
-              placeholder="Followed Date"
             />
           )}
         </div>
@@ -423,7 +338,6 @@ export default function CustomerTable({
                   "ID",
                   "Customer",
                   "Status",
-                  "Followed Date",
                   "Stage",
                   "Notes",
                   "Created",
@@ -449,11 +363,6 @@ export default function CustomerTable({
                     <div className="text-xs text-gray-500">{r.phone}</div>
                   </td>
                   <td className="px-4 py-2">{r.status}</td>
-                  <td className="px-4 py-2 whitespace-nowrap">
-                    {r.followed_date
-                      ? formatCrmDatetimeForISTDisplay(r.followed_date, "DD MMM YYYY HH:mm")
-                      : "-"}
-                  </td>
                   <td className="px-4 py-2">{r.stage}</td>
                   <td className="px-4 py-2">{r.notes}</td>
                   <td className="px-4 py-2">
@@ -499,7 +408,7 @@ export default function CustomerTable({
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={11} className="text-center p-4">
+                  <td colSpan={10} className="text-center p-4">
                     No customers found.
                   </td>
                 </tr>
@@ -531,12 +440,6 @@ export default function CustomerTable({
               </div>
               <div>
                 <span className="font-semibold">Status:</span> {r.status}
-              </div>
-              <div>
-                <span className="font-semibold">Followed Date:</span>{" "}
-                {r.followed_date
-                  ? formatCrmDatetimeForISTDisplay(r.followed_date, "DD MMM YYYY HH:mm")
-                  : "-"}
               </div>
               <div>
                 <span className="font-semibold">Stage:</span> {r.stage}

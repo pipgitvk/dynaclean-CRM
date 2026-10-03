@@ -2,8 +2,6 @@ import { getDbConnection } from "@/lib/db";
 import EditCustomerForm from "@/components/customer/EditCustomerForm";
 import UpdateLeadSourceForm from "@/components/customer/UpdateLeadSourceForm";
 import { getSessionPayload } from "@/lib/auth";
-import { latestFollowupNotesLanguageSelectSql } from "@/lib/customerFollowupNotesLanguage";
-import { ensureCustomerNotesLanguageColumn } from "@/lib/ensureCustomerNotesLanguageColumn";
 
 export const dynamic = "force-dynamic";
 
@@ -14,26 +12,9 @@ export default async function EditCustomerPage({ params }) {
   const userRole = payload?.role;
 
   const conn = await getDbConnection();
-  await ensureCustomerNotesLanguageColumn(conn);
-
+  // Explicitly select all columns including service_lead_source
   const [rows] = await conn.execute(
-    `SELECT
-      c.customer_id,
-      c.first_name,
-      c.email,
-      c.tags,
-      c.status,
-      c.phone,
-      c.gstin,
-      c.stage,
-      c.company,
-      c.address,
-      c.lead_source,
-      c.service_lead_source,
-      c.gem_lead_source,
-      ${latestFollowupNotesLanguageSelectSql}
-    FROM customers c
-    WHERE c.customer_id = ?`,
+    `SELECT customer_id, first_name, email, tags, status, phone, gstin, stage, company, address, lead_source, service_lead_source FROM customers WHERE customer_id = ?`,
     [customerId]
   );
   const customerData = rows[0] || {};
@@ -58,16 +39,6 @@ export default async function EditCustomerPage({ params }) {
   } catch (error) {
     console.error('Error fetching service employees:', error);
   }
-
-  let gemEmployees = [];
-  try {
-    const [gemEmployeeRows] = await conn.execute(
-      `SELECT username FROM rep_list WHERE userRole = 'GEM' AND status = 1 ORDER BY username ASC`
-    );
-    gemEmployees = gemEmployeeRows.map((row) => row.username);
-  } catch (error) {
-    console.error("Error fetching GEM employees:", error);
-  }
   // await conn.end();
 
   if (!rows.length) {
@@ -85,7 +56,7 @@ export default async function EditCustomerPage({ params }) {
       <h1 className="text-2xl font-bold mb-6 text-center text-blue-700">
         Edit Customer #{customerId}
       </h1>
-      <UpdateLeadSourceForm initialData={customerData} leadSources={leadSources} serviceEmployees={serviceEmployees} gemEmployees={gemEmployees} userRole={userRole} />
+      <UpdateLeadSourceForm initialData={customerData} leadSources={leadSources} serviceEmployees={serviceEmployees} userRole={userRole} />
       <EditCustomerForm initialData={customerData} userRole={userRole} />
     </div>
   );

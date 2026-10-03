@@ -13,28 +13,16 @@ const formatCurrency = (val) =>
   val != null && val !== "" ? `₹${Number(val).toLocaleString("en-IN")}` : "—";
 
 const KPI_CARDS = [
-  { key: "clientFollowups", label: "Nos. Of Client Follow-up", color: "text-blue-600", border: "border-blue-200 hover:border-blue-300", bg: "bg-blue-50" },
-  { key: "complaintsReceived", label: "Nos. Of Complaint Registered & Received", color: "text-red-600", border: "border-red-200 hover:border-red-300", bg: "bg-red-50" },
-  { key: "warrantyRegistered", label: "Nos. Of Product Registered", color: "text-teal-600", border: "border-teal-200 hover:border-teal-300", bg: "bg-teal-50" },
-  { key: "upcomingInstallations", label: "Nos. Of New Installation Received", color: "text-indigo-600", border: "border-indigo-200 hover:border-indigo-300", bg: "bg-indigo-50" },
-  { key: "complaintsResolved", label: "Nos. Of Complaint Solved", color: "text-green-600", border: "border-green-200 hover:border-green-300", bg: "bg-green-50" },
-  { key: "complaintsPending", label: "Nos. Of Complaint Pending", color: "text-rose-600", border: "border-rose-200 hover:border-rose-300", bg: "bg-rose-50" },
-  { key: "overdueInstallations", label: "Nos. Of Overdue Installation Pending", color: "text-orange-600", border: "border-orange-200 hover:border-orange-300", bg: "bg-orange-50" },
+  { key: "complaintsReceived", label: "Nos. Of Complaint Received", color: "text-red-600", border: "border-red-200 hover:border-red-300", bg: "bg-red-50" },
+  { key: "complaintsResolved", label: "Nos. Of Complaint Resolved", color: "text-green-600", border: "border-green-200 hover:border-green-300", bg: "bg-green-50" },
   { key: "quotations", label: "Nos. Of Quotation", color: "text-amber-600", border: "border-amber-200 hover:border-amber-300", bg: "bg-amber-50" },
-  { key: "ordersProcessed", label: "Order No.", color: "text-violet-600", border: "border-violet-200 hover:border-violet-300", bg: "bg-violet-50" },
+  { key: "ordersProcessed", label: "Nos. Of Order Process", color: "text-blue-600", border: "border-blue-200 hover:border-blue-300", bg: "bg-blue-50" },
+  { key: "upcomingInstallations", label: "Nos. Of Upcoming Installation", color: "text-indigo-600", border: "border-indigo-200 hover:border-indigo-300", bg: "bg-indigo-50" },
+  { key: "warrantyRegistered", label: "Nos. Of Product Registered In Warranty", color: "text-teal-600", border: "border-teal-200 hover:border-teal-300", bg: "bg-teal-50" },
+  { key: "warrantyPending", label: "Nos. Of Product Pending Register", color: "text-orange-600", border: "border-orange-200 hover:border-orange-300", bg: "bg-orange-50" },
 ];
 
 const KPI_DETAIL_COLUMNS = {
-  clientFollowups: [
-    { key: "customer_name", label: "Customer" },
-    { key: "customer_phone", label: "Phone" },
-    { key: "followed_by", label: "Followed By" },
-    { key: "followed_date", label: "Followed Date", format: "datetime" },
-    { key: "comm_mode", label: "Mode" },
-    { key: "purpose", label: "Purpose" },
-    { key: "service_next_followup", label: "Next Follow-up", format: "datetime" },
-    { key: "notes", label: "Notes", wide: true },
-  ],
   complaintsReceived: [
     { key: "service_id", label: "Service ID" },
     { key: "service_type", label: "Type" },
@@ -58,16 +46,6 @@ const KPI_DETAIL_COLUMNS = {
     { key: "completed_date", label: "Completed Date", format: "date" },
     { key: "complaint_summary", label: "Summary", wide: true },
   ],
-  complaintsPending: [
-    { key: "service_id", label: "Service ID" },
-    { key: "serial_number", label: "Serial No." },
-    { key: "customer_name", label: "Customer" },
-    { key: "contact", label: "Contact" },
-    { key: "assigned_to", label: "Assigned To" },
-    { key: "status", label: "Status" },
-    { key: "complaint_date", label: "Complaint Date", format: "date" },
-    { key: "complaint_summary", label: "Summary", wide: true },
-  ],
   quotations: [
     { key: "quote_number", label: "Quote No." },
     { key: "company_name", label: "Company" },
@@ -88,15 +66,6 @@ const KPI_DETAIL_COLUMNS = {
     { key: "created_at", label: "Created At", format: "date" },
   ],
   upcomingInstallations: [
-    { key: "order_id", label: "Order ID" },
-    { key: "quote_number", label: "Quote No." },
-    { key: "client_name", label: "Client" },
-    { key: "company_name", label: "Company" },
-    { key: "contact", label: "Contact" },
-    { key: "created_by", label: "Created By" },
-    { key: "delivery_date", label: "Delivery Date", format: "date" },
-  ],
-  overdueInstallations: [
     { key: "order_id", label: "Order ID" },
     { key: "quote_number", label: "Quote No." },
     { key: "client_name", label: "Client" },
@@ -136,19 +105,14 @@ function formatCellValue(value, format) {
 export default function ServiceSupportReportPage() {
   const [selectedEmployee, setSelectedEmployee] = useState("all");
   const [employees, setEmployees] = useState([]);
-  const [canSelectEmployee, setCanSelectEmployee] = useState(true);
-  const [currentEmployee, setCurrentEmployee] = useState("");
   const [customerFollowups, setCustomerFollowups] = useState([]);
   const [machineFollowups, setMachineFollowups] = useState([]);
   const [summary, setSummary] = useState({
-    clientFollowups: 0,
     complaintsReceived: 0,
     complaintsResolved: 0,
-    complaintsPending: 0,
     quotations: 0,
     ordersProcessed: 0,
     upcomingInstallations: 0,
-    overdueInstallations: 0,
     warrantyRegistered: 0,
     warrantyPending: 0,
   });
@@ -202,20 +166,12 @@ export default function ServiceSupportReportPage() {
       if (!res.ok) throw new Error("Failed");
       const data = await res.json();
       setEmployees(data.employees || []);
-      setCanSelectEmployee(data.canSelectEmployee !== false);
-      setCurrentEmployee(data.currentEmployee || "");
-      if (data.canSelectEmployee === false && data.currentEmployee) {
-        setSelectedEmployee(data.currentEmployee);
-      }
       setSummary(data.summary || {
-        clientFollowups: 0,
         complaintsReceived: 0,
         complaintsResolved: 0,
-        complaintsPending: 0,
         quotations: 0,
         ordersProcessed: 0,
         upcomingInstallations: 0,
-        overdueInstallations: 0,
         warrantyRegistered: 0,
         warrantyPending: 0,
       });
@@ -226,14 +182,11 @@ export default function ServiceSupportReportPage() {
       setCustomerFollowups([]);
       setMachineFollowups([]);
       setSummary({
-        clientFollowups: 0,
         complaintsReceived: 0,
         complaintsResolved: 0,
-        complaintsPending: 0,
         quotations: 0,
         ordersProcessed: 0,
         upcomingInstallations: 0,
-        overdueInstallations: 0,
         warrantyRegistered: 0,
         warrantyPending: 0,
       });
@@ -287,22 +240,16 @@ export default function ServiceSupportReportPage() {
           <label className="text-sm font-medium text-gray-700 block mb-1">
             Employee Name
           </label>
-          {canSelectEmployee ? (
-            <select
-              value={selectedEmployee}
-              onChange={(e) => setSelectedEmployee(e.target.value)}
-              className="w-full md:w-64 px-4 py-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="all">All Employees</option>
-              {employees.map((emp) => (
-                <option key={emp} value={emp}>{emp}</option>
-              ))}
-            </select>
-          ) : (
-            <div className="w-full md:w-64 px-4 py-2 border rounded-lg bg-gray-50 text-gray-800">
-              {currentEmployee || "—"}
-            </div>
-          )}
+          <select
+            value={selectedEmployee}
+            onChange={(e) => setSelectedEmployee(e.target.value)}
+            className="w-full md:w-64 px-4 py-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500"
+          >
+            <option value="all">All Employees</option>
+            {employees.map((emp) => (
+              <option key={emp} value={emp}>{emp}</option>
+            ))}
+          </select>
         </div>
 
         {/* Date Range */}

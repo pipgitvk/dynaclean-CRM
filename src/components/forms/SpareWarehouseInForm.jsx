@@ -34,7 +34,7 @@ export default function SpareWarehouseInForm() {
 
   const loadPendingRequests = async () => {
     try {
-      const res = await fetch("/api/spare/warehouse-in");
+      const res = await fetch("/api/spare/warehouse-in-");
       if (res.ok) {
         const data = await res.json();
         setPendingRequests(data);

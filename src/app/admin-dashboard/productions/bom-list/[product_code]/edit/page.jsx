@@ -1,27 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
-
-function resolveProductCode(pathParam, queryParam) {
-  const raw = String(queryParam || pathParam || "").trim();
-  if (!raw) return "";
-  try {
-    return decodeURIComponent(raw.replace(/\+/g, " ")).trim();
-  } catch {
-    return raw.replace(/\+/g, " ").trim();
-  }
-}
+import { useParams, useRouter } from "next/navigation";
 
 export default function EditBomPage() {
-  const { product_code: pathProductCode } = useParams();
-  const searchParams = useSearchParams();
+  const { product_code } = useParams();
   const router = useRouter();
 
-  const decodedProductCode = resolveProductCode(
-    Array.isArray(pathProductCode) ? pathProductCode.join("/") : pathProductCode,
-    searchParams.get("product_code")
-  );
+  // Decode the product_code from URL params
+  const decodedProductCode = decodeURIComponent(product_code);
 
   const [product, setProduct] = useState(null);
   const [items, setItems] = useState([]);
@@ -36,12 +23,6 @@ export default function EditBomPage() {
   const [bomExists, setBomExists] = useState(false);
 
   useEffect(() => {
-    if (!decodedProductCode) {
-      setError("Product code is missing from the URL.");
-      setLoading(false);
-      return;
-    }
-
     (async () => {
       try {
         const res = await fetch(`/api/productions/bom/get?product_code=${encodeURIComponent(decodedProductCode)}`, { cache: 'no-store' });
