@@ -4,6 +4,15 @@ import NextTopLoader from "nextjs-toploader";
 import { UserProvider } from "@/context/UserContext";
 import "./globals.css";
 
+// Import and start the recurring task cron job (only on server side)
+let cronStarted = false;
+if (typeof window === "undefined" && !cronStarted) {
+  cronStarted = true;
+  import("@/lib/cron/recurringTaskCron").then((mod) => {
+    mod.startRecurringTaskCron();
+  });
+}
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
