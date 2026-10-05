@@ -441,24 +441,7 @@ const AttendancePage = () => {
       allDates.push({ ...existingLog, type: "present", workedSunday: isWeekend, approvedHalfDay });
     } else {
       const base = existingLog ? { ...existingLog } : {};
-      if (isWeekend) {
-        allDates.push({
-          ...base,
-          date: d.toISOString(),
-          type: "sunday",
-          holidayTitle: "Sunday",
-          holidayDescription: null,
-        });
-      } else if (isHoliday) {
-        const holidayInfo = holidayMap.get(dateString);
-        allDates.push({
-          ...base,
-          date: d.toISOString(),
-          type: "holiday",
-          holidayTitle: holidayInfo?.title || "Holiday",
-          holidayDescription: holidayInfo?.description || null,
-        });
-      } else if (isOnLeave) {
+      if (isOnLeave) {
         const leaveInfo = leaveMap.get(dateString);
         const isUnpaid = leaveInfo?.leave_type === "unpaid";
         // No attendance logs → treat leave exactly as stored.
@@ -475,6 +458,23 @@ const AttendancePage = () => {
           is_half_day: leaveIsHalfDay ? 1 : 0,
           half_day_type: leaveIsHalfDay ? finalHalfType : null,
           has_punch_on_leave: 0,
+        });
+      } else if (isWeekend) {
+        allDates.push({
+          ...base,
+          date: d.toISOString(),
+          type: "sunday",
+          holidayTitle: "Sunday",
+          holidayDescription: null,
+        });
+      } else if (isHoliday) {
+        const holidayInfo = holidayMap.get(dateString);
+        allDates.push({
+          ...base,
+          date: d.toISOString(),
+          type: "holiday",
+          holidayTitle: holidayInfo?.title || "Holiday",
+          holidayDescription: holidayInfo?.description || null,
         });
       } else {
         allDates.push({ ...base, date: d.toISOString(), type: "absent" });

@@ -45,6 +45,7 @@ export default function UserLeaveManagement() {
   const [submitting, setSubmitting] = useState(false);
   const [emailConfigured, setEmailConfigured] = useState(null);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [leaveDayPreview, setLeaveDayPreview] = useState(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -52,6 +53,30 @@ export default function UserLeaveManagement() {
     fetchStats();
     checkEmailSettings();
   }, []);
+
+  useEffect(() => {
+    if (!formData.from_date) {
+      setLeaveDayPreview(null);
+      return;
+    }
+    const to = formData.is_half_day ? formData.from_date : formData.to_date;
+    if (!to) {
+      setLeaveDayPreview(null);
+      return;
+    }
+    const params = new URLSearchParams({
+      from_date: formData.from_date,
+      to_date: to,
+      is_half_day: formData.is_half_day ? "1" : "0",
+    });
+    fetch(`/api/empcrm/leaves/preview-days?${params}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.success) setLeaveDayPreview(data);
+        else setLeaveDayPreview(null);
+      })
+      .catch(() => setLeaveDayPreview(null));
+  }, [formData.from_date, formData.to_date, formData.is_half_day]);
 
   const checkEmailSettings = async () => {
     try {
@@ -277,18 +302,10 @@ export default function UserLeaveManagement() {
     });
   };
 
-  const calculateTotalDays = () => {
-    if (formData.is_half_day && formData.from_date) return 0.5;
-    if (formData.from_date && formData.to_date) {
-      const from = new Date(formData.from_date);
-      const to = new Date(formData.to_date);
-      const days = Math.ceil((to - from) / (1000 * 60 * 60 * 24)) + 1;
-      return days > 0 ? days : 0;
-    }
-    return 0;
-  };
-
-  const totalDays = calculateTotalDays();
+  const totalDays =
+    formData.is_half_day && formData.from_date
+      ? 0.5
+      : leaveDayPreview?.totalDays ?? 0;
 
   // Leave type options shared between both forms
   const leaveTypeOptions = (
@@ -742,13 +759,27 @@ export default function UserLeaveManagement() {
               </div>
 
               {totalDays > 0 && (
-                <div className={`border rounded-lg p-3 ${formData.is_half_day ? "bg-orange-50 border-orange-200" : "bg-blue-50 border-blue-200"}`}>
+                <div className={`border rounded-lg p-3 space-y-2 ${formData.is_half_day ? "bg-orange-50 border-orange-200" : "bg-blue-50 border-blue-200"}`}>
                   <p className={`text-xs sm:text-sm ${formData.is_half_day ? "text-orange-800" : "text-blue-800"}`}>
                     Total Leave Days:{" "}
                     <span className="font-bold">
                       {formData.is_half_day ? "0.5 day (Half-Day)" : `${totalDays} days`}
                     </span>
                   </p>
+                  {!formData.is_half_day && leaveDayPreview?.breakdown && (
+                    <p className="text-[11px] sm:text-xs text-blue-700/90">
+                      Continuous leave: includes{" "}
+                      {leaveDayPreview.breakdown.weekdays} weekday
+                      {leaveDayPreview.breakdown.weekdays !== 1 ? "s" : ""}
+                      {leaveDayPreview.breakdown.sundays > 0
+                        ? `, ${leaveDayPreview.breakdown.sundays} Sunday${leaveDayPreview.breakdown.sundays !== 1 ? "s" : ""}`
+                        : ""}
+                      {leaveDayPreview.breakdown.holidays > 0
+                        ? `, ${leaveDayPreview.breakdown.holidays} holiday${leaveDayPreview.breakdown.holidays !== 1 ? "s" : ""}`
+                        : ""}
+                      {" "}in this span (continuous leave — all days from start to end date).
+                    </p>
+                  )}
                 </div>
               )}
 

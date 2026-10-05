@@ -100,20 +100,20 @@ export function classifyAttendanceSheetDay(ctx) {
     return { code: "P", kind: "present", graceHalfDaysUsed: graceUsed };
   }
 
-  if (isHoliday) return { code: "H", kind: "holiday" };
-
-  if (isSunday) {
-    const paidWeeklyOff = weeklyOffSundayCountsAsPaid(ymd, { holidayMap, dateMap });
-    if (paidWeeklyOff) return { code: "S", kind: "sunday" };
-    return { code: "A", kind: "absent" };
-  }
-
   const leaveInfo = leaveMap.get(ymd);
   if (leaveInfo) {
     const leaveIsHalfDay =
       leaveInfo.is_half_day == 1 || leaveInfo.leave_type === "half-day";
     if (leaveIsHalfDay) return { code: "HD", kind: "half" };
     return { code: leaveCode(leaveInfo), kind: "leave" };
+  }
+
+  if (isHoliday) return { code: "H", kind: "holiday" };
+
+  if (isSunday) {
+    const paidWeeklyOff = weeklyOffSundayCountsAsPaid(ymd, { holidayMap, dateMap });
+    if (paidWeeklyOff) return { code: "S", kind: "sunday" };
+    return { code: "A", kind: "absent" };
   }
 
   return { code: "A", kind: "absent" };

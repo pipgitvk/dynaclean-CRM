@@ -4,6 +4,11 @@ import { getSessionPayload } from "@/lib/auth";
 import { getReportees } from "@/lib/reportingManager";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
+import {
+  calculateContinuousLeaveDays,
+  eachDayInLeaveRange,
+  fetchCompanyHolidays,
+} from "@/lib/leaveContinuousDays";
 
 // GET: Fetch leaves (admin sees all, users see only their own, reporting manager sees reportees only)
 export async function GET(request) {
@@ -314,11 +319,15 @@ export async function POST(request) {
       return Math.max(0, accrued);
     };
 
+    const holidays = await fetchCompanyHolidays(conn);
+    const continuousLeave = calculateContinuousLeaveDays(from_date, to_date, holidays);
+    const calendarSpanDays = eachDayInLeaveRange(from_date, to_date).length;
+
     // Calculate total days (half-day = 0.5 unless time range given, stored as decimal)
     let totalDays;
     const fromDateRaw = new Date(from_date);
     const toDateRaw   = new Date(to_date);
-    const dateDiffRaw = Math.ceil((toDateRaw - fromDateRaw) / (1000 * 60 * 60 * 24)) + 1;
+    const dateDiffRaw = calendarSpanDays;
 
     if (isHalfDay) {
       // If time range provided for half-day, calculate actual fraction
@@ -413,24 +422,23 @@ export async function POST(request) {
               const totalMinutes = firstDayMin + lastDayMin + middleDays * workDayMinutes;
               totalDays = parseFloat((totalMinutes / workDayMinutes).toFixed(1));
             }
-            // Safety: must be at least 0.5 and at most dateDiffRaw
-            totalDays = Math.max(0.5, Math.min(totalDays, dateDiffRaw));
+            totalDays = Math.max(0.5, Math.min(totalDays, continuousLeave.totalDays));
           } else {
-            totalDays = dateDiffRaw;
+            totalDays = continuousLeave.totalDays;
           }
         } catch {
-          // Non-fatal: fall back to date diff
-          totalDays = dateDiffRaw;
+          // Non-fatal: fall back to continuous leave days
+          totalDays = continuousLeave.totalDays;
         }
       } else {
-        totalDays = dateDiffRaw;
+        totalDays = continuousLeave.totalDays;
       }
     }
 
     // 🔒 FINAL FLOOR GUARANTEE (POST create):
     // Ensures totalDays never goes to 0 / NaN / negative on any edge path
     const floorMinDays = isHalfDay ? 0.5 : 1;
-    const ceilMaxDays  = isHalfDay ? 0.5 : Math.max(1, dateDiffRaw);
+    const ceilMaxDays  = isHalfDay ? 0.5 : Math.max(1, continuousLeave.totalDays);
     if (!Number.isFinite(totalDays) || totalDays < floorMinDays) totalDays = floorMinDays;
     if (totalDays > ceilMaxDays) totalDays = ceilMaxDays;
 

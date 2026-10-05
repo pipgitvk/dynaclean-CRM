@@ -14,6 +14,7 @@ import {
   getCalendarDaysInMonth,
 } from "@/lib/salaryPayDaysFromAttendance";
 import { rowHasMeaningfulCheckinOrCheckout } from "@/lib/attendanceMeaningfulPunch";
+import { eachDayInLeaveRange } from "@/lib/leaveContinuousDays";
 
 function startOfDay(d) {
   const x = new Date(d);
@@ -27,10 +28,11 @@ function buildLeaveMapForUser(leaves, username) {
   (leaves || [])
     .filter((leave) => leave.username === username)
     .forEach((leave) => {
-      const fromDate = new Date(leave.from_date);
-      const toDate = new Date(leave.to_date);
-      for (let d = new Date(fromDate); d <= toDate; d.setDate(d.getDate() + 1)) {
-        const k = dateToYmdKey(d);
+      const fromKey = dateToYmdKey(leave.from_date);
+      const toKey = dateToYmdKey(leave.to_date);
+      if (!fromKey || !toKey) return;
+      for (const day of eachDayInLeaveRange(fromKey, toKey)) {
+        const k = dateToYmdKey(day);
         if (k) map.set(k, leave);
       }
     });
@@ -73,10 +75,11 @@ export function computeAttendanceDetailsCardSummaryForMonth(p) {
   for (const leave of leavesAll || []) {
     if (String(leave.username ?? "").trim().toLowerCase() !== String(username ?? "").trim().toLowerCase()) continue;
     if (leave.leave_type !== "paid") continue;
-    const fromD = new Date(leave.from_date);
-    const toD = new Date(leave.to_date);
-    for (let x = new Date(fromD); x <= toD; x.setDate(x.getDate() + 1)) {
-      const k = dateToYmdKey(x);
+    const fromKey = dateToYmdKey(leave.from_date);
+    const toKey = dateToYmdKey(leave.to_date);
+    if (!fromKey || !toKey) continue;
+    for (const day of eachDayInLeaveRange(fromKey, toKey)) {
+      const k = dateToYmdKey(day);
       if (k) paidLeaveMap.set(k, leave);
     }
   }
@@ -142,6 +145,16 @@ export function computeAttendanceDetailsCardSummaryForMonth(p) {
       halfDayGraceUsed = graceUsed;
       if (isHalfDay) summary.halfDays++;
       if (isLateDaySummary(existingLog, rules)) summary.lateDays++;
+    } else if (isOnLeave) {
+      const leave = leaveMap.get(dateString);
+      if (leave?.leave_type === "unpaid") {
+        summary.absents++;
+      } else {
+        const leaveIsHalfDay =
+          leave?.is_half_day == 1 || leave?.leave_type === "half-day";
+        if (leaveIsHalfDay) summary.halfDays++;
+        else summary.leaves++;
+      }
     } else if (isHoliday) {
       summary.holidays++;
     } else if (isWeekend) {
@@ -156,16 +169,6 @@ export function computeAttendanceDetailsCardSummaryForMonth(p) {
         summary.sundays++;
       } else {
         summary.absents++;
-      }
-    } else if (isOnLeave) {
-      const leave = leaveMap.get(dateString);
-      if (leave?.leave_type === "unpaid") {
-        summary.absents++;
-      } else {
-        const leaveIsHalfDay =
-          leave?.is_half_day == 1 || leave?.leave_type === "half-day";
-        if (leaveIsHalfDay) summary.halfDays++;
-        else summary.leaves++;
       }
     } else {
       summary.absents++;

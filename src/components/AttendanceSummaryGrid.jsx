@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import { Calendar, ChevronDown } from "lucide-react";
 import { isHalfDayByRules } from "@/lib/attendanceRulesEngine";
 import { rowHasMeaningfulCheckinOrCheckout } from "@/lib/attendanceMeaningfulPunch";
+import { dateToYmdKey } from "@/lib/salaryPayDaysFromAttendance";
+import { eachDayInLeaveRange } from "@/lib/leaveContinuousDays";
 
 const MONTHS = [
   "January",
@@ -26,6 +28,8 @@ const LEGEND = [
   { code: "S", label: "Sunday", swatch: "bg-purple-100 text-purple-900 ring-purple-200" },
   { code: "H", label: "Holiday", swatch: "bg-gray-200 text-gray-800 ring-gray-300" },
   { code: "PL", label: "Paid Leave", swatch: "bg-orange-100 text-orange-900 ring-orange-200" },
+  { code: "UL", label: "Unpaid Leave", swatch: "bg-rose-100 text-rose-900 ring-rose-200" },
+  { code: "L", label: "Other Leave", swatch: "bg-sky-100 text-sky-900 ring-sky-200" },
   { code: "HD", label: "Half-day", swatch: "bg-yellow-50 text-yellow-900 ring-yellow-200" },
 ];
 
@@ -47,15 +51,22 @@ function cellCode(year, monthIndex, day, maps) {
   const existingLog = maps.dateMap.get(dateString);
   const isSunday = d.getDay() === 0;
   const isHoliday = maps.holidayMap.has(dateString);
-  const isOnLeave = maps.leaveMap.has(dateString);
+  const leaveRec = maps.leaveMap.get(dateString);
 
   if (existingLog && rowHasMeaningfulCheckinOrCheckout(existingLog)) {
     if (maps.isHalfDay(existingLog)) return { code: "HD", kind: "hd" };
     return { code: "P", kind: "present" };
   }
+  if (leaveRec) {
+    const leaveIsHalfDay =
+      leaveRec.is_half_day == 1 || leaveRec.leave_type === "half-day";
+    if (leaveIsHalfDay) return { code: "HD", kind: "hd" };
+    if (leaveRec.leave_type === "paid") return { code: "PL", kind: "leave" };
+    if (leaveRec.leave_type === "unpaid") return { code: "UL", kind: "unpaidleave" };
+    return { code: "L", kind: "leave" };
+  }
   if (isSunday) return { code: "S", kind: "sunday" };
   if (isHoliday) return { code: "H", kind: "holiday" };
-  if (isOnLeave) return { code: "PL", kind: "leave" };
   return { code: "LOP", kind: "lop" };
 }
 
@@ -67,6 +78,7 @@ const cellClass = {
   sunday: "bg-purple-100 text-purple-900 font-semibold",
   holiday: "bg-gray-200 text-gray-800 font-semibold",
   leave: "bg-orange-100 text-orange-900 font-semibold",
+  unpaidleave: "bg-rose-100 text-rose-900 font-semibold",
   lop: "bg-red-100 text-red-800 font-semibold",
 };
 
@@ -74,18 +86,24 @@ export default function AttendanceSummaryGrid({ logs, holidays, leaves, rules, c
   const [year, setYear] = useState(() => new Date().getFullYear());
 
   const maps = useMemo(() => {
-    const dateMap = new Map(
-      (logs || []).map((log) => [new Date(log.date).toLocaleDateString("en-CA"), log])
-    );
-    const holidayMap = new Map(
-      (holidays || []).map((h) => [new Date(h.holiday_date).toLocaleDateString("en-CA"), h])
-    );
+    const dateMap = new Map();
+    for (const log of logs || []) {
+      const k = dateToYmdKey(log.date);
+      if (k) dateMap.set(k, log);
+    }
+    const holidayMap = new Map();
+    for (const h of holidays || []) {
+      const k = dateToYmdKey(h.holiday_date);
+      if (k) holidayMap.set(k, h);
+    }
     const leaveMap = new Map();
     (leaves || []).forEach((leave) => {
-      const from = new Date(leave.from_date);
-      const to = new Date(leave.to_date);
-      for (let x = new Date(from); x <= to; x.setDate(x.getDate() + 1)) {
-        leaveMap.set(x.toLocaleDateString("en-CA"), leave);
+      const fromKey = dateToYmdKey(leave.from_date);
+      const toKey = dateToYmdKey(leave.to_date);
+      if (!fromKey || !toKey) return;
+      for (const day of eachDayInLeaveRange(fromKey, toKey)) {
+        const k = dateToYmdKey(day);
+        if (k) leaveMap.set(k, leave);
       }
     });
     const isHalfDay = (log) => isHalfDayByRules(log, rules);

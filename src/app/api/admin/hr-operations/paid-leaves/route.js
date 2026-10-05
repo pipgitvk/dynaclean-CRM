@@ -3,6 +3,11 @@ import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { userHasModuleKey } from "@/lib/userModuleAccessServer";
+import {
+  calculateContinuousLeaveDays,
+  eachDayInLeaveRange,
+  fetchCompanyHolidays,
+} from "@/lib/leaveContinuousDays";
 
 // POST: Add paid leave for employee (with add-paid-leaves module access)
 export async function POST(request) {
@@ -144,10 +149,10 @@ export async function POST(request) {
         }
       } catch (_e) { /* keep caller's half_day_type */ }
     } else {
-      const fromDate = new Date(from_date);
-      const toDate = new Date(to_date);
-      const dateDiff = Math.ceil((toDate - fromDate) / (1000 * 60 * 60 * 24)) + 1;
-      totalDays = dateDiff;
+      const holidays = await fetchCompanyHolidays(conn);
+      const continuousLeave = calculateContinuousLeaveDays(from_date, to_date, holidays);
+      const dateDiff = eachDayInLeaveRange(from_date, to_date).length;
+      totalDays = continuousLeave.totalDays;
 
       // Time-range based fraction calculation (same as /api/empcrm/leaves POST)
       if (has_time_range && start_time && end_time && dateDiff > 0 && workDayMinutes > 0) {
@@ -165,10 +170,10 @@ export async function POST(request) {
               const totalMinutes = firstDayMin + lastDayMin + middleDays * workDayMinutes;
               totalDays = parseFloat((totalMinutes / workDayMinutes).toFixed(1));
             }
-            totalDays = Math.max(0.5, Math.min(totalDays, dateDiff));
+            totalDays = Math.max(0.5, Math.min(totalDays, continuousLeave.totalDays));
           }
         } catch (_err) {
-          totalDays = dateDiff;
+          totalDays = continuousLeave.totalDays;
         }
       }
     }

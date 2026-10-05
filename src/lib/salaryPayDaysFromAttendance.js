@@ -283,16 +283,6 @@ export function computeSalaryPayDaysForUser(p) {
       }
       continue;
     }
-    if (isHoliday) {
-      holiday++;
-      continue;
-    }
-    if (isSunday) {
-      sunday++;
-      weekend_off++;
-      weeklyOffSundayDates.push(dateString);
-      continue;
-    }
     if (isOnLeave) {
       // Generic (non-paid or other-type) approved leave day.
       //  — unpaid leave: LOP deduction only
@@ -311,6 +301,16 @@ export function computeSalaryPayDaysForUser(p) {
           weekdayPayCredits += 1;
         }
       }
+      continue;
+    }
+    if (isHoliday) {
+      holiday++;
+      continue;
+    }
+    if (isSunday) {
+      sunday++;
+      weekend_off++;
+      weeklyOffSundayDates.push(dateString);
       continue;
     }
     lop++;
