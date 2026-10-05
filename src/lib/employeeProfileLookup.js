@@ -70,6 +70,17 @@ export function pickFatherOrSpouseName(profile) {
   );
 }
 
+/** Attendance register designation: rep_list userRole (e.g. DEVELOPER, PRODUCTION ENGINEER). */
+export function pickEmployeeDesignation(profile, repListRow) {
+  const role = repListRow?.userRole != null ? String(repListRow.userRole).trim() : "";
+  if (role) return role;
+  const dept =
+    repListRow?.userDepartment != null ? String(repListRow.userDepartment).trim() : "";
+  if (dept) return dept;
+  const fromProfile = profile?.designation != null ? String(profile.designation).trim() : "";
+  return fromProfile;
+}
+
 export function formatDojDisplay(d) {
   if (!d) return "";
   const months = [

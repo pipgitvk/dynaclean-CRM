@@ -19,8 +19,11 @@ import {
 } from "@/lib/attendanceSheetMonth";
 import {
   PAYROLL_ACTIVE_EMPLOYEE_SQL,
-  isPayrollActiveEmployee,
+  buildEmployeeProfileByUsername,
+  dedupeEmployeesForPayrollSheet,
+  filterEmployeesForAttendanceSheet,
 } from "@/lib/payrollActiveEmployees";
+import { dateToYmdKey } from "@/lib/salaryPayDaysFromAttendance";
 
 const HR_ROLES = [
   "SUPERADMIN",
@@ -61,9 +64,17 @@ export async function GET(request) {
     const db = await getDbConnection();
 
     const [employeeRows] = await db.query(PAYROLL_ACTIVE_EMPLOYEE_SQL);
-    const employees = (employeeRows || []).filter(isPayrollActiveEmployee);
-
     const profileRows = await loadEmployeeProfilesRows(db);
+    const profileByUser = buildEmployeeProfileByUsername(profileRows);
+    const filtered = filterEmployeesForAttendanceSheet(
+      employeeRows,
+      profileRows,
+      meta.to
+    );
+    const { employees, relatedUsernamesByWinner } = dedupeEmployeesForPayrollSheet(
+      filtered,
+      profileRows
+    );
     const profileIndex = buildEmployeeProfileIndex(profileRows);
 
     const [holidays] = await db.query(
@@ -106,18 +117,31 @@ export async function GET(request) {
 
     const rows = employees.map((emp, index) => {
       const uk = normalizeUserKey(emp.username);
-      const profile = resolveEmployeeProfile(emp, profileIndex) || {};
+      const profile =
+        profileByUser.get(uk) || resolveEmployeeProfile(emp, profileIndex) || {};
+      const related = relatedUsernamesByWinner.get(emp.username) || [emp.username];
       const rules = mergeGlobalRulesWithEmployeeSchedule(
         globalRules,
         scheduleByUser.get(uk) || null
       );
+      const logs = [];
+      const logDates = new Set();
+      for (const uname of related) {
+        for (const log of logsByUser[normalizeUserKey(uname)] || []) {
+          const dk = dateToYmdKey(log.date);
+          if (dk && logDates.has(dk)) continue;
+          if (dk) logDates.add(dk);
+          logs.push(log);
+        }
+      }
       const row = buildEmployeeAttendanceSheetRow({
         meta,
         username: emp.username,
+        relatedUsernames: related,
         displayName: profile.full_name || emp.username,
         profile,
         emp,
-        logs: logsByUser[uk] || [],
+        logs,
         holidays,
         leaves,
         rules,

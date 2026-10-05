@@ -1,7 +1,12 @@
 import { isHalfDayWithGrace } from "@/lib/attendanceRulesEngine";
 import { rowHasMeaningfulCheckinOrCheckout } from "@/lib/attendanceMeaningfulPunch";
 import { weeklyOffSundayCountsAsPaid, dateToYmdKey } from "@/lib/salaryPayDaysFromAttendance";
-import { formatDojDisplay, pickDateOfJoining } from "@/lib/employeeProfileLookup";
+import {
+  formatDojDisplay,
+  normalizeUserKey,
+  pickDateOfJoining,
+  pickEmployeeDesignation,
+} from "@/lib/employeeProfileLookup";
 
 const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -41,11 +46,14 @@ export function calendarMonthMeta(monthStr) {
   };
 }
 
-function buildLeaveMaps(leaves, username) {
+function buildLeaveMaps(leaves, usernames) {
   const leaveMap = new Map();
   const paidLeaveMap = new Map();
+  const keys = new Set(
+    (Array.isArray(usernames) ? usernames : [usernames]).map((u) => normalizeUserKey(u))
+  );
   for (const leave of leaves || []) {
-    if (String(leave.username) !== String(username)) continue;
+    if (!keys.has(normalizeUserKey(leave.username))) continue;
     const fromD = new Date(leave.from_date);
     const toD = new Date(leave.to_date);
     for (let d = new Date(fromD); d <= toD; d.setDate(d.getDate() + 1)) {
@@ -128,6 +136,7 @@ function countTowardTotalPresent(code) {
 export function buildEmployeeAttendanceSheetRow({
   meta,
   username,
+  relatedUsernames,
   displayName,
   profile,
   emp,
@@ -148,7 +157,9 @@ export function buildEmployeeAttendanceSheetRow({
     if (k) dateMap.set(k, log);
   }
 
-  const { leaveMap, paidLeaveMap } = buildLeaveMaps(leaves, username);
+  const leaveUsers =
+    relatedUsernames?.length ? relatedUsernames : [username];
+  const { leaveMap, paidLeaveMap } = buildLeaveMaps(leaves, leaveUsers);
   let graceHalfDaysUsed = 0;
   const cells = [];
   let totalPresent = 0;
@@ -191,7 +202,7 @@ export function buildEmployeeAttendanceSheetRow({
     name: displayName || username,
     date_of_birth_display: dobDisplay,
     date_of_joining_display: doj ? formatDojDisplay(doj) : "",
-    designation: emp?.userRole || emp?.userDepartment || profile?.designation || "",
+    designation: pickEmployeeDesignation(profile, emp),
     cells,
     total_present: totalPresent % 1 === 0 ? totalPresent : Number(totalPresent.toFixed(1)),
   };

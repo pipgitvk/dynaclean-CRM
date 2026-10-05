@@ -25,6 +25,10 @@ import {
   formatDojDisplay,
   loadEmployeeProfilesRows,
 } from "@/lib/employeeProfileLookup";
+import {
+  PAYROLL_ACTIVE_EMPLOYEE_SQL,
+  isPayrollActiveEmployee,
+} from "@/lib/payrollActiveEmployees";
 
 const HR_SALARY_ROLES = [
   "SUPERADMIN",
@@ -90,13 +94,8 @@ export async function GET(request) {
 
     const db = await getDbConnection();
 
-    const [employees] = await db.query(`
-      SELECT username, empId, userRole, userDepartment
-      FROM rep_list
-      WHERE status = 1
-        AND UPPER(TRIM(userRole)) <> 'SUPERADMIN'
-      ORDER BY username ASC
-    `);
+    const [employeeRows] = await db.query(PAYROLL_ACTIVE_EMPLOYEE_SQL);
+    const employees = (employeeRows || []).filter(isPayrollActiveEmployee);
 
     const profileRows = await loadEmployeeProfilesRows(db);
     const profileIndex = buildEmployeeProfileIndex(profileRows);
