@@ -17,6 +17,7 @@ import {
   UserPlus,
 } from "lucide-react";
 import { useWarrantyProductFollowup } from "@/components/warranty/WarrantyProductFollowupControls";
+import ServiceRecordFollowupActions from "@/components/services/ServiceRecordFollowupActions";
 
 const actionIconClass =
   "inline-flex items-center justify-center p-1.5 rounded-md text-white transition-colors";
@@ -51,9 +52,14 @@ export default function ServiceTable({ serviceRecords, role }) {
     currentStatus: "",
     newStatus: "",
     description: "",
+    plannedDate: "",
   });
   const [statusError, setStatusError] = useState("");
   const [isStatusSubmitting, setIsStatusSubmitting] = useState(false);
+  const [plannedDatePopup, setPlannedDatePopup] = useState(null);
+  const [plannedPopupError, setPlannedPopupError] = useState("");
+  const [plannedPopupSaving, setPlannedPopupSaving] = useState(false);
+  const [inlinePlannedDateSavingId, setInlinePlannedDateSavingId] = useState(null);
 
   // Assign modal state
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
@@ -90,6 +96,14 @@ export default function ServiceTable({ serviceRecords, role }) {
       .map((date) => date.trim());
     const index = ids.indexOf(String(reportId));
     return index >= 0 ? dates[index] || "" : "";
+  };
+
+  const handleFollowupUpdated = (serviceId, patch) => {
+    setRecords((prev) =>
+      prev.map((record) =>
+        record.service_id === serviceId ? { ...record, ...patch } : record
+      )
+    );
   };
 
   const handleRecordImagesUpdated = (serviceId, preCompletion, afterCompletion) => {
@@ -313,7 +327,11 @@ export default function ServiceTable({ serviceRecords, role }) {
     </div>
   );
 
-  const tableColSpan = (role === "ADMIN" ? 12 : 11) + (showStepVideos ? 1 : 0);
+  const showAdminServiceFollowup = dashboardPath === "admin-dashboard";
+  const tableColSpan =
+    (role === "ADMIN" ? 12 : 11) +
+    (showStepVideos ? 1 : 0) +
+    (showAdminServiceFollowup ? 1 : 0);
 
   // Helper: format dates safely
   const formatDate = (value) => {
@@ -321,6 +339,15 @@ export default function ServiceTable({ serviceRecords, role }) {
     if (value instanceof Date) return value.toDateString();
     if (!isNaN(Date.parse(value))) return new Date(value).toDateString();
     return value;
+  };
+
+  const plannedDateForInput = (value) => {
+    if (!value) return "";
+    const s = String(value).trim();
+    if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return "";
+    return d.toISOString().slice(0, 10);
   };
 
   // Sort logic
@@ -457,7 +484,15 @@ export default function ServiceTable({ serviceRecords, role }) {
 
   // Status options for the change-status modal (ensure Pending By Customer is available)
   const statusOptions = Array.from(
-    new Set([...uniqueStatuses.filter(Boolean), "PENDING BY CUSTOMER"]),
+    new Set([
+      ...uniqueStatuses.filter(Boolean),
+      "PENDING BY CUSTOMER",
+      "PLANNED",
+    ]),
+  );
+
+  const statusFilterOptions = Array.from(
+    new Set([...uniqueStatuses.filter(Boolean), "PLANNED"]),
   );
 
   // Calculate KPIs — all from full unfiltered records so they never change with filters
@@ -491,6 +526,7 @@ export default function ServiceTable({ serviceRecords, role }) {
       currentStatus: record.status || "",
       newStatus: record.status || "",
       description: record.status_description || "",
+      plannedDate: plannedDateForInput(record.planned_date),
     });
     setIsStatusModalOpen(true);
   };
@@ -503,9 +539,217 @@ export default function ServiceTable({ serviceRecords, role }) {
 
   const handleStatusFieldChange = (field, value) => {
     setStatusForm((prev) => ({ ...prev, [field]: value }));
-    if (field === "newStatus" || field === "description") {
+    if (field === "newStatus" || field === "description" || field === "plannedDate") {
       setStatusError("");
     }
+  };
+
+  const canChangeServiceStatus = (record) =>
+    record.status?.toUpperCase() !== "COMPLETED" &&
+    (role === "ADMIN" ||
+      role === "SUPERADMIN" ||
+      role === "TEAM LEADER" ||
+      role === "SERVICE HEAD" ||
+      role === "SERVICE SUPPORT");
+
+  const pendingInlineStatusOptions = Array.from(
+    new Set(["PENDING", "PLANNED", ...statusOptions.filter(Boolean)]),
+  );
+
+  const applyStatusUpdate = async ({
+    service_id,
+    status,
+    description = "",
+    planned_date = null,
+  }) => {
+    const newStatus = String(status || "").trim();
+    const requiresDescription = newStatus.toUpperCase() === "PENDING BY CUSTOMER";
+    const desc = (description || "").trim();
+    const isPlanned = newStatus.toUpperCase() === "PLANNED";
+    const plannedDate = isPlanned ? (planned_date || "").trim() : null;
+
+    if (!service_id || !newStatus) {
+      throw new Error("Please select a status.");
+    }
+    if (requiresDescription && !desc) {
+      throw new Error("Description is required when status is PENDING BY CUSTOMER.");
+    }
+    if (isPlanned && !plannedDate) {
+      throw new Error("Please select a planned date.");
+    }
+
+    const res = await fetch("/api/service-status/update", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        service_id,
+        status: newStatus,
+        description: requiresDescription ? desc : desc || null,
+        planned_date: isPlanned ? plannedDate : null,
+      }),
+    });
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.message || "Failed to update status.");
+    }
+
+    setRecords((prev) =>
+      prev.map((r) =>
+        r.service_id === service_id
+          ? {
+              ...r,
+              status: newStatus,
+              status_description: desc,
+              planned_date: isPlanned ? plannedDate : null,
+            }
+          : r,
+      ),
+    );
+  };
+
+  const handleInlinePlannedDateChange = async (record, dateYmd) => {
+    const next = (dateYmd || "").trim();
+    if (!next) return;
+    if (next === plannedDateForInput(record.planned_date)) return;
+    try {
+      setInlinePlannedDateSavingId(record.service_id);
+      await applyStatusUpdate({
+        service_id: record.service_id,
+        status: "PLANNED",
+        description: record.status_description || "",
+        planned_date: next,
+      });
+    } catch (err) {
+      window.alert(err.message || "Failed to update planned date.");
+    } finally {
+      setInlinePlannedDateSavingId(null);
+    }
+  };
+
+  const handleInlinePendingStatusChange = (record, newStatus) => {
+    const current = record.status || "PENDING";
+    if (newStatus === current) return;
+
+    if (newStatus.toUpperCase() === "PLANNED") {
+      setPlannedPopupError("");
+      setPlannedDatePopup({
+        serviceId: record.service_id,
+        plannedDate: plannedDateForInput(record.planned_date) || "",
+      });
+      return;
+    }
+
+    if (newStatus.toUpperCase() === "PENDING BY CUSTOMER") {
+      setStatusError("");
+      setStatusForm({
+        service_id: record.service_id,
+        currentStatus: current,
+        newStatus,
+        description: record.status_description || "",
+        plannedDate: plannedDateForInput(record.planned_date),
+      });
+      setIsStatusModalOpen(true);
+      return;
+    }
+
+    applyStatusUpdate({
+      service_id: record.service_id,
+      status: newStatus,
+      description: record.status_description || "",
+      planned_date: null,
+    }).catch((err) => {
+      window.alert(err.message || "Failed to update status.");
+    });
+  };
+
+  const closePlannedDatePopup = () => {
+    if (plannedPopupSaving) return;
+    setPlannedDatePopup(null);
+    setPlannedPopupError("");
+  };
+
+  const savePlannedDatePopup = async () => {
+    if (!plannedDatePopup?.serviceId) return;
+    const plannedDate = (plannedDatePopup.plannedDate || "").trim();
+    if (!plannedDate) {
+      setPlannedPopupError("Please select a planned date.");
+      return;
+    }
+    try {
+      setPlannedPopupSaving(true);
+      setPlannedPopupError("");
+      await applyStatusUpdate({
+        service_id: plannedDatePopup.serviceId,
+        status: "PLANNED",
+        description: "",
+        planned_date: plannedDate,
+      });
+      setPlannedDatePopup(null);
+    } catch (err) {
+      setPlannedPopupError(err.message || "Failed to save.");
+    } finally {
+      setPlannedPopupSaving(false);
+    }
+  };
+
+  const renderServiceStatusCell = (record) => {
+    const isPending = record.status?.toUpperCase() === "PENDING";
+    const isPlanned = record.status?.toUpperCase() === "PLANNED";
+    const canEdit = canChangeServiceStatus(record);
+
+    if (canEdit && (isPending || isPlanned)) {
+      return (
+        <div className="flex flex-col gap-1.5 min-w-[140px]">
+          <select
+            className="w-full max-w-[180px] border border-gray-300 rounded-md px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"
+            value={record.status || "PENDING"}
+            onClick={(e) => e.stopPropagation()}
+            onChange={(e) => handleInlinePendingStatusChange(record, e.target.value)}
+          >
+            {pendingInlineStatusOptions.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+          {isPlanned && (
+            <label className="flex flex-col gap-0.5">
+              <span className="text-[11px] font-medium text-indigo-700">
+                Planned date
+              </span>
+              <input
+                type="date"
+                disabled={inlinePlannedDateSavingId === record.service_id}
+                className="w-full max-w-[180px] border border-indigo-200 rounded-md px-2 py-1 text-sm bg-indigo-50/40 focus:outline-none focus:ring-2 focus:ring-indigo-300 disabled:opacity-60"
+                value={plannedDateForInput(record.planned_date)}
+                onClick={(e) => e.stopPropagation()}
+                onChange={(e) =>
+                  handleInlinePlannedDateChange(record, e.target.value)
+                }
+              />
+            </label>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex flex-col">
+        <span>{record.status}</span>
+        {isPlanned && record.planned_date && (
+          <span className="text-xs font-medium text-indigo-700 mt-1">
+            Planned: {formatDate(record.planned_date)}
+          </span>
+        )}
+        {record.status?.toUpperCase() === "PENDING BY CUSTOMER" &&
+          record.status_description && (
+            <span className="text-xs text-gray-600 mt-1 break-words max-w-xs">
+              {record.status_description}
+            </span>
+          )}
+      </div>
+    );
   };
 
   const handleStatusSubmit = async () => {
@@ -515,47 +759,19 @@ export default function ServiceTable({ serviceRecords, role }) {
     }
 
     const newStatus = statusForm.newStatus.trim();
-    const requiresDescription =
-      newStatus.toUpperCase() === "PENDING BY CUSTOMER";
     const description = (statusForm.description || "").trim();
-
-    if (requiresDescription && !description) {
-      setStatusError(
-        "Description is required when status is PENDING BY CUSTOMER.",
-      );
-      return;
-    }
+    const isPlanned = newStatus.toUpperCase() === "PLANNED";
+    const plannedDate = (statusForm.plannedDate || "").trim();
 
     try {
       setIsStatusSubmitting(true);
       setStatusError("");
-
-      const res = await fetch("/api/service-status/update", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          service_id: statusForm.service_id,
-          status: newStatus,
-          description: requiresDescription ? description : description || null,
-        }),
+      await applyStatusUpdate({
+        service_id: statusForm.service_id,
+        status: newStatus,
+        description,
+        planned_date: isPlanned ? plannedDate : null,
       });
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.message || "Failed to update status.");
-      }
-
-      // Optimistically update local records so UI reflects change immediately
-      setRecords((prev) =>
-        prev.map((r) =>
-          r.service_id === statusForm.service_id
-            ? { ...r, status: newStatus, status_description: description }
-            : r,
-        ),
-      );
-
       setIsStatusModalOpen(false);
     } catch (err) {
       setStatusError(err.message || "Something went wrong.");
@@ -733,7 +949,11 @@ export default function ServiceTable({ serviceRecords, role }) {
             <select className="p-2 w-full border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
               value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}>
               <option value="">All Statuses</option>
-              {uniqueStatuses.map((s) => <option key={s} value={s}>{s}</option>)}
+              {statusFilterOptions.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
             </select>
           </div>
           <div className="flex-1 min-w-[120px]">
@@ -766,6 +986,9 @@ export default function ServiceTable({ serviceRecords, role }) {
                 >
                   Service ID {getSortIndicator("service_id")}
                 </th>
+                {showAdminServiceFollowup && (
+                  <th className="px-3 py-3 text-left w-[52px]">Follow-up</th>
+                )}
                 <th
                   onClick={() => handleSort("complaint_date")}
                   className="px-6 py-3 text-left cursor-pointer"
@@ -876,6 +1099,15 @@ export default function ServiceTable({ serviceRecords, role }) {
                           <div className="text-xs text-green-600 font-medium mt-0.5">{record.serial_number}</div>
                         )}
                       </td>
+                      {showAdminServiceFollowup && (
+                        <td className="px-3 py-3 align-top">
+                          <ServiceRecordFollowupActions
+                            record={record}
+                            enabled
+                            onUpdated={handleFollowupUpdated}
+                          />
+                        </td>
+                      )}
                       <td className="px-6 py-3">
                         {formatDate(record.complaint_date)}
                       </td>
@@ -926,18 +1158,7 @@ export default function ServiceTable({ serviceRecords, role }) {
                       </td>
                       <td className="px-6 py-3">{record.assigned_to}</td>
                       <td className="px-6 py-3">{record.service_type}</td>
-                      <td className="px-6 py-3">
-                        <div className="flex flex-col">
-                          <span>{record.status}</span>
-                          {record.status?.toUpperCase() ===
-                            "PENDING BY CUSTOMER" &&
-                            record.status_description && (
-                              <span className="text-xs text-gray-600 mt-1 break-words max-w-xs">
-                                {record.status_description}
-                              </span>
-                            )}
-                        </div>
-                      </td>
+                      <td className="px-6 py-3">{renderServiceStatusCell(record)}</td>
                       <td className="px-6 py-3 align-top overflow-hidden">
                         <ServiceCompletionDateCell
                           completedDate={record.completed_date}
@@ -1054,20 +1275,67 @@ export default function ServiceTable({ serviceRecords, role }) {
                       <span className="font-bold text-lg text-blue-600">
                         Service ID: {record.service_id}
                       </span>
+                      {showAdminServiceFollowup && (
+                        <div className="mt-2">
+                          <ServiceRecordFollowupActions
+                            record={record}
+                            enabled
+                            onUpdated={handleFollowupUpdated}
+                          />
+                        </div>
+                      )}
                     </div>
                     <div className="flex flex-col items-end max-w-[50%]">
-                      <span
-                        className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                          record.status?.toUpperCase() === "COMPLETED"
-                            ? "bg-green-200 text-green-800"
-                            : record.status?.toUpperCase() ===
-                                "PENDING FOR SPARES"
-                              ? "bg-orange-200 text-orange-800"
-                              : "bg-gray-200 text-gray-800"
-                        }`}
-                      >
-                        {record.status}
-                      </span>
+                      {(record.status?.toUpperCase() === "PENDING" ||
+                        record.status?.toUpperCase() === "PLANNED") &&
+                      canChangeServiceStatus(record) ? (
+                        <div className="flex flex-col items-end gap-1">
+                          <select
+                            className="max-w-[160px] border border-gray-300 rounded-md px-2 py-1 text-xs bg-white"
+                            value={record.status || "PENDING"}
+                            onChange={(e) =>
+                              handleInlinePendingStatusChange(record, e.target.value)
+                            }
+                          >
+                            {pendingInlineStatusOptions.map((s) => (
+                              <option key={s} value={s}>
+                                {s}
+                              </option>
+                            ))}
+                          </select>
+                          {record.status?.toUpperCase() === "PLANNED" && (
+                            <input
+                              type="date"
+                              disabled={inlinePlannedDateSavingId === record.service_id}
+                              className="max-w-[160px] border border-indigo-200 rounded-md px-2 py-1 text-xs bg-indigo-50/40 disabled:opacity-60"
+                              value={plannedDateForInput(record.planned_date)}
+                              onChange={(e) =>
+                                handleInlinePlannedDateChange(record, e.target.value)
+                              }
+                            />
+                          )}
+                        </div>
+                      ) : (
+                        <span
+                          className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                            record.status?.toUpperCase() === "COMPLETED"
+                              ? "bg-green-200 text-green-800"
+                              : record.status?.toUpperCase() ===
+                                  "PENDING FOR SPARES"
+                                ? "bg-orange-200 text-orange-800"
+                                : "bg-gray-200 text-gray-800"
+                          }`}
+                        >
+                          {record.status}
+                        </span>
+                      )}
+                      {record.status?.toUpperCase() === "PLANNED" &&
+                        record.planned_date &&
+                        !canChangeServiceStatus(record) && (
+                          <span className="mt-1 text-[11px] font-medium text-indigo-700 text-right">
+                            Planned: {formatDate(record.planned_date)}
+                          </span>
+                        )}
                       {record.status?.toUpperCase() === "PENDING BY CUSTOMER" &&
                         record.status_description && (
                           <span className="mt-1 text-[11px] text-gray-700 text-right break-words">
@@ -1214,6 +1482,53 @@ export default function ServiceTable({ serviceRecords, role }) {
         dashboardPath={dashboardPath}
       />
 
+      {plannedDatePopup && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-sm p-5">
+            <h3 className="text-lg font-semibold text-gray-900">
+              Planned visit date
+            </h3>
+            <p className="text-xs text-gray-500 mt-1">
+              Service ID: {plannedDatePopup.serviceId}
+            </p>
+            <label className="block text-sm font-medium text-gray-700 mt-4 mb-1">
+              Select date <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="date"
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+              value={plannedDatePopup.plannedDate || ""}
+              onChange={(e) =>
+                setPlannedDatePopup((p) =>
+                  p ? { ...p, plannedDate: e.target.value } : p,
+                )
+              }
+            />
+            {plannedPopupError && (
+              <p className="text-sm text-red-600 mt-2">{plannedPopupError}</p>
+            )}
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={closePlannedDatePopup}
+                disabled={plannedPopupSaving}
+                className="px-4 py-2 text-sm rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={savePlannedDatePopup}
+                disabled={plannedPopupSaving}
+                className="px-4 py-2 text-sm rounded-md bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
+              >
+                {plannedPopupSaving ? "Saving…" : "Save"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Status Change Modal */}
       {isStatusModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm">
@@ -1254,6 +1569,22 @@ export default function ServiceTable({ serviceRecords, role }) {
                   ))}
                 </select>
               </div>
+
+              {statusForm.newStatus?.toUpperCase() === "PLANNED" && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Planned date <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                    value={statusForm.plannedDate || ""}
+                    onChange={(e) =>
+                      handleStatusFieldChange("plannedDate", e.target.value)
+                    }
+                  />
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">

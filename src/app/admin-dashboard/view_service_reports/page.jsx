@@ -6,6 +6,8 @@ import { cookies } from "next/headers";
 import jwt from "jsonwebtoken";
 import { getSessionPayload } from "@/lib/auth";
 import { ensureServiceReportStepsTable } from "@/lib/ensureServiceReportStepsTable";
+import { ensureServiceRecordsFollowupColumns } from "@/lib/ensureServiceRecordsFollowupColumns";
+import { ensureServiceRecordsPlannedDateColumn } from "@/lib/ensureServiceRecordsPlannedDateColumn";
 
 // ✅ Disable caching to always fetch fresh data from database
 export const revalidate = 0;
@@ -30,6 +32,8 @@ export default async function AdminViewServiceReportsPage() {
 
   try {
     await ensureServiceReportStepsTable();
+    await ensureServiceRecordsFollowupColumns();
+    await ensureServiceRecordsPlannedDateColumn();
     const conn = await getDbConnection();
     const sql = `
       SELECT
