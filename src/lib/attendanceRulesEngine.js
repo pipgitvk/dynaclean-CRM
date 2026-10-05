@@ -1,7 +1,7 @@
 import { parseAttendanceClockMinutes } from "@/lib/istDateTime";
 
 /** True when there is no usable clock-out time (null, empty, or unparsable). */
-function isMissingCheckoutTime(log) {
+export function isMissingCheckoutTime(log) {
   if (log == null) return true;
   const t = log.checkout_time;
   if (t == null) return true;

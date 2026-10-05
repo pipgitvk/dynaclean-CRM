@@ -62,6 +62,7 @@ export default function SalarySheetTable({ rows, monthLabel, companyName, loadin
         <p className="text-xs text-gray-600 mt-3 flex flex-wrap justify-center gap-x-4 gap-y-1 max-w-4xl mx-auto">
           <span><strong>P</strong> — Present</span>
           <span><strong>HD</strong> — Half day leave (approved)</span>
+          <span><strong>NC</strong> — No checkout (check-in only)</span>
           <span><strong>A</strong> — Absent / LOP</span>
           <span><strong>PL</strong> — Paid leave (approved)</span>
           <span><strong>WO</strong> — Weekly off + holidays</span>
@@ -90,7 +91,7 @@ export default function SalarySheetTable({ rows, monthLabel, companyName, loadin
             <tr>
               <th colSpan={4} className={thBase}>Employee</th>
               <th colSpan={4} className={thGreen}>Salary Rate</th>
-              <th colSpan={8} className={thBase}>Attendance</th>
+              <th colSpan={9} className={thBase}>Attendance</th>
               <th colSpan={7} className={thGreen}>Gross Earned Salary</th>
               <th colSpan={4} className={thBase}>Deductions</th>
               <th rowSpan={2} className={thGreen}>Net Salary</th>
@@ -107,6 +108,9 @@ export default function SalarySheetTable({ rows, monthLabel, companyName, loadin
               <th className={thBase}>P</th>
               <th className={thBase} title="Half day leave taken (approved)">
                 HD
+              </th>
+              <th className={thBase} title="Check-in without check-out">
+                NC
               </th>
               <th className={thBase} title="Absent / LOP (attendance summary)">
                 A
@@ -138,7 +142,7 @@ export default function SalarySheetTable({ rows, monthLabel, companyName, loadin
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={28} className="px-4 py-8 text-center text-sm text-gray-500">
+                <td colSpan={29} className="px-4 py-8 text-center text-sm text-gray-500">
                   No rows to display.
                 </td>
               </tr>
@@ -160,6 +164,7 @@ export default function SalarySheetTable({ rows, monthLabel, companyName, loadin
                     <td className={tdGreen}>{formatInr(r.rate_total)}</td>
                     <td className={tdNum}>{formatNum(att.present)}</td>
                     <td className={tdNum}>{formatNum(att.half_day)}</td>
+                    <td className={tdNum}>{formatNum(att.no_checkout)}</td>
                     <td className={tdNum}>{formatNum(att.absent)}</td>
                     <td className={tdNum}>{formatNum(att.paid_leave)}</td>
                     <td className={tdNum}>{formatNum(att.weekly_off)}</td>

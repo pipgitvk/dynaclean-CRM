@@ -7,6 +7,12 @@ import {
   applyStatutoryDeductionsFromStructure,
   isHealthInsuranceDeductionRow,
 } from "@/lib/salaryGrossSpecialAllowance";
+import { isMissingCheckoutTime } from "@/lib/attendanceRulesEngine";
+import { isMeaningfulAttendancePunch } from "@/lib/attendanceMeaningfulPunch";
+import {
+  dateToYmdKey,
+  isSalaryMonthFullyElapsed,
+} from "@/lib/salaryPayDaysFromAttendance";
 
 const WORKING_DAYS_DEFAULT = 30;
 
@@ -273,6 +279,48 @@ export function countHalfDayLeaveDaysInMonth(leaves, username, monthStr) {
       if (d < bounds.start || d > bounds.end) continue;
       total += 1;
     }
+  }
+  return total;
+}
+
+/** Days with check-in but no check-out in the calendar month. */
+export function countNoCheckoutDaysInMonth({ monthStr, logs, dateOfJoining }) {
+  const bounds = monthBounds(monthStr);
+  if (!bounds) return 0;
+
+  let doj = null;
+  let dojValid = false;
+  if (dateOfJoining != null && String(dateOfJoining).trim() !== "") {
+    const parsed = new Date(dateOfJoining);
+    parsed.setHours(0, 0, 0, 0);
+    if (!Number.isNaN(parsed.getTime())) {
+      doj = parsed;
+      dojValid = true;
+    }
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const payrollMonthElapsed = isSalaryMonthFullyElapsed(monthStr, today);
+
+  const seen = new Set();
+  let total = 0;
+
+  for (const log of logs || []) {
+    const k = dateToYmdKey(log.date);
+    if (!k || seen.has(k)) continue;
+
+    const d = new Date(log.date);
+    d.setHours(0, 0, 0, 0);
+    if (d < bounds.start || d > bounds.end) continue;
+    if (!payrollMonthElapsed && d > today) continue;
+    if (dojValid && d < doj) continue;
+
+    if (!isMeaningfulAttendancePunch(log.checkin_time)) continue;
+    if (!isMissingCheckoutTime(log)) continue;
+
+    seen.add(k);
+    total += 1;
   }
   return total;
 }
