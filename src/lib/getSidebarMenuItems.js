@@ -113,6 +113,7 @@ function transformMenuItemPaths(item, roleKey) {
       "paid-leave-ledger": "/accounts-dashboard/paid-leave-ledger",
       "salary-slips": "/accounts-dashboard/salary-slips",
       "salary-management": "/accounts-dashboard/salary",
+      "salary-sheet": "/accounts-dashboard/salary-sheet",
       "add-paid-leaves": "/accounts-dashboard/add-paid-leave",
     };
     if (item.moduleKey && accountantModulePaths[item.moduleKey]) {
@@ -870,6 +871,13 @@ const allMenuItems = [
         moduleKey: "salary-management",
         roles: ["ALL"],
         icon: "DollarSign",
+      },
+      {
+        path: "/empcrm/admin-dashboard/salary-sheet",
+        name: "Salary Sheet",
+        moduleKey: "salary-sheet",
+        roles: ["ALL"],
+        icon: "FileSpreadsheet",
       },
       {
         path: "/empcrm/admin-dashboard/salary-slips",

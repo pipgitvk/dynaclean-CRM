@@ -329,6 +329,7 @@ export async function middleware(request) {
         const isAccountantSalaryAccess =
           roleKey === "ACCOUNTANT" &&
           (pathname.startsWith("/empcrm/admin-dashboard/salary") ||
+           pathname.startsWith("/empcrm/admin-dashboard/salary-sheet") ||
            pathname.startsWith("/empcrm/admin-dashboard/salary-slips"));
         if (!isHrEmpCrm && !isAccountantSalaryAccess) {
           return NextResponse.redirect(new URL("/empcrm/user-dashboard", request.url));

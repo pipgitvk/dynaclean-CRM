@@ -46,6 +46,7 @@ import {
   Globe,
   Truck,
   Landmark,
+  FileSpreadsheet,
 } from "lucide-react";
 
 // Icon map
@@ -89,6 +90,7 @@ const iconMap = {
   Globe,
   Truck,
   Landmark,
+  FileSpreadsheet,
 };
 
 export default function Sidebar({

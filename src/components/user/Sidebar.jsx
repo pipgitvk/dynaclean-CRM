@@ -119,6 +119,7 @@ import {
   Briefcase,
   Globe,
   TrendingUp,
+  FileSpreadsheet,
 } from "lucide-react";
 
 // Icon map
@@ -160,6 +161,7 @@ const iconMap = {
   Briefcase,
   Globe,
   TrendingUp,
+  FileSpreadsheet,
 };
 
 function isPathActive(pathname, path) {

@@ -42,6 +42,7 @@ export const empCrmAdminMenuItems = [
   { path: "/empcrm/admin-dashboard/documents", name: "Employee Documents", roles: ["SUPERADMIN", "HR HEAD", "HR", "Junior HR Executive", "HR Executive", "HR Recruiter"], icon: "FileText" },
   { path: "/empcrm/admin-dashboard/hiring", name: "Hiring", roles: ["HR HEAD", "HR", "Junior HR Executive", "HR Executive", "HR Recruiter"], icon: "UserPlus" },
   { path: "/empcrm/admin-dashboard/salary", name: "Salary Management", roles: ["SUPERADMIN", "HR HEAD", "HR", "Junior HR Executive", "HR Executive", "HR Recruiter", "ACCOUNTANT"], icon: "DollarSign" },
+  { path: "/empcrm/admin-dashboard/salary-sheet", name: "Salary Sheet", roles: ["SUPERADMIN", "HR HEAD", "HR", "Junior HR Executive", "HR Executive", "HR Recruiter", "ACCOUNTANT"], icon: "FileSpreadsheet" },
   { path: "/empcrm/admin-dashboard/salary-slips", name: "Salary slips", roles: ["SUPERADMIN", "HR HEAD", "HR", "Junior HR Executive", "HR Executive", "HR Recruiter", "ACCOUNTANT"], icon: "Receipt" },
 ];
 

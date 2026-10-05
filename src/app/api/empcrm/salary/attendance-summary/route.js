@@ -207,8 +207,8 @@ export async function GET(request) {
     const [attendance] = await db.query(
       `
       SELECT ${ATT_SELECT}
-      FROM attendance_logs 
-      WHERE date >= ? AND date <= ?
+      FROM attendance_logs a
+      WHERE a.date >= ? AND a.date <= ?
     `,
       [logRange.from, logRange.to]
     );

@@ -772,6 +772,13 @@ const allMenuItems = [
         icon: "DollarSign",
       },
       {
+        path: "/empcrm/admin-dashboard/salary-sheet",
+        name: "Salary Sheet",
+        accessKey: "salary-management",
+        roles: ["SUPERADMIN", "HR", "ACCOUNTANT"],
+        icon: "FileSpreadsheet",
+      },
+      {
         path: "/empcrm/admin-dashboard/salary-slips",
         name: "Salary Slips",
         accessKey: "salary-slips",
