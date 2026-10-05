@@ -118,6 +118,7 @@ export const MODULE_TREE = [
       { key: "employee-crm", label: "Employee CRM" },
       { key: "attendance-log", label: "All Attendance details" },
       { key: "attendance-sheet", label: "Attendance Sheet" },
+      { key: "salary-sheet", label: "Salary Sheet" },
     ],
   },
   {
@@ -399,6 +400,7 @@ export const SUPERADMIN_MODULE_UI_NODES = [
       { kind: "leaf", key: "employee-list", label: "Employee list" },
       { kind: "leaf", key: "employee-crm", label: "Employee CRM" },
       { kind: "leaf", key: "attendance-sheet", label: "Attendance Sheet" },
+      { kind: "leaf", key: "salary-sheet", label: "Salary Sheet" },
     ],
   },
   {

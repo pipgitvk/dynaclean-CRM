@@ -64,10 +64,13 @@ export default function SalarySheetTable({ rows, monthLabel, companyName, loadin
           <span><strong>HD</strong> — Half day leave (approved)</span>
           <span><strong>A</strong> — Absent / LOP</span>
           <span><strong>PL</strong> — Paid leave (approved)</span>
-          <span><strong>WO</strong> — Weekly off + holidays</span>
+          <span><strong>WO</strong> — Weekly off (Sunday)</span>
+          <span><strong>H</strong> — Company holidays</span>
           <span><strong>SL</strong> — Sick leave (approved)</span>
-          <span><strong>OL</strong> — Other leave (unpaid, approved)</span>
-          <span><strong>Paid Days</strong> — Days counted for salary</span>
+          <span><strong>UL</strong> — Unpaid leave (approved)</span>
+        </p>
+        <p className="text-xs text-gray-800 mt-2 text-center font-semibold max-w-4xl mx-auto">
+          Total paid days = P + HD/2 − A + PL + WO + SL − UL
         </p>
       </div>
 
@@ -90,7 +93,7 @@ export default function SalarySheetTable({ rows, monthLabel, companyName, loadin
             <tr>
               <th colSpan={4} className={thBase}>Employee</th>
               <th colSpan={4} className={thGreen}>Salary Rate</th>
-              <th colSpan={8} className={thBase}>Attendance</th>
+              <th colSpan={9} className={thBase}>Attendance</th>
               <th colSpan={7} className={thGreen}>Gross Earned Salary</th>
               <th colSpan={4} className={thBase}>Deductions</th>
               <th rowSpan={2} className={thGreen}>Net Salary</th>
@@ -114,12 +117,15 @@ export default function SalarySheetTable({ rows, monthLabel, companyName, loadin
               <th className={thBase} title="Paid leave (approved)">
                 PL
               </th>
-              <th className={thBase} title="Weekly off (Sunday) + company holidays">
+              <th className={thBase} title="Weekly off (Sunday)">
                 WO
               </th>
+              <th className={thBase} title="Company holidays">
+                H
+              </th>
               <th className={thBase}>SL</th>
-              <th className={thBase} title="Other leave — unpaid leave (approved)">
-                OL
+              <th className={thBase} title="Unpaid leave (approved)">
+                UL
               </th>
               <th className={thBase}>Paid Days</th>
               <th className={thGreen}>Basic</th>
@@ -138,7 +144,7 @@ export default function SalarySheetTable({ rows, monthLabel, companyName, loadin
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={28} className="px-4 py-8 text-center text-sm text-gray-500">
+                <td colSpan={29} className="px-4 py-8 text-center text-sm text-gray-500">
                   No rows to display.
                 </td>
               </tr>
@@ -163,8 +169,9 @@ export default function SalarySheetTable({ rows, monthLabel, companyName, loadin
                     <td className={tdNum}>{formatNum(att.absent)}</td>
                     <td className={tdNum}>{formatNum(att.paid_leave)}</td>
                     <td className={tdNum}>{formatNum(att.weekly_off)}</td>
+                    <td className={tdNum}>{formatNum(att.holidays)}</td>
                     <td className={tdNum}>{formatNum(att.sick_leave)}</td>
-                    <td className={tdNum}>{formatNum(att.other_leave)}</td>
+                    <td className={tdNum}>{formatNum(att.unpaid_leave)}</td>
                     <td className={tdNum}>{formatNum(att.paid_days)}</td>
                     <td className={tdNum}>
                       {noStructure ? "—" : formatInr(earned.basic)}

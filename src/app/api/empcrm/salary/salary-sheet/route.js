@@ -218,8 +218,40 @@ export async function GET(request) {
 
       const present =
         cards?.present != null ? Number(cards.present) : Number(stats.present) || 0;
-      let payDays = stats.pay_days != null ? Number(stats.pay_days) : 0;
-      if (present === 0) payDays = 0;
+      const absent =
+        cards?.absents != null
+          ? Number(cards.absents) || 0
+          : Number(stats.lop) || 0;
+      const weeklyOff = Number(stats.weekend_off) || 0;
+      const holidayCount = Number(stats.holiday) || 0;
+
+      const sickLeave = related.reduce(
+        (sum, u) => sum + countLeaveTypeDaysInMonth(leaves, u, month, "sick"),
+        0
+      );
+      const paidLeave = related.reduce(
+        (sum, u) => sum + countLeaveTypeDaysInMonth(leaves, u, month, "paid"),
+        0
+      );
+      const unpaidLeave = related.reduce(
+        (sum, u) => sum + countLeaveTypeDaysInMonth(leaves, u, month, "unpaid"),
+        0
+      );
+      const halfDayLeave = related.reduce(
+        (sum, u) => sum + countHalfDayLeaveDaysInMonth(leaves, u, month),
+        0
+      );
+
+      // Paid days = P + HD/2 − A + PL + WO + SL − UL (salary sheet register)
+      const payDaysRaw =
+        present +
+        halfDayLeave / 2 -
+        absent +
+        paidLeave +
+        weeklyOff +
+        sickLeave -
+        unpaidLeave;
+      const payDays = Math.max(0, Math.round(payDaysRaw * 100) / 100);
 
       const structure = pickFirstByRelatedUsernames(structureByUser, related);
       const rate = getSalaryRateFromStructure(structure);
@@ -234,23 +266,6 @@ export async function GET(request) {
       const earnedTotal = breakdown != null ? breakdown.totalEarnings : null;
 
       const fatherOrSpouse = pickFatherOrSpouseName(profile);
-
-      const sickLeave = related.reduce(
-        (sum, u) => sum + countLeaveTypeDaysInMonth(leaves, u, month, "sick"),
-        0
-      );
-      const paidLeave = related.reduce(
-        (sum, u) => sum + countLeaveTypeDaysInMonth(leaves, u, month, "paid"),
-        0
-      );
-      const otherLeave = related.reduce(
-        (sum, u) => sum + countLeaveTypeDaysInMonth(leaves, u, month, "unpaid"),
-        0
-      );
-      const halfDayLeave = related.reduce(
-        (sum, u) => sum + countHalfDayLeaveDaysInMonth(leaves, u, month),
-        0
-      );
 
       return {
         username: emp.username,
@@ -267,15 +282,12 @@ export async function GET(request) {
         attendance: {
           present,
           half_day: halfDayLeave,
-          absent:
-            cards?.absents != null
-              ? Number(cards.absents) || 0
-              : Number(stats.lop) || 0,
-          weekly_off:
-            (Number(stats.weekend_off) || 0) + (Number(stats.holiday) || 0),
+          absent,
+          weekly_off: weeklyOff,
+          holidays: holidayCount,
           sick_leave: sickLeave,
           paid_leave: paidLeave,
-          other_leave: otherLeave,
+          unpaid_leave: unpaidLeave,
           paid_days: payDays,
         },
         earned: breakdown
