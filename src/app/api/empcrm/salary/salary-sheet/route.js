@@ -15,7 +15,6 @@ import {
   getSalaryRateFromStructure,
   countLeaveTypeDaysInMonth,
   countHalfDayLeaveDaysInMonth,
-  countNoCheckoutDaysInMonth,
 } from "@/lib/salaryPayrollBreakdown";
 import {
   normalizeUserKey,
@@ -219,11 +218,6 @@ export async function GET(request) {
       const paidLeave = countLeaveTypeDaysInMonth(leaves, emp.username, month, "paid");
       const otherLeave = countLeaveTypeDaysInMonth(leaves, emp.username, month, "unpaid");
       const halfDayLeave = countHalfDayLeaveDaysInMonth(leaves, emp.username, month);
-      const noCheckout = countNoCheckoutDaysInMonth({
-        monthStr: month,
-        logs,
-        dateOfJoining,
-      });
 
       return {
         username: emp.username,
@@ -240,7 +234,6 @@ export async function GET(request) {
         attendance: {
           present,
           half_day: halfDayLeave,
-          no_checkout: noCheckout,
           absent:
             cards?.absents != null
               ? Number(cards.absents) || 0
