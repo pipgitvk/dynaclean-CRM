@@ -1,20 +1,19 @@
 import { normalizeUserKey, pickDateOfJoining } from "@/lib/employeeProfileLookup";
 import { dateToYmdKey } from "@/lib/salaryPayDaysFromAttendance";
 
-/** Not shown on attendance / salary registers. */
-export const PAYROLL_SHEET_EXCLUDED_ROLES = [
+/** Not shown on attendance / salary registers (roles). */
+export const PAYROLL_SHEET_EXCLUDED_ROLES = [];
+
+export const PAYROLL_SHEET_EXCLUDED_USERNAMES = ["neha"];
+
+/** Listed on payroll registers without employee_profiles when rep_list role matches. */
+export const ATTENDANCE_SHEET_ROLES_WITHOUT_PROFILE = [
+  "SERVICE ENGINEER",
+  "PRODUCTION ENGINEER",
   "DIRECTOR",
   "WELDER HELPER",
   "PAINTER",
   "WELDER",
-];
-
-export const PAYROLL_SHEET_EXCLUDED_USERNAMES = ["neha"];
-
-/** Field roles listed on attendance sheet even without employee_profiles (rep_list only). */
-export const ATTENDANCE_SHEET_ROLES_WITHOUT_PROFILE = [
-  "SERVICE ENGINEER",
-  "PRODUCTION ENGINEER",
 ];
 
 export function normalizeRepListRole(emp) {
@@ -28,7 +27,6 @@ export const PAYROLL_ACTIVE_EMPLOYEE_SQL = `
   WHERE r.status = 1
     AND UPPER(TRIM(COALESCE(r.userRole, ''))) <> 'SUPERADMIN'
     AND LOWER(TRIM(r.username)) <> 'admin'
-    AND UPPER(TRIM(COALESCE(r.userRole, ''))) NOT IN ('DIRECTOR', 'WELDER HELPER', 'PAINTER', 'WELDER')
     AND LOWER(TRIM(r.username)) <> 'neha'
   ORDER BY r.username ASC
 `;
