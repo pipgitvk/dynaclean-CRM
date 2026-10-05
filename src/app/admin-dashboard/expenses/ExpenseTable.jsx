@@ -14,6 +14,11 @@ export default function ExpenseTable({ rows, role, activeEmployeesList }) {
   const router = useRouter();
   const pathname = usePathname();
 
+  const dashboardBase = (() => {
+    const match = pathname?.match(/^\/[\w-]+-dashboard/);
+    return match ? match[0] : "/admin-dashboard";
+  })();
+
   const [searchQuery, setSearchQuery] = useState("");
   const [fromDate, setFromDate] = useState(dayjs().startOf("month").format("YYYY-MM-DD"));
   const [toDate, setToDate] = useState(dayjs().endOf("month").format("YYYY-MM-DD"));
@@ -523,14 +528,14 @@ export default function ExpenseTable({ rows, role, activeEmployeesList }) {
                     </td>
                     <td className="p-3 flex gap-2 items-center">
                       <Link
-                        href={`/admin-dashboard/expenses/${row.ID}`}
+                        href={`${dashboardBase}/expenses/${row.ID}`}
                         className="text-blue-600 hover:underline"
                       >
                         <Eye size={16} />
                       </Link>
                       {row.approval_status !== "Approved" && row.approval_status !== "Rejected" && (
                         <Link
-                          href={`/admin-dashboard/expenses/edit/${row.ID}`}
+                          href={`${dashboardBase}/expenses/edit/${row.ID}`}
                           className="text-yellow-600 hover:text-yellow-800"
                           title="Edit Expense"
                         >
@@ -669,14 +674,14 @@ export default function ExpenseTable({ rows, role, activeEmployeesList }) {
               </div>
               <div className="flex items-center gap-4 pt-2">
                 <Link
-                  href={`/admin-dashboard/expenses/${row.ID}`}
+                  href={`${dashboardBase}/expenses/${row.ID}`}
                   className="text-blue-600 hover:underline"
                 >
                   <Eye size={16} />
                 </Link>
                 {row.approval_status !== "Approved" && row.approval_status !== "Rejected" && (
                   <Link
-                    href={`/admin-dashboard/expenses/edit/${row.ID}`}
+                    href={`${dashboardBase}/expenses/edit/${row.ID}`}
                     className="text-yellow-600 hover:text-yellow-800"
                     title="Edit Expense"
                   >
