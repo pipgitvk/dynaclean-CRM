@@ -198,12 +198,16 @@ import ProfileApprovalsCard from "@/components/ProfileApprovalsCard";
 import ScheduleVisitCard from "@/components/scheduleVisit/ScheduleVisitCard";
 import OverduePaymentCard from "@/components/OverduePaymentCard";
 import KeywordPerformanceQuickCard from "@/components/keywords/KeywordPerformanceQuickCard";
-import { Package, BarChart3, Upload, DollarSign, Calendar, Plane, FileText, ClipboardList, Users } from "lucide-react";
+import { Package, BarChart3, Upload, DollarSign, Calendar, Plane, FileText, ClipboardList, Users, Wrench } from "lucide-react";
 import ServiceTeamReportCard from "@/components/service/ServiceTeamReportCard";
 import ServiceSupportQuotesOrdersCard from "@/components/service/ServiceSupportQuotesOrdersCard";
 import ServiceSupportTotalCard from "@/components/service/ServiceSupportTotalCard";
 import { SPECIAL_PRICE_PENDING_CONDITION } from "@/lib/specialPriceDefaults";
 import { getPendingProspectSubmissionsCount } from "@/lib/prospectSubmissionCounts";
+import {
+  ADMIN_SERVICE_HISTORY_PENDING_OVER_48H_HREF,
+  getPendingServiceRecordsOver48hCount,
+} from "@/lib/serviceRecordsPendingOver48h";
 
 // import UpcomingLeads from "@/components/Leads/UpcommingLeads";
 
@@ -414,6 +418,13 @@ export default async function UserDashboardPage() {
       console.warn("pending prospect submissions count:", e.message);
     }
 
+    let pendingServiceOver48hCount = 0;
+    try {
+      pendingServiceOver48hCount = await getPendingServiceRecordsOver48hCount(connection);
+    } catch (e) {
+      console.warn("pending service records over 48h count:", e.message);
+    }
+
     if (!user) {
       return <p className="text-red-600">User not found</p>;
     }
@@ -571,6 +582,32 @@ export default async function UserDashboardPage() {
                   {pendingProspectSubmissionsCount}
                 </p>
                 <p className="text-xs text-gray-600 mt-0.5">Pending review</p>
+              </div>
+            </div>
+          </a>
+
+          {/* Pending service records &gt; 48 hours */}
+          <a
+            href={ADMIN_SERVICE_HISTORY_PENDING_OVER_48H_HREF}
+            className="bg-white rounded-lg shadow-md p-4 text-black hover:shadow-lg transition-shadow h-full cursor-pointer block border-l-4 border-red-600 min-h-[140px]"
+          >
+            <div className="flex flex-col h-full justify-between">
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <Wrench className="w-5 h-5 text-red-600 shrink-0" />
+                  <h2 className="text-sm font-bold text-black leading-tight">
+                    Service Pending &gt; 48h
+                  </h2>
+                </div>
+                <p
+                  className={`text-2xl font-bold mt-1 ${
+                    pendingServiceOver48hCount === 0
+                      ? "text-green-600"
+                      : "text-red-600"
+                  }`}
+                >
+                  {pendingServiceOver48hCount}
+                </p>
               </div>
             </div>
           </a>

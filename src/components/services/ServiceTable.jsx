@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import Modal from "./Modal";
 import ServiceAttachmentLink from "./ServiceAttachmentLink";
 import ServiceReportPrintButton from "./ServiceReportPrintButton";
@@ -18,6 +18,10 @@ import {
 } from "lucide-react";
 import { useWarrantyProductFollowup } from "@/components/warranty/WarrantyProductFollowupControls";
 import ServiceRecordFollowupActions from "@/components/services/ServiceRecordFollowupActions";
+import {
+  isServiceRecordPendingOver48Hours,
+  parseServicePendingOver48hFromSearchParam,
+} from "@/lib/serviceRecordsPendingOver48h";
 
 const actionIconClass =
   "inline-flex items-center justify-center p-1.5 rounded-md text-white transition-colors";
@@ -29,7 +33,7 @@ function dedupeServiceRecords(rows) {
   );
 }
 
-export default function ServiceTable({ serviceRecords, role }) {
+function ServiceTableInner({ serviceRecords, role }) {
   const [records, setRecords] = useState(() => dedupeServiceRecords(serviceRecords));
   const [searchTerm, setSearchTerm] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
@@ -40,6 +44,7 @@ export default function ServiceTable({ serviceRecords, role }) {
   const [statusFilter, setStatusFilter] = useState("PENDING");
   const [assignedFilter, setAssignedFilter] = useState("");
   const [assignedToFilter, setAssignedToFilter] = useState("");
+  const [pendingOver48hOnly, setPendingOver48hOnly] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedService, setSelectedService] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -77,6 +82,22 @@ export default function ServiceTable({ serviceRecords, role }) {
 
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const statusParam = searchParams.get("status");
+    const over48 = parseServicePendingOver48hFromSearchParam(
+      searchParams.get("pending_over_48h"),
+    );
+    if (statusParam != null && String(statusParam).trim() !== "") {
+      setStatusFilter(String(statusParam).trim());
+    } else if (over48) {
+      setStatusFilter("PENDING");
+    }
+    if (over48) {
+      setPendingOver48hOnly(true);
+    }
+  }, [searchParams]);
   const dashboardPath = (() => {
     const seg = pathname?.split("/").filter(Boolean)[0];
     if (seg?.endsWith("-dashboard")) return seg;
@@ -427,6 +448,10 @@ export default function ServiceTable({ serviceRecords, role }) {
       return false;
     }
 
+    if (pendingOver48hOnly && !isServiceRecordPendingOver48Hours(record)) {
+      return false;
+    }
+
     return true;
   });
 
@@ -466,10 +491,13 @@ export default function ServiceTable({ serviceRecords, role }) {
   const handleResetSearch = () => {
     setSearchTerm("");
     setComplaintDateFilter("");
+    setComplaintDateFrom("");
+    setComplaintDateTo("");
     setServiceTypeFilter("");
     setStatusFilter("");
     setAssignedFilter("");
     setAssignedToFilter("");
+    setPendingOver48hOnly(false);
     setCurrentPage(1);
   };
 
@@ -981,6 +1009,18 @@ export default function ServiceTable({ serviceRecords, role }) {
               {uniqueEngineers.map((eng) => <option key={eng} value={eng}>{eng}</option>)}
             </select>
           </div>
+          <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-red-200 bg-red-50/50 px-3 py-2.5 text-sm text-red-900">
+            <input
+              type="checkbox"
+              checked={pendingOver48hOnly}
+              onChange={(e) => {
+                setPendingOver48hOnly(e.target.checked);
+                setCurrentPage(1);
+              }}
+              className="h-4 w-4 rounded border-red-300 text-red-600 focus:ring-red-500"
+            />
+            Pending &gt; 48 hours
+          </label>
         </div>
       </div>
         {/* Table (visible on larger screens) */}
@@ -1702,5 +1742,19 @@ export default function ServiceTable({ serviceRecords, role }) {
       )}
       {followupModals}
     </div>
+  );
+}
+
+export default function ServiceTable(props) {
+  return (
+    <Suspense
+      fallback={
+        <div className="rounded-lg border border-gray-200 bg-white p-6 text-sm text-gray-500">
+          Loading service records…
+        </div>
+      }
+    >
+      <ServiceTableInner {...props} />
+    </Suspense>
   );
 }
