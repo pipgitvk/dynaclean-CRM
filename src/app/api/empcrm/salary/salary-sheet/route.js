@@ -7,7 +7,10 @@ import {
   rowToAttendanceRulesShape,
   mergeGlobalRulesWithEmployeeSchedule,
 } from "@/lib/attendanceRulesDb";
-import { computeSalaryPayDaysForUser } from "@/lib/salaryPayDaysFromAttendance";
+import {
+  computeSalaryPayDaysForUser,
+  dateToYmdKey,
+} from "@/lib/salaryPayDaysFromAttendance";
 import { computeAttendanceDetailsCardSummaryForMonth } from "@/lib/attendanceDetailsCardSummary";
 import { getPayrollAttendanceLogDateRange } from "@/lib/payrollLogDateRange";
 import {
@@ -27,7 +30,14 @@ import {
 } from "@/lib/employeeProfileLookup";
 import {
   PAYROLL_ACTIVE_EMPLOYEE_SQL,
-  isPayrollActiveEmployee,
+  buildEmployeeProfileByUsername,
+  collectPayrollLogsForUsers,
+  dedupeEmployeesForPayrollSheet,
+  filterEmployeesForPayrollSheet,
+  mergeDeductionsForRelated,
+  normalizeLeavesForRelatedAccounts,
+  pickFirstByRelatedUsernames,
+  sumOvertimeHoursForRelated,
 } from "@/lib/payrollActiveEmployees";
 
 const HR_SALARY_ROLES = [
@@ -95,9 +105,17 @@ export async function GET(request) {
     const db = await getDbConnection();
 
     const [employeeRows] = await db.query(PAYROLL_ACTIVE_EMPLOYEE_SQL);
-    const employees = (employeeRows || []).filter(isPayrollActiveEmployee);
-
     const profileRows = await loadEmployeeProfilesRows(db);
+    const profileByUser = buildEmployeeProfileByUsername(profileRows);
+    const filtered = filterEmployeesForPayrollSheet(
+      employeeRows,
+      profileRows,
+      logRange.to
+    );
+    const { employees, relatedUsernamesByWinner } = dedupeEmployeesForPayrollSheet(
+      filtered,
+      profileRows
+    );
     const profileIndex = buildEmployeeProfileIndex(profileRows);
 
     const [holidays] = await db.query(
@@ -163,19 +181,26 @@ export async function GET(request) {
 
     const rows = employees.map((emp) => {
       const uk = normalizeUserKey(emp.username);
-      const profile = resolveEmployeeProfile(emp, profileIndex) || {};
+      const related = relatedUsernamesByWinner.get(emp.username) || [emp.username];
+      const profile =
+        profileByUser.get(uk) || resolveEmployeeProfile(emp, profileIndex) || {};
       const dateOfJoining = pickDateOfJoining(profile);
       const rules = mergeGlobalRulesWithEmployeeSchedule(
         globalRules,
         scheduleByUser.get(uk) || null
       );
-      const logs = logsByUser[uk] || [];
+      const logs = collectPayrollLogsForUsers(logsByUser, related, dateToYmdKey);
+      const leavesForPayroll = normalizeLeavesForRelatedAccounts(
+        leaves,
+        related,
+        emp.username
+      );
 
       const stats = computeSalaryPayDaysForUser({
         monthStr: month,
         logs,
         holidaysAll: holidays,
-        leavesAll: leaves,
+        leavesAll: leavesForPayroll,
         username: emp.username,
         rules,
         dateOfJoining,
@@ -186,7 +211,7 @@ export async function GET(request) {
         username: emp.username,
         logs,
         holidaysAll: holidays,
-        leavesAll: leaves,
+        leavesAll: leavesForPayroll,
         rules,
         dateOfJoining,
       });
@@ -196,15 +221,12 @@ export async function GET(request) {
       let payDays = stats.pay_days != null ? Number(stats.pay_days) : 0;
       if (present === 0) payDays = 0;
 
-      const structure = structureByUser.get(uk) || null;
+      const structure = pickFirstByRelatedUsernames(structureByUser, related);
       const rate = getSalaryRateFromStructure(structure);
-      const monthlyRecord = recordByUser.get(uk);
-      const overtimeHours = monthlyRecord?.overtime_hours != null
-        ? Number(monthlyRecord.overtime_hours)
-        : 0;
+      const overtimeHours = sumOvertimeHoursForRelated(recordByUser, related);
       const breakdown = computePayrollBreakdown({
         salaryStructure: structure,
-        deductions: deductionsByUser.get(uk) || [],
+        deductions: mergeDeductionsForRelated(deductionsByUser, related),
         presentDays: payDays,
         overtimeHours,
       });
@@ -213,10 +235,22 @@ export async function GET(request) {
 
       const fatherOrSpouse = pickFatherOrSpouseName(profile);
 
-      const sickLeave = countLeaveTypeDaysInMonth(leaves, emp.username, month, "sick");
-      const paidLeave = countLeaveTypeDaysInMonth(leaves, emp.username, month, "paid");
-      const otherLeave = countLeaveTypeDaysInMonth(leaves, emp.username, month, "unpaid");
-      const halfDayLeave = countHalfDayLeaveDaysInMonth(leaves, emp.username, month);
+      const sickLeave = related.reduce(
+        (sum, u) => sum + countLeaveTypeDaysInMonth(leaves, u, month, "sick"),
+        0
+      );
+      const paidLeave = related.reduce(
+        (sum, u) => sum + countLeaveTypeDaysInMonth(leaves, u, month, "paid"),
+        0
+      );
+      const otherLeave = related.reduce(
+        (sum, u) => sum + countLeaveTypeDaysInMonth(leaves, u, month, "unpaid"),
+        0
+      );
+      const halfDayLeave = related.reduce(
+        (sum, u) => sum + countHalfDayLeaveDaysInMonth(leaves, u, month),
+        0
+      );
 
       return {
         username: emp.username,

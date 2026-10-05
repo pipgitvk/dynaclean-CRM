@@ -62,10 +62,10 @@ export function buildEmployeeProfileByUsername(profileRows) {
 }
 
 /**
- * Attendance register: active rep_list + published Employee CRM profile + joined on/before month end.
+ * Payroll registers (attendance + salary): active rep_list + profile (or field roles) + DOJ on/before month end.
  * @param {string} monthEndYmd - last calendar day of sheet month (YYYY-MM-DD)
  */
-export function filterEmployeesForAttendanceSheet(employees, profileRows, monthEndYmd) {
+export function filterEmployeesForPayrollSheet(employees, profileRows, monthEndYmd) {
   const profileByUser = buildEmployeeProfileByUsername(profileRows);
   const monthEnd = monthEndYmd ? String(monthEndYmd).slice(0, 10) : null;
 
@@ -85,6 +85,9 @@ export function filterEmployeesForAttendanceSheet(employees, profileRows, monthE
     return true;
   });
 }
+
+/** @deprecated use filterEmployeesForPayrollSheet */
+export const filterEmployeesForAttendanceSheet = filterEmployeesForPayrollSheet;
 
 function normalizePersonName(value) {
   const s = String(value ?? "").trim().replace(/\s+/g, " ");
@@ -188,4 +191,53 @@ export function dedupeEmployeesForPayrollSheet(employees, profileRows) {
   );
 
   return { employees: winners, relatedUsernamesByWinner };
+}
+
+/** Merge attendance logs for duplicate logins (one row per day). */
+export function collectPayrollLogsForUsers(logsByUser, relatedUsernames, dateToYmdKeyFn) {
+  const logs = [];
+  const logDates = new Set();
+  for (const uname of relatedUsernames || []) {
+    for (const log of logsByUser[normalizeUserKey(uname)] || []) {
+      const dk = dateToYmdKeyFn(log.date);
+      if (dk && logDates.has(dk)) continue;
+      if (dk) logDates.add(dk);
+      logs.push(log);
+    }
+  }
+  return logs;
+}
+
+export function pickFirstByRelatedUsernames(map, relatedUsernames) {
+  for (const uname of relatedUsernames || []) {
+    const hit = map.get(normalizeUserKey(uname));
+    if (hit != null) return hit;
+  }
+  return null;
+}
+
+export function mergeDeductionsForRelated(deductionsByUser, relatedUsernames) {
+  const out = [];
+  for (const uname of relatedUsernames || []) {
+    out.push(...(deductionsByUser.get(normalizeUserKey(uname)) || []));
+  }
+  return out;
+}
+
+export function sumOvertimeHoursForRelated(recordByUser, relatedUsernames) {
+  let total = 0;
+  for (const uname of relatedUsernames || []) {
+    const row = recordByUser.get(normalizeUserKey(uname));
+    if (row?.overtime_hours != null) total += Number(row.overtime_hours) || 0;
+  }
+  return total;
+}
+
+/** Attribute alias-account leaves to the canonical username for payroll math. */
+export function normalizeLeavesForRelatedAccounts(leaves, relatedUsernames, primaryUsername) {
+  const keys = new Set((relatedUsernames || []).map((u) => normalizeUserKey(u)));
+  const primary = primaryUsername;
+  return (leaves || []).map((leave) =>
+    keys.has(normalizeUserKey(leave.username)) ? { ...leave, username: primary } : leave
+  );
 }
