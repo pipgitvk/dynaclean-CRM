@@ -6,6 +6,7 @@ import {
   parseCustomerIdsParam,
   parseProspectsAdminFiltersFromUrlSearchParams,
   mergeProspectAdminCalendarDefaultsFromUrlSearchParams,
+  parseProspectTlFollowupOnlyFromUrlSearchParams,
 } from "@/lib/prospectFilterUtils";
 import {
   canAccessProspectsRole,
@@ -69,12 +70,18 @@ export async function GET(req) {
     const adminParsed = isProspectsAdminRole(payload.role)
       ? parseProspectsAdminFiltersFromUrlSearchParams(searchParams)
       : null;
-    const adminFilters = isProspectsAdminRole(payload.role)
+    let adminFilters = isProspectsAdminRole(payload.role)
       ? mergeProspectAdminCalendarDefaultsFromUrlSearchParams(
           searchParams,
           adminParsed,
         )
       : null;
+    if (
+      isProspectsAdminRole(payload.role) &&
+      parseProspectTlFollowupOnlyFromUrlSearchParams(searchParams)
+    ) {
+      adminFilters = { ...(adminFilters ?? {}), tlFollowupOnly: true };
+    }
 
     const { whereSql, params } = buildProspectsListWhereClause({
       customerIds,

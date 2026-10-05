@@ -1,6 +1,6 @@
 /**
  * Optional admin-only filters (commitment calendar + creator). Ignored when `isAdmin` is false.
- * @typedef {{ commitmentYear?: number|null, commitmentMonth?: number|null, commitmentDay?: number|null, createdBy?: string|null, adminSearch?: string|null }} AdminProspectFilters
+ * @typedef {{ commitmentYear?: number|null, commitmentMonth?: number|null, commitmentDay?: number|null, createdBy?: string|null, adminSearch?: string|null, tlFollowupOnly?: boolean }} AdminProspectFilters
  */
 
 /**
@@ -105,6 +105,11 @@ export function buildProspectsListWhereClause({
         `(CAST(p.customer_id AS CHAR) LIKE ? OR COALESCE(TRIM(p.quote_number), '') LIKE ? OR COALESCE(NULLIF(TRIM(CONCAT_WS(' ', c.first_name, c.last_name)), ''), NULLIF(TRIM(c.company), '')) LIKE ?)`,
       );
       params.push(lp, lp, lp);
+    }
+    if (adminFilters.tlFollowupOnly) {
+      parts.push(
+        `EXISTS (SELECT 1 FROM TL_followups tlf WHERE BINARY TRIM(tlf.customer_id) = BINARY TRIM(p.customer_id))`,
+      );
     }
   }
 
