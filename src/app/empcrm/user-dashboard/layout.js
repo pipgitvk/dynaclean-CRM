@@ -1,7 +1,11 @@
 import "../../globals.css";
 import getEmpCrmUserSidebarMenuItems from "@/lib/getEmpCrmUserSidebarMenuItems";
-import SalesLayoutShell from "@/components/layouts/SalesLayoutShell";
-import IpGuard from "@/components/IpGuard";
+import getMainCrmSidebarMenuItems from "@/lib/getSidebarMenuItems";
+import getAdminSidebarMenuItems, {
+  getShowBackToUserCrm,
+  getAccountantBackPath,
+} from "@/lib/getAdminSidebarMenuItems";
+import EmpCrmUserDashboardLayoutClient from "@/components/empcrm/EmpCrmUserDashboardLayoutClient";
 import { getSessionPayload } from "@/lib/auth";
 
 function getBackToCrmPathByRole(roleValue) {
@@ -22,19 +26,28 @@ function getBackToCrmPathByRole(roleValue) {
 }
 
 export default async function EmpCrmUserLayout({ children }) {
-  const menuItems = await getEmpCrmUserSidebarMenuItems();
+  const [empcrmMenuItems, mainCrmMenuItems, adminMenuItems] = await Promise.all([
+    getEmpCrmUserSidebarMenuItems(),
+    getMainCrmSidebarMenuItems(),
+    getAdminSidebarMenuItems(),
+  ]);
   const payload = await getSessionPayload();
-  const backButtonPath = getBackToCrmPathByRole(payload?.role || payload?.userRole);
+  const role = payload?.role || payload?.userRole;
+  const backButtonPath = getBackToCrmPathByRole(role);
+  const showBackToUserCrmAdmin = await getShowBackToUserCrm();
+  const accountantBackPath = await getAccountantBackPath();
 
   return (
-    <SalesLayoutShell
-      menuItems={menuItems}
-      showBackButton={true}
+    <EmpCrmUserDashboardLayoutClient
+      empcrmMenuItems={empcrmMenuItems}
+      mainCrmMenuItems={mainCrmMenuItems}
+      adminMenuItems={adminMenuItems}
+      role={role}
       backButtonPath={backButtonPath}
-      showBackToUserCrm={false}
+      showBackToUserCrmAdmin={showBackToUserCrmAdmin}
+      accountantBackPath={accountantBackPath}
     >
-      <IpGuard />
       {children}
-    </SalesLayoutShell>
+    </EmpCrmUserDashboardLayoutClient>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import {
   Calendar,
   Plus,
@@ -47,6 +47,8 @@ export default function UserLeaveManagement() {
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [leaveDayPreview, setLeaveDayPreview] = useState(null);
   const router = useRouter();
+  const pathname = usePathname();
+  const leaveReturnUrl = `${pathname || "/empcrm/user-dashboard/leave"}?apply=1`;
 
   useEffect(() => {
     fetchLeaves();
@@ -922,7 +924,11 @@ export default function UserLeaveManagement() {
                 Cancel
               </button>
               <button
-                onClick={() => router.push("/empcrm/user-dashboard/settings")}
+                onClick={() =>
+                  router.push(
+                    `/empcrm/user-dashboard/settings?returnTo=${encodeURIComponent(leaveReturnUrl)}`,
+                  )
+                }
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
               >
                 Go to Settings

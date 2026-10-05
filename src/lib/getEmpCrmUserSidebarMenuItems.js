@@ -86,12 +86,7 @@ function mapEmpCrmUserMenuItems(filteredItems, pendingOvertimeCount, forMainCrmS
     if (item.path === "/empcrm/user-dashboard/attendance-regularization") {
       result = { ...item, badge: pendingOvertimeCount };
     }
-    if (forMainCrmSidebar) {
-      return {
-        ...result,
-        moduleKey: result.moduleKey || "employee-crm",
-      };
-    }
+    // Main CRM sidebar: access via path prefix in getSidebarMenuItems (not moduleKey per link).
     return result;
   });
 }

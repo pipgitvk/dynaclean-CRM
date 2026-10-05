@@ -126,16 +126,25 @@ function transformMenuItemPaths(item, roleKey) {
     return { ...item, path: "/sales-dashboard/denied-leads" };
   }
 
-  // Don't transform admin-dashboard, accounts-dashboard or empcrm paths
-  if (item.path?.startsWith("/admin-dashboard") || item.path?.startsWith("/accounts-dashboard") || item.path?.startsWith("/empcrm")) {
+  // Don't transform admin-dashboard, accounts-dashboard or empcrm paths (same URLs for all roles).
+  if (
+    item.path?.startsWith("/admin-dashboard") ||
+    item.path?.startsWith("/accounts-dashboard") ||
+    item.path?.startsWith("/empcrm")
+  ) {
+    if (item.children?.length) {
+      return {
+        ...item,
+        children: item.children.map((child) => transformMenuItemPaths(child, roleKey)),
+      };
+    }
     return item;
   }
 
-  // Transform children recursively
   if (item.children?.length) {
     return {
       ...item,
-      children: item.children.map(child => transformMenuItemPaths(child, roleKey)),
+      children: item.children.map((child) => transformMenuItemPaths(child, roleKey)),
     };
   }
 
@@ -835,6 +844,7 @@ const allMenuItems = [
   {
     name: "Employee CRM",
     moduleKey: "employee-crm",
+    path: "/empcrm/user-dashboard",
     roles: ["ALL"],
     icon: "User",
     children: [],
@@ -1156,6 +1166,12 @@ export default async function getSidebarMenuItems() {
       }
     }
 
+    const empCrmUserPathAllowed = (path) => {
+      const p = String(path || "");
+      if (!p.startsWith("/empcrm/user-dashboard")) return false;
+      return isModuleKeyAllowed("employee-crm", allowedModules);
+    };
+
     const filterByModuleAccess = (list) =>
       (list || [])
         .map((item) => {
@@ -1167,10 +1183,13 @@ export default async function getSidebarMenuItems() {
             ? item.moduleKey === "prospect-submissions"
               ? isModuleKeyAllowed("prospect-submissions", allowedModules) ||
                 isModuleKeyAllowed("dashboard-home", allowedModules)
-              : isModuleKeyAllowed(item.moduleKey, allowedModules)
-            : item?.path
-              ? false
-              : true;
+              : isModuleKeyAllowed(item.moduleKey, allowedModules) ||
+                empCrmUserPathAllowed(item.path)
+            : empCrmUserPathAllowed(item.path)
+              ? true
+              : item?.path
+                ? false
+                : true;
           if (item?.children?.length) {
             return children.length > 0 ? { ...item, children } : null;
           }
