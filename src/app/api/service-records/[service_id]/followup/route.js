@@ -8,6 +8,7 @@ const ALLOWED_ROLES = new Set([
   "ADMIN",
   "SERVICE HEAD",
   "SERVICE SUPPORT",
+  "SERVICE ENGINEER",
   "DIRECTOR",
 ]);
 

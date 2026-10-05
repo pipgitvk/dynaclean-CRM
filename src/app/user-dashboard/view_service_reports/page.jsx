@@ -4,6 +4,8 @@ import { getDbConnection } from "@/lib/db"; // DB connection utility
 import ServiceTable from "@/components/services/ServiceTable"; // Import the new Table Component
 import { getSessionPayload } from "@/lib/auth";
 import { ensureServiceReportStepsTable } from "@/lib/ensureServiceReportStepsTable";
+import { ensureServiceRecordsFollowupColumns } from "@/lib/ensureServiceRecordsFollowupColumns";
+import { ensureServiceRecordsPlannedDateColumn } from "@/lib/ensureServiceRecordsPlannedDateColumn";
 
 // ✅ Disable caching to always fetch fresh data from database
 export const revalidate = 0;
@@ -23,6 +25,8 @@ export default async function UserViewServiceReportsPage() {
 
   try {
     await ensureServiceReportStepsTable();
+    await ensureServiceRecordsFollowupColumns();
+    await ensureServiceRecordsPlannedDateColumn();
     const conn = await getDbConnection();
     const sql = `
       SELECT

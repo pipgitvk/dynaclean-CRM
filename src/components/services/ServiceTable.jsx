@@ -327,11 +327,13 @@ export default function ServiceTable({ serviceRecords, role }) {
     </div>
   );
 
-  const showAdminServiceFollowup = dashboardPath === "admin-dashboard";
+  const showServiceFollowupColumn =
+    dashboardPath === "admin-dashboard" ||
+    dashboardPath === "user-dashboard";
   const tableColSpan =
     (role === "ADMIN" ? 12 : 11) +
     (showStepVideos ? 1 : 0) +
-    (showAdminServiceFollowup ? 1 : 0);
+    (showServiceFollowupColumn ? 1 : 0);
 
   // Helper: format dates safely
   const formatDate = (value) => {
@@ -544,13 +546,19 @@ export default function ServiceTable({ serviceRecords, role }) {
     }
   };
 
-  const canChangeServiceStatus = (record) =>
-    record.status?.toUpperCase() !== "COMPLETED" &&
-    (role === "ADMIN" ||
-      role === "SUPERADMIN" ||
-      role === "TEAM LEADER" ||
-      role === "SERVICE HEAD" ||
-      role === "SERVICE SUPPORT");
+  const canChangeServiceStatus = (record) => {
+    if (record.status?.toUpperCase() === "COMPLETED") return false;
+    const roleNorm = String(role ?? "").trim().toUpperCase();
+    return (
+      roleNorm === "ADMIN" ||
+      roleNorm === "SUPERADMIN" ||
+      roleNorm === "TEAM LEADER" ||
+      roleNorm === "SERVICE HEAD" ||
+      roleNorm === "SERVICE SUPPORT" ||
+      roleNorm === "SERVICE ENGINEER" ||
+      roleNorm.includes("SERVICE ENGINEER")
+    );
+  };
 
   const pendingInlineStatusOptions = Array.from(
     new Set(["PENDING", "PLANNED", ...statusOptions.filter(Boolean)]),
@@ -986,7 +994,7 @@ export default function ServiceTable({ serviceRecords, role }) {
                 >
                   Service ID {getSortIndicator("service_id")}
                 </th>
-                {showAdminServiceFollowup && (
+                {showServiceFollowupColumn && (
                   <th className="px-3 py-3 text-left w-[52px]">Follow-up</th>
                 )}
                 <th
@@ -1099,7 +1107,7 @@ export default function ServiceTable({ serviceRecords, role }) {
                           <div className="text-xs text-green-600 font-medium mt-0.5">{record.serial_number}</div>
                         )}
                       </td>
-                      {showAdminServiceFollowup && (
+                      {showServiceFollowupColumn && (
                         <td className="px-3 py-3 align-top">
                           <ServiceRecordFollowupActions
                             record={record}
@@ -1275,7 +1283,7 @@ export default function ServiceTable({ serviceRecords, role }) {
                       <span className="font-bold text-lg text-blue-600">
                         Service ID: {record.service_id}
                       </span>
-                      {showAdminServiceFollowup && (
+                      {showServiceFollowupColumn && (
                         <div className="mt-2">
                           <ServiceRecordFollowupActions
                             record={record}
