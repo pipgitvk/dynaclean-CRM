@@ -14,6 +14,7 @@ import {
   computePayrollBreakdown,
   getSalaryRateFromStructure,
   countLeaveTypeDaysInMonth,
+  countHalfDayLeaveDaysInMonth,
 } from "@/lib/salaryPayrollBreakdown";
 import {
   normalizeUserKey,
@@ -216,6 +217,7 @@ export async function GET(request) {
       const sickLeave = countLeaveTypeDaysInMonth(leaves, emp.username, month, "sick");
       const paidLeave = countLeaveTypeDaysInMonth(leaves, emp.username, month, "paid");
       const otherLeave = countLeaveTypeDaysInMonth(leaves, emp.username, month, "unpaid");
+      const halfDayLeave = countHalfDayLeaveDaysInMonth(leaves, emp.username, month);
 
       return {
         username: emp.username,
@@ -231,6 +233,7 @@ export async function GET(request) {
         rate_total: rate.total,
         attendance: {
           present,
+          half_day: halfDayLeave,
           absent:
             cards?.absents != null
               ? Number(cards.absents) || 0

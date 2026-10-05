@@ -249,6 +249,34 @@ function monthBounds(monthStr) {
   return { start, end, y, m };
 }
 
+/** Approved half-day leave instances in a month (ledger only, not punch-based HD). */
+export function countHalfDayLeaveDaysInMonth(leaves, username, monthStr) {
+  const bounds = monthBounds(monthStr);
+  if (!bounds) return 0;
+  const userKey = String(username ?? "").trim().toLowerCase();
+  let total = 0;
+
+  for (const leave of leaves || []) {
+    if (String(leave.username ?? "").trim().toLowerCase() !== userKey) continue;
+    const st = String(leave.status ?? "approved").toLowerCase();
+    if (st !== "approved") continue;
+
+    const type = String(leave.leave_type ?? "").toLowerCase();
+    const isHalfLeave = leave.is_half_day == 1 || type === "half-day";
+    if (!isHalfLeave) continue;
+
+    const from = new Date(leave.from_date);
+    const to = new Date(leave.to_date);
+    if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) continue;
+
+    for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
+      if (d < bounds.start || d > bounds.end) continue;
+      total += 1;
+    }
+  }
+  return total;
+}
+
 /** Approved leave days of a given type overlapping a payroll month. */
 export function countLeaveTypeDaysInMonth(leaves, username, monthStr, leaveType) {
   const bounds = monthBounds(monthStr);
