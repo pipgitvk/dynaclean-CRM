@@ -104,7 +104,6 @@ const TaskTable = ({ tasks = [], currentUser = "" }) => {
                       >
                         <PenLine size={14} /> Follow
                       </a>
-
                       {currentUser && task.createdby === currentUser && (
                         <button
                           onClick={() => openReassign(task)}

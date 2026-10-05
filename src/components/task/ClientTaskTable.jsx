@@ -14,12 +14,21 @@ import { Repeat } from "lucide-react";
 import ReassignModal from "@/components/models/ReassignModal";
 import AutoTaskBadge, { isAutoTask } from "@/components/task/AutoTaskBadge";
 import AutomatedTasksList from "@/components/task/AutomatedTasksList";
+import TaskFollowupPlusButton from "@/components/task/TaskFollowupPlusButton";
+import { usePathname } from "next/navigation";
 
 dayjs.extend(isSameOrBefore);
 dayjs.extend(isSameOrAfter);
 
 export default function ClientTaskTable({ initialTasks, currentUser = "" }) {
   const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const dashboardSegment =
+    pathname?.split("/").filter(Boolean)[0] || "user-dashboard";
+  const viewTaskPrefix =
+    dashboardSegment === "admin-dashboard"
+      ? "admin-dashboard"
+      : "user-dashboard";
   const [reassignOpen, setReassignOpen] = useState(false);
   const [modalTask, setModalTask] = useState(null);
   const [search, setSearch] = useState("");
@@ -440,11 +449,12 @@ export default function ClientTaskTable({ initialTasks, currentUser = "" }) {
                   <td className="px-4 py-2">
                     <div className="flex items-center gap-2">
                       <a
-                        href={`/user-dashboard/view-task/${task.task_id}`}
+                        href={`/${viewTaskPrefix}/view-task/${task.task_id}`}
                         className="text-blue-600 hover:underline"
                       >
                         View
                       </a>
+                      <TaskFollowupPlusButton task={task} />
                       {currentUser && (task.createdby || "").trim().toLowerCase() === currentUser.trim().toLowerCase() && (
                         <button
                           onClick={() => {
@@ -521,13 +531,14 @@ export default function ClientTaskTable({ initialTasks, currentUser = "" }) {
                     ? formatTaskDateOnly(task.task_completion_date)
                     : "-"}
                 </div>
-                <div className="text-sm mt-2 flex items-center gap-2">
+                <div className="text-sm mt-2 flex items-center gap-2 flex-wrap">
                   <a
-                    href={`/user-dashboard/view-task/${task.task_id}`}
+                    href={`/${viewTaskPrefix}/view-task/${task.task_id}`}
                     className="text-blue-600 hover:underline font-medium"
                   >
                     View Task →
                   </a>
+                  <TaskFollowupPlusButton task={task} />
                   {currentUser && (task.createdby || "").trim().toLowerCase() === currentUser.trim().toLowerCase() && (
                     <button
                       onClick={() => {

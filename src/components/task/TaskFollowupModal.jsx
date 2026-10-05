@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import dayjs from "dayjs";
 import { X } from "lucide-react";
-import FollowupForm from "@/app/admin-dashboard/followup_task/[taskId]/FollowupForm";
+import FollowupForm from "@/components/task/TaskFollowupForm";
 
 export default function TaskFollowupModal({ open, task, onClose }) {
   const router = useRouter();
