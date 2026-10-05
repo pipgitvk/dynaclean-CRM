@@ -1,10 +1,11 @@
 "use client";
 import React, { useEffect, useState, useRef } from "react";
 import { Eye, PenLine, Repeat, Search } from "lucide-react";
+import { formatCrmDatetimeForISTDisplay } from "@/lib/timezone";
 import {
-  formatCrmDatetimeForISTDisplay,
-  getCrmInstantMs,
-} from "@/lib/timezone";
+  applyUpcomingLeadsClientFilters,
+  defaultUpcomingLeadsFilters,
+} from "@/utils/applyUpcomingLeadsClientFilters";
 
 export default function UpcomingLeadsTable({
   leadSource,
@@ -19,52 +20,40 @@ export default function UpcomingLeadsTable({
   const [showTable, setShowTable] = useState(false);
   const rowsPerPage = 10;
   const isServiceSupport = userRole === "SERVICE SUPPORT";
-  const lastFetchRef = useRef({ startDate: '', endDate: '' });
+  const appliedFiltersRef = useRef(defaultUpcomingLeadsFilters());
 
-  const fetchFilteredData = async (startDate, endDate) => {
+  const fetchFilteredData = async (filters) => {
+    const f = filters || appliedFiltersRef.current;
+    appliedFiltersRef.current = f;
+    const { startDate, endDate } = f;
+
     setLoading(true);
     try {
       let url;
-      
+
       if (startDate || endDate) {
-        // Date filter set hai - use table API (strict date filter)
         url = `/api/upcoming-leads-table?leadSource=${leadSource}&userRole=${userRole}`;
         if (startDate) url += `&startDate=${startDate}`;
         if (endDate) url += `&endDate=${endDate}`;
       } else {
-        // No date filter - use same API as cards (saara same data)
         url = `/api/upcoming-leads?leadSource=${leadSource}&userRole=${userRole}`;
       }
-      
+
       const res = await fetch(url);
       const data = await res.json();
-      
-      let filtered = data.leads || [];
-      
-      const invalidStatuses = isServiceSupport
-        ? ["invalid", "disqualified"]
-        : ["invalid", "disqualified", "denied"];
-      filtered = filtered.filter((c) => {
-        const statusLower = (c.status || "").trim().toLowerCase();
-        return !invalidStatuses.includes(statusLower);
-      });
 
-      if (isServiceSupport) {
-        filtered = filtered.filter((cust) => cust.service_next_followup);
-      }
-
-      filtered.sort((a, b) => {
-        const dateField = isServiceSupport ? "service_next_followup" : "next_followup_date";
-        const aTime = a[dateField] ? getCrmInstantMs(a[dateField]) : Infinity;
-        const bTime = b[dateField] ? getCrmInstantMs(b[dateField]) : Infinity;
-        return aTime - bTime;
-      });
+      const filtered = applyUpcomingLeadsClientFilters(
+        data.leads || [],
+        f,
+        isServiceSupport
+      );
 
       setFilteredData(filtered);
-      lastFetchRef.current = { startDate, endDate };
-      
+
       if (onCountChange) onCountChange(filtered.length);
-      window.dispatchEvent(new CustomEvent('tableCountUpdate', { detail: { count: filtered.length } }));
+      window.dispatchEvent(
+        new CustomEvent("tableCountUpdate", { detail: { count: filtered.length } })
+      );
     } catch (err) {
       console.error("Failed to fetch leads", err);
     } finally {
@@ -80,20 +69,24 @@ export default function UpcomingLeadsTable({
       localStorage.removeItem('upcomingLeads_endDate');
     }
 
-    const today = new Date().toISOString().split('T')[0];
+    const initFilters = defaultUpcomingLeadsFilters();
 
     setShowTable(true);
-    // By default: show <= today (endDate-only filter) so future dates like 4 Oct don't appear
-    fetchFilteredData('', today);
+    fetchFilteredData(initFilters);
 
-    // Listen for filter changes from cards component
     const handleFilterChange = (event) => {
-      const { startDate, endDate } = event.detail;
-      fetchFilteredData(startDate || '', endDate || '');
+      const detail = event.detail || {};
+      fetchFilteredData({
+        ...defaultUpcomingLeadsFilters(),
+        ...detail,
+        startDate: detail.startDate ?? "",
+        endDate: detail.endDate ?? "",
+      });
     };
 
-    window.addEventListener('upcomingLeadsFilterChanged', handleFilterChange);
-    return () => window.removeEventListener('upcomingLeadsFilterChanged', handleFilterChange);
+    window.addEventListener("upcomingLeadsFilterChanged", handleFilterChange);
+    return () =>
+      window.removeEventListener("upcomingLeadsFilterChanged", handleFilterChange);
   }, []);
 
   // Filter by search
