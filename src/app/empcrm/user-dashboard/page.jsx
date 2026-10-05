@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { User, FileText, Calendar, Clock, Grid3x3, DollarSign, Receipt, Settings, CheckSquare } from "lucide-react";
+import { User, FileText, Calendar, Clock, Grid3x3, DollarSign, Receipt, Settings, CheckSquare, Wallet } from "lucide-react";
 import AttendanceTracker from "@/components/empcrm/AttendanceTracker";
 
 export default function UserEmpCrmDashboard() {
@@ -10,6 +10,7 @@ export default function UserEmpCrmDashboard() {
   const [reportingManagerStatus, setReportingManagerStatus] = useState({
     hasReportees: false,
     pendingLeavesCount: 0,
+    pendingExpensesCount: 0,
   });
 
   useEffect(() => {
@@ -25,6 +26,7 @@ export default function UserEmpCrmDashboard() {
         setReportingManagerStatus({
           hasReportees: true,
           pendingLeavesCount: data.pendingLeavesCount || 0,
+          pendingExpensesCount: data.pendingExpensesCount || 0,
         });
       }
     } catch (e) {
@@ -74,6 +76,14 @@ export default function UserEmpCrmDashboard() {
             icon: CheckSquare,
             color: "bg-amber-500",
             href: "/empcrm/user-dashboard/leave-approvals",
+            available: true,
+          },
+          {
+            title: "Expense Approvals",
+            description: `Review and approve expense claims${reportingManagerStatus.pendingExpensesCount > 0 ? ` (${reportingManagerStatus.pendingExpensesCount} pending)` : ""}`,
+            icon: Wallet,
+            color: "bg-emerald-500",
+            href: "/empcrm/user-dashboard/employee-expenses",
             available: true,
           },
         ]

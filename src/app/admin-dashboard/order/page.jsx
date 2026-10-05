@@ -1,16 +1,20 @@
 import { getDbConnection } from "@/lib/db";
 import OrderTable from "./OrderTable";
 import { getSessionPayload } from "@/lib/auth";
+import { canViewAllOrders } from "@/lib/dataScope";
 
 // Secret for verifying JWT
 const JWT_SECRET = process.env.JWT_SECRET;
 
-export default async function OrdersPage() {
+export default async function OrdersPage({ searchParams }) {
   const payload = await getSessionPayload();
   if (!payload) {
     // You can handle unauthorized access here, e.g., redirect or return an error
     return null;
   }
+
+  const sp = await searchParams;
+  const serviceSupportOnly = String(sp?.ss || "") === "1";
 
   const username = payload.username;
   if (!username) {
@@ -115,7 +119,17 @@ export default async function OrdersPage() {
                 MAX(cn.credit_note_number) as credit_note_number,
                 GROUP_CONCAT(DISTINCT qi.item_name SEPARATOR ', ') as item_name,
                 GROUP_CONCAT(DISTINCT qi.item_code SEPARATOR ', ') as item_code,
-                COALESCE(SUM(COALESCE(qi.total_taxable_amt, qi.taxable_price, 0)), 0) AS order_taxable_total
+                COALESCE(SUM(COALESCE(qi.total_taxable_amt, qi.taxable_price, 0)), 0) AS order_taxable_total,
+                GROUP_CONCAT(
+                  CONCAT(
+                    COALESCE(qi.item_name, ''),
+                    '::',
+                    COALESCE(qi.item_code, ''),
+                    '::',
+                    COALESCE(qi.quantity, 0)
+                  )
+                  SEPARATOR '||'
+                ) AS line_items_raw
             FROM 
                 neworder no
             LEFT JOIN 
@@ -126,24 +140,57 @@ export default async function OrdersPage() {
                 credit_notes cn ON CAST(cn.order_id AS CHAR) COLLATE utf8mb4_unicode_ci = CAST(no.order_id AS CHAR) COLLATE utf8mb4_unicode_ci AND cn.is_saved = 1`;
 
   const params = [];
+  const where = [];
 
-  if (!["SUPERADMIN", "DIRECTOR"].includes(String(userRole).toUpperCase())) {
-    sql += " WHERE no.created_by = ?";
+  if (!canViewAllOrders(userRole)) {
+    where.push("no.created_by = ?");
     params.push(username);
+  }
+
+  if (serviceSupportOnly) {
+    where.push(
+      `no.created_by COLLATE utf8mb4_unicode_ci IN (
+        SELECT username COLLATE utf8mb4_unicode_ci FROM rep_list
+        WHERE userRole = 'SERVICE SUPPORT' AND status = 1
+      )`,
+    );
+  }
+
+  if (where.length) {
+    sql += " WHERE " + where.join(" AND ");
   }
 
   sql += " GROUP BY no.order_id ORDER BY no.created_at DESC";
 
   const [orders] = await conn.execute(sql, params);
 
-  const enrichedOrders = orders;
+  const enrichedOrders = orders.map((order) => {
+    const raw = order.line_items_raw;
+    const line_items =
+      typeof raw === "string" && raw
+        ? raw
+            .split("||")
+            .map((part) => {
+              const [item_name, item_code, quantity] = part.split("::");
+              return {
+                item_name: item_name || "",
+                item_code: item_code || "",
+                quantity: Number(quantity) || 0,
+              };
+            })
+            .filter((item) => item.item_name)
+        : [];
+    return { ...order, line_items };
+  });
 
   // await conn.end();
 
   return (
     <div className="mx-auto p-6">
       <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-4">
-        <h3 className="text-xl font-bold">Your Orders</h3>
+        <h3 className="text-xl font-bold">
+          {serviceSupportOnly ? "Service Support Orders" : "Your Orders"}
+        </h3>
 
         <div className="flex flex-wrap gap-2">
           <a

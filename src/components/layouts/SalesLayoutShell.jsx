@@ -6,7 +6,6 @@ import Sidebar from "@/components/sales/Sidebar";
 import { UserProvider } from "@/context/UserContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import ImpersonationWrapper from "@/components/ImpersonationWrapper";
-
 function LayoutContent({
   children,
   menuItems,

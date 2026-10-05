@@ -2,11 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, usePathname, useRouter } from "next/navigation";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { HIRING_TAG_OPTIONS as TAG_OPTIONS, HR_SCORE_RATING_OPTIONS, HAVE_NOT_TALKED_REASONS } from "@/lib/hiringPayload";
 import { HR_TARGET_ALLOWED_DESIGNATIONS, mergeDesignationOptions, resolveCanonicalDesignation } from "@/lib/designationDedupe";
 import { canonicalHiringCityInList, mergeHiringCityOptions } from "@/lib/hiringCities";
+import { getDirectorHrHiringBase } from "@/lib/directorHrPaths";
 import {
   EXPERIENCE_OPTIONS,
   fieldClass,
@@ -28,6 +29,8 @@ const HR_SCORE_RATING_LABELS = {
 export default function EmpcrmHiringEditPage() {
   const router = useRouter();
   const params = useParams();
+  const pathname = usePathname();
+  const hiringBase = getDirectorHrHiringBase(pathname);
   const idRaw = params?.id;
   const entryId = idRaw != null ? parseInt(String(idRaw), 10) : NaN;
 
@@ -228,7 +231,7 @@ export default function EmpcrmHiringEditPage() {
         setError(json.error || "Update failed");
         return;
       }
-      router.push("/empcrm/admin-dashboard/hiring");
+      router.push(hiringBase);
       router.refresh();
     } catch (err) {
       setError(err.message || "Network error");
@@ -237,7 +240,7 @@ export default function EmpcrmHiringEditPage() {
     }
   };
 
-  const backHref = "/empcrm/admin-dashboard/hiring";
+  const backHref = hiringBase;
 
   if (loading) {
     return (

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import toast from "react-hot-toast";
 import { formatAttendanceTimeForDisplay as formatTime } from "@/lib/istDateTime";
+import { getAttendanceRegularizationAttachmentHref } from "@/lib/attendanceRegularizationAttachmentHref";
 
 function formatLogDate(v) {
   if (v == null) return "—";
@@ -279,7 +280,10 @@ export default function DirectorAttendanceRegularizationPage() {
                     <td className="px-3 py-2">
                       {req.attachment_url ? (
                         <a
-                          href={req.attachment_url}
+                          href={getAttendanceRegularizationAttachmentHref(
+                            req.attachment_url,
+                            req.id,
+                          )}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-teal-700 underline hover:text-teal-900"

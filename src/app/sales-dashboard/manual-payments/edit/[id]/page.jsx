@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
+import { manualPaymentInvoiceHref } from "@/lib/manualPaymentInvoiceHref";
 
 export default function EditPaymentPage() {
     const router = useRouter();
@@ -61,7 +62,7 @@ export default function EditPaymentPage() {
                 });
             } else {
                 alert("Payment entry not found");
-                router.push("/user-dashboard/manual-payments");
+                router.push("/sales-dashboard/manual-payments");
             }
         } catch (error) {
             console.error("Fetch error:", error);
@@ -113,7 +114,7 @@ export default function EditPaymentPage() {
 
             if (data.success) {
                 alert("Payment entry updated successfully!");
-                router.push("/user-dashboard/manual-payments");
+                router.push("/sales-dashboard/manual-payments");
             } else {
                 alert(`Error: ${data.error}`);
             }
@@ -347,7 +348,7 @@ export default function EditPaymentPage() {
                                 {currentInvoice && !removeInvoice && !newInvoiceFile && (
                                     <div className="mb-2 p-2 bg-gray-50 border border-gray-200 rounded flex items-center justify-between">
                                         <a
-                                            href={currentInvoice}
+                                            href={manualPaymentInvoiceHref(currentInvoice)}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className="text-blue-600 hover:text-blue-800 text-sm underline"

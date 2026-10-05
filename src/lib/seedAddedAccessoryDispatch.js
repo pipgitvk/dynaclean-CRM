@@ -11,11 +11,31 @@ async function resolveProductCode(conn, itemCode) {
   return productCheck.length > 0 ? productCheck[0].item_code : itemCode;
 }
 
+async function countExistingAccessoryDispatchRows(
+  conn,
+  quoteNumber,
+  dispatchItemCode,
+  dispatchItemName,
+) {
+  const [rows] = await conn.execute(
+    `SELECT COUNT(*) AS cnt
+     FROM dispatch
+     WHERE quote_number = ?
+       AND item_code = ?
+       AND TRIM(item_name) = TRIM(?)`,
+    [quoteNumber, dispatchItemCode, dispatchItemName],
+  );
+  return Number(rows[0]?.cnt || 0);
+}
+
 /**
  * Insert dispatch rows for accessories marked as "added" (not in package).
  * One set of added accessories is created per product unit in the order.
+ * Idempotent: only inserts rows that are still missing.
  */
 export async function seedAddedAccessoryDispatchRows(conn, quoteNumber, quotationItems) {
+  let inserted = 0;
+
   for (const item of quotationItems) {
     const { item_code, quantity } = item;
     const productQty = Number(quantity) || 0;
@@ -26,7 +46,7 @@ export async function seedAddedAccessoryDispatchRows(conn, quoteNumber, quotatio
     if (!isProduct) continue;
 
     const [addedAccessories] = await conn.execute(
-      `SELECT pa.spare_id, pa.qty, pa.accessory_name, sl.item_name AS spare_name, sl.spare_number
+      `SELECT pa.id, pa.spare_id, pa.qty, pa.accessory_name, sl.item_name AS spare_name, sl.spare_number
        FROM product_accessories pa
        LEFT JOIN spare_list sl ON sl.id = pa.spare_id
        WHERE pa.product_code = ? AND pa.package_status = 'added' AND pa.spare_id IS NOT NULL`,
@@ -35,20 +55,46 @@ export async function seedAddedAccessoryDispatchRows(conn, quoteNumber, quotatio
 
     if (!addedAccessories.length) continue;
 
-    for (let unit = 0; unit < productQty; unit++) {
-      for (const acc of addedAccessories) {
-        const accQty = Number(acc.qty) || 1;
-        const dispatchItemCode = acc.spare_number != null ? String(acc.spare_number) : String(acc.spare_id);
-        const dispatchItemName = acc.spare_name || acc.accessory_name;
+    for (const acc of addedAccessories) {
+      const accQty = Number(acc.qty) || 1;
+      const dispatchItemCode =
+        acc.spare_number != null ? String(acc.spare_number) : String(acc.spare_id);
+      const dispatchItemName = acc.spare_name || acc.accessory_name;
+      const neededTotal = productQty * accQty;
+      const existingCount = await countExistingAccessoryDispatchRows(
+        conn,
+        quoteNumber,
+        dispatchItemCode,
+        dispatchItemName,
+      );
+      const toInsert = neededTotal - existingCount;
+      if (toInsert <= 0) continue;
 
-        for (let i = 0; i < accQty; i++) {
-          await conn.execute(
-            `INSERT INTO dispatch (quote_number, item_name, item_code, serial_no, remarks, photos, created_at, updated_at)
-             VALUES (?, ?, ?, NULL, NULL, NULL, NOW(), NULL)`,
-            [quoteNumber, dispatchItemName, dispatchItemCode],
-          );
-        }
+      for (let i = 0; i < toInsert; i++) {
+        await conn.execute(
+          `INSERT INTO dispatch (quote_number, item_name, item_code, serial_no, remarks, photos, created_at, updated_at)
+           VALUES (?, ?, ?, NULL, NULL, NULL, NOW(), NULL)`,
+          [quoteNumber, dispatchItemName, dispatchItemCode],
+        );
+        inserted += 1;
       }
     }
   }
+
+  return inserted;
+}
+
+/**
+ * Ensure added accessories exist for an order quote (safe to call on every dispatch load).
+ */
+export async function ensureAddedAccessoryDispatchRows(conn, quoteNumber) {
+  if (!quoteNumber) return 0;
+
+  const [quotationItems] = await conn.execute(
+    `SELECT item_name, item_code, quantity FROM quotation_items WHERE quote_number = ?`,
+    [quoteNumber],
+  );
+
+  if (!quotationItems.length) return 0;
+  return seedAddedAccessoryDispatchRows(conn, quoteNumber, quotationItems);
 }

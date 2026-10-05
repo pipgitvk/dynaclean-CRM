@@ -12,7 +12,7 @@ import { buildEmploymentConfirmationEmail } from "@/lib/emailTemplates/employmen
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { username, email, professional_email, full_name, confirmationLetterPath, confirmation_letter_link } = body;
+    const { username, email, professional_email, full_name, confirmationLetterPath, confirmation_letter_link, confirmation_letter_download_link } = body;
 
     if (!username || (!email && !professional_email)) {
       return NextResponse.json(
@@ -87,6 +87,7 @@ export async function POST(request) {
       joining_date: formatDate(employee.date_of_joining),
       confirmation_date: formatDate(new Date()),
       confirmation_letter_link: confirmation_letter_link || '#',
+      confirmation_letter_download_link: confirmation_letter_download_link || confirmation_letter_link || '#',
       current_year: new Date().getFullYear(),
     };
 

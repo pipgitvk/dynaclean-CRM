@@ -318,7 +318,7 @@ const AttendancePage = () => {
       const k = new Date(log.date).toLocaleDateString("en-CA");
       map.set(k, log.type);
       if (log.type === "absent") acc.absents++;
-      if (log.type === "leave") acc.leaves++;
+      if (log.type === "leave" || log.type === "paidleave") acc.leaves++;
       if (log.type === "holiday") acc.holidays++;
       if (log.type === "sunday") acc.sundays++;
       if (log.type === "present") {

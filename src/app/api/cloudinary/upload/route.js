@@ -36,14 +36,22 @@ export async function POST(request) {
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    // Prepare upload options
+    const fileName = String(file.name || "");
+    const isPdf =
+      String(file.type || "").toLowerCase() === "application/pdf" ||
+      fileName.toLowerCase().endsWith(".pdf");
+
+    // Cloudinary stores PDFs as images so the browser can open them.
+    // Raw PDFs are served as a blocked/empty response and Chrome shows
+    // "Failed to load PDF document".
     const uploadOptions = {
       folder: folder,
-      resource_type: 'auto',
+      resource_type: isPdf ? "image" : "auto",
+      access_mode: "public",
     };
 
     if (publicId) {
-      uploadOptions.public_id = publicId;
+      uploadOptions.public_id = String(publicId).replace(/\.pdf$/i, "");
     }
 
     if (tags) {

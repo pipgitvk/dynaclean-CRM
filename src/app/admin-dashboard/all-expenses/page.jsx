@@ -64,7 +64,7 @@ export default async function ExpensesPage() {
   const query = `
     SELECT ID, TravelDate, FromLocation, Tolocation,
            TicketCost, HotelCost, MealsCost, OtherExpenses,
-           approved_amount, payment_date, approval_status, username, linked_statement_ids
+           approved_amount, payment_date, approval_status, username, linked_statement_ids, approved_by
     FROM expenses
     ORDER BY TravelDate DESC
   `;

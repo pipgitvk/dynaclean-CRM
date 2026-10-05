@@ -57,6 +57,9 @@ function mapOneEmployeeSummary(emp, logs, holidays, leaves, globalRules, schedul
     total_punched_days:
       stats.total_punched_days != null ? Number(stats.total_punched_days) : stats.present + stats.late_days,
     half_day_count: stats.half_day,
+    half_day_paid_count: stats.half_day_paid || 0,
+    half_day_unpaid_count: stats.half_day_unpaid || 0,
+    unpaid_leave_count: stats.lop || 0,
     late_day_count: stats.late_days,
     sunday_count: stats.sunday,
     weekend_off_count: stats.weekend_off,
@@ -66,6 +69,8 @@ function mapOneEmployeeSummary(emp, logs, holidays, leaves, globalRules, schedul
     pay_days: Number(stats.pay_days),
     pay_days_raw: stats.pay_days_raw != null ? Number(stats.pay_days_raw) : null,
     pay_period_days: stats.period_days != null ? Number(stats.period_days) : null,
+    pay_salary_period_cap:
+      stats.salary_period_cap != null ? Number(stats.salary_period_cap) : null,
     pay_sundays_in_period: stats.sundays_in_period != null ? Number(stats.sundays_in_period) : null,
     pay_sundays_in_period_dates: stats.sundays_in_period_dates,
     pay_holiday_weekdays_in_period:
@@ -84,6 +89,8 @@ function mapOneEmployeeSummary(emp, logs, holidays, leaves, globalRules, schedul
       stats.sundays_unpaid_whole_week_off != null
         ? Number(stats.sundays_unpaid_whole_week_off)
         : null,
+    pay_sunday_work_credits:
+      stats.sunday_work_pay_credits != null ? Number(stats.sunday_work_pay_credits) : null,
     attendance_log_days: logs.length,
     dates_worked: logs.map((l) => l.date),
     sunday_worked_dates: stats.sunday_worked_dates,
@@ -117,7 +124,7 @@ export async function GET(request) {
     );
 
     const [leaves] = await db.query(
-      `SELECT username, from_date, to_date, leave_type, reason
+      `SELECT username, from_date, to_date, leave_type, reason, is_half_day, half_day_type
        FROM employee_leaves
        WHERE status = 'approved'`
     );

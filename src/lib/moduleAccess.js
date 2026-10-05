@@ -1,3 +1,5 @@
+import { getRoleDefaultModuleKeys } from "@/lib/roleDefaultModuleAccess";
+import { normalizeRoleKey } from "@/lib/roleKeyUtils";
 
 export const MODULE_TREE = [
   {
@@ -21,6 +23,7 @@ export const MODULE_TREE = [
       { key: "dm-fresh-leads", label: "24h Fresh Leads (DM)" },
       { key: "task-manager", label: "Task Manager" },
       { key: "demo-details", label: "Demo Details" },
+      { key: "schedule-visits", label: "Schedule Visits" },
       { key: "attendance-details", label: "Attendance details" },
       { key: "regularization-approvals", label: "Overtime" },
       { key: "fast-card", label: "Fast Card" },
@@ -35,6 +38,7 @@ export const MODULE_TREE = [
       { key: "view-customers", label: "View Customers" },
       { key: "quotations", label: "Quotations" },
       { key: "invoices", label: "Invoices" },
+      { key: "performa-invoices", label: "Performa Invoices" },
       { key: "ads-management", label: "Ads Management" },
     ],
   },
@@ -45,6 +49,7 @@ export const MODULE_TREE = [
       { key: "keywords-management", label: "Keywords Management" },
       { key: "backlinks-management", label: "Backlinks Management" },
       { key: "backlinks-excel-data", label: "Backlinks Excel Data" },
+      { key: "meta-credentials-add", label: "Meta Credentials Add" },
     ],
   },
   {
@@ -72,19 +77,23 @@ export const MODULE_TREE = [
     children: [
       { key: "warranty-console", label: "Register Product" },
       { key: "registered-products", label: "Registered Products" },
-      { key: "service-followups", label: "Service Follow-ups" },
+      { key: "service-followups", label: "Machine Follow-ups" },
+      { key: "service-support-report", label: "Service Support Report" },
       { key: "warranty-map", label: "Map View" },
       { key: "service-records", label: "Service Records" },
       { key: "upcoming-installations", label: "Upcoming Installations" },
       { key: "service-map", label: "Service Map" },
       { key: "amc-cmc", label: "AMC/CMC Management" },
       { key: "return-products", label: "Return Products" },
+      { key: "third-party-engineers", label: "Third Party Service Engineers" },
     ],
   },
   {
     key: "products",
     label: "Products & inventory",
     children: [
+      { key: "parties", label: "Parties" },
+      { key: "purchase-products", label: "Purchase Billings" },
       { key: "product-stock", label: "Product Stock" },
       { key: "product-accessories", label: "Product Accessories" },
       { key: "purchase-direct-in", label: "Purchase – Direct In" },
@@ -122,6 +131,7 @@ export const MODULE_TREE = [
       { key: "other-income", label: "Other Income", icon: "📈" },
       { key: "import-billing", label: "Billing" },
       { key: "ledger", label: "Ledger" },
+      { key: "bank-management", label: "Bank Management" },
     ],
   },
   {
@@ -177,6 +187,9 @@ export const MODULE_TREE = [
       { key: "hiring-process", label: "Hiring Process" },
       { key: "final-profile-approval", label: "Final Profile Approval" },
       { key: "hr-daily-report", label: "HR Daily Report" },
+      { key: "salary-management", label: "Salary Management" },
+      { key: "add-paid-leaves", label: "Add Paid Leaves" },
+      { key: "paid-leave-ledger", label: "Paid Leave Ledger" },
     ],
   },
 ];
@@ -200,6 +213,7 @@ export const SUPERADMIN_MODULE_UI_NODES = [
       { kind: "leaf", key: "fast-card", label: "Fast Card" },
       { kind: "leaf", key: "attendance-details", label: "Attendance details" },
       { kind: "leaf", key: "regularization-approvals", label: "Overtime" },
+      { kind: "leaf", key: "schedule-visits", label: "Schedule Visits" },
     ],
   },
   {
@@ -253,6 +267,7 @@ export const SUPERADMIN_MODULE_UI_NODES = [
       { kind: "leaf", key: "keywords-management", label: "Keywords Management" },
       { kind: "leaf", key: "backlinks-management", label: "Backlinks Management" },
       { kind: "leaf", key: "backlinks-excel-data", label: "Backlinks Excel Data" },
+      { kind: "leaf", key: "meta-credentials-add", label: "Meta Credentials Add" },
     ],
   },
   {
@@ -262,6 +277,7 @@ export const SUPERADMIN_MODULE_UI_NODES = [
     children: [
       { kind: "leaf", key: "demo-followups", label: "Demo Followups" },
       { kind: "leaf", key: "demo-details", label: "Demo Details" },
+      { kind: "leaf", key: "schedule-visits", label: "Schedule Visits" },
     ],
   },
   {
@@ -271,6 +287,7 @@ export const SUPERADMIN_MODULE_UI_NODES = [
     children: [
       { kind: "leaf", key: "quotations", label: "Quotation" },
       { kind: "leaf", key: "invoices", label: "Invoices" },
+      { kind: "leaf", key: "performa-invoices", label: "Performa Invoices" },
       { kind: "leaf", key: "orders-process", label: "Order Process" },
       { kind: "leaf", key: "orders-delay", label: "Delay Delivery" },
       { kind: "leaf", key: "estimate-delivery", label: "Estimate Delivery" },
@@ -283,13 +300,15 @@ export const SUPERADMIN_MODULE_UI_NODES = [
     children: [
       { kind: "leaf", key: "warranty-console", label: "Register Product" },
       { kind: "leaf", key: "registered-products", label: "Registered Products" },
-      { kind: "leaf", key: "service-followups", label: "Service Follow-ups" },
+      { kind: "leaf", key: "service-followups", label: "Machine Follow-ups" },
+      { kind: "leaf", key: "service-support-report", label: "Service Support Report" },
       { kind: "leaf", key: "service-records", label: "Service History" },
       { kind: "leaf", key: "upcoming-installations", label: "Upcoming Installations" },
       { kind: "leaf", key: "service-map", label: "Service Map" },
       { kind: "leaf", key: "warranty-map", label: "Map View" },
       { kind: "leaf", key: "amc-cmc", label: "AMC/CMC Management" },
       { kind: "leaf", key: "return-products", label: "Return Products" },
+      { kind: "leaf", key: "third-party-engineers", label: "Third Party Service Engineers" },
     ],
   },
   {
@@ -307,6 +326,8 @@ export const SUPERADMIN_MODULE_UI_NODES = [
     id: "procurement",
     label: "Procurement",
     children: [
+      { kind: "leaf", key: "parties", label: "Parties" },
+      { kind: "leaf", key: "purchase-products", label: "Purchase Billings" },
       {
         kind: "group",
         id: "purchase-products",
@@ -354,6 +375,7 @@ export const SUPERADMIN_MODULE_UI_NODES = [
       { kind: "leaf", key: "other-income", label: "📈 Other Income" },
       { kind: "leaf", key: "import-billing", label: "Billing" },
       { kind: "leaf", key: "ledger", label: "Ledger" },
+      { kind: "leaf", key: "bank-management", label: "Bank Management" },
     ],
   },
   {
@@ -385,7 +407,10 @@ export const SUPERADMIN_MODULE_UI_NODES = [
       { kind: "leaf", key: "hiring-process", label: "Hiring Process" },
       { kind: "leaf", key: "final-profile-approval", label: "Final Profile Approval" },
       { kind: "leaf", key: "hr-daily-report", label: "HR Daily Report" },
+      { kind: "leaf", key: "salary-management", label: "Salary Management" },
       { kind: "leaf", key: "salary-slips", label: "Salary Slips" },
+      { kind: "leaf", key: "add-paid-leaves", label: "Add Paid Leaves" },
+      { kind: "leaf", key: "paid-leave-ledger", label: "Paid Leave Ledger" },
     ],
   },
   {
@@ -527,6 +552,18 @@ export const ALL_MODULE_KEYS = MODULE_TREE.flatMap((parent) => [
 /** Just the top-level (section) keys */
 export const TOP_LEVEL_KEYS = MODULE_TREE.map((m) => m.key);
 
+const TOP_LEVEL_KEY_SET = new Set(TOP_LEVEL_KEYS);
+
+/** Parent section keys (e.g. "dashboard") must not unlock every child in the sidebar. */
+export function stripParentSectionKeys(keys) {
+  if (!Array.isArray(keys)) return [];
+  return keys.filter((k) => !TOP_LEVEL_KEY_SET.has(k));
+}
+
+function containsParentSectionKeys(keys) {
+  return Array.isArray(keys) && keys.some((k) => TOP_LEVEL_KEY_SET.has(k));
+}
+
 /** Child keys that belong to a given parent section key */
 export function getChildKeys(parentKey) {
   if (parentKey === "others") {
@@ -563,15 +600,14 @@ export function normalizeModuleAccessKeys(keys) {
 }
 
 /**
- * Parse the raw DB value of module_access.
+ * Parse the raw DB value of module_access (ignores role — use resolveModuleAccess for enforcement).
  *
- * NULL / undefined / empty-string in DB  → not configured yet → return ALL keys (backward compat).
- * "[]" (empty JSON array) in DB          → user explicitly has NO access → return [].
- * "[\"dashboard\",...]" in DB            → return normalized keys.
+ * NULL / undefined / empty-string → ALL keys (legacy callers that expect “unset = full list”).
+ * "[]" → explicitly no access.
  */
 export function parseModuleAccess(raw) {
   if (raw === null || raw === undefined || raw === "") {
-    return [...ALL_MODULE_KEYS]; // never been set → grant all
+    return [...ALL_MODULE_KEYS];
   }
   try {
     const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
@@ -582,6 +618,96 @@ export function parseModuleAccess(raw) {
     return [...ALL_MODULE_KEYS];
   } catch {
     return [...ALL_MODULE_KEYS];
+  }
+}
+
+const FULL_GRANT_BYPASS_ROLES = new Set(["SUPERADMIN", "EA", "DIRECTOR"]);
+
+function isFullModuleGrant(keys) {
+  if (!Array.isArray(keys) || keys.length < ALL_MODULE_KEYS.length) return false;
+  const set = new Set(keys);
+  return ALL_MODULE_KEYS.every((k) => set.has(k));
+}
+
+/** Near-full grants saved before module renames — still a legacy leak. */
+function isLegacyLeakGrant(keys) {
+  if (!Array.isArray(keys) || keys.length === 0) return false;
+  if (containsParentSectionKeys(keys)) return true;
+  if (isFullModuleGrant(keys)) return true;
+  const threshold = Math.max(
+    40,
+    ALL_MODULE_KEYS.length - 8,
+    Math.floor(ALL_MODULE_KEYS.length * 0.92),
+  );
+  return keys.length >= threshold;
+}
+
+function finalizeResolvedModuleAccess(normalized, role) {
+  const leafKeys = stripParentSectionKeys(normalized);
+  if (shouldCollapseLegacyLeak(role) && isLegacyLeakGrant(normalized)) {
+    if (leafKeys.length > 0 && leafKeys.length <= 24 && !isFullModuleGrant(leafKeys)) {
+      return leafKeys;
+    }
+    return resolveUnsetModuleAccess(role);
+  }
+  return leafKeys;
+}
+
+function shouldCollapseLegacyLeak(role) {
+  const roleKey = normalizeRoleKey(role);
+  return roleKey && !FULL_GRANT_BYPASS_ROLES.has(roleKey);
+}
+
+function resolveUnsetModuleAccess(role) {
+  const defaults = getRoleDefaultModuleKeys(role);
+  return defaults.length > 0 ? normalizeModuleAccessKeys(defaults) : [];
+}
+
+/**
+ * Read module_access from DB without role-based rewriting.
+ * null/empty column → null (unset). "[]" → []. Otherwise normalized leaf keys.
+ */
+export function parseStoredModuleAccess(raw) {
+  if (raw === null || raw === undefined || raw === "") return null;
+  try {
+    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+    if (Array.isArray(parsed)) {
+      if (parsed.length === 0) return [];
+      return normalizeModuleAccessKeys(parsed);
+    }
+  } catch {
+    // fall through
+  }
+  return null;
+}
+
+/** For edit UI: unset → role defaults; explicit DB array → exact saved keys. */
+export function getModuleAccessForDisplay(raw, role) {
+  const stored = parseStoredModuleAccess(raw);
+  if (stored === null) return resolveUnsetModuleAccess(role);
+  return stripParentSectionKeys(stored);
+}
+
+/**
+ * Effective module_access for sidebar / route guards.
+ * NULL in DB → role default preset.
+ * Explicit JSON array → exactly those modules (Global Module Access / Quick Edit).
+ * Near-full legacy grant → role defaults for non-SUPERADMIN roles.
+ */
+export function resolveModuleAccess(raw, role) {
+  if (raw === null || raw === undefined || raw === "") {
+    return resolveUnsetModuleAccess(role);
+  }
+  try {
+    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+    if (Array.isArray(parsed)) {
+      if (parsed.length === 0) return [];
+      const normalized = normalizeModuleAccessKeys(parsed);
+      return finalizeResolvedModuleAccess(normalized, role);
+    }
+    return resolveUnsetModuleAccess(role);
+  } catch {
+    return resolveUnsetModuleAccess(role);
   }
 }
 
@@ -606,27 +732,10 @@ export function applySuperadminOnlyModuleRestrictions(allowedKeys, role) {
 
 /**
  * Role-specific deny lists (even if module_access contains the key).
- * Use for "this role must never see this module".
+ * Global Module Access / Quick Edit selections are the source of truth — no stripping here.
  */
-const HR_DENY_MODULE_KEYS = new Set([
-  // Reports / Orders should not be shown to HR
-  "lead-reports",
-  "quotations-report",
-  "order-report",
-  "demo-followups",
-  "item-wise-sales",
-  "customer-payment-behavior",
-  "payment-pending",
-  "orders-process",
-  "orders-delay",
-]);
-
-export function applyRoleDenyModuleRestrictions(allowedKeys, role) {
-  if (!allowedKeys) return allowedKeys ?? null;
-  const r = String(role ?? "").trim().toUpperCase();
-  const isHr = r === "HR" || r === "HR HEAD" || r === "HR EXECUTIVE" || r === "JUNIOR HR EXECUTIVE" || r === "HR RECRUITER";
-  if (!isHr) return allowedKeys;
-  return allowedKeys.filter((k) => !HR_DENY_MODULE_KEYS.has(k));
+export function applyRoleDenyModuleRestrictions(allowedKeys) {
+  return allowedKeys ?? null;
 }
 
 /**
@@ -658,4 +767,15 @@ export function isSectionAllowed(sectionKey, allowedKeys) {
   if (allowedKeys.includes(sectionKey)) return true;
   const childKeys = getChildKeys(sectionKey);
   return childKeys.some((k) => allowedKeys.includes(k));
+}
+
+/**
+ * Whether a leaf module key is allowed — exact key match only.
+ * (Parent section keys do not auto-unlock all children.)
+ */
+export function isModuleKeyAllowed(moduleKey, allowedKeys) {
+  if (!allowedKeys) return true;
+  const key = String(moduleKey || "").trim();
+  if (!key) return false;
+  return allowedKeys.includes(key);
 }

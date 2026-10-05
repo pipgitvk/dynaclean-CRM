@@ -13,8 +13,8 @@ export default function FastCardsWidget() {
     const init = async () => {
       try {
         const [modulesRes, cardRes] = await Promise.all([
-          fetch("/api/my--modules"),
-          fetch("/api/card-data,"),
+          fetch("/api/my-modules"),
+          fetch("/api/card-data"),
         ]);
 
         if (modulesRes.ok) {

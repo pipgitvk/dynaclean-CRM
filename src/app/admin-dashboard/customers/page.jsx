@@ -1,6 +1,7 @@
 import { getDbConnection } from "@/lib/db";
 import CustomerTable from "./CustomerTable"; // Import the new component
 import { getSessionPayload } from "@/lib/auth";
+import { notesLanguageExistsSql } from "@/constants/notesLanguageOptions";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +33,7 @@ export default async function HomePage({ searchParams }) {
     from,
     to,
     tags,
+    notes_language,
     page = "1",
   } = searchParamsResolved;
 
@@ -119,6 +121,11 @@ export default async function HomePage({ searchParams }) {
     if (tags) {
       query += ` AND cf.multi_tag LIKE ?`;
       params.push(`%${tags}%`);
+    }
+
+    if (notes_language) {
+      query += ` AND ${notesLanguageExistsSql("?")}`;
+      params.push(notes_language);
     }
 
     // Get total count

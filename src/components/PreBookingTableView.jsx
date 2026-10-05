@@ -29,7 +29,7 @@ export default function PreBookingTableView({ basePath }) {
       console.error("Error fetching pre-bookings:", error);
       // Fallback to regular API if new endpoint doesn't exist
       try {
-        const response = await fetch("/api/pre-booking?limit=5.00");
+        const response = await fetch("/api/pre-booking?limit=500");
         const data = await response.json();
         if (data.success) {
           setPreBookings(data.bookings || []);

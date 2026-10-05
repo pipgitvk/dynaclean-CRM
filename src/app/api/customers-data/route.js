@@ -3,6 +3,7 @@ import { getDbConnection } from "@/lib/db";
 import { NextResponse } from "next/server";
 import { getSessionPayload } from "@/lib/auth";
 import {
+  buildGemCustomerScopeWhere,
   buildOwnershipWhere,
   canViewAllCustomers,
   getScopedUsername,
@@ -23,6 +24,7 @@ export async function GET(req) {
 
     const { searchParams } = new URL(req.url);
     const mode = searchParams.get("mode") || "table";
+    const globalSearch = searchParams.get("global") === "1";
 
     const startDate = searchParams.get("startDate");
     const endDate = searchParams.get("endDate");
@@ -72,13 +74,22 @@ export async function GET(req) {
 
     // Data visibility:
     // Privileged roles (incl. SALES CUM BACKOFFICE) → all rows incl. Denied
-    // SERVICE SUPPORT → rows where service_lead_source = their username
-    // GEM → rows where gem_lead_source = their username
+    // When globalSearch=1 (header search): SERVICE SUPPORT sees processed-order customers
+    // GEM → own customers (lead_source, gem_lead_source, assignment, follow-up)
     // everyone else → only rows assigned/owned by them (or deny if username missing)
     if (!canViewAllCustomers(role)) {
       const normalizedRole = normalizeRoleKey(role);
 
-      if (normalizedRole === "SERVICE SUPPORT") {
+      if (globalSearch && normalizedRole === "SERVICE SUPPORT") {
+        // SERVICE SUPPORT global header search: only customers with at least one fully processed order
+        // (account_status = 1 AND dispatch_status = 1)
+        // Use subquery with no outer-table reference so it works in both countSql (no alias) and dataSql (alias c)
+        whereClause += ` AND customer_id IN (
+          SELECT DISTINCT customer_id FROM neworder
+          WHERE account_status = 1
+            AND dispatch_status = 1
+        )`;
+      } else if (normalizedRole === "SERVICE SUPPORT") {
         // SERVICE SUPPORT sees only customers assigned to them via service_lead_source
         if (username) {
           whereClause += ` AND service_lead_source = ?`;
@@ -87,13 +98,9 @@ export async function GET(req) {
           whereClause += ` AND 1=0`;
         }
       } else if (normalizedRole === "GEM") {
-        // GEM sees only customers assigned to them via gem_lead_source
-        if (username) {
-          whereClause += ` AND gem_lead_source = ?`;
-          params.push(username);
-        } else {
-          whereClause += ` AND 1=0`;
-        }
+        const gemScope = buildGemCustomerScopeWhere({ username });
+        whereClause += ` AND ${gemScope.sql}`;
+        params.push(...gemScope.params);
       } else {
         const ownership = buildOwnershipWhere({
           role,
@@ -185,7 +192,7 @@ export async function GET(req) {
     }
     
     const dataSql =
-      "SELECT c.customer_id, c.date_created, c.lead_campaign, c.first_name, c.company, c.status, c.lead_source, " + serviceLeadSourceColumn + " c.stage, " +
+      "SELECT c.customer_id, c.date_created, c.lead_campaign, c.first_name, c.company, c.status, c.lead_source, c.address, c.state, " + serviceLeadSourceColumn + " c.stage, " +
       "(SELECT MIN(cf.followed_date) FROM customers_followup cf WHERE cf.customer_id = c.customer_id) as contacted_time, " +
       "(SELECT cf.next_followup_date FROM customers_followup cf WHERE cf.customer_id = c.customer_id AND cf.next_followup_date IS NOT NULL ORDER BY cf.followed_date ASC LIMIT 1) as next_followup_time, " +
       "(SELECT COUNT(*) FROM customers_followup cf WHERE cf.customer_id = c.customer_id) as followup_count " +

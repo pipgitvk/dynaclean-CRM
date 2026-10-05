@@ -69,67 +69,133 @@ export async function POST(req) {
     }
     if (!items || !items.length) return NextResponse.json({ error: "Credit note has no items" }, { status: 400 });
 
-    // 3. For each item → increase product_stock & product_stock_summary
+    // 3. For each item → increase stock in correct table (spare vs product)
     for (const item of items) {
       const product_code = item.item_code || item.product_code || item.code;
       const qty = Number(item.qty || item.quantity || item.return_qty || 0);
 
       if (!product_code || qty <= 0) continue;
 
-      // Get latest stock snapshot
-      const [lastRows] = await conn.execute(
-        `SELECT total, delhi, south FROM product_stock
-         WHERE product_code = ?
-         ORDER BY created_at DESC LIMIT 1`,
-        [product_code]
+      // Resolve: is this a spare or a product?
+      // spare_number in spare_list is INT — compare as string on both sides
+      const [spareMatch] = await conn.execute(
+        `SELECT id FROM spare_list WHERE CAST(spare_number AS CHAR) = ? OR CAST(id AS CHAR) = ? LIMIT 1`,
+        [String(product_code), String(product_code)]
       );
-
-      const prev     = lastRows[0] || { total: 0, delhi: 0, south: 0 };
-      const newTotal = (Number(prev.total) || 0) + qty;
-      const newDelhi = (Number(prev.delhi) || 0) + qty; // returned stock → Delhi by default
-      const newSouth = Number(prev.south) || 0;
-
-      // Insert new IN row
-      await conn.execute(
-        `INSERT INTO product_stock
-           (product_code, quantity, note, stock_status, added_by, added_date, total, delhi, south)
-         VALUES (?, ?, ?, 'IN', ?, ?, ?, ?, ?)`,
-        [
-          product_code,
-          qty,
-          `Return Warehouse-In | Order: ${order_id}`,
-          payload.username,
-          wh_date || new Date().toISOString().split("T")[0],
-          newTotal,
-          newDelhi,
-          newSouth,
-        ]
-      );
-
-      // Update or insert summary
-      const [summaryRows] = await conn.execute(
-        "SELECT total_quantity, Delhi, South FROM product_stock_summary WHERE product_code = ?",
-        [product_code]
-      );
-
-      if (summaryRows.length > 0) {
-        await conn.execute(
-          `UPDATE product_stock_summary
-             SET last_updated_quantity = ?,
-                 total_quantity = total_quantity + ?,
-                 Delhi = Delhi + ?,
-                 last_status = 'IN',
-                 updated_at = NOW()
-             WHERE product_code = ?`,
-          [qty, qty, qty, product_code]
+      // Fallback: match by item_name
+      let spareRow = spareMatch[0] || null;
+      if (!spareRow && item.item_name) {
+        const [spareByName] = await conn.execute(
+          `SELECT id FROM spare_list WHERE LOWER(TRIM(item_name)) = LOWER(TRIM(?)) LIMIT 1`,
+          [item.item_name]
         );
+        spareRow = spareByName[0] || null;
+      }
+
+      const godown = "Delhi - Mundka"; // returned stock → Delhi by default
+
+      if (spareRow) {
+        // ── Spare: stock_list + stock_summary ─────────────────────────────
+        const spareId = spareRow.id;
+
+        const [lastRows] = await conn.execute(
+          `SELECT total, delhi, south FROM stock_list WHERE spare_id = ? ORDER BY created_at DESC LIMIT 1`,
+          [spareId]
+        );
+        const prev     = lastRows[0] || { total: 0, delhi: 0, south: 0 };
+        const newTotal = (Number(prev.total) || 0) + qty;
+        const newDelhi = (Number(prev.delhi) || 0) + qty;
+        const newSouth = Number(prev.south) || 0;
+
+        await conn.execute(
+          `INSERT INTO stock_list
+             (spare_id, quantity, note, stock_status, added_by, added_date, godown, total, Delhi, South, godown_location)
+           VALUES (?, ?, ?, 'IN', ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            spareId, qty,
+            `Return Warehouse-In | Order: ${order_id}`,
+            payload.username,
+            wh_date || new Date().toISOString().split("T")[0],
+            godown, newTotal, newDelhi, newSouth, godown,
+          ]
+        );
+
+        const [summaryRows] = await conn.execute(
+          "SELECT total_quantity, Delhi, South FROM stock_summary WHERE spare_id = ?",
+          [spareId]
+        );
+        if (summaryRows.length > 0) {
+          await conn.execute(
+            `UPDATE stock_summary
+               SET last_updated_quantity = ?,
+                   total_quantity = total_quantity + ?,
+                   Delhi = Delhi + ?,
+                   last_status = 'IN',
+                   updated_at = NOW()
+             WHERE spare_id = ?`,
+            [qty, qty, qty, spareId]
+          );
+        } else {
+          await conn.execute(
+            `INSERT INTO stock_summary (spare_id, last_updated_quantity, total_quantity, Delhi, South, last_status)
+             VALUES (?, ?, ?, ?, 0, 'IN')`,
+            [spareId, qty, qty, qty]
+          );
+        }
+
+        console.log(`[warehouse-in] Spare id=${spareId} (code=${product_code}) +${qty} → stock_list/stock_summary`);
+
       } else {
-        await conn.execute(
-          `INSERT INTO product_stock_summary
-             (product_code, last_updated_quantity, total_quantity, Delhi, South, last_status)
-           VALUES (?, ?, ?, ?, 0, 'IN')`,
-          [product_code, qty, qty, qty]
+        // ── Product: product_stock + product_stock_summary ─────────────────
+        const [lastRows] = await conn.execute(
+          `SELECT total, delhi, south FROM product_stock
+           WHERE product_code = ?
+           ORDER BY created_at DESC LIMIT 1`,
+          [product_code]
         );
+        const prev     = lastRows[0] || { total: 0, delhi: 0, south: 0 };
+        const newTotal = (Number(prev.total) || 0) + qty;
+        const newDelhi = (Number(prev.delhi) || 0) + qty;
+        const newSouth = Number(prev.south) || 0;
+
+        await conn.execute(
+          `INSERT INTO product_stock
+             (product_code, quantity, note, stock_status, added_by, added_date, total, delhi, south)
+           VALUES (?, ?, ?, 'IN', ?, ?, ?, ?, ?)`,
+          [
+            product_code, qty,
+            `Return Warehouse-In | Order: ${order_id}`,
+            payload.username,
+            wh_date || new Date().toISOString().split("T")[0],
+            newTotal, newDelhi, newSouth,
+          ]
+        );
+
+        const [summaryRows] = await conn.execute(
+          "SELECT total_quantity, Delhi, South FROM product_stock_summary WHERE product_code = ?",
+          [product_code]
+        );
+        if (summaryRows.length > 0) {
+          await conn.execute(
+            `UPDATE product_stock_summary
+               SET last_updated_quantity = ?,
+                   total_quantity = total_quantity + ?,
+                   Delhi = Delhi + ?,
+                   last_status = 'IN',
+                   updated_at = NOW()
+             WHERE product_code = ?`,
+            [qty, qty, qty, product_code]
+          );
+        } else {
+          await conn.execute(
+            `INSERT INTO product_stock_summary
+               (product_code, last_updated_quantity, total_quantity, Delhi, South, last_status)
+             VALUES (?, ?, ?, ?, 0, 'IN')`,
+            [product_code, qty, qty, qty]
+          );
+        }
+
+        console.log(`[warehouse-in] Product code=${product_code} +${qty} → product_stock/product_stock_summary`);
       }
     }
 

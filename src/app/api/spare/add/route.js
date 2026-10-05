@@ -5,6 +5,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import heicConvert from 'heic-convert';
 import { v2 as cloudinary } from 'cloudinary';
+import { ensureCoveredInWarrantyColumn, normalizeWarrantyFlag } from '@/lib/spareWarranty';
 
 /**
  * Cloudinary when creds exist and either:
@@ -101,6 +102,7 @@ export async function POST(request) {
     const sale_price = formData.get('sale_price');
     const last_negotiation_price = formData.get('last_negotiation_price');
     const tax = formData.get('tax');
+    const covered_in_warranty = normalizeWarrantyFlag(formData.get('covered_in_warranty'));
 
     // Basic validation - only require purchase_price and tax if not DESIGN ENGINEER or SERVICE SUPPORT or EA
     const userRole = tokenPayload.role;
@@ -114,6 +116,7 @@ export async function POST(request) {
 
     try {
         const db = await getDbConnection();
+        await ensureCoveredInWarrantyColumn(db);
 
         // Prevent duplicates by item_name (case-insensitive)
         const [existing] = await db.execute(
@@ -142,8 +145,8 @@ export async function POST(request) {
         // Insert into spare_list table
         const spareQuery = `
             INSERT INTO spare_list 
-            (item_name, specification, type, make, model, compatible_machine, purchase_price, sale_price, last_negotiation_price, tax, image, catalog , created_by) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (item_name, specification, type, make, model, compatible_machine, purchase_price, sale_price, last_negotiation_price, tax, image, catalog, created_by, covered_in_warranty) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
 
         const spareValues = [
@@ -159,7 +162,8 @@ export async function POST(request) {
             canSkipPriceFields ? null : parseFloat(tax),
             imagePath,
             catalogPath,
-            username
+            username,
+            covered_in_warranty,
         ];
 
         await db.execute(spareQuery, spareValues);

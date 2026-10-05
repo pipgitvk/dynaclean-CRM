@@ -23,7 +23,7 @@ export default function UpcomingTeamLeaderFollowupsCards({ teamLeader }) {
     async function fetchFollowups() {
       setLoading(true);
       try {
-        const res = await fetch(`/api/upcoming-tl-followups?teamLeader=:${teamLeader}`);
+        const res = await fetch(`/api/upcoming-tl-followups?teamLeader=${teamLeader}`);
         const data = await res.json();
         setFollowups(data.followups || []);
         console.log("Fetched TL followups:", data.followups);
