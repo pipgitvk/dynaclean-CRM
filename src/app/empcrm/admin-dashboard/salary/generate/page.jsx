@@ -216,10 +216,17 @@ const GenerateSalaryPage = () => {
                     }
                     const lateN = Number(empAtt.late_day_count) || 0;
                     const presN = Number(empAtt.present_days) || 0;
+                    const cardsPresent =
+                        cards != null && cards.present != null
+                            ? Number(cards.present) || 0
+                            : null;
                     const totalPunched =
-                        empAtt.total_punched_days != null && empAtt.total_punched_days !== ""
-                            ? Number(empAtt.total_punched_days)
-                            : presN + lateN;
+                        cardsPresent != null
+                            ? cardsPresent
+                            : empAtt.total_punched_days != null &&
+                                empAtt.total_punched_days !== ""
+                              ? Number(empAtt.total_punched_days)
+                              : presN + lateN;
                     setAttendanceBreakdown({
                         month: selectedMonth,
                         cards: empAtt.attendance_cards || null,
@@ -815,11 +822,16 @@ const GenerateSalaryPage = () => {
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Present Days</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Pay days (salary)
+                                    <span className="block text-xs font-normal text-gray-500">
+                                        Pro-rated payout days — not the attendance “Present” count
+                                    </span>
+                                </label>
                                 <input
                                     type="number"
                                     min={0}
-                                    step={1}
+                                    step={0.5}
                                     value={formData.present_days}
                                     disabled
                                     className="w-full px-3 py-2 border rounded-md border-gray-200 bg-gray-100 text-gray-700 cursor-not-allowed"
@@ -1162,23 +1174,19 @@ const GenerateSalaryPage = () => {
                             {(() => {
                                 const c = attendanceBreakdown.cards;
                                 if (c) {
-                                    const presentRegular = attendanceDisplayAllZero
-                                        ? 0
-                                        : Math.max(
-                                              0,
-                                              (Number(c.present) || 0) -
-                                                  (Number(c.halfDays) || 0) -
-                                                  (Number(c.lateDays) || 0)
-                                          );
                                     const z = (n) => (attendanceDisplayAllZero ? 0 : Number(n) || 0);
+                                    const presentLikeAttendanceLog = z(c.present);
                                     return (
                                         <>
                                             <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
-                                                <dt className="text-slate-600">Present days</dt>
+                                                <dt className="text-slate-600">
+                                                    Present
+                                                    <span className="block text-[11px] font-normal text-slate-500">
+                                                        Same as Attendance details card (punch days)
+                                                    </span>
+                                                </dt>
                                                 <dd className="font-semibold text-green-600 tabular-nums">
-                                                    {attendanceDisplayAllZero
-                                                        ? 0
-                                                        : z(c.present) + z(c.lateDays)}
+                                                    {presentLikeAttendanceLog}
                                                 </dd>
                                             </div>
                                             <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">

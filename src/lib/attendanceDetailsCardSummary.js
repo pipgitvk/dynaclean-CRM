@@ -4,9 +4,8 @@
  * date keys use dateToYmdKey (stable for DB strings) like the rest of payroll.
  */
 import {
-  classifyAttendanceDayForSalary,
-  isHalfDayByRules,
   isHalfDayWithGrace,
+  isLateDaySummary,
 } from "@/lib/attendanceRulesEngine";
 import {
   dateToYmdKey,
@@ -69,30 +68,16 @@ export function computeAttendanceDetailsCardSummaryForMonth(p) {
 
   const leaveMap = buildLeaveMapForUser(leavesAll, username);
 
-  // Paid leave map (non-half-day, leave_type=paid) — overrides punch like the attendance page does
+  // All paid leaves (incl. half-day) — same priority as attendance timeline
   const paidLeaveMap = new Map();
   for (const leave of leavesAll || []) {
     if (String(leave.username ?? "").trim().toLowerCase() !== String(username ?? "").trim().toLowerCase()) continue;
-    if (leave.leave_type !== 'paid') continue;
-    if (leave.is_half_day == 1 || leave.is_half_day === true) continue;
+    if (leave.leave_type !== "paid") continue;
     const fromD = new Date(leave.from_date);
     const toD = new Date(leave.to_date);
     for (let x = new Date(fromD); x <= toD; x.setDate(x.getDate() + 1)) {
       const k = dateToYmdKey(x);
       if (k) paidLeaveMap.set(k, leave);
-    }
-  }
-
-  // Half-day leave map — track which dates have approved half-day leaves
-  const halfDayLeaveMap = new Map();
-  for (const leave of leavesAll || []) {
-    if (String(leave.username ?? "").trim().toLowerCase() !== String(username ?? "").trim().toLowerCase()) continue;
-    if (!(leave.is_half_day == 1 || leave.is_half_day === true)) continue;
-    const fromD = new Date(leave.from_date);
-    const toD = new Date(leave.to_date);
-    for (let x = new Date(fromD); x <= toD; x.setDate(x.getDate() + 1)) {
-      const k = dateToYmdKey(x);
-      if (k) halfDayLeaveMap.set(k, leave);
     }
   }
 
@@ -114,8 +99,8 @@ export function computeAttendanceDetailsCardSummaryForMonth(p) {
     holidays: 0,
     halfDays: 0,
     lateDays: 0,
+    paidHalfDays: 0,
   };
-  let freeGraceUsed = 0;
   /** Grace counter for half-day calculation (first 3 grace period days not counted as half-days) */
   let halfDayGraceUsed = 0;
 
@@ -130,31 +115,33 @@ export function computeAttendanceDetailsCardSummaryForMonth(p) {
     const isWeekend = d.getDay() === 0;
     const isHoliday = holidayMap.has(dateString);
     const isOnLeave = leaveMap.has(dateString);
-    const hasHalfDayLeave = halfDayLeaveMap.has(dateString);
 
     const hasRealPunch = rowHasMeaningfulCheckinOrCheckout(existingLog);
-    // Paid leave takes priority over punch (same logic as attendance page frontend)
-    if (paidLeaveMap.has(dateString)) {
-      // Full paid leave day: treat as half-day if there's also a real punch
-      // (employee worked half the day and took leave for the other half)
-      if (hasRealPunch) {
+    const approvedPaidLeave = paidLeaveMap.get(dateString);
+
+    // Paid leave before punch — same order as generateAttendanceTimeline
+    if (approvedPaidLeave) {
+      const leaveIsHalfDay =
+        approvedPaidLeave.is_half_day == 1 ||
+        approvedPaidLeave.leave_type === "half-day";
+      const treatAsHalfDay = hasRealPunch || leaveIsHalfDay;
+      if (treatAsHalfDay) {
         summary.halfDays++;
+        summary.paidHalfDays++;
       } else {
         summary.leaves++;
       }
-    } else if (hasHalfDayLeave) {
-      // DB-marked half-day leave → always counts as half-day
-      summary.halfDays++;
     } else if (existingLog && hasRealPunch) {
-      // Match payroll (`computeSalaryPayDaysForUser`): only "regular" is a full credit day.
-      const cls = classifyAttendanceDayForSalary(existingLog, rules, freeGraceUsed);
-      freeGraceUsed = cls.freeGraceUsed;
-      if (cls.kind === "lateDay") summary.lateDays++;
-      else summary.present++;
-      // Count half-days for all present days using grace period logic (matching attendance page behavior)
-      const { isHalfDay, graceUsed } = isHalfDayWithGrace(existingLog, rules, halfDayGraceUsed);
+      // Punch wins over half-day leave on same date (attendance page)
+      summary.present++;
+      const { isHalfDay, graceUsed } = isHalfDayWithGrace(
+        existingLog,
+        rules,
+        halfDayGraceUsed
+      );
       halfDayGraceUsed = graceUsed;
       if (isHalfDay) summary.halfDays++;
+      if (isLateDaySummary(existingLog, rules)) summary.lateDays++;
     } else if (isHoliday) {
       summary.holidays++;
     } else if (isWeekend) {
@@ -172,10 +159,13 @@ export function computeAttendanceDetailsCardSummaryForMonth(p) {
       }
     } else if (isOnLeave) {
       const leave = leaveMap.get(dateString);
-      if (leave?.leave_type === 'unpaid') {
+      if (leave?.leave_type === "unpaid") {
         summary.absents++;
       } else {
-        summary.leaves++;
+        const leaveIsHalfDay =
+          leave?.is_half_day == 1 || leave?.leave_type === "half-day";
+        if (leaveIsHalfDay) summary.halfDays++;
+        else summary.leaves++;
       }
     } else {
       summary.absents++;
