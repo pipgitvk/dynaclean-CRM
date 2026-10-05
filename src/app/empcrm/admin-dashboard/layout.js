@@ -1,26 +1,26 @@
 import "../../globals.css";
-import getEmpCrmAdminSidebarMenuItems, {
-  getShowBackToUserCrmForEmpCrmAdmin,
-  getEmpCrmAdminBackButtonPath,
-} from "@/lib/getEmpCrmAdminSidebarMenuItems";
-import SalesLayoutShell from "@/components/layouts/SalesLayoutShell";
+import getSidebarMenuItems, {
+  getShowBackToUserCrm,
+  getAccountantBackPath,
+} from "@/lib/getAdminSidebarMenuItems";
+import UserLayoutShell from "@/components/layouts/UserAdminLayoutShell";
 import IpGuard from "@/components/IpGuard";
 
-export default async function EmpCrmLayout({ children }) {
-  const menuItems = await getEmpCrmAdminSidebarMenuItems();
-  const showBackToUserCrm = await getShowBackToUserCrmForEmpCrmAdmin();
-  const backButtonPath = await getEmpCrmAdminBackButtonPath();
+/** Same admin shell + sidebar as /admin-dashboard; EMPCRM pages stay under /empcrm/... URLs. */
+export default async function EmpCrmAdminLayout({ children }) {
+  const menuItems = await getSidebarMenuItems();
+  const showBackToUserCrm = await getShowBackToUserCrm();
+  const accountantBackPath = await getAccountantBackPath();
 
   return (
-    <SalesLayoutShell
+    <UserLayoutShell
       menuItems={menuItems}
-      // HR: only show “Back to user CRM” (hide “Back to CRM” to avoid 2 buttons)
-      showBackButton={!showBackToUserCrm}
-      backButtonPath={backButtonPath}
       showBackToUserCrm={showBackToUserCrm}
+      showBackButton={!!accountantBackPath}
+      backButtonPath={accountantBackPath}
     >
       <IpGuard />
       {children}
-    </SalesLayoutShell>
+    </UserLayoutShell>
   );
 }

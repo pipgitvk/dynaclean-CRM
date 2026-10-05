@@ -162,7 +162,21 @@ const iconMap = {
   TrendingUp,
 };
 
-//this is test
+function isPathActive(pathname, path) {
+  if (!path || !pathname) return false;
+  const normalizedPath = String(path).replace(/\/+$/, "");
+  const normalizedPathname = String(pathname).replace(/\/+$/, "");
+  if (normalizedPathname === normalizedPath) return true;
+  return normalizedPathname.startsWith(`${normalizedPath}/`);
+}
+
+function menuTreeHasActivePath(item, pathname) {
+  if (item.path && isPathActive(pathname, item.path)) return true;
+  if (item.children?.length) {
+    return item.children.some((child) => menuTreeHasActivePath(child, pathname));
+  }
+  return false;
+}
 
 export default function Sidebar({
   isOpen,
@@ -174,7 +188,9 @@ export default function Sidebar({
   const [openMenus, setOpenMenus] = useState({});
   const { theme } = useTheme();
   const pathname = usePathname();
-  const isAdminDashboardRoute = pathname?.includes("/admin-dashboard");
+  const isAdminDashboardRoute =
+    pathname?.includes("/admin-dashboard") ||
+    pathname?.startsWith("/empcrm/admin-dashboard");
   const sidebarTitle = isAdminDashboardRoute
     ? "Admin Dashboard"
     : "User Dashboard";
@@ -200,7 +216,9 @@ export default function Sidebar({
       const Icon = iconMap[item.icon] || null;
 
       if (item.children?.length) {
-        const isSubOpen = openMenus[itemKey];
+        const childActive = menuTreeHasActivePath(item, pathname);
+        const isSubOpen =
+          openMenus[itemKey] !== undefined ? openMenus[itemKey] : childActive;
         return (
           <li key={itemKey} className="m-2">
             <button

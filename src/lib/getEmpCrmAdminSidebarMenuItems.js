@@ -29,7 +29,7 @@ function attachProfileApprovalsBadge(items, pendingCount) {
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret";
 
-const empCrmMenuItems = [
+export const empCrmAdminMenuItems = [
   { path: "/empcrm/admin-dashboard", name: "EMPCRM Dashboard", roles: ["SUPERADMIN", "HR HEAD", "HR", "Junior HR Executive", "HR Executive", "HR Recruiter"], icon: "Home" },
   { path: "/empcrm/admin-dashboard/profile", name: "Profile Management", roles: ["SUPERADMIN", "HR HEAD", "HR", "Junior HR Executive", "HR Executive", "HR Recruiter"], icon: "UserCircle" },
   { path: "/empcrm/admin-dashboard/profile/approvals", name: "Profile Approvals", roles: ["SUPERADMIN", "HR HEAD", "HR", "Junior HR Executive", "HR Executive", "HR Recruiter"], icon: "UserCircle" },
@@ -44,6 +44,25 @@ const empCrmMenuItems = [
   { path: "/empcrm/admin-dashboard/salary", name: "Salary Management", roles: ["SUPERADMIN", "HR HEAD", "HR", "Junior HR Executive", "HR Executive", "HR Recruiter", "ACCOUNTANT"], icon: "DollarSign" },
   { path: "/empcrm/admin-dashboard/salary-slips", name: "Salary slips", roles: ["SUPERADMIN", "HR HEAD", "HR", "Junior HR Executive", "HR Executive", "HR Recruiter", "ACCOUNTANT"], icon: "Receipt" },
 ];
+
+/** Filtered EMPCRM admin links for nesting under main admin sidebar (Employee CRM). */
+export async function getEmpCrmAdminMenuChildrenForRole(roleKeyNormalized) {
+  let items = empCrmAdminMenuItems.filter(
+    (item) =>
+      item.roles.includes("ALL") ||
+      item.roles.some((r) => normalizeRoleKey(r) === roleKeyNormalized),
+  );
+
+  const seesProfileApprovals = items.some(
+    (item) => item.path === PROFILE_APPROVALS_PATH,
+  );
+  if (seesProfileApprovals) {
+    const pending = await countPendingHrProfileApprovals();
+    items = attachProfileApprovalsBadge(items, pending);
+  }
+
+  return items;
+}
 
 export default async function getEmpCrmAdminSidebarMenuItems() {
   const cookieStore = await cookies();
@@ -62,7 +81,7 @@ export default async function getEmpCrmAdminSidebarMenuItems() {
 
   const roleKey = normalizeRoleKey(role || "GUEST") || "GUEST";
 
-  let items = empCrmMenuItems.filter(
+  let items = empCrmAdminMenuItems.filter(
     (item) =>
       item.roles.includes("ALL") ||
       item.roles.some((r) => normalizeRoleKey(r) === roleKey),

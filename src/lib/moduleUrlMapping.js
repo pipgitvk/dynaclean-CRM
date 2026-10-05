@@ -96,7 +96,7 @@ export const MODULE_KEY_TO_URL = {
 
   // Employees
   "employee-list": "/admin-dashboard/employees",
-  "employee-crm": "/empcrm",
+  "employee-crm": "/empcrm/admin-dashboard",
   "attendance-log": "/empcrm/admin-dashboard/attendance ",
 
   // HR Operations

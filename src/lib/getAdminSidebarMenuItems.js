@@ -157,6 +157,7 @@ import {
   applySuperadminOnlyModuleRestrictions,
   applyRoleDenyModuleRestrictions,
 } from "@/lib/moduleAccess";
+import { getEmpCrmAdminMenuChildrenForRole } from "@/lib/getEmpCrmAdminSidebarMenuItems";
 
 const FINAL_PROFILE_APPROVAL_PATH =
   "/empcrm/admin-dashboard/profile/approvals-admin";
@@ -714,12 +715,6 @@ const allMenuItems = [
       //   icon: "User",
       // },
       {
-        path: "/empcrm",
-        name: "Employee CRM",
-        roles: ["SUPERADMIN", "HR", "HR HEAD"],
-        icon: "User",
-      },
-      {
         path: "/admin-dashboard/paid-leave-ledger",
         name: "Paid Leave Ledger",
         accessKey: "paid-leave-ledger",
@@ -727,6 +722,21 @@ const allMenuItems = [
         icon: "Calendar",
       },
     ],
+  },
+  {
+    name: "Employee CRM",
+    accessKey: "employee-crm",
+    roles: [
+      "SUPERADMIN",
+      "HR",
+      "HR HEAD",
+      "Junior HR Executive",
+      "HR Executive",
+      "HR Recruiter",
+      "ACCOUNTANT",
+    ],
+    icon: "User",
+    children: [],
   },
   {
     name: "HR Operations",
@@ -1028,8 +1038,21 @@ async function getUserModuleAccess(username, roleKey) {
  * Parents with moduleKey: section visible if any child key matches (isSectionAllowed).
  * Nested children: recurse. Leaves with accessKey: require that exact key.
  */
+function injectEmpCrmChildren(items, empCrmChildren) {
+  if (!empCrmChildren?.length) return items;
+  return items.map((item) => {
+    if (item.name === "Employee CRM") {
+      return { ...item, children: empCrmChildren };
+    }
+    return item;
+  });
+}
+
 function filterMenuItemDeep(item, allowedModules) {
   if (item.children?.length) {
+    if (item.accessKey && !allowedModules.includes(item.accessKey)) {
+      return null;
+    }
     const sectionOk =
       !item.moduleKey || isSectionAllowed(item.moduleKey, allowedModules);
     if (!sectionOk) return null;
@@ -1055,7 +1078,9 @@ function filterMenuItemsByModuleAccess(items, allowedModules) {
 
 export default async function getSidebarMenuItems() {
   const roleKeyNormalized = await getAdminRoleKeyNormalized();
-  let items = filterMenuItemsByRole(allMenuItems, roleKeyNormalized);
+  const empCrmChildren = await getEmpCrmAdminMenuChildrenForRole(roleKeyNormalized);
+  const menuWithEmpCrm = injectEmpCrmChildren(allMenuItems, empCrmChildren);
+  let items = filterMenuItemsByRole(menuWithEmpCrm, roleKeyNormalized);
 
   // Apply module_access filtering for non-SUPERADMIN users
   if (roleKeyNormalized !== "SUPERADMIN") {
