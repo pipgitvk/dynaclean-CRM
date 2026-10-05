@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import dayjs from "dayjs";
 import toast from "react-hot-toast";
 
-export default function FollowupForm({ taskId, status }) {
+export default function FollowupForm({ taskId, status, onSuccess }) {
   const router = useRouter();
   const fileInputRef = useRef(null);
   const [notes, setNotes] = useState("");
@@ -15,6 +15,10 @@ export default function FollowupForm({ taskId, status }) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    setCurrentStatus(status);
+  }, [status]);
 
   const handleImageChange = (e) => {
     const file = e.target.files?.[0];
@@ -69,6 +73,12 @@ export default function FollowupForm({ taskId, status }) {
       if (!res.ok) throw new Error("Failed to submit follow-up");
 
       toast.success("✅ Task follow-up saved successfully!");
+      setNotes("");
+      removeImage();
+      if (typeof onSuccess === "function") {
+        onSuccess();
+        return;
+      }
       setTimeout(() => {
         router.push("/admin-dashboard?message=followup-success");
       }, 1500);

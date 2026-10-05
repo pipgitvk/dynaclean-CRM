@@ -2,6 +2,7 @@ import { getDbConnection } from "@/lib/db";
 import { NextResponse } from "next/server";
 import fs from "fs/promises";
 import path from "path";
+import { getSessionPayload } from "@/lib/auth";
 
 // Use uploads/ + /api/image/... so files are served by the Node handler (same as other media).
 // public/task_followup_images often 404s behind reverse proxies or ephemeral serverless disks.
@@ -24,6 +25,49 @@ async function saveImage(file) {
   const filepath = path.join(UPLOAD_DIR, filename);
   await fs.writeFile(filepath, buffer);
   return `/api/image/task_followup/${filename}`;
+}
+
+export async function GET(_req, { params }) {
+  const payload = await getSessionPayload();
+  if (!payload) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const resolvedParams = await params;
+  const taskId = resolvedParams.taskId;
+  const pool = await getDbConnection();
+
+  try {
+    const [[taskRow]] = await pool.execute(
+      `SELECT task_id, taskname, taskassignto, next_followup_date, status
+       FROM task WHERE task_id = ?`,
+      [taskId],
+    );
+
+    if (!taskRow) {
+      return NextResponse.json({ error: "Task not found" }, { status: 404 });
+    }
+
+    const [followups] = await pool.execute(
+      `SELECT followed_date, notes, status, image_path FROM task_followup
+       WHERE task_id = ?
+         AND (
+           followed_date IS NOT NULL
+           OR (notes IS NOT NULL AND TRIM(notes) <> '')
+         )
+       ORDER BY followed_date DESC`,
+      [taskId],
+    );
+
+    return NextResponse.json({
+      success: true,
+      task: taskRow,
+      followups: followups || [],
+    });
+  } catch (e) {
+    console.error("Follow-up GET Error:", e);
+    return NextResponse.json({ error: "Failed to load follow-up" }, { status: 500 });
+  }
 }
 
 export async function POST(req, { params }) {

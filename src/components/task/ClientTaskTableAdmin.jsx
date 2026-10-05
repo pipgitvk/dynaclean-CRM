@@ -8,10 +8,11 @@ import {
   formatTaskDateOnly,
   dayjsTaskCalendarStart,
 } from "@/lib/formatTaskDate";
-import { Repeat } from "lucide-react";
+import { Repeat, Plus } from "lucide-react";
 import ReassignModal from "@/components/models/ReassignModal";
 import AutoTaskBadge, { isAutoTask } from "@/components/task/AutoTaskBadge";
 import AutomatedTasksList from "@/components/task/AutomatedTasksList";
+import TaskFollowupModal from "@/components/task/TaskFollowupModal";
 
 dayjs.extend(isSameOrBefore);
 dayjs.extend(isSameOrAfter);
@@ -19,6 +20,8 @@ dayjs.extend(isSameOrAfter);
 export default function ClientTaskTable({ initialTasks, currentUser = "" }) {
   const [reassignOpen, setReassignOpen] = useState(false);
   const [modalTask, setModalTask] = useState(null);
+  const [followupOpen, setFollowupOpen] = useState(false);
+  const [followupTask, setFollowupTask] = useState(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [assignedToFilter, setAssignedToFilter] = useState("");
@@ -385,6 +388,18 @@ export default function ClientTaskTable({ initialTasks, currentUser = "" }) {
                       >
                         View
                       </a>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFollowupTask(task);
+                          setFollowupOpen(true);
+                        }}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-green-200 bg-green-50 text-green-700 hover:bg-green-100"
+                        title="Add follow-up"
+                        aria-label={`Follow up task ${task.task_id}`}
+                      >
+                        <Plus size={16} strokeWidth={2.5} />
+                      </button>
                       {currentUser && (task.createdby || "").trim().toLowerCase() === currentUser.trim().toLowerCase() && (
                         <button
                           onClick={() => {
@@ -453,13 +468,25 @@ export default function ClientTaskTable({ initialTasks, currentUser = "" }) {
                     ? formatTaskDateOnly(task.task_completion_date)
                     : "-"}
                 </div>
-                <div className="text-sm mt-2 flex items-center gap-2">
+                <div className="text-sm mt-2 flex items-center gap-2 flex-wrap">
                   <a
                     href={`/admin-dashboard/view-task/${task.task_id}`}
                     className="text-blue-600 hover:underline font-medium"
                   >
                     View Task →
                   </a>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFollowupTask(task);
+                      setFollowupOpen(true);
+                    }}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-green-200 bg-green-50 text-green-700 hover:bg-green-100"
+                    title="Add follow-up"
+                    aria-label={`Follow up task ${task.task_id}`}
+                  >
+                    <Plus size={16} strokeWidth={2.5} />
+                  </button>
                   {currentUser && (task.createdby || "").trim().toLowerCase() === currentUser.trim().toLowerCase() && (
                     <button
                       onClick={() => {
@@ -491,6 +518,14 @@ export default function ClientTaskTable({ initialTasks, currentUser = "" }) {
           setModalTask(null);
         }}
         task={modalTask}
+      />
+      <TaskFollowupModal
+        open={followupOpen}
+        task={followupTask}
+        onClose={() => {
+          setFollowupOpen(false);
+          setFollowupTask(null);
+        }}
       />
     </>
   );
