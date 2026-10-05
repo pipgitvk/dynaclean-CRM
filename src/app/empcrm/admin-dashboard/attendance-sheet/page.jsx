@@ -3,15 +3,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { CalendarDays, FileSpreadsheet, Loader2, RefreshCw } from "lucide-react";
 import toast from "react-hot-toast";
-import SalarySheetTable from "@/components/empcrm/SalarySheetTable";
-import { downloadSalarySheetExcel } from "@/lib/exportSalarySheetExcel";
+import AttendanceSheetGrid from "@/components/empcrm/AttendanceSheetGrid";
+import { downloadAttendanceSheetExcel } from "@/lib/exportAttendanceSheetExcel";
 
-export default function SalarySheetPage() {
-  const [month, setMonth] = useState(() => {
-    const d = new Date();
-    d.setMonth(d.getMonth() - 1);
-    return d.toISOString().slice(0, 7);
-  });
+export default function AttendanceSheetPage() {
+  const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const [loading, setLoading] = useState(true);
   const [exportingExcel, setExportingExcel] = useState(false);
   const [data, setData] = useState(null);
@@ -21,18 +17,18 @@ export default function SalarySheetPage() {
     setLoading(true);
     try {
       const res = await fetch(
-        `/api/empcrm/salary/salary-sheet?month=${encodeURIComponent(month)}`
+        `/api/empcrm/attendance/attendance-sheet?month=${encodeURIComponent(month)}`
       );
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
-        toast.error(json.message || "Failed to load salary sheet");
+        toast.error(json.message || "Failed to load attendance sheet");
         setData(null);
         return;
       }
       setData(json);
     } catch (e) {
       console.error(e);
-      toast.error("Failed to load salary sheet");
+      toast.error("Failed to load attendance sheet");
       setData(null);
     } finally {
       setLoading(false);
@@ -44,20 +40,14 @@ export default function SalarySheetPage() {
   }, [load]);
 
   const handleExportExcel = async () => {
-    const rows = data?.rows;
-    if (!rows?.length) {
-      toast.error("No data to export. Load the sheet first.");
+    if (!data?.rows?.length) {
+      toast.error("No data to export.");
       return;
     }
     setExportingExcel(true);
     const toastId = toast.loading("Building Excel…");
     try {
-      const count = await downloadSalarySheetExcel({
-        month,
-        monthLabel: data.month_label,
-        companyName: data.company_name,
-        rows,
-      });
+      const count = await downloadAttendanceSheetExcel(data);
       toast.success(`Exported ${count} row${count === 1 ? "" : "s"}`, { id: toastId });
     } catch (e) {
       console.error(e);
@@ -71,10 +61,8 @@ export default function SalarySheetPage() {
     <div className="p-4 md:p-6 max-w-[100vw]">
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
         <div>
-          <h2 className="text-xl font-bold text-gray-900">Salary Sheet</h2>
-          <p className="text-sm text-gray-600 mt-1">
-            Monthly payroll view from attendance and salary structure
-          </p>
+          <h2 className="text-xl font-bold text-gray-900">Attendance Sheet</h2>
+          <p className="text-sm text-gray-600 mt-1">Monthly attendance register (calendar month)</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <label className="flex items-center gap-2 text-sm text-gray-700">
@@ -92,18 +80,14 @@ export default function SalarySheetPage() {
             disabled={loading}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-60"
           >
-            {loading ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <RefreshCw className="w-4 h-4" />
-            )}
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
             Refresh
           </button>
           <button
             type="button"
             onClick={handleExportExcel}
             disabled={loading || exportingExcel || !data?.rows?.length}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-800 text-sm font-medium hover:bg-gray-50 disabled:opacity-60"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 bg-white text-sm font-medium hover:bg-gray-50 disabled:opacity-60"
           >
             {exportingExcel ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -115,12 +99,7 @@ export default function SalarySheetPage() {
         </div>
       </div>
 
-      <SalarySheetTable
-        rows={data?.rows}
-        monthLabel={data?.month_label}
-        companyName={data?.company_name}
-        loading={loading}
-      />
+      <AttendanceSheetGrid data={data} loading={loading} />
     </div>
   );
 }

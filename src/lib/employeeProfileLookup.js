@@ -103,7 +103,7 @@ export function formatDojDisplay(d) {
 /** Load employee_profiles without optional columns that may be missing in older DBs. */
 export async function loadEmployeeProfilesRows(db) {
   const sqlVariants = [
-    `SELECT username, full_name, employee_code, empId, father_name, date_of_joining FROM employee_profiles`,
+    `SELECT username, full_name, employee_code, empId, father_name, date_of_joining, date_of_birth, designation FROM employee_profiles`,
     `SELECT username, full_name, empId, father_name, date_of_joining FROM employee_profiles`,
     `SELECT username, full_name, empId, date_of_joining FROM employee_profiles`,
   ];

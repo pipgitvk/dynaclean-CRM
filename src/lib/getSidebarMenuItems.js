@@ -114,6 +114,7 @@ function transformMenuItemPaths(item, roleKey) {
       "salary-slips": "/accounts-dashboard/salary-slips",
       "salary-management": "/accounts-dashboard/salary",
       "salary-sheet": "/accounts-dashboard/salary-sheet",
+      "attendance-sheet": "/accounts-dashboard/attendance-sheet",
       "add-paid-leaves": "/accounts-dashboard/add-paid-leave",
     };
     if (item.moduleKey && accountantModulePaths[item.moduleKey]) {
@@ -880,6 +881,13 @@ const allMenuItems = [
         icon: "FileSpreadsheet",
       },
       {
+        path: "/empcrm/admin-dashboard/attendance-sheet",
+        name: "Attendance Sheet",
+        moduleKey: "attendance-sheet",
+        roles: ["ALL"],
+        icon: "FileSpreadsheet",
+      },
+      {
         path: "/empcrm/admin-dashboard/salary-slips",
         name: "Salary slips",
         moduleKey: "salary-slips",
@@ -1143,7 +1151,7 @@ export default async function getSidebarMenuItems() {
       roleKey,
     ) ?? [];
     if (roleKey === "ACCOUNTANT" && Array.isArray(allowedModules)) {
-      for (const key of ["salary-management", "add-paid-leaves"]) {
+      for (const key of ["salary-management", "salary-sheet", "attendance-sheet", "add-paid-leaves"]) {
         if (!allowedModules.includes(key)) allowedModules.push(key);
       }
     }

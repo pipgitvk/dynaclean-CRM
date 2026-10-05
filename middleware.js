@@ -330,7 +330,8 @@ export async function middleware(request) {
           roleKey === "ACCOUNTANT" &&
           (pathname.startsWith("/empcrm/admin-dashboard/salary") ||
            pathname.startsWith("/empcrm/admin-dashboard/salary-sheet") ||
-           pathname.startsWith("/empcrm/admin-dashboard/salary-slips"));
+           pathname.startsWith("/empcrm/admin-dashboard/salary-slips") ||
+           pathname.startsWith("/empcrm/admin-dashboard/attendance-sheet"));
         if (!isHrEmpCrm && !isAccountantSalaryAccess) {
           return NextResponse.redirect(new URL("/empcrm/user-dashboard", request.url));
         }

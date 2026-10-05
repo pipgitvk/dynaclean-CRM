@@ -214,9 +214,8 @@ export async function GET(request) {
       const fatherOrSpouse = pickFatherOrSpouseName(profile);
 
       const sickLeave = countLeaveTypeDaysInMonth(leaves, emp.username, month, "sick");
-      const casualLeave =
-        countLeaveTypeDaysInMonth(leaves, emp.username, month, "casual") +
-        countLeaveTypeDaysInMonth(leaves, emp.username, month, "unpaid");
+      const paidLeave = countLeaveTypeDaysInMonth(leaves, emp.username, month, "paid");
+      const otherLeave = countLeaveTypeDaysInMonth(leaves, emp.username, month, "unpaid");
 
       return {
         username: emp.username,
@@ -236,11 +235,11 @@ export async function GET(request) {
             cards?.absents != null
               ? Number(cards.absents) || 0
               : Number(stats.lop) || 0,
-          paid_leave: Number(stats.paid_leave) || 0,
-          weekly_off: Number(stats.weekend_off) || 0,
+          weekly_off:
+            (Number(stats.weekend_off) || 0) + (Number(stats.holiday) || 0),
           sick_leave: sickLeave,
-          casual_leave: casualLeave,
-          other_leave: Number(stats.holiday) || 0,
+          paid_leave: paidLeave,
+          other_leave: otherLeave,
           paid_days: payDays,
         },
         earned: breakdown

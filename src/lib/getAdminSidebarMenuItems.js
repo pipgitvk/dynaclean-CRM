@@ -158,6 +158,7 @@ import {
   applyRoleDenyModuleRestrictions,
 } from "@/lib/moduleAccess";
 import { getEmpCrmAdminMenuChildrenForRole } from "@/lib/getEmpCrmAdminSidebarMenuItems";
+import { filterEmpCrmAdminMenuByModuleAccess } from "@/lib/empCrmMenuModuleAccess";
 
 const FINAL_PROFILE_APPROVAL_PATH =
   "/empcrm/admin-dashboard/profile/approvals-admin";
@@ -774,7 +775,14 @@ const allMenuItems = [
       {
         path: "/empcrm/admin-dashboard/salary-sheet",
         name: "Salary Sheet",
-        accessKey: "salary-management",
+        accessKey: "salary-sheet",
+        roles: ["SUPERADMIN", "HR", "ACCOUNTANT"],
+        icon: "FileSpreadsheet",
+      },
+      {
+        path: "/empcrm/admin-dashboard/attendance-sheet",
+        name: "Attendance Sheet",
+        accessKey: "attendance-sheet",
         roles: ["SUPERADMIN", "HR", "ACCOUNTANT"],
         icon: "FileSpreadsheet",
       },
@@ -1085,18 +1093,31 @@ function filterMenuItemsByModuleAccess(items, allowedModules) {
 
 export default async function getSidebarMenuItems() {
   const roleKeyNormalized = await getAdminRoleKeyNormalized();
-  const empCrmChildren = await getEmpCrmAdminMenuChildrenForRole(roleKeyNormalized);
+  let allowedModules = null;
+  if (roleKeyNormalized !== "SUPERADMIN") {
+    const username = await getSessionUsername();
+    const allowedModulesRaw = await getUserModuleAccess(username, roleKeyNormalized);
+    allowedModules =
+      applyRoleDenyModuleRestrictions(
+        applySuperadminOnlyModuleRestrictions(allowedModulesRaw, roleKeyNormalized) ?? [],
+        roleKeyNormalized,
+      ) ?? [];
+    if (String(roleKeyNormalized).includes("ACCOUNTANT")) {
+      for (const key of ["salary-management", "salary-sheet", "attendance-sheet", "add-paid-leaves"]) {
+        if (!allowedModules.includes(key)) allowedModules.push(key);
+      }
+    }
+  }
+
+  let empCrmChildren = await getEmpCrmAdminMenuChildrenForRole(roleKeyNormalized);
+  if (allowedModules) {
+    empCrmChildren = filterEmpCrmAdminMenuByModuleAccess(empCrmChildren, allowedModules);
+  }
   const menuWithEmpCrm = injectEmpCrmChildren(allMenuItems, empCrmChildren);
   let items = filterMenuItemsByRole(menuWithEmpCrm, roleKeyNormalized);
 
   // Apply module_access filtering for non-SUPERADMIN users
-  if (roleKeyNormalized !== "SUPERADMIN") {
-    const username = await getSessionUsername();
-    const allowedModulesRaw = await getUserModuleAccess(username, roleKeyNormalized);
-    const allowedModules = applyRoleDenyModuleRestrictions(
-      applySuperadminOnlyModuleRestrictions(allowedModulesRaw, roleKeyNormalized) ?? [],
-      roleKeyNormalized,
-    ) ?? [];
+  if (allowedModules) {
     items = filterMenuItemsByModuleAccess(items, allowedModules);
   }
 

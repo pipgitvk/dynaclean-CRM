@@ -117,6 +117,7 @@ export const MODULE_TREE = [
       { key: "employee-list", label: "Employee List" },
       { key: "employee-crm", label: "Employee CRM" },
       { key: "attendance-log", label: "All Attendance details" },
+      { key: "attendance-sheet", label: "Attendance Sheet" },
     ],
   },
   {
@@ -188,6 +189,7 @@ export const MODULE_TREE = [
       { key: "final-profile-approval", label: "Final Profile Approval" },
       { key: "hr-daily-report", label: "HR Daily Report" },
       { key: "salary-management", label: "Salary Management" },
+      { key: "salary-sheet", label: "Salary Sheet" },
       { key: "add-paid-leaves", label: "Add Paid Leaves" },
       { key: "paid-leave-ledger", label: "Paid Leave Ledger" },
     ],
@@ -396,6 +398,7 @@ export const SUPERADMIN_MODULE_UI_NODES = [
     children: [
       { kind: "leaf", key: "employee-list", label: "Employee list" },
       { kind: "leaf", key: "employee-crm", label: "Employee CRM" },
+      { kind: "leaf", key: "attendance-sheet", label: "Attendance Sheet" },
     ],
   },
   {
@@ -408,6 +411,7 @@ export const SUPERADMIN_MODULE_UI_NODES = [
       { kind: "leaf", key: "final-profile-approval", label: "Final Profile Approval" },
       { kind: "leaf", key: "hr-daily-report", label: "HR Daily Report" },
       { kind: "leaf", key: "salary-management", label: "Salary Management" },
+      { kind: "leaf", key: "salary-sheet", label: "Salary Sheet" },
       { kind: "leaf", key: "salary-slips", label: "Salary Slips" },
       { kind: "leaf", key: "add-paid-leaves", label: "Add Paid Leaves" },
       { kind: "leaf", key: "paid-leave-ledger", label: "Paid Leave Ledger" },

@@ -81,6 +81,9 @@ export const MODULE_KEY_TO_URL = {
   "delivery-challan": "/accounts-dashboard/delivery-challan",
   "statements": "/admin-dashboard/statements",
   "salary-slips": "/empcrm/admin-dashboard/salary-slips",
+  "salary-management": "/empcrm/admin-dashboard/salary",
+  "salary-sheet": "/empcrm/admin-dashboard/salary-sheet",
+  "attendance-sheet": "/empcrm/admin-dashboard/attendance-sheet",
   "ledger": "/admin-dashboard/ledger",
 
   // Resource Center
