@@ -43,7 +43,7 @@ async function getPendingOvertimeCount(username) {
   }
 }
 
-export default async function getEmpCrmUserSidebarMenuItems() {
+async function getEmpCrmUserSessionContext() {
   const cookieStore = await cookies();
   const token = cookieStore.get("token")?.value;
 
@@ -66,22 +66,47 @@ export default async function getEmpCrmUserSidebarMenuItems() {
   }
 
   const roleKey = normalizeRoleKey(role || "GUEST") || "GUEST";
-
-  // Get pending overtime count
   const pendingOvertimeCount = await getPendingOvertimeCount(username);
 
-  const filteredItems = empCrmUserMenuItems.filter((item) => {
+  return { roleKey, hasReportees, pendingOvertimeCount };
+}
+
+function filterEmpCrmUserMenuItems(roleKey, hasReportees) {
+  return empCrmUserMenuItems.filter((item) => {
     if (item.roles.includes("ALL")) return true;
     if (item.roles.some((r) => normalizeRoleKey(r) === roleKey)) return true;
     if (item.roles.includes("REPORTING_MANAGER") && hasReportees) return true;
     return false;
   });
+}
 
-  // Add badge count to attendance regularization menu item
+function mapEmpCrmUserMenuItems(filteredItems, pendingOvertimeCount, forMainCrmSidebar) {
   return filteredItems.map((item) => {
+    let result = item;
     if (item.path === "/empcrm/user-dashboard/attendance-regularization") {
-      return { ...item, badge: pendingOvertimeCount };
+      result = { ...item, badge: pendingOvertimeCount };
     }
-    return item;
+    if (forMainCrmSidebar) {
+      return {
+        ...result,
+        moduleKey: result.moduleKey || "employee-crm",
+      };
+    }
+    return result;
   });
+}
+
+/** Nested under main CRM sidebar “Employee CRM” (same links as /empcrm/user-dashboard sidebar). */
+export async function getEmpCrmUserMenuChildrenForRole() {
+  const { roleKey, hasReportees, pendingOvertimeCount } =
+    await getEmpCrmUserSessionContext();
+  const filteredItems = filterEmpCrmUserMenuItems(roleKey, hasReportees);
+  return mapEmpCrmUserMenuItems(filteredItems, pendingOvertimeCount, true);
+}
+
+export default async function getEmpCrmUserSidebarMenuItems() {
+  const { roleKey, hasReportees, pendingOvertimeCount } =
+    await getEmpCrmUserSessionContext();
+  const filteredItems = filterEmpCrmUserMenuItems(roleKey, hasReportees);
+  return mapEmpCrmUserMenuItems(filteredItems, pendingOvertimeCount, false);
 }

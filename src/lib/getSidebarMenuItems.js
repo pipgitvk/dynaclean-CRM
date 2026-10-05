@@ -9,6 +9,7 @@ import {
   SUPERADMIN_ONLY_MODULE_KEYS,
 } from "@/lib/moduleAccess";
 import { getDbConnection } from "@/lib/db";
+import { getEmpCrmUserMenuChildrenForRole } from "@/lib/getEmpCrmUserSidebarMenuItems";
 
 // Role to dashboard prefix mapping
 function getDashboardPrefix(roleKey) {
@@ -188,7 +189,7 @@ function filterByRole(list, roleKey) {
 /**
  * Top-level order mirrors super-admin (`getAdminSidebarMenuItems.js`): Dashboard → TL → Reports →
  * Leads Management → Activities → Sales → Service → Products → Procurement → Production →
- * Accounting → Main Expenses → Employees → HR Operations → Targets → Resource Center.
+ * Accounting → Main Expenses → Employees → Employee CRM → HR Operations → Targets → Resource Center.
  * Paths stay under user CRM (`/user-dashboard`, `/empcrm/...`) except where only an admin route exists.
  */
 const allMenuItems = [
@@ -827,14 +828,14 @@ const allMenuItems = [
         roles: ["ALL"],
         icon: "UserPlus",
       },
-      {
-        path: "/empcrm/user-dashboard",
-        name: "Employee CRM",
-        moduleKey: "employee-crm",
-        roles: ["ALL"],
-        icon: "User",
-      },
     ],
+  },
+  {
+    name: "Employee CRM",
+    moduleKey: "employee-crm",
+    roles: ["ALL"],
+    icon: "User",
+    children: [],
   },
   {
     name: "HR Operations",
@@ -1081,6 +1082,16 @@ const allMenuItems = [
   },
 ];
 
+function injectEmpCrmChildren(items, empCrmChildren) {
+  if (!empCrmChildren?.length) return items;
+  return items.map((item) => {
+    if (item.name === "Employee CRM") {
+      return { ...item, children: empCrmChildren };
+    }
+    return item;
+  });
+}
+
 async function getUserModuleAccess(username, roleKey) {
   if (!username) return resolveModuleAccess(null, roleKey);
   try {
@@ -1107,8 +1118,11 @@ export default async function getSidebarMenuItems() {
   const roleKey = normalizeRoleKey(role) || "GUEST";
   const username = payload?.username || null;
 
+  const empCrmChildren = await getEmpCrmUserMenuChildrenForRole();
+  const menuWithEmpCrm = injectEmpCrmChildren(allMenuItems, empCrmChildren);
+
   // Module access is the source of truth (per-user selection in Quick Edit).
-  let items = filterByRole(allMenuItems, roleKey);
+  let items = filterByRole(menuWithEmpCrm, roleKey);
 
   // Hard deny SUPERADMIN-only modules even when module_access is NULL (backward compat).
   items = stripSuperadminOnlyMenuItems(items, roleKey);
