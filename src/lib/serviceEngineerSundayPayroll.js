@@ -73,16 +73,20 @@ function attendanceLocationFromLog(log) {
 }
 
 /**
- * Sunday punch counts toward salary "Sunday work" bonus only when:
- * - Non–service-engineer: any meaningful check-in or checkout (unchanged).
- * - Service engineer: meaningful check-in AND that day's attendance location matches profile work_location.
+ * +1 pay day on Sunday / company holiday only when check-in exists and
+ * attendance location matches profile work_location.
  */
-export function shouldCountSundayWorkForSalary({ userRole, log, workLocation = null }) {
+export function qualifiesOffDayExtraPayCredit(log, workLocation) {
+  if (!log) return false;
   if (!rowHasMeaningfulCheckinOrCheckout(log)) return false;
-  if (!isServiceEngineerRole(userRole)) return true;
   if (!isMeaningfulAttendancePunch(log.checkin_time)) return false;
   return attendanceLocationMatchesWorkLocation(
     attendanceLocationFromLog(log),
     workLocation
   );
+}
+
+/** @deprecated Use qualifiesOffDayExtraPayCredit — same rule for all roles. */
+export function shouldCountSundayWorkForSalary({ userRole, log, workLocation = null }) {
+  return qualifiesOffDayExtraPayCredit(log, workLocation);
 }

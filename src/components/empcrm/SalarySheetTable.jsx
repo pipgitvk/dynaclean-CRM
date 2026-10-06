@@ -79,12 +79,18 @@ export default function SalarySheetTable({ rows, monthLabel, companyName, loadin
           <span><strong>H</strong> — Company holidays</span>
           <span><strong>SL</strong> — Sick leave (approved)</span>
           <span><strong>UL</strong> — Unpaid leave (approved)</span>
+          <span>
+            <strong>Sun+</strong> — +1 pay day if Sunday punch &amp; attendance location matches profile work location
+          </span>
+          <span>
+            <strong>Hol+</strong> — +1 pay day if holiday punch &amp; location matches work location
+          </span>
         </p>
         <p className="text-xs text-gray-800 mt-2 text-center font-semibold max-w-4xl mx-auto">
-          Paid Days = same as Salary Generate (min(30, period) − deduction, weekly-off rules)
+          Paid Days = Salary Generate engine (incl. Sun+ / Hol+ in total pay days)
         </p>
         <p className="text-xs text-gray-500 mt-1 text-center max-w-4xl mx-auto">
-          Register columns (P, HD, A, …) are for reference; pay days use payroll engine credits, not a simple sum.
+          OT columns are not used (—). P, HD, A… are register reference only.
         </p>
       </div>
 
@@ -107,7 +113,7 @@ export default function SalarySheetTable({ rows, monthLabel, companyName, loadin
             <tr>
               <th colSpan={4} className={thBase}>Employee</th>
               <th colSpan={4} className={thGreen}>Salary Rate</th>
-              <th colSpan={9} className={thBase}>Attendance</th>
+              <th colSpan={11} className={thBase}>Attendance</th>
               <th colSpan={7} className={thGreen}>Gross Earned Salary</th>
               <th colSpan={4} className={thBase}>Deductions</th>
               <th rowSpan={2} className={thGreen}>Net Salary</th>
@@ -146,6 +152,12 @@ export default function SalarySheetTable({ rows, monthLabel, companyName, loadin
               <th className={thBase} title="Unpaid leave (approved)">
                 UL
               </th>
+              <th className={thBase} title="Extra pay days: worked on Sunday">
+                Sun+
+              </th>
+              <th className={thBase} title="Extra pay days: worked on company holiday">
+                Hol+
+              </th>
               <th className={thBase}>Paid Days</th>
               <th className={thGreen}>Basic</th>
               <th className={thGreen}>HRA</th>
@@ -163,7 +175,7 @@ export default function SalarySheetTable({ rows, monthLabel, companyName, loadin
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={29} className="px-4 py-8 text-center text-sm text-gray-500">
+                <td colSpan={31} className="px-4 py-8 text-center text-sm text-gray-500">
                   No rows to display.
                 </td>
               </tr>
@@ -191,6 +203,12 @@ export default function SalarySheetTable({ rows, monthLabel, companyName, loadin
                     <td className={tdNum}>{formatNum(att.holidays)}</td>
                     <td className={tdNum}>{formatNum(att.sick_leave)}</td>
                     <td className={tdNum}>{formatNum(att.unpaid_leave)}</td>
+                    <td className={tdNum}>
+                      {att.sunday_work_days ? formatNum(att.sunday_work_days) : "—"}
+                    </td>
+                    <td className={tdNum}>
+                      {att.holiday_work_days ? formatNum(att.holiday_work_days) : "—"}
+                    </td>
                     <td className={tdNum}>{formatNum(att.paid_days)}</td>
                     <td className={tdNum}>
                       {noStructure ? "—" : formatInr(earned.basic)}

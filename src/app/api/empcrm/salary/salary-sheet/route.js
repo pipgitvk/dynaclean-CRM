@@ -37,7 +37,6 @@ import {
   mergeDeductionsForRelated,
   normalizeLeavesForRelatedAccounts,
   pickFirstByRelatedUsernames,
-  sumOvertimeHoursForRelated,
 } from "@/lib/payrollActiveEmployees";
 
 const HR_SALARY_ROLES = [
@@ -172,14 +171,6 @@ export async function GET(request) {
     );
     const deductionsByUser = groupDeductionsByUser(deductionRows);
 
-    const [monthlyRecords] = await db.query(
-      `SELECT username, overtime_hours FROM monthly_salary_records WHERE salary_month = ?`,
-      [month]
-    );
-    const recordByUser = new Map(
-      (monthlyRecords || []).map((r) => [normalizeUserKey(r.username), r])
-    );
-
     const rows = employees.map((emp) => {
       const uk = normalizeUserKey(emp.username);
       const related = relatedUsernamesByWinner.get(emp.username) || [emp.username];
@@ -205,7 +196,6 @@ export async function GET(request) {
         username: emp.username,
         rules,
         dateOfJoining,
-        userRole: emp.userRole ?? null,
         workLocation: profile.work_location ?? null,
       });
 
@@ -255,18 +245,27 @@ export async function GET(request) {
               rules,
             });
 
-      // Same pay days as Salary Generate (computeSalaryPayDaysForUser)
+      const sundayWorkDays = Number(stats.sunday_work_pay_credits) || 0;
+      const holidayWorkDays = Number(stats.holiday_work_pay_credits) || 0;
+
+      // Same pay days as Salary Generate (incl. +1 per Sunday/holiday punch)
       let payDays = stats.pay_days != null ? Number(stats.pay_days) : 0;
-      if (!(Number(present) > 0)) payDays = 0;
+      if (
+        !(Number(present) > 0) &&
+        sundayWorkDays <= 0 &&
+        holidayWorkDays <= 0 &&
+        !(Number(stats.paid_leave) > 0)
+      ) {
+        payDays = 0;
+      }
 
       const structure = pickFirstByRelatedUsernames(structureByUser, related);
       const rate = getSalaryRateFromStructure(structure);
-      const overtimeHours = sumOvertimeHoursForRelated(recordByUser, related);
       const breakdown = computePayrollBreakdown({
         salaryStructure: structure,
         deductions: mergeDeductionsForRelated(deductionsByUser, related),
         presentDays: payDays,
-        overtimeHours,
+        overtimeHours: 0,
       });
 
       const earnedTotal = breakdown != null ? breakdown.totalEarnings : null;
@@ -294,6 +293,8 @@ export async function GET(request) {
           sick_leave: sickLeave,
           paid_leave: paidLeave,
           unpaid_leave: unpaidLeave,
+          sunday_work_days: sundayWorkDays,
+          holiday_work_days: holidayWorkDays,
           paid_days: payDays,
         },
         earned: breakdown
@@ -301,8 +302,8 @@ export async function GET(request) {
               basic: breakdown.basicSalary,
               hra: breakdown.hra,
               other_allow: breakdown.otherAllowanceEarned,
-              overtime_hours: overtimeHours || null,
-              overtime_pay: breakdown.overtimeAmount,
+              overtime_hours: null,
+              overtime_pay: null,
               incentive: null,
               total: earnedTotal,
             }

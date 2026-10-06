@@ -95,11 +95,22 @@ function mapOneEmployeeSummary(emp, logs, holidays, leaves, globalRules, schedul
         : null,
     pay_sunday_work_credits:
       stats.sunday_work_pay_credits != null ? Number(stats.sunday_work_pay_credits) : null,
+    pay_holiday_work_credits:
+      stats.holiday_work_pay_credits != null
+        ? Number(stats.holiday_work_pay_credits)
+        : null,
     attendance_log_days: logs.length,
     dates_worked: logs.map((l) => l.date),
     sunday_worked_dates: stats.sunday_worked_dates,
+    holiday_worked_dates: stats.holiday_worked_dates,
+    paid_leave_worked_dates: stats.leave_worked_dates,
     user_role: emp.userRole ?? null,
     work_location: emp.work_location ?? null,
+    off_day_work_location_policy: "attendance_location_matches_work_location",
+    has_profile_work_location: Boolean(String(emp.work_location ?? "").trim()),
+    off_day_work_pay_enabled:
+      (Number(stats.sunday_work_pay_credits) || 0) > 0 ||
+      (Number(stats.holiday_work_pay_credits) || 0) > 0,
     service_engineer_sunday_work_policy: isServiceEngineerRole(emp.userRole)
       ? "attendance_location_matches_work_location"
       : null,
@@ -107,8 +118,8 @@ function mapOneEmployeeSummary(emp, logs, holidays, leaves, globalRules, schedul
       ? Boolean(String(emp.work_location ?? "").trim())
       : null,
     service_engineer_sunday_work_enabled:
-      isServiceEngineerRole(emp.userRole) &&
-      (Number(stats.sunday_work_pay_credits) || 0) > 0,
+      (Number(stats.sunday_work_pay_credits) || 0) > 0 ||
+      (Number(stats.holiday_work_pay_credits) || 0) > 0,
   };
 }
 

@@ -5,7 +5,7 @@ import {
   isHalfDayWithGrace,
 } from "@/lib/attendanceRulesEngine";
 import { rowHasMeaningfulCheckinOrCheckout } from "@/lib/attendanceMeaningfulPunch";
-import { shouldCountSundayWorkForSalary } from "@/lib/serviceEngineerSundayPayroll";
+import { qualifiesOffDayExtraPayCredit } from "@/lib/serviceEngineerSundayPayroll";
 
 function startOfDay(d) {
   const x = new Date(d);
@@ -134,8 +134,7 @@ function buildLeaveDateMapForUser(leaves, username) {
  * @param {string} p.username
  * @param {string|Date|null|undefined} p.dateOfJoining — skip calendar days before this (exclusive of LOP/present).
  * @param {import("@/lib/attendanceRulesEngine").AttendanceRulesShape} p.rules
- * @param {string} [p.userRole] — rep_list.userRole (Sunday work rules for service engineers).
- * @param {string|null} [p.workLocation] — employee_profiles.work_location (service engineer Sunday match).
+ * @param {string|null} [p.workLocation] — profile work_location (Sun/holiday +1 pay day match).
  */
 export function computeSalaryPayDaysForUser(p) {
   const {
@@ -146,7 +145,6 @@ export function computeSalaryPayDaysForUser(p) {
     username,
     rules,
     dateOfJoining,
-    userRole = null,
     workLocation = null,
   } = p;
   const [y, m] = monthStr.split("-").map(Number);
@@ -206,6 +204,10 @@ export function computeSalaryPayDaysForUser(p) {
   let lop = 0;
   let paid_leave = 0;
   const sundayWorkedDates = [];
+  /** Company holidays (non-Sunday) with qualifying work punch (+1 pay day each). */
+  const holidayWorkedDates = [];
+  /** Approved leave days where employee also punched (worked that day). */
+  const leaveWorkedDates = [];
   /** Paid weekly-off Sundays in period (must align with week rule below). */
   const weeklyOffSundayDates = [];
   let freeGraceUsed = 0;
@@ -225,8 +227,10 @@ export function computeSalaryPayDaysForUser(p) {
 
   /** Mon–Sat (non‑holiday) payroll credits toward required slots: 1 or 0.5 for structural half-days. */
   let weekdayPayCredits = 0;
-  /** Extra pay credits for punching on a weekly-off Sunday (not counted in requiredWorkingDays). */
+  /** +1 pay day per punch on Sunday (weekly off). */
   let sundayWorkPayCredits = 0;
+  /** +1 pay day per punch on a company holiday (Mon–Sat; Sunday+holiday counts once via Sunday). */
+  let holidayWorkPayCredits = 0;
 
   for (let day = 1; day <= daysInMonth; day++) {
     const d = new Date(y, monthIndex, day);
@@ -261,6 +265,9 @@ export function computeSalaryPayDaysForUser(p) {
       const leaveRec = paidLeaveMap.get(dateString);
       const dbHalf = leaveRec?.is_half_day == 1 || leaveRec?.leave_type === 'half-day';
       const treatAsHalfDay = hasRealPunch || dbHalf;
+      if (hasRealPunch) {
+        leaveWorkedDates.push(dateString);
+      }
       if (treatAsHalfDay) {
         half_day++;
         half_day_paid++;  // Paid leave half-day — full slot credit (no LOP on unpaid half)
@@ -272,18 +279,8 @@ export function computeSalaryPayDaysForUser(p) {
       continue;
     }
     if (existingLog && hasRealPunch) {
-      if (
-        isSunday &&
-        !shouldCountSundayWorkForSalary({
-          userRole,
-          log: existingLog,
-          workLocation,
-        })
-      ) {
-        sunday++;
-        weekend_off++;
-        weeklyOffSundayDates.push(dateString);
-        continue;
+      if (isOnLeave && leaveType !== "unpaid") {
+        leaveWorkedDates.push(dateString);
       }
       const cls = classifyAttendanceDayForSalary(existingLog, rules, freeGraceUsed);
       freeGraceUsed = cls.freeGraceUsed;
@@ -300,9 +297,18 @@ export function computeSalaryPayDaysForUser(p) {
       } else if (!isSunday && !isHoliday) {
         weekdayPayCredits += 1;
       }
-      if (isSunday) {
+      if (
+        isSunday &&
+        qualifiesOffDayExtraPayCredit(existingLog, workLocation)
+      ) {
         sundayWorkedDates.push(dateString);
-        sundayWorkPayCredits += isHalfDay ? 0.5 : 1;
+        sundayWorkPayCredits += 1;
+      } else if (
+        isHoliday &&
+        qualifiesOffDayExtraPayCredit(existingLog, workLocation)
+      ) {
+        holidayWorkedDates.push(dateString);
+        holidayWorkPayCredits += 1;
       }
       continue;
     }
@@ -315,6 +321,9 @@ export function computeSalaryPayDaysForUser(p) {
       } else {
         const dbHalf = (leaveType === 'half-day');
         const treatAsHalfDay = hasRealPunch || dbHalf;
+        if (hasRealPunch) {
+          leaveWorkedDates.push(dateString);
+        }
         if (treatAsHalfDay) {
           half_day++;
           half_day_unpaid++;  // Non-paid leave half-day (sick, casual, etc)
@@ -359,7 +368,11 @@ export function computeSalaryPayDaysForUser(p) {
     }
   }
 
-  const payDays = payDaysBase - sundaysUnpaidNoWeekPresence + sundayWorkPayCredits;
+  const payDays =
+    payDaysBase -
+    sundaysUnpaidNoWeekPresence +
+    sundayWorkPayCredits +
+    holidayWorkPayCredits;
 
   /** Every day with a meaningful punch is either `present` (regular) or `late_days` (salary classifier). Sum matches attendance “Present” when ranges align. */
   const total_punched_days = present + late_days;
@@ -381,7 +394,10 @@ export function computeSalaryPayDaysForUser(p) {
     pay_days_base: payDaysBase,
     sundays_unpaid_whole_week_off: sundaysUnpaidNoWeekPresence,
     sunday_worked_dates: sundayWorkedDates,
+    holiday_worked_dates: holidayWorkedDates,
+    leave_worked_dates: leaveWorkedDates,
     sunday_work_pay_credits: sundayWorkPayCredits,
+    holiday_work_pay_credits: holidayWorkPayCredits,
     sundays_in_period_dates: sundaysInPeriodDates,
     period_days: periodDays,
     salary_period_cap: salaryPeriodCap,
