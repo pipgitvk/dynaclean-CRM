@@ -246,17 +246,9 @@ export async function GET(request) {
         rules,
       });
 
-      // Paid days = P + HD/2 − A + PL + WO + H + SL − UL (salary sheet register)
-      const payDaysRaw =
-        present +
-        halfDayCount / 2 -
-        absent +
-        paidLeave +
-        weeklyOff +
-        holidayCount +
-        sickLeave -
-        unpaidLeave;
-      const payDays = Math.max(0, Math.round(payDaysRaw * 100) / 100);
+      // Same pay days as Salary Generate (computeSalaryPayDaysForUser)
+      let payDays = stats.pay_days != null ? Number(stats.pay_days) : 0;
+      if (present === 0) payDays = 0;
 
       const structure = pickFirstByRelatedUsernames(structureByUser, related);
       const rate = getSalaryRateFromStructure(structure);

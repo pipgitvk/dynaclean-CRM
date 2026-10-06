@@ -70,7 +70,10 @@ export default function SalarySheetTable({ rows, monthLabel, companyName, loadin
           <span><strong>UL</strong> — Unpaid leave (approved)</span>
         </p>
         <p className="text-xs text-gray-800 mt-2 text-center font-semibold max-w-4xl mx-auto">
-          Total paid days = P + HD/2 − A + PL + WO + H + SL − UL
+          Paid Days = same as Salary Generate (min(30, period) − deduction, weekly-off rules)
+        </p>
+        <p className="text-xs text-gray-500 mt-1 text-center max-w-4xl mx-auto">
+          Register columns (P, HD, A, …) are for reference; pay days use payroll engine credits, not a simple sum.
         </p>
       </div>
 
