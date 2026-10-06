@@ -25,6 +25,8 @@ import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 import { redirect } from "next/navigation";
 import IpGuard from "@/components/IpGuard";
+import getThirdPartyEngineerSidebarMenuItems from "@/lib/getThirdPartyEngineerSidebarMenuItems";
+import { getEngineerIdFromPayload } from "@/lib/thirdPartyEngineerPortalSession";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret";
 
@@ -34,6 +36,8 @@ export default async function UserDashboardLayout({ children }) {
     cookieStore.get("impersonation_token")?.value ||
     cookieStore.get("token")?.value;
 
+  let thirdPartyEngineerSession = false;
+
   if (token) {
     try {
       const { payload } = await jwtVerify(
@@ -41,6 +45,7 @@ export default async function UserDashboardLayout({ children }) {
         new TextEncoder().encode(JWT_SECRET)
       );
       const roleNorm = String(payload?.role || "").trim().toUpperCase();
+      thirdPartyEngineerSession = Boolean(getEngineerIdFromPayload(payload));
       if (roleNorm === "SUPERADMIN" || roleNorm === "EA") {
         redirect("/admin-dashboard");
       }
@@ -52,7 +57,9 @@ export default async function UserDashboardLayout({ children }) {
     }
   }
 
-  const menuItems = await getSidebarMenuItems(); // ✅ runs server-side
+  const menuItems = thirdPartyEngineerSession
+    ? getThirdPartyEngineerSidebarMenuItems()
+    : await getSidebarMenuItems();
 
   return (
     <SalesLayoutShell menuItems={menuItems} showBackToUserCrm={false}>

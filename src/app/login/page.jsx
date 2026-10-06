@@ -23,6 +23,7 @@ const getDashboardRouteByRole = (roleNorm) => {
     return "/digital-marketing-dashboard";
   }
   if (roleNorm.includes("ACCOUNTANT")) return "/accounts-dashboard";
+  if (roleNorm === "THIRD PARTY ENGINEER") return "/third-party-engineer-dashboard";
   return "/user-dashboard";
 };
 

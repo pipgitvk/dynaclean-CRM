@@ -260,6 +260,10 @@ export default function Navbar({ onToggleSidebar, showSalesMeta = false }) {
   const shouldShowAttendanceTracker =
     Boolean(username) && normalizeRoleKey(userRole) !== "SUPERADMIN";
 
+  const isThirdPartyEngineerPortal =
+    pathname?.startsWith("/third-party-engineer-dashboard") ||
+    normalizeRoleKey(userRole) === "THIRD PARTY ENGINEER";
+
   const searchDropdown =
     typeof window !== "undefined" &&
     showDropdown &&
@@ -384,8 +388,10 @@ export default function Navbar({ onToggleSidebar, showSalesMeta = false }) {
       </div>
 
       <div className="flex flex-1 min-w-0 flex-col gap-2 min-[1100px]:flex-row min-[1100px]:items-center min-[1100px]:justify-end min-[1100px]:gap-4 min-[1100px]:overflow-visible overflow-x-auto">
-        <ProspectHeaderButton userRole={userRole} username={username} />
-        {shouldShowAttendanceTracker && (
+        {!isThirdPartyEngineerPortal && (
+          <ProspectHeaderButton userRole={userRole} username={username} />
+        )}
+        {shouldShowAttendanceTracker && !isThirdPartyEngineerPortal && (
           <AttendanceStatusTracker username={username} />
         )}
         {shouldShowSearch() && (
@@ -419,6 +425,7 @@ export default function Navbar({ onToggleSidebar, showSalesMeta = false }) {
         )}
 
         <div className="flex shrink-0 items-center justify-end gap-2 md:gap-3">
+          {!isThirdPartyEngineerPortal && (
           <Link
             href={
               showSalesMeta
@@ -434,6 +441,8 @@ export default function Navbar({ onToggleSidebar, showSalesMeta = false }) {
           >
             <UserPlus size={18} />
           </Link>
+          )}
+          {!isThirdPartyEngineerPortal && (
           <button
             type="button"
             onClick={handleNewTask}
@@ -447,8 +456,10 @@ export default function Navbar({ onToggleSidebar, showSalesMeta = false }) {
           >
             <Plus size={18} />
           </button>
+          )}
           
           {/* Notification Icon */}
+          {!isThirdPartyEngineerPortal && (
           <div className="relative" ref={notificationRef}>
             <button
               type="button"
@@ -581,6 +592,7 @@ export default function Navbar({ onToggleSidebar, showSalesMeta = false }) {
               </div>
             )}
           </div>
+          )}
 
           <button
             type="button"

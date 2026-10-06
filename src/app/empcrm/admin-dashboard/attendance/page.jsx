@@ -856,7 +856,8 @@ const AttendancePage = () => {
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-col items-stretch gap-2 w-full md:w-auto md:items-end">
+              <div className="flex flex-wrap items-center justify-end gap-2">
               <button
                 onClick={handleShowAll}
                 className={`px-4 py-2 rounded-md font-medium text-sm transition-colors duration-200 ${filterStatus === "all"
@@ -866,10 +867,24 @@ const AttendancePage = () => {
               >
                 Show All
               </button>
-              <TypeableDateFilterInput value={fromDate} onChange={setFromDate} placeholder="From Date"
-                className="px-4 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
-              <TypeableDateFilterInput value={toDate} onChange={setToDate} placeholder="To Date"
-                className="px-4 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+              <div className="flex flex-row items-center gap-2 shrink-0">
+              <TypeableDateFilterInput
+                value={fromDate}
+                onChange={setFromDate}
+                placeholder="From Date"
+                wrapperClassName="relative flex w-[10.5rem] sm:w-36 shrink-0 items-stretch"
+                className="px-3 py-2 w-full border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <TypeableDateFilterInput
+                value={toDate}
+                onChange={setToDate}
+                placeholder="To Date"
+                wrapperClassName="relative flex w-[10.5rem] sm:w-36 shrink-0 items-stretch"
+                className="px-3 py-2 w-full border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              </div>
+              </div>
+              <div className="flex flex-wrap items-center justify-end gap-2">
               <button
                 onClick={() => setFilterStatus("late")}
                 className={`px-4 py-2 rounded-md font-medium text-sm transition-colors duration-200 ${filterStatus === "late"
@@ -903,6 +918,7 @@ const AttendancePage = () => {
               >
                 Download
               </button>
+              </div>
             </div>
           </div>
             </>

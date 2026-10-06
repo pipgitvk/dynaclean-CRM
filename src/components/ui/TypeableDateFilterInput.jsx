@@ -48,6 +48,7 @@ export default function TypeableDateFilterInput({
   value,
   onChange,
   className = "",
+  wrapperClassName = "",
   placeholder = "DD/MM/YYYY",
   showToastOnInvalid = true,
   id,
@@ -118,8 +119,12 @@ export default function TypeableDateFilterInput({
     .filter(Boolean)
     .join(" ");
 
+  const wrapperClasses = wrapperClassName
+    ? wrapperClassName
+    : "relative flex w-full min-w-0 items-stretch";
+
   return (
-    <div className="relative flex w-full min-w-0 items-stretch">
+    <div className={wrapperClasses}>
       <input
         type="text"
         inputMode="numeric"

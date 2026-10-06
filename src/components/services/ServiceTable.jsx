@@ -34,7 +34,7 @@ function dedupeServiceRecords(rows) {
   );
 }
 
-function ServiceTableInner({ serviceRecords, role }) {
+function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
   const [records, setRecords] = useState(() => dedupeServiceRecords(serviceRecords));
   const [searchTerm, setSearchTerm] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
@@ -99,11 +99,13 @@ function ServiceTableInner({ serviceRecords, role }) {
       setPendingOver48hOnly(true);
     }
   }, [searchParams]);
-  const dashboardPath = (() => {
-    const seg = pathname?.split("/").filter(Boolean)[0];
-    if (seg?.endsWith("-dashboard")) return seg;
-    return role?.toLowerCase() === "superadmin" ? "admin-dashboard" : "user-dashboard";
-  })();
+  const dashboardPath =
+    dashboardPathOverride ||
+    (() => {
+      const seg = pathname?.split("/").filter(Boolean)[0];
+      if (seg?.endsWith("-dashboard")) return seg;
+      return role?.toLowerCase() === "superadmin" ? "admin-dashboard" : "user-dashboard";
+    })();
 
   const parseReportIds = (reportIds) =>
     String(reportIds || "")
@@ -585,7 +587,8 @@ function ServiceTableInner({ serviceRecords, role }) {
       roleNorm === "SERVICE HEAD" ||
       roleNorm === "SERVICE SUPPORT" ||
       roleNorm === "SERVICE ENGINEER" ||
-      roleNorm.includes("SERVICE ENGINEER")
+      roleNorm.includes("SERVICE ENGINEER") ||
+      roleNorm === "THIRD PARTY ENGINEER"
     );
   };
 

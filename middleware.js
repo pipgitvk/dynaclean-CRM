@@ -67,6 +67,8 @@ export async function middleware(request) {
         return NextResponse.redirect(new URL("/digital-marketing-dashboard", request.url));
       } else if (roleNorm.includes("ACCOUNTANT")) {
         return NextResponse.redirect(new URL("/accounts-dashboard", request.url));
+      } else if (roleNorm === "THIRD PARTY ENGINEER") {
+        return NextResponse.redirect(new URL("/third-party-engineer-dashboard", request.url));
       } else {
         return NextResponse.redirect(new URL("/user-dashboard", request.url));
       }
@@ -87,7 +89,8 @@ export async function middleware(request) {
     pathname.startsWith("/digital-marketing-dashboard") ||
     pathname.startsWith("/accounts-dashboard") ||
     pathname.startsWith("/accountant-dashboard") ||
-    pathname.startsWith("/gem-dashboard")
+    pathname.startsWith("/gem-dashboard") ||
+    pathname.startsWith("/third-party-engineer-dashboard")
   ) {
     if (!token) {
       return NextResponse.redirect(new URL("/login", request.url));
@@ -355,6 +358,35 @@ export async function middleware(request) {
         return NextResponse.redirect(dest);
       }
 
+      const thirdPartyServicePrefixes = [
+        "/user-dashboard/complete-service",
+        "/user-dashboard/update-service",
+        "/user-dashboard/view-service-report",
+        "/user-dashboard/service-report-steps",
+        "/user-dashboard/installation-completion-video",
+      ];
+
+      if (roleNorm === "THIRD PARTY ENGINEER") {
+        if (pathname.startsWith("/third-party-engineer-dashboard")) {
+          return NextResponse.next();
+        }
+        if (thirdPartyServicePrefixes.some((p) => pathname.startsWith(p))) {
+          return NextResponse.next();
+        }
+        if (pathname.startsWith("/user-dashboard")) {
+          return NextResponse.redirect(
+            new URL("/third-party-engineer-dashboard", request.url),
+          );
+        }
+      }
+
+      if (
+        pathname.startsWith("/third-party-engineer-dashboard") &&
+        roleNorm !== "THIRD PARTY ENGINEER"
+      ) {
+        return NextResponse.redirect(new URL("/user-dashboard", request.url));
+      }
+
       if (
         pathname.startsWith("/user-dashboard") &&
         role === "SUPERADMIN" &&
@@ -395,5 +427,6 @@ export const config = {
     "/accountant-dashboard/:path*",
     "/api/schedule-visit",
     "/api/schedule-visit/:path*",
+    "/third-party-engineer-dashboard/:path*",
   ],
 };

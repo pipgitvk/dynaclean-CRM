@@ -3,6 +3,8 @@ import jwt from "jsonwebtoken";
 import { getDbConnection } from "@/lib/db";
 import { getCurrentISTTime } from "@/lib/timezone";
 import { ensureLoginTimeRestrictionColumn } from "@/lib/ensureLoginTimeRestrictionColumn";
+import { verifyThirdPartyEngineerPassword } from "@/lib/thirdPartyEngineerPassword";
+import { THIRD_PARTY_ENGINEER_ROLE } from "@/lib/thirdPartyEngineerPortalSession";
 
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret";
@@ -109,7 +111,69 @@ export async function POST(request) {
     
 
 
+    const inputPassword = password.trim();
+
     if (!user) {
+      const [tpeRows] = await conn.execute(
+        `SELECT engineer_id, email, password, status
+         FROM third_party_service_engineers
+         WHERE LOWER(email) = LOWER(?)
+         LIMIT 1`,
+        [username.trim()]
+      );
+
+      if (tpeRows.length > 0) {
+        const eng = tpeRows[0];
+        if (eng.status !== "active") {
+          await recordActivity(
+            username,
+            THIRD_PARTY_ENGINEER_ROLE,
+            "FAILED",
+            "Third-party engineer account inactive"
+          );
+          return NextResponse.json({ error: "Account is inactive" }, { status: 403 });
+        }
+        if (!verifyThirdPartyEngineerPassword(inputPassword, eng.password)) {
+          await recordActivity(
+            username,
+            THIRD_PARTY_ENGINEER_ROLE,
+            "FAILED",
+            "Incorrect password"
+          );
+          return NextResponse.json({ error: "Incorrect password" }, { status: 401 });
+        }
+
+        const token = jwt.sign(
+          {
+            id: eng.engineer_id,
+            engineerId: eng.engineer_id,
+            username: eng.email,
+            role: THIRD_PARTY_ENGINEER_ROLE,
+          },
+          JWT_SECRET,
+          { expiresIn: "7d" }
+        );
+
+        const res = NextResponse.json({
+          message: "Login successful",
+          role: THIRD_PARTY_ENGINEER_ROLE,
+        });
+        res.cookies.set("token", token, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: "strict",
+          path: "/",
+          maxAge: 7 * 24 * 60 * 60,
+        });
+        await recordActivity(
+          eng.email,
+          THIRD_PARTY_ENGINEER_ROLE,
+          "SUCCESS",
+          `Third-party engineer login from IP: ${ip}`
+        );
+        return res;
+      }
+
       await recordActivity(username, "UNKNOWN", "FAILED", "User not found");
       return NextResponse.json({ error: "User not found" }, { status: 401 });
     }
@@ -142,7 +206,6 @@ export async function POST(request) {
       }
     }
     const dbPassword = user.password || "";
-    const inputPassword = password.trim();
 
     console.log("inputPassword",inputPassword);
     console.log("dbPassword",dbPassword);
