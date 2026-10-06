@@ -93,6 +93,58 @@ function parseModelFiltersFromStorage(raw) {
   return [];
 }
 
+function readOrderTableFilterState() {
+  const monthStart = dayjs().startOf("month").format("YYYY-MM-DD");
+  const monthEnd = dayjs().endOf("month").format("YYYY-MM-DD");
+  if (typeof window === "undefined") {
+    return {
+      searchQuery: "",
+      statusFilter: "",
+      dateFrom: monthStart,
+      dateTo: monthEnd,
+      createdByFilter: "",
+      modelNameFilters: [],
+      approvalStatusFilter: "",
+      paymentStatusFilter: "",
+      showRejected: false,
+    };
+  }
+  const savedModel =
+    localStorage.getItem("orderTable_modelNameFilters") ||
+    localStorage.getItem("orderTable_modelNameFilter");
+  let showRejected = false;
+  try {
+    const rawRejected = localStorage.getItem("orderTable_showRejected");
+    if (rawRejected) showRejected = JSON.parse(rawRejected);
+  } catch {
+    showRejected = false;
+  }
+  return {
+    searchQuery: localStorage.getItem("orderTable_searchQuery") || "",
+    statusFilter: localStorage.getItem("orderTable_statusFilter") || "",
+    dateFrom: localStorage.getItem("orderTable_dateFrom") || monthStart,
+    dateTo: localStorage.getItem("orderTable_dateTo") || monthEnd,
+    createdByFilter: localStorage.getItem("orderTable_createdByFilter") || "",
+    modelNameFilters: parseModelFiltersFromStorage(savedModel),
+    approvalStatusFilter: localStorage.getItem("orderTable_approvalStatusFilter") || "",
+    paymentStatusFilter: localStorage.getItem("orderTable_paymentStatusFilter") || "",
+    showRejected,
+  };
+}
+
+function persistOrderTableFilterState(state) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem("orderTable_searchQuery", state.searchQuery);
+  localStorage.setItem("orderTable_statusFilter", state.statusFilter);
+  localStorage.setItem("orderTable_dateFrom", state.dateFrom);
+  localStorage.setItem("orderTable_dateTo", state.dateTo);
+  localStorage.setItem("orderTable_createdByFilter", state.createdByFilter);
+  localStorage.setItem("orderTable_modelNameFilters", JSON.stringify(state.modelNameFilters));
+  localStorage.setItem("orderTable_approvalStatusFilter", state.approvalStatusFilter);
+  localStorage.setItem("orderTable_paymentStatusFilter", state.paymentStatusFilter);
+  localStorage.setItem("orderTable_showRejected", JSON.stringify(state.showRejected));
+}
+
 function formatModelOptionLabel(item) {
   const code = String(item?.item_code || "").trim();
   const name = String(item?.item_name || "").trim();
@@ -464,48 +516,38 @@ export default function OrderTable({ orders, userRole }) {
   const [spareCatalog, setSpareCatalog] = useState([]);
   const searchParams = useSearchParams();
 
-  // Initialize from localStorage with defaults
-  const [searchQuery, setSearchQuery] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("orderTable_searchQuery") || "";
-    }
-    return "";
-  });
-  const [statusFilter, setStatusFilter] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("orderTable_statusFilter") || "";
-    }
-    return "";
-  });
-  const [dateFrom, setDateFrom] = useState(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("orderTable_dateFrom");
-      return saved || dayjs().startOf('month').format('YYYY-MM-DD');
-    }
-    return dayjs().startOf('month').format('YYYY-MM-DD');
-  });
-  const [dateTo, setDateTo] = useState(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("orderTable_dateTo");
-      return saved || dayjs().endOf('month').format('YYYY-MM-DD');
-    }
-    return dayjs().endOf('month').format('YYYY-MM-DD');
-  });
-  const [createdByFilter, setCreatedByFilter] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("orderTable_createdByFilter") || "";
-    }
-    return "";
-  });
-  const [modelNameFilters, setModelNameFilters] = useState(() => {
-    if (typeof window !== "undefined") {
-      const saved =
-        localStorage.getItem("orderTable_modelNameFilters") ||
-        localStorage.getItem("orderTable_modelNameFilter");
-      return parseModelFiltersFromStorage(saved);
-    }
-    return [];
-  });
+  const [searchQuery, setSearchQuery] = useState(
+    () => readOrderTableFilterState().searchQuery,
+  );
+  const [appliedSearchQuery, setAppliedSearchQuery] = useState(
+    () => readOrderTableFilterState().searchQuery,
+  );
+  const [statusFilter, setStatusFilter] = useState(
+    () => readOrderTableFilterState().statusFilter,
+  );
+  const [appliedStatusFilter, setAppliedStatusFilter] = useState(
+    () => readOrderTableFilterState().statusFilter,
+  );
+  const [dateFrom, setDateFrom] = useState(() => readOrderTableFilterState().dateFrom);
+  const [appliedDateFrom, setAppliedDateFrom] = useState(
+    () => readOrderTableFilterState().dateFrom,
+  );
+  const [dateTo, setDateTo] = useState(() => readOrderTableFilterState().dateTo);
+  const [appliedDateTo, setAppliedDateTo] = useState(
+    () => readOrderTableFilterState().dateTo,
+  );
+  const [createdByFilter, setCreatedByFilter] = useState(
+    () => readOrderTableFilterState().createdByFilter,
+  );
+  const [appliedCreatedByFilter, setAppliedCreatedByFilter] = useState(
+    () => readOrderTableFilterState().createdByFilter,
+  );
+  const [modelNameFilters, setModelNameFilters] = useState(
+    () => readOrderTableFilterState().modelNameFilters,
+  );
+  const [appliedModelNameFilters, setAppliedModelNameFilters] = useState(
+    () => readOrderTableFilterState().modelNameFilters,
+  );
   const [modelSearchText, setModelSearchText] = useState("");
   const [showModelDropdown, setShowModelDropdown] = useState(false);
   const modelSearchRef = useRef(null);
@@ -536,25 +578,24 @@ export default function OrderTable({ orders, userRole }) {
   }, []);
   const [openMenuId, setOpenMenuId] = useState(null); // State to track which menu is open
   // const canShowInstall = ["SUPERADMIN"].includes(userRole);
-  const [approvalStatusFilter, setApprovalStatusFilter] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("orderTable_approvalStatusFilter") || "";
-    }
-    return "";
-  });
-  const [paymentStatusFilter, setPaymentStatusFilter] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("orderTable_paymentStatusFilter") || "";
-    }
-    return "";
-  });
-  const [showRejected, setShowRejected] = useState(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("orderTable_showRejected");
-      return saved ? JSON.parse(saved) : false;
-    }
-    return false;
-  });
+  const [approvalStatusFilter, setApprovalStatusFilter] = useState(
+    () => readOrderTableFilterState().approvalStatusFilter,
+  );
+  const [appliedApprovalStatusFilter, setAppliedApprovalStatusFilter] = useState(
+    () => readOrderTableFilterState().approvalStatusFilter,
+  );
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState(
+    () => readOrderTableFilterState().paymentStatusFilter,
+  );
+  const [appliedPaymentStatusFilter, setAppliedPaymentStatusFilter] = useState(
+    () => readOrderTableFilterState().paymentStatusFilter,
+  );
+  const [showRejected, setShowRejected] = useState(
+    () => readOrderTableFilterState().showRejected,
+  );
+  const [appliedShowRejected, setAppliedShowRejected] = useState(
+    () => readOrderTableFilterState().showRejected,
+  );
   const [showNukePanel, setShowNukePanel] = useState(false);
   const [nukeConfirmText, setNukeConfirmText] = useState("");
   const [nukeLoading, setNukeLoading] = useState(false);
@@ -569,65 +610,53 @@ export default function OrderTable({ orders, userRole }) {
     const status = searchParams.get("status");
     const from = searchParams.get("dateFrom");
     const to = searchParams.get("dateTo");
-    if (status) setStatusFilter(status);
-    if (from) setDateFrom(from);
-    if (to) setDateTo(to);
+    if (!status && !from && !to) return;
+    if (status) {
+      setStatusFilter(status);
+      setAppliedStatusFilter(status);
+    }
+    if (from) {
+      setDateFrom(from);
+      setAppliedDateFrom(from);
+    }
+    if (to) {
+      setDateTo(to);
+      setAppliedDateTo(to);
+    }
   }, [searchParams]);
 
-  // Save filter states to localStorage whenever they change
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("orderTable_searchQuery", searchQuery);
-    }
-  }, [searchQuery]);
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("orderTable_statusFilter", statusFilter);
-    }
-  }, [statusFilter]);
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("orderTable_dateFrom", dateFrom);
-    }
-  }, [dateFrom]);
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("orderTable_dateTo", dateTo);
-    }
-  }, [dateTo]);
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("orderTable_createdByFilter", createdByFilter);
-    }
-  }, [createdByFilter]);
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("orderTable_modelNameFilters", JSON.stringify(modelNameFilters));
-    }
-  }, [modelNameFilters]);
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("orderTable_approvalStatusFilter", approvalStatusFilter);
-    }
-  }, [approvalStatusFilter]);
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("orderTable_paymentStatusFilter", paymentStatusFilter);
-    }
-  }, [paymentStatusFilter]);
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("orderTable_showRejected", JSON.stringify(showRejected));
-    }
-  }, [showRejected]);
+  const handleApplySearch = useCallback(() => {
+    setAppliedSearchQuery(searchQuery);
+    setAppliedStatusFilter(statusFilter);
+    setAppliedDateFrom(dateFrom);
+    setAppliedDateTo(dateTo);
+    setAppliedCreatedByFilter(createdByFilter);
+    setAppliedModelNameFilters(modelNameFilters);
+    setAppliedApprovalStatusFilter(approvalStatusFilter);
+    setAppliedPaymentStatusFilter(paymentStatusFilter);
+    setAppliedShowRejected(showRejected);
+    persistOrderTableFilterState({
+      searchQuery,
+      statusFilter,
+      dateFrom,
+      dateTo,
+      createdByFilter,
+      modelNameFilters,
+      approvalStatusFilter,
+      paymentStatusFilter,
+      showRejected,
+    });
+  }, [
+    searchQuery,
+    statusFilter,
+    dateFrom,
+    dateTo,
+    createdByFilter,
+    modelNameFilters,
+    approvalStatusFilter,
+    paymentStatusFilter,
+    showRejected,
+  ]);
 
   const toggleMenu = (id) => {
     setOpenMenuId(openMenuId === id ? null : id);
@@ -680,34 +709,6 @@ export default function OrderTable({ orders, userRole }) {
         return order.duedate ? new Date(order.duedate).getTime() : 0;
       default:
         return "";
-    }
-  };
-
-  const handleResetFilters = () => {
-    setSearchQuery("");
-    setStatusFilter("");
-    setDateFrom(dayjs().startOf('month').format('YYYY-MM-DD'));
-    setDateTo(dayjs().endOf('month').format('YYYY-MM-DD'));
-    setCreatedByFilter("");
-    setModelNameFilters([]);
-    setModelSearchText("");
-    setShowModelDropdown(false);
-    setApprovalStatusFilter("");
-    setPaymentStatusFilter("");
-    setShowRejected(false);
-    
-    // Clear localStorage
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("orderTable_searchQuery");
-      localStorage.removeItem("orderTable_statusFilter");
-      localStorage.removeItem("orderTable_dateFrom");
-      localStorage.removeItem("orderTable_dateTo");
-      localStorage.removeItem("orderTable_createdByFilter");
-      localStorage.removeItem("orderTable_modelNameFilters");
-      localStorage.removeItem("orderTable_modelNameFilter");
-      localStorage.removeItem("orderTable_approvalStatusFilter");
-      localStorage.removeItem("orderTable_paymentStatusFilter");
-      localStorage.removeItem("orderTable_showRejected");
     }
   };
 
@@ -868,49 +869,49 @@ export default function OrderTable({ orders, userRole }) {
   const filteredOrders = useMemo(() => {
     if (!orders) return [];
 
-    const lowercasedQuery = searchQuery.toLowerCase();
+    const lowercasedQuery = appliedSearchQuery.toLowerCase();
     let result = orders.filter((order) => {
-      if (!showRejected && order.approval_status === "rejected") {
+      if (!appliedShowRejected && order.approval_status === "rejected") {
         return false;
       }
 
-      if (statusFilter) {
+      if (appliedStatusFilter) {
         const orderStatus = getStatusText(order)
           .text.toLowerCase()
           .replace(/\s+/g, "");
-        if (statusFilter === "pendingdispatched") {
+        if (appliedStatusFilter === "pendingdispatched") {
           if (Number(order.dispatch_status) === 1) return false;
-        } else if (statusFilter === "dispatchdone") {
+        } else if (appliedStatusFilter === "dispatchdone") {
           if (Number(order.dispatch_status) !== 1) return false;
-        } else if (orderStatus !== statusFilter.toLowerCase()) {
+        } else if (orderStatus !== appliedStatusFilter.toLowerCase()) {
           return false;
         }
       }
 
-      if (!orderCreatedInDateRange(order, dateFrom, dateTo)) return false;
+      if (!orderCreatedInDateRange(order, appliedDateFrom, appliedDateTo)) return false;
 
-      if (createdByFilter && order.created_by !== createdByFilter) {
+      if (appliedCreatedByFilter && order.created_by !== appliedCreatedByFilter) {
         return false;
       }
 
       if (
-        approvalStatusFilter &&
-        order.approval_status !== approvalStatusFilter
+        appliedApprovalStatusFilter &&
+        order.approval_status !== appliedApprovalStatusFilter
       ) {
         return false;
       }
 
-      if (paymentStatusFilter === "paid" && !isOrderPaid(order)) {
+      if (appliedPaymentStatusFilter === "paid" && !isOrderPaid(order)) {
         return false;
       }
-      if (paymentStatusFilter === "unpaid" && isOrderPaid(order)) {
+      if (appliedPaymentStatusFilter === "unpaid" && isOrderPaid(order)) {
         return false;
       }
-      if (paymentStatusFilter === "unpaid" && order.is_cancelled) {
+      if (appliedPaymentStatusFilter === "unpaid" && order.is_cancelled) {
         return false;
       }
 
-      if (!orderMatchesModelFilters(order, modelNameFilters)) {
+      if (!orderMatchesModelFilters(order, appliedModelNameFilters)) {
         return false;
       }
 
@@ -936,18 +937,18 @@ export default function OrderTable({ orders, userRole }) {
       return 0;
     });
   }, [
-    searchQuery,
+    appliedSearchQuery,
     orders,
-    statusFilter,
-    dateFrom,
-    dateTo,
-    createdByFilter,
-    approvalStatusFilter,
-    paymentStatusFilter,
+    appliedStatusFilter,
+    appliedDateFrom,
+    appliedDateTo,
+    appliedCreatedByFilter,
+    appliedApprovalStatusFilter,
+    appliedPaymentStatusFilter,
     sortColumn,
     sortDirection,
-    showRejected,
-    modelNameFilters,
+    appliedShowRejected,
+    appliedModelNameFilters,
   ]);
 
   const catalogByCode = useMemo(() => {
@@ -976,12 +977,12 @@ export default function OrderTable({ orders, userRole }) {
   );
 
   const filteredModelQuantity = useMemo(() => {
-    if (!modelNameFilters.length) return 0;
+    if (!appliedModelNameFilters.length) return 0;
     return filteredOrders.reduce(
-      (sum, order) => sum + modelQuantityInOrders(order, modelNameFilters),
+      (sum, order) => sum + modelQuantityInOrders(order, appliedModelNameFilters),
       0,
     );
-  }, [filteredOrders, modelNameFilters]);
+  }, [filteredOrders, appliedModelNameFilters]);
 
   const filteredModelOptions = useMemo(() => {
     const query = modelSearchText.trim().toLowerCase();
@@ -1112,22 +1113,22 @@ export default function OrderTable({ orders, userRole }) {
   }, [filteredOrders]);
 
   const activeStatCard = useMemo(() => {
-    if (paymentStatusFilter === "paid") return "paid";
-    if (paymentStatusFilter === "unpaid") return "unpaid";
-    if (statusFilter === "dispatchdone") return "dispatched";
-    if (statusFilter === "pendingdispatched") return "pendingDispatch";
-    if (approvalStatusFilter === "approved") return "approved";
-    if (approvalStatusFilter === "pending") return "pending";
-    if (approvalStatusFilter === "rejected") return "rejected";
+    if (appliedPaymentStatusFilter === "paid") return "paid";
+    if (appliedPaymentStatusFilter === "unpaid") return "unpaid";
+    if (appliedStatusFilter === "dispatchdone") return "dispatched";
+    if (appliedStatusFilter === "pendingdispatched") return "pendingDispatch";
+    if (appliedApprovalStatusFilter === "approved") return "approved";
+    if (appliedApprovalStatusFilter === "pending") return "pending";
+    if (appliedApprovalStatusFilter === "rejected") return "rejected";
     if (
-      !statusFilter &&
-      !approvalStatusFilter &&
-      !paymentStatusFilter
+      !appliedStatusFilter &&
+      !appliedApprovalStatusFilter &&
+      !appliedPaymentStatusFilter
     ) {
       return "total";
     }
     return "";
-  }, [statusFilter, approvalStatusFilter, paymentStatusFilter]);
+  }, [appliedStatusFilter, appliedApprovalStatusFilter, appliedPaymentStatusFilter]);
 
   const orderPieChartData = useMemo(() => {
     const entries = [
@@ -1780,15 +1781,22 @@ export default function OrderTable({ orders, userRole }) {
             placeholder="Search by ID, client, company, etc."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                handleApplySearch();
+              }
+            }}
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200 ease-in-out"
           />
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 w-full sm:w-auto">
           <button
-            onClick={handleResetFilters}
-            className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm font-medium rounded-lg transition-colors w-full sm:w-auto"
+            type="button"
+            onClick={handleApplySearch}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors w-full sm:w-auto"
           >
-            Reset Filters
+            Search
           </button>
           <button
             onClick={handleExportToExcel}
@@ -1871,7 +1879,7 @@ export default function OrderTable({ orders, userRole }) {
       </div>
 
       {/* Show Rejected Orders Toggle */}
-      <div className="mt-3 flex items-center">
+      <div className="mt-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <label className="flex items-center gap-2 cursor-pointer">
           <input
             type="checkbox"
@@ -1881,6 +1889,9 @@ export default function OrderTable({ orders, userRole }) {
           />
           <span className="text-sm font-medium text-gray-700">Show Rejected Orders</span>
         </label>
+        <p className="text-xs text-gray-500 sm:text-right">
+          Set filters above, then click Search to update the list.
+        </p>
       </div>
 
       {/* 👨‍💼 TABLE VIEW for large screens */}
