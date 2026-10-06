@@ -39,10 +39,13 @@ export async function fetchThirdPartyEngineerServiceRecords(conn, engineerId) {
       FROM service_records sr
       LEFT JOIN service_report_steps srs ON srs.service_id = sr.service_id
       LEFT JOIN warranty_products wp ON TRIM(sr.serial_number) COLLATE utf8mb4_unicode_ci = TRIM(wp.serial_number) COLLATE utf8mb4_unicode_ci
-      WHERE sr.assigned_to_type = 'third_party' AND sr.assigned_to_id = ?
+      WHERE (
+        sr.third_party_engineer_id = ?
+        OR (sr.assigned_to_type = 'third_party' AND sr.assigned_to_id = ?)
+      )
       ORDER BY sr.service_id DESC
     `,
-    [engineerId]
+    [engineerId, engineerId]
   );
 
   return (rows || []).map((row) => ({

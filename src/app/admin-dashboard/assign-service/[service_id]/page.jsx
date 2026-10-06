@@ -19,9 +19,14 @@ export async function updateServiceAssignment(formData) {
     connection = await getDbConnection();
     
     // Update both assigned_to (username for internal) and new fields for tracking type and third-party ID
+    const tpId =
+      assigned_to_type === "third_party" && assigned_to_id
+        ? Number(assigned_to_id)
+        : null;
     const [result] = await connection.execute(
-      "UPDATE service_records SET assigned_to = ?, assigned_to_type = ?, assigned_to_id = ? WHERE service_id = ?",
-      [assigned_to, assigned_to_type, assigned_to_id, serviceIdToUpdate]
+      `UPDATE service_records SET assigned_to = ?, assigned_to_type = ?, assigned_to_id = ?,
+       third_party_engineer_id = ? WHERE service_id = ?`,
+      [assigned_to, assigned_to_type, assigned_to_id, tpId, serviceIdToUpdate]
     );
 
     if (result.affectedRows === 0) {

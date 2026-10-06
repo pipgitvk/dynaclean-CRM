@@ -30,8 +30,9 @@ export default async function ThirdPartyEngineerDashboardPage() {
        SUM(CASE WHEN status NOT IN ('COMPLETED', 'CANCELLED') THEN 1 ELSE 0 END) AS pending,
        SUM(CASE WHEN status = 'COMPLETED' THEN 1 ELSE 0 END) AS completed
      FROM service_records
-     WHERE assigned_to_type = 'third_party' AND assigned_to_id = ?`,
-    [engineerId]
+     WHERE third_party_engineer_id = ?
+        OR (assigned_to_type = 'third_party' AND assigned_to_id = ?)`,
+    [engineerId, engineerId]
   );
 
   const c = countRows[0] || {};

@@ -19,7 +19,14 @@ export async function GET(req) {
       .trim();
 
     // Allow SUPERADMIN, ADMIN, DIRECTOR, SERVICE HEAD, EA to view active engineers
-    const allowed = ["SUPERADMIN", "ADMIN", "DIRECTOR", "SERVICE HEAD", "EA"];
+    const allowed = [
+      "SUPERADMIN",
+      "ADMIN",
+      "DIRECTOR",
+      "SERVICE HEAD",
+      "SERVICE SUPPORT",
+      "EA",
+    ];
     if (!allowed.includes(roleNorm)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }

@@ -71,7 +71,9 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [assignServiceId, setAssignServiceId] = useState(null);
   const [assignEngineer, setAssignEngineer] = useState("NOT ASSIGNED");
+  const [assignThirdPartyId, setAssignThirdPartyId] = useState("");
   const [engineers, setEngineers] = useState([]);
+  const [thirdPartyEngineers, setThirdPartyEngineers] = useState([]);
   const [isAssignSubmitting, setIsAssignSubmitting] = useState(false);
   const [assignError, setAssignError] = useState("");
 
@@ -817,14 +819,24 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
   const openAssignModal = async (record) => {
     setAssignServiceId(record.service_id);
     setAssignEngineer(record.assigned_to || "NOT ASSIGNED");
+    const tpId =
+      record.third_party_engineer_id ??
+      (record.assigned_to_type === "third_party" ? record.assigned_to_id : null);
+    setAssignThirdPartyId(tpId != null && tpId !== "" ? String(tpId) : "");
     setAssignError("");
     setIsAssignModalOpen(true);
     try {
-      const res = await fetch("/api/reps");
-      const data = await res.json();
-      setEngineers(data.users?.map((u) => u.username) || []);
+      const [repsRes, tpRes] = await Promise.all([
+        fetch("/api/reps"),
+        fetch("/api/third-party-engineers/active"),
+      ]);
+      const repsData = await repsRes.json();
+      setEngineers(repsData.users?.map((u) => u.username) || []);
+      const tpData = await tpRes.json().catch(() => []);
+      setThirdPartyEngineers(Array.isArray(tpData) ? tpData : []);
     } catch {
       setEngineers([]);
+      setThirdPartyEngineers([]);
     }
   };
 
@@ -845,15 +857,28 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
       const res = await fetch("/api/service-status/assign", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ service_id: assignServiceId, assigned_to: assignEngineer }),
+        body: JSON.stringify({
+          service_id: assignServiceId,
+          assigned_to: assignEngineer,
+          third_party_engineer_id: assignThirdPartyId || null,
+        }),
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
         throw new Error(d.message || "Failed to assign.");
       }
+      const tpIdNum = assignThirdPartyId ? Number(assignThirdPartyId) : null;
       setRecords((prev) =>
         prev.map((r) =>
-          r.service_id === assignServiceId ? { ...r, assigned_to: assignEngineer } : r
+          r.service_id === assignServiceId
+            ? {
+                ...r,
+                assigned_to: assignEngineer,
+                third_party_engineer_id: tpIdNum,
+                assigned_to_id: tpIdNum,
+                assigned_to_type: tpIdNum ? "third_party" : "internal",
+              }
+            : r
         )
       );
       setIsAssignModalOpen(false);
@@ -1661,7 +1686,7 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
       {/* Assign Modal */}
       {isAssignModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-sm p-6 relative">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 relative">
             <button
               type="button"
               onClick={closeAssignModal}
@@ -1676,7 +1701,7 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Assign To
+                  Assign To (Internal)
                 </label>
                 <select
                   className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
@@ -1690,6 +1715,28 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
                     ))
                   ) : (
                     <option disabled>Loading...</option>
+                  )}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Third Party Engineer
+                </label>
+                <select
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                  value={assignThirdPartyId}
+                  onChange={(e) => setAssignThirdPartyId(e.target.value)}
+                >
+                  <option value="">— Not assigned —</option>
+                  {thirdPartyEngineers.length > 0 ? (
+                    thirdPartyEngineers.map((eng) => (
+                      <option key={eng.engineer_id} value={String(eng.engineer_id)}>
+                        {eng.name}
+                        {eng.state ? ` (${eng.state})` : ""}
+                      </option>
+                    ))
+                  ) : (
+                    <option disabled>No third-party engineers found</option>
                   )}
                 </select>
               </div>
