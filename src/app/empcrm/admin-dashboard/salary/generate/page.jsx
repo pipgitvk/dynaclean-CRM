@@ -245,6 +245,7 @@ const GenerateSalaryPage = () => {
                         serviceEngineerSundayPolicy: {
                             role: empAtt.user_role || "",
                             workLocation: empAtt.work_location || "",
+                            hasWorkLocation: Boolean(empAtt.service_engineer_has_work_location),
                             sundayWorkEnabled: Boolean(empAtt.service_engineer_sunday_work_enabled),
                         },
                         payCalc:
@@ -910,10 +911,17 @@ const GenerateSalaryPage = () => {
                                 .trim()
                                 .toUpperCase() === "SERVICE ENGINEER" && (
                                 <p className="mb-3 text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
-                                    Service engineer: Sunday work counts only when that day&apos;s{" "}
-                                    <strong>check-in address</strong> in attendance logs is
-                                    Delhi/NCR (not profile work location). Sunday needs a real
-                                    check-in. Addresses like Gujarat/Kheda do not count.
+                                    Service engineer: Sunday pay only when that Sunday&apos;s{" "}
+                                    <strong>attendance check-in location</strong> matches profile{" "}
+                                    <strong>work location</strong> (
+                                    {attendanceBreakdown.serviceEngineerSundayPolicy.workLocation
+                                        ? attendanceBreakdown.serviceEngineerSundayPolicy.workLocation
+                                        : "not set — set in Profile"}
+                                    ). Real check-in required; punch from another city/region does
+                                    not count.
+                                    {!attendanceBreakdown.serviceEngineerSundayPolicy.hasWorkLocation
+                                        ? " Add work location on profile for Sunday matching."
+                                        : ""}
                                     {attendanceBreakdown.serviceEngineerSundayPolicy.sundayWorkEnabled
                                         ? " At least one qualifying Sunday work day this month."
                                         : " No qualifying Sunday work for pay this month."}

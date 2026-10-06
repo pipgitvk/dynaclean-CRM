@@ -76,6 +76,7 @@ async function generateForEmployee({ db, emp, salaryMonth, workingDays, defaultS
     rules,
     dateOfJoining: salaryContext.dojByUser?.get(uk) ?? null,
     userRole: salaryContext.roleByUser?.get(uk) ?? emp.userRole ?? null,
+    workLocation: salaryContext.workLocationByUser?.get(uk) ?? null,
   });
   const presentDays = stats.pay_days;
 
@@ -344,9 +345,14 @@ export async function GET(request) {
       (schedules || []).map((s) => [normalizeUserKey(s.username), s])
     );
 
-    const [profileRows] = await db.query(`SELECT username, date_of_joining FROM employee_profiles`);
+    const [profileRows] = await db.query(
+      `SELECT username, date_of_joining, work_location FROM employee_profiles`
+    );
     const dojByUser = new Map(
       (profileRows || []).map((p) => [normalizeUserKey(p.username), p.date_of_joining])
+    );
+    const workLocationByUser = new Map(
+      (profileRows || []).map((p) => [normalizeUserKey(p.username), p.work_location])
     );
     const roleByUser = new Map(
       (employees || []).map((e) => [normalizeUserKey(e.username), e.userRole])
@@ -360,6 +366,7 @@ export async function GET(request) {
       scheduleByUser,
       dojByUser,
       roleByUser,
+      workLocationByUser,
     };
 
     let generated = 0, skipped = 0, failed = 0;

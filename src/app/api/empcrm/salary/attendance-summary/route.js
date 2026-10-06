@@ -40,6 +40,7 @@ function mapOneEmployeeSummary(emp, logs, holidays, leaves, globalRules, schedul
     rules,
     dateOfJoining: emp.date_of_joining ?? null,
     userRole: emp.userRole ?? null,
+    workLocation: emp.work_location ?? null,
   });
 
   const attendance_cards = computeAttendanceDetailsCardSummaryForMonth({
@@ -100,7 +101,10 @@ function mapOneEmployeeSummary(emp, logs, holidays, leaves, globalRules, schedul
     user_role: emp.userRole ?? null,
     work_location: emp.work_location ?? null,
     service_engineer_sunday_work_policy: isServiceEngineerRole(emp.userRole)
-      ? "checkin_address_delhi"
+      ? "attendance_location_matches_work_location"
+      : null,
+    service_engineer_has_work_location: isServiceEngineerRole(emp.userRole)
+      ? Boolean(String(emp.work_location ?? "").trim())
       : null,
     service_engineer_sunday_work_enabled:
       isServiceEngineerRole(emp.userRole) &&

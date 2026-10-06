@@ -206,6 +206,7 @@ export async function GET(request) {
         rules,
         dateOfJoining,
         userRole: emp.userRole ?? null,
+        workLocation: profile.work_location ?? null,
       });
 
       const cards = computeAttendanceDetailsCardSummaryForMonth({

@@ -135,6 +135,7 @@ function buildLeaveDateMapForUser(leaves, username) {
  * @param {string|Date|null|undefined} p.dateOfJoining — skip calendar days before this (exclusive of LOP/present).
  * @param {import("@/lib/attendanceRulesEngine").AttendanceRulesShape} p.rules
  * @param {string} [p.userRole] — rep_list.userRole (Sunday work rules for service engineers).
+ * @param {string|null} [p.workLocation] — employee_profiles.work_location (service engineer Sunday match).
  */
 export function computeSalaryPayDaysForUser(p) {
   const {
@@ -146,6 +147,7 @@ export function computeSalaryPayDaysForUser(p) {
     rules,
     dateOfJoining,
     userRole = null,
+    workLocation = null,
   } = p;
   const [y, m] = monthStr.split("-").map(Number);
   const monthIndex = m - 1;
@@ -275,6 +277,7 @@ export function computeSalaryPayDaysForUser(p) {
         !shouldCountSundayWorkForSalary({
           userRole,
           log: existingLog,
+          workLocation,
         })
       ) {
         sunday++;
