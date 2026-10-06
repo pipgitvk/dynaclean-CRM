@@ -17,8 +17,8 @@ import {
   computePayrollBreakdown,
   getSalaryRateFromStructure,
   countLeaveTypeDaysInMonth,
-  countHalfDayLeaveDaysInMonth,
 } from "@/lib/salaryPayrollBreakdown";
+import { countAttendanceSheetHalfDaysInMonth } from "@/lib/attendanceSheetMonth";
 import {
   normalizeUserKey,
   buildEmployeeProfileIndex,
@@ -237,18 +237,23 @@ export async function GET(request) {
         (sum, u) => sum + countLeaveTypeDaysInMonth(leaves, u, month, "unpaid"),
         0
       );
-      const halfDayLeave = related.reduce(
-        (sum, u) => sum + countHalfDayLeaveDaysInMonth(leaves, u, month),
-        0
-      );
+      const halfDayCount = countAttendanceSheetHalfDaysInMonth({
+        monthStr: month,
+        relatedUsernames: related,
+        logs,
+        holidays,
+        leaves,
+        rules,
+      });
 
-      // Paid days = P + HD/2 − A + PL + WO + SL − UL (salary sheet register)
+      // Paid days = P + HD/2 − A + PL + WO + H + SL − UL (salary sheet register)
       const payDaysRaw =
         present +
-        halfDayLeave / 2 -
+        halfDayCount / 2 -
         absent +
         paidLeave +
         weeklyOff +
+        holidayCount +
         sickLeave -
         unpaidLeave;
       const payDays = Math.max(0, Math.round(payDaysRaw * 100) / 100);
@@ -281,7 +286,7 @@ export async function GET(request) {
         rate_total: rate.total,
         attendance: {
           present,
-          half_day: halfDayLeave,
+          half_day: halfDayCount,
           absent,
           weekly_off: weeklyOff,
           holidays: holidayCount,

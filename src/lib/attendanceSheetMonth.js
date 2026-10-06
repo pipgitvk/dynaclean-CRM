@@ -133,6 +133,59 @@ function countTowardTotalPresent(code) {
   return 0;
 }
 
+/** Count of HD cells on the attendance register (calendar month, same rules as the grid). */
+export function countAttendanceSheetHalfDaysInMonth({
+  monthStr,
+  relatedUsernames,
+  logs,
+  holidays,
+  leaves,
+  rules,
+}) {
+  const meta = calendarMonthMeta(monthStr);
+  if (!meta) return 0;
+
+  const holidayMap = new Map();
+  for (const h of holidays || []) {
+    const k = dateToYmdKey(h.holiday_date);
+    if (k) holidayMap.set(k, h);
+  }
+
+  const dateMap = new Map();
+  for (const log of logs || []) {
+    const k = dateToYmdKey(log.date);
+    if (k) dateMap.set(k, log);
+  }
+
+  const leaveUsers =
+    relatedUsernames?.length ? relatedUsernames : [];
+  if (leaveUsers.length === 0) return 0;
+
+  const { leaveMap, paidLeaveMap } = buildLeaveMaps(leaves, leaveUsers);
+  let graceHalfDaysUsed = 0;
+  let hdCount = 0;
+
+  for (const dayCol of meta.days) {
+    const log = dateMap.get(dayCol.ymd);
+    const classified = classifyAttendanceSheetDay({
+      ymd: dayCol.ymd,
+      log,
+      holidayMap,
+      leaveMap,
+      paidLeaveMap,
+      rules,
+      dateMap,
+      graceHalfDaysUsed,
+    });
+    if (classified.graceHalfDaysUsed != null) {
+      graceHalfDaysUsed = classified.graceHalfDaysUsed;
+    }
+    if (classified.code === "HD") hdCount += 1;
+  }
+
+  return hdCount;
+}
+
 export function buildEmployeeAttendanceSheetRow({
   meta,
   username,
