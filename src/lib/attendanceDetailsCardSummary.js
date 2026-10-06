@@ -102,7 +102,6 @@ export function computeAttendanceDetailsCardSummaryForMonth(p) {
     holidays: 0,
     halfDays: 0,
     lateDays: 0,
-    paidHalfDays: 0,
   };
   /** Grace counter for half-day calculation (first 3 grace period days not counted as half-days) */
   let halfDayGraceUsed = 0;
@@ -129,10 +128,9 @@ export function computeAttendanceDetailsCardSummaryForMonth(p) {
         approvedPaidLeave.leave_type === "half-day";
       const treatAsHalfDay = hasRealPunch || leaveIsHalfDay;
       if (treatAsHalfDay) {
-        summary.halfDays++;
-        summary.paidHalfDays++;
+        summary.leaves += 0.5;
       } else {
-        summary.leaves++;
+        summary.leaves += 1;
       }
     } else if (existingLog && hasRealPunch) {
       // Punch wins over half-day leave on same date (attendance page)
@@ -153,7 +151,7 @@ export function computeAttendanceDetailsCardSummaryForMonth(p) {
         const leaveIsHalfDay =
           leave?.is_half_day == 1 || leave?.leave_type === "half-day";
         if (leaveIsHalfDay) summary.halfDays++;
-        else summary.leaves++;
+        else summary.leaves += 1;
       }
     } else if (isHoliday) {
       summary.holidays++;

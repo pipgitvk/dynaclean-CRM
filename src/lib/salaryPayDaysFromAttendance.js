@@ -261,8 +261,8 @@ export function computeSalaryPayDaysForUser(p) {
       const treatAsHalfDay = hasRealPunch || dbHalf;
       if (treatAsHalfDay) {
         half_day++;
-        half_day_paid++;  // Paid leave half-day
-        weekdayPayCredits += 0.5;
+        half_day_paid++;  // Paid leave half-day — full slot credit (no LOP on unpaid half)
+        weekdayPayCredits += 1;
       } else {
         paid_leave++;
         weekdayPayCredits += 1;
@@ -291,11 +291,8 @@ export function computeSalaryPayDaysForUser(p) {
       halfDayGraceUsed = graceUsed;
       if (isHalfDay) {
         half_day++;
-        // Punch-based half-day (not from leave) = unpaid half-day
+        // Punch-based / rules half-day (no paid leave on this date) = unpaid half-day
         half_day_unpaid++;
-      }
-      // Apply half-day credit reduction (0.5) for ALL half-days, regardless of day type
-      if (isHalfDay) {
         weekdayPayCredits += 0.5;
       } else if (!isSunday && !isHoliday) {
         weekdayPayCredits += 1;

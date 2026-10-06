@@ -993,9 +993,8 @@ const GenerateSalaryPage = () => {
                                     </li>
                                     <li>
                                         Total attendance (salary credits) =
-                                        Mon–Sat (non‑holiday) punched: 1 per day,
-                                        {" "}
-                                        0.5 only for structural half-day (e.g. no checkout via rules).
+                                        Mon–Sat (non‑holiday): 1 per full day; paid half-day
+                                        leave = 1 credit; unpaid / punch half-day = 0.5.
                                         Raw sum ={" "}
                                         <span className="font-semibold text-purple-800 tabular-nums">
                                             {formatPayCalcNumber(
@@ -1215,9 +1214,14 @@ const GenerateSalaryPage = () => {
                                                 </dd>
                                             </div>
                                             <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
-                                                <dt className="text-slate-600">Leaves</dt>
+                                                <dt className="text-slate-600">
+                                                    Leaves
+                                                    <span className="block text-[11px] font-normal text-slate-500">
+                                                        Full day = 1, paid half-day = 0.5
+                                                    </span>
+                                                </dt>
                                                 <dd className="font-semibold text-blue-600 tabular-nums">
-                                                    {z(c.leaves)}
+                                                    {formatPayCalcNumber(z(c.leaves))}
                                                 </dd>
                                             </div>
                                             <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
@@ -1256,17 +1260,6 @@ const GenerateSalaryPage = () => {
                                                         : attendanceBreakdown.cards
                                                         ? attendanceBreakdown.cards.halfDays
                                                         : attendanceBreakdown.halfDay}
-                                                </dd>
-                                            </div>
-                                            <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
-                                                <dt className="text-slate-600">
-                                                    <span className="text-xs block">Paid Half-Days</span>
-                                                    <span className="text-[11px] text-slate-500">(paid leave + punch-based)</span>
-                                                </dt>
-                                                <dd className="font-semibold text-emerald-600 tabular-nums">
-                                                    {attendanceDisplayAllZero
-                                                        ? 0
-                                                        : attendanceBreakdown.halfDayPaid}
                                                 </dd>
                                             </div>
                                             <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
@@ -1320,15 +1313,6 @@ const GenerateSalaryPage = () => {
                                             <dt className="text-slate-600">Half days</dt>
                                             <dd className="font-semibold text-amber-700 tabular-nums">
                                                 {fz(v.halfDays)}
-                                            </dd>
-                                        </div>
-                                        <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
-                                            <dt className="text-slate-600">
-                                                <span className="text-xs block">Paid Half-Days</span>
-                                                <span className="text-[11px] text-slate-500">(paid leave + punch-based)</span>
-                                            </dt>
-                                            <dd className="font-semibold text-emerald-600 tabular-nums">
-                                                {fz(attendanceBreakdown.halfDayPaid)}
                                             </dd>
                                         </div>
                                         <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
