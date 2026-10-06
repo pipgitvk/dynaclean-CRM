@@ -17,6 +17,7 @@ import {
 } from "@/lib/moduleAccess";
 import { getModuleUrl } from "@/lib/moduleUrlMapping";
 import { getRoleDefaultModuleKeys } from "@/lib/roleDefaultModuleAccess";
+import { ADMIN_EMPLOYEES_RELOAD_MESSAGE } from "@/lib/employeesPageReload";
 
 function uniqueStrings(arr) {
   return [...new Set((arr || []).map((v) => String(v || "").trim()).filter(Boolean))];
@@ -374,6 +375,17 @@ const EmpTable = ({ employees }) => {
   }, []);
 
   useEffect(() => {
+    const onMessage = (event) => {
+      if (event.origin !== window.location.origin) return;
+      if (event.data?.type !== ADMIN_EMPLOYEES_RELOAD_MESSAGE) return;
+      setIframePopup({ open: false, url: "", title: "" });
+      window.location.reload();
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, []);
+
+  useEffect(() => {
     const map = {};
     employees.forEach((emp) => {
       map[emp.username] = emp.login_time_restriction_enabled === 0 ? 0 : 1;
@@ -408,6 +420,7 @@ const EmpTable = ({ employees }) => {
           ? `${username}: login restricted to 09:00–19:15 IST`
           : `${username}: login time restriction removed`,
       );
+      window.location.reload();
     } catch (err) {
       toast.error(err.message || "Failed to update login time restriction.");
     } finally {
@@ -446,7 +459,7 @@ const EmpTable = ({ employees }) => {
       const data = await res.json();
       if (res.ok) {
         setShowReportingManagerModal(false);
-        router.refresh();
+        window.location.reload();
       } else {
         alert(data.error || "Failed to update reporting manager.");
       }
@@ -659,7 +672,7 @@ const EmpTable = ({ employees }) => {
         [key]: [...bulkSelectedModules],
       }));
       setShowGlobalModulesModal(false);
-      router.refresh();
+      window.location.reload();
     } catch (e) {
       toast.error(e.message || "Failed to apply module access.");
     } finally {

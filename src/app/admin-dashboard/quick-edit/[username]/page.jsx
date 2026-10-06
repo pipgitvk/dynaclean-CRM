@@ -14,6 +14,10 @@ import {
   applyRoleDenyModuleRestrictions,
 } from "@/lib/moduleAccess";
 import { getRoleDefaultModuleKeys } from "@/lib/roleDefaultModuleAccess";
+import {
+  notifyEmployeesListReload,
+  reloadEmployeesAdminPage,
+} from "@/lib/employeesPageReload";
 
 function uniqueStrings(arr) {
   return [...new Set((arr || []).map((v) => String(v || "").trim()).filter(Boolean))];
@@ -676,7 +680,9 @@ const QuickEditPage = () => {
       if (!response.ok)
         throw new Error(payload.message || "Failed to update employee data.");
       toast.success("Employee data updated successfully!");
-      router.push("/admin-dashboard/employees");
+      if (!notifyEmployeesListReload()) {
+        reloadEmployeesAdminPage();
+      }
     } catch (err) {
       toast.error(err.message);
     } finally {
