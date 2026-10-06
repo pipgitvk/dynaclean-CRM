@@ -9,7 +9,11 @@ import {
   SUPERADMIN_ONLY_MODULE_KEYS,
 } from "@/lib/moduleAccess";
 import { getDbConnection } from "@/lib/db";
-import { getEmpCrmUserMenuChildrenForRole } from "@/lib/getEmpCrmUserSidebarMenuItems";
+import {
+  getEmpCrmUserMenuChildrenForRole,
+  isEmpCrmReportingManagerMenuPath,
+} from "@/lib/getEmpCrmUserSidebarMenuItems";
+import { getReportees } from "@/lib/reportingManager";
 
 // Role to dashboard prefix mapping
 function getDashboardPrefix(roleKey) {
@@ -1145,6 +1149,8 @@ export default async function getSidebarMenuItems() {
 
   const empCrmChildren = await getEmpCrmUserMenuChildrenForRole();
   const menuWithEmpCrm = injectEmpCrmChildren(allMenuItems, empCrmChildren);
+  const reportees = username ? await getReportees(username) : [];
+  const hasReportees = reportees.length > 0;
 
   // Module access is the source of truth (per-user selection in Quick Edit).
   let items = filterByRole(menuWithEmpCrm, roleKey);
@@ -1172,6 +1178,9 @@ export default async function getSidebarMenuItems() {
     };
 
     const isMenuItemModuleAllowed = (item) => {
+      if (hasReportees && isEmpCrmReportingManagerMenuPath(item?.path)) {
+        return true;
+      }
       const mk = String(item?.moduleKey || "").trim();
       if (!mk) {
         return empCrmUserPathAllowed(item?.path)
