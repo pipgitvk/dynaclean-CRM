@@ -63,7 +63,7 @@ export default function SalarySheetTable({ rows, monthLabel, companyName, loadin
           <span><strong>P</strong> — Present</span>
           <span><strong>HD</strong> — Half days (same as attendance sheet)</span>
           <span><strong>A</strong> — Absent / LOP</span>
-          <span><strong>PL</strong> — Paid leave (approved)</span>
+          <span><strong>PL</strong> — Paid leave (approved; half-day = 0.5)</span>
           <span><strong>WO</strong> — Weekly off (Sunday)</span>
           <span><strong>H</strong> — Company holidays</span>
           <span><strong>SL</strong> — Sick leave (approved)</span>
@@ -111,13 +111,13 @@ export default function SalarySheetTable({ rows, monthLabel, companyName, loadin
               <th className={thGreen}>Oth. Allow</th>
               <th className={thGreen}>Total</th>
               <th className={thBase}>P</th>
-              <th className={thBase} title="Half days — matches attendance sheet HD">
+              <th className={thBase} title="Half days (unpaid / punch-based; not paid half-leave)">
                 HD
               </th>
               <th className={thBase} title="Absent / LOP (attendance summary)">
                 A
               </th>
-              <th className={thBase} title="Paid leave (approved)">
+              <th className={thBase} title="Paid leave (approved; half-day = 0.5)">
                 PL
               </th>
               <th className={thBase} title="Weekly off (Sunday)">

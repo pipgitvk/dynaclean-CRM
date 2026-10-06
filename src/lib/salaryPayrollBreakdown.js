@@ -294,9 +294,13 @@ export function countLeaveTypeDaysInMonth(leaves, username, monthStr, leaveType)
     const to = new Date(leave.to_date);
     if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) continue;
 
+    const isHalfDay =
+      leave.is_half_day == 1 ||
+      String(leave.leave_type ?? "").toLowerCase() === "half-day";
+
     for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
       if (d < bounds.start || d > bounds.end) continue;
-      total += leave.is_half_day ? 0.5 : 1;
+      total += isHalfDay ? 0.5 : 1;
     }
   }
   return total;

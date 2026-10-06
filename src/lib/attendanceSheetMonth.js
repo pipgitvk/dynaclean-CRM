@@ -95,10 +95,7 @@ export function classifyAttendanceSheetDay(ctx) {
   const approvedPaidLeave = paidLeaveMap.get(ymd);
 
   if (approvedPaidLeave) {
-    const leaveIsHalfDay =
-      approvedPaidLeave.is_half_day == 1 || approvedPaidLeave.leave_type === "half-day";
-    const treatAsHalfDay = hasRealPunch || leaveIsHalfDay;
-    if (treatAsHalfDay) return { code: "HD", kind: "half" };
+    // Paid leave (incl. half-day + punch) → L / PL, not HD (matches attendance summary)
     return { code: "L", kind: "leave" };
   }
 

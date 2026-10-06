@@ -239,14 +239,17 @@ export async function GET(request) {
         (sum, u) => sum + countLeaveTypeDaysInMonth(leaves, u, month, "unpaid"),
         0
       );
-      const halfDayCount = countAttendanceSheetHalfDaysInMonth({
-        monthStr: month,
-        relatedUsernames: related,
-        logs,
-        holidays,
-        leaves,
-        rules,
-      });
+      const halfDayCount =
+        cards?.halfDays != null
+          ? Number(cards.halfDays) || 0
+          : countAttendanceSheetHalfDaysInMonth({
+              monthStr: month,
+              relatedUsernames: related,
+              logs,
+              holidays,
+              leaves,
+              rules,
+            });
 
       // Same pay days as Salary Generate (computeSalaryPayDaysForUser)
       let payDays = stats.pay_days != null ? Number(stats.pay_days) : 0;
