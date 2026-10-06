@@ -1271,7 +1271,7 @@ export default function   AddPurchasePage() {
                       className="text-blue-600 hover:text-blue-700"
                       onClick={() => {
                         const inp = document.createElement("input");
-                        inp. ;
+                        inp.type = "date";
                         inp.style.position = "absolute";
                         inp.style.opacity = "0";
                         document.body.appendChild(inp);
