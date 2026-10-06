@@ -49,7 +49,9 @@ export async function GET(request) {
 
     const referer = request.headers.get("referer") || "";
     const forceUserMode = referer.includes("user-dashboard");
-    const forceAdminMode = referer.includes("admin-dashboard");
+    const forceAdminMode =
+      referer.includes("admin-dashboard") ||
+      referer.includes("director-dashboard/leave");
     const isRealAdmin = ["SUPERADMIN", "HR HEAD", "HR", "HR Executive"].includes(session.role);
 
     // Reporting manager mode: user has reportees and is fetching for approval

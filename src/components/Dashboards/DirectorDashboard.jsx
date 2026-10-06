@@ -24,7 +24,8 @@ import {
   AlertCircle,
   DollarSign,
   FileText,
-  PackageX
+  PackageX,
+  Sun,
 } from "lucide-react";
 import { 
   BarChart, 
@@ -105,7 +106,14 @@ const SimpleCard = ({ title, value, icon: Icon, borderColor, onClick, subtext, m
   );
 };
 
-export default function DirectorDashboard({ user, reportingManager, regTotal = 0, regPending = 0 }) {
+export default function DirectorDashboard({
+  user,
+  reportingManager,
+  regTotal = 0,
+  regPending = 0,
+  leaveTotal = 0,
+  leavePending = 0,
+}) {
   const router = useRouter();
   const [dateFrom, setDateFrom] = useState(new Date().toISOString().slice(0, 7) + "-01");
   const [dateTo, setDateTo] = useState(new Date().toISOString().slice(0, 10));
@@ -323,6 +331,15 @@ export default function DirectorDashboard({ user, reportingManager, regTotal = 0
           borderColor="border-orange-600"
           subtext={`${regTotal} Total`}
           onClick={() => router.push("/director-dashboard/attendance-regularization")}
+        />
+
+        <SimpleCard
+          title="Leave Approvals"
+          value={leavePending}
+          icon={Sun}
+          borderColor="border-yellow-500"
+          subtext={`${leaveTotal} Total applications`}
+          onClick={() => router.push("/director-dashboard/leave")}
         />
 
         <ScheduleVisitCard href="/director-dashboard/schedule-visits" alwaysShow />

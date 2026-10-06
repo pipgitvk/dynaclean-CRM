@@ -17,8 +17,14 @@ import {
 } from "lucide-react";
 import SearchableSelect from "@/components/ui/SearchableSelect";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 export default function AdminLeaveManagement() {
+  const pathname = usePathname();
+  const leaveAdminBase = pathname?.startsWith("/director-dashboard")
+    ? "/director-dashboard/leave"
+    : "/empcrm/admin-dashboard/leave";
+
   const [leaves, setLeaves] = useState([]);
   const [filteredLeaves, setFilteredLeaves] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -623,7 +629,7 @@ export default function AdminLeaveManagement() {
       {canAddReportingManager && (
         <div className="flex justify-end mb-4">
           <Link
-            href="/empcrm/admin-dashboard/leave/reporting-manager"
+            href={`${leaveAdminBase}/reporting-manager`}
             className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
           >
             Set Reporting Manager
