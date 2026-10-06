@@ -4,6 +4,11 @@ import { isUnknownApprovalNoteColumnError } from "@/lib/specialPriceApprovalNote
 import { redirect } from "next/navigation";
 import { deleteSpecialPrice, updateSpecialPrice } from "../../_actions";
 import SpecialPriceApproveRejectButtons from "@/components/specialPrice/SpecialPriceApproveRejectButtons";
+import {
+  dealerApprovalNoteForTerm,
+  isDealerPricePending,
+  resolveDealerPriceFromProductStock,
+} from "@/lib/specialPriceDefaults";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +26,10 @@ export default async function ProductSpecialPrice({ params }) {
   const detailSql = `
     SELECT 
       sp.id,
+      sp.item_type,
       sp.special_price,
+      sp.price_type,
+      sp.price_term,
       sp.status,
       sp.set_date,
       sp.approved_by,
@@ -31,7 +39,9 @@ export default async function ProductSpecialPrice({ params }) {
       c.last_name,
       p.item_name,
       p.price_per_unit,
-      p.gst_rate
+      p.gst_rate,
+      p.dp AS stock_dp,
+      p.dp_no_warranty AS stock_dp_no_warranty
     FROM special_price sp
     JOIN customers c ON sp.customer_id = c.customer_id
     JOIN products_list p ON sp.product_id = p.id
@@ -60,6 +70,17 @@ export default async function ProductSpecialPrice({ params }) {
   if (!data) {
     return <div className="p-6 text-red-500">Special price not found</div>;
   }
+
+  const dealerPending = isDealerPricePending(data);
+  const autoDealerPrice = dealerPending
+    ? resolveDealerPriceFromProductStock(data.price_term, {
+        dp: data.stock_dp,
+        dp_no_warranty: data.stock_dp_no_warranty,
+      })
+    : null;
+  const autoApprovalNote = dealerPending
+    ? dealerApprovalNoteForTerm(data.price_term)
+    : "";
 
   return (
     <div className="p-6 max-w-2xl">
@@ -138,7 +159,14 @@ export default async function ProductSpecialPrice({ params }) {
       {/* APPROVE / REJECT */}
       {data.status === "pending" && (
         <div className="mt-6">
-          <SpecialPriceApproveRejectButtons id={data.id} variant="page" />
+          <SpecialPriceApproveRejectButtons
+            id={data.id}
+            itemType={data.item_type || "product"}
+            variant="page"
+            needsDealerPrice={dealerPending}
+            autoDealerPrice={autoDealerPrice}
+            autoApprovalNote={autoApprovalNote}
+          />
         </div>
       )}
 

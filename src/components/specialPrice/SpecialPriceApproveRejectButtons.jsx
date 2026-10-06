@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useRef, useState } from "react";
 import { decideSpecialPrice } from "@/app/admin-dashboard/special-pricing/_actions";
 
 export default function SpecialPriceApproveRejectButtons({
@@ -8,11 +8,24 @@ export default function SpecialPriceApproveRejectButtons({
   itemType = "product",
   variant = "table",
   needsDealerPrice = false,
+  autoDealerPrice = null,
+  autoApprovalNote = "",
 }) {
   const [modal, setModal] = useState(null);
   const [state, formAction, pending] = useActionState(decideSpecialPrice, null);
+  const quickApproveFormRef = useRef(null);
 
-  const openApprove = () => setModal("approve");
+  const autoPrice = Number(autoDealerPrice);
+  const canQuickApproveDealer =
+    needsDealerPrice && Number.isFinite(autoPrice) && autoPrice > 0;
+
+  const openApprove = () => {
+    if (canQuickApproveDealer) {
+      quickApproveFormRef.current?.requestSubmit();
+      return;
+    }
+    setModal("approve");
+  };
   const openReject = () => setModal("reject");
   const close = () => setModal(null);
 
@@ -25,18 +38,33 @@ export default function SpecialPriceApproveRejectButtons({
 
   return (
     <>
+      <form
+        ref={quickApproveFormRef}
+        action={formAction}
+        className="hidden"
+        aria-hidden
+      >
+        <input type="hidden" name="id" value={id} />
+        <input type="hidden" name="itemType" value={itemType} />
+        <input type="hidden" name="decision" value="approve" />
+        <input type="hidden" name="note" value={autoApprovalNote} />
+        <input type="hidden" name="dealer_price" value={String(autoPrice)} />
+      </form>
+
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
           onClick={openApprove}
-          className={`bg-green-600 text-white hover:bg-green-700 ${btnBase}`}
+          disabled={pending}
+          className={`bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 ${btnBase}`}
         >
-          Approve
+          {pending && canQuickApproveDealer ? "Approving…" : "Approve"}
         </button>
         <button
           type="button"
           onClick={openReject}
-          className={`bg-red-600 text-white hover:bg-red-700 ${btnBase}`}
+          disabled={pending}
+          className={`bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 ${btnBase}`}
         >
           Reject
         </button>
@@ -80,7 +108,7 @@ export default function SpecialPriceApproveRejectButtons({
                 value={isApprove ? "approve" : "reject"}
               />
 
-              {isApprove && needsDealerPrice && (
+              {isApprove && needsDealerPrice && !canQuickApproveDealer && (
                 <div>
                   <label
                     htmlFor="sp-dealer-price"

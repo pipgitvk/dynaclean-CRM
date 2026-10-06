@@ -33,3 +33,42 @@ export function isDealerPricePending(row) {
     Number(row?.special_price || 0) === 0
   );
 }
+
+function normalizeDealerPriceTerm(priceTerm) {
+  return String(priceTerm || "").trim().toLowerCase();
+}
+
+/** DP from product-stock: `dp` (with delivery & warranty) or `dp_no_warranty`. */
+export function resolveDealerPriceFromProductStock(priceTerm, stockRow) {
+  const term = normalizeDealerPriceTerm(priceTerm);
+  if (term === DEALER_PRICE_TERM_OPTIONS[1].toLowerCase()) {
+    const n = Number(stockRow?.dp_no_warranty ?? 0);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }
+  if (term === DEALER_PRICE_TERM_OPTIONS[0].toLowerCase()) {
+    const n = Number(stockRow?.dp ?? 0);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }
+  return null;
+}
+
+/** Standard approval remark for auto dealer-price approval. */
+export function dealerApprovalNoteForTerm(priceTerm) {
+  const term = normalizeDealerPriceTerm(priceTerm);
+  if (term === DEALER_PRICE_TERM_OPTIONS[1].toLowerCase()) {
+    return "DP with no delivery and warranty.";
+  }
+  if (term === DEALER_PRICE_TERM_OPTIONS[0].toLowerCase()) {
+    return "DP price";
+  }
+  return "Dealer price approved.";
+}
+
+export function canAutoApproveDealerPrice(row) {
+  if (!isDealerPricePending(row)) return false;
+  const stock = {
+    dp: row?.stock_dp ?? row?.dp,
+    dp_no_warranty: row?.stock_dp_no_warranty ?? row?.dp_no_warranty,
+  };
+  return resolveDealerPriceFromProductStock(row?.price_term, stock) != null;
+}

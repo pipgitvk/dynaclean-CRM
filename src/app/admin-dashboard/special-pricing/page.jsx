@@ -1,19 +1,13 @@
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { isUnknownApprovalNoteColumnError } from "@/lib/specialPriceApprovalNoteColumn";
-import Link from "next/link";
-import SpecialPriceDetailsModal from "@/components/specialPrice/SpecialPriceDetailsModal";
 import { updateSpecialPrice, deleteSpecialPrice } from "./_actions";
-import SpecialPriceApproveRejectButtons from "@/components/specialPrice/SpecialPriceApproveRejectButtons";
 import SpecialPricingSearch from "./SpecialPricingSearch";
 import StatusFilter from "./StatusFilter";
 import TypeFilter from "./TypeFilter";
-import {
-  isDealerPricePending,
-  resolveSpecialPriceTerm,
-  resolveSpecialPriceType,
-  SPECIAL_PRICE_PENDING_CONDITION,
-} from "@/lib/specialPriceDefaults";
+import PriceTypeFilter from "./PriceTypeFilter";
+import AdminSpecialPricingTable from "./AdminSpecialPricingTable";
+import { SPECIAL_PRICE_PENDING_CONDITION } from "@/lib/specialPriceDefaults";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +30,9 @@ export default async function AdminSpecialPricingPage({ searchParams }) {
   const searchQuery = String(searchParamsResolved?.search || "").trim();
   const statusFilter = String(searchParamsResolved?.status || "").toLowerCase().trim();
   const typeFilter = String(searchParamsResolved?.type || "").toLowerCase().trim();
+  const priceTypeFilter = String(searchParamsResolved?.priceType || "")
+    .toLowerCase()
+    .trim();
 
   const conn = await getDbConnection();
 
@@ -55,9 +52,10 @@ export default async function AdminSpecialPricingPage({ searchParams }) {
         ELSE sl.item_name
       END LIKE ? OR
       sp.product_code LIKE ? OR
-      sp.status LIKE ?
+      sp.status LIKE ? OR
+      sp.price_type LIKE ?
     )`);
-    whereParams.push(like, like, like, like, like);
+    whereParams.push(like, like, like, like, like, like);
   }
 
   if (statusFilter === "pending") {
@@ -70,6 +68,16 @@ export default async function AdminSpecialPricingPage({ searchParams }) {
   if (typeFilter && ["product", "spare"].includes(typeFilter)) {
     conditions.push("sp.item_type = ?");
     whereParams.push(typeFilter);
+  }
+
+  if (priceTypeFilter === "dealer") {
+    conditions.push(
+      "LOWER(TRIM(IFNULL(sp.price_type, ''))) IN ('dealer price', 'dealer')",
+    );
+  } else if (priceTypeFilter === "special") {
+    conditions.push(
+      "LOWER(TRIM(IFNULL(sp.price_type, ''))) NOT IN ('dealer price', 'dealer')",
+    );
   }
 
   if (conditions.length > 0) {
@@ -112,6 +120,8 @@ export default async function AdminSpecialPricingPage({ searchParams }) {
         WHEN sp.item_type = 'spare' THEN sl.image
         ELSE p.product_image
       END AS product_image,
+      CASE WHEN sp.item_type = 'product' THEN p.dp ELSE NULL END AS stock_dp,
+      CASE WHEN sp.item_type = 'product' THEN p.dp_no_warranty ELSE NULL END AS stock_dp_no_warranty,
       u.username AS set_by_name
     FROM special_price sp
     JOIN customers c ON sp.customer_id = c.customer_id
@@ -170,6 +180,25 @@ export default async function AdminSpecialPricingPage({ searchParams }) {
     pending: Number(statusRows[0]?.pending || 0),
   };
 
+  const [suggestionRows] = await conn.execute(`
+    SELECT
+      c.first_name,
+      c.last_name,
+      CASE
+        WHEN sp.item_type = 'spare' THEN sl.item_name
+        ELSE p.item_name
+      END AS item_name,
+      sp.product_code,
+      sp.price_type,
+      sp.status
+    FROM special_price sp
+    JOIN customers c ON sp.customer_id = c.customer_id
+    LEFT JOIN products_list p ON sp.item_type = 'product' AND sp.product_id = p.id
+    LEFT JOIN spare_list sl ON sp.item_type = 'spare' AND sp.product_id = sl.id
+    ORDER BY sp.set_date DESC
+    LIMIT 400
+  `);
+
   return (
     <div className="p-4 sm:p-6 space-y-4 overflow-x-hidden min-w-0">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
@@ -203,245 +232,34 @@ export default async function AdminSpecialPricingPage({ searchParams }) {
       <div className="flex flex-col sm:flex-row gap-2 sm:items-center sm:gap-4">
         <SpecialPricingSearch
           initialSearch={searchQuery}
-          suggestions={rows.map((row) => ({
-            id: row.id,
+          suggestions={suggestionRows.map((row) => ({
             customerName: `${row.first_name || ""} ${row.last_name || ""}`.trim(),
             productName: row.item_name,
             productCode: row.product_code,
+            priceType: row.price_type,
+            status: row.status,
           }))}
         />
         <StatusFilter initialStatus={statusFilter} />
         <TypeFilter initialType={typeFilter} />
+        <PriceTypeFilter initialPriceType={priceTypeFilter} />
       </div>
 
-      <div className="bg-white shadow rounded-lg overflow-hidden min-w-0">
-        <div
-          className="overflow-x-scroll w-full min-w-0 touch-pan-x"
-          style={{ WebkitOverflowScrolling: "touch" }}
-        >
-          <table className="min-w-[1000px] w-full border-collapse text-sm">
-            <thead className="bg-gray-100">
-              <tr>
-                <th className="p-3 text-left">Type</th>
-                <th className="p-3 text-left">Customer</th>
-                <th className="p-3 text-left">Image</th>
-                <th className="p-3 text-left">Product/Spare</th>
-                <th className="p-3 text-right">Original Price</th>
-                <th className="p-3 text-right">Last Neg. Price</th>
-                <th className="p-3 text-right">Special Price</th>
-                <th className="p-3 text-left">Price Type</th>
-                <th className="p-3 text-left">Price Term</th>
-                <th className="p-3 text-center">Status</th>
-                <th className="p-3 text-left">Set By</th>
-                <th className="p-3 text-left">Set Date</th>
-                <th className="p-3 text-left min-w-[160px] sm:sticky sm:right-0 sm:bg-gray-100 sm:shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.1)]">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={13}
-                    className="p-4 text-center text-gray-500 text-sm"
-                  >
-                    {searchQuery || statusFilter || typeFilter ? "No data found" : "No special prices found."}
-                  </td>
-                </tr>
-              ) : (
-                rows.map((row) => {
-                  const status = (row.status || "").toLowerCase();
-                  const isApproved = status === "approved";
-                  const isRejected = status === "rejected";
-                  const badgeClass = isApproved
-                    ? "bg-green-100 text-green-700"
-                    : isRejected
-                    ? "bg-red-100 text-red-700"
-                    : "bg-yellow-100 text-yellow-700";
-                  const label = isApproved ? "approved" : isRejected ? "rejected" : "pending";
-                  const approvedMeta =
-                    isApproved && row.approved_by
-                      ? `Approved by ${row.approved_by}${
-                          row.approved_date
-                            ? ` on ${new Date(row.approved_date).toLocaleString()}`
-                            : ""
-                        }`
-                      : null;
-                  const rejectedMeta =
-                    isRejected && row.approved_by
-                      ? `Rejected by ${row.approved_by}${
-                          row.approved_date
-                            ? ` on ${new Date(row.approved_date).toLocaleString()}`
-                            : ""
-                        }`
-                      : null;
-
-                  return (
-                    <tr key={`${row.item_type}-${row.id}`} className="border-t">
-                      {/* Type Badge */}
-                      <td className="p-3">
-                        <span className={`px-2 py-1 rounded text-xs font-semibold ${
-                          row.item_type === 'product' 
-                            ? 'bg-blue-100 text-blue-700' 
-                            : 'bg-purple-100 text-purple-700'
-                        }`}>
-                          {row.item_type === 'product' ? 'Product' : 'Spare'}
-                        </span>
-                      </td>
-                      <td className="p-3">
-                        {row.first_name} {row.last_name || ""}
-                        <div className="text-xs text-gray-500">
-                          ID: {row.customer_id}
-                        </div>
-                      </td>
-                      <td className="p-3">
-                        {row.product_image ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={row.product_image}
-                            alt={row.item_name || "Item"}
-                            className="w-10 h-10 object-cover rounded"
-                          />
-                        ) : (
-                          <span className="text-gray-400 text-xs">No image</span>
-                        )}
-                      </td>
-                      <td className="p-3">
-                        <div>{row.item_name}</div>
-                        <div className="text-xs text-gray-500">
-                          Code: {row.product_code}
-                        </div>
-                      </td>
-                      <td className="p-3 text-right text-gray-600">
-                        ₹ {row.price_per_unit}
-                      </td>
-                      <td className="p-3 text-right text-gray-600">
-                        ₹ {row.last_negotiation_price ?? 0}
-                      </td>
-                      <td className="p-3 text-right font-semibold">
-                        {isDealerPricePending(row) ? (
-                          <span className="text-gray-400 italic text-sm font-normal">
-                            Enter on approve
-                          </span>
-                        ) : (
-                          `₹ ${row.special_price}`
-                        )}
-                      </td>
-                      <td className="p-3 text-sm capitalize">
-                        {resolveSpecialPriceType(row.price_type)}
-                      </td>
-                      <td className="p-3 text-sm capitalize">
-                        {resolveSpecialPriceTerm(row.price_term)}
-                      </td>
-                      <td className="p-3 text-center">
-                        <div className="flex flex-col items-center gap-1">
-                          <span
-                            className={`px-3 py-1 rounded text-xs capitalize ${badgeClass}`}
-                          >
-                            {label}
-                          </span>
-                          {approvedMeta && (
-                            <span className="text-[11px] text-gray-500">
-                              {approvedMeta}
-                            </span>
-                          )}
-                          {rejectedMeta && (
-                            <span className="text-[11px] text-gray-500">
-                              {rejectedMeta}
-                            </span>
-                          )}
-                          {(isApproved || isRejected) && row.approval_note && (
-                            <div className="text-[11px] text-gray-700 max-w-[min(240px,28vw)] text-center leading-snug border-t border-gray-200/80 pt-1.5 mt-0.5">
-                              <span className="font-semibold text-gray-600">
-                                Note:{" "}
-                              </span>
-                              <span className="whitespace-pre-wrap break-words">
-                                {row.approval_note}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                      <td className="p-3 text-sm">{row.set_by}</td>
-                      <td className="p-3 text-xs text-gray-600">
-                        {row.set_date
-                          ? new Date(row.set_date).toLocaleString()
-                          : "-"}
-                      </td>
-                      <td className="p-3 space-y-2 min-w-[160px] sm:sticky sm:right-0 sm:bg-white sm:shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.1)]">
-                        <div className="flex flex-wrap gap-2">
-                          <SpecialPriceDetailsModal
-                            details={{
-                              id: row.id,
-                              itemType: row.item_type,
-                              customerId: row.customer_id,
-                              customerName: `${row.first_name || ""} ${row.last_name || ""}`.trim(),
-                              productName: row.item_name,
-                              productCode: row.product_code,
-                              originalPrice: row.price_per_unit,
-                              specialPrice: row.special_price,
-                              priceType: row.price_type,
-                              priceTerm: row.price_term,
-                              status: row.status,
-                              setBy: row.set_by,
-                              setDate: row.set_date,
-                              approvedBy: row.approved_by,
-                              approvedDate: row.approved_date,
-                              approvalNote: row.approval_note,
-                            }}
-                            onUpdate={updateSpecialPrice}
-                            onDelete={deleteSpecialPrice}
-                          />
-                        </div>
-                        {!isApproved && !isRejected && (
-                          <SpecialPriceApproveRejectButtons
-                            id={row.id}
-                            itemType={row.item_type}
-                            needsDealerPrice={isDealerPricePending(row)}
-                          />
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="flex flex-col sm:flex-row justify-between items-center gap-3 p-4 border-t text-sm">
-          <span>
-            Page {currentPage} of {totalPages}
-          </span>
-          <div className="flex gap-2">
-            {currentPage > 1 && (
-              <Link
-                href={`/admin-dashboard/special-pricing?${new URLSearchParams({
-                  ...(searchQuery && { search: searchQuery }),
-                  ...(statusFilter && { status: statusFilter }),
-                  ...(typeFilter && { type: typeFilter }),
-                  page: String(currentPage - 1),
-                }).toString()}`}
-                className="px-3 py-1.5 border rounded hover:bg-gray-50"
-              >
-                Previous
-              </Link>
-            )}
-            {currentPage < totalPages && (
-              <Link
-                href={`/admin-dashboard/special-pricing?${new URLSearchParams({
-                  ...(searchQuery && { search: searchQuery }),
-                  ...(statusFilter && { status: statusFilter }),
-                  ...(typeFilter && { type: typeFilter }),
-                  page: String(currentPage + 1),
-                }).toString()}`}
-                className="px-3 py-1.5 border rounded hover:bg-gray-50"
-              >
-                Next
-              </Link>
-            )}
-          </div>
-        </div>
-      </div>
+      <AdminSpecialPricingTable
+        rows={rows.map((row) => ({
+          ...row,
+          set_date: row.set_date ? String(row.set_date) : null,
+          approved_date: row.approved_date ? String(row.approved_date) : null,
+        }))}
+        currentPage={currentPage}
+        totalPages={totalPages}
+        searchQuery={searchQuery}
+        statusFilter={statusFilter}
+        typeFilter={typeFilter}
+        priceTypeFilter={priceTypeFilter}
+        updateSpecialPrice={updateSpecialPrice}
+        deleteSpecialPrice={deleteSpecialPrice}
+      />
     </div>
   );
 }
