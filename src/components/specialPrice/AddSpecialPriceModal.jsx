@@ -1,11 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   SPECIAL_PRICE_TERM_DEFAULT,
   SPECIAL_PRICE_TYPE_DEFAULT,
 } from "@/lib/specialPriceDefaults";
+import SpecialPriceItemFilterBar from "@/components/specialPrice/SpecialPriceItemFilterBar";
+import {
+  filterSpecialPriceItems,
+  getSpecialPriceItemKey,
+} from "@/components/specialPrice/specialPriceItemListUtils";
 
 export default function AddSpecialPriceModal({
   customerId,
@@ -16,7 +21,7 @@ export default function AddSpecialPriceModal({
   const [step, setStep] = useState("select");
   const [allItems, setAllItems] = useState([]);
   const [search, setSearch] = useState("");
-  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [typeFilter, setTypeFilter] = useState("all");
   const [selectedItems, setSelectedItems] = useState([]);
   const [priceEntries, setPriceEntries] = useState({});
   const [submitting, setSubmitting] = useState(false);
@@ -25,8 +30,8 @@ export default function AddSpecialPriceModal({
     setStep("select");
     setSelectedItems([]);
     setSearch("");
+    setTypeFilter("all");
     setPriceEntries({});
-    setShowSuggestions(false);
     setSubmitting(false);
   };
 
@@ -60,17 +65,12 @@ export default function AddSpecialPriceModal({
     fetchItems();
   }, []);
 
-  const filteredItems = allItems.filter((p) => {
-    const q = search.trim().toLowerCase();
-    if (!q) return true;
-    const name = String(p.item_name ?? "").toLowerCase();
-    const spec = String(p.specification ?? "").toLowerCase();
-    const model = String(p._model ?? "").toLowerCase();
-    const code = String(p._code ?? "").toLowerCase();
-    return name.includes(q) || spec.includes(q) || model.includes(q) || code.includes(q);
-  });
+  const filteredItems = useMemo(
+    () => filterSpecialPriceItems(allItems, { search, typeFilter }),
+    [allItems, search, typeFilter],
+  );
 
-  const getKey = (item) => `${item._type}-${item.id}`;
+  const getKey = getSpecialPriceItemKey;
 
   const getOriginalPrice = (item) =>
     Number(item.price_per_unit ?? item.sale_price ?? 0);
@@ -82,6 +82,27 @@ export default function AddSpecialPriceModal({
       return exists ? prev.filter((p) => getKey(p) !== key) : [...prev, item];
     });
   };
+
+  const selectAllFiltered = () => {
+    setSelectedItems((prev) => {
+      const map = new Map(prev.map((item) => [getKey(item), item]));
+      filteredItems.forEach((item) => map.set(getKey(item), item));
+      return Array.from(map.values());
+    });
+  };
+
+  const deselectAllFiltered = () => {
+    const visible = new Set(filteredItems.map((item) => getKey(item)));
+    setSelectedItems((prev) => prev.filter((item) => !visible.has(getKey(item))));
+  };
+
+  const selectedInViewCount = useMemo(
+    () =>
+      filteredItems.filter((item) =>
+        selectedItems.some((p) => getKey(p) === getKey(item)),
+      ).length,
+    [filteredItems, selectedItems],
+  );
 
   const handleContinueToPrice = () => {
     if (!selectedItems.length) {
@@ -168,46 +189,20 @@ export default function AddSpecialPriceModal({
               <>
                 <h2 className="text-lg font-bold mb-4">Add Special Price</h2>
 
-                <div className="mb-3 relative">
-                  <input
-                    type="text"
-                    placeholder="Search by name, code, model, or specification..."
-                    className="border p-2 w-full rounded"
-                    value={search}
-                    onChange={(e) => {
-                      setSearch(e.target.value);
-                      setShowSuggestions(true);
-                    }}
-                    onFocus={() => { if (search.trim()) setShowSuggestions(true); }}
-                    autoComplete="off"
-                  />
+                <SpecialPriceItemFilterBar
+                  search={search}
+                  onSearchChange={setSearch}
+                  typeFilter={typeFilter}
+                  onTypeFilterChange={setTypeFilter}
+                  onSelectAllFiltered={selectAllFiltered}
+                  onDeselectAllFiltered={deselectAllFiltered}
+                  onClearAll={() => setSelectedItems([])}
+                  shownCount={filteredItems.length}
+                  selectedInViewCount={selectedInViewCount}
+                  selectedTotalCount={selectedItems.length}
+                />
 
-                  {showSuggestions && search.trim() && filteredItems.length > 0 && (
-                    <ul className="absolute z-20 bg-white border shadow-sm rounded mt-1 max-h-60 overflow-y-auto w-full text-xs">
-                      {filteredItems.slice(0, 10).map((p) => (
-                        <li
-                          key={getKey(p)}
-                          className="px-3 py-2 hover:bg-blue-50 cursor-pointer flex items-center gap-2"
-                          onClick={() => {
-                            toggleSelect(p);
-                            setSearch(p.item_name || "");
-                            setShowSuggestions(false);
-                          }}
-                        >
-                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${
-                            p._type === "product" ? "bg-blue-100 text-blue-700" : "bg-purple-100 text-purple-700"
-                          }`}>
-                            {p._type === "product" ? "Product" : "Spare"}
-                          </span>
-                          <span className="font-medium">{p.item_name || "Unnamed"}</span>
-                          {p._code && <span className="text-gray-400">({p._code})</span>}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-
-                <div className="flex-1 overflow-y-auto border rounded mb-3">
+                <div className="flex-1 overflow-y-auto border rounded mb-3 min-h-[240px]">
                   <table className="w-full text-xs">
                     <thead className="bg-gray-100 sticky top-0">
                       <tr>
