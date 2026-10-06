@@ -345,6 +345,16 @@ export async function middleware(request) {
         return NextResponse.next();
       }
 
+      // Director CRM sidebar uses /director-dashboard URLs (rewritten to user-dashboard pages).
+      if (roleNorm === "DIRECTOR" && pathname.startsWith("/user-dashboard")) {
+        const dest = new URL(
+          pathname.replace(/^\/user-dashboard/, "/director-dashboard"),
+          request.url,
+        );
+        dest.search = request.nextUrl.search;
+        return NextResponse.redirect(dest);
+      }
+
       if (
         pathname.startsWith("/user-dashboard") &&
         role === "SUPERADMIN" &&

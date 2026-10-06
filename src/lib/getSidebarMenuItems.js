@@ -14,8 +14,7 @@ import { getEmpCrmUserMenuChildrenForRole } from "@/lib/getEmpCrmUserSidebarMenu
 // Role to dashboard prefix mapping
 function getDashboardPrefix(roleKey) {
   const role = String(roleKey || "").toUpperCase();
-  // Director keeps user-dashboard for most CRM routes; specific modules use director-dashboard copies.
-  if (role === "DIRECTOR") return "/user-dashboard";
+  if (role === "DIRECTOR") return "/director-dashboard";
   if (role.includes("SALES")) return "/sales-dashboard";
   if (role.includes("SERVICE") && role.includes("HEAD")) return "/service-head-dashboard";
   if (role.includes("HR")) return "/hr-dashboard";

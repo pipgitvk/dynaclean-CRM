@@ -65,9 +65,7 @@ export default function TLCustomersTable({
 
   console.log("customer data ", customers);
 
-  const basePath = isAdmin
-    ? "/director-dashboard/tl-customers"
-    : "/user-dashboard/tl-customers";
+  const basePath = "/director-dashboard/tl-customers";
 
   // Use allCustomersForKPI for counts, or fallback to customers if not provided
   const customersForKPI =

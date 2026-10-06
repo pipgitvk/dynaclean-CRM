@@ -319,7 +319,7 @@ export default function EditStatementPage() {
             const value = e.target.value;
             if (value === "invoices") {
               if (userRole.includes("ACCOUNTANT") || userRole === "USER") {
-                router.push("/user-dashboard/invoices");
+                router.push("/director-dashboard/invoices");
               } else {
                 router.push("/director-dashboard/statements/invoices");
               }

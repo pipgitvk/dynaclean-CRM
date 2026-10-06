@@ -518,7 +518,7 @@ export default function ExpenseTable({ rows, role }) {
                       <td className="p-3">{row.approval_status}</td>
                       <td className="p-3 flex gap-2 items-center">
                         <Link
-                          href={`/user-dashboard/expenses/${row.ID}`}
+                          href={`/director-dashboard/expenses/${row.ID}`}
                           className="text-blue-600 hover:text-blue-800"
                           title="View Details"
                         >
@@ -526,7 +526,7 @@ export default function ExpenseTable({ rows, role }) {
                         </Link>
                         {row.approval_status !== "Approved" && row.approval_status !== "Rejected" && (
                           <Link
-                            href={`/user-dashboard/expenses/edit/${row.ID}`}
+                            href={`/director-dashboard/expenses/edit/${row.ID}`}
                             className="text-yellow-600 hover:text-yellow-800"
                             title="Edit Expense"
                           >
@@ -661,14 +661,14 @@ export default function ExpenseTable({ rows, role }) {
                   </div>
                   <div className="mt-4 flex justify-between items-center border-t pt-3">
                     <Link
-                      href={`/user-dashboard/expenses/${row.ID}`}
+                      href={`/director-dashboard/expenses/${row.ID}`}
                       className="text-blue-600 hover:text-blue-800 flex items-center gap-1 text-sm font-semibold"
                     >
                       View Details <ExternalLink size={14} />
                     </Link>
                     {row.approval_status !== "Approved" && row.approval_status !== "Rejected" && (
                       <Link
-                        href={`/user-dashboard/expenses/edit/${row.ID}`}
+                        href={`/director-dashboard/expenses/edit/${row.ID}`}
                         className="text-yellow-600 hover:text-yellow-800 flex items-center gap-1 text-sm font-semibold"
                       >
                         Edit <Pencil size={14} />

@@ -14,41 +14,49 @@ const nextConfig = {
     ],
   },
   async rewrites() {
-    return [
-      // Handle common misspellings/pluralizations for expense attachments
-      {
-        source: "/expenses_attachments/:path*",
-        destination: "/expense_attachments/:path*",
-      },
-      {
-        source: "/expenses_atachments/:path*",
-        destination: "/expense_attachments/:path*",
-      },
-      {
-        source: "/expense_atachments/:path*",
-        destination: "/expense_attachments/:path*",
-      },
-      {
-        source: "/expenses-attachments/:path*",
-        destination: "/expense_attachments/:path*",
-      },
-      // Serve uploaded files via catch-all API route (query-string rewrites do not
-      // reliably pass :path* into ?path=, which caused {"error":"File path required"}).
-      {
-        source: "/uploads/:path*",
-        destination: "/api/serve/:path*",
-      },
-      // Serve company documents via catch-all API route
-      {
-        source: "/company_documents/:path*",
-        destination: "/api/serve/:path*",
-      },
-      // Order invoice / e-way bill uploads (public/Order/accounts/)
-      {
-        source: "/Order/:path*",
-        destination: "/api/serve/Order/:path*",
-      },
-    ];
+    return {
+      afterFiles: [
+        {
+          source: "/director-dashboard/:path+",
+          destination: "/user-dashboard/:path+",
+        },
+        // Handle common misspellings/pluralizations for expense attachments
+        {
+          source: "/expenses_attachments/:path*",
+          destination: "/expense_attachments/:path*",
+        },
+        {
+          source: "/expenses_atachments/:path*",
+          destination: "/expense_attachments/:path*",
+        },
+        {
+          source: "/expense_atachments/:path*",
+          destination: "/expense_attachments/:path*",
+        },
+        {
+          source: "/expenses-attachments/:path*",
+          destination: "/expense_attachments/:path*",
+        },
+        // Serve uploaded files via catch-all API route (query-string rewrites do not
+        // reliably pass :path* into ?path=, which caused {"error":"File path required"}).
+        {
+          source: "/uploads/:path*",
+          destination: "/api/serve/:path*",
+        },
+        // Serve company documents via catch-all API route
+        {
+          source: "/company_documents/:path*",
+          destination: "/api/serve/:path*",
+        },
+        // Order invoice / e-way bill uploads (public/Order/accounts/)
+        {
+          source: "/Order/:path*",
+          destination: "/api/serve/Order/:path*",
+        },
+      ],
+      beforeFiles: [],
+      fallback: [],
+    };
   },
 };
 
