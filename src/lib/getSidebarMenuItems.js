@@ -851,7 +851,7 @@ const allMenuItems = [
   },
   {
     name: "HR Operations",
-    moduleKey: "employee",
+    moduleKey: "hr-operations",
     roles: ["ALL"],
     icon: "Briefcase",
     children: [
@@ -1161,7 +1161,7 @@ export default async function getSidebarMenuItems() {
       roleKey,
     ) ?? [];
     if (roleKey === "ACCOUNTANT" && Array.isArray(allowedModules)) {
-      for (const key of ["salary-management", "salary-sheet", "attendance-sheet", "add-paid-leaves"]) {
+      for (const key of ["salary-management", "salary-sheet", "attendance-sheet"]) {
         if (!allowedModules.includes(key)) allowedModules.push(key);
       }
     }
@@ -1172,24 +1172,36 @@ export default async function getSidebarMenuItems() {
       return isModuleKeyAllowed("employee-crm", allowedModules);
     };
 
+    const isMenuItemModuleAllowed = (item) => {
+      const mk = String(item?.moduleKey || "").trim();
+      if (!mk) {
+        return empCrmUserPathAllowed(item?.path)
+          ? true
+          : item?.path
+            ? false
+            : true;
+      }
+      if (mk === "prospect-submissions") {
+        return (
+          isModuleKeyAllowed("prospect-submissions", allowedModules) ||
+          isModuleKeyAllowed("dashboard-home", allowedModules)
+        );
+      }
+      if (isModuleKeyAllowed(mk, allowedModules)) return true;
+      // Only generic EMPCRM home links may inherit employee-crm — not gated HR keys.
+      if (mk === "employee-crm" && empCrmUserPathAllowed(item?.path)) {
+        return true;
+      }
+      return false;
+    };
+
     const filterByModuleAccess = (list) =>
       (list || [])
         .map((item) => {
           const children = item?.children?.length
             ? filterByModuleAccess(item.children)
             : [];
-          // Prospect submissions: keep visible with dashboard-home until a dedicated module key is granted.
-          const allowed = item?.moduleKey
-            ? item.moduleKey === "prospect-submissions"
-              ? isModuleKeyAllowed("prospect-submissions", allowedModules) ||
-                isModuleKeyAllowed("dashboard-home", allowedModules)
-              : isModuleKeyAllowed(item.moduleKey, allowedModules) ||
-                empCrmUserPathAllowed(item.path)
-            : empCrmUserPathAllowed(item.path)
-              ? true
-              : item?.path
-                ? false
-                : true;
+          const allowed = isMenuItemModuleAllowed(item);
           if (item?.children?.length) {
             return children.length > 0 ? { ...item, children } : null;
           }

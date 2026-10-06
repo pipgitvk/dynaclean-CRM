@@ -67,7 +67,6 @@ export async function getEffectiveAllowedModuleKeys(username, role) {
       "salary-management",
       "salary-sheet",
       "attendance-sheet",
-      "add-paid-leaves",
     ]);
   }
   return uniqueStrings(next);

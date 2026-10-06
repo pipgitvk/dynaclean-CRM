@@ -741,6 +741,7 @@ const allMenuItems = [
   },
   {
     name: "HR Operations",
+    moduleKey: "hr-operations",
     roles: ["SUPERADMIN", "ADMIN", "HR", "ACCOUNTANT"],
     icon: "Briefcase",
     children: [
@@ -804,7 +805,7 @@ const allMenuItems = [
         path: "/admin-dashboard/hr-operations",
         name: "Add Paid Leaves",
         accessKey: "add-paid-leaves",
-        roles: ["SUPERADMIN"],
+        roles: ["ALL"],
         icon: "Calendar",
       },
     ],
@@ -1103,7 +1104,7 @@ export default async function getSidebarMenuItems() {
         roleKeyNormalized,
       ) ?? [];
     if (String(roleKeyNormalized).includes("ACCOUNTANT")) {
-      for (const key of ["salary-management", "salary-sheet", "attendance-sheet", "add-paid-leaves"]) {
+      for (const key of ["salary-management", "salary-sheet", "attendance-sheet"]) {
         if (!allowedModules.includes(key)) allowedModules.push(key);
       }
     }
