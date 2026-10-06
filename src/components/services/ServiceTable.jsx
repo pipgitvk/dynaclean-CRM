@@ -1,7 +1,10 @@
 "use client";
 
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useState, useCallback } from "react";
+import ManualFilterSearchButton, {
+  MANUAL_FILTER_HINT,
+} from "@/components/ui/ManualFilterSearchButton";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import Modal from "./Modal";
@@ -37,15 +40,24 @@ function dedupeServiceRecords(rows) {
 function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
   const [records, setRecords] = useState(() => dedupeServiceRecords(serviceRecords));
   const [searchTerm, setSearchTerm] = useState("");
+  const [appliedSearchTerm, setAppliedSearchTerm] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
   const [complaintDateFilter, setComplaintDateFilter] = useState("");
   const [complaintDateFrom, setComplaintDateFrom] = useState("");
+  const [appliedComplaintDateFrom, setAppliedComplaintDateFrom] = useState("");
   const [complaintDateTo, setComplaintDateTo] = useState("");
+  const [appliedComplaintDateTo, setAppliedComplaintDateTo] = useState("");
   const [serviceTypeFilter, setServiceTypeFilter] = useState("");
+  const [appliedServiceTypeFilter, setAppliedServiceTypeFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("PENDING");
+  const [appliedStatusFilter, setAppliedStatusFilter] = useState("PENDING");
   const [assignedFilter, setAssignedFilter] = useState("");
+  const [appliedAssignedFilter, setAppliedAssignedFilter] = useState("");
   const [assignedToFilter, setAssignedToFilter] = useState("");
+  const [appliedAssignedToFilter, setAppliedAssignedToFilter] = useState("");
   const [pendingOver48hOnly, setPendingOver48hOnly] = useState(false);
+  const [appliedPendingOver48hOnly, setAppliedPendingOver48hOnly] =
+    useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedService, setSelectedService] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -93,14 +105,39 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
       searchParams.get("pending_over_48h"),
     );
     if (statusParam != null && String(statusParam).trim() !== "") {
-      setStatusFilter(String(statusParam).trim());
+      const s = String(statusParam).trim();
+      setStatusFilter(s);
+      setAppliedStatusFilter(s);
     } else if (over48) {
       setStatusFilter("PENDING");
+      setAppliedStatusFilter("PENDING");
     }
     if (over48) {
       setPendingOver48hOnly(true);
+      setAppliedPendingOver48hOnly(true);
     }
   }, [searchParams]);
+
+  const handleApplySearch = useCallback(() => {
+    setAppliedSearchTerm(searchTerm);
+    setAppliedComplaintDateFrom(complaintDateFrom);
+    setAppliedComplaintDateTo(complaintDateTo);
+    setAppliedServiceTypeFilter(serviceTypeFilter);
+    setAppliedStatusFilter(statusFilter);
+    setAppliedAssignedFilter(assignedFilter);
+    setAppliedAssignedToFilter(assignedToFilter);
+    setAppliedPendingOver48hOnly(pendingOver48hOnly);
+    setCurrentPage(1);
+  }, [
+    searchTerm,
+    complaintDateFrom,
+    complaintDateTo,
+    serviceTypeFilter,
+    statusFilter,
+    assignedFilter,
+    assignedToFilter,
+    pendingOver48hOnly,
+  ]);
   const dashboardPath =
     dashboardPathOverride ||
     (() => {
@@ -392,8 +429,8 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
   // Universal search across all fields including company name
   const filteredRecords = sortedRecords.filter((record) => {
     // Search filter
-    if (searchTerm.trim()) {
-      const lowerSearch = searchTerm.toLowerCase();
+    if (appliedSearchTerm.trim()) {
+      const lowerSearch = appliedSearchTerm.toLowerCase();
       const searchMatch =
         Object.values(record).some((value) =>
           value?.toString().toLowerCase().includes(lowerSearch),
@@ -411,49 +448,55 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
     // }
 
     // Complaint Date Range Filter
-    if ((complaintDateFrom || complaintDateTo) && record.complaint_date) {
+    if (
+      (appliedComplaintDateFrom || appliedComplaintDateTo) &&
+      record.complaint_date
+    ) {
       const recordDate = new Date(record.complaint_date)
         .toISOString()
         .split("T")[0];
 
-      // If FROM date is given
-      if (complaintDateFrom && recordDate < complaintDateFrom) {
+      if (appliedComplaintDateFrom && recordDate < appliedComplaintDateFrom) {
         return false;
       }
 
-      // If TO date is given
-      if (complaintDateTo && recordDate > complaintDateTo) {
+      if (appliedComplaintDateTo && recordDate > appliedComplaintDateTo) {
         return false;
       }
     }
 
-    // Service Type filter
-    if (serviceTypeFilter && record.service_type !== serviceTypeFilter) {
-      return false;
-    }
-
-    // Status filter
     if (
-      statusFilter &&
-      record.status?.toUpperCase() !== statusFilter.toUpperCase()
+      appliedServiceTypeFilter &&
+      record.service_type !== appliedServiceTypeFilter
     ) {
       return false;
     }
 
-    // Assigned filter
-    if (assignedFilter === "NOT_ASSIGNED" && record.assigned_to) {
-      return false;
-    }
-    if (assignedFilter === "ASSIGNED" && !record.assigned_to) {
-      return false;
-    }
-
-    // Assigned-to engineer filter
-    if (assignedToFilter && record.assigned_to !== assignedToFilter) {
+    if (
+      appliedStatusFilter &&
+      record.status?.toUpperCase() !== appliedStatusFilter.toUpperCase()
+    ) {
       return false;
     }
 
-    if (pendingOver48hOnly && !isServiceRecordPendingOver48Hours(record)) {
+    if (appliedAssignedFilter === "NOT_ASSIGNED" && record.assigned_to) {
+      return false;
+    }
+    if (appliedAssignedFilter === "ASSIGNED" && !record.assigned_to) {
+      return false;
+    }
+
+    if (
+      appliedAssignedToFilter &&
+      record.assigned_to !== appliedAssignedToFilter
+    ) {
+      return false;
+    }
+
+    if (
+      appliedPendingOver48hOnly &&
+      !isServiceRecordPendingOver48Hours(record)
+    ) {
       return false;
     }
 
@@ -495,14 +538,22 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
 
   const handleResetSearch = () => {
     setSearchTerm("");
+    setAppliedSearchTerm("");
     setComplaintDateFilter("");
     setComplaintDateFrom("");
+    setAppliedComplaintDateFrom("");
     setComplaintDateTo("");
+    setAppliedComplaintDateTo("");
     setServiceTypeFilter("");
+    setAppliedServiceTypeFilter("");
     setStatusFilter("");
+    setAppliedStatusFilter("");
     setAssignedFilter("");
+    setAppliedAssignedFilter("");
     setAssignedToFilter("");
+    setAppliedAssignedToFilter("");
     setPendingOver48hOnly(false);
+    setAppliedPendingOver48hOnly(false);
     setCurrentPage(1);
   };
 
@@ -979,15 +1030,24 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
             placeholder="Search records (including company name)..."
             className="p-2 w-full border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
             value={searchTerm}
-            onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                handleApplySearch();
+              }
+            }}
           />
+          <ManualFilterSearchButton onClick={handleApplySearch} />
           <button
+            type="button"
             onClick={handleResetSearch}
             className="px-4 py-2 bg-gray-100 border border-gray-300 rounded-lg hover:bg-gray-200 transition-colors text-sm whitespace-nowrap"
           >
-            Reset
+            Clear
           </button>
         </div>
+        <p className="text-xs text-gray-500">{MANUAL_FILTER_HINT}</p>
 
         {/* Filters Row */}
         <div className="flex flex-wrap gap-3 items-end">

@@ -2,10 +2,7 @@ import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { isUnknownApprovalNoteColumnError } from "@/lib/specialPriceApprovalNoteColumn";
 import { updateSpecialPrice, deleteSpecialPrice } from "./_actions";
-import SpecialPricingSearch from "./SpecialPricingSearch";
-import StatusFilter from "./StatusFilter";
-import TypeFilter from "./TypeFilter";
-import PriceTypeFilter from "./PriceTypeFilter";
+import SpecialPricingFilterBar from "./SpecialPricingFilterBar";
 import AdminSpecialPricingTable from "./AdminSpecialPricingTable";
 import { SPECIAL_PRICE_PENDING_CONDITION } from "@/lib/specialPriceDefaults";
 
@@ -229,21 +226,19 @@ export default async function AdminSpecialPricingPage({ searchParams }) {
         </div>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-2 sm:items-center sm:gap-4">
-        <SpecialPricingSearch
-          initialSearch={searchQuery}
-          suggestions={suggestionRows.map((row) => ({
-            customerName: `${row.first_name || ""} ${row.last_name || ""}`.trim(),
-            productName: row.item_name,
-            productCode: row.product_code,
-            priceType: row.price_type,
-            status: row.status,
-          }))}
-        />
-        <StatusFilter initialStatus={statusFilter} />
-        <TypeFilter initialType={typeFilter} />
-        <PriceTypeFilter initialPriceType={priceTypeFilter} />
-      </div>
+      <SpecialPricingFilterBar
+        initialSearch={searchQuery}
+        initialStatus={statusFilter}
+        initialType={typeFilter}
+        initialPriceType={priceTypeFilter}
+        suggestions={suggestionRows.map((row) => ({
+          customerName: `${row.first_name || ""} ${row.last_name || ""}`.trim(),
+          productName: row.item_name,
+          productCode: row.product_code,
+          priceType: row.price_type,
+          status: row.status,
+        }))}
+      />
 
       <AdminSpecialPricingTable
         rows={rows.map((row) => ({

@@ -1,7 +1,14 @@
 "use client";
 
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import {
+  filterPaymentPendingOrders,
+  sortPaymentPendingOrders,
+} from "@/lib/filterPaymentPendingOrders";
+import ManualFilterSearchButton, {
+  MANUAL_FILTER_HINT,
+} from "@/components/ui/ManualFilterSearchButton";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import dayjs from "dayjs";
@@ -10,37 +17,37 @@ import { Download, Search, Calendar, DollarSign, ArrowUp, ArrowDown, Trash2, X, 
 export default function PaymentPendingReport() {
   const router = useRouter();
   const [orders, setOrders] = useState([]);
-  const [filteredOrders, setFilteredOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [appliedSearchQuery, setAppliedSearchQuery] = useState("");
   const [userRole, setUserRole] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [deletingAll, setDeletingAll] = useState(false);
   const [totalOrdersCardClicks, setTotalOrdersCardClicks] = useState(0);
   
-  // New filter states
   const [dueDateFrom, setDueDateFrom] = useState("");
+  const [appliedDueDateFrom, setAppliedDueDateFrom] = useState("");
   const [dueDateTo, setDueDateTo] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all"); // all, due, no-due
-  const [completionFilter, setCompletionFilter] = useState("pending"); // pending, completed, all
+  const [appliedDueDateTo, setAppliedDueDateTo] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [appliedStatusFilter, setAppliedStatusFilter] = useState("all");
+  const [completionFilter, setCompletionFilter] = useState("pending");
+  const [appliedCompletionFilter, setAppliedCompletionFilter] = useState("pending");
   const [followupModalOpen, setFollowupModalOpen] = useState(false);
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const canAddDeduction = ["ACCOUNTANT", "PRODUCTION ACCOUNTANT", "ADMIN", "SUPERADMIN"].includes(userRole);
 
-  useEffect(() => {
-    fetchReport();
-  }, [completionFilter]);
-
-  const fetchReport = async () => {
+  const fetchReport = useCallback(async (completion) => {
     try {
       setLoading(true);
-      const res = await fetch(`/api/reports/payment-pending?completion=${completionFilter}`);
+      const res = await fetch(
+        `/api/reports/payment-pending?completion=${completion}`,
+      );
       const data = await res.json();
       
       if (data.success) {
         setOrders(data.orders || []);
-        setFilteredOrders(data.orders || []);
         setUserRole(data.userRole || "");
       } else {
         alert(data.error || "Failed to fetch report");
@@ -51,83 +58,45 @@ export default function PaymentPendingReport() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    let filtered = orders;
-    
-    // Apply search filter
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(order => 
-        order.order_id?.toLowerCase().includes(query) ||
-        order.quote_number?.toLowerCase().includes(query) ||
-        order.client_name?.toLowerCase().includes(query) ||
-        order.company_name?.toLowerCase().includes(query) ||
-        order.contact?.toLowerCase().includes(query) ||
-        order.created_by?.toLowerCase().includes(query)
-      );
+    fetchReport(appliedCompletionFilter);
+  }, [fetchReport, appliedCompletionFilter]);
+
+  const handleApplySearch = useCallback(() => {
+    setAppliedSearchQuery(searchQuery);
+    setAppliedDueDateFrom(dueDateFrom);
+    setAppliedDueDateTo(dueDateTo);
+    setAppliedStatusFilter(statusFilter);
+    if (completionFilter !== appliedCompletionFilter) {
+      setAppliedCompletionFilter(completionFilter);
     }
+  }, [
+    searchQuery,
+    dueDateFrom,
+    dueDateTo,
+    statusFilter,
+    completionFilter,
+    appliedCompletionFilter,
+  ]);
 
-    // Apply due date range filter
-    if (dueDateFrom) {
-      filtered = filtered.filter(order =>
-        dayjs(order.due_date).isAfter(dayjs(dueDateFrom).subtract(1, 'day'), 'day')
-      );
-    }
-    if (dueDateTo) {
-      filtered = filtered.filter(order =>
-        dayjs(order.due_date).isBefore(dayjs(dueDateTo).add(1, 'day'), 'day')
-      );
-    }
-
-    // Apply status filter
-    if (statusFilter !== "all") {
-      const today = dayjs().startOf('day');
-      if (statusFilter === "due") {
-        // Due: due_date has passed (is before today)
-        filtered = filtered.filter(order =>
-          dayjs(order.due_date).isBefore(today, 'day')
-        );
-      } else if (statusFilter === "no-due") {
-        // No Due: due_date is in future (is same or after today)
-        filtered = filtered.filter(order => {
-          const orderDate = dayjs(order.due_date).startOf('day');
-          return !orderDate.isBefore(today, 'day');
-        });
-      }
-    }
-
-    // Apply sorting
-    if (sortConfig.key) {
-      filtered = [...filtered].sort((a, b) => {
-        let aVal = a[sortConfig.key];
-        let bVal = b[sortConfig.key];
-
-        // Handle date sorting
-        if (sortConfig.key === 'due_date' || sortConfig.key === 'next_followup_date') {
-          aVal = dayjs(aVal).unix();
-          bVal = dayjs(bVal).unix();
-        }
-        // Handle numeric sorting
-        else if (['total_amount', 'paid_amount', 'remaining_amount', 'deduction_amount'].includes(sortConfig.key)) {
-          aVal = parseFloat(aVal) || 0;
-          bVal = parseFloat(bVal) || 0;
-        }
-        // Handle string sorting
-        else {
-          aVal = (aVal || '').toString().toLowerCase();
-          bVal = (bVal || '').toString().toLowerCase();
-        }
-
-        if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
-        if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
-        return 0;
-      });
-    }
-
-    setFilteredOrders(filtered);
-  }, [searchQuery, orders, sortConfig, dueDateFrom, dueDateTo, statusFilter]);
+  const filteredOrders = useMemo(() => {
+    const filtered = filterPaymentPendingOrders(orders, {
+      searchQuery: appliedSearchQuery,
+      dueDateFrom: appliedDueDateFrom,
+      dueDateTo: appliedDueDateTo,
+      statusFilter: appliedStatusFilter,
+    });
+    return sortPaymentPendingOrders(filtered, sortConfig);
+  }, [
+    orders,
+    appliedSearchQuery,
+    appliedDueDateFrom,
+    appliedDueDateTo,
+    appliedStatusFilter,
+    sortConfig,
+  ]);
 
   const handleSort = (key) => {
     setSortConfig(prev => ({
@@ -201,7 +170,6 @@ export default function PaymentPendingReport() {
 
       alert("All data deleted successfully.");
       setOrders([]);
-      setFilteredOrders([]);
     } catch (error) {
       console.error("Error deleting all data:", error);
       alert(error.message || "Failed to delete all data");
@@ -292,6 +260,12 @@ export default function PaymentPendingReport() {
                 placeholder="Search..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleApplySearch();
+                  }
+                }}
                 className="w-full pl-6 pr-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
             </div>
@@ -326,15 +300,25 @@ export default function PaymentPendingReport() {
                 <option value="no-due">Not Due</option>
               </select>
 
-              {/* Clear Button */}
+              <ManualFilterSearchButton
+                onClick={handleApplySearch}
+                className="px-2 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded"
+              />
+
               {(dueDateFrom || dueDateTo || statusFilter !== "all" || completionFilter !== "pending" || searchQuery) && (
                 <button
+                  type="button"
                   onClick={() => {
                     setDueDateFrom("");
                     setDueDateTo("");
                     setStatusFilter("all");
                     setCompletionFilter("pending");
                     setSearchQuery("");
+                    setAppliedDueDateFrom("");
+                    setAppliedDueDateTo("");
+                    setAppliedStatusFilter("all");
+                    setAppliedSearchQuery("");
+                    setAppliedCompletionFilter("pending");
                   }}
                   className="flex items-center justify-center bg-gray-500 hover:bg-gray-600 text-white px-1.5 py-1.5 rounded text-xs transition-colors"
                   title="Clear Filters"
@@ -363,6 +347,7 @@ export default function PaymentPendingReport() {
               )}
             </div>
           </div>
+          <p className="text-xs text-gray-500 mt-2">{MANUAL_FILTER_HINT}</p>
         </div>
       </div>
       {/* Table */}

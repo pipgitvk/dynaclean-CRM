@@ -1,7 +1,10 @@
 // components/GoodFollowupsTable.jsx
 import dayjs from "dayjs";
 import { Search } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useMemo, useCallback } from "react";
+import ManualFilterSearchButton, {
+  MANUAL_FILTER_HINT,
+} from "@/components/ui/ManualFilterSearchButton";
 
 const SkeletonRows = () => (
   <>
@@ -49,39 +52,46 @@ function isOldReassignedFollowupStatus(status) {
 
 export default function GoodFollowupsTable({ data, isLoading }) {
   const [searchQuery, setSearchQuery] = useState("");
-  const [filteredData, setFilteredData] = useState([]);
+  const [appliedSearchQuery, setAppliedSearchQuery] = useState("");
   const [stageFilter, setStageFilter] = useState("");
+  const [appliedStageFilter, setAppliedStageFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [appliedStatusFilter, setAppliedStatusFilter] = useState("");
+
+  const handleApplySearch = useCallback(() => {
+    setAppliedSearchQuery(searchQuery);
+    setAppliedStageFilter(stageFilter);
+    setAppliedStatusFilter(statusFilter);
+  }, [searchQuery, stageFilter, statusFilter]);
     
   const stages = Array.from(
     new Set(data?.map((item) => item.stage).filter(Boolean))
   );
   const statuses = ["NEW", "Very Good", "Average", "Poor", "Denied", "Invalid"];
 
-  useEffect(() => {
-    if (!data) return;
-    const lowercasedQuery = searchQuery.toLowerCase();
+  const filteredData = useMemo(() => {
+    if (!data) return [];
+    const lowercasedQuery = appliedSearchQuery.toLowerCase();
 
-    const result = data.filter((item) => {
+    return data.filter((item) => {
       const matchesSearch = Object.values(item).some(
         (value) =>
-          value && value.toString().toLowerCase().includes(lowercasedQuery)
+          value && value.toString().toLowerCase().includes(lowercasedQuery),
       );
 
       const matchesStage =
-        stageFilter === "" || item.stage?.toLowerCase() === stageFilter.toLowerCase();
+        appliedStageFilter === "" ||
+        item.stage?.toLowerCase() === appliedStageFilter.toLowerCase();
 
       const matchesStatus =
-        statusFilter === "" ||
-        (statusFilter === "old_reassigned"
+        appliedStatusFilter === "" ||
+        (appliedStatusFilter === "old_reassigned"
           ? isOldReassignedFollowupStatus(item.status)
-          : item.status?.toLowerCase() === statusFilter.toLowerCase());
+          : item.status?.toLowerCase() === appliedStatusFilter.toLowerCase());
 
       return matchesSearch && matchesStage && matchesStatus;
     });
-
-    setFilteredData(result);
-  }, [searchQuery, stageFilter, statusFilter, data]);
+  }, [data, appliedSearchQuery, appliedStageFilter, appliedStatusFilter]);
 
 
   if (isLoading) {
@@ -124,6 +134,12 @@ export default function GoodFollowupsTable({ data, isLoading }) {
               placeholder="Search followups..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleApplySearch();
+                }
+              }}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-200"
             />
           </div>
@@ -162,6 +178,7 @@ export default function GoodFollowupsTable({ data, isLoading }) {
             </select>
           </div>
 
+          <ManualFilterSearchButton onClick={handleApplySearch} />
 
           {/* Dynamic Row Count */}
           <div className="text-sm font-medium text-gray-600">
@@ -169,6 +186,7 @@ export default function GoodFollowupsTable({ data, isLoading }) {
             result{rowCount !== 1 ? "s" : ""}
           </div>
         </div>
+        <p className="text-xs text-gray-500">{MANUAL_FILTER_HINT}</p>
       </div>
 
       <div className="flex-1 overflow-y-auto mt-4 rounded-lg shadow-sm">

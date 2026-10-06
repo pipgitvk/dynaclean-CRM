@@ -13,7 +13,7 @@ import {
   MoreVertical,
   Truck,
 } from "lucide-react";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import dayjs from "dayjs";
 import { isSalesRole } from "@/lib/isSalesRole";
 
@@ -54,78 +54,55 @@ const SkeletonLoader = () => (
 export default function OrderTable({ orders, userRole }) {
   const searchParams = useSearchParams();
   const [searchQuery, setSearchQuery] = useState("");
-  const [filteredOrders, setFilteredOrders] = useState([]);
-  const [statusFilter, setStatusFilter] = useState(""); // '', pendinginvoice, invoiceuploaded, bookingdone, dispatchdone, canceled
+  const [appliedSearchQuery, setAppliedSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [appliedStatusFilter, setAppliedStatusFilter] = useState("");
   const [dateFrom, setDateFrom] = useState("");
+  const [appliedDateFrom, setAppliedDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [appliedDateTo, setAppliedDateTo] = useState("");
   const [createdByFilter, setCreatedByFilter] = useState("");
+  const [appliedCreatedByFilter, setAppliedCreatedByFilter] = useState("");
   const [hasInvoiceFilter, setHasInvoiceFilter] = useState(false);
+  const [appliedHasInvoiceFilter, setAppliedHasInvoiceFilter] = useState(false);
+
+  const handleApplySearch = useCallback(() => {
+    setAppliedSearchQuery(searchQuery);
+    setAppliedStatusFilter(statusFilter);
+    setAppliedDateFrom(dateFrom);
+    setAppliedDateTo(dateTo);
+    setAppliedCreatedByFilter(createdByFilter);
+    setAppliedHasInvoiceFilter(hasInvoiceFilter);
+  }, [
+    searchQuery,
+    statusFilter,
+    dateFrom,
+    dateTo,
+    createdByFilter,
+    hasInvoiceFilter,
+  ]);
   const [openMenuId, setOpenMenuId] = useState(null); // State to track which menu is open
   // const canShowInstall = ["ADMIN", "SALES", "SERVICE"].includes(userRole);
 
   useEffect(() => {
     const from = searchParams.get("date_from");
     const to = searchParams.get("date_to");
-    if (from) setDateFrom(from);
-    if (to) setDateTo(to);
-    setHasInvoiceFilter(searchParams.get("has_invoice") === "1");
+    if (from) {
+      setDateFrom(from);
+      setAppliedDateFrom(from);
+    }
+    if (to) {
+      setDateTo(to);
+      setAppliedDateTo(to);
+    }
+    const hasInv = searchParams.get("has_invoice") === "1";
+    setHasInvoiceFilter(hasInv);
+    setAppliedHasInvoiceFilter(hasInv);
   }, [searchParams]);
 
   const toggleMenu = (id) => {
     setOpenMenuId(openMenuId === id ? null : id);
   };
-
-  // Filter orders based on search query, status filter, and date range
-  useEffect(() => {
-    if (!orders) return;
-
-    const lowercasedQuery = searchQuery.toLowerCase();
-    const result = orders.filter((order) => {
-      // Step 1: Filter by status
-      if (statusFilter) {
-        const orderStatus = getStatusText(order)
-          .text.toLowerCase()
-          .replace(/\s+/g, "");
-        if (orderStatus !== statusFilter.toLowerCase()) return false;
-      }
-
-      // Step 2: Date range filter (created_at, IST calendar day)
-      if (dateFrom || dateTo) {
-        if (!order.created_at) return false;
-        const createdKey = new Date(order.created_at).toLocaleDateString(
-          "en-CA",
-          { timeZone: "Asia/Kolkata" },
-        );
-        if (dateFrom && createdKey < dateFrom) return false;
-        if (dateTo && createdKey > dateTo) return false;
-      }
-
-      // Step 2.5: Filter by created_by
-      if (createdByFilter && order.created_by !== createdByFilter) {
-        return false;
-      }
-
-      if (hasInvoiceFilter) {
-        const invoiceNumber = String(order.invoice_number || "").trim();
-        if (!invoiceNumber) return false;
-      }
-
-      // Step 2.6: Filter by approval_status (User Dashboard specific)
-      if (order.approval_status === 'pending') {
-        return false;
-      }
-
-      // Step 3: Search across multiple fields
-      return (
-        order.order_id?.toLowerCase().includes(lowercasedQuery) ||
-        order.client_name?.toLowerCase().includes(lowercasedQuery) ||
-        order.company_name?.toLowerCase().includes(lowercasedQuery) ||
-        order.contact?.toLowerCase().includes(lowercasedQuery) ||
-        order.state?.toLowerCase().includes(lowercasedQuery)
-      );
-    });
-    setFilteredOrders(result);
-  }, [searchQuery, orders, statusFilter, dateFrom, dateTo, createdByFilter, hasInvoiceFilter]);
 
   const getStatusText = (order) => {
     // Check for return status first (highest priority)
@@ -252,6 +229,62 @@ export default function OrderTable({ orders, userRole }) {
     );
   };
 
+  const filteredOrders = useMemo(() => {
+    if (!orders) return [];
+
+    const lowercasedQuery = appliedSearchQuery.toLowerCase();
+    return orders.filter((order) => {
+      if (appliedStatusFilter) {
+        const orderStatus = getStatusText(order)
+          .text.toLowerCase()
+          .replace(/\s+/g, "");
+        if (orderStatus !== appliedStatusFilter.toLowerCase()) return false;
+      }
+
+      if (appliedDateFrom || appliedDateTo) {
+        if (!order.created_at) return false;
+        const createdKey = new Date(order.created_at).toLocaleDateString(
+          "en-CA",
+          { timeZone: "Asia/Kolkata" },
+        );
+        if (appliedDateFrom && createdKey < appliedDateFrom) return false;
+        if (appliedDateTo && createdKey > appliedDateTo) return false;
+      }
+
+      if (
+        appliedCreatedByFilter &&
+        order.created_by !== appliedCreatedByFilter
+      ) {
+        return false;
+      }
+
+      if (appliedHasInvoiceFilter) {
+        const invoiceNumber = String(order.invoice_number || "").trim();
+        if (!invoiceNumber) return false;
+      }
+
+      if (order.approval_status === "pending") {
+        return false;
+      }
+
+      return (
+        order.order_id?.toLowerCase().includes(lowercasedQuery) ||
+        order.client_name?.toLowerCase().includes(lowercasedQuery) ||
+        order.company_name?.toLowerCase().includes(lowercasedQuery) ||
+        order.contact?.toLowerCase().includes(lowercasedQuery) ||
+        order.state?.toLowerCase().includes(lowercasedQuery)
+      );
+    });
+  }, [
+    orders,
+    appliedSearchQuery,
+    appliedStatusFilter,
+    appliedDateFrom,
+    appliedDateTo,
+    appliedCreatedByFilter,
+    appliedHasInvoiceFilter,
+  ]);
+
   if (!orders) {
     return <SkeletonLoader />;
   }
@@ -272,9 +305,22 @@ export default function OrderTable({ orders, userRole }) {
             placeholder="Search by ID, client, company, etc."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                handleApplySearch();
+              }
+            }}
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200 ease-in-out"
           />
         </div>
+        <button
+          type="button"
+          onClick={handleApplySearch}
+          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg w-full sm:w-auto"
+        >
+          Search
+        </button>
       </div>
 
       {/* 🧰 Filters */}
@@ -324,6 +370,9 @@ export default function OrderTable({ orders, userRole }) {
           </select>
         </div>
       </div>
+      <p className="text-xs text-gray-500">
+        Set filters, then click Search to update the list.
+      </p>
 
       {/* 👨‍💼 TABLE VIEW for large screens */}
       <div className="hidden lg:block overflow-x-auto overflow-y-auto max-h-[calc(100vh-300px)] bg-white rounded-xl shadow-lg">

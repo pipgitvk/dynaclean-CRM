@@ -2,7 +2,10 @@
 "use client";
 
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import ManualFilterSearchButton, {
+  MANUAL_FILTER_HINT,
+} from "@/components/ui/ManualFilterSearchButton";
 import { useSearchParams } from "next/navigation";
 import dayjs from "dayjs";
 import isSameOrBefore from "dayjs/plugin/isSameOrBefore";
@@ -33,13 +36,17 @@ export default function ClientTaskTable({ initialTasks, currentUser = "" }) {
   const [reassignOpen, setReassignOpen] = useState(false);
   const [modalTask, setModalTask] = useState(null);
   const [search, setSearch] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [appliedStatusFilter, setAppliedStatusFilter] = useState("");
   const [assignedToFilter, setAssignedToFilter] = useState("");
+  const [appliedAssignedToFilter, setAppliedAssignedToFilter] = useState("");
   const [fromDate, setFromDate] = useState("");
+  const [appliedFromDate, setAppliedFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const [appliedToDate, setAppliedToDate] = useState("");
   const [sortBy, setSortBy] = useState("task_id");
   const [sortOrder, setSortOrder] = useState("desc");
-  const [filteredTasks, setFilteredTasks] = useState(initialTasks);
   const [taskView, setTaskView] = useState("tasks");
 
   useEffect(() => {
@@ -47,90 +54,117 @@ export default function ClientTaskTable({ initialTasks, currentUser = "" }) {
     const fromCard = searchParams.get("fromCard");
     if (statusFromCard === "Pending" || statusFromCard === "Working" || statusFromCard === "Completed") {
       setStatusFilter(statusFromCard);
+      setAppliedStatusFilter(statusFromCard);
     }
     if (fromCard === "1") {
       setSearch("");
+      setAppliedSearch("");
       setAssignedToFilter("");
+      setAppliedAssignedToFilter("");
       setFromDate("");
+      setAppliedFromDate("");
       setToDate("");
+      setAppliedToDate("");
     }
   }, [searchParams]);
 
-  useEffect(() => {
+  const handleApplySearch = useCallback(() => {
+    setAppliedSearch(search);
+    setAppliedStatusFilter(statusFilter);
+    setAppliedAssignedToFilter(assignedToFilter);
+    setAppliedFromDate(fromDate);
+    setAppliedToDate(toDate);
+  }, [search, statusFilter, assignedToFilter, fromDate, toDate]);
+
+  const filteredTasks = useMemo(() => {
     let filtered = initialTasks.filter((task) => {
-      // Search filter
-      const matchesSearch = !search || 
-        (task.taskname?.toLowerCase() || "").includes(search.toLowerCase()) ||
-        (task.taskassignto?.toLowerCase() || "").includes(search.toLowerCase()) ||
-        (task.createdby?.toLowerCase() || "").includes(search.toLowerCase()) ||
-        (task.status?.toLowerCase() || "").includes(search.toLowerCase()) ||
-        (task.first_assignto?.toLowerCase() || "").includes(search.toLowerCase());
-      
-      // Status filter
-      const matchesStatus = !statusFilter || task.status === statusFilter;
-      
-      // Assigned To filter (check taskassignto, first_assignto, AND reassign)
-      const matchesAssignedTo = !assignedToFilter || 
-        task.taskassignto === assignedToFilter || 
-        task.first_assignto === assignedToFilter ||
-        task.reassign === assignedToFilter;
-      
-      // Date range filter
+      const matchesSearch =
+        !appliedSearch ||
+        (task.taskname?.toLowerCase() || "").includes(appliedSearch.toLowerCase()) ||
+        (task.taskassignto?.toLowerCase() || "").includes(appliedSearch.toLowerCase()) ||
+        (task.createdby?.toLowerCase() || "").includes(appliedSearch.toLowerCase()) ||
+        (task.status?.toLowerCase() || "").includes(appliedSearch.toLowerCase()) ||
+        (task.first_assignto?.toLowerCase() || "").includes(appliedSearch.toLowerCase());
+
+      const matchesStatus =
+        !appliedStatusFilter || task.status === appliedStatusFilter;
+
+      const matchesAssignedTo =
+        !appliedAssignedToFilter ||
+        task.taskassignto === appliedAssignedToFilter ||
+        task.first_assignto === appliedAssignedToFilter ||
+        task.reassign === appliedAssignedToFilter;
+
       let matchesDateRange = true;
-      if (fromDate || toDate) {
+      if (appliedFromDate || appliedToDate) {
         const assignDate = task.followed_date
           ? dayjsTaskCalendarStart(task.followed_date)
           : null;
         if (assignDate && assignDate.isValid()) {
-          if (fromDate && toDate) {
-            matchesDateRange = assignDate.isSameOrAfter(dayjs(fromDate), 'day') && 
-                              assignDate.isSameOrBefore(dayjs(toDate), 'day');
-          } else if (fromDate) {
-            matchesDateRange = assignDate.isSameOrAfter(dayjs(fromDate), 'day');
-          } else if (toDate) {
-            matchesDateRange = assignDate.isSameOrBefore(dayjs(toDate), 'day');
+          if (appliedFromDate && appliedToDate) {
+            matchesDateRange =
+              assignDate.isSameOrAfter(dayjs(appliedFromDate), "day") &&
+              assignDate.isSameOrBefore(dayjs(appliedToDate), "day");
+          } else if (appliedFromDate) {
+            matchesDateRange = assignDate.isSameOrAfter(
+              dayjs(appliedFromDate),
+              "day",
+            );
+          } else if (appliedToDate) {
+            matchesDateRange = assignDate.isSameOrBefore(
+              dayjs(appliedToDate),
+              "day",
+            );
           }
-        } else if (fromDate || toDate) {
-          matchesDateRange = false; // Exclude tasks without valid date when date filter is active
+        } else if (appliedFromDate || appliedToDate) {
+          matchesDateRange = false;
         }
       }
-      
+
       return matchesSearch && matchesStatus && matchesAssignedTo && matchesDateRange;
     });
 
-    // Sorting
     filtered.sort((a, b) => {
       let aVal, bVal;
-      
-      switch(sortBy) {
-        case 'taskname':
-          aVal = (a.taskname || '').toLowerCase();
-          bVal = (b.taskname || '').toLowerCase();
+
+      switch (sortBy) {
+        case "taskname":
+          aVal = (a.taskname || "").toLowerCase();
+          bVal = (b.taskname || "").toLowerCase();
           break;
-        case 'status':
-          aVal = (a.status || '').toLowerCase();
-          bVal = (b.status || '').toLowerCase();
+        case "status":
+          aVal = (a.status || "").toLowerCase();
+          bVal = (b.status || "").toLowerCase();
           break;
-        case 'deadline':
+        case "deadline":
           aVal = a.next_followup_date ? dayjs(a.next_followup_date).unix() : 0;
           bVal = b.next_followup_date ? dayjs(b.next_followup_date).unix() : 0;
           break;
-        case 'assignedTo':
-          aVal = (a.first_assignto || a.taskassignto || '').toLowerCase();
-          bVal = (b.first_assignto || b.taskassignto || '').toLowerCase();
+        case "assignedTo":
+          aVal = (a.first_assignto || a.taskassignto || "").toLowerCase();
+          bVal = (b.first_assignto || b.taskassignto || "").toLowerCase();
           break;
-        default: // task_id
+        default:
           aVal = a.task_id;
           bVal = b.task_id;
       }
-      
-      if (aVal < bVal) return sortOrder === 'asc' ? -1 : 1;
-      if (aVal > bVal) return sortOrder === 'asc' ? 1 : -1;
+
+      if (aVal < bVal) return sortOrder === "asc" ? -1 : 1;
+      if (aVal > bVal) return sortOrder === "asc" ? 1 : -1;
       return 0;
     });
 
-    setFilteredTasks(filtered);
-  }, [search, statusFilter, assignedToFilter, fromDate, toDate, sortBy, sortOrder, initialTasks]);
+    return filtered;
+  }, [
+    initialTasks,
+    appliedSearch,
+    appliedStatusFilter,
+    appliedAssignedToFilter,
+    appliedFromDate,
+    appliedToDate,
+    sortBy,
+    sortOrder,
+  ]);
 
   // Calculate KPIs
   const today = dayjs().startOf("day");
@@ -167,6 +201,11 @@ export default function ClientTaskTable({ initialTasks, currentUser = "" }) {
     setAssignedToFilter("");
     setFromDate("");
     setToDate("");
+    setAppliedSearch("");
+    setAppliedStatusFilter("");
+    setAppliedAssignedToFilter("");
+    setAppliedFromDate("");
+    setAppliedToDate("");
   };
 
   const getTableRowColor = (task) => {
@@ -289,6 +328,12 @@ export default function ClientTaskTable({ initialTasks, currentUser = "" }) {
               className="border p-2 rounded-md w-full"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleApplySearch();
+                }
+              }}
             />
           </div>
           <div>
@@ -325,15 +370,21 @@ export default function ClientTaskTable({ initialTasks, currentUser = "" }) {
             <label className="block text-sm font-medium text-gray-700 mb-1">To Date</label>
             <TypeableDateFilterInput value={toDate} onChange={setToDate} className="border p-2 rounded-md w-full"/>
           </div>
-          <div className="flex items-end">
+          <div className="flex items-end gap-2">
+            <ManualFilterSearchButton
+              onClick={handleApplySearch}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md w-full"
+            />
             <button
+              type="button"
               onClick={resetFilters}
               className="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600 w-full"
             >
-              Reset Filters
+              Clear
             </button>
           </div>
         </div>
+        <p className="text-xs text-gray-500 mt-2">{MANUAL_FILTER_HINT}</p>
       </div>
 
       {/* Sleek Color Key */}

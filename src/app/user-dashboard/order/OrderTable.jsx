@@ -15,7 +15,7 @@ import {
   ArrowUp,
   Pencil,
 } from "lucide-react";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import dayjs from "dayjs";
 
 import DeleteButton from "@/components/accounts/DeleteButton";
@@ -57,68 +57,39 @@ const SkeletonLoader = () => (
 
 export default function OrderTable({ orders, userRole }) {
   const [searchQuery, setSearchQuery] = useState("");
-  const [filteredOrders, setFilteredOrders] = useState([]);
-  const [statusFilter, setStatusFilter] = useState(""); // '', pendinginvoice, invoiceuploaded, bookingdone, dispatchdone, canceled
+  const [appliedSearchQuery, setAppliedSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [appliedStatusFilter, setAppliedStatusFilter] = useState("");
   const [paymentTermsFilter, setPaymentTermsFilter] = useState("");
+  const [appliedPaymentTermsFilter, setAppliedPaymentTermsFilter] = useState("");
   const [dateFrom, setDateFrom] = useState("");
+  const [appliedDateFrom, setAppliedDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [appliedDateTo, setAppliedDateTo] = useState("");
   const [createdByFilter, setCreatedByFilter] = useState("");
+  const [appliedCreatedByFilter, setAppliedCreatedByFilter] = useState("");
+
+  const handleApplySearch = useCallback(() => {
+    setAppliedSearchQuery(searchQuery);
+    setAppliedStatusFilter(statusFilter);
+    setAppliedPaymentTermsFilter(paymentTermsFilter);
+    setAppliedDateFrom(dateFrom);
+    setAppliedDateTo(dateTo);
+    setAppliedCreatedByFilter(createdByFilter);
+  }, [
+    searchQuery,
+    statusFilter,
+    paymentTermsFilter,
+    dateFrom,
+    dateTo,
+    createdByFilter,
+  ]);
   const [openMenuId, setOpenMenuId] = useState(null); // State to track which menu is open
   // const canShowInstall = ["ADMIN", "SALES", "SERVICE"].includes(userRole);
 
   const toggleMenu = (id) => {
     setOpenMenuId(openMenuId === id ? null : id);
   };
-
-  // Filter orders based on search query, status filter, and date range
-  useEffect(() => {
-    if (!orders) return;
-
-    const lowercasedQuery = searchQuery.toLowerCase();
-    const result = orders.filter((order) => {
-      // Step 1: Filter by status
-      if (statusFilter) {
-        const orderStatus = getStatusText(order)
-          .text.toLowerCase()
-          .replace(/\s+/g, "");
-        if (orderStatus !== statusFilter.toLowerCase()) return false;
-      }
-
-      // Step 2: Date range filter (created_at)
-      if (dateFrom || dateTo) {
-        const created = order.created_at ? new Date(order.created_at) : null;
-        if (!created || isNaN(created)) return false;
-        if (dateFrom) {
-          const from = new Date(dateFrom + "T00:00:00");
-          if (created < from) return false;
-        }
-        if (dateTo) {
-          const to = new Date(dateTo + "T23:59:59");
-          if (created > to) return false;
-        }
-      }
-
-      // Step 2.5: Filter by created_by
-      if (createdByFilter && order.created_by !== createdByFilter) {
-        return false;
-      }
-
-      // Step 2.7: Filter by payment_terms
-      if (paymentTermsFilter && order.payment_terms !== paymentTermsFilter) {
-        return false;
-      }
-
-      // Step 3: Search across multiple fields
-      return (
-        order.order_id?.toLowerCase().includes(lowercasedQuery) ||
-        order.client_name?.toLowerCase().includes(lowercasedQuery) ||
-        order.company_name?.toLowerCase().includes(lowercasedQuery) ||
-        order.contact?.toLowerCase().includes(lowercasedQuery) ||
-        order.state?.toLowerCase().includes(lowercasedQuery)
-      );
-    });
-    setFilteredOrders(result);
-  }, [searchQuery, orders, statusFilter, paymentTermsFilter, dateFrom, dateTo, createdByFilter]);
 
   const getStatusText = (order) => {
     // Check for pending approval first
@@ -288,6 +259,57 @@ export default function OrderTable({ orders, userRole }) {
     );
   };
 
+  const filteredOrders = useMemo(() => {
+    if (!orders) return [];
+
+    const lowercasedQuery = appliedSearchQuery.toLowerCase();
+    return orders.filter((order) => {
+      if (appliedStatusFilter) {
+        const orderStatus = getStatusText(order)
+          .text.toLowerCase()
+          .replace(/\s+/g, "");
+        if (orderStatus !== appliedStatusFilter.toLowerCase()) return false;
+      }
+
+      if (appliedDateFrom || appliedDateTo) {
+        const created = order.created_at ? new Date(order.created_at) : null;
+        if (!created || isNaN(created)) return false;
+        if (appliedDateFrom) {
+          const from = new Date(appliedDateFrom + "T00:00:00");
+          if (created < from) return false;
+        }
+        if (appliedDateTo) {
+          const to = new Date(appliedDateTo + "T23:59:59");
+          if (created > to) return false;
+        }
+      }
+
+      if (appliedCreatedByFilter && order.created_by !== appliedCreatedByFilter) {
+        return false;
+      }
+
+      if (appliedPaymentTermsFilter && order.payment_terms !== appliedPaymentTermsFilter) {
+        return false;
+      }
+
+      return (
+        order.order_id?.toLowerCase().includes(lowercasedQuery) ||
+        order.client_name?.toLowerCase().includes(lowercasedQuery) ||
+        order.company_name?.toLowerCase().includes(lowercasedQuery) ||
+        order.contact?.toLowerCase().includes(lowercasedQuery) ||
+        order.state?.toLowerCase().includes(lowercasedQuery)
+      );
+    });
+  }, [
+    orders,
+    appliedSearchQuery,
+    appliedStatusFilter,
+    appliedPaymentTermsFilter,
+    appliedDateFrom,
+    appliedDateTo,
+    appliedCreatedByFilter,
+  ]);
+
   if (!orders) {
     return <SkeletonLoader />;
   }
@@ -308,9 +330,22 @@ export default function OrderTable({ orders, userRole }) {
             placeholder="Search by ID, client, company, etc."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                handleApplySearch();
+              }
+            }}
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200 ease-in-out"
           />
         </div>
+        <button
+          type="button"
+          onClick={handleApplySearch}
+          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg w-full sm:w-auto"
+        >
+          Search
+        </button>
       </div>
 
       {/* 🧰 Filters */}
@@ -381,6 +416,7 @@ export default function OrderTable({ orders, userRole }) {
           </select>
         </div>
       </div>
+      <p className="text-xs text-gray-500">Set filters, then click Search to update the list.</p>
 
       {/* 👨‍💼 TABLE VIEW for large screens */}
       <div className="hidden lg:block overflow-x-auto overflow-y-auto max-h-[calc(100vh-300px)] bg-white rounded-xl shadow-lg">
