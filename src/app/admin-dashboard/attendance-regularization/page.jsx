@@ -52,13 +52,14 @@ function StatusBadge({ status, acknowledgedAt }) {
       {display}
     </span>
   );
-  if (!acknowledgedAt) return statusEl;
-  return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-indigo-100 text-indigo-700 border border-indigo-200">
-      <BadgeCheck className="w-3 h-3" />
-      Acknowledged
-    </span>
-  );
+  // if (!acknowledgedAt) return statusEl;
+  // return (
+  //   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-indigo-100 text-indigo-700 border border-indigo-200">
+  //     <BadgeCheck className="w-3 h-3" />
+  //     Acknowledged
+  //   </span>
+  // );
+  return statusEl;
 }
 
 export default function AdminAttendanceRegularizationPage() {
@@ -101,12 +102,12 @@ export default function AdminAttendanceRegularizationPage() {
         approve: "Approve",
         reject: "Reject",
         revert: "Revert",
-        acknowledge: "Acknowledge",
+        // acknowledge: "Acknowledge",
       };
       const label = labels[action] || "Action";
       
-      // For approve/reject/acknowledge, show modal instead of confirming
-      if ((action === "approve" || action === "reject" || action === "acknowledge") && !remark) {
+      // For approve/reject, show modal instead of confirming
+      if ((action === "approve" || action === "reject") && !remark) {
         const req = requests.find(r => r.id === id);
         setSelectedRequest(req);
         setModalAction(action);
@@ -327,7 +328,7 @@ export default function AdminAttendanceRegularizationPage() {
                           <span className="text-gray-500">By:</span>{" "}
                           {req.reviewed_by || "—"}
                         </div>
-                        {req.acknowledged_by && (
+                        {/* {req.acknowledged_by && (
                           <div className="flex items-center gap-1 text-indigo-700">
                             <BadgeCheck className="w-3 h-3" />
                             <span>
@@ -343,7 +344,7 @@ export default function AdminAttendanceRegularizationPage() {
                             <span className="font-medium text-indigo-800">Remark: </span>
                             {req.acknowledgement_remark}
                           </div>
-                        )}
+                        )} */}
                         <div className="text-gray-400 mt-1 pt-1 border-t border-gray-50">
                           {req.created_at
                             ? new Date(req.created_at).toLocaleString()
@@ -396,13 +397,13 @@ export default function AdminAttendanceRegularizationPage() {
                           >
                             {actionLoading === `${req.id}-reject` ? "…" : "Reject"}
                           </button>
-                          <button
+                          {/* <button
                             onClick={() => handleAction(req.id, "acknowledge")}
                             disabled={actionLoading !== null}
                             className="px-2 py-1 text-xs font-medium rounded bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             {actionLoading === `${req.id}-acknowledge` ? "…" : "Acknowledge"}
-                          </button>
+                          </button> */}
                         </div>
                       ) : req.status === "approved" || req.status === "rejected" ? (
                         <div className="flex gap-2 flex-wrap">
@@ -414,13 +415,13 @@ export default function AdminAttendanceRegularizationPage() {
                           >
                             {actionLoading === `${req.id}-revert` ? "…" : "Revert"}
                           </button>
-                          <button
+                          {/* <button
                             onClick={() => handleAction(req.id, "acknowledge")}
                             disabled={actionLoading !== null}
                             className="px-2 py-1 text-xs font-medium rounded bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             {actionLoading === `${req.id}-acknowledge` ? "…" : "Acknowledge"}
-                          </button>
+                          </button> */}
                         </div>
                       ) : (
                         <span className="text-gray-400 text-xs">—</span>

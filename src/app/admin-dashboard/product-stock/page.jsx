@@ -633,7 +633,7 @@ function ProductAndSpareLists({ type, onOpenHistory }) {
                                 </div>
                               )}
                             </div>
-                            {/* Dealer Price */}
+                            {/* Dealer Price — hidden
                             <div className="flex items-center justify-between gap-2 group">
                               <span className="text-gray-500 text-xs w-28 shrink-0">Dealer Price</span>
                               {editingField.key === r.item_code && editingField.field === 'dealer_price' ? (
@@ -649,6 +649,7 @@ function ProductAndSpareLists({ type, onOpenHistory }) {
                                 </div>
                               )}
                             </div>
+                            */}
                             {/* DP No Warranty */}
                             <div className="flex items-center justify-between gap-2 group">
                               <span className="text-gray-500 text-xs w-28 shrink-0">DP No-Warranty</span>
@@ -1187,7 +1188,7 @@ function ProductAndSpareLists({ type, onOpenHistory }) {
                 />
               </div>
 
-              {/* Dealer Price */}
+              {/* Dealer Price — hidden
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Dealer Price</label>
                 <input
@@ -1197,6 +1198,7 @@ function ProductAndSpareLists({ type, onOpenHistory }) {
                   className="w-full border rounded p-2 text-sm"
                 />
               </div>
+              */}
 
               {/* DP NO-warranty */}
               <div>
