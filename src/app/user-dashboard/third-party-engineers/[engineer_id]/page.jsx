@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { toast } from 'react-hot-toast';
 import Link from 'next/link';
+import { PhoneCall } from 'lucide-react';
 
 export default function ViewThirdPartyEngineerPage() {
   const params = useParams();
@@ -87,12 +88,22 @@ export default function ViewThirdPartyEngineerPage() {
             <h1 className="text-4xl font-bold text-slate-900">{engineer.name}</h1>
             <p className="text-slate-600 mt-2">View third-party engineer details</p>
           </div>
-          <Link
-            href={`/user-dashboard/third-party-engineers/${engineer_id}/edit`}
-            className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-semibold"
-          >
-            Edit
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href={`/user-dashboard/third-party-engineers/${engineer_id}/followup`}
+              className="inline-flex items-center justify-center p-3 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition"
+              title="Add follow-up"
+              aria-label="Add follow-up"
+            >
+              <PhoneCall size={20} />
+            </Link>
+            <Link
+              href={`/user-dashboard/third-party-engineers/${engineer_id}/edit`}
+              className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-semibold"
+            >
+              Edit
+            </Link>
+          </div>
         </div>
 
         {/* Details Card */}
@@ -125,6 +136,29 @@ export default function ViewThirdPartyEngineerPage() {
               <a href={`tel:${engineer.mobile}`} className="text-lg font-semibold text-blue-600 hover:underline">
                 {engineer.mobile}
               </a>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 uppercase mb-2">Secondary Contact</label>
+              {engineer.secondary_contact_number ? (
+                <a
+                  href={`tel:${engineer.secondary_contact_number}`}
+                  className="text-lg font-semibold text-blue-600 hover:underline"
+                >
+                  {engineer.secondary_contact_number}
+                </a>
+              ) : (
+                <p className="text-slate-700">N/A</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 uppercase mb-2">Service Charge</label>
+              <p className="text-lg font-semibold text-slate-900">
+                {engineer.service_charge != null && engineer.service_charge !== ''
+                  ? `₹${Number(engineer.service_charge).toLocaleString('en-IN')}`
+                  : 'N/A'}
+              </p>
             </div>
 
             <div>

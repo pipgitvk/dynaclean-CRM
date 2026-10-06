@@ -1,6 +1,8 @@
 import { getDbConnection } from "@/lib/db";
 import { NextResponse } from "next/server";
 import { getSessionPayload } from "@/lib/auth";
+import { ensureThirdPartyEngineerColumns } from "@/lib/thirdPartyEngineerSchema";
+import { ensureThirdPartyEngineerFollowupsTable } from "@/lib/ensureThirdPartyEngineerFollowupsTable";
 import crypto from "crypto";
 
 /**
@@ -67,12 +69,8 @@ export async function GET(req) {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
       `);
     } catch (_) {}
-    try {
-      await conn.execute(`ALTER TABLE third_party_service_engineers ADD COLUMN IF NOT EXISTS attachments TEXT NULL COMMENT 'JSON array of {attachment_id, attachment_name, file_path}'`);
-    } catch (_) {}
-    try {
-      await conn.execute(`ALTER TABLE third_party_service_engineers ADD COLUMN IF NOT EXISTS created_by VARCHAR(255) NULL`);
-    } catch (_) {}
+    await ensureThirdPartyEngineerColumns(conn);
+    await ensureThirdPartyEngineerFollowupsTable(conn);
 
     const { searchParams } = new URL(req.url);
     const search = searchParams.get("search") || "";
@@ -88,21 +86,26 @@ export async function GET(req) {
     const username = payload.username || payload.email || "";
 
     let whereClause = "WHERE 1=1";
+    let listWhereClause = "WHERE 1=1";
     const params = [];
 
     // If not SUPERADMIN, only show their own engineers
     if (roleNorm !== "SUPERADMIN") {
       whereClause += " AND created_by = ?";
+      listWhereClause += " AND e.created_by = ?";
       params.push(username);
     }
 
     if (status && status !== "all") {
       whereClause += " AND status = ?";
+      listWhereClause += " AND e.status = ?";
       params.push(status);
     }
 
     if (search) {
       whereClause += " AND (name LIKE ? OR email LIKE ? OR mobile LIKE ? OR state LIKE ?)";
+      listWhereClause +=
+        " AND (e.name LIKE ? OR e.email LIKE ? OR e.mobile LIKE ? OR e.state LIKE ?)";
       const searchTerm = `%${search}%`;
       params.push(searchTerm, searchTerm, searchTerm, searchTerm);
     }
@@ -112,10 +115,31 @@ export async function GET(req) {
     const total = countRows[0]?.total || 0;
 
     const sql = `
-      SELECT engineer_id, name, mobile, email, address, state, geo_location, remark, status, created_by, created_at, updated_at
-      FROM third_party_service_engineers
-      ${whereClause}
-      ORDER BY created_at DESC
+      SELECT
+        e.engineer_id,
+        e.name,
+        e.mobile,
+        e.secondary_contact_number,
+        e.email,
+        e.address,
+        e.state,
+        e.geo_location,
+        e.remark,
+        e.service_charge,
+        e.status,
+        e.created_by,
+        e.created_at,
+        e.updated_at,
+        (
+          SELECT f.next_followup_date
+          FROM third_party_engineer_followups f
+          WHERE f.engineer_id = e.engineer_id
+          ORDER BY f.created_at DESC, f.id DESC
+          LIMIT 1
+        ) AS next_followup_date
+      FROM third_party_service_engineers e
+      ${listWhereClause}
+      ORDER BY e.created_at DESC
       LIMIT ? OFFSET ?
     `;
     params.push(limit, offset);
@@ -154,7 +178,20 @@ export async function POST(req) {
     const payload = await getSessionPayload();
     const username = payload.username || payload.email || "";
 
-    const { name, mobile, email, password, address, state, geo_location, remark } = body;
+    await ensureThirdPartyEngineerColumns(conn);
+
+    const {
+      name,
+      mobile,
+      secondary_contact_number,
+      email,
+      password,
+      address,
+      state,
+      geo_location,
+      remark,
+      service_charge,
+    } = body;
 
     // Validation
     if (!name || !mobile || !email || !password) {
@@ -181,19 +218,26 @@ export async function POST(req) {
 
     const sql = `
       INSERT INTO third_party_service_engineers 
-      (name, mobile, email, password, address, state, geo_location, remark, status, created_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (name, mobile, secondary_contact_number, email, password, address, state, geo_location, remark, service_charge, status, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
+
+    const parsedCharge =
+      service_charge === "" || service_charge === undefined || service_charge === null
+        ? null
+        : Number(service_charge);
 
     const values = [
       name,
       mobile,
+      secondary_contact_number || null,
       email,
       hashedPassword,
       address || null,
       state || null,
       geo_location || null,
       remark || null,
+      Number.isFinite(parsedCharge) ? parsedCharge : null,
       "active",
       username,
     ];

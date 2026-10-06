@@ -1,6 +1,7 @@
 import { getDbConnection } from "@/lib/db";
 import { NextResponse } from "next/server";
 import { getSessionPayload } from "@/lib/auth";
+import { ensureThirdPartyEngineerColumns } from "@/lib/thirdPartyEngineerSchema";
 import crypto from "crypto";
 
 /**
@@ -66,12 +67,7 @@ export async function GET(req, context) {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
       `);
     } catch (_) {}
-    try {
-      await conn.execute(`ALTER TABLE third_party_service_engineers ADD COLUMN IF NOT EXISTS attachments TEXT NULL COMMENT 'JSON array of {attachment_id, attachment_name, file_path}'`);
-    } catch (_) {}
-    try {
-      await conn.execute(`ALTER TABLE third_party_service_engineers ADD COLUMN IF NOT EXISTS created_by VARCHAR(255) NULL`);
-    } catch (_) {}
+    await ensureThirdPartyEngineerColumns(conn);
 
     const params = await context.params;
     const { engineer_id } = params;
@@ -92,7 +88,7 @@ export async function GET(req, context) {
 
     // Fetch engineer details
     const [engineers] = await conn.execute(
-      `SELECT engineer_id, name, mobile, email, address, state, geo_location, remark, attachments, status, created_by, created_at, updated_at
+      `SELECT engineer_id, name, mobile, secondary_contact_number, email, address, state, geo_location, remark, service_charge, attachments, status, created_by, created_at, updated_at
        FROM third_party_service_engineers
        WHERE engineer_id = ?`,
       [engineer_id]
@@ -153,7 +149,21 @@ export async function PUT(req, context) {
     const { engineer_id } = params;
     const body = await req.json();
 
-    const { name, mobile, email, password, address, state, geo_location, remark, status } = body;
+    await ensureThirdPartyEngineerColumns(conn);
+
+    const {
+      name,
+      mobile,
+      secondary_contact_number,
+      email,
+      password,
+      address,
+      state,
+      geo_location,
+      remark,
+      service_charge,
+      status,
+    } = body;
 
     if (!engineer_id) {
       return NextResponse.json(
@@ -239,6 +249,18 @@ export async function PUT(req, context) {
     if (remark !== undefined) {
       updateFields.push("remark = ?");
       values.push(remark);
+    }
+    if (secondary_contact_number !== undefined) {
+      updateFields.push("secondary_contact_number = ?");
+      values.push(secondary_contact_number || null);
+    }
+    if (service_charge !== undefined) {
+      const parsedCharge =
+        service_charge === "" || service_charge === null
+          ? null
+          : Number(service_charge);
+      updateFields.push("service_charge = ?");
+      values.push(Number.isFinite(parsedCharge) ? parsedCharge : null);
     }
     if (status !== undefined) {
       updateFields.push("status = ?");

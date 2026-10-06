@@ -4,7 +4,13 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { toast } from 'react-hot-toast';
 import { useRouter } from 'next/navigation';
-import { Search } from 'lucide-react';
+import { Search, PhoneCall } from 'lucide-react';
+import {
+  consumeThirdPartyEngineersListReturnPage,
+  consumeThirdPartyEngineersListScrollY,
+  saveThirdPartyEngineersListReturnState,
+  THIRD_PARTY_ENGINEERS_TABLE_HASH,
+} from '@/lib/thirdPartyEngineersListReturn';
 
 export default function ThirdPartyEngineersPage() {
   const router = useRouter();
@@ -16,8 +22,33 @@ export default function ThirdPartyEngineersPage() {
   const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0 });
 
   useEffect(() => {
+    const pageNum = consumeThirdPartyEngineersListReturnPage();
+    if (pageNum != null && pageNum !== pagination.page) {
+      setPagination((prev) => ({ ...prev, page: pageNum }));
+      return;
+    }
     fetchEngineers();
   }, [search, status, pagination.page]);
+
+  useEffect(() => {
+    if (loading) return;
+    const scrollY = consumeThirdPartyEngineersListScrollY();
+    if (scrollY != null) {
+      requestAnimationFrame(() => window.scrollTo(0, scrollY));
+      return;
+    }
+    if (
+      typeof window !== 'undefined' &&
+      window.location.hash === `#${THIRD_PARTY_ENGINEERS_TABLE_HASH}`
+    ) {
+      requestAnimationFrame(() => {
+        document.getElementById(THIRD_PARTY_ENGINEERS_TABLE_HASH)?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start',
+        });
+      });
+    }
+  }, [loading, engineers.length]);
 
   const fetchEngineers = async () => {
     try {
@@ -165,7 +196,10 @@ export default function ThirdPartyEngineersPage() {
         </div>
 
         {/* Table */}
-        <div className="bg-white rounded-lg shadow-md overflow-hidden">
+        <div
+          id={THIRD_PARTY_ENGINEERS_TABLE_HASH}
+          className="bg-white rounded-lg shadow-md overflow-hidden scroll-mt-4"
+        >
           {loading ? (
             <div className="flex justify-center items-center h-64">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
@@ -190,9 +224,12 @@ export default function ThirdPartyEngineersPage() {
                     <tr>
                       <th className="px-6 py-3 text-left text-sm font-semibold text-slate-700">Name</th>
                       <th className="px-6 py-3 text-left text-sm font-semibold text-slate-700">Mobile</th>
+                      <th className="px-6 py-3 text-left text-sm font-semibold text-slate-700">Secondary Contact</th>
                       <th className="px-6 py-3 text-left text-sm font-semibold text-slate-700">Email</th>
                       <th className="px-6 py-3 text-left text-sm font-semibold text-slate-700">State</th>
                       <th className="px-6 py-3 text-left text-sm font-semibold text-slate-700">Geo Location</th>
+                      <th className="px-6 py-3 text-left text-sm font-semibold text-slate-700">Service Charge</th>
+                      <th className="px-6 py-3 text-left text-sm font-semibold text-slate-700">Next Follow-up</th>
                       <th className="px-6 py-3 text-left text-sm font-semibold text-slate-700">Status</th>
                       <th className="px-6 py-3 text-left text-sm font-semibold text-slate-700">Actions</th>
                     </tr>
@@ -207,10 +244,26 @@ export default function ThirdPartyEngineersPage() {
                       >
                         <td className="px-6 py-4 text-sm font-semibold text-slate-900">{engineer.name}</td>
                         <td className="px-6 py-4 text-sm text-slate-700">{engineer.mobile}</td>
+                        <td className="px-6 py-4 text-sm text-slate-700">
+                          {engineer.secondary_contact_number || '—'}
+                        </td>
                         <td className="px-6 py-4 text-sm text-slate-700">{engineer.email}</td>
                         <td className="px-6 py-4 text-sm text-slate-700">{engineer.state || 'N/A'}</td>
-                        <td className="px-6 py-4 text-sm text-slate-700">
+                        <td className="px-6 py-4 text-sm text-slate-700 max-w-[200px] truncate">
                           {engineer.geo_location || 'N/A'}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-slate-700">
+                          {engineer.service_charge != null && engineer.service_charge !== ''
+                            ? `₹${Number(engineer.service_charge).toLocaleString('en-IN')}`
+                            : '—'}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-slate-700">
+                          {engineer.next_followup_date
+                            ? new Date(engineer.next_followup_date).toLocaleString('en-IN', {
+                                dateStyle: 'medium',
+                                timeStyle: 'short',
+                              })
+                            : '—'}
                         </td>
                         <td className="px-6 py-4 text-sm">
                           <span
@@ -230,6 +283,15 @@ export default function ThirdPartyEngineersPage() {
                               className="px-3 py-1 bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition text-xs font-semibold"
                             >
                               View
+                            </Link>
+                            <Link
+                              href={`/user-dashboard/third-party-engineers/${engineer.engineer_id}/followup`}
+                              onClick={() => saveThirdPartyEngineersListReturnState(pagination.page)}
+                              className="inline-flex items-center justify-center p-1.5 bg-purple-50 text-purple-600 rounded hover:bg-purple-100 transition"
+                              title="Add follow-up"
+                              aria-label="Add follow-up"
+                            >
+                              <PhoneCall size={16} />
                             </Link>
                             <Link
                               href={`/user-dashboard/third-party-engineers/${engineer.engineer_id}/edit`}

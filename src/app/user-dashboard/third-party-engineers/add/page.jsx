@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'react-hot-toast';
 import Link from 'next/link';
 import { useEffect } from 'react';
+import { INDIAN_STATES } from '@/lib/indianStates';
+import GeoLocationPicker from '@/components/thirdParty/GeoLocationPicker';
 
 export default function AddThirdPartyEngineerPage() {
   const router = useRouter();
@@ -14,6 +16,7 @@ export default function AddThirdPartyEngineerPage() {
   const [formData, setFormData] = useState({
     name: '',
     mobile: '',
+    secondary_contact_number: '',
     email: '',
     password: '',
     confirmPassword: '',
@@ -21,6 +24,7 @@ export default function AddThirdPartyEngineerPage() {
     state: '',
     geo_location: '',
     remark: '',
+    service_charge: '',
   });
 
   const [fileInputs, setFileInputs] = useState([{ name: '', file: null }]);
@@ -102,12 +106,14 @@ export default function AddThirdPartyEngineerPage() {
         body: JSON.stringify({
           name: formData.name.trim(),
           mobile: formData.mobile.trim(),
+          secondary_contact_number: formData.secondary_contact_number.trim(),
           email: formData.email.trim(),
           password: formData.password,
           address: formData.address.trim(),
           state: formData.state.trim(),
           geo_location: formData.geo_location.trim(),
           remark: formData.remark.trim(),
+          service_charge: formData.service_charge.trim(),
         }),
       });
 
@@ -237,6 +243,18 @@ export default function AddThirdPartyEngineerPage() {
               </div>
 
               <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Secondary Contact Number</label>
+                <input
+                  type="tel"
+                  name="secondary_contact_number"
+                  value={formData.secondary_contact_number}
+                  onChange={handleInputChange}
+                  placeholder="Alternate contact number"
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+
+              <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">Email *</label>
                 <input
                   type="email"
@@ -299,25 +317,28 @@ export default function AddThirdPartyEngineerPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-2">State</label>
-                  <input
-                    type="text"
+                  <select
                     name="state"
                     value={formData.state}
                     onChange={handleInputChange}
-                    placeholder="State"
                     className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
+                  >
+                    <option value="">Select state</option>
+                    {INDIAN_STATES.map((st) => (
+                      <option key={st} value={st}>
+                        {st}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
-                <div>
+                <div className="md:col-span-2">
                   <label className="block text-sm font-semibold text-slate-700 mb-2">Geo Location</label>
-                  <input
-                    type="text"
-                    name="geo_location"
+                  <GeoLocationPicker
                     value={formData.geo_location}
-                    onChange={handleInputChange}
-                    placeholder="Latitude, Longitude or area"
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    onChange={(val) =>
+                      setFormData((prev) => ({ ...prev, geo_location: val }))
+                    }
                   />
                 </div>
               </div>
@@ -330,16 +351,31 @@ export default function AddThirdPartyEngineerPage() {
               Additional Information
             </h2>
 
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">Remark</label>
-              <textarea
-                name="remark"
-                value={formData.remark}
-                onChange={handleInputChange}
-                placeholder="Any additional remarks or notes"
-                rows="4"
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Service Charge (₹)</label>
+                <input
+                  type="number"
+                  name="service_charge"
+                  value={formData.service_charge}
+                  onChange={handleInputChange}
+                  min="0"
+                  step="0.01"
+                  placeholder="e.g. 500"
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Remark</label>
+                <textarea
+                  name="remark"
+                  value={formData.remark}
+                  onChange={handleInputChange}
+                  placeholder="Any additional remarks or notes"
+                  rows="4"
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
             </div>
           </div>
 

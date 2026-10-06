@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { toast } from 'react-hot-toast';
 import Link from 'next/link';
+import { INDIAN_STATES } from '@/lib/indianStates';
+import GeoLocationPicker from '@/components/thirdParty/GeoLocationPicker';
 
 export default function EditThirdPartyEngineerPage() {
   const params = useParams();
@@ -17,6 +19,7 @@ export default function EditThirdPartyEngineerPage() {
   const [formData, setFormData] = useState({
     name: '',
     mobile: '',
+    secondary_contact_number: '',
     email: '',
     password: '',
     confirmPassword: '',
@@ -24,6 +27,7 @@ export default function EditThirdPartyEngineerPage() {
     state: '',
     geo_location: '',
     remark: '',
+    service_charge: '',
     status: 'active',
   });
 
@@ -53,6 +57,7 @@ export default function EditThirdPartyEngineerPage() {
       setFormData({
         name: data.name,
         mobile: data.mobile,
+        secondary_contact_number: data.secondary_contact_number || '',
         email: data.email,
         password: '',
         confirmPassword: '',
@@ -60,6 +65,10 @@ export default function EditThirdPartyEngineerPage() {
         state: data.state || '',
         geo_location: data.geo_location || '',
         remark: data.remark || '',
+        service_charge:
+          data.service_charge != null && data.service_charge !== ''
+            ? String(data.service_charge)
+            : '',
         status: data.status,
       });
     } catch (error) {
@@ -150,12 +159,13 @@ export default function EditThirdPartyEngineerPage() {
       // Update engineer
       const updateData = {
         name: formData.name.trim(),
-        mobile: formData.mobile.trim(),
         email: formData.email.trim(),
         address: formData.address.trim(),
         state: formData.state.trim(),
         geo_location: formData.geo_location.trim(),
         remark: formData.remark.trim(),
+        secondary_contact_number: formData.secondary_contact_number.trim(),
+        service_charge: formData.service_charge.trim(),
         status: formData.status,
       };
 
@@ -285,9 +295,22 @@ export default function EditThirdPartyEngineerPage() {
                   type="tel"
                   name="mobile"
                   value={formData.mobile}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  readOnly
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg bg-slate-100 text-slate-600 cursor-not-allowed"
                   required
+                />
+                <p className="text-xs text-slate-500 mt-1">Mobile number cannot be changed after creation</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Secondary Contact Number</label>
+                <input
+                  type="tel"
+                  name="secondary_contact_number"
+                  value={formData.secondary_contact_number}
+                  onChange={handleInputChange}
+                  placeholder="Alternate contact number"
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
 
@@ -364,23 +387,32 @@ export default function EditThirdPartyEngineerPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-2">State</label>
-                  <input
-                    type="text"
+                  <select
                     name="state"
                     value={formData.state}
                     onChange={handleInputChange}
                     className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
+                  >
+                    <option value="">Select state</option>
+                    {INDIAN_STATES.map((st) => (
+                      <option key={st} value={st}>
+                        {st}
+                      </option>
+                    ))}
+                    {formData.state &&
+                      !INDIAN_STATES.includes(formData.state) && (
+                        <option value={formData.state}>{formData.state}</option>
+                      )}
+                  </select>
                 </div>
 
-                <div>
+                <div className="md:col-span-2">
                   <label className="block text-sm font-semibold text-slate-700 mb-2">Geo Location</label>
-                  <input
-                    type="text"
-                    name="geo_location"
+                  <GeoLocationPicker
                     value={formData.geo_location}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    onChange={(val) =>
+                      setFormData((prev) => ({ ...prev, geo_location: val }))
+                    }
                   />
                 </div>
               </div>
@@ -393,15 +425,30 @@ export default function EditThirdPartyEngineerPage() {
               Additional Information
             </h2>
 
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">Remark</label>
-              <textarea
-                name="remark"
-                value={formData.remark}
-                onChange={handleInputChange}
-                rows="4"
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Service Charge (₹)</label>
+                <input
+                  type="number"
+                  name="service_charge"
+                  value={formData.service_charge}
+                  onChange={handleInputChange}
+                  min="0"
+                  step="0.01"
+                  placeholder="e.g. 500"
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+              <div className="md:col-span-1">
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Remark</label>
+                <textarea
+                  name="remark"
+                  value={formData.remark}
+                  onChange={handleInputChange}
+                  rows="4"
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
             </div>
           </div>
 
