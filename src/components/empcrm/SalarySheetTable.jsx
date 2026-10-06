@@ -80,10 +80,10 @@ export default function SalarySheetTable({ rows, monthLabel, companyName, loadin
           <span><strong>SL</strong> — Sick leave (approved)</span>
           <span><strong>UL</strong> — Unpaid leave (approved)</span>
           <span>
-            <strong>Sun+</strong> — +1 pay day if Sunday punch &amp; attendance location matches profile work location
+            <strong>Sun+</strong> — +1 pay day; amount = (total salary ÷ 30) × days
           </span>
           <span>
-            <strong>Hol+</strong> — +1 pay day if holiday punch &amp; location matches work location
+            <strong>Hol+</strong> — +1 pay day; amount = (total salary ÷ 30) × days (included in earned total)
           </span>
         </p>
         <p className="text-xs text-gray-800 mt-2 text-center font-semibold max-w-4xl mx-auto">
@@ -152,10 +152,10 @@ export default function SalarySheetTable({ rows, monthLabel, companyName, loadin
               <th className={thBase} title="Unpaid leave (approved)">
                 UL
               </th>
-              <th className={thBase} title="Extra pay days: worked on Sunday">
+              <th className={thBase} title="Sunday work bonus days and pay (salary ÷ 30 × days)">
                 Sun+
               </th>
-              <th className={thBase} title="Extra pay days: worked on company holiday">
+              <th className={thBase} title="Holiday work bonus days and pay (salary ÷ 30 × days)">
                 Hol+
               </th>
               <th className={thBase}>Paid Days</th>
@@ -204,10 +204,28 @@ export default function SalarySheetTable({ rows, monthLabel, companyName, loadin
                     <td className={tdNum}>{formatNum(att.sick_leave)}</td>
                     <td className={tdNum}>{formatNum(att.unpaid_leave)}</td>
                     <td className={tdNum}>
-                      {att.sunday_work_days ? formatNum(att.sunday_work_days) : "—"}
+                      {att.sunday_work_days ? (
+                        <span className="block leading-tight">
+                          <span>{formatNum(att.sunday_work_days)}</span>
+                          <span className="block text-[10px] text-emerald-800 font-medium">
+                            {formatInr(att.sunday_work_pay)}
+                          </span>
+                        </span>
+                      ) : (
+                        "—"
+                      )}
                     </td>
                     <td className={tdNum}>
-                      {att.holiday_work_days ? formatNum(att.holiday_work_days) : "—"}
+                      {att.holiday_work_days ? (
+                        <span className="block leading-tight">
+                          <span>{formatNum(att.holiday_work_days)}</span>
+                          <span className="block text-[10px] text-emerald-800 font-medium">
+                            {formatInr(att.holiday_work_pay)}
+                          </span>
+                        </span>
+                      ) : (
+                        "—"
+                      )}
                     </td>
                     <td className={tdNum}>{formatNum(att.paid_days)}</td>
                     <td className={tdNum}>

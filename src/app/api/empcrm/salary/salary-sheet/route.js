@@ -15,6 +15,7 @@ import { computeAttendanceDetailsCardSummaryForMonth } from "@/lib/attendanceDet
 import { getPayrollAttendanceLogDateRange } from "@/lib/payrollLogDateRange";
 import {
   computePayrollBreakdown,
+  computeOffDayWorkPayAmount,
   getSalaryRateFromStructure,
   countLeaveTypeDaysInMonth,
 } from "@/lib/salaryPayrollBreakdown";
@@ -261,14 +262,34 @@ export async function GET(request) {
 
       const structure = pickFirstByRelatedUsernames(structureByUser, related);
       const rate = getSalaryRateFromStructure(structure);
+      const grossMonthly = Number(rate.total) || 0;
+      const sundayWorkPay = computeOffDayWorkPayAmount(grossMonthly, sundayWorkDays);
+      const holidayWorkPay = computeOffDayWorkPayAmount(grossMonthly, holidayWorkDays);
+      const offDayBonusDays = sundayWorkDays + holidayWorkDays;
+      const corePayDays = Math.max(0, payDays - offDayBonusDays);
+      const structuralPresentDays =
+        corePayDays > 0 ? corePayDays : offDayBonusDays > 0 ? 0 : payDays;
+
       const breakdown = computePayrollBreakdown({
         salaryStructure: structure,
         deductions: mergeDeductionsForRelated(deductionsByUser, related),
-        presentDays: payDays,
+        presentDays: structuralPresentDays,
         overtimeHours: 0,
       });
 
-      const earnedTotal = breakdown != null ? breakdown.totalEarnings : null;
+      const offDayWorkPayTotal = sundayWorkPay + holidayWorkPay;
+      const earnedTotal =
+        breakdown != null
+          ? breakdown.totalEarnings + offDayWorkPayTotal
+          : offDayWorkPayTotal > 0
+            ? offDayWorkPayTotal
+            : null;
+      const netSalary =
+        breakdown != null
+          ? breakdown.netSalary + offDayWorkPayTotal
+          : offDayWorkPayTotal > 0
+            ? offDayWorkPayTotal
+            : null;
 
       const fatherOrSpouse = pickFatherOrSpouseName(profile);
 
@@ -294,20 +315,34 @@ export async function GET(request) {
           paid_leave: paidLeave,
           unpaid_leave: unpaidLeave,
           sunday_work_days: sundayWorkDays,
+          sunday_work_pay: sundayWorkPay,
           holiday_work_days: holidayWorkDays,
+          holiday_work_pay: holidayWorkPay,
           paid_days: payDays,
         },
         earned: breakdown
           ? {
               basic: breakdown.basicSalary,
               hra: breakdown.hra,
-              other_allow: breakdown.otherAllowanceEarned,
+              other_allow: breakdown.otherAllowanceEarned + offDayWorkPayTotal,
               overtime_hours: null,
               overtime_pay: null,
               incentive: null,
+              off_day_work_pay: offDayWorkPayTotal,
               total: earnedTotal,
             }
-          : null,
+          : offDayWorkPayTotal > 0
+            ? {
+                basic: 0,
+                hra: 0,
+                other_allow: offDayWorkPayTotal,
+                overtime_hours: null,
+                overtime_pay: null,
+                incentive: null,
+                off_day_work_pay: offDayWorkPayTotal,
+                total: earnedTotal,
+              }
+            : null,
         deductions: breakdown
           ? {
               pf: breakdown.pf,
@@ -317,7 +352,7 @@ export async function GET(request) {
               total: breakdown.totalDeductions,
             }
           : null,
-        net_salary: breakdown ? breakdown.netSalary : null,
+        net_salary: netSalary,
       };
     });
 

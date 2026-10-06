@@ -9,6 +9,14 @@ import {
 } from "@/lib/salaryGrossSpecialAllowance";
 const WORKING_DAYS_DEFAULT = 30;
 
+/** Per-day rate for Sun+ / Hol+ bonus (gross monthly ÷ 30). */
+export function computeOffDayWorkPayAmount(grossMonthly, bonusDays) {
+  const days = Number(bonusDays) || 0;
+  const gross = Number(grossMonthly) || 0;
+  if (days <= 0 || gross <= 0) return 0;
+  return floorInr((gross / WORKING_DAYS_DEFAULT) * days);
+}
+
 /**
  * Payroll earnings/deductions for one employee (matches salary generate page).
  */
