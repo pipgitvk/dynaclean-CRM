@@ -1725,14 +1725,15 @@ import React from "react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import Image from "next/image";
-import signImg from "../../../public/s.png"
 import dynacleanLogo from "@/components/logo1.jpg";
 import html2canvas from "html2canvas";
 import DownloadPDFButton from "@/app/admin-dashboard/invoices/DownloadButton";
 import InvoicePDFPreview from "../Preview";
 import { numberToWords } from "@/utils/NumbertoWord";
 import { INVOICE_LETTERHEAD } from "@/lib/invoiceLetterhead";
-console.log(signImg);
+
+/** Static file in `public/s.png` (not bundled — avoids missing asset build errors). */
+const INVOICE_SIGNATURE_SRC = "/s.png";
 
 const NewInvoice = ({ invoice }) => {
   // Determine invoice type label
@@ -3755,7 +3756,7 @@ const NewInvoice = ({ invoice }) => {
     }}
   >
     <img
-      src={signImg.src}
+      src={INVOICE_SIGNATURE_SRC}
       alt="Signature"
       style={{
         height: "60px",
