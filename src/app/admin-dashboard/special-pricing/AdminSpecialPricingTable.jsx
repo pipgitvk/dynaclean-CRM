@@ -287,15 +287,15 @@ export default function AdminSpecialPricingTable({
                     </td>
                     <td className="p-3 text-right align-top">
                       {row.item_type === "product" ? (
-                        <div className="font-bold text-green-700 space-y-0.5 leading-snug">
+                        <div className="text-green-700 space-y-0.5 leading-snug font-normal">
                           <div>
-                            <span className="text-[10px] font-semibold text-green-800/80 uppercase tracking-wide">
+                            <span className="text-[10px] font-medium text-green-800/70 uppercase tracking-wide">
                               With warranty
                             </span>
-                            <div>{formatStockDpLine(row.stock_dp)}</div>
+                            <div className="font-normal">{formatStockDpLine(row.stock_dp)}</div>
                           </div>
                           <div>
-                            <span className="text-[10px] font-semibold text-green-800/80 uppercase tracking-wide">
+                            <span className="text-[10px] font-medium text-green-800/70 uppercase tracking-wide">
                               No warranty
                             </span>
                             <div>
@@ -307,13 +307,15 @@ export default function AdminSpecialPricingTable({
                         <span className="text-gray-400">—</span>
                       )}
                     </td>
-                    <td className="p-3 text-right font-semibold">
+                    <td className="p-3 text-right">
                       {dealerPending ? (
                         <span className="text-gray-400 italic text-sm font-normal">
                           Enter on approve
                         </span>
                       ) : (
-                        `₹ ${row.special_price}`
+                        <span className="font-bold text-green-700">
+                          ₹ {row.special_price}
+                        </span>
                       )}
                     </td>
                     <td className="p-3 text-sm capitalize">
