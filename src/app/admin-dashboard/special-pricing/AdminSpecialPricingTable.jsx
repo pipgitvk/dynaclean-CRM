@@ -24,6 +24,13 @@ function isPendingRow(row) {
   return status !== "approved" && status !== "rejected";
 }
 
+function formatStockDpLine(value) {
+  if (value == null || value === "") return "—";
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "—";
+  return `₹ ${n}`;
+}
+
 export default function AdminSpecialPricingTable({
   rows,
   currentPage,
@@ -152,6 +159,7 @@ export default function AdminSpecialPricingTable({
               <th className="p-3 text-left">Product/Spare</th>
               <th className="p-3 text-right">Original Price</th>
               <th className="p-3 text-right">Last Neg. Price</th>
+              <th className="p-3 text-right min-w-[140px]">Stock DP</th>
               <th className="p-3 text-right">Special Price</th>
               <th className="p-3 text-left">Price Type</th>
               <th className="p-3 text-left">Price Term</th>
@@ -167,7 +175,7 @@ export default function AdminSpecialPricingTable({
             {rows.length === 0 ? (
               <tr>
                 <td
-                  colSpan={14}
+                  colSpan={15}
                   className="p-4 text-center text-gray-500 text-sm"
                 >
                   {searchQuery || statusFilter || typeFilter || priceTypeFilter
@@ -276,6 +284,28 @@ export default function AdminSpecialPricingTable({
                     </td>
                     <td className="p-3 text-right text-gray-600">
                       ₹ {row.last_negotiation_price ?? 0}
+                    </td>
+                    <td className="p-3 text-right align-top">
+                      {row.item_type === "product" ? (
+                        <div className="font-bold text-green-700 space-y-0.5 leading-snug">
+                          <div>
+                            <span className="text-[10px] font-semibold text-green-800/80 uppercase tracking-wide">
+                              With warranty
+                            </span>
+                            <div>{formatStockDpLine(row.stock_dp)}</div>
+                          </div>
+                          <div>
+                            <span className="text-[10px] font-semibold text-green-800/80 uppercase tracking-wide">
+                              No warranty
+                            </span>
+                            <div>
+                              {formatStockDpLine(row.stock_dp_no_warranty)}
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-gray-400">—</span>
+                      )}
                     </td>
                     <td className="p-3 text-right font-semibold">
                       {dealerPending ? (
