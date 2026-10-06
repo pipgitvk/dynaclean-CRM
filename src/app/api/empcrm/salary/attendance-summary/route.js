@@ -8,6 +8,7 @@ import {
   mergeGlobalRulesWithEmployeeSchedule,
 } from "@/lib/attendanceRulesDb";
 import { computeSalaryPayDaysForUser } from "@/lib/salaryPayDaysFromAttendance";
+import { isServiceEngineerRole } from "@/lib/serviceEngineerSundayPayroll";
 import { computeAttendanceDetailsCardSummaryForMonth } from "@/lib/attendanceDetailsCardSummary";
 import { getPayrollAttendanceLogDateRange } from "@/lib/payrollLogDateRange";
 
@@ -19,6 +20,7 @@ function normalizeUserKey(value) {
 
 const ATT_SELECT = `
       a.username, a.date, a.checkin_time, a.checkout_time,
+      a.checkin_latitude, a.checkin_longitude, a.checkin_address,
       a.break_morning_start, a.break_morning_end,
       a.break_lunch_start, a.break_lunch_end,
       a.break_evening_start, a.break_evening_end
@@ -37,6 +39,7 @@ function mapOneEmployeeSummary(emp, logs, holidays, leaves, globalRules, schedul
     username: emp.username,
     rules,
     dateOfJoining: emp.date_of_joining ?? null,
+    userRole: emp.userRole ?? null,
   });
 
   const attendance_cards = computeAttendanceDetailsCardSummaryForMonth({
@@ -94,6 +97,14 @@ function mapOneEmployeeSummary(emp, logs, holidays, leaves, globalRules, schedul
     attendance_log_days: logs.length,
     dates_worked: logs.map((l) => l.date),
     sunday_worked_dates: stats.sunday_worked_dates,
+    user_role: emp.userRole ?? null,
+    work_location: emp.work_location ?? null,
+    service_engineer_sunday_work_policy: isServiceEngineerRole(emp.userRole)
+      ? "checkin_address_delhi"
+      : null,
+    service_engineer_sunday_work_enabled:
+      isServiceEngineerRole(emp.userRole) &&
+      (Number(stats.sunday_work_pay_credits) || 0) > 0,
   };
 }
 
@@ -154,17 +165,24 @@ export async function GET(request) {
       }
 
       let dateOfJoining = null;
+      let workLocation = null;
       try {
         const [profileRows] = await db.query(
-          `SELECT date_of_joining FROM employee_profiles WHERE username = ? LIMIT 1`,
+          `SELECT date_of_joining, work_location FROM employee_profiles WHERE username = ? LIMIT 1`,
           [empRows[0].username]
         );
         dateOfJoining = profileRows[0]?.date_of_joining ?? null;
+        workLocation = profileRows[0]?.work_location ?? null;
       } catch {
         /* table/column missing in some DBs */
       }
 
-      const emp = { ...empRows[0], _monthStr: month, date_of_joining: dateOfJoining };
+      const emp = {
+        ...empRows[0],
+        _monthStr: month,
+        date_of_joining: dateOfJoining,
+        work_location: workLocation,
+      };
 
       const [attendance] = await db.query(
         `
@@ -193,12 +211,16 @@ export async function GET(request) {
     `);
 
     let dojByUser = new Map();
+    let workLocationByUser = new Map();
     try {
       const [profileRows] = await db.query(
-        `SELECT username, date_of_joining FROM employee_profiles`
+        `SELECT username, date_of_joining, work_location FROM employee_profiles`
       );
       dojByUser = new Map(
         (profileRows || []).map((p) => [normalizeUserKey(p.username), p.date_of_joining])
+      );
+      workLocationByUser = new Map(
+        (profileRows || []).map((p) => [normalizeUserKey(p.username), p.work_location])
       );
     } catch {
       /* employee_profiles missing */
@@ -222,9 +244,11 @@ export async function GET(request) {
 
     const employeeSummary = employees.map((emp) => {
       const logs = logsByUser[normalizeUserKey(emp.username)] || [];
-      const dateOfJoining = dojByUser.get(normalizeUserKey(emp.username)) ?? null;
+      const uk = normalizeUserKey(emp.username);
+      const dateOfJoining = dojByUser.get(uk) ?? null;
+      const workLocation = workLocationByUser.get(uk) ?? null;
       return mapOneEmployeeSummary(
-        { ...emp, _monthStr: month, date_of_joining: dateOfJoining },
+        { ...emp, _monthStr: month, date_of_joining: dateOfJoining, work_location: workLocation },
         logs,
         holidays,
         leaves,

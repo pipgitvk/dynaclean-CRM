@@ -53,6 +53,7 @@ const HR_SALARY_ROLES = [
 
 const ATT_SELECT = `
       a.username, a.date, a.checkin_time, a.checkout_time,
+      a.checkin_latitude, a.checkin_longitude, a.checkin_address,
       a.break_morning_start, a.break_morning_end,
       a.break_lunch_start, a.break_lunch_end,
       a.break_evening_start, a.break_evening_end
@@ -204,6 +205,7 @@ export async function GET(request) {
         username: emp.username,
         rules,
         dateOfJoining,
+        userRole: emp.userRole ?? null,
       });
 
       const cards = computeAttendanceDetailsCardSummaryForMonth({

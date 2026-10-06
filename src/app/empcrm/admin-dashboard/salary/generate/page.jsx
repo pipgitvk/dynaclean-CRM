@@ -243,6 +243,11 @@ const GenerateSalaryPage = () => {
                         paidLeave: Number(empAtt.paid_leave_days) || 0,
                         payDays: Number(empAtt.pay_days) || 0,
                         sundaysInPeriodDates: empAtt.pay_sundays_in_period_dates || [],
+                        serviceEngineerSundayPolicy: {
+                            role: empAtt.user_role || "",
+                            workLocation: empAtt.work_location || "",
+                            sundayWorkEnabled: Boolean(empAtt.service_engineer_sunday_work_enabled),
+                        },
                         payCalc:
                             empAtt.pay_period_days != null &&
                             empAtt.pay_period_days !== ""
@@ -901,6 +906,20 @@ const GenerateSalaryPage = () => {
                                 ? "Same metrics as Attendance details (admin) for this month — through today if current month."
                                 : "Breakdown for the selected employee and month (from attendance records)."}
                         </p>
+                        {attendanceBreakdown.serviceEngineerSundayPolicy &&
+                            String(attendanceBreakdown.serviceEngineerSundayPolicy.role || "")
+                                .trim()
+                                .toUpperCase() === "SERVICE ENGINEER" && (
+                                <p className="mb-3 text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+                                    Service engineer: Sunday work counts only when that day&apos;s{" "}
+                                    <strong>check-in address</strong> in attendance logs is
+                                    Delhi/NCR (not profile work location). Sunday needs a real
+                                    check-in. Addresses like Gujarat/Kheda do not count.
+                                    {attendanceBreakdown.serviceEngineerSundayPolicy.sundayWorkEnabled
+                                        ? " At least one qualifying Sunday work day this month."
+                                        : " No qualifying Sunday work for pay this month."}
+                                </p>
+                            )}
                         {attendanceBreakdown.payCalc && (
                             <div className="mb-4 rounded-lg border border-purple-100 bg-purple-50/60 p-3 text-xs text-slate-700">
                                 <p className="font-semibold text-slate-900 mb-2">

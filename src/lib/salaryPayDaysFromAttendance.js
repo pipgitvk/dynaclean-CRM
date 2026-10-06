@@ -5,6 +5,7 @@ import {
   isHalfDayWithGrace,
 } from "@/lib/attendanceRulesEngine";
 import { rowHasMeaningfulCheckinOrCheckout } from "@/lib/attendanceMeaningfulPunch";
+import { shouldCountSundayWorkForSalary } from "@/lib/serviceEngineerSundayPayroll";
 
 function startOfDay(d) {
   const x = new Date(d);
@@ -133,9 +134,19 @@ function buildLeaveDateMapForUser(leaves, username) {
  * @param {string} p.username
  * @param {string|Date|null|undefined} p.dateOfJoining — skip calendar days before this (exclusive of LOP/present).
  * @param {import("@/lib/attendanceRulesEngine").AttendanceRulesShape} p.rules
+ * @param {string} [p.userRole] — rep_list.userRole (Sunday work rules for service engineers).
  */
 export function computeSalaryPayDaysForUser(p) {
-  const { monthStr, logs, holidaysAll, leavesAll, username, rules, dateOfJoining } = p;
+  const {
+    monthStr,
+    logs,
+    holidaysAll,
+    leavesAll,
+    username,
+    rules,
+    dateOfJoining,
+    userRole = null,
+  } = p;
   const [y, m] = monthStr.split("-").map(Number);
   const monthIndex = m - 1;
   const daysInMonth = getCalendarDaysInMonth(y, m);
@@ -259,6 +270,18 @@ export function computeSalaryPayDaysForUser(p) {
       continue;
     }
     if (existingLog && hasRealPunch) {
+      if (
+        isSunday &&
+        !shouldCountSundayWorkForSalary({
+          userRole,
+          log: existingLog,
+        })
+      ) {
+        sunday++;
+        weekend_off++;
+        weeklyOffSundayDates.push(dateString);
+        continue;
+      }
       const cls = classifyAttendanceDayForSalary(existingLog, rules, freeGraceUsed);
       freeGraceUsed = cls.freeGraceUsed;
       if (cls.kind === "lateDay") late_days++;
