@@ -42,6 +42,20 @@ function rowKey(p) {
   return `name:${(p.name || "").toLowerCase()}`;
 }
 
+function displayCustomerId(p) {
+  if (p?.customer_id == null) return "";
+  const id = String(p.customer_id).trim();
+  return id && id !== "0" ? id : "";
+}
+
+function formatSidebarCustomerMeta(p) {
+  const id = displayCustomerId(p);
+  const clientName = String(p?.client_name || "").trim();
+  if (!id) return clientName;
+  if (clientName) return `${clientName} (${id})`;
+  return `(${id})`;
+}
+
 export default function PartiesPage() {
   const [search, setSearch] = useState("");
   const [parties, setParties] = useState([]);
@@ -283,6 +297,7 @@ export default function PartiesPage() {
             ) : (
               filteredParties.map((p) => {
                 const isSelected = rowKey(p) === selectedKey;
+                const customerMeta = formatSidebarCustomerMeta(p);
                 return (
                   <button
                     key={rowKey(p)}
@@ -301,15 +316,16 @@ export default function PartiesPage() {
                       >
                         {p.name}
                       </span>
-                      {p.customer_id != null && String(p.customer_id).trim() !== "" && (
+                      {customerMeta ? (
                         <span
-                          className={`text-xs mt-0.5 block ${
+                          className={`text-xs mt-0.5 block truncate ${
                             isSelected ? "text-gray-500" : "text-gray-400"
                           }`}
+                          title={customerMeta}
                         >
-                          ID: {p.customer_id}
+                          {customerMeta}
                         </span>
-                      )}
+                      ) : null}
                     </div>
                     <span
                       className={`font-semibold tabular-nums whitespace-nowrap self-start text-right ${

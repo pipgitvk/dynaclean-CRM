@@ -67,6 +67,15 @@ function mergeContactField(existing, incoming) {
   return existing;
 }
 
+function clientContactNameFromCustomerRow(r) {
+  const company = String(r.company || "").trim();
+  const full = String(r.full_name || "").trim();
+  const first = String(r.first_name || "").trim();
+  if (full && keyFor(full) !== keyFor(company)) return full;
+  if (first && keyFor(first) !== keyFor(company)) return first;
+  return "";
+}
+
 function buildCustomerIdByPartyName(custRows, invBuyerRows) {
   const map = new Map();
   for (const r of custRows) {
@@ -439,13 +448,17 @@ export async function GET(req) {
 
     const canonicalNameByCustomerId = buildCanonicalNameByCustomerId(custRows);
     const contactByCustomerId = new Map();
+    const clientNameByCustomerId = new Map();
     for (const r of custRows) {
       const cid = r.customer_id != null ? String(r.customer_id).trim() : "";
       if (!cid || contactByCustomerId.has(cid)) continue;
+      const clientName = clientContactNameFromCustomerRow(r);
+      if (clientName) clientNameByCustomerId.set(cid, clientName);
       contactByCustomerId.set(cid, {
         phone: r.phone ? String(r.phone).trim() : "",
         billing_address: r.billing_address ? String(r.billing_address).trim() : "",
         gstin: r.gstin ? String(r.gstin).trim() : "",
+        client_name: clientName,
       });
     }
 
@@ -676,11 +689,18 @@ export async function GET(req) {
       let phoneOut = p.phone;
       let billingOut = p.billing_address;
       let gstinOut = p.gstin;
+      let clientNameOut =
+        customerIdKey && clientNameByCustomerId.has(customerIdKey)
+          ? clientNameByCustomerId.get(customerIdKey)
+          : "";
       if (customerIdKey && contactByCustomerId.has(customerIdKey)) {
         const contact = contactByCustomerId.get(customerIdKey);
         phoneOut = contact.phone;
         billingOut = contact.billing_address;
         gstinOut = contact.gstin;
+        if (!clientNameOut && contact.client_name) {
+          clientNameOut = contact.client_name;
+        }
       } else if (invAggForContact) {
         if (!phoneOut && invAggForContact.phone) phoneOut = invAggForContact.phone;
         if (!billingOut && invAggForContact.billing_address) {
@@ -709,6 +729,7 @@ export async function GET(req) {
         phone: phoneOut,
         billing_address: billingOut,
         gstin: gstinOut,
+        client_name: clientNameOut || undefined,
         balance: Number(net.toFixed(2)),
         net_balance: Number(net.toFixed(2)),
         balance_side: balanceSide,

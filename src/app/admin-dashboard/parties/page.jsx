@@ -92,6 +92,14 @@ function displayCustomerId(p) {
   return id && id !== "0" ? id : "";
 }
 
+function formatSidebarCustomerMeta(p) {
+  const id = displayCustomerId(p);
+  const clientName = String(p?.client_name || "").trim();
+  if (!id) return clientName;
+  if (clientName) return `${clientName} (${id})`;
+  return `(${id})`;
+}
+
 export default function PartiesPage() {
   const [search, setSearch] = useState("");
   const [parties, setParties] = useState([]);
@@ -353,6 +361,7 @@ export default function PartiesPage() {
                     : p;
                 const { amount, suffix, colorClass } =
                   formatSidebarNetBalance(partyForNet);
+                const customerMeta = formatSidebarCustomerMeta(p);
                 return (
                   <button
                     key={rowKey(p)}
@@ -371,13 +380,14 @@ export default function PartiesPage() {
                       >
                         {p.name}
                       </span>
-                      {displayCustomerId(p) ? (
+                      {customerMeta ? (
                         <span
-                          className={`text-xs mt-0.5 block ${
+                          className={`text-xs mt-0.5 block truncate ${
                             isSelected ? "text-gray-500" : "text-gray-400"
                           }`}
+                          title={customerMeta}
                         >
-                          Customer ID: {displayCustomerId(p)}
+                          {customerMeta}
                         </span>
                       ) : null}
                     </div>
