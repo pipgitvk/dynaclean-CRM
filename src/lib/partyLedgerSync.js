@@ -1,6 +1,10 @@
 import { getDbConnection } from "@/lib/db";
 import { buildLedgerForParty } from "@/lib/partyLedger";
-import { ensurePartyLedgerLinesTable } from "@/lib/ensurePartyLedgerLinesTable";
+import {
+  ensurePartyLedgerLinesTable,
+  netBalanceSide,
+} from "@/lib/ensurePartyLedgerLinesTable";
+import { computeLedgerTotals } from "@/lib/partyLedger";
 
 function normalizeCustomerId(customerId) {
   if (customerId == null) return "";
@@ -116,10 +120,71 @@ export async function listPartyTargets(conn) {
   return [...withCustomerId, ...withoutCustomerId];
 }
 
+async function upsertPartyLedgerBalance(connection, customerId, partyName) {
+  const customer_id = normalizeCustomerId(customerId);
+  const name = String(partyName || "").trim();
+
+  const [aggRows] = await connection.execute(
+    `SELECT
+       COALESCE(SUM(debit), 0) AS total_debit,
+       COALESCE(SUM(credit), 0) AS total_credit,
+       COUNT(*) AS line_count
+     FROM party_ledger_lines
+     WHERE customer_id = ? AND party_name = ?`,
+    [customer_id, name],
+  );
+  const agg = aggRows[0] || {};
+  const totalDebit = Number(agg.total_debit || 0);
+  const totalCredit = Number(agg.total_credit || 0);
+  const net = totalDebit - totalCredit;
+  const { net_balance, balance_side } = netBalanceSide(net);
+  const lineCount = Number(agg.line_count || 0);
+
+  await connection.execute(
+    `INSERT INTO party_ledger_balances (
+       customer_id, party_name, total_debit, total_credit,
+       net_balance, balance_side, line_count, synced_at
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
+     ON DUPLICATE KEY UPDATE
+       total_debit = VALUES(total_debit),
+       total_credit = VALUES(total_credit),
+       net_balance = VALUES(net_balance),
+       balance_side = VALUES(balance_side),
+       line_count = VALUES(line_count),
+       synced_at = NOW()`,
+    [
+      customer_id,
+      name,
+      totalDebit,
+      totalCredit,
+      net_balance,
+      balance_side,
+      lineCount,
+    ],
+  );
+
+  return {
+    total_debit: totalDebit,
+    total_credit: totalCredit,
+    net_balance,
+    balance_side,
+    line_count: lineCount,
+  };
+}
+
 async function partyHasSnapshot(conn, customerId, partyName) {
   const customer_id = normalizeCustomerId(customerId);
   const name = String(partyName || "").trim();
   if (!name) return false;
+  try {
+    const [rows] = await conn.execute(
+      `SELECT 1 FROM party_ledger_balances
+       WHERE customer_id = ? AND party_name = ?
+       LIMIT 1`,
+      [customer_id, name],
+    );
+    if (rows.length > 0) return true;
+  } catch (_) {}
   const [rows] = await conn.execute(
     `SELECT 1 FROM party_ledger_lines
      WHERE customer_id = ? AND party_name = ?
@@ -152,6 +217,7 @@ export async function savePartyLedgerEntriesToDatabase(
 
   let inserted = 0;
   let skipped = 0;
+  let balance = null;
 
   const connection = await conn.getConnection();
   try {
@@ -160,6 +226,11 @@ export async function savePartyLedgerEntriesToDatabase(
     if (replace) {
       await connection.execute(
         `DELETE FROM party_ledger_lines
+         WHERE customer_id = ? AND party_name = ?`,
+        [customer_id, name],
+      );
+      await connection.execute(
+        `DELETE FROM party_ledger_balances
          WHERE customer_id = ? AND party_name = ?`,
         [customer_id, name],
       );
@@ -201,6 +272,8 @@ export async function savePartyLedgerEntriesToDatabase(
       }
     }
 
+    balance = await upsertPartyLedgerBalance(connection, customer_id, name);
+
     await connection.commit();
   } catch (err) {
     await connection.rollback();
@@ -209,12 +282,18 @@ export async function savePartyLedgerEntriesToDatabase(
     connection.release();
   }
 
+  const totals = computeLedgerTotals(rows);
+
   return {
     customer_id,
     party_name: name,
     line_count: rows.length,
     inserted,
     skipped,
+    total_debit: balance?.total_debit ?? totals.debit,
+    total_credit: balance?.total_credit ?? totals.credit,
+    net_balance: balance?.net_balance ?? totals.netBalance,
+    balance_side: balance?.balance_side ?? netBalanceSide(totals.netBalance).balance_side,
   };
 }
 
@@ -256,11 +335,48 @@ export async function syncPartyLedgerToDatabase(
   return savePartyLedgerEntriesToDatabase(name, customer_id, entries, options);
 }
 
+/** Fill party_ledger_balances from existing lines (after migration). */
+export async function backfillPartyLedgerBalancesFromLines(conn) {
+  const db = conn || (await ensurePartyLedgerLinesTable());
+  try {
+    await db.execute(
+      `INSERT INTO party_ledger_balances (
+         customer_id, party_name, total_debit, total_credit,
+         net_balance, balance_side, line_count, synced_at
+       )
+       SELECT
+         customer_id,
+         party_name,
+         COALESCE(SUM(debit), 0),
+         COALESCE(SUM(credit), 0),
+         COALESCE(SUM(debit), 0) - COALESCE(SUM(credit), 0),
+         CASE
+           WHEN ABS(COALESCE(SUM(debit), 0) - COALESCE(SUM(credit), 0)) <= 0.01 THEN 'flat'
+           WHEN COALESCE(SUM(debit), 0) - COALESCE(SUM(credit), 0) > 0 THEN 'Dr'
+           ELSE 'Cr'
+         END,
+         COUNT(*),
+         NOW()
+       FROM party_ledger_lines
+       GROUP BY customer_id, party_name
+       ON DUPLICATE KEY UPDATE
+         total_debit = VALUES(total_debit),
+         total_credit = VALUES(total_credit),
+         net_balance = VALUES(net_balance),
+         balance_side = VALUES(balance_side),
+         line_count = VALUES(line_count),
+         synced_at = NOW()`,
+    );
+  } catch (_) {}
+  return db;
+}
+
 /**
  * Rebuild ledger snapshots for all known parties.
  */
 export async function syncAllPartyLedgersToDatabase(options = {}) {
   const conn = await ensurePartyLedgerLinesTable();
+  await backfillPartyLedgerBalancesFromLines(conn);
   const targets = await listPartyTargets(conn);
   const skipExistingParties = options.skipExistingParties !== false;
 

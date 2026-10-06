@@ -8,10 +8,8 @@ import {
 
 export const dynamic = "force-dynamic";
 
-const PRIVILEGED = new Set(["ADMIN", "SUPERADMIN"]);
-
-function isPrivileged(payload) {
-  return PRIVILEGED.has(String(payload?.role || "").toUpperCase());
+function isSuperAdmin(payload) {
+  return String(payload?.role || "").toUpperCase() === "SUPERADMIN";
 }
 
 export async function GET() {
@@ -19,7 +17,7 @@ export async function GET() {
   if (!payload) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  if (!isPrivileged(payload)) {
+  if (!isSuperAdmin(payload)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -40,7 +38,7 @@ export async function POST(req) {
   if (!payload) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  if (!isPrivileged(payload)) {
+  if (!isSuperAdmin(payload)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
