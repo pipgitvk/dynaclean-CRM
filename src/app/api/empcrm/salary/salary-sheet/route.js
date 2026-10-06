@@ -231,10 +231,13 @@ export async function GET(request) {
         (sum, u) => sum + countLeaveTypeDaysInMonth(leaves, u, month, "sick"),
         0
       );
-      const paidLeave = related.reduce(
-        (sum, u) => sum + countLeaveTypeDaysInMonth(leaves, u, month, "paid"),
-        0
-      );
+      const paidLeave =
+        cards?.leaves != null
+          ? Number(cards.leaves) || 0
+          : related.reduce(
+              (sum, u) => sum + countLeaveTypeDaysInMonth(leaves, u, month, "paid"),
+              0
+            );
       const unpaidLeave = related.reduce(
         (sum, u) => sum + countLeaveTypeDaysInMonth(leaves, u, month, "unpaid"),
         0
@@ -253,7 +256,7 @@ export async function GET(request) {
 
       // Same pay days as Salary Generate (computeSalaryPayDaysForUser)
       let payDays = stats.pay_days != null ? Number(stats.pay_days) : 0;
-      if (present === 0) payDays = 0;
+      if (!(Number(present) > 0)) payDays = 0;
 
       const structure = pickFirstByRelatedUsernames(structureByUser, related);
       const rate = getSalaryRateFromStructure(structure);

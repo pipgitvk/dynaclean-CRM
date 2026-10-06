@@ -669,6 +669,13 @@ const AttendancePage = () => {
         if (log.is_half_day == 1) {
           if (isPaidLeaveRow(log)) {
             acc.leaves += 0.5;
+            acc.present += 0.5;
+            if (
+              logShowsAttendancePunchDetails(log) &&
+              isLateDaySummary(log, rulesFor(log.username))
+            ) {
+              acc.lateDays++;
+            }
           } else {
             acc.halfDays++;
             halfDayKeys.add(timelineLogKey(log));
@@ -867,9 +874,12 @@ const AttendancePage = () => {
           <div className="grid grid-cols-2 md:grid-cols-7 gap-4 mb-8 text-center">
             <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
               <p className="text-2xl font-bold text-green-600">
-                {summary.present}
+                {formatLeaveSummaryDays(summary.present)}
               </p>
               <p className="text-sm text-gray-500">Present</p>
+              <p className="text-[11px] text-gray-400 mt-0.5">
+                Full day punch = 1; paid half-day work = 0.5
+              </p>
             </div>
             <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
               <p className="text-2xl font-bold text-orange-600">{summary.absents}</p>

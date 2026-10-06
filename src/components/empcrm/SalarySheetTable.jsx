@@ -16,6 +16,15 @@ function formatNum(n) {
   return x % 1 === 0 ? String(x) : x.toFixed(2);
 }
 
+/** Match attendance / salary generate cards (e.g. 23.5 present, 0.5 PL). */
+function formatAttendanceDays(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "—";
+  if (n === 0) return "0";
+  if (Math.abs(n - Math.round(n)) < 1e-9) return String(Math.round(n));
+  return n.toFixed(1);
+}
+
 const thBase =
   "px-2 py-2 text-xs font-bold text-gray-900 border border-gray-300 whitespace-nowrap bg-amber-100";
 const thGreen = `${thBase} bg-green-100`;
@@ -60,7 +69,9 @@ export default function SalarySheetTable({ rows, monthLabel, companyName, loadin
           Salary Sheet — {monthLabel || ""}
         </p>
         <p className="text-xs text-gray-600 mt-3 flex flex-wrap justify-center gap-x-4 gap-y-1 max-w-4xl mx-auto">
-          <span><strong>P</strong> — Present</span>
+          <span>
+            <strong>P</strong> — Present (attendance card; paid half-day work = 0.5)
+          </span>
           <span><strong>HD</strong> — Half days (same as attendance sheet)</span>
           <span><strong>A</strong> — Absent / LOP</span>
           <span><strong>PL</strong> — Paid leave (approved; half-day = 0.5)</span>
@@ -110,7 +121,12 @@ export default function SalarySheetTable({ rows, monthLabel, companyName, loadin
               <th className={thGreen}>HRA</th>
               <th className={thGreen}>Oth. Allow</th>
               <th className={thGreen}>Total</th>
-              <th className={thBase}>P</th>
+              <th
+                className={thBase}
+                title="Same as Attendance details card — full day punch = 1; paid half-day work = 0.5"
+              >
+                P
+              </th>
               <th className={thBase} title="Half days (unpaid / punch-based; not paid half-leave)">
                 HD
               </th>
@@ -167,10 +183,10 @@ export default function SalarySheetTable({ rows, monthLabel, companyName, loadin
                     <td className={tdNum}>{formatInr(r.rate_hra)}</td>
                     <td className={tdNum}>{formatInr(r.rate_other_allow)}</td>
                     <td className={tdGreen}>{formatInr(r.rate_total)}</td>
-                    <td className={tdNum}>{formatNum(att.present)}</td>
+                    <td className={tdNum}>{formatAttendanceDays(att.present)}</td>
                     <td className={tdNum}>{formatNum(att.half_day)}</td>
                     <td className={tdNum}>{formatNum(att.absent)}</td>
-                    <td className={tdNum}>{formatNum(att.paid_leave)}</td>
+                    <td className={tdNum}>{formatAttendanceDays(att.paid_leave)}</td>
                     <td className={tdNum}>{formatNum(att.weekly_off)}</td>
                     <td className={tdNum}>{formatNum(att.holidays)}</td>
                     <td className={tdNum}>{formatNum(att.sick_leave)}</td>

@@ -230,7 +230,7 @@ const GenerateSalaryPage = () => {
                     setAttendanceBreakdown({
                         month: selectedMonth,
                         cards: empAtt.attendance_cards || null,
-                        present: presN,
+                        present: cardsPresent != null ? cardsPresent : presN,
                         totalPunchedDays: totalPunched,
                         halfDay: Number(empAtt.half_day_count) || 0,
                         halfDayPaid: Number(empAtt.half_day_paid_count) || 0,
@@ -1199,11 +1199,12 @@ const GenerateSalaryPage = () => {
                                                 <dt className="text-slate-600">
                                                     Present
                                                     <span className="block text-[11px] font-normal text-slate-500">
-                                                        Same as Attendance details card (punch days)
+                                                        Same as Attendance card — full day punch = 1;
+                                                        paid half-day work = 0.5
                                                     </span>
                                                 </dt>
                                                 <dd className="font-semibold text-green-600 tabular-nums">
-                                                    {presentLikeAttendanceLog}
+                                                    {formatPayCalcNumber(presentLikeAttendanceLog)}
                                                 </dd>
                                             </div>
                                             <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
@@ -1292,9 +1293,14 @@ const GenerateSalaryPage = () => {
                                 return (
                                     <>
                                         <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
-                                            <dt className="text-slate-600">Full day present</dt>
+                                            <dt className="text-slate-600">
+                                                Full day present
+                                                <span className="block text-[11px] font-normal text-slate-500">
+                                                    Incl. 0.5 per paid half-day (attendance card)
+                                                </span>
+                                            </dt>
                                             <dd className="font-semibold text-emerald-700 tabular-nums">
-                                                {fz(v.fullDayPresent)}
+                                                {formatPayCalcNumber(fz(v.fullDayPresent))}
                                             </dd>
                                         </div>
                                         <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
