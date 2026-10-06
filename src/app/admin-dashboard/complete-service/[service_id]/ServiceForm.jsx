@@ -1,5 +1,6 @@
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import SignaturePad from "signature_pad";
@@ -875,14 +876,7 @@ export default function ServiceForm({ service }) {
                 <label className="block mb-1 font-medium text-sm">
                   Completed Date
                 </label>
-                <input
-                  type="date"
-                  name="completed_date"
-                  className="border p-2 w-full rounded text-sm"
-                  value={formData.completed_date}
-                  onChange={handleChange}
-                  required
-                />
+                <TypeableDateFilterInput value={formData.completed_date} onChange={(v) => handleChange({ target: { name: "completed_date", value: v } })} className="border p-2 w-full rounded text-sm" required/>
               </div>
               <FileUploader
                 label="Pre-Completion Images"

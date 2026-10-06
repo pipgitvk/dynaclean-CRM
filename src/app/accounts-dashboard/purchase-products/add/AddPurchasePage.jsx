@@ -1,5 +1,6 @@
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -1263,18 +1264,14 @@ export default function   AddPurchasePage() {
                 <div className="text-right">
                   <label className="block text-xs text-gray-500 mb-1">Bill Date</label>
                   <div className="flex items-center gap-2 justify-end">
-                    <input
-                      type="text"
-                      value={billDate}
-                      onChange={(e) => setBillDate(e.target.value)}
-                      className="w-28 border border-gray-300 rounded px-2 py-1 text-sm text-right focus:outline-none focus:border-blue-400"
+                    <TypeableDateFilterInput value={billDate} onChange={setBillDate} type="text" className="w-28 border border-gray-300 rounded px-2 py-1 text-sm text-right focus:outline-none focus:border-blue-400"
                     />
                     <button
                       type="button"
                       className="text-blue-600 hover:text-blue-700"
                       onClick={() => {
                         const inp = document.createElement("input");
-                        inp.type = "date";
+                        inp. ;
                         inp.style.position = "absolute";
                         inp.style.opacity = "0";
                         document.body.appendChild(inp);
@@ -1288,7 +1285,7 @@ export default function   AddPurchasePage() {
                         };
                       }}
                     >
-                      <Calculator size={14} />
+                      <Calculator size={14}/>
                     </button>
                   </div>
                 </div>

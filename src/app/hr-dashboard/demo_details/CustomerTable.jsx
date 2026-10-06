@@ -1,5 +1,6 @@
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import dayjs from "dayjs";
@@ -161,18 +162,8 @@ export default function CustomerTable({ rows, searchParams }) {
           placeholder="Search"
           className="p-2 border rounded w-full text-sm"
         />
-        <input
-          type="date"
-          value={filters.date_from}
-          onChange={(e) => update("date_from", e.target.value)}
-          className="p-2 border rounded w-full text-sm"
-        />
-        <input
-          type="date"
-          value={filters.date_to}
-          onChange={(e) => update("date_to", e.target.value)}
-          className="p-2 border rounded w-full text-sm"
-        />
+        <TypeableDateFilterInput value={filters.date_from} onChange={(v) => update("date_from", v)} className="p-2 border rounded w-full text-sm"/>
+        <TypeableDateFilterInput value={filters.date_to} onChange={(v) => update("date_to", v)} className="p-2 border rounded w-full text-sm"/>
         <select
           value={filters.sort}
           onChange={(e) => update("sort", e.target.value)}
@@ -325,13 +316,7 @@ export default function CustomerTable({ rows, searchParams }) {
                 >
                   Postpone Date
                 </label>
-                <input
-                  id="postpone-date"
-                  type="date"
-                  value={postponeDate}
-                  onChange={(e) => setPostponeDate(e.target.value)}
-                  className="p-2 border rounded w-full text-sm"
-                />
+                <TypeableDateFilterInput value={postponeDate} onChange={setPostponeDate} id="postpone-date" className="p-2 border rounded w-full text-sm"/>
               </div>
             )}
 

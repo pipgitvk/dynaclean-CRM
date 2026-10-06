@@ -1,5 +1,6 @@
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
@@ -292,16 +293,9 @@ export default function CreateEmployeeForm() {
           >
             Date of Birth
           </label>
-          <input
-            type="date"
-            id="dob"
-            name="dob"
-            value={formData.dob}
-            onChange={handleChange}
-            required
+          <TypeableDateFilterInput value={formData.dob} onChange={(v) => handleChange({ target: { name: "dob", value: v } })} id="dob" required
             max={new Date().toISOString().split("T")[0]}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-          />
+            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"/>
           {errors.dob && (
             <p className="text-red-600 text-sm mt-1">{errors.dob}</p>
           )}

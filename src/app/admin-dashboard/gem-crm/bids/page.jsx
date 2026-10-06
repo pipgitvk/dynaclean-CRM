@@ -1,5 +1,6 @@
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect } from "react";
 import {
   Plus,
@@ -466,22 +467,12 @@ export default function GemCrmBidsPage() {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Date From</label>
-                <input
-                  type="date"
-                  value={dateFrom}
-                  onChange={(e) => setDateFrom(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                />
+                <TypeableDateFilterInput value={dateFrom} onChange={setDateFrom} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"/>
               </div>
 
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Date To</label>
-                <input
-                  type="date"
-                  value={dateTo}
-                  onChange={(e) => setDateTo(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                />
+                <TypeableDateFilterInput value={dateTo} onChange={setDateTo} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"/>
               </div>
 
               <div>

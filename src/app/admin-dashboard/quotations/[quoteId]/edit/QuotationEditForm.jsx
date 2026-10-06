@@ -1,5 +1,6 @@
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
@@ -359,12 +360,7 @@ export default function QuotationEditForm({ quoteId }) {
         </div>
         <div>
           <label className="text-sm text-gray-600">Date</label>
-          <input
-            type="date"
-            value={quoteDate}
-            onChange={(e) => setQuoteDate(e.target.value)}
-            className="input w-full"
-          />
+          <TypeableDateFilterInput value={quoteDate} onChange={setQuoteDate} className="input w-full"/>
         </div>
       </div>
 

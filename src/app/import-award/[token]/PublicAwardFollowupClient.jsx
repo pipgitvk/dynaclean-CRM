@@ -1,5 +1,6 @@
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useCallback, useEffect, useState } from "react";
 import toast from "react-hot-toast";
 
@@ -377,14 +378,7 @@ export default function PublicAwardFollowupClient({ token }) {
           lockedValue={savedForm?.pickup_date}
         >
           <Label htmlFor="pickup_date">Scheduled pickup date</Label>
-          <input
-            id="pickup_date"
-            name="pickup_date"
-            type="date"
-            value={pickup_date}
-            onChange={(e) => setPickupDate(e.target.value)}
-            className={inputClass}
-          />
+          <TypeableDateFilterInput value={pickup_date} onChange={setPickupDate} id="pickup_date" className={inputClass}/>
         </SectionMaybeReadOnly>
 
         <SectionMaybeReadOnly
@@ -393,14 +387,7 @@ export default function PublicAwardFollowupClient({ token }) {
           lockedValue={savedForm?.picked_date}
         >
           <Label htmlFor="picked_date">Actual picked date</Label>
-          <input
-            id="picked_date"
-            name="picked_date"
-            type="date"
-            value={picked_date}
-            onChange={(e) => setPickedDate(e.target.value)}
-            className={inputClass}
-          />
+          <TypeableDateFilterInput value={picked_date} onChange={setPickedDate} id="picked_date" className={inputClass}/>
         </SectionMaybeReadOnly>
 
         <SectionMaybeReadOnly
@@ -409,14 +396,7 @@ export default function PublicAwardFollowupClient({ token }) {
           lockedValue={savedForm?.transit_date}
         >
           <Label htmlFor="transit_date">Transit / departure date</Label>
-          <input
-            id="transit_date"
-            name="transit_date"
-            type="date"
-            value={transit_date}
-            onChange={(e) => setTransitDate(e.target.value)}
-            className={inputClass}
-          />
+          <TypeableDateFilterInput value={transit_date} onChange={setTransitDate} id="transit_date" className={inputClass}/>
         </SectionMaybeReadOnly>
 
         <SectionMaybeReadOnly
@@ -425,14 +405,7 @@ export default function PublicAwardFollowupClient({ token }) {
           lockedValue={savedForm?.delivered_date}
         >
           <Label htmlFor="delivered_date">Delivered date</Label>
-          <input
-            id="delivered_date"
-            name="delivered_date"
-            type="date"
-            value={delivered_date}
-            onChange={(e) => setDeliveredDate(e.target.value)}
-            className={inputClass}
-          />
+          <TypeableDateFilterInput value={delivered_date} onChange={setDeliveredDate} id="delivered_date" className={inputClass}/>
         </SectionMaybeReadOnly>
 
         {/* ── Supplier ── */}

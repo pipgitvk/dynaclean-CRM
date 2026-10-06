@@ -1,5 +1,6 @@
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { Search, Download, Eye, Plus, Link2, Edit2 } from "lucide-react";
@@ -1406,18 +1407,8 @@ export default function SparePurchasesPage() {
               />
             </div>
             <div className="flex gap-2">
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="px-3 py-1.5 border rounded-md text-sm"
-              />
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="px-3 py-1.5 border rounded-md text-sm"
-              />
+              <TypeableDateFilterInput value={startDate} onChange={setStartDate} className="px-3 py-1.5 border rounded-md text-sm"/>
+              <TypeableDateFilterInput value={endDate} onChange={setEndDate} className="px-3 py-1.5 border rounded-md text-sm"/>
               {(startDate || endDate) && (
                 <button
                   onClick={() => {

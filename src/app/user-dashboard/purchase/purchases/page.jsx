@@ -1,5 +1,6 @@
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import Link from "next/link";
 import { Search, Download, Eye, Plus, Edit2 } from "lucide-react";
@@ -1347,19 +1348,9 @@ export default function PurchasesPage() {
             </div>
             <div className="flex gap-2 items-center">
               <span className="text-xs text-gray-500 whitespace-nowrap">Created Date:</span>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="px-3 py-1.5 border rounded-md text-sm"
-              />
+              <TypeableDateFilterInput value={startDate} onChange={setStartDate} className="px-3 py-1.5 border rounded-md text-sm"/>
               <span className="text-xs text-gray-400">to</span>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="px-3 py-1.5 border rounded-md text-sm"
-              />
+              <TypeableDateFilterInput value={endDate} onChange={setEndDate} className="px-3 py-1.5 border rounded-md text-sm"/>
               {(startDate || endDate) && (
                 <button
                   onClick={() => { setStartDate(""); setEndDate(""); }}
@@ -1389,19 +1380,9 @@ export default function PurchasesPage() {
             </div>
             <div className="flex gap-2 items-center">
               <span className="text-xs text-gray-500 whitespace-nowrap">Invoice Date:</span>
-              <input
-                type="date"
-                value={invoiceDateStart}
-                onChange={(e) => setInvoiceDateStart(e.target.value)}
-                className="px-3 py-1.5 border rounded-md text-sm"
-              />
+              <TypeableDateFilterInput value={invoiceDateStart} onChange={setInvoiceDateStart} className="px-3 py-1.5 border rounded-md text-sm"/>
               <span className="text-xs text-gray-400">to</span>
-              <input
-                type="date"
-                value={invoiceDateEnd}
-                onChange={(e) => setInvoiceDateEnd(e.target.value)}
-                className="px-3 py-1.5 border rounded-md text-sm"
-              />
+              <TypeableDateFilterInput value={invoiceDateEnd} onChange={setInvoiceDateEnd} className="px-3 py-1.5 border rounded-md text-sm"/>
               {(invoiceDateStart || invoiceDateEnd) && (
                 <button
                   onClick={() => { setInvoiceDateStart(""); setInvoiceDateEnd(""); }}

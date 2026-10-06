@@ -1,4 +1,5 @@
 "use client";
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useTransition } from "react";
 import { format } from "date-fns";
 import { useRouter } from "next/navigation";
@@ -202,18 +203,8 @@ export default function CustomerTable({
               </option>
             ))}
           </select>
-          <input
-            type="date"
-            value={filters.from}
-            onChange={(e) => setFilters({ ...filters, from: e.target.value })}
-            className="border border-gray-300 rounded-lg px-3 py-2 text-sm min-w-[120px] sm:min-w-0"
-          />
-          <input
-            type="date"
-            value={filters.to}
-            onChange={(e) => setFilters({ ...filters, to: e.target.value })}
-            className="border border-gray-300 rounded-lg px-3 py-2 text-sm min-w-[120px] sm:min-w-0"
-          />
+          <TypeableDateFilterInput value={filters.from} onChange={(v) => setFilters({ ...filters, from: v })} className="border border-gray-300 rounded-lg px-3 py-2 text-sm min-w-[120px] sm:min-w-0"/>
+          <TypeableDateFilterInput value={filters.to} onChange={(v) => setFilters({ ...filters, to: v })} className="border border-gray-300 rounded-lg px-3 py-2 text-sm min-w-[120px] sm:min-w-0"/>
           
           <button
             type="submit"

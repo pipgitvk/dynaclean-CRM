@@ -1,5 +1,6 @@
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -244,21 +245,11 @@ export default function PaymentDeductionsReport({ paymentPendingPath }) {
             <option value="received">Received</option>
             <option value="not received">Not Received</option>
           </select>
-          <input
-            type="date"
-            value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
-            className="rounded border border-gray-300 px-2 py-1.5 text-xs"
-            title="From Date"
-          />
+          <TypeableDateFilterInput value={dateFrom} onChange={setDateFrom} className="rounded border border-gray-300 px-2 py-1.5 text-xs"
+            title="From Date"/>
           <div className="flex gap-1">
-            <input
-              type="date"
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-              className="w-full rounded border border-gray-300 px-2 py-1.5 text-xs"
-              title="To Date"
-            />
+            <TypeableDateFilterInput value={dateTo} onChange={setDateTo} className="w-full rounded border border-gray-300 px-2 py-1.5 text-xs"
+              title="To Date"/>
             {(searchQuery ||
               deductionTypeFilter !== "all" ||
               claimableFilter !== "all" ||

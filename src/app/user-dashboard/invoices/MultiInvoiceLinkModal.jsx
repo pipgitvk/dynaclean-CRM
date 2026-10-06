@@ -1,5 +1,6 @@
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import React, { useEffect, useState, useMemo } from "react";
 import { Search } from "lucide-react";
 import { toast } from "react-hot-toast";
@@ -457,19 +458,9 @@ const MultiInvoiceLinkModal = ({ isOpen, closeModal, selectedInvoiceIds, selecte
                 className="pl-8 pr-3 py-1.5 border rounded-md text-sm w-72 focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
             </div>
-            <input
-              type="date"
-              value={stmtStartDate}
-              onChange={(e) => setStmtStartDate(e.target.value)}
-              className="px-3 py-1.5 border rounded-md text-sm"
-            />
+            <TypeableDateFilterInput value={stmtStartDate} onChange={setStmtStartDate} className="px-3 py-1.5 border rounded-md text-sm"/>
             <span className="text-gray-500">to</span>
-            <input
-              type="date"
-              value={stmtEndDate}
-              onChange={(e) => setStmtEndDate(e.target.value)}
-              className="px-3 py-1.5 border rounded-md text-sm"
-            />
+            <TypeableDateFilterInput value={stmtEndDate} onChange={setStmtEndDate} className="px-3 py-1.5 border rounded-md text-sm"/>
             <label className="flex items-center gap-2 text-sm text-gray-700 whitespace-nowrap">
               <input
                 type="checkbox"

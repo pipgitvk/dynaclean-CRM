@@ -1,5 +1,6 @@
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
@@ -239,25 +240,13 @@ export default function ProspectSubmissionsPage({ defaultScope = "team" }) {
           <label className="mb-1 block text-xs font-medium text-gray-600">
             Created From
           </label>
-          <input
-            type="date"
-            value={fromDate}
-            max={toDate || undefined}
-            onChange={(e) => setFromDate(e.target.value)}
-            className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
-          />
+          <TypeableDateFilterInput value={fromDate} onChange={setFromDate} max={toDate || undefined} className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"/>
         </div>
         <div>
           <label className="mb-1 block text-xs font-medium text-gray-600">
             Created To
           </label>
-          <input
-            type="date"
-            value={toDate}
-            min={fromDate || undefined}
-            onChange={(e) => setToDate(e.target.value)}
-            className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
-          />
+          <TypeableDateFilterInput value={toDate} onChange={setToDate} min={fromDate || undefined} className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"/>
         </div>
         {showAdminFilters && (
           <>

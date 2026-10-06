@@ -1,5 +1,6 @@
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect, useMemo } from "react";
 import { X, Loader, CheckCircle, Unlink, Search } from "lucide-react";
 import { toast } from "react-hot-toast";
@@ -276,21 +277,11 @@ export default function LinkStatementModal({ isOpen, onClose, asset, onLinked })
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-2">
               <label className="text-sm text-gray-600 whitespace-nowrap">From</label>
-              <input
-                type="date"
-                value={fromDate}
-                onChange={(e) => setFromDate(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-              />
+              <TypeableDateFilterInput value={fromDate} onChange={setFromDate} className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"/>
             </div>
             <div className="flex items-center gap-2">
               <label className="text-sm text-gray-600 whitespace-nowrap">To</label>
-              <input
-                type="date"
-                value={toDate}
-                onChange={(e) => setToDate(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-              />
+              <TypeableDateFilterInput value={toDate} onChange={setToDate} className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"/>
             </div>
             <button
               type="button"

@@ -1,5 +1,6 @@
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import React from "react";
 import Link from "next/link";
 import dayjs from "dayjs";
@@ -186,20 +187,10 @@ export default function ClientExpensesTable({ rows, client, group, initialSearch
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-1 min-w-0">
                 <Calendar className="w-4 h-4 text-gray-400 shrink-0" />
-                <input
-                  type="date"
-                  value={fromDate}
-                  onChange={(e) => setFromDate(e.target.value)}
-                  className="flex-1 min-w-0 w-full sm:w-28 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
-                />
+                <TypeableDateFilterInput value={fromDate} onChange={setFromDate} className="flex-1 min-w-0 w-full sm:w-28 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"/>
               </div>
               <span className="text-gray-400 shrink-0">to</span>
-              <input
-                type="date"
-                value={toDate}
-                onChange={(e) => setToDate(e.target.value)}
-                className="flex-1 min-w-0 w-full sm:w-28 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
-              />
+              <TypeableDateFilterInput value={toDate} onChange={setToDate} className="flex-1 min-w-0 w-full sm:w-28 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"/>
             </div>
             <button
               onClick={handleReset}

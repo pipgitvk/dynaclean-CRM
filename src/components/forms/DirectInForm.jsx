@@ -1,5 +1,6 @@
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect } from "react";
 import { toast } from "react-hot-toast";
 
@@ -440,14 +441,8 @@ export default function DirectInForm() {
                         </div>
                         <div>
                             <label className="block mb-1">Invoice Date *</label>
-                            <input
-                                type="date"
-                                name="invoice_date"
-                                value={formData.invoice_date}
-                                onChange={handleChange}
-                                className="w-full border p-2 rounded"
-                                required
-                            />
+                            <TypeableDateFilterInput value={formData.invoice_date} onChange={(v) => handleChange({ target: { name: "invoice_date", value: v } })} className="w-full border p-2 rounded"
+                                required/>
                         </div>
                     </div>
 
@@ -572,15 +567,9 @@ export default function DirectInForm() {
                         </div>
                         <div>
                             <label className="block mb-1 font-medium">Received Date *</label>
-                            <input
-                                type="date"
-                                name="received_date"
-                                value={formData.received_date}
-                                onChange={handleChange}
-                                max={new Date().toISOString().split("T")[0]}
+                            <TypeableDateFilterInput value={formData.received_date} onChange={(v) => handleChange({ target: { name: "received_date", value: v } })} max={new Date().toISOString().split("T")[0]}
                                 className="w-full border p-2 rounded"
-                                required
-                            />
+                                required/>
                         </div>
                         <div>
                             <label className="block mb-1 font-medium">Received Quantity *</label>

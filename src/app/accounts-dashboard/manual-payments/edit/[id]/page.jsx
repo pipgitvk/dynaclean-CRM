@@ -1,5 +1,6 @@
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { manualPaymentInvoiceHref } from "@/lib/manualPaymentInvoiceHref";
@@ -645,14 +646,8 @@ export default function EditPaymentPage() {
                 <label className="mb-1 block text-sm font-medium text-gray-700">
                   Payment Date <span className="text-red-600">*</span>
                 </label>
-                <input
-                  type="date"
-                  name="payment_date"
-                  value={receivedForm.payment_date}
-                  onChange={handleReceivedChange}
-                  required
-                  className={INPUT}
-                />
+                <TypeableDateFilterInput value={receivedForm.payment_date} onChange={(v) => handleReceivedChange({ target: { name: "payment_date", value: v } })} required
+                  className={INPUT}/>
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">

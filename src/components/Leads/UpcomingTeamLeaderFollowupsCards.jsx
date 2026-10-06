@@ -1,4 +1,5 @@
 "use client";
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useEffect, useState } from "react";
 import TaskCard from "./TLTaskCard";
 import { getGradientColor } from "@/utils/getGradientColor";
@@ -140,21 +141,11 @@ export default function UpcomingTeamLeaderFollowupsCards({ teamLeader }) {
           </div>
           <div className="flex flex-col">
             <label className="text-xs text-gray-600 mb-1">Start date</label>
-            <input
-              type="date"
-              className="border rounded-md px-3 py-2 text-sm"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-            />
+            <TypeableDateFilterInput value={startDate} onChange={setStartDate} className="border rounded-md px-3 py-2 text-sm"/>
           </div>
           <div className="flex flex-col">
             <label className="text-xs text-gray-600 mb-1">End date</label>
-            <input
-              type="date"
-              className="border rounded-md px-3 py-2 text-sm"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-            />
+            <TypeableDateFilterInput value={endDate} onChange={setEndDate} className="border rounded-md px-3 py-2 text-sm"/>
           </div>
           {(startDate || endDate) && (
             <button

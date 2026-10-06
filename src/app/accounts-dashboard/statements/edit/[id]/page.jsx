@@ -1,5 +1,6 @@
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -372,36 +373,18 @@ export default function EditStatementPage() {
             </div>
             <div>
               <label className="block text-sm mb-1">Date *</label>
-              <input
-                name="date"
-                type="date"
-                value={form.date}
-                onChange={handleChange}
-                readOnly
+              <TypeableDateFilterInput value={form.date} onChange={(v) => handleChange({ target: { name: "date", value: v } })} readOnly
                 className="w-full border p-2 rounded bg-gray-50 cursor-not-allowed"
-                required
-              />
+                required/>
             </div>
             <div>
               <label className="block text-sm mb-1">Txn Dated Deb</label>
-              <input
-                name="txn_dated_deb"
-                type="date"
-                value={form.txn_dated_deb}
-                onChange={handleChange}
-                readOnly
-                className="w-full border p-2 rounded bg-gray-50 cursor-not-allowed"
-              />
+              <TypeableDateFilterInput value={form.txn_dated_deb} onChange={(v) => handleChange({ target: { name: "txn_dated_deb", value: v } })} readOnly
+                className="w-full border p-2 rounded bg-gray-50 cursor-not-allowed"/>
             </div>
             <div>
               <label className="block text-sm mb-1">Txn Posted Date</label>
-              <input
-                name="txn_posted_date"
-                type="date"
-                value={form.txn_posted_date}
-                onChange={handleChange}
-                className="w-full border p-2 rounded"
-              />
+              <TypeableDateFilterInput value={form.txn_posted_date} onChange={(v) => handleChange({ target: { name: "txn_posted_date", value: v } })} className="w-full border p-2 rounded"/>
             </div>
             <div>
               <label className="block text-sm mb-1">Cheq No</label>
@@ -1054,21 +1037,11 @@ function AllStatementsTable({ type = "Credit", statementType = "failed_transacti
         <div className="flex flex-col sm:flex-row gap-3 items-end">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="px-4 py-2 border rounded"
-            />
+            <TypeableDateFilterInput value={startDate} onChange={setStartDate} className="px-4 py-2 border rounded"/>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="px-4 py-2 border rounded"
-            />
+            <TypeableDateFilterInput value={endDate} onChange={setEndDate} className="px-4 py-2 border rounded"/>
           </div>
           <button
             onClick={handleDateFilter}

@@ -1,5 +1,6 @@
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect, useCallback } from "react";
 import SummaryBox from "@/components/SummaryBox";
 import Modal from "@/components/ModalUser";
@@ -184,19 +185,9 @@ export default function HrTodayReportPage() {
           </div>
           {/* Custom Date Picker */}
           <div className="flex flex-col sm:flex-row items-center gap-2">
-            <input
-              type="date"
-              value={customFromDate}
-              onChange={(e) => setCustomFromDate(e.target.value)}
-              className="px-3 py-2 border rounded-lg text-sm w-full sm:w-auto"
-            />
+            <TypeableDateFilterInput value={customFromDate} onChange={setCustomFromDate} className="px-3 py-2 border rounded-lg text-sm w-full sm:w-auto"/>
             <span className="text-gray-500 hidden sm:block">to</span>
-            <input
-              type="date"
-              value={customToDate}
-              onChange={(e) => setCustomToDate(e.target.value)}
-              className="px-3 py-2 border rounded-lg text-sm w-full sm:w-auto"
-            />
+            <TypeableDateFilterInput value={customToDate} onChange={setCustomToDate} className="px-3 py-2 border rounded-lg text-sm w-full sm:w-auto"/>
             <button
               onClick={() => {
                 if (customFromDate && customToDate) {

@@ -1,5 +1,6 @@
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
@@ -212,18 +213,8 @@ export default function EmployeeLeadsTable() {
           </select>
         </div>
         <div className="flex flex-col sm:flex-row gap-2">
-          <input
-            type="date"
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-          />
-          <input
-            type="date"
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-          />
+          <TypeableDateFilterInput value={startDate} onChange={setStartDate} className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"/>
+          <TypeableDateFilterInput value={endDate} onChange={setEndDate} className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"/>
         </div>
       </div>
 

@@ -1,5 +1,6 @@
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -297,22 +298,12 @@ export default function PaymentPendingReport() {
             </div>
 
             {/* Due Date From */}
-            <input
-              type="date"
-              value={dueDateFrom}
-              onChange={(e) => setDueDateFrom(e.target.value)}
-              className="px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
-              title="From Date"
-            />
+            <TypeableDateFilterInput value={dueDateFrom} onChange={setDueDateFrom} className="px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+              title="From Date"/>
 
             {/* Due Date To */}
-            <input
-              type="date"
-              value={dueDateTo}
-              onChange={(e) => setDueDateTo(e.target.value)}
-              className="px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
-              title="To Date"
-            />
+            <TypeableDateFilterInput value={dueDateTo} onChange={setDueDateTo} className="px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+              title="To Date"/>
 
             {/* Payment Completion Filter */}
             <select

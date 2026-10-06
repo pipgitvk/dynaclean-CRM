@@ -1,5 +1,6 @@
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Search, Users, FileText, IndianRupee, X } from "lucide-react";
@@ -362,21 +363,11 @@ export default function BuyerCards() {
               <div className="flex gap-4 flex-wrap items-end">
                 <div>
                   <label className="block text-xs font-semibold text-gray-600 mb-1">From Date</label>
-                  <input
-                    type="date"
-                    value={fromDate}
-                    onChange={(e) => setFromDate(e.target.value)}
-                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                  />
+                  <TypeableDateFilterInput value={fromDate} onChange={setFromDate} className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"/>
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-gray-600 mb-1">To Date</label>
-                  <input
-                    type="date"
-                    value={toDate}
-                    onChange={(e) => setToDate(e.target.value)}
-                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                  />
+                  <TypeableDateFilterInput value={toDate} onChange={setToDate} className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"/>
                 </div>
                 <button
                   onClick={handleFilterChange}

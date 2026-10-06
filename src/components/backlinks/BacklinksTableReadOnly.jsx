@@ -1,5 +1,6 @@
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect, useMemo } from "react";
 import { Search, Edit, Plus, Mail } from "lucide-react";
 import toast from "react-hot-toast";
@@ -298,12 +299,7 @@ const BacklinksTableReadOnly = () => {
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Date From
           </label>
-          <input
-            type="date"
-            value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+          <TypeableDateFilterInput value={dateFrom} onChange={setDateFrom} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"/>
         </div>
 
         {/* Filter by Date To */}
@@ -311,12 +307,7 @@ const BacklinksTableReadOnly = () => {
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Date To
           </label>
-          <input
-            type="date"
-            value={dateTo}
-            onChange={(e) => setDateTo(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+          <TypeableDateFilterInput value={dateTo} onChange={setDateTo} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"/>
         </div>
       </div>
 

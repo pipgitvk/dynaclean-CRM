@@ -1,5 +1,6 @@
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { FileCheck, UploadCloud, CheckCircle } from "lucide-react";
@@ -230,28 +231,16 @@ export function ReturnBookingMenuItem({ order }) {
                   <label className="block text-sm font-medium text-gray-700">
                     Return Booking Date
                   </label>
-                  <input
-                    type="date"
-                    name="return_booking_date"
-                    value={formData.return_booking_date}
-                    onChange={handleChange}
-                    required
-                    className="mt-1 w-full border px-3 py-2 rounded-md"
-                  />
+                  <TypeableDateFilterInput value={formData.return_booking_date} onChange={(v) => handleChange({ target: { name: "return_booking_date", value: v } })} required
+                    className="mt-1 w-full border px-3 py-2 rounded-md"/>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
                     Expected Pickup Date
                   </label>
-                  <input
-                    type="date"
-                    name="expected_pickup_date"
-                    value={formData.expected_pickup_date}
-                    onChange={handleChange}
-                    required
-                    className="mt-1 w-full border px-3 py-2 rounded-md"
-                  />
+                  <TypeableDateFilterInput value={formData.expected_pickup_date} onChange={(v) => handleChange({ target: { name: "expected_pickup_date", value: v } })} required
+                    className="mt-1 w-full border px-3 py-2 rounded-md"/>
                 </div>
 
                 <input

@@ -1,5 +1,6 @@
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useMemo, useRef } from "react";
 import { Plus, Search, Download, ArrowUp, ArrowDown, X } from "lucide-react";
 import dayjs from "dayjs";
@@ -232,19 +233,9 @@ export default function LedgerTable({ rows: initialRows }) {
             className="pl-8 pr-3 py-2 text-sm rounded-lg border border-gray-300 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 text-black w-56"
           />
         </div>
-        <input
-          type="date"
-          value={dateFrom}
-          onChange={(e) => setDateFrom(e.target.value)}
-          className="text-sm rounded-lg border border-gray-300 bg-white px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 text-black"
-        />
+        <TypeableDateFilterInput value={dateFrom} onChange={setDateFrom} className="text-sm rounded-lg border border-gray-300 bg-white px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 text-black"/>
         <span className="text-gray-400 text-sm">to</span>
-        <input
-          type="date"
-          value={dateTo}
-          onChange={(e) => setDateTo(e.target.value)}
-          className="text-sm rounded-lg border border-gray-300 bg-white px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 text-black"
-        />
+        <TypeableDateFilterInput value={dateTo} onChange={setDateTo} className="text-sm rounded-lg border border-gray-300 bg-white px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 text-black"/>
         <select
           value={vchTypeFilter}
           onChange={(e) => setVchTypeFilter(e.target.value)}

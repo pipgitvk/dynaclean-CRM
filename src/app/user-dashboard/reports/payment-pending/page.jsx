@@ -1,5 +1,6 @@
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import dayjs from "dayjs";
@@ -300,24 +301,14 @@ export default function PaymentPendingReport() {
             <div className="grid grid-cols-2 md:grid-cols-5 gap-2 items-end">
               {/* Due Date From */}
               <div>
-                <input
-                  type="date"
-                  value={dueDateFrom}
-                  onChange={(e) => setDueDateFrom(e.target.value)}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  title="From Date"
-                />
+                <TypeableDateFilterInput value={dueDateFrom} onChange={setDueDateFrom} className="w-full px-3 py-2.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  title="From Date"/>
               </div>
 
               {/* Due Date To */}
               <div>
-                <input
-                  type="date"
-                  value={dueDateTo}
-                  onChange={(e) => setDueDateTo(e.target.value)}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  title="To Date"
-                />
+                <TypeableDateFilterInput value={dueDateTo} onChange={setDueDateTo} className="w-full px-3 py-2.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  title="To Date"/>
               </div>
 
               {/* Status Filter */}

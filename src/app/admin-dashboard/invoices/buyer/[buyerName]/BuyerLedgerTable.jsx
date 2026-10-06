@@ -1,5 +1,6 @@
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useMemo, useEffect } from "react";
 import {
   Plus,
@@ -588,23 +589,13 @@ left("Closing Balance", col.particulars, y, 9, true);
             <label className="block text-xs font-medium text-gray-700 mb-2">
               From Date
             </label>
-            <input
-              type="date"
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
-            />
+            <TypeableDateFilterInput value={dateFrom} onChange={setDateFrom} className="px-3 py-2 border border-gray-300 rounded-lg outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"/>
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-2">
               To Date
             </label>
-            <input
-              type="date"
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
-            />
+            <TypeableDateFilterInput value={dateTo} onChange={setDateTo} className="px-3 py-2 border border-gray-300 rounded-lg outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"/>
           </div>
           <button
             onClick={() => {

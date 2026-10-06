@@ -1,5 +1,6 @@
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect, useMemo } from "react";
 import {
     Pencil,
@@ -1084,17 +1085,17 @@ export default function DDManagementPage() {
                                         </div>
                                         <div>
                                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Assign Date</label>
-                                            <input disabled={selectedDD?.assign_date} type="date" name="assign_date" value={formData.assign_date} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" />
+                                            <TypeableDateFilterInput value={formData.assign_date} onChange={(v) => handleInputChange({ target: { name: "assign_date", value: v } })} disabled={selectedDD?.assign_date} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"/>
                                         </div>
                                     </div>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
                                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Expiry Date</label>
-                                            <input disabled={selectedDD?.expiry_date} type="date" name="expiry_date" value={formData.expiry_date} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" />
+                                            <TypeableDateFilterInput value={formData.expiry_date} onChange={(v) => handleInputChange({ target: { name: "expiry_date", value: v } })} disabled={selectedDD?.expiry_date} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"/>
                                         </div>
                                         <div>
                                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Claim Expiry Date</label>
-                                            <input disabled={selectedDD?.claim_expiry_date} type="date" name="claim_expiry_date" value={formData.claim_expiry_date} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" />
+                                            <TypeableDateFilterInput value={formData.claim_expiry_date} onChange={(v) => handleInputChange({ target: { name: "claim_expiry_date", value: v } })} disabled={selectedDD?.claim_expiry_date} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"/>
                                         </div>
                                     </div>
                                     <div>
@@ -1123,7 +1124,7 @@ export default function DDManagementPage() {
                                     </div>
                                     <div>
                                         <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Overdue Date</label>
-                                        <input name="overdue_date" type="date" value={formData.overdue_date} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none" />
+                                        <TypeableDateFilterInput value={formData.overdue_date} onChange={(v) => handleInputChange({ target: { name: "overdue_date", value: v } })} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"/>
                                     </div>
                                     <div>
                                         <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Upload BG Format</label>
@@ -1171,7 +1172,7 @@ export default function DDManagementPage() {
                                         </div>
                                         <div>
                                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Assign Date</label>
-                                            <input disabled={selectedDD?.assign_date} type="date" name="assign_date" value={formData.assign_date} onChange={handleInputChange} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`} />
+                                            <TypeableDateFilterInput value={formData.assign_date} onChange={(v) => handleInputChange({ target: { name: "assign_date", value: v } })} disabled={selectedDD?.assign_date} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`}/>
                                         </div>
                                     </div>
                                     <div>
@@ -1200,7 +1201,7 @@ export default function DDManagementPage() {
                                     </div>
                                     <div>
                                         <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Overdue Date</label>
-                                        <input name="overdue_date" type="date" value={formData.overdue_date} onChange={handleInputChange} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`} />
+                                        <TypeableDateFilterInput value={formData.overdue_date} onChange={(v) => handleInputChange({ target: { name: "overdue_date", value: v } })} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`}/>
                                     </div>
                                     <div>
                                         <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Bid Document</label>
@@ -1337,7 +1338,7 @@ export default function DDManagementPage() {
                                             <div className="grid grid-cols-2 gap-4">
                                                 <div>
                                                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Date</label>
-                                                    <input disabled={selectedDD?.payment_date} type="date" name="payment_date" value={formData.payment_date} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none disabled:bg-gray-100" />
+                                                    <TypeableDateFilterInput value={formData.payment_date} onChange={(v) => handleInputChange({ target: { name: "payment_date", value: v } })} disabled={selectedDD?.payment_date} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none disabled:bg-gray-100"/>
                                                 </div>
                                                 <div>
                                                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">From Bank Account No</label>
@@ -1378,7 +1379,7 @@ export default function DDManagementPage() {
                                             <div className="grid grid-cols-2 gap-4">
                                                 <div>
                                                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Date</label>
-                                                    <input disabled={selectedDD?.bg_date} type="date" name="bg_date" value={formData.bg_date} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none disabled:bg-gray-100" />
+                                                    <TypeableDateFilterInput value={formData.bg_date} onChange={(v) => handleInputChange({ target: { name: "bg_date", value: v } })} disabled={selectedDD?.bg_date} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none disabled:bg-gray-100"/>
                                                 </div>
                                                 <div>
                                                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Amount</label>
@@ -1392,7 +1393,7 @@ export default function DDManagementPage() {
                                                 </div>
                                                 <div>
                                                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Validity Upto</label>
-                                                    <input disabled={selectedDD?.validity_upto} type="date" name="validity_upto" value={formData.validity_upto} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none disabled:bg-gray-100" />
+                                                    <TypeableDateFilterInput value={formData.validity_upto} onChange={(v) => handleInputChange({ target: { name: "validity_upto", value: v } })} disabled={selectedDD?.validity_upto} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none disabled:bg-gray-100"/>
                                                 </div>
                                             </div>
                                             <div className="grid grid-cols-2 gap-4">
@@ -1445,7 +1446,7 @@ export default function DDManagementPage() {
                                         </div>
                                         <div>
                                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Filled Date</label>
-                                            <input type="date" name="filled_date" value={formData.filled_date} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg outline-none" />
+                                            <TypeableDateFilterInput value={formData.filled_date} onChange={(v) => handleInputChange({ target: { name: "filled_date", value: v } })} className="w-full p-2.5 border rounded-lg outline-none"/>
                                         </div>
                                     </div>
                                     <div className="pt-4 border-t">
@@ -1559,7 +1560,7 @@ export default function DDManagementPage() {
                                             <div className="grid grid-cols-2 gap-4">
                                                 <div>
                                                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Date</label>
-                                                    <input disabled={selectedDD?.payment_date} type="date" name="payment_date" value={formData.payment_date} onChange={handleInputChange} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none disabled:bg-gray-100 ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`} />
+                                                    <TypeableDateFilterInput value={formData.payment_date} onChange={(v) => handleInputChange({ target: { name: "payment_date", value: v } })} disabled={selectedDD?.payment_date} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none disabled:bg-gray-100 ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`}/>
                                                 </div>
                                                 <div>
                                                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">From Bank Account No</label>
@@ -1604,7 +1605,7 @@ export default function DDManagementPage() {
                                                 </div>
                                                 <div>
                                                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">DD Date</label>
-                                                    <input disabled={selectedDD?.dd_date} type="date" name="dd_date" value={formData.dd_date} onChange={handleInputChange} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none disabled:bg-gray-100 ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`} />
+                                                    <TypeableDateFilterInput value={formData.dd_date} onChange={(v) => handleInputChange({ target: { name: "dd_date", value: v } })} disabled={selectedDD?.dd_date} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none disabled:bg-gray-100 ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`}/>
                                                 </div>
                                             </div>
                                             <div className="grid grid-cols-2 gap-4">
@@ -1620,7 +1621,7 @@ export default function DDManagementPage() {
                                             <div className="grid grid-cols-2 gap-4">
                                                 <div>
                                                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Expiry Bank Date</label>
-                                                    <input disabled={selectedDD?.expiry_bank} type="date" name="expiry_bank" value={formData.expiry_bank} onChange={handleInputChange} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none disabled:bg-gray-100 ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`} />
+                                                    <TypeableDateFilterInput value={formData.expiry_bank} onChange={(v) => handleInputChange({ target: { name: "expiry_bank", value: v } })} disabled={selectedDD?.expiry_bank} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none disabled:bg-gray-100 ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`}/>
                                                 </div>
                                                 <div>
                                                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Issuing Branch</label>
@@ -1661,7 +1662,7 @@ export default function DDManagementPage() {
                                             <div className="grid grid-cols-2 gap-4">
                                                 <div>
                                                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Date</label>
-                                                    <input disabled={selectedDD?.bg_date} type="date" name="bg_date" value={formData.bg_date} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100" />
+                                                    <TypeableDateFilterInput value={formData.bg_date} onChange={(v) => handleInputChange({ target: { name: "bg_date", value: v } })} disabled={selectedDD?.bg_date} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100"/>
                                                 </div>
                                                 <div>
                                                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Amount</label>
@@ -1675,7 +1676,7 @@ export default function DDManagementPage() {
                                                 </div>
                                                 <div>
                                                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Validity Upto</label>
-                                                    <input disabled={selectedDD?.validity_upto} type="date" name="validity_upto" value={formData.validity_upto} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100" />
+                                                    <TypeableDateFilterInput value={formData.validity_upto} onChange={(v) => handleInputChange({ target: { name: "validity_upto", value: v } })} disabled={selectedDD?.validity_upto} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100"/>
                                                 </div>
                                             </div>
                                             <div className="grid grid-cols-2 gap-4">
@@ -1737,7 +1738,7 @@ export default function DDManagementPage() {
                                                 {formData.claim_from_bank && (
                                                     <div>
                                                         <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Claim Date</label>
-                                                        <input disabled={!isAuthorized} type="date" name="claim_date" value={formData.claim_date} onChange={handleInputChange} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none disabled:bg-gray-100 ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`} />
+                                                        <TypeableDateFilterInput value={formData.claim_date} onChange={(v) => handleInputChange({ target: { name: "claim_date", value: v } })} disabled={!isAuthorized} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none disabled:bg-gray-100 ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`}/>
                                                     </div>
                                                 )}
                                                 {formData.original_dd_location === "Client" && (
@@ -1759,7 +1760,7 @@ export default function DDManagementPage() {
                                                         </div>
                                                         <div>
                                                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Delivery Date</label>
-                                                            <input disabled={!isAuthorized} type="date" name="delivery_date" value={formData.delivery_date || ""} onChange={handleInputChange} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none disabled:bg-gray-100 ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`} />
+                                                            <TypeableDateFilterInput value={formData.delivery_date || ""} onChange={(v) => handleInputChange({ target: { name: "delivery_date", value: v } })} disabled={!isAuthorized} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none disabled:bg-gray-100 ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`}/>
                                                         </div>
                                                     </div>
                                                 )}
@@ -1786,7 +1787,7 @@ export default function DDManagementPage() {
                                         </div>
                                         <div>
                                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Filled Date</label>
-                                            <input disabled={selectedDD?.filled_date} type="date" name="filled_date" value={formData.filled_date} onChange={handleInputChange} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`} />
+                                            <TypeableDateFilterInput value={formData.filled_date} onChange={(v) => handleInputChange({ target: { name: "filled_date", value: v } })} disabled={selectedDD?.filled_date} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`}/>
                                         </div>
                                     </div>
                                     <div className="space-y-4 pt-4 border-t">
@@ -1874,7 +1875,7 @@ export default function DDManagementPage() {
                                     {formData.claim_from_bank && (
                                         <div>
                                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Claim Date</label>
-                                            <input disabled={!isAuthorized} type="date" name="claim_date" value={formData.claim_date} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100" />
+                                            <TypeableDateFilterInput value={formData.claim_date} onChange={(v) => handleInputChange({ target: { name: "claim_date", value: v } })} disabled={!isAuthorized} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100"/>
                                         </div>
                                     )}
                                 </div>
@@ -1954,21 +1955,11 @@ export default function DDManagementPage() {
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium text-gray-500 uppercase mb-1">From Date</label>
-                                    <input
-                                        type="date"
-                                        value={paymentDateFrom}
-                                        onChange={(e) => setPaymentDateFrom(e.target.value)}
-                                        className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
-                                    />
+                                    <TypeableDateFilterInput value={paymentDateFrom} onChange={setPaymentDateFrom} className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none"/>
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium text-gray-500 uppercase mb-1">To Date</label>
-                                    <input
-                                        type="date"
-                                        value={paymentDateTo}
-                                        onChange={(e) => setPaymentDateTo(e.target.value)}
-                                        className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
-                                    />
+                                    <TypeableDateFilterInput value={paymentDateTo} onChange={setPaymentDateTo} className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none"/>
                                 </div>
                                 <div className="flex items-end">
                                     <button
@@ -2138,21 +2129,11 @@ export default function DDManagementPage() {
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium text-gray-500 uppercase mb-1">From Date</label>
-                                    <input
-                                        type="date"
-                                        value={creditDateFrom}
-                                        onChange={(e) => setCreditDateFrom(e.target.value)}
-                                        className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                                    />
+                                    <TypeableDateFilterInput value={creditDateFrom} onChange={setCreditDateFrom} className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"/>
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium text-gray-500 uppercase mb-1">To Date</label>
-                                    <input
-                                        type="date"
-                                        value={creditDateTo}
-                                        onChange={(e) => setCreditDateTo(e.target.value)}
-                                        className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                                    />
+                                    <TypeableDateFilterInput value={creditDateTo} onChange={setCreditDateTo} className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"/>
                                 </div>
                                 <div className="flex items-end">
                                     <button

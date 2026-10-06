@@ -1,5 +1,6 @@
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect } from "react";
 import { X } from "lucide-react";
 
@@ -248,13 +249,7 @@ export default function EditIncomingShipment({
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Expected Arrival Date
             </label>
-            <input
-              type="date"
-              name="expected_arrival_date"
-              value={formData.expected_arrival_date}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed" disabled={readonly}
-            />
+            <TypeableDateFilterInput value={formData.expected_arrival_date} onChange={(v) => handleChange({ target: { name: "expected_arrival_date", value: v } })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed" disabled={readonly}/>
           </div>
 
           {/* Notes */}

@@ -1,6 +1,7 @@
 // app/demo-registrations/page.jsx
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useMemo, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import dayjs from "dayjs";
@@ -312,23 +313,13 @@ export default function DemoRegistrationPage() {
             {/* Date From */}
             <div className="flex flex-col gap-1">
               <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">From</label>
-              <input
-                type="date"
-                value={filters.date_from}
-                onChange={(e) => handleFilterUpdate("date_from", e.target.value)}
-                className="p-2.5 border border-gray-300 rounded-lg text-sm"
-              />
+              <TypeableDateFilterInput value={filters.date_from} onChange={(v) => handleFilterUpdate("date_from", v)} className="p-2.5 border border-gray-300 rounded-lg text-sm"/>
             </div>
 
             {/* Date To */}
             <div className="flex flex-col gap-1">
               <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">To</label>
-              <input
-                type="date"
-                value={filters.date_to}
-                onChange={(e) => handleFilterUpdate("date_to", e.target.value)}
-                className="p-2.5 border border-gray-300 rounded-lg text-sm"
-              />
+              <TypeableDateFilterInput value={filters.date_to} onChange={(v) => handleFilterUpdate("date_to", v)} className="p-2.5 border border-gray-300 rounded-lg text-sm"/>
             </div>
 
             {/* Employee Filter */}
@@ -552,13 +543,7 @@ export default function DemoRegistrationPage() {
                 >
                   Postpone Date
                 </label>
-                <input
-                  id="postpone-date"
-                  type="date"
-                  value={postponeDate}
-                  onChange={(e) => setPostponeDate(e.target.value)}
-                  className="p-2 border rounded w-full text-sm"
-                />
+                <TypeableDateFilterInput value={postponeDate} onChange={setPostponeDate} id="postpone-date" className="p-2 border rounded w-full text-sm"/>
               </div>
             )}
 

@@ -1,5 +1,6 @@
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect } from "react";
 import { toast } from "react-hot-toast";
 import {
@@ -383,14 +384,8 @@ export default function CompanyDocumentsPage() {
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Expiry Date *
                     </label>
-                    <input
-                      type="date"
-                      name="expiryDate"
-                      value={formData.expiryDate}
-                      onChange={handleInputChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      required={!formData.isLifetime}
-                    />
+                    <TypeableDateFilterInput value={formData.expiryDate} onChange={(v) => handleInputChange({ target: { name: "expiryDate", value: v } })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      required={!formData.isLifetime}/>
                   </div>
                 )}
 

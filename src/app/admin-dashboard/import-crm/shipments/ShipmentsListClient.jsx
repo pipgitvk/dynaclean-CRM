@@ -1,5 +1,6 @@
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useCallback, useEffect, useState } from "react";
 import {
   Dialog,
@@ -512,27 +513,13 @@ export default function ShipmentsListClient() {
                   </div>
                   <div>
                     <label className={labelClass}>Material ready date</label>
-                    <input
-                      className={inputClass}
-                      type="date"
-                      value={form.material_ready_date}
-                      onChange={(e) =>
-                        update("material_ready_date", e.target.value)
-                      }
-                    />
+                    <TypeableDateFilterInput value={form.material_ready_date} onChange={(v) => update("material_ready_date", v)} className={inputClass}/>
                   </div>
                   <div>
                     <label className={labelClass}>
                       Agent delivery deadline
                     </label>
-                    <input
-                      className={inputClass}
-                      type="date"
-                      value={form.agent_delivery_deadline}
-                      onChange={(e) =>
-                        update("agent_delivery_deadline", e.target.value)
-                      }
-                    />
+                    <TypeableDateFilterInput value={form.agent_delivery_deadline} onChange={(v) => update("agent_delivery_deadline", v)} className={inputClass}/>
                   </div>
                   <div className="sm:col-span-2">
                     <label className={labelClass}>Extra remarks</label>

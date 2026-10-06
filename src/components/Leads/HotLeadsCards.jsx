@@ -1,4 +1,5 @@
 "use client";
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useEffect, useState } from "react";
 import { Phone, CalendarDays, Tag, Layers, Clock, Search } from "lucide-react";
 import { formatCrmDatetimeForISTDisplay } from "@/lib/timezone";
@@ -262,12 +263,7 @@ export default function HotLeadsCards({
         <div className="flex flex-wrap items-end gap-3">
           <div className="flex flex-col">
             <label className="mb-1 text-xs text-slate-500">From Date</label>
-            <input
-              type="date"
-              className={filterClass}
-              value={dateFilter}
-              onChange={(e) => setDateFilter(e.target.value)}
-            />
+            <TypeableDateFilterInput value={dateFilter} onChange={setDateFilter} className={filterClass}/>
           </div>
           <div className="flex flex-col">
             <label className="mb-1 text-xs text-slate-500">Status</label>

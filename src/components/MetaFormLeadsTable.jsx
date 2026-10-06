@@ -1,5 +1,6 @@
 'use client';
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Loader2, User, Calendar, CheckCircle, XCircle, Filter, X, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -134,21 +135,11 @@ export default function MetaFormLeadsTable({ formIds }) {
           </div>
           <div className="flex flex-col">
             <label className="text-xs font-medium text-gray-600 mb-1">Start Date</label>
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            <TypeableDateFilterInput value={startDate} onChange={setStartDate} className="px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
           </div>
           <div className="flex flex-col">
             <label className="text-xs font-medium text-gray-600 mb-1">End Date</label>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            <TypeableDateFilterInput value={endDate} onChange={setEndDate} className="px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
           </div>
           <button
             onClick={clearFilters}

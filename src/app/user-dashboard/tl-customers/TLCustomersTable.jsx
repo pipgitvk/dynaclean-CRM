@@ -1,5 +1,6 @@
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useTransition, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -712,26 +713,14 @@ export default function TLCustomersTable({
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Next Followup from
                   </label>
-                  <input
-                    type="date"
-                    placeholder="dd/mm/yyyy"
-                    value={nextFromDate}
-                    onChange={(e) => setNextFromDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                  <TypeableDateFilterInput value={nextFromDate} onChange={setNextFromDate} placeholder="dd/mm/yyyy" className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"/>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Next Followup to
                   </label>
-                  <input
-                    type="date"
-                    placeholder="dd/mm/yyyy"
-                    value={nextToDate}
-                    onChange={(e) => setNextToDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                  <TypeableDateFilterInput value={nextToDate} onChange={setNextToDate} placeholder="dd/mm/yyyy" className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"/>
                 </div>
 
                 {/* Products / Models filter - Dropdown */}

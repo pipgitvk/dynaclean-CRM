@@ -1,5 +1,6 @@
 // app/reports/page.jsx
 "use client";
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import CustomerTable from "@/components/CustomerTable";
@@ -176,25 +177,13 @@ export default function ReportsPage() {
           <label className="text-sm font-medium text-gray-700 block mb-1">
             Date From
           </label>
-          <input
-            type="date"
-            name="startDate"
-            value={filters.startDate}
-            onChange={handleFilterChange}
-            className="w-full px-4 py-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500"
-          />
+          <TypeableDateFilterInput value={filters.startDate} onChange={(v) => handleFilterChange({ target: { name: "startDate", value: v } })} className="w-full px-4 py-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500"/>
         </div>
         <div>
           <label className="text-sm font-medium text-gray-700 block mb-1">
             Date To
           </label>
-          <input
-            type="date"
-            name="endDate"
-            value={filters.endDate}
-            onChange={handleFilterChange}
-            className="w-full px-4 py-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500"
-          />
+          <TypeableDateFilterInput value={filters.endDate} onChange={(v) => handleFilterChange({ target: { name: "endDate", value: v } })} className="w-full px-4 py-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500"/>
         </div>
         <div>
           <label className="text-sm font-medium text-gray-700 block mb-1">

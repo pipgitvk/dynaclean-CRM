@@ -1,5 +1,6 @@
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect } from "react";
 import { 
   Calendar, 
@@ -574,23 +575,12 @@ export default function AdminLeaveManagement() {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">From date</label>
-            <input
-              type="date"
-              value={fromDateFilter}
-              onChange={(e) => setFromDateFilter(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
+            <TypeableDateFilterInput value={fromDateFilter} onChange={setFromDateFilter} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"/>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">To date</label>
-            <input
-              type="date"
-              value={toDateFilter}
-              min={fromDateFilter || undefined}
-              onChange={(e) => setToDateFilter(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
+            <TypeableDateFilterInput value={toDateFilter} onChange={setToDateFilter} min={fromDateFilter || undefined} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"/>
           </div>
         </div>
 

@@ -1,6 +1,7 @@
 // src/components/ClientTaskTable.jsx
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import dayjs from "dayjs";
@@ -318,21 +319,11 @@ export default function ClientTaskTable({ initialTasks, currentUser = "" }) {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">From Date</label>
-            <input
-              type="date"
-              className="border p-2 rounded-md w-full"
-              value={fromDate}
-              onChange={(e) => setFromDate(e.target.value)}
-            />
+            <TypeableDateFilterInput value={fromDate} onChange={setFromDate} className="border p-2 rounded-md w-full"/>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">To Date</label>
-            <input
-              type="date"
-              className="border p-2 rounded-md w-full"
-              value={toDate}
-              onChange={(e) => setToDate(e.target.value)}
-            />
+            <TypeableDateFilterInput value={toDate} onChange={setToDate} className="border p-2 rounded-md w-full"/>
           </div>
           <div className="flex items-end">
             <button

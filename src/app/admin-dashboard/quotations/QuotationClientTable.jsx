@@ -1,5 +1,6 @@
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useEffect, useMemo, useState } from "react";
 import QuotationViewModal from "@/components/Quotation/QuotationViewModal";
 
@@ -192,18 +193,8 @@ export default function QuotationTableClient({ username, customerId, role, servi
           >
             Reset
           </button>
-          <input
-            type="date"
-            value={fromDate}
-            onChange={(e) => setFromDate(e.target.value)}
-            className="border border-gray-300 rounded px-3 py-1 w-full"
-          />
-          <input
-            type="date"
-            value={toDate}
-            onChange={(e) => setToDate(e.target.value)}
-            className="border border-gray-300 rounded px-3 py-1 w-full"
-          />
+          <TypeableDateFilterInput value={fromDate} onChange={setFromDate} className="border border-gray-300 rounded px-3 py-1 w-full"/>
+          <TypeableDateFilterInput value={toDate} onChange={setToDate} className="border border-gray-300 rounded px-3 py-1 w-full"/>
           <select
             value={employeeFilter}
             onChange={(e) => setEmployeeFilter(e.target.value)}

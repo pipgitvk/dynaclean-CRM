@@ -1,3 +1,4 @@
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { shouldShowField, isReassignFieldMode } from "@/lib/reassignFieldVisibility";
 import { Eye, Upload, Loader } from "lucide-react";
 import { useState } from "react";
@@ -253,15 +254,9 @@ export default function PersonalInfoSection({
         {show("date_of_joining") && (
         <div>
           <label className={labelClass}>Date of Joining *</label>
-          <input
-            type="date"
-            name="date_of_joining"
-            value={formData.date_of_joining || ""}
-            onChange={handleChange}
-            required={!rf || show("date_of_joining")}
+          <TypeableDateFilterInput value={formData.date_of_joining || ""} onChange={(v) => handleChange({ target: { name: "date_of_joining", value: v } })} required={!rf || show("date_of_joining")}
             disabled={ro}
-            className={inactive(inputClass)}
-          />
+            className={inactive(inputClass)}/>
         </div>
         )}
 
@@ -377,15 +372,9 @@ export default function PersonalInfoSection({
         {show("date_of_birth") && (
         <div>
           <label className={labelClass}>Date of Birth *</label>
-          <input
-            type="date"
-            name="date_of_birth"
-            value={formData.date_of_birth || ""}
-            onChange={handleChange}
-            required={!rf || show("date_of_birth")}
+          <TypeableDateFilterInput value={formData.date_of_birth || ""} onChange={(v) => handleChange({ target: { name: "date_of_birth", value: v } })} required={!rf || show("date_of_birth")}
             disabled={ro}
-            className={inactive(inputClass)}
-          />
+            className={inactive(inputClass)}/>
         </div>
         )}
 

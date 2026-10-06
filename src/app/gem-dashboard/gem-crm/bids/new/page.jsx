@@ -1,5 +1,6 @@
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -751,25 +752,13 @@ export default function NewBidPage() {
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         RA Start Date *
                       </label>
-                      <input
-                        type="date"
-                        name="ra_start_date"
-                        value={formData.ra_start_date}
-                        onChange={handleChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                      />
+                      <TypeableDateFilterInput value={formData.ra_start_date} onChange={(v) => handleChange({ target: { name: "ra_start_date", value: v } })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"/>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         RA End Date *
                       </label>
-                      <input
-                        type="date"
-                        name="ra_end_date"
-                        value={formData.ra_end_date}
-                        onChange={handleChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                      />
+                      <TypeableDateFilterInput value={formData.ra_end_date} onChange={(v) => handleChange({ target: { name: "ra_end_date", value: v } })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"/>
                     </div>
                   </div>
                 </div>

@@ -1,4 +1,5 @@
 "use client";
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -339,21 +340,11 @@ export default function OrderTable({ orders, userRole }) {
         </div>
         <div>
           <label className="block text-xs text-gray-600 mb-1">From Date</label>
-          <input
-            type="date"
-            value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-          />
+          <TypeableDateFilterInput value={dateFrom} onChange={setDateFrom} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"/>
         </div>
         <div>
           <label className="block text-xs text-gray-600 mb-1">To Date</label>
-          <input
-            type="date"
-            value={dateTo}
-            onChange={(e) => setDateTo(e.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-          />
+          <TypeableDateFilterInput value={dateTo} onChange={setDateTo} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"/>
         </div>
         <div>
           <label className="block text-xs text-gray-600 mb-1">Created By</label>
@@ -1382,13 +1373,8 @@ function UpdateDeliveryMenuItem({ order }) {
                     <label className="block text-sm text-gray-700 font-medium mb-1">
                       Actual Delivery Date *
                     </label>
-                    <input
-                      type="date"
-                      value={deliveredOn}
-                      onChange={(e) => setDeliveredOn(e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      required
-                    />
+                    <TypeableDateFilterInput value={deliveredOn} onChange={setDeliveredOn} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      required/>
                   </div>
 
                   <div>
@@ -1815,28 +1801,16 @@ function ReturnBookingMenuItem({ order }) {
                   <label className="block text-sm font-medium text-gray-700">
                     Return Booking Date
                   </label>
-                  <input
-                    type="date"
-                    name="return_booking_date"
-                    value={formData.return_booking_date}
-                    onChange={handleChange}
-                    required
-                    className="mt-1 w-full border px-3 py-2 rounded-md"
-                  />
+                  <TypeableDateFilterInput value={formData.return_booking_date} onChange={(v) => handleChange({ target: { name: "return_booking_date", value: v } })} required
+                    className="mt-1 w-full border px-3 py-2 rounded-md"/>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
                     Expected Pickup Date
                   </label>
-                  <input
-                    type="date"
-                    name="expected_pickup_date"
-                    value={formData.expected_pickup_date}
-                    onChange={handleChange}
-                    required
-                    className="mt-1 w-full border px-3 py-2 rounded-md"
-                  />
+                  <TypeableDateFilterInput value={formData.expected_pickup_date} onChange={(v) => handleChange({ target: { name: "expected_pickup_date", value: v } })} required
+                    className="mt-1 w-full border px-3 py-2 rounded-md"/>
                 </div>
 
                 <input

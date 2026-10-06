@@ -1,5 +1,6 @@
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useMemo, useTransition } from "react";
 import { useEffect } from "react";
 import dayjs from "dayjs";
@@ -206,18 +207,8 @@ export default function CustomerTable({
           onChange={(e) => update("search", e.target.value)}
           className="p-2 border rounded w-full"
         />
-        <input
-          type="date"
-          value={filters.date_from}
-          onChange={(e) => update("date_from", e.target.value)}
-          className="p-2 border rounded w-full"
-        />
-        <input
-          type="date"
-          value={filters.date_to}
-          onChange={(e) => update("date_to", e.target.value)}
-          className="p-2 border rounded w-full"
-        />
+        <TypeableDateFilterInput value={filters.date_from} onChange={(v) => update("date_from", v)} className="p-2 border rounded w-full"/>
+        <TypeableDateFilterInput value={filters.date_to} onChange={(v) => update("date_to", v)} className="p-2 border rounded w-full"/>
         <select
           value={filters.sort}
           onChange={(e) => update("sort", e.target.value)}
@@ -328,15 +319,9 @@ export default function CustomerTable({
             Select Next Follow-up
           </label>
           {isNextFollowInputVisible && (
-            <input
-              id="next_follow_date"
-              type="date"
-              value={filters.next_follow_date}
-              onChange={(e) => update("next_follow_date", e.target.value)}
-              onBlur={handleNextFollowBlur}
+            <TypeableDateFilterInput value={filters.next_follow_date} onChange={(v) => update("next_follow_date", v)} id="next_follow_date" onBlur={handleNextFollowBlur}
               className="p-2 border rounded w-full text-gray-700 mt-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200"
-              placeholder="Next Follow-up"
-            />
+              placeholder="Next Follow-up"/>
           )}
         </div>
         <div className="relative">
@@ -348,15 +333,9 @@ export default function CustomerTable({
             Select Followed Date
           </label>
           {isFollowedDateInputVisible && (
-            <input
-              id="followed_date"
-              type="date"
-              value={filters.followed_date}
-              onChange={(e) => update("followed_date", e.target.value)}
-              onBlur={handleFollowedDateBlur}
+            <TypeableDateFilterInput value={filters.followed_date} onChange={(v) => update("followed_date", v)} id="followed_date" onBlur={handleFollowedDateBlur}
               className="p-2 border rounded w-full text-gray-700 mt-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200"
-              placeholder="Followed Date"
-            />
+              placeholder="Followed Date"/>
           )}
         </div>
 
@@ -389,21 +368,11 @@ export default function CustomerTable({
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full sm:w-auto">
           <div className="flex flex-col gap-1 w-full sm:w-auto">
             <label className="text-xs text-gray-700 font-medium">Reporting From</label>
-            <input
-              type="date"
-              value={filters.reporting_date_from}
-              onChange={(e) => update("reporting_date_from", e.target.value)}
-              className="p-2 border rounded w-full"
-            />
+            <TypeableDateFilterInput value={filters.reporting_date_from} onChange={(v) => update("reporting_date_from", v)} className="p-2 border rounded w-full"/>
           </div>
           <div className="flex flex-col gap-1 w-full sm:w-auto">
             <label className="text-xs text-gray-700 font-medium">Reporting To</label>
-            <input
-              type="date"
-              value={filters.reporting_date_to}
-              onChange={(e) => update("reporting_date_to", e.target.value)}
-              className="p-2 border rounded w-full"
-            />
+            <TypeableDateFilterInput value={filters.reporting_date_to} onChange={(v) => update("reporting_date_to", v)} className="p-2 border rounded w-full"/>
           </div>
         </div>
       </div>

@@ -1,6 +1,7 @@
 // app/admin-dashboard/quick-edit/[username]/page.jsx
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
@@ -765,14 +766,8 @@ const QuickEditPage = () => {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700">Date of Birth</label>
-            <input
-              type="date"
-              name="dob"
-              value={employee.dob || ""}
-              onChange={handleInputChange}
-              max={today}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-            />
+            <TypeableDateFilterInput value={employee.dob || ""} onChange={(v) => handleInputChange({ target: { name: "dob", value: v } })} max={today}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"/>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700">Number</label>

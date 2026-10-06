@@ -1,5 +1,6 @@
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Calendar, Save, X, Search } from "lucide-react";
@@ -329,13 +330,7 @@ export default function TLFollowupForm({
               <Calendar size={14} className="inline mr-1" />
               Estimated Order Date (optional)
             </label>
-            <input
-              type="date"
-              name="estimated_order_date"
-              value={formData.estimated_order_date}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            <TypeableDateFilterInput value={formData.estimated_order_date} onChange={(v) => handleChange({ target: { name: "estimated_order_date", value: v } })} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"/>
           </div>
 
           {/* Lead Quality Score */}

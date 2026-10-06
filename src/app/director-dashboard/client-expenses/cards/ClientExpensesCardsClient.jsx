@@ -1,5 +1,6 @@
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import Link from "next/link";
 import { useMemo, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -322,19 +323,9 @@ export default function ClientExpensesCardsClient({ rows }) {
           <div className="flex flex-col sm:flex-row gap-3 lg:w-auto">
             <div className="flex items-center gap-2 bg-white px-4 py-2.5 rounded-lg border border-gray-200">
               <Calendar className="w-4 h-4 text-gray-500" />
-              <input
-                type="date"
-                value={fromDate}
-                onChange={(e) => setFromDate(e.target.value)}
-                className="px-0 py-0 border-none text-sm focus:ring-0 focus:outline-none bg-transparent text-gray-700"
-              />
+              <TypeableDateFilterInput value={fromDate} onChange={setFromDate} className="px-0 py-0 border-none text-sm focus:ring-0 focus:outline-none bg-transparent text-gray-700"/>
               <span className="text-gray-500">to</span>
-              <input
-                type="date"
-                value={toDate}
-                onChange={(e) => setToDate(e.target.value)}
-                className="px-0 py-0 border-none text-sm focus:ring-0 focus:outline-none bg-transparent text-gray-700"
-              />
+              <TypeableDateFilterInput value={toDate} onChange={setToDate} className="px-0 py-0 border-none text-sm focus:ring-0 focus:outline-none bg-transparent text-gray-700"/>
             </div>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />

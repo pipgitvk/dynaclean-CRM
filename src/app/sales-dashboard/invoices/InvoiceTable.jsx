@@ -1,5 +1,6 @@
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import InvoiceEditModal from "@/app/admin-dashboard/invoices/InvoiceEditModal";
@@ -140,18 +141,8 @@ export default function InvoiceTable() {
           >
             Reset
           </button>
-          <input
-            type="date"
-            value={fromDate}
-            onChange={(e) => setFromDate(e.target.value)}
-            className="border px-3 py-1 rounded"
-          />
-          <input
-            type="date"
-            value={toDate}
-            onChange={(e) => setToDate(e.target.value)}
-            className="border px-3 py-1 rounded"
-          />
+          <TypeableDateFilterInput value={fromDate} onChange={setFromDate} className="border px-3 py-1 rounded"/>
+          <TypeableDateFilterInput value={toDate} onChange={setToDate} className="border px-3 py-1 rounded"/>
         </div>
         <input
           type="text"

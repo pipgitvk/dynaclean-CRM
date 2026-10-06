@@ -1,5 +1,6 @@
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import Link from "next/link";
 import { useMemo, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -362,19 +363,9 @@ export default function ClientExpensesCardsClient({ rows }) {
             <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
               <div className="flex items-center gap-2 flex-1 min-w-0">
                 <Calendar className="w-4 h-4 text-gray-400 shrink-0" />
-                <input
-                  type="date"
-                  value={fromDate}
-                  onChange={(e) => setFromDate(e.target.value)}
-                  className="flex-1 min-w-0 px-3 py-2.5 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
-                />
+                <TypeableDateFilterInput value={fromDate} onChange={setFromDate} className="flex-1 min-w-0 px-3 py-2.5 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"/>
                 <span className="text-gray-500 shrink-0">to</span>
-                <input
-                  type="date"
-                  value={toDate}
-                  onChange={(e) => setToDate(e.target.value)}
-                  className="flex-1 min-w-0 px-3 py-2.5 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
-                />
+                <TypeableDateFilterInput value={toDate} onChange={setToDate} className="flex-1 min-w-0 px-3 py-2.5 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"/>
               </div>
               <button
                 type="button"
