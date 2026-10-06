@@ -827,11 +827,21 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
     setIsAssignModalOpen(true);
     try {
       const [repsRes, tpRes] = await Promise.all([
-        fetch("/api/reps"),
+        fetch("/api/service-engineers/active"),
         fetch("/api/third-party-engineers/active"),
       ]);
       const repsData = await repsRes.json();
-      setEngineers(repsData.users?.map((u) => u.username) || []);
+      let internalNames =
+        repsData.users?.map((u) => u.username).filter(Boolean) || [];
+      const currentInternal = record.assigned_to;
+      if (
+        currentInternal &&
+        currentInternal !== "NOT ASSIGNED" &&
+        !internalNames.includes(currentInternal)
+      ) {
+        internalNames = [currentInternal, ...internalNames];
+      }
+      setEngineers(internalNames);
       const tpData = await tpRes.json().catch(() => []);
       setThirdPartyEngineers(Array.isArray(tpData) ? tpData : []);
     } catch {
