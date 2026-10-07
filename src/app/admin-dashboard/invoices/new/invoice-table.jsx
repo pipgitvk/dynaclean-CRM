@@ -3,7 +3,12 @@
 import { useState } from "react";
 import Image from "next/image";
 
-export default function InvoiceItemsTable({ items, setItems, isEditMode = false }) {
+export default function InvoiceItemsTable({
+  items,
+  setItems,
+  isEditMode = false,
+  canEditHsn = false,
+}) {
   const [productSuggestions, setProductSuggestions] = useState([]);
   const [activeRowIndex, setActiveRowIndex] = useState(null);
 
@@ -253,7 +258,21 @@ export default function InvoiceItemsTable({ items, setItems, isEditMode = false 
                   </div>
                 </td>
                 <td className="border px-2 py-2 bg-gray-50">{item.product_number || "-"}</td>
-                <td className="border px-2 py-2">{item.hsn_code || "-"}</td>
+                <td className="border px-2 py-2">
+                  {canEditHsn ? (
+                    <input
+                      type="text"
+                      value={item.hsn_code || ""}
+                      onChange={(e) =>
+                        handleChange(idx, "hsn_code", e.target.value)
+                      }
+                      className="border p-1 w-24 text-xs rounded"
+                      placeholder="HSN/SAC"
+                    />
+                  ) : (
+                    item.hsn_code || "-"
+                  )}
+                </td>
                 <td className="border px-2 py-2 align-top">
                   <textarea
                     value={item.description || ""}

@@ -13,6 +13,16 @@ export function isAccountantRole(role) {
   return /ACCOUNTANT/.test(String(role || "").toUpperCase().trim());
 }
 
+/** HSN/SAC on invoice line items — editable in admin add/edit for these roles only. */
+export function canEditInvoiceHsn(roleOrPayload) {
+  const role =
+    roleOrPayload != null && typeof roleOrPayload === "object"
+      ? roleOrPayload.role || roleOrPayload.userRole
+      : roleOrPayload;
+  const r = String(role || "").toUpperCase().trim();
+  return r === "SUPERADMIN" || isAccountantRole(r);
+}
+
 /**
  * SUPERADMIN and ACCOUNTANT roles can see every performa invoice.
  * Other roles only see performa invoices they created.

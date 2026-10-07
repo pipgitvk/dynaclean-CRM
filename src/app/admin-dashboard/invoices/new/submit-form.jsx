@@ -9,10 +9,14 @@ import toast from "react-hot-toast";
 import AddSpecialPriceModal from "@/components/specialPrice/AddSpecialPriceModal";
 import dynacleanLogo from "@/components/logo1.jpg";
 import { LetterheadCompanyInfo, LetterheadBankLine, LetterheadSignatoryLine } from "@/components/invoice/InvoiceLetterheadSection";
+import { useUser } from "@/context/UserContext";
+import { canEditInvoiceHsn } from "@/lib/performaInvoiceAccess";
 
 
 export default function InvoiceForm({ invoiceNumber, invoiceDate, invoiceType = "tax", onBack, onSuccessRedirect, initialQuotationNumber = "" }) {
   const router = useRouter();
+  const { user } = useUser();
+  const canEditHsn = canEditInvoiceHsn(user?.userRole);
   const autoFilledQuoteRef = useRef(false);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -839,7 +843,11 @@ const fetchQuotationAndFill = async (quoteNoArg) => {
       </div>
 
       {/* Invoice Items Table */}
-      <InvoiceItemsTable items={items} setItems={setItems} />
+      <InvoiceItemsTable
+        items={items}
+        setItems={setItems}
+        canEditHsn={canEditHsn}
+      />
 
       {/* Tax Summary */}
       <TaxAndSummary

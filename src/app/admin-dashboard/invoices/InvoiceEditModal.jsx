@@ -6,6 +6,8 @@ import toast from "react-hot-toast";
 import InvoiceItemsTable from "./new/invoice-table";
 import TaxAndSummary from "./new/Tax-invoice";
 import PaymentLinkModal from "@/app/user-dashboard/invoices/new/PaymentLinkModal";
+import { useUser } from "@/context/UserContext";
+import { canEditInvoiceHsn } from "@/lib/performaInvoiceAccess";
 
 const emptyItem = () => ({
   item_name: "",
@@ -81,6 +83,8 @@ export default function InvoiceEditModal({
   onSaved,
   viewHrefBase = "/admin-dashboard/invoices",
 }) {
+  const { user } = useUser();
+  const canEditHsn = canEditInvoiceHsn(user?.userRole);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [invoiceNumber, setInvoiceNumber] = useState("");
@@ -753,7 +757,12 @@ export default function InvoiceEditModal({
                 </div>
               </div>
 
-              <InvoiceItemsTable items={items} setItems={setItems} isEditMode={true} />
+              <InvoiceItemsTable
+                items={items}
+                setItems={setItems}
+                isEditMode={true}
+                canEditHsn={canEditHsn}
+              />
 
               <TaxAndSummary
                 items={items}
