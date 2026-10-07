@@ -99,6 +99,13 @@ export const MODULE_KEY_TO_URL = {
 
   // Employees
   "employee-list": "/admin-dashboard/employees",
+  "hr-employee-registry": "/hr-dashboard/employees",
+  "admin-crm-dashboard": "/hr-dashboard/admin-crm",
+  "admin-crm-profile": "/hr-dashboard/admin-crm/profile",
+  "admin-crm-profile-approvals": "/hr-dashboard/admin-crm/profile/approvals",
+  "admin-crm-leave": "/hr-dashboard/admin-crm/leave",
+  "admin-crm-attendance-summary": "/hr-dashboard/admin-crm/attendance-summary",
+  "admin-crm-documents": "/hr-dashboard/admin-crm/documents",
   "employee-crm": "/empcrm/user-dashboard",
   "attendance-log": "/empcrm/admin-dashboard/attendance ",
 

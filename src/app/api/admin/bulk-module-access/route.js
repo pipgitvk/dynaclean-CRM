@@ -8,6 +8,7 @@ import {
   getModuleAccessForDisplay,
   parseStoredModuleAccess,
   stripParentSectionKeys,
+  applyRoleDenyModuleRestrictions,
   applySuperadminOnlyModuleRestrictions,
 } from "@/lib/moduleAccess";
 
@@ -151,6 +152,7 @@ export async function POST(req) {
     }
 
     next = applySuperadminOnlyModuleRestrictions(next, userRole) ?? [];
+    next = applyRoleDenyModuleRestrictions(next, userRole) ?? [];
     next = stripParentSectionKeys(uniqueStrings(next));
 
     await db.query(

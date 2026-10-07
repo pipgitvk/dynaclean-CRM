@@ -103,12 +103,52 @@ function isDashboardRootPath(path) {
   );
 }
 
-function isPathActive(pathname, path) {
-  if (!path) return false;
-  if (isDashboardRootPath(path)) {
-    return pathname === path;
+function normalizePathForMatch(path) {
+  const p = String(path || "").trim();
+  if (!p) return "";
+  const withoutTrailing = p.replace(/\/+$/, "");
+  return withoutTrailing || "/";
+}
+
+/** Longest menu path that matches pathname (avoids highlighting dashboard + profile + approvals together). */
+function getActiveMenuPath(pathname, paths) {
+  const normalized = normalizePathForMatch(pathname);
+  let best = null;
+  let bestLen = -1;
+
+  for (const path of paths || []) {
+    const p = normalizePathForMatch(path);
+    if (!p) continue;
+
+    let matches = false;
+    if (isDashboardRootPath(p)) {
+      matches = normalized === p;
+    } else {
+      matches = normalized === p || normalized.startsWith(`${p}/`);
+    }
+
+    if (matches && p.length > bestLen) {
+      best = p;
+      bestLen = p.length;
+    }
   }
-  return pathname === path || pathname.startsWith(`${path}/`);
+
+  return best;
+}
+
+function isPathActive(pathname, path, peerPaths) {
+  if (!path) return false;
+  const p = normalizePathForMatch(path);
+
+  if (Array.isArray(peerPaths) && peerPaths.length > 0) {
+    return getActiveMenuPath(pathname, peerPaths) === p;
+  }
+
+  if (isDashboardRootPath(p)) {
+    return normalizePathForMatch(pathname) === p;
+  }
+  const normalized = normalizePathForMatch(pathname);
+  return normalized === p || normalized.startsWith(`${p}/`);
 }
 
 export default function SalesSidebar({
@@ -144,14 +184,20 @@ export default function SalesSidebar({
   };
 
   const renderMenuList = (items, parentKey = "", depth = 0) => {
+    const peerPaths = (items || [])
+      .filter((entry) => !entry.children?.length)
+      .map((entry) => entry.path)
+      .filter(Boolean);
+
     return items.map((item, idx) => {
       const keyBase = parentKey ? `${parentKey}-` : "";
       const itemKey = `${keyBase}${item.path || item.name || idx}`;
       const Icon = iconMap[item.icon] || null;
 
       if (item.children?.length) {
-        const childActive = item.children.some((child) =>
-          isPathActive(pathname, child.path)
+        const childPaths = item.children.map((child) => child.path).filter(Boolean);
+        const childActive = childPaths.some((childPath) =>
+          isPathActive(pathname, childPath, childPaths),
         );
         const isSubOpen =
           openMenus[item.name] !== undefined
@@ -198,7 +244,7 @@ export default function SalesSidebar({
         );
       }
 
-      const active = isPathActive(pathname, item.path);
+      const active = isPathActive(pathname, item.path, peerPaths);
       const isLightRedNav = item.sidebarVariant === "lightRed";
       const badgeCount =
         typeof item.badgeCount === "number"

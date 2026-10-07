@@ -1,5 +1,25 @@
+import { ADMIN_EMPLOYEE_CRM_MODULES } from "@/lib/adminEmployeeCrmModules";
 import { getRoleDefaultModuleKeys } from "@/lib/roleDefaultModuleAccess";
+import {
+  HR_ADMIN_EMPLOYEE_CRM_MODULE_KEYS,
+  HR_ONLY_MODULE_KEYS,
+  isHrEmployeeCrmRole,
+  isHrOperationsKeyDuplicatedInAdminEmployeeCrm,
+  shouldHideEmployeesGroupLeafForHrRole,
+  stripHrOnlyModulesForNonHrRoles,
+} from "@/lib/hrEmployeeCrmAccess";
+import { adminCrmModuleKeyAllowed } from "@/lib/empCrmMenuModuleAccess";
 import { normalizeRoleKey } from "@/lib/roleKeyUtils";
+
+const ADMIN_EMPLOYEE_CRM_MODULE_TREE_CHILDREN = ADMIN_EMPLOYEE_CRM_MODULES.map(
+  (m) => ({ key: m.key, label: m.label }),
+);
+
+const ADMIN_EMPLOYEE_CRM_UI_LEAVES = ADMIN_EMPLOYEE_CRM_MODULES.map((m) => ({
+  kind: "leaf",
+  key: m.key,
+  label: m.label,
+}));
 
 export const MODULE_TREE = [
   {
@@ -180,6 +200,11 @@ export const MODULE_TREE = [
       { key: "gem-crm-bids", label: "Bids" },
       { key: "gem-crm-reports", label: "Reports" },
     ],
+  },
+  {
+    key: "hr-admin-employee-crm",
+    label: "Admin Employee CRM",
+    children: ADMIN_EMPLOYEE_CRM_MODULE_TREE_CHILDREN,
   },
   {
     key: "hr-operations",
@@ -405,6 +430,12 @@ export const SUPERADMIN_MODULE_UI_NODES = [
   },
   {
     kind: "group",
+    id: "hr-admin-employee-crm",
+    label: "Admin Employee CRM",
+    children: ADMIN_EMPLOYEE_CRM_UI_LEAVES,
+  },
+  {
+    kind: "group",
     id: "hr-operations",
     label: "HR Operations",
     children: [
@@ -525,7 +556,48 @@ export function buildModuleUiSearchIndex(uiNodes) {
 /**
  * Full UI tree for Global Module Access: super-admin sidebar layout + “Others” at the end.
  */
-export function getModuleTreeForEmployeeBulkUi() {
+function filterModuleUiNodesForRole(nodes, roleKey, parentGroupId = "") {
+  const hrRole = isHrEmployeeCrmRole(roleKey);
+  const out = [];
+  for (const node of nodes || []) {
+    if (node.kind === "leaf") {
+      if (HR_ONLY_MODULE_KEYS.includes(node.key) && !hrRole) continue;
+      if (
+        hrRole &&
+        parentGroupId === "employees" &&
+        shouldHideEmployeesGroupLeafForHrRole(node.key)
+      ) {
+        continue;
+      }
+      if (
+        hrRole &&
+        parentGroupId === "hr-operations" &&
+        isHrOperationsKeyDuplicatedInAdminEmployeeCrm(node.key)
+      ) {
+        continue;
+      }
+      out.push(node);
+      continue;
+    }
+    if (node.kind === "single") {
+      if (HR_ONLY_MODULE_KEYS.includes(node.key) && !hrRole) continue;
+      out.push(node);
+      continue;
+    }
+    if (node.kind === "group") {
+      const children = filterModuleUiNodesForRole(
+        node.children,
+        roleKey,
+        node.id,
+      );
+      if (!children.length) continue;
+      out.push({ ...node, children });
+    }
+  }
+  return out;
+}
+
+export function getModuleTreeForEmployeeBulkUi(roleKey) {
   const othersLeaves = [];
   for (const k of MODULE_CHILD_KEYS_OTHERS_ONLY) {
     othersLeaves.push({
@@ -546,7 +618,9 @@ export function getModuleTreeForEmployeeBulkUi() {
           },
         ]
       : [];
-  return [...SUPERADMIN_MODULE_UI_NODES, ...othersGroup];
+  const tree = [...SUPERADMIN_MODULE_UI_NODES, ...othersGroup];
+  if (!roleKey) return tree;
+  return filterModuleUiNodesForRole(tree, roleKey);
 }
 
 /** Flat list of ALL keys (parent + children) */
@@ -666,7 +740,9 @@ function shouldCollapseLegacyLeak(role) {
 
 function resolveUnsetModuleAccess(role) {
   const defaults = getRoleDefaultModuleKeys(role);
-  return defaults.length > 0 ? normalizeModuleAccessKeys(defaults) : [];
+  const keys =
+    defaults.length > 0 ? normalizeModuleAccessKeys(defaults) : [];
+  return keys;
 }
 
 /**
@@ -740,8 +816,9 @@ export function applySuperadminOnlyModuleRestrictions(allowedKeys, role) {
  * Role-specific deny lists (even if module_access contains the key).
  * Global Module Access / Quick Edit selections are the source of truth — no stripping here.
  */
-export function applyRoleDenyModuleRestrictions(allowedKeys) {
-  return allowedKeys ?? null;
+export function applyRoleDenyModuleRestrictions(allowedKeys, role) {
+  if (!allowedKeys) return allowedKeys ?? null;
+  return stripHrOnlyModulesForNonHrRoles(allowedKeys, role);
 }
 
 /**
@@ -783,5 +860,6 @@ export function isModuleKeyAllowed(moduleKey, allowedKeys) {
   if (!allowedKeys) return true;
   const key = String(moduleKey || "").trim();
   if (!key) return false;
-  return allowedKeys.includes(key);
+  if (allowedKeys.includes(key)) return true;
+  return adminCrmModuleKeyAllowed(key, allowedKeys);
 }

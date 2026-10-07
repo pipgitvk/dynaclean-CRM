@@ -13,6 +13,13 @@ import {
   getEmpCrmUserMenuChildrenForRole,
   isEmpCrmReportingManagerMenuPath,
 } from "@/lib/getEmpCrmUserSidebarMenuItems";
+import { getEmpCrmAdminMenuChildrenForRole } from "@/lib/getEmpCrmAdminSidebarMenuItems";
+import {
+  HR_ADMIN_EMPLOYEE_CRM_MENU_NAME,
+  isHrEmployeeCrmRole,
+  isHrOperationsKeyDuplicatedInAdminEmployeeCrm,
+  toHrEmployeeCrmSidebarItem,
+} from "@/lib/hrEmployeeCrmAccess";
 import { getReportees } from "@/lib/reportingManager";
 
 // Role to dashboard prefix mapping
@@ -95,12 +102,25 @@ function transformMenuItemPaths(item, roleKey) {
 
   if (dashboardPrefix === "/hr-dashboard" && item.moduleKey) {
     const hrDashboardModulePaths = {
+      "employee-list": "/hr-dashboard/employees",
+      "hr-employee-registry": "/hr-dashboard/employees",
+      "hr-admin-employee-crm": "/hr-dashboard/admin-crm",
       "attendance-rules": "/hr-dashboard/attendance-rules",
       "hiring-process": "/hr-dashboard/hiring",
       "salary-slips": "/hr-dashboard/salary-slips",
+      "salary-sheet": "/hr-dashboard/salary-sheet",
     };
     if (hrDashboardModulePaths[item.moduleKey]) {
-      return { ...item, path: hrDashboardModulePaths[item.moduleKey] };
+      const next = { ...item, path: hrDashboardModulePaths[item.moduleKey] };
+      if (item.children?.length) {
+        return {
+          ...next,
+          children: item.children.map((child) =>
+            transformMenuItemPaths(child, roleKey),
+          ),
+        };
+      }
+      return next;
     }
   }
 
@@ -843,17 +863,43 @@ const allMenuItems = [
   {
     name: "Employees",
     moduleKey: "employee",
-    roles: ["ALL", "HR", "HR HEAD", "HR Executive", "SUPERADMIN"],
+    roles: [
+      "HR",
+      "HR HEAD",
+      "HR EXECUTIVE",
+      "JUNIOR HR EXECUTIVE",
+      "HR RECRUITER",
+    ],
     icon: "User",
     children: [
       {
-        path: "/user-dashboard/employees",
+        path: "/hr-dashboard/employees",
         name: "Employees",
-        moduleKey: "employee-list",
-        roles: ["ALL"],
+        moduleKey: "hr-employee-registry",
+        roles: [
+          "HR",
+          "HR HEAD",
+          "HR EXECUTIVE",
+          "JUNIOR HR EXECUTIVE",
+          "HR RECRUITER",
+        ],
         icon: "UserPlus",
       },
     ],
+  },
+  {
+    name: HR_ADMIN_EMPLOYEE_CRM_MENU_NAME,
+    moduleKey: "hr-admin-employee-crm",
+    path: "/hr-dashboard/admin-crm",
+    roles: [
+      "HR",
+      "HR HEAD",
+      "HR EXECUTIVE",
+      "JUNIOR HR EXECUTIVE",
+      "HR RECRUITER",
+    ],
+    icon: "LayoutGrid",
+    children: [],
   },
   {
     name: "Employee CRM",
@@ -878,7 +924,7 @@ const allMenuItems = [
       },
       {
         path: "/empcrm/admin-dashboard/hiring",
-        name: "Hiring",
+        name: "Hiring Process",
         moduleKey: "hiring-process",
         roles: ["ALL"],
         icon: "Users",
@@ -1132,6 +1178,33 @@ function injectEmpCrmChildren(items, empCrmChildren) {
   });
 }
 
+function stripDuplicateHrOperationsForHrRole(items, roleKey) {
+  if (!isHrEmployeeCrmRole(roleKey)) return items;
+  return (items || [])
+    .map((item) => {
+      if (item?.name !== "HR Operations" || !item.children?.length) {
+        return item;
+      }
+      const children = item.children.filter(
+        (child) =>
+          !isHrOperationsKeyDuplicatedInAdminEmployeeCrm(child?.moduleKey),
+      );
+      if (!children.length) return null;
+      return { ...item, children };
+    })
+    .filter(Boolean);
+}
+
+function injectHrAdminEmployeeCrmChildren(items, adminChildren) {
+  if (!adminChildren?.length) return items;
+  return items.map((item) => {
+    if (item.name === HR_ADMIN_EMPLOYEE_CRM_MENU_NAME) {
+      return { ...item, children: adminChildren };
+    }
+    return item;
+  });
+}
+
 async function getUserModuleAccess(username, roleKey) {
   if (!username) return resolveModuleAccess(null, roleKey);
   try {
@@ -1159,7 +1232,18 @@ export default async function getSidebarMenuItems() {
   const username = payload?.username || null;
 
   const empCrmChildren = await getEmpCrmUserMenuChildrenForRole();
-  const menuWithEmpCrm = injectEmpCrmChildren(allMenuItems, empCrmChildren);
+  let menuWithEmpCrm = injectEmpCrmChildren(allMenuItems, empCrmChildren);
+  if (isHrEmployeeCrmRole(roleKey)) {
+    const adminRaw = await getEmpCrmAdminMenuChildrenForRole(roleKey);
+    const adminChildren = adminRaw
+      .filter((item) => item.path !== "/empcrm/admin-dashboard/hiring")
+      .map(toHrEmployeeCrmSidebarItem)
+      .filter(Boolean);
+    menuWithEmpCrm = injectHrAdminEmployeeCrmChildren(
+      menuWithEmpCrm,
+      adminChildren,
+    );
+  }
   const reportees = username ? await getReportees(username) : [];
   const hasReportees = reportees.length > 0;
 
@@ -1232,7 +1316,9 @@ export default async function getSidebarMenuItems() {
   }
 
   // Transform paths based on role-specific dashboard
-  items = items.map(item => transformMenuItemPaths(item, roleKey));
+  items = items.map((item) => transformMenuItemPaths(item, roleKey));
+
+  items = stripDuplicateHrOperationsForHrRole(items, roleKey);
 
   return items;
 }
