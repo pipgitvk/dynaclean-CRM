@@ -20,6 +20,28 @@ import Link from "next/link";
 import axios from "axios";
 import { notFound } from "next/navigation";
 
+function CustomerTagsDisplay({ tags, multiTag }) {
+  const segment = String(tags || "").trim();
+  const multi = String(multiTag || "").trim();
+  if (!segment && !multi) {
+    return <span className="text-gray-400">—</span>;
+  }
+  return (
+    <div className="flex flex-col gap-2">
+      {segment ? (
+        <span className="inline-block text-sm px-2.5 py-1 rounded-md bg-slate-100 text-slate-800 break-words max-w-full">
+          {segment}
+        </span>
+      ) : null}
+      {multi ? (
+        <span className="inline-block text-sm px-2.5 py-1 rounded-md bg-indigo-50 text-indigo-800 break-words max-w-full">
+          {multi}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
 export default async function CustomerPage({ params }) {
   const { customerId } = await params;
   const conn = await getDbConnection();
@@ -36,7 +58,14 @@ export default async function CustomerPage({ params }) {
 
   // Explicitly select all columns including service_lead_source
   const [custs] = await conn.execute(
-    `SELECT c.customer_id, c.first_name, c.last_name, c.email, c.phone, c.company, c.address, c.tags, c.status, c.stage, c.lead_source, c.assigned_to, c.service_lead_source, c.lead_campaign, c.date_created, c.notes, c.parent_customer_id,
+    `SELECT c.customer_id, c.first_name, c.last_name, c.email, c.phone, c.company, c.address, c.tags, c.status, c.stage, c.lead_source, c.assigned_to, c.service_lead_source, c.lead_campaign, c.date_created, c.notes, c.parent_customer_id, c.products_interest,
+      (
+        SELECT cf.multi_tag
+        FROM customers_followup cf
+        WHERE cf.customer_id = c.customer_id
+        ORDER BY cf.time_stamp DESC
+        LIMIT 1
+      ) AS latest_multi_tag,
       p.customer_id AS parent_id,
       CONCAT(TRIM(p.first_name), ' ', TRIM(COALESCE(p.last_name, ''))) AS parent_name,
       p.phone AS parent_phone,
@@ -227,10 +256,13 @@ export default async function CustomerPage({ params }) {
       </div>
 
       {/* Row 3 */}
-      <div>
+      <div className="sm:col-span-2">
         <dt className="text-sm font-medium text-gray-500">Tags</dt>
-        <dd className="mt-1 text-gray-800">
-          {customer.tags || "-"}
+        <dd className="mt-1">
+          <CustomerTagsDisplay
+            tags={customer.tags}
+            multiTag={customer.latest_multi_tag}
+          />
         </dd>
       </div>
 

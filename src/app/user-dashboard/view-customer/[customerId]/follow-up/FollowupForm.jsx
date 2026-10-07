@@ -241,6 +241,8 @@ export default function FollowupForm({ customerId, userRole = "" }) {
     "Repeat Order",
     "Running Order",
     "Strong Follow-Up",
+    "Reseller",
+    "Contractor",
     "N/A",
   ];
   const salesOnlyTags = [

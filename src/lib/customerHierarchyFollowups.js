@@ -32,10 +32,12 @@ export async function fetchCustomerFollowupHistory(
   const selectFields = includeContactLabel
     ? `cf.next_followup_date, cf.service_next_followup, cf.gem_next_followup,
        cf.followed_date, cf.followed_by, cf.notes, cf.comm_mode, cf.time_stamp,
+       cf.multi_tag,
        cf.customer_id,
        TRIM(CONCAT(COALESCE(c.first_name, ''), ' ', COALESCE(c.last_name, ''))) AS contact_name`
     : `cf.next_followup_date, cf.service_next_followup, cf.gem_next_followup,
-       cf.followed_date, cf.followed_by, cf.notes, cf.comm_mode, cf.time_stamp`;
+       cf.followed_date, cf.followed_by, cf.notes, cf.comm_mode, cf.time_stamp,
+       cf.multi_tag`;
 
   let sql = `SELECT ${selectFields}
      FROM customers_followup cf`;

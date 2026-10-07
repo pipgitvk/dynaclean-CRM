@@ -285,6 +285,32 @@ function getContactDisplayName(entry) {
   );
 }
 
+function FollowupTagsCell({ multiTag }) {
+  const raw = String(multiTag || "").trim();
+  if (!raw) {
+    return <span className="text-gray-400">—</span>;
+  }
+  const parts = raw
+    .split(",")
+    .map((t) => t.trim())
+    .filter(Boolean);
+  if (!parts.length) {
+    return <span className="text-gray-400">—</span>;
+  }
+  return (
+    <div className="flex flex-wrap gap-1">
+      {parts.map((tag, i) => (
+        <span
+          key={`${tag}-${i}`}
+          className="inline-block text-xs px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-800 break-words"
+        >
+          {tag}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 export default function FollowUpHistory({
   entries = [],
   cust_analysis_external,
@@ -365,7 +391,7 @@ export default function FollowUpHistory({
       (a, b) => getCrmInstantMs(b.datetime) - getCrmInstantMs(a.datetime),
     );
 
-  const totalColumns = (hasUploads ? 9 : 5) + (showNameColumn ? 1 : 0);
+  const totalColumns = (hasUploads ? 10 : 6) + (showNameColumn ? 1 : 0);
   const showUploadOnlyRows = nameFilter === "all";
 
   const getRowUploads = (entry) => {
@@ -387,7 +413,8 @@ export default function FollowUpHistory({
           <col className={hasUploads ? "w-[8%]" : "w-[10%]"} />
           <col className={hasUploads ? "w-[10%]" : "w-[12%]"} />
           <col className={hasUploads ? "w-[6%]" : "w-[8%]"} />
-          <col className={hasUploads ? "w-[30%]" : "w-[44%]"} />
+          <col className={hasUploads ? "w-[12%]" : "w-[14%]"} />
+          <col className={hasUploads ? "w-[24%]" : "w-[34%]"} />
           {hasUploads && (
             <>
               <col className="w-[8%]" />
@@ -420,6 +447,7 @@ export default function FollowUpHistory({
             <th className="px-3 py-2 text-left">Followed By</th>
             <th className="px-3 py-2 text-left">Followed Date</th>
             <th className="px-3 py-2 text-left">Mode</th>
+            <th className="px-3 py-2 text-left">Tags</th>
             <th className="px-3 py-2 text-left">Remarks</th>
             {hasUploads && (
               <>
@@ -473,6 +501,9 @@ export default function FollowUpHistory({
                         : "-"}
                     </td>
                     <td className="px-3 py-2 align-top">{entry.comm_mode || "-"}</td>
+                    <td className="px-3 py-2 min-w-0 align-top">
+                      <FollowupTagsCell multiTag={entry.multi_tag} />
+                    </td>
                     <td className="px-3 py-2 min-w-0 align-top">
                       <div className="whitespace-pre-wrap break-words [overflow-wrap:anywhere] leading-snug text-gray-800">
                         {entry.notes || "-"}
@@ -539,6 +570,7 @@ export default function FollowUpHistory({
                 uploadOnlyRows.map((upload, index) => (
                 <tr key={`upload-${upload.datetime || index}`} className="align-top">
                   {showNameColumn && <td className="px-3 py-2">-</td>}
+                  <td className="px-3 py-2">-</td>
                   <td className="px-3 py-2">-</td>
                   <td className="px-3 py-2">-</td>
                   <td className="px-3 py-2">-</td>

@@ -43,6 +43,28 @@ function normalizeStatusFromParams(raw) {
   return LEGACY_STATUS_SLUGS[raw] ?? raw;
 }
 
+function TagsCell({ tags, multiTag }) {
+  const segment = String(tags || "").trim();
+  const multi = String(multiTag || "").trim();
+  if (!segment && !multi) {
+    return <span className="text-gray-400">—</span>;
+  }
+  return (
+    <div className="flex flex-col gap-1 max-w-[14rem]">
+      {segment ? (
+        <span className="inline-block text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-800 break-words">
+          {segment}
+        </span>
+      ) : null}
+      {multi ? (
+        <span className="inline-block text-xs px-2 py-0.5 rounded bg-indigo-50 text-indigo-800 break-words">
+          {multi}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
 export default function CustomerTable({ 
   rows, 
   searchParams,
@@ -285,6 +307,8 @@ export default function CustomerTable({
           <option value="Repeat Order">Repeat Order</option>
           <option value="Running Order">Running Order</option>
           <option value="Strong Follow-Up">Strong Follow-Up</option>
+          <option value="Reseller">Reseller</option>
+          <option value="Contractor">Contractor</option>
           <option value="N/A">N/A</option>
         </select>
         <select
@@ -425,6 +449,7 @@ export default function CustomerTable({
                   "ID",
                   "Customer",
                   "Status",
+                  "Tags",
                   "Followed Date",
                   "Stage",
                   "Notes",
@@ -451,6 +476,9 @@ export default function CustomerTable({
                     <div className="text-xs text-gray-500">{r.phone}</div>
                   </td>
                   <td className="px-4 py-2">{r.status}</td>
+                  <td className="px-4 py-2 align-top">
+                    <TagsCell tags={r.tags} multiTag={r.multi_tag} />
+                  </td>
                   <td className="px-4 py-2 whitespace-nowrap">
                     {r.followed_date
                       ? formatCrmDatetimeForISTDisplay(r.followed_date, "DD MMM YYYY HH:mm")
@@ -501,7 +529,7 @@ export default function CustomerTable({
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={11} className="text-center p-4">
+                  <td colSpan={12} className="text-center p-4">
                     No customers found.
                   </td>
                 </tr>
@@ -533,6 +561,10 @@ export default function CustomerTable({
               </div>
               <div>
                 <span className="font-semibold">Status:</span> {r.status}
+              </div>
+              <div>
+                <span className="font-semibold">Tags:</span>
+                <TagsCell tags={r.tags} multiTag={r.multi_tag} />
               </div>
               <div>
                 <span className="font-semibold">Followed Date:</span>{" "}

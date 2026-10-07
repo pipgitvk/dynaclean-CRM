@@ -186,6 +186,8 @@ export default function CustomerTable({
             <option value="Repeat Order">Repeat Order</option>
             <option value="Running Order">Running Order</option>
             <option value="Strong Follow-Up">Strong Follow-Up</option>
+            <option value="Reseller">Reseller</option>
+            <option value="Contractor">Contractor</option>
             <option value="N/A">N/A</option>
           </select>
 

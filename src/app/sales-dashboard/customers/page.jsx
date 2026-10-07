@@ -260,6 +260,7 @@ export default async function CustomersPage({ searchParams }) {
       c.date_created,
       c.lead_campaign,
       c.products_interest,
+      COALESCE(c.tags, '') AS tags,
       COALESCE(${filter === "today_reporting" ? "tlf.multi_tag" : "cf.multi_tag"}, '') AS multi_tag,
       ${filter === "today_reporting" ? "tlf.next_followup_date" : "cf.next_followup_date"} AS next_follow_date,
       ${filter === "today_reporting" ? "tlf.notes" : "cf.notes"} AS latest_followup_notes,
