@@ -1,11 +1,13 @@
 import { ensureServiceReportStepsTable } from "@/lib/ensureServiceReportStepsTable";
 import { ensureServiceRecordsFollowupColumns } from "@/lib/ensureServiceRecordsFollowupColumns";
 import { ensureServiceRecordsPlannedDateColumn } from "@/lib/ensureServiceRecordsPlannedDateColumn";
+import { ensureServiceRecordsThirdPartyAssignColumns } from "@/lib/ensureServiceRecordsThirdPartyAssignColumns";
 
 export async function fetchThirdPartyEngineerServiceRecords(conn, engineerId) {
   await ensureServiceReportStepsTable();
   await ensureServiceRecordsFollowupColumns();
   await ensureServiceRecordsPlannedDateColumn();
+  await ensureServiceRecordsThirdPartyAssignColumns(conn);
 
   const [rows] = await conn.execute(
     `

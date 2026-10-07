@@ -1,6 +1,18 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
+import {
+  ATTENDANCE_EDIT_TRACKED_FIELDS,
+  diffAttendanceEditFields,
+  recordAttendanceEditHistory,
+} from "@/lib/attendanceEditHistory";
+import { reverseGeocodeNominatim } from "@/lib/reverseGeocodeNominatim";
+
+function parseCoord(value) {
+  if (value == null || value === "") return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
 
 const HR_ATTENDANCE_ROLES = ["SUPERADMIN", "HR HEAD", "HR", "HR Executive"];
 
@@ -60,6 +72,7 @@ export async function PATCH(request) {
       );
     }
 
+    const afterValues = {};
     const assignments = [];
     const params = [];
     for (const col of EDITABLE_TIME_COLUMNS) {
@@ -71,6 +84,7 @@ export async function PATCH(request) {
       }
       const raw = body[col];
       if (raw === null || raw === "") {
+        afterValues[col] = null;
         assignments.push(`${col} = NULL`);
       } else {
         const normalized = normalizeMysqlDatetime(raw);
@@ -80,25 +94,95 @@ export async function PATCH(request) {
             { status: 400 }
           );
         }
+        afterValues[col] = normalized;
         assignments.push(`${col} = ?`);
         params.push(normalized);
       }
     }
 
     const conn = await getDbConnection();
-    const [exists] = await conn.execute(
-      "SELECT 1 FROM attendance_logs WHERE username = ? AND date = ? LIMIT 1",
+    const cols = ATTENDANCE_EDIT_TRACKED_FIELDS.join(", ");
+    const [beforeRows] = await conn.execute(
+      `SELECT ${cols},
+              checkin_latitude, checkin_longitude, checkin_address,
+              checkout_latitude, checkout_longitude, checkout_address
+       FROM attendance_logs WHERE username = ? AND date = ? LIMIT 1`,
       [username, dateStr]
     );
-    if (!exists.length) {
+    if (!beforeRows.length) {
       return NextResponse.json(
         { message: "No attendance record for that user and date." },
         { status: 404 }
       );
     }
 
+    const changes = diffAttendanceEditFields(beforeRows[0], afterValues);
+    const editedBy =
+      payload.username || payload.name || payload.email || String(payload.sub || "unknown");
+
+    const checkinLat = parseCoord(body.checkin_latitude);
+    const checkinLng = parseCoord(body.checkin_longitude);
+    const checkoutLat = parseCoord(body.checkout_latitude);
+    const checkoutLng = parseCoord(body.checkout_longitude);
+
+    if (afterValues.checkin_time == null) {
+      assignments.push(
+        "checkin_latitude = NULL",
+        "checkin_longitude = NULL",
+        "checkin_address = NULL"
+      );
+    } else if (checkinLat != null && checkinLng != null) {
+      const checkinAddr =
+        (await reverseGeocodeNominatim(checkinLat, checkinLng)) ||
+        `${checkinLat}, ${checkinLng}`;
+      assignments.push(
+        "checkin_latitude = ?",
+        "checkin_longitude = ?",
+        "checkin_address = ?"
+      );
+      params.push(checkinLat, checkinLng, checkinAddr);
+    }
+
+    if (afterValues.checkout_time == null) {
+      assignments.push(
+        "checkout_latitude = NULL",
+        "checkout_longitude = NULL",
+        "checkout_address = NULL"
+      );
+    } else if (checkoutLat != null && checkoutLng != null) {
+      const checkoutAddr =
+        (await reverseGeocodeNominatim(checkoutLat, checkoutLng)) ||
+        `${checkoutLat}, ${checkoutLng}`;
+      assignments.push(
+        "checkout_latitude = ?",
+        "checkout_longitude = ?",
+        "checkout_address = ?"
+      );
+      params.push(checkoutLat, checkoutLng, checkoutAddr);
+    } else if (
+      afterValues.checkout_time != null &&
+      (beforeRows[0].checkout_latitude == null ||
+        beforeRows[0].checkout_longitude == null)
+    ) {
+      return NextResponse.json(
+        {
+          message:
+            "Checkout time requires GPS. Allow location access on this device when saving.",
+        },
+        { status: 400 }
+      );
+    }
+
     const sql = `UPDATE attendance_logs SET ${assignments.join(", ")} WHERE username = ? AND date = ?`;
     await conn.execute(sql, [...params, username, dateStr]);
+
+    await recordAttendanceEditHistory(conn, {
+      username,
+      logDate: dateStr,
+      editedBy,
+      source: "admin_times_modal",
+      changes,
+    });
 
     return NextResponse.json({ success: true });
   } catch (err) {

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { requireThirdPartyEngineerPortalSession } from "@/lib/thirdPartyEngineerPortalAuth";
+import { ensureServiceRecordsThirdPartyAssignColumns } from "@/lib/ensureServiceRecordsThirdPartyAssignColumns";
 
 export async function GET() {
   try {
@@ -10,6 +11,7 @@ export async function GET() {
     }
 
     const conn = await getDbConnection();
+    await ensureServiceRecordsThirdPartyAssignColumns(conn);
 
     const [rows] = await conn.execute(
       `SELECT

@@ -3,6 +3,7 @@ import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { getEngineerIdFromPayload } from "@/lib/thirdPartyEngineerPortalSession";
 import { ensureThirdPartyEngineerColumns } from "@/lib/thirdPartyEngineerSchema";
+import { ensureServiceRecordsThirdPartyAssignColumns } from "@/lib/ensureServiceRecordsThirdPartyAssignColumns";
 import ThirdPartyEngineerHome from "@/components/thirdParty/ThirdPartyEngineerHome";
 
 export const dynamic = "force-dynamic";
@@ -14,6 +15,7 @@ export default async function ThirdPartyEngineerDashboardPage() {
 
   const conn = await getDbConnection();
   await ensureThirdPartyEngineerColumns(conn);
+  await ensureServiceRecordsThirdPartyAssignColumns(conn);
 
   const [engRows] = await conn.execute(
     `SELECT engineer_id, name, email, mobile, status

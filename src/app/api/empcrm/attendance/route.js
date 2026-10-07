@@ -3,6 +3,18 @@
 import { getDbConnection } from "@/lib/db";
 import { getISTDateString, getISTDateTimeString } from "@/lib/istDateTime";
 import { NextResponse } from "next/server";
+import { getSessionPayload } from "@/lib/auth";
+import {
+  ATTENDANCE_EDIT_TRACKED_FIELDS,
+  diffAttendanceEditFields,
+  recordAttendanceEditHistory,
+} from "@/lib/attendanceEditHistory";
+
+const HR_ATTENDANCE_ROLES = ["SUPERADMIN", "HR HEAD", "HR", "HR Executive"];
+
+function isHrRole(role) {
+  return role != null && HR_ATTENDANCE_ROLES.includes(String(role));
+}
 
 
 
@@ -171,6 +183,14 @@ export async function POST(req) {
 
 export async function PUT(req) {
   try {
+    const payload = await getSessionPayload();
+    if (!payload) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    if (!isHrRole(payload.role)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     const body = await req.json();
     const { username, date, ...updates } = body;
 
@@ -178,19 +198,32 @@ export async function PUT(req) {
       return NextResponse.json({ error: "Username and date are required" }, { status: 400 });
     }
 
-    const conn = await getDbConnection();
-
-    // Build the update query dynamically
-    const fields = [];
-    const values = [];
-
+    const allowed = new Set(ATTENDANCE_EDIT_TRACKED_FIELDS);
+    const afterValues = {};
     for (const [key, value] of Object.entries(updates)) {
-      fields.push(`${key} = ?`);
-      values.push(value);
+      if (allowed.has(key)) afterValues[key] = value;
     }
 
-    if (fields.length === 0) {
-      return NextResponse.json({ error: "No fields to update" }, { status: 400 });
+    if (Object.keys(afterValues).length === 0) {
+      return NextResponse.json({ error: "No allowed fields to update" }, { status: 400 });
+    }
+
+    const conn = await getDbConnection();
+    const cols = ATTENDANCE_EDIT_TRACKED_FIELDS.join(", ");
+    const [beforeRows] = await conn.execute(
+      `SELECT ${cols} FROM attendance_logs WHERE username = ? AND date = ? LIMIT 1`,
+      [username, date]
+    );
+    if (!beforeRows.length) {
+      return NextResponse.json({ error: "Attendance record not found" }, { status: 404 });
+    }
+
+    const changes = diffAttendanceEditFields(beforeRows[0], afterValues);
+    const fields = [];
+    const values = [];
+    for (const [key, value] of Object.entries(afterValues)) {
+      fields.push(`${key} = ?`);
+      values.push(value === "" ? null : value);
     }
 
     values.push(username);
@@ -200,6 +233,16 @@ export async function PUT(req) {
       `UPDATE attendance_logs SET ${fields.join(", ")} WHERE username = ? AND date = ?`,
       values
     );
+
+    const editedBy =
+      payload.username || payload.name || payload.email || String(payload.sub || "unknown");
+    await recordAttendanceEditHistory(conn, {
+      username,
+      logDate: date,
+      editedBy,
+      source: "admin_full_edit",
+      changes,
+    });
 
     return NextResponse.json({ success: true });
   } catch (error) {

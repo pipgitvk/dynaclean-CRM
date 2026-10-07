@@ -4,7 +4,9 @@
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
-import { Loader2, Search, Info, Pencil, Sun } from "lucide-react";
+import { Loader2, Search, Info, Pencil, Sun, History } from "lucide-react";
+import AttendanceEditHistoryPanel from "@/components/AttendanceEditHistoryPanel";
+import { getBrowserGeolocation } from "@/lib/browserGeolocation";
 import ExcelJS from "exceljs";
 import {
   DEFAULT_ATTENDANCE_RULES,
@@ -153,6 +155,8 @@ const AttendancePage = () => {
   const [leaves, setLeaves] = useState([]);
   const [isHolidayModalOpen, setHolidayModalOpen] = useState(false);
   const [breakEditLog, setBreakEditLog] = useState(null);
+  /** Snapshot when modal opens — detect check-in/out changes for GPS. */
+  const [breakEditBaseline, setBreakEditBaseline] = useState(null);
   const [breakEditForm, setBreakEditForm] = useState({
     checkin_time: "",
     checkout_time: "",
@@ -177,6 +181,8 @@ const AttendancePage = () => {
   const [deleteModalLog, setDeleteModalLog] = useState(null);
   const [addressMapOpen, setAddressMapOpen] = useState(false);
   const [addressMapPayload, setAddressMapPayload] = useState(null);
+  const [historyModalLog, setHistoryModalLog] = useState(null);
+  const [editHistoryRefresh, setEditHistoryRefresh] = useState(0);
 
   const openAddressMap = (payload) => {
     setAddressMapPayload(payload);
@@ -211,6 +217,7 @@ const AttendancePage = () => {
       }
 
       toast.success("Attendance log updated successfully!");
+      setEditHistoryRefresh((n) => n + 1);
       setEditModalOpen(false);
       setEditModalLog(null);
       fetchAttendance();
@@ -368,9 +375,13 @@ const AttendancePage = () => {
     }, 120);
   };
 
+  const openAttendanceHistoryModal = (log) => {
+    setHistoryModalLog(log);
+  };
+
   const openBreakEditModal = (log) => {
     setBreakEditLog(log);
-    setBreakEditForm({
+    const form = {
       checkin_time: timeInputFromDbValue(log.checkin_time),
       checkout_time: timeInputFromDbValue(log.checkout_time),
       break_morning_start: timeInputFromDbValue(log.break_morning_start),
@@ -379,11 +390,14 @@ const AttendancePage = () => {
       break_lunch_end: timeInputFromDbValue(log.break_lunch_end),
       break_evening_start: timeInputFromDbValue(log.break_evening_start),
       break_evening_end: timeInputFromDbValue(log.break_evening_end),
-    });
+    };
+    setBreakEditForm(form);
+    setBreakEditBaseline(form);
   };
 
   const closeBreakEditModal = () => {
     setBreakEditLog(null);
+    setBreakEditBaseline(null);
     setBreakEditSaving(false);
   };
 
@@ -396,6 +410,16 @@ const AttendancePage = () => {
     }
     setBreakEditSaving(true);
     try {
+      const baseline = breakEditBaseline || breakEditForm;
+      const checkinChanged =
+        breakEditForm.checkin_time !== baseline.checkin_time;
+      const checkoutChanged =
+        breakEditForm.checkout_time !== baseline.checkout_time;
+      const needsCheckinGps =
+        Boolean(breakEditForm.checkin_time) && checkinChanged;
+      const needsCheckoutGps =
+        checkoutChanged && Boolean(breakEditForm.checkout_time);
+
       const payload = {
         username: breakEditLog.username,
         date: dateYmd,
@@ -432,6 +456,26 @@ const AttendancePage = () => {
           breakEditForm.break_evening_end
         ),
       };
+
+      if (needsCheckinGps || needsCheckoutGps) {
+        try {
+          const { latitude, longitude } = await getBrowserGeolocation();
+          if (needsCheckinGps) {
+            payload.checkin_latitude = latitude;
+            payload.checkin_longitude = longitude;
+          }
+          if (needsCheckoutGps) {
+            payload.checkout_latitude = latitude;
+            payload.checkout_longitude = longitude;
+          }
+        } catch (locErr) {
+          throw new Error(
+            locErr.message ||
+              "Allow location access to set check-in or check-out times."
+          );
+        }
+      }
+
       const res = await fetch("/api/empcrm/attendance/admin-edit-breaks", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -442,8 +486,9 @@ const AttendancePage = () => {
         throw new Error(data.message || "Failed to save");
       }
       toast.success("Attendance times updated.");
-      closeBreakEditModal();
+      setEditHistoryRefresh((n) => n + 1);
       await fetchAttendance();
+      closeBreakEditModal();
     } catch (e) {
       toast.error(e.message);
     } finally {
@@ -1256,14 +1301,25 @@ const AttendancePage = () => {
                               <Pencil className="h-4 w-4" aria-hidden />
                               Edit Log
                             </button> */}
-                            <button
-                              type="button"
-                              onClick={() => openBreakEditModal(log)}
-                              className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100"
-                            >
-                              <Pencil className="h-4 w-4" aria-hidden />
-                              Edit Break Times
-                            </button>
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => openBreakEditModal(log)}
+                                className="inline-flex flex-1 items-center justify-center gap-2 rounded-md border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100"
+                              >
+                                <Pencil className="h-4 w-4" aria-hidden />
+                                Edit times
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => openAttendanceHistoryModal(log)}
+                                className="inline-flex items-center justify-center rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-700 hover:bg-slate-50"
+                                title="View edit history"
+                                aria-label="View edit history"
+                              >
+                                <History className="h-4 w-4" aria-hidden />
+                              </button>
+                            </div>
                             {/* <button
                               type="button"
                               onClick={() => openDeleteDialog(log)}
@@ -1559,7 +1615,16 @@ const AttendancePage = () => {
                                 title="Edit check-in, check-out, and break times"
                               >
                                 <Pencil className="h-3.5 w-3.5" aria-hidden />
-                                Edit Breaks
+                                Edit
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => openAttendanceHistoryModal(log)}
+                                className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                                title="View edit history"
+                                aria-label="View edit history"
+                              >
+                                <History className="h-3.5 w-3.5" aria-hidden />
                               </button>
                               {/* <button
                                 type="button"
@@ -1665,7 +1730,8 @@ const AttendancePage = () => {
             </p>
             <p className="text-xs text-gray-500 mb-3">
               Leave a field empty to clear that time. Times use the attendance
-              date (IST).
+              date (IST). If you change check-in or check-out, this device&apos;s
+              current location is saved (required for checkout GPS).
             </p>
             <div className="space-y-4">
               {[
@@ -1729,6 +1795,12 @@ const AttendancePage = () => {
                 </div>
               ))}
             </div>
+            <AttendanceEditHistoryPanel
+              className="mt-5 pt-4 border-t border-gray-200"
+              username={breakEditLog.username}
+              logDate={attendanceDateYmd(breakEditLog.date)}
+              refreshToken={editHistoryRefresh}
+            />
             <div className="mt-5 flex flex-wrap justify-end gap-2">
               <button
                 type="button"
@@ -1748,6 +1820,47 @@ const AttendancePage = () => {
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : null}
                 Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {historyModalLog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div
+            className="bg-white rounded-lg shadow-lg w-full max-w-lg max-h-[90vh] overflow-y-auto p-4"
+            role="dialog"
+            aria-labelledby="attendance-history-title"
+          >
+            <div className="flex items-center justify-between mb-3">
+              <h3 id="attendance-history-title" className="text-lg font-semibold">
+                Edit history
+              </h3>
+              <button
+                type="button"
+                onClick={() => setHistoryModalLog(null)}
+                className="text-gray-500 hover:text-gray-800 text-xl leading-none"
+                aria-label="Close"
+              >
+                ✕
+              </button>
+            </div>
+            <p className="text-sm text-gray-600 mb-4">
+              {historyModalLog.username} ·{" "}
+              {new Date(historyModalLog.date).toLocaleDateString()}
+            </p>
+            <AttendanceEditHistoryPanel
+              username={historyModalLog.username}
+              logDate={attendanceDateYmd(historyModalLog.date)}
+              refreshToken={editHistoryRefresh}
+            />
+            <div className="mt-4 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setHistoryModalLog(null)}
+                className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Close
               </button>
             </div>
           </div>
