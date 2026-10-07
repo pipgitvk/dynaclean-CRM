@@ -5,7 +5,7 @@ import axios from 'axios';
 import toast from 'react-hot-toast';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Users, Loader2 } from 'lucide-react';
+import { ArrowLeft, Users, Loader2, Tag } from 'lucide-react';
 import MetaFormAssignments from '@/components/MetaFormAssignments';
 import MetaFormLeadsTable from '@/components/MetaFormLeadsTable';
 
@@ -70,7 +70,7 @@ export default function ViewCredentialPage() {
   }
 
   return (
-    <div className="p-4 md:p-6 max-w-7xl mx-auto">
+    <div className="w-full px-2 sm:px-4 py-4 sm:py-6">
       <div className="mb-6">
         <Link
           href="/admin-dashboard/meta-credentials"
@@ -79,7 +79,17 @@ export default function ViewCredentialPage() {
           <ArrowLeft className="w-4 h-4" />
           Back to Credentials
         </Link>
-        <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">Employee Assignments</h1>
+        <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-start gap-2 mb-2">
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900">Employee Assignments</h1>
+          {credential.latestProductInterest && (
+            <span
+              className="inline-flex items-start gap-1.5 px-2 py-1 rounded-md text-xs font-medium bg-indigo-100 text-indigo-800 whitespace-normal break-words w-full sm:w-auto sm:max-w-xl"
+            >
+              <Tag className="w-3 h-3 shrink-0 mt-0.5" />
+              <span>{credential.latestProductInterest}</span>
+            </span>
+          )}
+        </div>
         <p className="text-gray-600 text-sm md:text-base">
           Manage employee assignments for {credential.employeeName}
         </p>
@@ -88,8 +98,8 @@ export default function ViewCredentialPage() {
       {/* Credential Info Card */}
       <div className="bg-white rounded-lg shadow-md p-4 md:p-6 mb-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Credential Details</h2>
-        <div className="flex flex-wrap items-center gap-4 md:gap-6">
-          <div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+          <div className="min-w-0">
             <label className="text-xs md:text-sm font-medium text-gray-500">Page ID</label>
             <p className="text-gray-900 font-mono text-sm break-all">{credential.pageId}</p>
           </div>
@@ -99,7 +109,7 @@ export default function ViewCredentialPage() {
               {credential.isActive ? 'Active' : 'Inactive'}
             </p>
           </div>
-          <div>
+          <div className="sm:col-span-2 lg:col-span-1 min-w-0">
             <label className="text-xs md:text-sm font-medium text-gray-500">Form IDs</label>
             <div className="flex flex-wrap gap-2 mt-1">
               {Array.isArray(credential.formIds) && credential.formIds.length > 0 ? (
@@ -126,7 +136,10 @@ export default function ViewCredentialPage() {
       )}
 
       {/* Form Leads Table */}
-      <MetaFormLeadsTable formIds={credential.formIds} />
+      <MetaFormLeadsTable
+        formIds={credential.formIds}
+        productInterestByFormId={credential.productInterestByFormId || {}}
+      />
     </div>
   );
 }

@@ -169,19 +169,36 @@ async function getCredentialById(id) {
   if (rows.length === 0) return null;
   const row = rows[0];
   try {
+    const formIds = normalizeFormIds(row.form_ids);
+    let latestByFormId = new Map();
+    try {
+      latestByFormId = await getLatestProductInterestMap(formIds);
+    } catch (error) {
+      console.error('Error fetching latest product interest:', error);
+    }
+    const latestProductInterest = pickLatestProductInterest(formIds, latestByFormId);
+    const productInterestByFormId = {};
+    for (const fid of formIds) {
+      const entry = latestByFormId.get(String(fid));
+      if (entry?.products_interest) {
+        productInterestByFormId[fid] = entry.products_interest;
+      }
+    }
     return {
       id: row.id,
       employeeName: row.employee_name,
       verifyToken: row.verify_token,
       pageId: row.page_id,
       pageToken: row.page_token,
-      formIds: normalizeFormIds(row.form_ids),
+      formIds,
       isActive: Boolean(row.is_active),
       lastSyncAt: row.last_sync_at,
       lastSyncStatus: row.last_sync_status,
       totalLeadsImported: row.total_leads_imported || 0,
       lastSyncMessage: row.last_sync_message,
       totalLeadsFetched: row.total_leads_fetched,
+      latestProductInterest,
+      productInterestByFormId,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
       _id: row.id.toString()

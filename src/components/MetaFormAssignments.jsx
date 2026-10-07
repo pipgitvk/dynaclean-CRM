@@ -108,17 +108,17 @@ export default function MetaFormAssignments({ formIds, employees }) {
 
       {formIds.map((formId, index) => (
         <div key={formId} className="mb-4 border rounded-lg overflow-hidden">
-          <div className="px-4 py-3 bg-gray-50 border-b">
-            <span className="font-medium text-gray-900">Form ID {index + 1}</span>
-            <span className="ml-2 text-sm text-gray-600 font-mono">{formId}</span>
+          <div className="px-3 sm:px-4 py-3 bg-gray-50 border-b">
+            <span className="font-medium text-gray-900 text-sm">Form ID {index + 1}</span>
+            <span className="block sm:inline sm:ml-2 mt-1 sm:mt-0 text-xs sm:text-sm text-gray-600 font-mono break-all">{formId}</span>
           </div>
 
-          <div className="p-4 bg-white">
+          <div className="p-3 sm:p-4 bg-white">
             {/* Add new assignment */}
             <div className="mb-4">
               <h4 className="text-sm font-medium text-gray-700 mb-2">Add Assignment</h4>
-              <div className="flex flex-wrap gap-2 items-end">
-                <div className="flex-1 min-w-[200px]">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-wrap gap-2 lg:items-end">
+                <div className="w-full lg:flex-1 lg:min-w-[200px]">
                   <label className="text-xs text-gray-600 mb-1 block">Employee</label>
                   <select
                     id={`employee-${formId}`}
@@ -132,7 +132,7 @@ export default function MetaFormAssignments({ formIds, employees }) {
                     ))}
                   </select>
                 </div>
-                <div className="w-24">
+                <div className="w-full sm:w-24">
                   <label className="text-xs text-gray-600 mb-1 block">Priority</label>
                   <input
                     type="number"
@@ -141,7 +141,7 @@ export default function MetaFormAssignments({ formIds, employees }) {
                     className="w-full px-3 py-2 border rounded text-sm"
                   />
                 </div>
-                <div className="w-24">
+                <div className="w-full sm:w-24">
                   <label className="text-xs text-gray-600 mb-1 block">Max Leads</label>
                   <input
                     type="number"
@@ -169,7 +169,7 @@ export default function MetaFormAssignments({ formIds, employees }) {
                       maxLeadsInput.value = '';
                     }
                   }}
-                  className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 flex items-center gap-1"
+                  className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 flex items-center justify-center gap-1"
                   disabled={savingUsernames[`${formId}-new`]}
                 >
                   <Plus className="w-4 h-4" />
@@ -180,10 +180,107 @@ export default function MetaFormAssignments({ formIds, employees }) {
 
             {/* Existing assignments table */}
             {assignments[formId] && assignments[formId].length > 0 && (
-              <div className="bg-gray-100 border rounded p-4 shadow">
-                <h4 className="font-semibold mb-2">Current Assignments</h4>
-                <div className="overflow-auto">
-                  <table className="w-full text-sm">
+              <div className="bg-gray-100 border rounded p-3 sm:p-4 shadow">
+                <h4 className="font-semibold mb-2 text-sm sm:text-base">Current Assignments</h4>
+
+                <div className="md:hidden space-y-3">
+                  {assignments[formId].map((assignment) => (
+                    <div
+                      key={`m-${assignment.username}`}
+                      className="bg-white border border-gray-200 rounded-lg p-3 space-y-2"
+                    >
+                      <p className="font-semibold text-gray-900 break-all">{assignment.username}</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-xs text-gray-600 mb-1 block">Priority</label>
+                          <input
+                            type="number"
+                            className="w-full border rounded p-2 text-sm"
+                            value={
+                              priorityTouched[`${formId}-${assignment.username}`]
+                                ? assignment.priority || ''
+                                : (assignment.priority ?? 0)
+                            }
+                            onFocus={() =>
+                              setPriorityTouched((s) => ({
+                                ...s,
+                                [`${formId}-${assignment.username}`]: true,
+                              }))
+                            }
+                            onChange={(e) => {
+                              const v = parseInt(e.target.value, 10);
+                              setAssignments((prev) => ({
+                                ...prev,
+                                [formId]: prev[formId].map((a) =>
+                                  a.username === assignment.username
+                                    ? { ...a, priority: Number.isNaN(v) ? 0 : v }
+                                    : a,
+                                ),
+                              }));
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-600 mb-1 block">Max Leads</label>
+                          <input
+                            type="number"
+                            className="w-full border rounded p-2 text-sm"
+                            value={
+                              maxTouched[`${formId}-${assignment.username}`]
+                                ? assignment.max_leads || ''
+                                : (assignment.max_leads ?? 0)
+                            }
+                            onFocus={() =>
+                              setMaxTouched((s) => ({
+                                ...s,
+                                [`${formId}-${assignment.username}`]: true,
+                              }))
+                            }
+                            onChange={(e) => {
+                              const v = parseInt(e.target.value, 10);
+                              setAssignments((prev) => ({
+                                ...prev,
+                                [formId]: prev[formId].map((a) =>
+                                  a.username === assignment.username
+                                    ? { ...a, max_leads: Number.isNaN(v) ? 0 : v }
+                                    : a,
+                                ),
+                              }));
+                            }}
+                          />
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          className="flex-1 bg-green-600 text-white px-3 py-2 rounded text-sm"
+                          onClick={() =>
+                            updateAssignment(
+                              formId,
+                              assignment.username,
+                              assignment.priority,
+                              assignment.max_leads,
+                            )
+                          }
+                          disabled={!!savingUsernames[`${formId}-${assignment.username}`]}
+                        >
+                          Save
+                        </button>
+                        <button
+                          type="button"
+                          className="flex-1 bg-red-600 text-white px-3 py-2 rounded text-sm"
+                          onClick={() => deleteAssignment(formId, assignment.username)}
+                          disabled={!!savingUsernames[`${formId}-${assignment.username}`]}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="hidden md:block overflow-x-auto">
+                  <table className="w-full text-sm min-w-[480px]">
                     <thead className="bg-gray-100 text-left">
                       <tr>
                         <th className="p-2 border">Username</th>
