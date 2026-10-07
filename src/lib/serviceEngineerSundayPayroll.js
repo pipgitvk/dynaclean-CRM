@@ -39,10 +39,21 @@ function isDelhiNcrRegionText(text) {
 function workLocationParts(workLocation) {
   const n = normalizeLocationText(workLocation);
   if (!n) return [];
-  return n
+  const parts = new Set();
+  const segments = n
     .split(/[,/|;]+|\s+-\s+|\band\b/)
     .map((p) => p.trim())
     .filter((p) => p.length >= 2);
+  for (const seg of segments) {
+    parts.add(seg);
+    // "Khunti Jharkhand" (no comma) — match if address contains each word token
+    if (!/[,/|;]/.test(seg) && /\s/.test(seg)) {
+      for (const token of seg.split(/\s+/)) {
+        if (token.length >= 3) parts.add(token);
+      }
+    }
+  }
+  return [...parts];
 }
 
 /**
