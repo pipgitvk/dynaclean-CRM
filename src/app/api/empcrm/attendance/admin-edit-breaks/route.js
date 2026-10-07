@@ -4,7 +4,9 @@ import { getSessionPayload } from "@/lib/auth";
 
 const HR_ATTENDANCE_ROLES = ["SUPERADMIN", "HR HEAD", "HR", "HR Executive"];
 
-const BREAK_COLUMNS = [
+const EDITABLE_TIME_COLUMNS = [
+  "checkin_time",
+  "checkout_time",
   "break_morning_start",
   "break_morning_end",
   "break_lunch_start",
@@ -32,8 +34,8 @@ function normalizeMysqlDatetime(s) {
 }
 
 /**
- * PATCH — admin edits break start/end times for one attendance row.
- * Body: { username, date: "YYYY-MM-DD", ...break columns as string or null }
+ * PATCH — admin edits check-in/out and break times for one attendance row.
+ * Body: { username, date: "YYYY-MM-DD", ...time columns as datetime string or null }
  */
 export async function PATCH(request) {
   try {
@@ -43,7 +45,7 @@ export async function PATCH(request) {
     }
     if (!isHrRole(payload.role)) {
       return NextResponse.json(
-        { message: "Only HR / SUPERADMIN can edit attendance breaks." },
+        { message: "Only HR / SUPERADMIN can edit attendance times." },
         { status: 403 }
       );
     }
@@ -60,7 +62,7 @@ export async function PATCH(request) {
 
     const assignments = [];
     const params = [];
-    for (const col of BREAK_COLUMNS) {
+    for (const col of EDITABLE_TIME_COLUMNS) {
       if (!Object.prototype.hasOwnProperty.call(body, col)) {
         return NextResponse.json(
           { message: `Missing field: ${col}` },

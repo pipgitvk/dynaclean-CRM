@@ -20,6 +20,9 @@ import { weeklyOffSundayCountsAsPaid } from "@/lib/salaryPayDaysFromAttendance";
 import { formatAttendanceTimeForDisplay as formatTime } from "@/lib/istDateTime";
 import AttendanceRegularizeModal from "@/app/user-dashboard/attendance/AttendanceRegularizeModal";
 import AttendanceBulkImportPanel from "@/components/AttendanceBulkImportPanel";
+import AttendanceAddressMapModal, {
+  ViewAddressLink,
+} from "@/components/AttendanceAddressMapModal";
 
 function attendanceDateYmd(value) {
   if (value == null || value === "") return "";
@@ -151,6 +154,8 @@ const AttendancePage = () => {
   const [isHolidayModalOpen, setHolidayModalOpen] = useState(false);
   const [breakEditLog, setBreakEditLog] = useState(null);
   const [breakEditForm, setBreakEditForm] = useState({
+    checkin_time: "",
+    checkout_time: "",
     break_morning_start: "",
     break_morning_end: "",
     break_lunch_start: "",
@@ -170,6 +175,13 @@ const AttendancePage = () => {
   const [editModalLog, setEditModalLog] = useState(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteModalLog, setDeleteModalLog] = useState(null);
+  const [addressMapOpen, setAddressMapOpen] = useState(false);
+  const [addressMapPayload, setAddressMapPayload] = useState(null);
+
+  const openAddressMap = (payload) => {
+    setAddressMapPayload(payload);
+    setAddressMapOpen(true);
+  };
 
   const logDateKeyForReg = (log) =>
     log?.date ? new Date(log.date).toLocaleDateString("en-CA") : "";
@@ -359,6 +371,8 @@ const AttendancePage = () => {
   const openBreakEditModal = (log) => {
     setBreakEditLog(log);
     setBreakEditForm({
+      checkin_time: timeInputFromDbValue(log.checkin_time),
+      checkout_time: timeInputFromDbValue(log.checkout_time),
       break_morning_start: timeInputFromDbValue(log.break_morning_start),
       break_morning_end: timeInputFromDbValue(log.break_morning_end),
       break_lunch_start: timeInputFromDbValue(log.break_lunch_start),
@@ -385,6 +399,14 @@ const AttendancePage = () => {
       const payload = {
         username: breakEditLog.username,
         date: dateYmd,
+        checkin_time: combineDateAndTimeForDb(
+          dateYmd,
+          breakEditForm.checkin_time
+        ),
+        checkout_time: combineDateAndTimeForDb(
+          dateYmd,
+          breakEditForm.checkout_time
+        ),
         break_morning_start: combineDateAndTimeForDb(
           dateYmd,
           breakEditForm.break_morning_start
@@ -419,7 +441,7 @@ const AttendancePage = () => {
       if (!res.ok) {
         throw new Error(data.message || "Failed to save");
       }
-      toast.success("Break times updated.");
+      toast.success("Attendance times updated.");
       closeBreakEditModal();
       await fetchAttendance();
     } catch (e) {
@@ -1100,9 +1122,14 @@ const AttendancePage = () => {
                         <span className="text-sm font-semibold text-gray-900">
                           Check-in Address:
                         </span>
-                        <span className="text-sm text-gray-700">
-                          {log.checkin_address}
-                        </span>
+                        <ViewAddressLink
+                          title={`Check-in — ${log.username}`}
+                          address={log.checkin_address}
+                          latitude={log.checkin_latitude}
+                          longitude={log.checkin_longitude}
+                          onOpen={openAddressMap}
+                          className="text-sm"
+                        />
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-semibold text-gray-900">
@@ -1180,9 +1207,14 @@ const AttendancePage = () => {
                           Check-out Address:
                         </span>
                         <span className="text-sm text-gray-700 flex items-center gap-1.5 justify-end text-right min-w-0">
-                          <span className="truncate">
-                            {log.checkout_address || "—"}
-                          </span>
+                          <ViewAddressLink
+                            title={`Check-out — ${log.username}`}
+                            address={log.checkout_address}
+                            latitude={log.checkout_latitude}
+                            longitude={log.checkout_longitude}
+                            onOpen={openAddressMap}
+                            className="text-sm"
+                          />
                           {log.regularization ? (
                             <span className="relative inline-flex shrink-0 group/regm">
                               <Info
@@ -1413,13 +1445,14 @@ const AttendancePage = () => {
                               <span className="text-gray-400 italic">No photo</span>
                             )}
                           </td>
-                          <td className="px-6 py-4 text-sm text-gray-500 relative group">
-                            <span className="underline cursor-help">
-                              View Address
-                            </span>
-                            <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-3 py-1 bg-gray-800 text-white text-xs rounded-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
-                              {log.checkin_address}
-                            </span>
+                          <td className="px-6 py-4 text-sm text-gray-500">
+                            <ViewAddressLink
+                              title={`Check-in — ${log.username} (${attendanceDateYmd(log.date)})`}
+                              address={log.checkin_address}
+                              latitude={log.checkin_latitude}
+                              longitude={log.checkin_longitude}
+                              onOpen={openAddressMap}
+                            />
                           </td>
                           <td
                             className={`px-6 py-4 whitespace-nowrap text-sm text-gray-500 ${(() => {
@@ -1469,14 +1502,13 @@ const AttendancePage = () => {
                           </td>
                           <td className="px-6 py-4 text-sm text-gray-500">
                             <div className="flex flex-wrap items-center gap-1.5">
-                              <span className="relative group/coaddr inline-block">
-                                <span className="underline cursor-help">
-                                  View Address
-                                </span>
-                                <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-3 py-1 bg-gray-800 text-white text-xs rounded-md max-w-sm whitespace-normal opacity-0 group-hover/coaddr:opacity-100 transition-opacity duration-200 pointer-events-none z-10">
-                                  {log.checkout_address || "—"}
-                                </span>
-                              </span>
+                              <ViewAddressLink
+                                title={`Check-out — ${log.username} (${attendanceDateYmd(log.date)})`}
+                                address={log.checkout_address}
+                                latitude={log.checkout_latitude}
+                                longitude={log.checkout_longitude}
+                                onOpen={openAddressMap}
+                              />
                               {log.regularization ? (
                                 <span className="relative inline-flex group/coreg">
                                   <Info
@@ -1524,7 +1556,7 @@ const AttendancePage = () => {
                                 type="button"
                                 onClick={() => openBreakEditModal(log)}
                                 className="inline-flex items-center gap-1 rounded-md border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-100"
-                                title="Edit morning, lunch, evening break times"
+                                title="Edit check-in, check-out, and break times"
                               >
                                 <Pencil className="h-3.5 w-3.5" aria-hidden />
                                 Edit Breaks
@@ -1610,13 +1642,13 @@ const AttendancePage = () => {
       {breakEditLog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div
-            className="bg-white rounded-lg shadow-lg w-full max-w-md max-h-[90vh] overflow-y-auto p-4"
+            className="bg-white rounded-lg shadow-lg w-full max-w-lg max-h-[90vh] overflow-y-auto p-4"
             role="dialog"
             aria-labelledby="break-edit-title"
           >
             <div className="flex items-center justify-between mb-3">
               <h3 id="break-edit-title" className="text-lg font-semibold">
-                Edit break times
+                Edit attendance times
               </h3>
               <button
                 type="button"
@@ -1635,33 +1667,66 @@ const AttendancePage = () => {
               Leave a field empty to clear that time. Times use the attendance
               date (IST).
             </p>
-            <div className="space-y-3">
+            <div className="space-y-4">
               {[
-                ["Morning break — start", "break_morning_start"],
-                ["Morning break — end", "break_morning_end"],
-                ["Lunch break — start", "break_lunch_start"],
-                ["Lunch break — end", "break_lunch_end"],
-                ["Evening break — start", "break_evening_start"],
-                ["Evening break — end", "break_evening_end"],
-              ].map(([label, key]) => (
-                <label
-                  key={key}
-                  className="flex flex-col gap-1 text-sm font-medium text-gray-700"
-                >
-                  {label}
-                  <input
-                    type="time"
-                    step={60}
-                    value={breakEditForm[key]}
-                    onChange={(e) =>
-                      setBreakEditForm((f) => ({
-                        ...f,
-                        [key]: e.target.value,
-                      }))
-                    }
-                    className="rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                </label>
+                {
+                  section: null,
+                  fields: [
+                    ["Check-in", "checkin_time"],
+                    ["Check-out", "checkout_time"],
+                  ],
+                },
+                {
+                  section: "Morning break",
+                  fields: [
+                    ["Start", "break_morning_start"],
+                    ["End", "break_morning_end"],
+                  ],
+                },
+                {
+                  section: "Lunch break",
+                  fields: [
+                    ["Start", "break_lunch_start"],
+                    ["End", "break_lunch_end"],
+                  ],
+                },
+                {
+                  section: "Evening break",
+                  fields: [
+                    ["Start", "break_evening_start"],
+                    ["End", "break_evening_end"],
+                  ],
+                },
+              ].map(({ section, fields }) => (
+                <div key={section ?? "punch"}>
+                  {section ? (
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                      {section}
+                    </p>
+                  ) : null}
+                  <div className="grid grid-cols-2 gap-3">
+                    {fields.map(([label, key]) => (
+                      <label
+                        key={key}
+                        className="flex flex-col gap-1 text-sm font-medium text-gray-700 min-w-0"
+                      >
+                        {label}
+                        <input
+                          type="time"
+                          step={60}
+                          value={breakEditForm[key]}
+                          onChange={(e) =>
+                            setBreakEditForm((f) => ({
+                              ...f,
+                              [key]: e.target.value,
+                            }))
+                          }
+                          className="w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </label>
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
             <div className="mt-5 flex flex-wrap justify-end gap-2">
@@ -1688,6 +1753,14 @@ const AttendancePage = () => {
           </div>
         </div>
       )}
+      <AttendanceAddressMapModal
+        open={addressMapOpen}
+        payload={addressMapPayload}
+        onClose={() => {
+          setAddressMapOpen(false);
+          setAddressMapPayload(null);
+        }}
+      />
       <AttendanceRegularizeModal
         open={regModalOpen}
         log={regModalLog}

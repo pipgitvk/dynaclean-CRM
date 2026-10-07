@@ -55,7 +55,11 @@ export async function GET(request) {
       a.break_evening_start,
       a.break_evening_end,
       a.checkin_address,
+      a.checkin_latitude,
+      a.checkin_longitude,
       a.checkout_address,
+      a.checkout_latitude,
+      a.checkout_longitude,
       a.checkin_photo
    FROM attendance_logs a
    INNER JOIN rep_list r
