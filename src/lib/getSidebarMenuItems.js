@@ -93,6 +93,17 @@ function transformMenuItemPaths(item, roleKey) {
     }
   }
 
+  if (dashboardPrefix === "/hr-dashboard" && item.moduleKey) {
+    const hrDashboardModulePaths = {
+      "attendance-rules": "/hr-dashboard/attendance-rules",
+      "hiring-process": "/hr-dashboard/hiring",
+      "salary-slips": "/hr-dashboard/salary-slips",
+    };
+    if (hrDashboardModulePaths[item.moduleKey]) {
+      return { ...item, path: hrDashboardModulePaths[item.moduleKey] };
+    }
+  }
+
   const accountsProcurementPaths = {
     "purchase-products": "/accounts-dashboard/purchase-products",
     "delivery-challan": "/accounts-dashboard/delivery-challan",

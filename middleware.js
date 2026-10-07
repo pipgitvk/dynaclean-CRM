@@ -111,7 +111,10 @@ export async function middleware(request) {
 
       // Same roles as getAdminSidebarMenuItems "Attendance rules" — must not block here,
       // otherwise ADMIN/HR see the link but middleware sends them to /user-dashboard.
-      if (pathname.startsWith("/admin-dashboard/attendance-rules")) {
+      if (
+        pathname.startsWith("/admin-dashboard/attendance-rules") ||
+        pathname.startsWith("/hr-dashboard/attendance-rules")
+      ) {
         const canAttendanceRules = ATTENDANCE_RULES_MIDDLEWARE_ROLES.some(
           (r) => normalizeRoleKey(r) === roleKey,
         );

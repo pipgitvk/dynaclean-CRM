@@ -3,6 +3,9 @@ export function getDirectorHrHiringBase(pathname = "") {
   if (path.startsWith("/director-dashboard/hiring")) {
     return "/director-dashboard/hiring";
   }
+  if (path.startsWith("/hr-dashboard")) {
+    return "/hr-dashboard/hiring";
+  }
   return "/empcrm/admin-dashboard/hiring";
 }
 
