@@ -1,4 +1,9 @@
-import { normalizeUserKey, pickDateOfJoining } from "@/lib/employeeProfileLookup";
+import {
+  normalizeUserKey,
+  pickDateOfJoining,
+  buildEmployeeProfileIndex,
+  resolveEmployeeProfile,
+} from "@/lib/employeeProfileLookup";
 import { dateToYmdKey } from "@/lib/salaryPayDaysFromAttendance";
 
 /** Not shown on attendance / salary registers (roles). */
@@ -60,20 +65,16 @@ export function buildEmployeeProfileByUsername(profileRows) {
 }
 
 /**
- * Payroll registers (attendance + salary): active rep_list + profile (or field roles) + DOJ on/before month end.
+ * Payroll registers (attendance + salary): active rep_list; profile via username or empId; DOJ on/before month end when known.
  * @param {string} monthEndYmd - last calendar day of sheet month (YYYY-MM-DD)
  */
 export function filterEmployeesForPayrollSheet(employees, profileRows, monthEndYmd) {
-  const profileByUser = buildEmployeeProfileByUsername(profileRows);
+  const profileIndex = buildEmployeeProfileIndex(profileRows);
   const monthEnd = monthEndYmd ? String(monthEndYmd).slice(0, 10) : null;
 
   return (employees || []).filter((emp) => {
     if (!isPayrollActiveEmployee(emp)) return false;
-    const uk = normalizeUserKey(emp.username);
-    const profile = profileByUser.get(uk);
-    if (!profile) {
-      return ATTENDANCE_SHEET_ROLES_WITHOUT_PROFILE.includes(normalizeRepListRole(emp));
-    }
+    const profile = resolveEmployeeProfile(emp, profileIndex);
 
     const doj = pickDateOfJoining(profile);
     if (doj && monthEnd) {
@@ -123,6 +124,7 @@ function payrollSheetEmployeePickScore(emp, profile) {
  */
 export function dedupeEmployeesForPayrollSheet(employees, profileRows) {
   const profileByUser = buildEmployeeProfileByUsername(profileRows);
+  const profileIndex = buildEmployeeProfileIndex(profileRows);
   const list = employees || [];
   if (list.length === 0) {
     return { employees: [], relatedUsernamesByWinner: new Map() };
@@ -149,7 +151,10 @@ export function dedupeEmployeesForPayrollSheet(employees, profileRows) {
   const keyToIndex = new Map();
   for (let i = 0; i < list.length; i++) {
     const emp = list[i];
-    const profile = profileByUser.get(normalizeUserKey(emp.username)) || {};
+    const profile =
+      resolveEmployeeProfile(emp, profileIndex) ||
+      profileByUser.get(normalizeUserKey(emp.username)) ||
+      {};
     for (const key of payrollSheetIdentityKeys(emp, profile)) {
       const prev = keyToIndex.get(key);
       if (prev != null) union(i, prev);
@@ -169,8 +174,14 @@ export function dedupeEmployeesForPayrollSheet(employees, profileRows) {
 
   for (const group of groups.values()) {
     const sorted = [...group].sort((a, b) => {
-      const pa = profileByUser.get(normalizeUserKey(a.username)) || {};
-      const pb = profileByUser.get(normalizeUserKey(b.username)) || {};
+      const pa =
+        resolveEmployeeProfile(a, profileIndex) ||
+        profileByUser.get(normalizeUserKey(a.username)) ||
+        {};
+      const pb =
+        resolveEmployeeProfile(b, profileIndex) ||
+        profileByUser.get(normalizeUserKey(b.username)) ||
+        {};
       return payrollSheetEmployeePickScore(b, pb) - payrollSheetEmployeePickScore(a, pa);
     });
     const winner = sorted[0];
