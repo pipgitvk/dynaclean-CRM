@@ -8,8 +8,30 @@ import { pickProductImageUrl } from "@/lib/productImageUrl";
 
 function ProductAndSpareLists({ type, userRole }) {
   const isGemRole = userRole === "GEM" || userRole === "GEM PORTAL";
+  const canSeePriceFields = ["ADMIN", "DIRECTOR", "SUPERADMIN"].includes(userRole);
   const [rows, setRows] = useState([]);
   const [q, setQ] = useState("");
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingProduct, setEditingProduct] = useState(null);
+  const [savingProduct, setSavingProduct] = useState(false);
+  const [editFormData, setEditFormData] = useState({
+    item_code: "",
+    item_name: "",
+    product_number: "",
+    min_qty: "",
+    price_per_unit: "",
+    gem_price: "",
+    gem_last_negotiation_price: "",
+    dealer_price: "",
+    dp_no_warranty: "",
+    dp: "",
+    last_negotiation_price: "",
+    gst_rate: "",
+    hsn_sac: "",
+    specification: "",
+    image: null,
+    productImages: [],
+  });
   const [showSparesModal, setShowSparesModal] = useState(false);
   const [selectedProductSpares, setSelectedProductSpares] = useState([]);
   const [allSpares, setAllSpares] = useState([]);
@@ -80,12 +102,16 @@ function ProductAndSpareLists({ type, userRole }) {
     setShowSparesModal(true);
   };
 
-  useEffect(() => {
+  const refreshProducts = () => {
     const url = type === "product" ? "/api/products/list" : "/api/spare/list";
     fetch(url)
       .then((r) => r.json())
       .then((d) => setRows(Array.isArray(d) ? d : []))
       .catch(() => setRows([]));
+  };
+
+  useEffect(() => {
+    refreshProducts();
 
     // Load all spares for compatibility check
     if (type === 'product') {
@@ -95,6 +121,76 @@ function ProductAndSpareLists({ type, userRole }) {
         .catch(() => setAllSpares([]));
     }
   }, [type]);
+
+  const handleOpenEditModal = (row) => {
+    setEditingProduct(row);
+    const images = row.images || (row.image_path ? [row.image_path] : []);
+    setEditFormData({
+      item_code: row.item_code || "",
+      item_name: row.item_name || "",
+      product_number: row.product_number || "",
+      min_qty: row.min_qty || "",
+      price_per_unit: row.price_per_unit || row.price || "",
+      gem_price: row.gem_price || "",
+      gem_last_negotiation_price: row.gem_last_negotiation_price || "",
+      dealer_price: row.dealer_price || "",
+      dp_no_warranty: row.dp_no_warranty || "",
+      dp: row.dp || "",
+      last_negotiation_price: row.last_negotiation_price || "",
+      gst_rate: row.gst_rate || "",
+      hsn_sac: row.hsn_sac || "",
+      specification: row.specification || "",
+      image: null,
+      productImages: images,
+    });
+    setShowEditModal(true);
+  };
+
+  const handleSaveProduct = async () => {
+    if (!editingProduct || savingProduct) return;
+    try {
+      setSavingProduct(true);
+      const formData = new FormData();
+      formData.append("item_code", editFormData.item_code);
+      formData.append("item_name", editFormData.item_name);
+      formData.append("product_number", editFormData.product_number);
+      formData.append("min_qty", editFormData.min_qty);
+      formData.append("price_per_unit", editFormData.price_per_unit);
+      formData.append("gem_price", editFormData.gem_price);
+      formData.append("gem_last_negotiation_price", editFormData.gem_last_negotiation_price);
+      formData.append("dealer_price", editFormData.dealer_price);
+      formData.append("dp_no_warranty", editFormData.dp_no_warranty);
+      formData.append("dp", editFormData.dp);
+      formData.append("last_negotiation_price", editFormData.last_negotiation_price);
+      formData.append("gst_rate", editFormData.gst_rate);
+      formData.append("hsn_sac", editFormData.hsn_sac);
+      formData.append("specification", editFormData.specification);
+      if (editFormData.image) {
+        formData.append("image", editFormData.image);
+      }
+
+      const res = await fetch("/api/products/update", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || "Failed to update product");
+        return;
+      }
+      refreshProducts();
+      setShowEditModal(false);
+      setEditingProduct(null);
+    } catch (err) {
+      console.error(err);
+      alert("Error updating product");
+    } finally {
+      setSavingProduct(false);
+    }
+  };
+
+  const productListColSpan =
+    type === "product" ? 4 + (canSeePriceFields ? 3 : 0) : 3;
 
   const view = useMemo(() => {
     const qt = q.trim().toLowerCase();
@@ -132,8 +228,15 @@ function ProductAndSpareLists({ type, userRole }) {
                 <>
                   <th className="p-2 text-left">Product</th>
                   <th className="p-2 text-left">Prices</th>
+                  {canSeePriceFields && (
+                    <>
+                      <th className="p-2 text-left">GST Rate (%)</th>
+                      <th className="p-2 text-left">HSN/SAC</th>
+                    </>
+                  )}
                   <th className="p-2 text-left">Specification</th>
                   <th className="p-2 text-left">Spares</th>
+                  {canSeePriceFields && <th className="p-2 text-left">Actions</th>}
                 </>
               ) : (
                 <>
@@ -232,6 +335,12 @@ function ProductAndSpareLists({ type, userRole }) {
                             )}
                           </div>
                         </td>
+                        {canSeePriceFields && (
+                          <>
+                            <td className="p-2 whitespace-nowrap">{r.gst_rate ?? "-"}</td>
+                            <td className="p-2 whitespace-nowrap">{r.hsn_sac || "-"}</td>
+                          </>
+                        )}
                         <td className="p-2">{r.specification}</td>
                         <td className="p-2">
                           <button
@@ -242,6 +351,16 @@ function ProductAndSpareLists({ type, userRole }) {
                             <Eye className="w-4 h-4 text-blue-600" />
                           </button>
                         </td>
+                        {canSeePriceFields && (
+                          <td className="p-2">
+                            <button
+                              onClick={() => handleOpenEditModal(r)}
+                              className="px-2 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
+                            >
+                              Edit
+                            </button>
+                          </td>
+                        )}
                       </>
                     ) : (
                       <>
@@ -270,10 +389,7 @@ function ProductAndSpareLists({ type, userRole }) {
 
             {view.length === 0 && (
               <tr>
-                <td
-                  className="p-2 text-gray-500"
-                  colSpan={type === "product" ? 4 : 3}
-                >
+                <td className="p-2 text-gray-500" colSpan={productListColSpan}>
                   No data
                 </td>
               </tr>
@@ -368,10 +484,31 @@ function ProductAndSpareLists({ type, userRole }) {
                         </p>
                       </>
                     )}
+                    {canSeePriceFields && (
+                      <>
+                        <p>
+                          <span className="font-semibold">GST Rate:</span>{" "}
+                          {r.gst_rate ?? "-"}
+                        </p>
+                        <p>
+                          <span className="font-semibold">HSN/SAC:</span>{" "}
+                          {r.hsn_sac || "-"}
+                        </p>
+                      </>
+                    )}
                     <p>
                       <span className="font-semibold">Specification:</span>{" "}
                       {r.specification}
                     </p>
+                    {canSeePriceFields && (
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEditModal(r)}
+                        className="mt-2 px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 w-full"
+                      >
+                        Edit
+                      </button>
+                    )}
                   </>
                 ) : (
                   <>
@@ -405,6 +542,204 @@ function ProductAndSpareLists({ type, userRole }) {
           );
         })}
       </div>
+
+      {/* Edit Product Modal */}
+      {showEditModal && editingProduct && type === "product" && canSeePriceFields && (
+        <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-4 border-b sticky top-0 bg-white">
+              <h3 className="text-lg font-semibold">Edit Product</h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowEditModal(false);
+                  setEditingProduct(null);
+                }}
+                className="p-1 hover:bg-gray-100 rounded"
+              >
+                <X className="w-5 h-5 text-gray-600" />
+              </button>
+            </div>
+            <div className="p-4 space-y-4">
+              {editFormData.productImages.length > 0 && (
+                <div className="flex flex-wrap gap-3">
+                  {editFormData.productImages.map((imgUrl, idx) => (
+                    <img
+                      key={idx}
+                      src={imgUrl.startsWith("http") ? imgUrl : imgUrl}
+                      alt={`Product ${idx + 1}`}
+                      className="w-24 h-24 object-cover rounded border"
+                    />
+                  ))}
+                </div>
+              )}
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) =>
+                  setEditFormData({ ...editFormData, image: e.target.files?.[0] || null })
+                }
+                className="w-full border rounded p-2 text-sm"
+              />
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Code</label>
+                <input
+                  type="text"
+                  value={editFormData.item_code}
+                  className="w-full border rounded p-2 text-sm bg-gray-50"
+                  disabled
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                <input
+                  type="text"
+                  value={editFormData.item_name}
+                  onChange={(e) => setEditFormData({ ...editFormData, item_name: e.target.value })}
+                  className="w-full border rounded p-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Product No</label>
+                <input
+                  type="text"
+                  value={editFormData.product_number}
+                  onChange={(e) =>
+                    setEditFormData({ ...editFormData, product_number: e.target.value })
+                  }
+                  className="w-full border rounded p-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Min Qty</label>
+                <input
+                  type="number"
+                  value={editFormData.min_qty}
+                  onChange={(e) => setEditFormData({ ...editFormData, min_qty: e.target.value })}
+                  className="w-full border rounded p-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Price</label>
+                <input
+                  type="number"
+                  value={editFormData.price_per_unit}
+                  onChange={(e) =>
+                    setEditFormData({ ...editFormData, price_per_unit: e.target.value })
+                  }
+                  className="w-full border rounded p-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">GEM Price</label>
+                <input
+                  type="number"
+                  value={editFormData.gem_price}
+                  onChange={(e) => setEditFormData({ ...editFormData, gem_price: e.target.value })}
+                  className="w-full border rounded p-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">GEM Last Neg. Price</label>
+                <input
+                  type="number"
+                  value={editFormData.gem_last_negotiation_price}
+                  onChange={(e) =>
+                    setEditFormData({
+                      ...editFormData,
+                      gem_last_negotiation_price: e.target.value,
+                    })
+                  }
+                  className="w-full border rounded p-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">DP NO-warranty</label>
+                <input
+                  type="text"
+                  value={editFormData.dp_no_warranty}
+                  onChange={(e) =>
+                    setEditFormData({ ...editFormData, dp_no_warranty: e.target.value })
+                  }
+                  className="w-full border rounded p-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">DP</label>
+                <input
+                  type="text"
+                  value={editFormData.dp}
+                  onChange={(e) => setEditFormData({ ...editFormData, dp: e.target.value })}
+                  className="w-full border rounded p-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Last Neg. Price</label>
+                <input
+                  type="number"
+                  value={editFormData.last_negotiation_price}
+                  onChange={(e) =>
+                    setEditFormData({ ...editFormData, last_negotiation_price: e.target.value })
+                  }
+                  className="w-full border rounded p-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">GST Rate (%)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={editFormData.gst_rate}
+                  onChange={(e) => setEditFormData({ ...editFormData, gst_rate: e.target.value })}
+                  className="w-full border rounded p-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">HSN/SAC Code</label>
+                <input
+                  type="text"
+                  value={editFormData.hsn_sac}
+                  onChange={(e) => setEditFormData({ ...editFormData, hsn_sac: e.target.value })}
+                  placeholder="e.g., 85171200"
+                  className="w-full border rounded p-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Specification</label>
+                <textarea
+                  value={editFormData.specification}
+                  onChange={(e) =>
+                    setEditFormData({ ...editFormData, specification: e.target.value })
+                  }
+                  className="w-full border rounded p-2 text-sm"
+                  rows={3}
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 p-4 border-t">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowEditModal(false);
+                  setEditingProduct(null);
+                }}
+                className="px-4 py-2 border rounded text-gray-700 hover:bg-gray-50"
+                disabled={savingProduct}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveProduct}
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                disabled={savingProduct}
+              >
+                {savingProduct ? "Saving..." : "Save"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Spares Modal */}
       {showSparesModal && (

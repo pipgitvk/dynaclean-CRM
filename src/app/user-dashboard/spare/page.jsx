@@ -90,6 +90,9 @@ function ProductAndSpareLists({ type, userRole }) {
         formData.append('purchase_price', editingSpare.purchase_price || 0);
         formData.append('tax', editingSpare.tax || 0);
       }
+      if (canSeePriceFields) {
+        formData.append('hsn_sac', editingSpare.hsn_sac || '');
+      }
       if (editingSpare.newImageFile) {
         formData.append('image', editingSpare.newImageFile);
       }
@@ -278,6 +281,7 @@ function ProductAndSpareLists({ type, userRole }) {
                 <>
                   <th className="p-2 text-left">Image</th>
                   <th className="p-2 text-left">Spare No</th>
+                  {canSeePriceFields && <th className="p-2 text-left">HSN Code</th>}
                   <th className="p-2 text-left">Name</th>
                   {isPrivileged && <th className="p-2 text-left">Type</th>}
                   {isPrivileged && <th className="p-2 text-left">Make</th>}
@@ -325,6 +329,9 @@ function ProductAndSpareLists({ type, userRole }) {
                     ) : (
                       <>
                         <td className="p-2">{r.spare_number}</td>
+                        {canSeePriceFields && (
+                          <td className="p-2 whitespace-nowrap">{r.hsn_sac || "-"}</td>
+                        )}
                         <td className="p-2">{r.item_name}</td>
                         {isPrivileged && <td className="p-2 text-xs bg-blue-50">{r.type || "-"}</td>}
                         {isPrivileged && <td className="p-2 text-xs bg-green-50">{r.make || "-"}</td>}
@@ -373,7 +380,7 @@ function ProductAndSpareLists({ type, userRole }) {
 
             {view.length === 0 && (
               <tr>
-                <td className="p-2 text-gray-500" colSpan={type === "product" ? 7 : 8}>
+                <td className="p-2 text-gray-500" colSpan={type === "product" ? 7 : canSeePriceFields ? 13 : 12}>
                   No data
                 </td>
               </tr>
@@ -434,6 +441,9 @@ function ProductAndSpareLists({ type, userRole }) {
                 ) : (
                   <>
                     <p><span className="font-semibold">Spare No:</span> {r.spare_number}</p>
+                    {canSeePriceFields && (
+                      <p><span className="font-semibold">HSN Code:</span> {r.hsn_sac || "-"}</p>
+                    )}
                     {isPrivileged && <p><span className="font-semibold">Type:</span> {r.type || "-"}</p>}
                     {isPrivileged && <p><span className="font-semibold">Make:</span> {r.make || "-"}</p>}
                     {isPrivileged && <p><span className="font-semibold">Model:</span> {r.model || "-"}</p>}
@@ -665,6 +675,18 @@ function ProductAndSpareLists({ type, userRole }) {
                     onChange={(e) => setEditingSpare({ ...editingSpare, tax: e.target.value })}
                     className="w-full border rounded px-3 py-2 text-sm"
                     step="0.01"
+                  />
+                </div>
+              )}
+              {canSeePriceFields && (
+                <div>
+                  <label className="block text-sm text-gray-700 mb-1">HSN Code</label>
+                  <input
+                    type="text"
+                    value={editingSpare.hsn_sac || ""}
+                    onChange={(e) => setEditingSpare({ ...editingSpare, hsn_sac: e.target.value })}
+                    placeholder="e.g., 85171200"
+                    className="w-full border rounded px-3 py-2 text-sm"
                   />
                 </div>
               )}
