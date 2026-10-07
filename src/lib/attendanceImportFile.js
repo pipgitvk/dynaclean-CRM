@@ -19,7 +19,6 @@ export const IMPORT_TIME_FIELDS = [
 export function cellValueToImportString(cellValue, fieldKey) {
   if (cellValue == null || cellValue === "") return "";
   if (
-    fieldKey === "date" &&
     typeof cellValue === "number" &&
     Number.isFinite(cellValue) &&
     cellValue > 20000 &&
@@ -27,11 +26,24 @@ export function cellValueToImportString(cellValue, fieldKey) {
   ) {
     const base = new Date(1899, 11, 30);
     const d = new Date(base.getTime() + cellValue * 86400000);
-    if (!Number.isNaN(d.getTime())) return d.toLocaleDateString("en-CA");
+    if (!Number.isNaN(d.getTime())) {
+      if (fieldKey === "date" || fieldKey === "checkin_time" || fieldKey === "checkout_time") {
+        return d.toLocaleDateString("en-CA");
+      }
+    }
   }
   if (cellValue instanceof Date) {
     if (fieldKey === "date") {
       return cellValue.toLocaleDateString("en-CA");
+    }
+    if (fieldKey === "checkin_time" || fieldKey === "checkout_time") {
+      const h = cellValue.getHours();
+      const m = cellValue.getMinutes();
+      const looksLikeDateOnly =
+        h === 0 && m === 0 && cellValue.getSeconds() === 0;
+      if (looksLikeDateOnly) {
+        return cellValue.toLocaleDateString("en-CA");
+      }
     }
     return cellValue.toLocaleTimeString("en-GB", {
       hour: "2-digit",
@@ -116,23 +128,53 @@ export async function parseAttendanceImportFile(file) {
   return rows;
 }
 
+/** When date column is empty but check-in holds a date (Excel column shift). */
+function healMisalignedImportRow(obj) {
+  const out = { ...obj };
+  let dateYmd = parseImportDateToYmd(out.date ?? "");
+  if (dateYmd) return out;
+
+  const checkinCell = out.checkin_time != null ? String(out.checkin_time).trim() : "";
+  const dateFromCheckin = parseImportDateToYmd(checkinCell);
+  if (!dateFromCheckin) return out;
+
+  dateYmd = dateFromCheckin;
+  const shifted = {
+    ...out,
+    date: dateYmd,
+    checkin_time: out.checkout_time ?? "",
+    checkout_time: out.break_morning_start ?? "",
+    break_morning_start: out.break_morning_end ?? "",
+    break_morning_end: out.break_lunch_start ?? "",
+    break_lunch_start: out.break_lunch_end ?? "",
+    break_lunch_end: out.break_evening_start ?? "",
+    break_evening_start: out.break_evening_end ?? "",
+    break_evening_end: "",
+  };
+  if (!shifted.checkin_address && out.checkout_address) {
+    shifted.checkin_address = out.checkout_address;
+  }
+  return shifted;
+}
+
 export function buildImportPayloadRows(parsed) {
   return parsed.map((obj) => {
+    const healed = healMisalignedImportRow(obj);
     const row = {
-      username: String(obj.username ?? "").trim(),
-      date: parseImportDateToYmd(obj.date ?? ""),
+      username: String(healed.username ?? "").trim(),
+      date: parseImportDateToYmd(healed.date ?? ""),
     };
     for (const key of IMPORT_TIME_FIELDS) {
-      const v = obj[key];
+      const v = healed[key];
       if (v != null && String(v).trim() !== "") {
         row[key] = String(v).trim();
       }
     }
-    if (obj.checkin_address != null && String(obj.checkin_address).trim() !== "") {
-      row.checkin_address = String(obj.checkin_address).trim();
+    if (healed.checkin_address != null && String(healed.checkin_address).trim() !== "") {
+      row.checkin_address = String(healed.checkin_address).trim();
     }
-    if (obj.checkout_address != null && String(obj.checkout_address).trim() !== "") {
-      row.checkout_address = String(obj.checkout_address).trim();
+    if (healed.checkout_address != null && String(healed.checkout_address).trim() !== "") {
+      row.checkout_address = String(healed.checkout_address).trim();
     }
     return row;
   });

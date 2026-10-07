@@ -30,6 +30,9 @@ const HEADER_ALIASES = {
   checkout_ad: "checkout_address",
   checkout_addr: "checkout_address",
   checkout_t: "checkout_time",
+  checkin_t: "checkin_time",
+  checkin_ti: "checkin_time",
+  checkout_ti: "checkout_time",
 };
 
 /** Excel duplicate truncated headers → start/end pairs (two adjacent same tokens). */
@@ -47,6 +50,20 @@ export function normalizeImportHeaderCell(h) {
   if (!s) return "";
   if (CANONICAL_HEADERS.has(s)) return s;
   if (HEADER_ALIASES[s]) return HEADER_ALIASES[s];
+  if (
+    (s.startsWith("checkin_t") || s === "checkin") &&
+    !s.includes("addr") &&
+    s !== "checkin_address"
+  ) {
+    return "checkin_time";
+  }
+  if (
+    (s.startsWith("checkout_t") || s === "checkout") &&
+    !s.includes("addr") &&
+    s !== "checkout_address"
+  ) {
+    return "checkout_time";
+  }
   if (s === "break_morn" || s === "break_morning") return "break_morn";
   if (s === "break_lunc" || s === "break_lunch") return "break_lunc";
   if (s === "break_ever" || s === "break_evening") return "break_ever";
@@ -135,6 +152,32 @@ export function parseImportDateToYmd(value) {
  * True if `yyyy-mm-dd` is Sunday on the India (Asia/Kolkata) calendar.
  * Uses noon IST so the weekday matches the wall date in the sheet.
  */
+/**
+ * Normalize "9:28 AM", "18:30", "18:30:00" → HH:mm:ss or null.
+ */
+export function normalizeWallClockTimeForImport(value) {
+  if (value == null || String(value).trim() === "") return null;
+  const t = String(value).trim();
+  const ampm = t.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)$/i);
+  if (ampm) {
+    let h = parseInt(ampm[1], 10);
+    const mm = ampm[2];
+    const ss = ampm[3] != null ? ampm[3] : "00";
+    const isPm = ampm[4].toUpperCase() === "PM";
+    if (h === 12 && !isPm) h = 0;
+    else if (h !== 12 && isPm) h += 12;
+    return `${String(h).padStart(2, "0")}:${mm}:${ss}`;
+  }
+  const hm = t.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  if (hm) {
+    const hh = String(parseInt(hm[1], 10)).padStart(2, "0");
+    const mm = String(parseInt(hm[2], 10)).padStart(2, "0");
+    const ss = hm[3] != null ? String(parseInt(hm[3], 10)).padStart(2, "0") : "00";
+    return `${hh}:${mm}:${ss}`;
+  }
+  return null;
+}
+
 export function isSundayWeeklyOffIndia(ymd) {
   const m = String(ymd ?? "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!m) return false;

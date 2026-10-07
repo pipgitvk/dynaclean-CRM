@@ -4,6 +4,7 @@ import { getSessionPayload } from "@/lib/auth";
 import {
   parseImportDateToYmd,
   isSundayWeeklyOffIndia,
+  normalizeWallClockTimeForImport,
 } from "@/lib/attendanceImportParse";
 import { canBulkImportAttendance } from "@/lib/attendanceBulkImportRoles";
 import { rowHasMeaningfulCheckinOrCheckout } from "@/lib/attendanceMeaningfulPunch";
@@ -76,14 +77,12 @@ function normalizeMysqlDatetime(s) {
 function combineDateAndTimeForDb(dateYmd, timeVal) {
   if (!dateYmd || timeVal == null || String(timeVal).trim() === "") return null;
   const t = String(timeVal).trim();
+  if (parseImportDateToYmd(t)) return null;
   const full = normalizeMysqlDatetime(t);
   if (full) return full;
-  const hm = t.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
-  if (!hm) return null;
-  const hh = String(parseInt(hm[1], 10)).padStart(2, "0");
-  const mm = String(parseInt(hm[2], 10)).padStart(2, "0");
-  const ss = hm[3] != null ? String(parseInt(hm[3], 10)).padStart(2, "0") : "00";
-  return normalizeMysqlDatetime(`${dateYmd} ${hh}:${mm}:${ss}`);
+  const wall = normalizeWallClockTimeForImport(t);
+  if (!wall) return null;
+  return normalizeMysqlDatetime(`${dateYmd} ${wall}`);
 }
 
 /** True if this log already has a real check-in or check-out punch (do not overwrite via import). */
@@ -232,10 +231,7 @@ export async function POST(request) {
 
       const hasAnyTime = TIME_FIELDS.some((col) => times[col] != null);
       if (!hasAnyTime) {
-        errors.push({
-          row: rowNum,
-          message: "Provide at least one time field to import.",
-        });
+        skipped++;
         continue;
       }
 
