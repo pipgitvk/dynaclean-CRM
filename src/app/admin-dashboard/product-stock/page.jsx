@@ -46,6 +46,7 @@ function ProductAndSpareLists({ type, onOpenHistory }) {
     dp: '',
     last_negotiation_price: '',
     gst_rate: '',
+    hsn_sac: '',
     specification: '',
     image: null,
     productImages: [] // To store all product images
@@ -284,6 +285,7 @@ function ProductAndSpareLists({ type, onOpenHistory }) {
       dp: row.dp || '',
       last_negotiation_price: row.last_negotiation_price || '',
       gst_rate: row.gst_rate || '',
+      hsn_sac: row.hsn_sac || '',
       specification: row.specification || '',
       image: null,
       productImages: images
@@ -406,6 +408,7 @@ function ProductAndSpareLists({ type, onOpenHistory }) {
       formData.append('dp', editFormData.dp);
       formData.append('last_negotiation_price', editFormData.last_negotiation_price);
       formData.append('gst_rate', editFormData.gst_rate);
+      formData.append('hsn_sac', editFormData.hsn_sac);
       formData.append('specification', editFormData.specification);
       if (editFormData.image) {
         formData.append('image', editFormData.image);
@@ -520,6 +523,7 @@ function ProductAndSpareLists({ type, onOpenHistory }) {
                   <th className="p-2 text-left">Product</th>
                   <th className="p-2 text-left">Prices</th>
                   <th className="p-2 text-left">GST Rate (%)</th>
+                  <th className="p-2 text-left">HSN Code</th>
                   <th className="p-2 text-left">Specification</th>
                   <th className="p-2 text-left">Spares</th>
                   <th className="p-2 text-left">Actions</th>
@@ -704,6 +708,7 @@ function ProductAndSpareLists({ type, onOpenHistory }) {
                             </div>
                           )}
                         </td>
+                        <td className="p-2 whitespace-nowrap">{r.hsn_sac || "-"}</td>
                         <td className="p-2">{r.specification}</td>
                         <td className="p-2">
                           <button
@@ -838,7 +843,7 @@ function ProductAndSpareLists({ type, onOpenHistory }) {
 
             {view.length === 0 && (
               <tr>
-                <td className="p-2 text-gray-500" colSpan={type === "product" ? 6 : 4}>
+                <td className="p-2 text-gray-500" colSpan={type === "product" ? 7 : 4}>
                   No data
                 </td>
               </tr>
@@ -951,6 +956,7 @@ function ProductAndSpareLists({ type, onOpenHistory }) {
                         </div>
                       )}
                     </div>
+                    <p><span className="font-semibold">HSN Code:</span> {r.hsn_sac || "-"}</p>
                     <p><span className="font-semibold">Specification:</span> {r.specification}</p>
                   </>
                 ) : (
@@ -1242,6 +1248,19 @@ function ProductAndSpareLists({ type, onOpenHistory }) {
                     step="0.01"
                     value={editFormData.gst_rate}
                     onChange={(e) => setEditFormData({ ...editFormData, gst_rate: e.target.value })}
+                    className="w-full border rounded p-2 text-sm"
+                  />
+                </div>
+              )}
+
+              {type === 'product' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">HSN Code</label>
+                  <input
+                    type="text"
+                    value={editFormData.hsn_sac}
+                    onChange={(e) => setEditFormData({ ...editFormData, hsn_sac: e.target.value })}
+                    placeholder="e.g., 85171200"
                     className="w-full border rounded p-2 text-sm"
                   />
                 </div>
@@ -2031,6 +2050,10 @@ export default function ProductStockForm() {
                         <p className="font-medium text-gray-800 break-words">{row.item_name}</p>
                       </div>
                       <div>
+                        <p className="text-gray-500">HSN Code</p>
+                        <p className="font-medium text-gray-800">{row.hsn_sac || "-"}</p>
+                      </div>
+                      <div>
                         <p className="text-gray-500">Total Qty</p>
                         <p className="font-semibold text-gray-900">{row.total}</p>
                       </div>
@@ -2148,6 +2171,7 @@ export default function ProductStockForm() {
                     <th className="p-3 border-b font-semibold">Product Code</th>
                     <th className="p-3 border-b font-semibold">Product Image</th>
                     <th className="p-3 border-b font-semibold">Item Name</th>
+                    <th className="p-3 border-b font-semibold">HSN Code</th>
                     <th className="p-3 border-b font-semibold">Total Qty</th>
                     <th className="p-3 border-b font-semibold">Pre-booked</th>
                     <th className="p-3 border-b font-semibold">Net Qty</th>
@@ -2161,7 +2185,7 @@ export default function ProductStockForm() {
                 <tbody>
                   {filteredAvailableStock.length === 0 ? (
                     <tr>
-                      <td colSpan="11" className="p-4 text-center text-gray-500">
+                      <td colSpan="12" className="p-4 text-center text-gray-500">
                         No stock data available
                       </td>
                     </tr>
@@ -2185,6 +2209,7 @@ export default function ProductStockForm() {
                           )}
                         </td>
                         <td className="p-2 sm:p-3">{row.item_name}</td>
+                        <td className="p-2 sm:p-3 whitespace-nowrap">{row.hsn_sac || "-"}</td>
                         <td className="p-2 sm:p-3 font-semibold">{row.total}</td>
                         <td className="p-2 sm:p-3">
                           <div className="flex items-center gap-2">

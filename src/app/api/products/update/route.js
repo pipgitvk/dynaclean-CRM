@@ -123,6 +123,7 @@ export async function POST(request) {
         const dp = formData.get('dp');
         const last_negotiation_price = formData.get('last_negotiation_price');
         const gst_rate = formData.get('gst_rate');
+        const hsn_sac = formData.get('hsn_sac');
         const specification = formData.get('specification');
         const imageFile = formData.get('image');
 
@@ -189,6 +190,10 @@ export async function POST(request) {
             updates.push('gst_rate = ?');
             values.push(gst_rate);
         }
+        if (hsn_sac !== null && hsn_sac !== undefined) {
+            updates.push('hsn_sac = ?');
+            values.push(hsn_sac);
+        }
         if (specification !== null && specification !== undefined) {
             updates.push('specification = ?');
             values.push(specification);
@@ -207,7 +212,7 @@ export async function POST(request) {
 
         // Get old values BEFORE update for logging
         const [oldProduct] = await db.execute(
-          'SELECT item_name, product_number, min_qty, price_per_unit, gst_rate, specification FROM products_list WHERE item_code = ?',
+          'SELECT item_name, product_number, min_qty, price_per_unit, gst_rate, hsn_sac, specification FROM products_list WHERE item_code = ?',
           [item_code]
         );
         const oldData = oldProduct[0] || {};
@@ -241,6 +246,9 @@ export async function POST(request) {
           }
           if (gst_rate !== null && gst_rate !== undefined && Number(oldData.gst_rate) !== Number(gst_rate)) {
             changes.push(`GST Rate: ${oldData.gst_rate} → ${gst_rate}`);
+          }
+          if (hsn_sac !== null && hsn_sac !== undefined && String(oldData.hsn_sac ?? '') !== String(hsn_sac)) {
+            changes.push(`HSN: ${oldData.hsn_sac ?? ''} → ${hsn_sac}`);
           }
           if (specification !== null && specification !== undefined && String(oldData.specification) !== String(specification)) {
             changes.push(`Specification changed`);

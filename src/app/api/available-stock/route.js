@@ -8,6 +8,7 @@ export async function GET() {
       pss.product_code,
       pl.product_image,
       pl.item_name,
+      pl.hsn_sac,
       pss.total_quantity as total,
       pss.Delhi as delhi,
       pss.South as south,

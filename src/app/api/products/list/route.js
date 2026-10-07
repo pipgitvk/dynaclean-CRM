@@ -23,6 +23,7 @@ export async function GET() {
          p.specification,
          p.last_negotiation_price,
          p.gst_rate,
+         p.hsn_sac,
          COALESCE(pss.total_quantity, 0) AS total_qty
        FROM products_list p
        LEFT JOIN product_stock_summary pss ON p.item_code = pss.product_code
