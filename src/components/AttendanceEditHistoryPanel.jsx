@@ -68,7 +68,21 @@ export default function AttendanceEditHistoryPanel({
         <p className="text-sm text-gray-500">No edits recorded for this day yet.</p>
       ) : (
         <ul className="space-y-3 max-h-56 overflow-y-auto pr-1">
-          {history.map((entry) => (
+          {history
+            .filter((entry) =>
+              (entry.changes || []).some(
+                (ch) =>
+                  String(ch.old_value ?? "").trim() !==
+                  String(ch.new_value ?? "").trim()
+              )
+            )
+            .map((entry) => {
+              const visibleChanges = (entry.changes || []).filter(
+                (ch) =>
+                  String(ch.old_value ?? "").trim() !==
+                  String(ch.new_value ?? "").trim()
+              );
+              return (
             <li
               key={entry.id}
               className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-xs"
@@ -83,7 +97,7 @@ export default function AttendanceEditHistoryPanel({
                 By <span className="font-medium">{entry.edited_by}</span>
               </p>
               <ul className="space-y-1">
-                {(entry.changes || []).map((ch, i) => (
+                {visibleChanges.map((ch, i) => (
                   <li key={`${entry.id}-${ch.field}-${i}`} className="text-gray-700">
                     <span className="font-medium">{ch.label}:</span>{" "}
                     <span className="text-red-700 line-through">{ch.old_value}</span>
@@ -93,7 +107,8 @@ export default function AttendanceEditHistoryPanel({
                 ))}
               </ul>
             </li>
-          ))}
+              );
+            })}
         </ul>
       )}
     </div>

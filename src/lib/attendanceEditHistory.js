@@ -76,21 +76,30 @@ export function formatAttendanceEditDisplayValue(value) {
  * @param {Record<string, unknown>} beforeRow
  * @param {Record<string, unknown>} afterValues — keys = field names, values = new raw values
  */
+/** Drop no-op rows (e.g. legacy logs where only seconds differed). */
+export function filterAttendanceHistoryChanges(changes) {
+  return (changes || []).filter(
+    (c) =>
+      c &&
+      String(c.old_value ?? "").trim() !== String(c.new_value ?? "").trim()
+  );
+}
+
 export function diffAttendanceEditFields(beforeRow, afterValues, fields = ATTENDANCE_EDIT_TRACKED_FIELDS) {
   const changes = [];
   for (const field of fields) {
     if (!Object.prototype.hasOwnProperty.call(afterValues, field)) continue;
-    const oldNorm = normalizeAttendanceEditValue(beforeRow?.[field]);
-    const newNorm = normalizeAttendanceEditValue(afterValues[field]);
-    if (oldNorm === newNorm) continue;
+    const oldDisplay = formatAttendanceEditDisplayValue(beforeRow?.[field]);
+    const newDisplay = formatAttendanceEditDisplayValue(afterValues[field]);
+    if (oldDisplay === newDisplay) continue;
     changes.push({
       field,
       label: attendanceEditFieldLabel(field),
-      old_value: formatAttendanceEditDisplayValue(beforeRow?.[field]),
-      new_value: formatAttendanceEditDisplayValue(afterValues[field]),
+      old_value: oldDisplay,
+      new_value: newDisplay,
     });
   }
-  return changes;
+  return filterAttendanceHistoryChanges(changes);
 }
 
 export async function recordAttendanceEditHistory(
@@ -130,13 +139,14 @@ export async function fetchAttendanceEditHistory(conn, username, logDate) {
     } catch {
       changes = [];
     }
+    const visibleChanges = filterAttendanceHistoryChanges(changes);
     return {
       id: row.id,
       edited_by: row.edited_by,
       edit_source: row.edit_source,
       edit_source_label: attendanceEditSourceLabel(row.edit_source),
-      changes,
+      changes: visibleChanges,
       created_at: row.created_at,
     };
-  });
+  }).filter((entry) => entry.changes.length > 0);
 }
