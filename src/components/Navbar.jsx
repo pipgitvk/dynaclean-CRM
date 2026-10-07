@@ -264,6 +264,10 @@ export default function Navbar({ onToggleSidebar, showSalesMeta = false }) {
     pathname?.startsWith("/third-party-engineer-dashboard") ||
     normalizeRoleKey(userRole) === "THIRD PARTY ENGINEER";
 
+  const shouldShowAddCustomer =
+    !isThirdPartyEngineerPortal &&
+    normalizeRoleKey(userRole) !== "DESIGN ENGINEER";
+
   const searchDropdown =
     typeof window !== "undefined" &&
     showDropdown &&
@@ -425,7 +429,7 @@ export default function Navbar({ onToggleSidebar, showSalesMeta = false }) {
         )}
 
         <div className="flex shrink-0 items-center justify-end gap-2 md:gap-3">
-          {!isThirdPartyEngineerPortal && (
+          {shouldShowAddCustomer && (
           <Link
             href={
               showSalesMeta
