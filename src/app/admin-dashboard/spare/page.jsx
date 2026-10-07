@@ -248,7 +248,7 @@ function SpareList({ userRole, previewImage, setPreviewImage }) {
   }, [stockTotals]);
 
   return (
-    <div className="border rounded-lg">
+    <div>
 
       {/* SUMMARY CARDS */}
       <div className="grid grid-cols-2 gap-4 p-4 border-b bg-gray-50">
@@ -1020,7 +1020,7 @@ export default function SpareStockPage() {
   }, [summaryData, summarySearch, summaryStatusFilter]);
 
   return (
-    <div className="max-w-6xl mx-auto w-full px-3 sm:px-6 py-4 sm:py-6">
+    <div className="w-full py-2 sm:py-4">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
         <h2 className="text-lg sm:text-xl font-semibold text-gray-800">Spare Stock Management</h2>
         <div className="flex flex-wrap items-center gap-2">
@@ -1043,7 +1043,7 @@ export default function SpareStockPage() {
           <span className="text-xl sm:text-2xl font-bold text-gray-500">{openSection === "list" ? "−" : "+"}</span>
         </div>
         {openSection === "list" && (
-          <div className="px-4 sm:px-6 pb-4 sm:pb-6 pt-0">
+          <div className="pb-2 sm:pb-4 pt-0">
             <SpareList userRole={userRole} previewImage={previewImage} setPreviewImage={setPreviewImage} />
           </div>
         )}

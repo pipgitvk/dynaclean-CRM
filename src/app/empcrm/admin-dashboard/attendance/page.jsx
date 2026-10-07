@@ -814,8 +814,8 @@ const AttendancePage = () => {
 
   return (
     <>
-      <div className="container mx-auto p-4 md:p-8 max-w-7xl">
-        <div className="bg-white shadow-md rounded-lg p-6 mb-6">
+      <div className="w-full py-2 sm:py-4">
+        <div className="bg-white shadow-md rounded-lg p-4 sm:p-5 mb-4 sm:mb-6">
           <h1 className="text-3xl font-bold text-gray-900 mb-4 text-center">
             Attendance details
           </h1>

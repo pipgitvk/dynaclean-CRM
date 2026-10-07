@@ -58,7 +58,7 @@ export default function AttendanceSheetPage() {
   };
 
   return (
-    <div className="p-4 md:p-6 max-w-[100vw]">
+    <div className="w-full py-2 sm:py-4">
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
         <div>
           <h2 className="text-xl font-bold text-gray-900">Attendance Sheet</h2>

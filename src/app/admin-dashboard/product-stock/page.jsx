@@ -486,7 +486,7 @@ function ProductAndSpareLists({ type, onOpenHistory }) {
   const totalPrice = rows.reduce((sum, row) => sum + ((row.min_qty || 0) * (row.price_per_unit || row.price || 0)), 0);
 
   return (
-    <div className="border rounded-lg">
+    <div>
 
       {/* SUMMARY CARDS */}
       <div className="grid grid-cols-2 gap-4 p-4 border-b bg-gray-50">
@@ -1917,8 +1917,8 @@ export default function ProductStockForm() {
   }, [stockSummaryData, summarySearch, summaryStatusFilter]);
 
   return (
-    <div className="max-w-6xl mx-auto w-full py-4 sm:py-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 px-3 sm:px-6">
+    <div className="w-full py-2 sm:py-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
         <h2 className="text-lg sm:text-xl font-semibold text-gray-800">Product Stock Management</h2>
         <div className="flex flex-wrap items-center gap-2">
           <Link href="/admin-dashboard/add-assets" className="text-sm px-4 py-2 rounded text-white bg-blue-600 hover:bg-blue-700">
@@ -1974,7 +1974,7 @@ export default function ProductStockForm() {
           <span className="text-xl sm:text-2xl font-bold text-gray-500">{openSection === "list" ? "−" : "+"}</span>
         </div>
         {openSection === "list" && (
-          <div className="pb-4 sm:pb-6 pt-0">
+          <div className="pb-2 sm:pb-4 pt-0">
             <ProductAndSpareLists type="product" onOpenHistory={openTransferHistoryModal} />
           </div>
         )}
@@ -1990,7 +1990,7 @@ export default function ProductStockForm() {
           <span className="text-xl sm:text-2xl font-bold text-gray-500">{openSection === "available" ? "−" : "+"}</span>
         </div>
         {openSection === "available" && (
-          <div className="px-4 sm:px-6 pb-4 sm:pb-6 pt-0">
+          <div className="pb-2 sm:pb-4 pt-0">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
               <div className="relative w-full sm:max-w-xs">
                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-500" />
@@ -2316,7 +2316,7 @@ export default function ProductStockForm() {
           <span className="text-xl sm:text-2xl font-bold text-gray-500">{openSection === "transactions" ? "−" : "+"}</span>
         </div>
         {openSection === "transactions" && (
-          <div className="px-4 sm:px-6 pb-4 sm:pb-6 pt-0">
+          <div className="pb-2 sm:pb-4 pt-0">
             <div className="flex flex-wrap justify-between items-center gap-3 mb-4">
               <div className="relative w-full sm:max-w-xs">
                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-500" />
@@ -2556,7 +2556,7 @@ export default function ProductStockForm() {
           <span className="text-xl sm:text-2xl font-bold text-gray-500">{openSection === "summary" ? "−" : "+"}</span>
         </div>
         {openSection === "summary" && (
-          <div className="px-4 sm:px-6 pb-4 sm:pb-6 pt-0">
+          <div className="pb-2 sm:pb-4 pt-0">
             <div className="flex flex-wrap justify-between items-center gap-3 mb-4">
               <div className="relative w-full sm:max-w-xs">
                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-500" />
