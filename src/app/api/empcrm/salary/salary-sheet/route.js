@@ -223,13 +223,11 @@ export async function GET(request) {
         (sum, u) => sum + countLeaveTypeDaysInMonth(leaves, u, month, "sick"),
         0
       );
-      const paidLeave =
-        cards?.leaves != null
-          ? Number(cards.leaves) || 0
-          : related.reduce(
-              (sum, u) => sum + countLeaveTypeDaysInMonth(leaves, u, month, "paid"),
-              0
-            );
+      // PL = approved `paid` leave only (not sick/casual — those show under SL / HD on the sheet).
+      const paidLeave = related.reduce(
+        (sum, u) => sum + countLeaveTypeDaysInMonth(leaves, u, month, "paid"),
+        0
+      );
       const unpaidLeave = related.reduce(
         (sum, u) => sum + countLeaveTypeDaysInMonth(leaves, u, month, "unpaid"),
         0
