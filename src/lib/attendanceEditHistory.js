@@ -1,5 +1,8 @@
 import { ensureAttendanceEditHistoryTable } from "@/lib/ensureAttendanceEditHistoryTable";
 
+/** Check-in/out address when HR edits punch times (no employee GPS). */
+export const ADMIN_EDIT_ATTENDANCE_ADDRESS = "Admin";
+
 export const ATTENDANCE_EDIT_TRACKED_FIELDS = [
   "checkin_time",
   "checkout_time",

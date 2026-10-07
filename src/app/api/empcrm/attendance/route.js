@@ -5,10 +5,12 @@ import { getISTDateString, getISTDateTimeString } from "@/lib/istDateTime";
 import { NextResponse } from "next/server";
 import { getSessionPayload } from "@/lib/auth";
 import {
+  ADMIN_EDIT_ATTENDANCE_ADDRESS,
   ATTENDANCE_EDIT_TRACKED_FIELDS,
   diffAttendanceEditFields,
   recordAttendanceEditHistory,
 } from "@/lib/attendanceEditHistory";
+import { ensureAttendanceCheckoutGpsTriggersAllowAdmin } from "@/lib/ensureAttendanceCheckoutGpsTriggers";
 
 const HR_ATTENDANCE_ROLES = ["SUPERADMIN", "HR HEAD", "HR", "HR Executive"];
 
@@ -209,6 +211,7 @@ export async function PUT(req) {
     }
 
     const conn = await getDbConnection();
+    await ensureAttendanceCheckoutGpsTriggersAllowAdmin(conn);
     const cols = ATTENDANCE_EDIT_TRACKED_FIELDS.join(", ");
     const [beforeRows] = await conn.execute(
       `SELECT ${cols} FROM attendance_logs WHERE username = ? AND date = ? LIMIT 1`,
@@ -219,11 +222,48 @@ export async function PUT(req) {
     }
 
     const changes = diffAttendanceEditFields(beforeRows[0], afterValues);
+    const checkinTimeEdited = changes.some((c) => c.field === "checkin_time");
+    const checkoutTimeEdited = changes.some((c) => c.field === "checkout_time");
+
     const fields = [];
     const values = [];
     for (const [key, value] of Object.entries(afterValues)) {
       fields.push(`${key} = ?`);
       values.push(value === "" ? null : value);
+    }
+
+    if (checkinTimeEdited) {
+      if (afterValues.checkin_time == null || afterValues.checkin_time === "") {
+        fields.push(
+          "checkin_latitude = NULL",
+          "checkin_longitude = NULL",
+          "checkin_address = NULL"
+        );
+      } else {
+        fields.push(
+          "checkin_latitude = NULL",
+          "checkin_longitude = NULL",
+          "checkin_address = ?"
+        );
+        values.push(ADMIN_EDIT_ATTENDANCE_ADDRESS);
+      }
+    }
+
+    if (checkoutTimeEdited) {
+      if (afterValues.checkout_time == null || afterValues.checkout_time === "") {
+        fields.push(
+          "checkout_latitude = NULL",
+          "checkout_longitude = NULL",
+          "checkout_address = NULL"
+        );
+      } else {
+        fields.push(
+          "checkout_latitude = NULL",
+          "checkout_longitude = NULL",
+          "checkout_address = ?"
+        );
+        values.push(ADMIN_EDIT_ATTENDANCE_ADDRESS);
+      }
     }
 
     values.push(username);

@@ -1,6 +1,6 @@
--- Blocks checkout without GPS unless checkout_address = 'Admin' (HR manual edit).
--- Run once on the production DB (MySQL 5.7+ / 8.x).
--- See also: migrations/attendance_checkout_gps_allow_admin_address.sql
+-- Allow HR admin edits: checkout without GPS when checkout_address = 'Admin'.
+-- Still blocks fake auto-checkouts with NULL coords and non-Admin address.
+-- Run once: mysql -u ... -p your_db < migrations/attendance_checkout_gps_allow_admin_address.sql
 
 DELIMITER $$
 

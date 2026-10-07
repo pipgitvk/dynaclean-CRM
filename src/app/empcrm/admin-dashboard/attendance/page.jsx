@@ -6,7 +6,6 @@ import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import { Loader2, Search, Info, Pencil, Sun, History } from "lucide-react";
 import AttendanceEditHistoryPanel from "@/components/AttendanceEditHistoryPanel";
-import { getBrowserGeolocation } from "@/lib/browserGeolocation";
 import ExcelJS from "exceljs";
 import {
   DEFAULT_ATTENDANCE_RULES,
@@ -155,8 +154,6 @@ const AttendancePage = () => {
   const [leaves, setLeaves] = useState([]);
   const [isHolidayModalOpen, setHolidayModalOpen] = useState(false);
   const [breakEditLog, setBreakEditLog] = useState(null);
-  /** Snapshot when modal opens — detect check-in/out changes for GPS. */
-  const [breakEditBaseline, setBreakEditBaseline] = useState(null);
   const [breakEditForm, setBreakEditForm] = useState({
     checkin_time: "",
     checkout_time: "",
@@ -392,12 +389,10 @@ const AttendancePage = () => {
       break_evening_end: timeInputFromDbValue(log.break_evening_end),
     };
     setBreakEditForm(form);
-    setBreakEditBaseline(form);
   };
 
   const closeBreakEditModal = () => {
     setBreakEditLog(null);
-    setBreakEditBaseline(null);
     setBreakEditSaving(false);
   };
 
@@ -410,16 +405,6 @@ const AttendancePage = () => {
     }
     setBreakEditSaving(true);
     try {
-      const baseline = breakEditBaseline || breakEditForm;
-      const checkinChanged =
-        breakEditForm.checkin_time !== baseline.checkin_time;
-      const checkoutChanged =
-        breakEditForm.checkout_time !== baseline.checkout_time;
-      const needsCheckinGps =
-        Boolean(breakEditForm.checkin_time) && checkinChanged;
-      const needsCheckoutGps =
-        checkoutChanged && Boolean(breakEditForm.checkout_time);
-
       const payload = {
         username: breakEditLog.username,
         date: dateYmd,
@@ -456,25 +441,6 @@ const AttendancePage = () => {
           breakEditForm.break_evening_end
         ),
       };
-
-      if (needsCheckinGps || needsCheckoutGps) {
-        try {
-          const { latitude, longitude } = await getBrowserGeolocation();
-          if (needsCheckinGps) {
-            payload.checkin_latitude = latitude;
-            payload.checkin_longitude = longitude;
-          }
-          if (needsCheckoutGps) {
-            payload.checkout_latitude = latitude;
-            payload.checkout_longitude = longitude;
-          }
-        } catch (locErr) {
-          throw new Error(
-            locErr.message ||
-              "Allow location access to set check-in or check-out times."
-          );
-        }
-      }
 
       const res = await fetch("/api/empcrm/attendance/admin-edit-breaks", {
         method: "PATCH",
@@ -1730,8 +1696,8 @@ const AttendancePage = () => {
             </p>
             <p className="text-xs text-gray-500 mb-3">
               Leave a field empty to clear that time. Times use the attendance
-              date (IST). If you change check-in or check-out, this device&apos;s
-              current location is saved (required for checkout GPS).
+              date (IST). If you change check-in or check-out, the address is
+              saved as Admin (no GPS).
             </p>
             <div className="space-y-4">
               {[

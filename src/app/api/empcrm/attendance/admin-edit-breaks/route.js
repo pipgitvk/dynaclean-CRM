@@ -3,16 +3,11 @@ import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import {
   ATTENDANCE_EDIT_TRACKED_FIELDS,
+  ADMIN_EDIT_ATTENDANCE_ADDRESS,
   diffAttendanceEditFields,
   recordAttendanceEditHistory,
 } from "@/lib/attendanceEditHistory";
-import { reverseGeocodeNominatim } from "@/lib/reverseGeocodeNominatim";
-
-function parseCoord(value) {
-  if (value == null || value === "") return null;
-  const n = Number(value);
-  return Number.isFinite(n) ? n : null;
-}
+import { ensureAttendanceCheckoutGpsTriggersAllowAdmin } from "@/lib/ensureAttendanceCheckoutGpsTriggers";
 
 const HR_ATTENDANCE_ROLES = ["SUPERADMIN", "HR HEAD", "HR", "HR Executive"];
 
@@ -101,6 +96,7 @@ export async function PATCH(request) {
     }
 
     const conn = await getDbConnection();
+    await ensureAttendanceCheckoutGpsTriggersAllowAdmin(conn);
     const cols = ATTENDANCE_EDIT_TRACKED_FIELDS.join(", ");
     const [beforeRows] = await conn.execute(
       `SELECT ${cols},
@@ -117,60 +113,43 @@ export async function PATCH(request) {
     }
 
     const changes = diffAttendanceEditFields(beforeRows[0], afterValues);
+    const checkinTimeEdited = changes.some((c) => c.field === "checkin_time");
+    const checkoutTimeEdited = changes.some((c) => c.field === "checkout_time");
     const editedBy =
       payload.username || payload.name || payload.email || String(payload.sub || "unknown");
 
-    const checkinLat = parseCoord(body.checkin_latitude);
-    const checkinLng = parseCoord(body.checkin_longitude);
-    const checkoutLat = parseCoord(body.checkout_latitude);
-    const checkoutLng = parseCoord(body.checkout_longitude);
-
-    if (afterValues.checkin_time == null) {
-      assignments.push(
-        "checkin_latitude = NULL",
-        "checkin_longitude = NULL",
-        "checkin_address = NULL"
-      );
-    } else if (checkinLat != null && checkinLng != null) {
-      const checkinAddr =
-        (await reverseGeocodeNominatim(checkinLat, checkinLng)) ||
-        `${checkinLat}, ${checkinLng}`;
-      assignments.push(
-        "checkin_latitude = ?",
-        "checkin_longitude = ?",
-        "checkin_address = ?"
-      );
-      params.push(checkinLat, checkinLng, checkinAddr);
+    if (checkinTimeEdited) {
+      if (afterValues.checkin_time == null) {
+        assignments.push(
+          "checkin_latitude = NULL",
+          "checkin_longitude = NULL",
+          "checkin_address = NULL"
+        );
+      } else {
+        assignments.push(
+          "checkin_latitude = NULL",
+          "checkin_longitude = NULL",
+          "checkin_address = ?"
+        );
+        params.push(ADMIN_EDIT_ATTENDANCE_ADDRESS);
+      }
     }
 
-    if (afterValues.checkout_time == null) {
-      assignments.push(
-        "checkout_latitude = NULL",
-        "checkout_longitude = NULL",
-        "checkout_address = NULL"
-      );
-    } else if (checkoutLat != null && checkoutLng != null) {
-      const checkoutAddr =
-        (await reverseGeocodeNominatim(checkoutLat, checkoutLng)) ||
-        `${checkoutLat}, ${checkoutLng}`;
-      assignments.push(
-        "checkout_latitude = ?",
-        "checkout_longitude = ?",
-        "checkout_address = ?"
-      );
-      params.push(checkoutLat, checkoutLng, checkoutAddr);
-    } else if (
-      afterValues.checkout_time != null &&
-      (beforeRows[0].checkout_latitude == null ||
-        beforeRows[0].checkout_longitude == null)
-    ) {
-      return NextResponse.json(
-        {
-          message:
-            "Checkout time requires GPS. Allow location access on this device when saving.",
-        },
-        { status: 400 }
-      );
+    if (checkoutTimeEdited) {
+      if (afterValues.checkout_time == null) {
+        assignments.push(
+          "checkout_latitude = NULL",
+          "checkout_longitude = NULL",
+          "checkout_address = NULL"
+        );
+      } else {
+        assignments.push(
+          "checkout_latitude = NULL",
+          "checkout_longitude = NULL",
+          "checkout_address = ?"
+        );
+        params.push(ADMIN_EDIT_ATTENDANCE_ADDRESS);
+      }
     }
 
     const sql = `UPDATE attendance_logs SET ${assignments.join(", ")} WHERE username = ? AND date = ?`;

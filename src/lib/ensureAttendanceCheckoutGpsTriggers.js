@@ -1,31 +1,39 @@
--- Blocks checkout without GPS unless checkout_address = 'Admin' (HR manual edit).
--- Run once on the production DB (MySQL 5.7+ / 8.x).
--- See also: migrations/attendance_checkout_gps_allow_admin_address.sql
+/** Must match ADMIN_EDIT_ATTENDANCE_ADDRESS in attendanceEditHistory.js */
+const ADMIN_ADDR = "Admin";
 
-DELIMITER $$
+let ensured = false;
 
-DROP TRIGGER IF EXISTS attendance_logs_bi_checkout_requires_gps $$
-DROP TRIGGER IF EXISTS attendance_logs_bu_checkout_requires_gps $$
+/**
+ * Updates DB triggers so checkout without GPS is allowed when checkout_address is Admin (HR edits).
+ */
+export async function ensureAttendanceCheckoutGpsTriggersAllowAdmin(conn) {
+  if (ensured) return;
+  const adminLit = conn.escape(ADMIN_ADDR);
 
+  await conn.query("DROP TRIGGER IF EXISTS attendance_logs_bi_checkout_requires_gps");
+  await conn.query("DROP TRIGGER IF EXISTS attendance_logs_bu_checkout_requires_gps");
+
+  await conn.query(`
 CREATE TRIGGER attendance_logs_bi_checkout_requires_gps
 BEFORE INSERT ON attendance_logs
 FOR EACH ROW
 BEGIN
   IF NEW.checkout_time IS NOT NULL
      AND (NEW.checkout_latitude IS NULL OR NEW.checkout_longitude IS NULL)
-     AND TRIM(COALESCE(NEW.checkout_address, '')) <> 'Admin' THEN
+     AND TRIM(COALESCE(NEW.checkout_address, '')) <> ${adminLit} THEN
     SIGNAL SQLSTATE '45000'
       SET MESSAGE_TEXT = 'Checkout requires GPS (checkout_latitude and checkout_longitude).';
   END IF;
-END $$
+END`);
 
+  await conn.query(`
 CREATE TRIGGER attendance_logs_bu_checkout_requires_gps
 BEFORE UPDATE ON attendance_logs
 FOR EACH ROW
 BEGIN
   IF NEW.checkout_time IS NOT NULL
      AND (NEW.checkout_latitude IS NULL OR NEW.checkout_longitude IS NULL)
-     AND TRIM(COALESCE(NEW.checkout_address, '')) <> 'Admin' THEN
+     AND TRIM(COALESCE(NEW.checkout_address, '')) <> ${adminLit} THEN
     IF NOT (
       OLD.checkout_time <=> NEW.checkout_time
       AND OLD.checkout_latitude <=> NEW.checkout_latitude
@@ -36,6 +44,7 @@ BEGIN
         SET MESSAGE_TEXT = 'Checkout requires GPS (checkout_latitude and checkout_longitude).';
     END IF;
   END IF;
-END $$
+END`);
 
-DELIMITER ;
+  ensured = true;
+}
