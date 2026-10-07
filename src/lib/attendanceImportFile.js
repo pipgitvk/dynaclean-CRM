@@ -16,40 +16,76 @@ export const IMPORT_TIME_FIELDS = [
   "break_evening_end",
 ];
 
+function pad2(n) {
+  return String(n).padStart(2, "0");
+}
+
+/** Excel time-only serial (fraction of day) → HH:mm:ss wall clock (no TZ shift). */
+function excelDayFractionToHms(fraction) {
+  const f = ((Number(fraction) % 1) + 1) % 1;
+  const totalSec = Math.round(f * 86400);
+  const h = Math.floor(totalSec / 3600) % 24;
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  return `${pad2(h)}:${pad2(m)}:${pad2(s)}`;
+}
+
+/** ExcelJS time cells use 1899/1900 phantom dates; wall clock is in UTC fields. */
+function isExcelPhantomDate(d) {
+  const y = d.getFullYear();
+  return y === 1899 || y === 1900;
+}
+
+function dateCellToYmd(d) {
+  if (isExcelPhantomDate(d)) {
+    const y = d.getUTCFullYear();
+    const m = d.getUTCMonth() + 1;
+    const day = d.getUTCDate();
+    return `${y}-${pad2(m)}-${pad2(day)}`;
+  }
+  return d.toLocaleDateString("en-CA");
+}
+
+function timeDateToHms(d) {
+  const useUtc = isExcelPhantomDate(d);
+  const h = useUtc ? d.getUTCHours() : d.getHours();
+  const m = useUtc ? d.getUTCMinutes() : d.getMinutes();
+  const s = useUtc ? d.getUTCSeconds() : d.getSeconds();
+  return `${pad2(h)}:${pad2(m)}:${pad2(s)}`;
+}
+
 export function cellValueToImportString(cellValue, fieldKey) {
   if (cellValue == null || cellValue === "") return "";
-  if (
-    typeof cellValue === "number" &&
-    Number.isFinite(cellValue) &&
-    cellValue > 20000 &&
-    cellValue < 100000
-  ) {
-    const base = new Date(1899, 11, 30);
-    const d = new Date(base.getTime() + cellValue * 86400000);
-    if (!Number.isNaN(d.getTime())) {
-      if (fieldKey === "date" || fieldKey === "checkin_time" || fieldKey === "checkout_time") {
-        return d.toLocaleDateString("en-CA");
-      }
+  const isTimeField = IMPORT_TIME_FIELDS.includes(fieldKey);
+
+  if (typeof cellValue === "number" && Number.isFinite(cellValue)) {
+    if (fieldKey === "date" && cellValue > 59 && cellValue < 2000000) {
+      const ymd = parseImportDateToYmd(cellValue);
+      if (ymd) return ymd;
+    }
+    if (isTimeField && cellValue >= 0 && cellValue < 1) {
+      return excelDayFractionToHms(cellValue);
+    }
+    if (isTimeField && cellValue >= 1) {
+      const frac = cellValue % 1;
+      if (frac > 0) return excelDayFractionToHms(frac);
     }
   }
+
   if (cellValue instanceof Date) {
     if (fieldKey === "date") {
-      return cellValue.toLocaleDateString("en-CA");
+      return dateCellToYmd(cellValue);
     }
-    if (fieldKey === "checkin_time" || fieldKey === "checkout_time") {
+    if (isTimeField) {
       const h = cellValue.getHours();
       const m = cellValue.getMinutes();
       const looksLikeDateOnly =
         h === 0 && m === 0 && cellValue.getSeconds() === 0;
-      if (looksLikeDateOnly) {
-        return cellValue.toLocaleDateString("en-CA");
+      if (looksLikeDateOnly && !isExcelPhantomDate(cellValue)) {
+        return dateCellToYmd(cellValue);
       }
+      return timeDateToHms(cellValue);
     }
-    return cellValue.toLocaleTimeString("en-GB", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    });
   }
   if (typeof cellValue === "object" && cellValue.text != null) {
     return String(cellValue.text).trim();
