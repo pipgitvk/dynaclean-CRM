@@ -197,7 +197,7 @@ export default async function AdminSpecialPricingPage({ searchParams }) {
   `);
 
   return (
-    <div className="p-4 sm:p-6 space-y-4 overflow-x-hidden min-w-0">
+    <div className="p-3 sm:p-4 md:p-6 space-y-4 overflow-x-hidden min-w-0 w-full">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <h1 className="text-xl sm:text-2xl font-bold">Special Price Approvals</h1>
         <span className="text-sm text-gray-600">

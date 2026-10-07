@@ -67,8 +67,8 @@ export default function SpecialPricingFilterBar({
   };
 
   return (
-    <div className="flex flex-col gap-2 w-full">
-      <div className="flex flex-col sm:flex-row flex-wrap gap-2 sm:items-center">
+    <div className="flex flex-col gap-2 w-full min-w-0">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-2 lg:items-center">
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -79,8 +79,8 @@ export default function SpecialPricingFilterBar({
             }
           }}
           list="special-price-approvals-search"
-          placeholder="Search all records (customer, product, code, status, price type)"
-          className="border border-gray-300 rounded px-3 py-2 text-sm w-full sm:w-80"
+          placeholder="Search customer, product, code…"
+          className="border border-gray-300 rounded px-3 py-2 text-sm w-full min-w-0 sm:col-span-2 lg:col-span-2"
         />
         <datalist id="special-price-approvals-search">
           {options.map((opt) => (
@@ -90,7 +90,7 @@ export default function SpecialPricingFilterBar({
         <select
           value={status}
           onChange={(e) => setStatus(e.target.value)}
-          className="border border-gray-300 rounded px-3 py-2 text-sm w-full sm:w-40 bg-white"
+          className="border border-gray-300 rounded px-3 py-2 text-sm w-full min-w-0 bg-white"
         >
           <option value="">All Status</option>
           <option value="approved">Approved</option>
@@ -100,7 +100,7 @@ export default function SpecialPricingFilterBar({
         <select
           value={type}
           onChange={(e) => setType(e.target.value)}
-          className="border border-gray-300 rounded px-3 py-2 text-sm w-full sm:w-36 bg-white"
+          className="border border-gray-300 rounded px-3 py-2 text-sm w-full min-w-0 bg-white"
         >
           <option value="">All Types</option>
           <option value="product">Products</option>
@@ -109,7 +109,7 @@ export default function SpecialPricingFilterBar({
         <select
           value={priceType}
           onChange={(e) => setPriceType(e.target.value)}
-          className="border border-gray-300 rounded px-3 py-2 text-sm w-full sm:w-44 bg-white"
+          className="border border-gray-300 rounded px-3 py-2 text-sm w-full min-w-0 bg-white"
         >
           <option value="">All Price Types</option>
           <option value="special">Special Price</option>
@@ -118,7 +118,7 @@ export default function SpecialPricingFilterBar({
         <button
           type="button"
           onClick={applyFilters}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md"
+          className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md sm:col-span-2 lg:col-span-1"
         >
           Search
         </button>

@@ -1790,14 +1790,7 @@ export default function OrderTable({ orders, userRole }) {
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200 ease-in-out"
           />
         </div>
-        <div className="flex gap-2 w-full sm:w-auto">
-          <button
-            type="button"
-            onClick={handleApplySearch}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors w-full sm:w-auto"
-          >
-            Search
-          </button>
+        <div className="flex w-full sm:w-auto">
           <button
             onClick={handleExportToExcel}
             disabled={isExporting}
@@ -1875,6 +1868,16 @@ export default function OrderTable({ orders, userRole }) {
             <option value="approved">Approved</option>
             <option value="rejected">Rejected</option>
           </select>
+        </div>
+
+        <div className="flex items-end">
+          <button
+            type="button"
+            onClick={handleApplySearch}
+            className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+          >
+            Search
+          </button>
         </div>
       </div>
 
