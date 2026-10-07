@@ -1131,7 +1131,7 @@ const GenerateSalaryPage = () => {
                                         : Number(attendanceBreakdown.payCalc.sundayWorkCredits) ||
                                           0) > 0 && (
                                         <li>
-                                            Sunday work (+1 pay day each) ={" "}
+                                            Sunday work (+1 full / +0.5 half-day) ={" "}
                                             <span className="font-semibold tabular-nums text-emerald-800">
                                                 +{formatPayCalcNumber(
                                                     attendanceDisplayAllZero
@@ -1158,7 +1158,7 @@ const GenerateSalaryPage = () => {
                                               attendanceBreakdown.payCalc.holidayWorkCredits
                                           ) || 0) > 0 && (
                                         <li>
-                                            Holiday work (+1 pay day each) ={" "}
+                                            Holiday work (+1 full / +0.5 half-day) ={" "}
                                             <span className="font-semibold tabular-nums text-emerald-800">
                                                 +{formatPayCalcNumber(
                                                     attendanceDisplayAllZero

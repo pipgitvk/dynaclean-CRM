@@ -297,18 +297,19 @@ export function computeSalaryPayDaysForUser(p) {
       } else if (!isSunday && !isHoliday) {
         weekdayPayCredits += 1;
       }
+      const offDayWorkCredit = isHalfDay ? 0.5 : 1;
       if (
         isSunday &&
         qualifiesOffDayExtraPayCredit(existingLog, workLocation)
       ) {
         sundayWorkedDates.push(dateString);
-        sundayWorkPayCredits += 1;
+        sundayWorkPayCredits += offDayWorkCredit;
       } else if (
         isHoliday &&
         qualifiesOffDayExtraPayCredit(existingLog, workLocation)
       ) {
         holidayWorkedDates.push(dateString);
-        holidayWorkPayCredits += 1;
+        holidayWorkPayCredits += offDayWorkCredit;
       }
       continue;
     }
