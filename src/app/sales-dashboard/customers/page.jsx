@@ -44,6 +44,7 @@ export default async function CustomersPage({ searchParams }) {
     followed_date,
     employee,
     tags,
+    tag_filter,
     notes_language,
     filter,
     reporting_date_from,
@@ -139,28 +140,31 @@ export default async function CustomersPage({ searchParams }) {
     followupParams.push(today);
   }
 
-  // Build INNER JOIN for filtering by next_follow_date or tags (latest follow-up)
-  if (next_follow_date || tags) {
-    joinClause = `
-      INNER JOIN (
-        SELECT customer_id, multi_tag, next_followup_date
-        FROM customers_followup
-        WHERE time_stamp = (
-          SELECT MAX(time_stamp) FROM customers_followup cf2
-          WHERE cf2.customer_id = customers_followup.customer_id
-        )
-      ) cf_filter ON c.customer_id = cf_filter.customer_id
-    `;
-
-    if (next_follow_date) {
-      followupConditions.push("DATE(cf_filter.next_followup_date) = ?");
+  // Latest customers_followup row is exposed as cf (or tlf for today_reporting).
+  if (next_follow_date) {
+    if (filter === "today_reporting") {
+      followupConditions.push("DATE(tlf.next_followup_date) = ?");
       followupParams.push(next_follow_date);
+    } else {
+      customerConditions.push("DATE(cf.next_followup_date) = ?");
+      customerParams.push(next_follow_date);
     }
+  }
 
-    if (tags) {
-      followupConditions.push("cf_filter.multi_tag LIKE ?");
-      followupParams.push(`%${tags}%`);
+  if (tags) {
+    const tagPattern = `%${tags}%`;
+    if (filter === "today_reporting") {
+      followupConditions.push("tlf.multi_tag LIKE ?");
+      followupParams.push(tagPattern);
+    } else {
+      customerConditions.push("cf.multi_tag LIKE ?");
+      customerParams.push(tagPattern);
     }
+  }
+
+  if (tag_filter) {
+    customerConditions.push("c.tags LIKE ?");
+    customerParams.push(`%${tag_filter}%`);
   }
 
   // Notes language: any follow-up row with matching notes_language

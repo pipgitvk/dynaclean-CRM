@@ -6,7 +6,7 @@ import { useEffect } from "react";
 import dayjs from "dayjs";
 import { formatCrmDatetimeForISTDisplay } from "@/lib/timezone";
 import { useRouter } from "next/navigation";
-import { Eye, Pencil, ArrowRightCircle, Loader2 } from "lucide-react";
+import { Eye, Pencil, ArrowRightCircle, Loader2, Search } from "lucide-react";
 
 /** Old option values sent `verygud` etc.; DB stores "Very Good", "Average", … */
 const LEGACY_STATUS_SLUGS = {
@@ -82,6 +82,7 @@ export default function CustomerTable({
   );
   const urlFilter = searchParams.filter ?? "";
   const isVeryGoodFollowupToday = urlFilter === "very_good_followup_today";
+  const [searchDraft, setSearchDraft] = useState(searchParams.search ?? "");
 
   const buildQueryString = (filterValues, page) => {
     const query = new URLSearchParams();
@@ -119,6 +120,7 @@ export default function CustomerTable({
     }));
     setIsNextFollowInputVisible(!!(searchParams.next_follow_date ?? ""));
     setIsFollowedDateInputVisible(!!(searchParams.followed_date ?? ""));
+    setSearchDraft(searchParams.search ?? "");
   }, [searchParams]);
 
   const resetFilters = () => {
@@ -140,7 +142,16 @@ export default function CustomerTable({
       notes_language: "",
     };
     setFilters(cleared);
+    setSearchDraft("");
     router.push(urlFilter ? `?filter=${urlFilter}` : "?");
+  };
+
+  const runSearch = () => {
+    const updated = { ...filters, search: searchDraft.trim() };
+    setFilters(updated);
+    startTransition(() => {
+      router.push(`?${buildQueryString(updated, 1)}`);
+    });
   };
 
   const update = (key, value) => {
@@ -171,18 +182,6 @@ export default function CustomerTable({
     setIsFollowedDateInputVisible((prev) => !prev);
   };
 
-  const handleNextFollowBlur = (e) => {
-    if (!e.target.value) {
-      setIsNextFollowInputVisible(false);
-    }
-  };
-
-  const handleFollowedDateBlur = (e) => {
-    if (!e.target.value) {
-      setIsFollowedDateInputVisible(false);
-    }
-  };
-
   return (
     <div className="space-y-4">
       {isVeryGoodFollowupToday && (
@@ -202,10 +201,16 @@ export default function CustomerTable({
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-8 gap-2">
         <input
           type="text"
-          placeholder="Search"
-          value={filters.search}
-          onChange={(e) => update("search", e.target.value)}
-          className="p-2 border rounded w-full"
+          placeholder="Search name, phone, email…"
+          value={searchDraft}
+          onChange={(e) => setSearchDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              runSearch();
+            }
+          }}
+          className="p-2 border rounded w-full sm:col-span-2"
         />
         <TypeableDateFilterInput value={filters.date_from} onChange={(v) => update("date_from", v)} className="p-2 border rounded w-full"/>
         <TypeableDateFilterInput value={filters.date_to} onChange={(v) => update("date_to", v)} className="p-2 border rounded w-full"/>
@@ -319,9 +324,13 @@ export default function CustomerTable({
             Select Next Follow-up
           </label>
           {isNextFollowInputVisible && (
-            <TypeableDateFilterInput value={filters.next_follow_date} onChange={(v) => update("next_follow_date", v)} id="next_follow_date" onBlur={handleNextFollowBlur}
+            <TypeableDateFilterInput
+              value={filters.next_follow_date}
+              onChange={(v) => update("next_follow_date", v)}
+              id="next_follow_date"
               className="p-2 border rounded w-full text-gray-700 mt-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200"
-              placeholder="Next Follow-up"/>
+              placeholder="Next Follow-up"
+            />
           )}
         </div>
         <div className="relative">
@@ -333,9 +342,13 @@ export default function CustomerTable({
             Select Followed Date
           </label>
           {isFollowedDateInputVisible && (
-            <TypeableDateFilterInput value={filters.followed_date} onChange={(v) => update("followed_date", v)} id="followed_date" onBlur={handleFollowedDateBlur}
+            <TypeableDateFilterInput
+              value={filters.followed_date}
+              onChange={(v) => update("followed_date", v)}
+              id="followed_date"
               className="p-2 border rounded w-full text-gray-700 mt-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200"
-              placeholder="Followed Date"/>
+              placeholder="Followed Date"
+            />
           )}
         </div>
 
@@ -356,25 +369,45 @@ export default function CustomerTable({
         )}
       </div>
       
-      {/* Second row for Reset and Reporting Date Filters */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mt-2">
+      {/* Reporting dates + Search / Reset */}
+      <div className="flex flex-col sm:flex-row flex-wrap items-end gap-3 mt-2">
+        <div className="flex flex-col gap-1 w-full sm:w-auto min-w-[10rem]">
+          <label className="text-xs text-gray-700 font-medium">Reporting From</label>
+          <TypeableDateFilterInput
+            value={filters.reporting_date_from}
+            onChange={(v) => update("reporting_date_from", v)}
+            className="p-2 border rounded w-full"
+          />
+        </div>
+        <div className="flex flex-col gap-1 w-full sm:w-auto min-w-[10rem]">
+          <label className="text-xs text-gray-700 font-medium">Reporting To</label>
+          <TypeableDateFilterInput
+            value={filters.reporting_date_to}
+            onChange={(v) => update("reporting_date_to", v)}
+            className="p-2 border rounded w-full"
+          />
+        </div>
         <button
+          type="button"
+          onClick={runSearch}
+          disabled={isPending}
+          className="inline-flex h-[42px] w-full sm:w-auto items-center justify-center gap-2 rounded border border-blue-600 bg-blue-600 px-6 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+          title="Search"
+        >
+          {isPending ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Search className="h-4 w-4" />
+          )}
+          Search
+        </button>
+        <button
+          type="button"
           onClick={resetFilters}
-          className="p-2 px-8 border rounded bg-red-100 hover:bg-red-200 w-full sm:w-auto"
+          className="h-[42px] w-full sm:w-auto rounded border bg-red-100 px-8 py-2 text-sm font-medium hover:bg-red-200"
         >
           Reset
         </button>
-        
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full sm:w-auto">
-          <div className="flex flex-col gap-1 w-full sm:w-auto">
-            <label className="text-xs text-gray-700 font-medium">Reporting From</label>
-            <TypeableDateFilterInput value={filters.reporting_date_from} onChange={(v) => update("reporting_date_from", v)} className="p-2 border rounded w-full"/>
-          </div>
-          <div className="flex flex-col gap-1 w-full sm:w-auto">
-            <label className="text-xs text-gray-700 font-medium">Reporting To</label>
-            <TypeableDateFilterInput value={filters.reporting_date_to} onChange={(v) => update("reporting_date_to", v)} className="p-2 border rounded w-full"/>
-          </div>
-        </div>
       </div>
 
       {/* Row count */}

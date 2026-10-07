@@ -110,7 +110,7 @@ export default function TypeableDateFilterInput({
     setFocused(false);
   };
 
-  const { type: _ignoredType, ...textRest } = rest;
+  const { type: _ignoredType, onBlur: onBlurProp, ...textRest } = rest;
 
   const textClassName = [
     className,
@@ -135,9 +135,10 @@ export default function TypeableDateFilterInput({
         disabled={disabled}
         onChange={(e) => setText(e.target.value)}
         onFocus={() => setFocused(true)}
-        onBlur={() => {
+        onBlur={(e) => {
           setFocused(false);
           commit();
+          onBlurProp?.(e);
         }}
         onKeyDown={(e) => {
           if (e.key === "Enter") {
@@ -153,6 +154,7 @@ export default function TypeableDateFilterInput({
         type="button"
         tabIndex={-1}
         disabled={disabled}
+        onMouseDown={(e) => e.preventDefault()}
         onClick={openPicker}
         className="absolute right-0 top-0 flex h-full w-9 shrink-0 items-center justify-center text-gray-500 hover:text-gray-700 disabled:pointer-events-none disabled:opacity-50"
         aria-label="Open calendar"
@@ -172,6 +174,7 @@ export default function TypeableDateFilterInput({
         max={max}
         onChange={handlePickerChange}
         className="absolute right-0 top-0 h-full w-9 cursor-pointer opacity-0"
+        onMouseDown={(e) => e.preventDefault()}
         onClick={(e) => e.stopPropagation()}
       />
     </div>
