@@ -576,6 +576,7 @@ export default function QuotationSalesEditForm({ quoteId, hasOrder = false, redi
         cgstRate={cgstRate}
         sgstRate={sgstRate}
         igstRate={igstRate}
+        editableSpecification={false}
       />
 
       <TaxAndSummary

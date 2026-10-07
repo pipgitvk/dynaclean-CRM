@@ -484,6 +484,7 @@ export default function QuotationEditForm({ quoteId }) {
         cgstRate={cgstRate}
         sgstRate={sgstRate}
         igstRate={igstRate}
+        editableSpecification={false}
       />
 
       {/* Tax Summary */}
