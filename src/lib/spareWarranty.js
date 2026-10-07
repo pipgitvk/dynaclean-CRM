@@ -36,3 +36,22 @@ export async function ensureCoveredInWarrantyColumn(conn = null) {
   }
   return db;
 }
+
+export async function ensureHsnSacColumn(conn = null) {
+  const db = conn || (await getDbConnection());
+  const [cols] = await db.execute(
+    `SELECT 1
+     FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'spare_list'
+       AND COLUMN_NAME = 'hsn_sac'`,
+  );
+  if (cols.length === 0) {
+    await db.execute(
+      `ALTER TABLE spare_list
+       ADD COLUMN hsn_sac VARCHAR(32) NULL DEFAULT NULL
+       COMMENT 'HSN/SAC code for GST'`,
+    );
+  }
+  return db;
+}

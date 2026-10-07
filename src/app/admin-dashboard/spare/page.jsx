@@ -94,6 +94,7 @@ function SpareList({ userRole, previewImage, setPreviewImage }) {
       formData.append('purchase_price', editingSpare.purchase_price);
       formData.append('sale_price', editingSpare.sale_price);
       formData.append('tax', editingSpare.tax || 0);
+      formData.append('hsn_sac', editingSpare.hsn_sac || '');
       formData.append('last_negotiation_price', editingSpare.last_negotiation_price);
       formData.append('specification', editingSpare.specification);
       formData.append('covered_in_warranty', warrantySelectValue(editingSpare.covered_in_warranty));
@@ -367,6 +368,7 @@ function SpareList({ userRole, previewImage, setPreviewImage }) {
             <tr>
               <th className="p-2 text-left">Image</th>
               <th className="p-2 text-left">Spare No</th>
+              <th className="p-2 text-left">HSN Code</th>
               <th className="p-2 text-left">Covered in Warranty</th>
               <th className="p-2 text-left">Name</th>
               <th className="p-2 text-left">Type</th>
@@ -403,6 +405,7 @@ function SpareList({ userRole, previewImage, setPreviewImage }) {
                       )}
                     </td>
                     <td className="p-2">{r.spare_number}</td>
+                    <td className="p-2 whitespace-nowrap">{r.hsn_sac || "-"}</td>
                     <td className="p-2 font-medium">{warrantyYn(r.covered_in_warranty)}</td>
                     <td className="p-2">{r.item_name}</td>
                     <td className="p-2 text-xs bg-blue-50">{r.type || "-"}</td>
@@ -511,7 +514,7 @@ function SpareList({ userRole, previewImage, setPreviewImage }) {
 
             {view.length === 0 && (
               <tr>
-                <td className="p-2 text-gray-500" colSpan={16}>
+                <td className="p-2 text-gray-500" colSpan={17}>
                   No data
                 </td>
               </tr>
@@ -572,6 +575,7 @@ function SpareList({ userRole, previewImage, setPreviewImage }) {
               {/* DETAILS */}
               <div className="mt-2 text-xs text-gray-700 space-y-1">
                 <p><span className="font-semibold">Spare No:</span> {r.spare_number}</p>
+                <p><span className="font-semibold">HSN Code:</span> {r.hsn_sac || "-"}</p>
                 <p><span className="font-semibold">Covered in Warranty:</span> {warrantyYn(r.covered_in_warranty)}</p>
                 <p><span className="font-semibold">Min Qty:</span> {r.min_qty}</p>
                 <div className="flex items-center gap-2">
@@ -614,6 +618,7 @@ function SpareList({ userRole, previewImage, setPreviewImage }) {
                     </div>
                   )}
                 </div>
+                <p><span className="font-semibold">Tax %:</span> {r.tax ?? "-"}</p>
                 <p><span className="font-semibold">Specification:</span> {r.specification}</p>
               </div>
             </div>
@@ -645,6 +650,16 @@ function SpareList({ userRole, previewImage, setPreviewImage }) {
                   type="text"
                   value={editingSpare.spare_number || ""}
                   onChange={(e) => setEditingSpare({ ...editingSpare, spare_number: e.target.value })}
+                  className="w-full border rounded px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-700 mb-1">HSN Code</label>
+                <input
+                  type="text"
+                  value={editingSpare.hsn_sac || ""}
+                  onChange={(e) => setEditingSpare({ ...editingSpare, hsn_sac: e.target.value })}
+                  placeholder="e.g., 85171200"
                   className="w-full border rounded px-3 py-2 text-sm"
                 />
               </div>

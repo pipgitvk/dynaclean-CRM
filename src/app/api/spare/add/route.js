@@ -5,7 +5,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import heicConvert from 'heic-convert';
 import { v2 as cloudinary } from 'cloudinary';
-import { ensureCoveredInWarrantyColumn, normalizeWarrantyFlag } from '@/lib/spareWarranty';
+import { ensureCoveredInWarrantyColumn, ensureHsnSacColumn, normalizeWarrantyFlag } from '@/lib/spareWarranty';
 
 /**
  * Cloudinary when creds exist and either:
@@ -102,6 +102,7 @@ export async function POST(request) {
     const sale_price = formData.get('sale_price');
     const last_negotiation_price = formData.get('last_negotiation_price');
     const tax = formData.get('tax');
+    const hsn_sac = formData.get('hsn_sac');
     const covered_in_warranty = normalizeWarrantyFlag(formData.get('covered_in_warranty'));
 
     // Basic validation - only require purchase_price and tax if not DESIGN ENGINEER or SERVICE SUPPORT or EA
@@ -117,6 +118,7 @@ export async function POST(request) {
     try {
         const db = await getDbConnection();
         await ensureCoveredInWarrantyColumn(db);
+        await ensureHsnSacColumn(db);
 
         // Prevent duplicates by item_name (case-insensitive)
         const [existing] = await db.execute(
@@ -145,8 +147,8 @@ export async function POST(request) {
         // Insert into spare_list table
         const spareQuery = `
             INSERT INTO spare_list 
-            (item_name, specification, type, make, model, compatible_machine, purchase_price, sale_price, last_negotiation_price, tax, image, catalog, created_by, covered_in_warranty) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (item_name, specification, type, make, model, compatible_machine, purchase_price, sale_price, last_negotiation_price, tax, hsn_sac, image, catalog, created_by, covered_in_warranty) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
 
         const spareValues = [
@@ -160,6 +162,7 @@ export async function POST(request) {
             sale_price ? parseFloat(sale_price) : null,
             last_negotiation_price ? parseFloat(last_negotiation_price) : null,
             canSkipPriceFields ? null : parseFloat(tax),
+            hsn_sac ? String(hsn_sac).trim() : null,
             imagePath,
             catalogPath,
             username,

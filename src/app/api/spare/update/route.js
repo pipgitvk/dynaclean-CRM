@@ -6,7 +6,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import heicConvert from 'heic-convert';
 import { v2 as cloudinary } from 'cloudinary';
-import { ensureCoveredInWarrantyColumn, normalizeWarrantyFlag } from '@/lib/spareWarranty';
+import { ensureCoveredInWarrantyColumn, ensureHsnSacColumn, normalizeWarrantyFlag } from '@/lib/spareWarranty';
 
 const secret = new TextEncoder().encode(process.env.JWT_SECRET);
 
@@ -120,6 +120,7 @@ export async function POST(request) {
         const model = formData.get('model');
         const compatible_machine = formData.get('compatible_machine');
         const tax = formData.get('tax');
+        const hsn_sac = formData.get('hsn_sac');
         const min_qty = formData.get('min_qty');
         const purchase_price = formData.get('purchase_price');
         const sale_price = formData.get('sale_price');
@@ -134,6 +135,7 @@ export async function POST(request) {
 
         const db = await getDbConnection();
         await ensureCoveredInWarrantyColumn(db);
+        await ensureHsnSacColumn(db);
 
         // Get current spare details
         const [currentSpare] = await db.execute('SELECT * FROM spare_list WHERE id = ? LIMIT 1', [id]);
@@ -180,6 +182,10 @@ export async function POST(request) {
         if (tax !== null && tax !== undefined) {
             updates.push('tax = ?');
             values.push(tax);
+        }
+        if (hsn_sac !== null && hsn_sac !== undefined) {
+            updates.push('hsn_sac = ?');
+            values.push(String(hsn_sac).trim() || null);
         }
         if (min_qty !== null && min_qty !== undefined) {
             updates.push('min_qty = ?');
