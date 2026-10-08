@@ -93,6 +93,7 @@ export default function ProfileForm({
     correspondence_address: "",
     permanent_address: "",
     near_police_station: "",
+    machine_code: "",
     pan_number: "",
     aadhar_number: "",
     pf_uan: "",

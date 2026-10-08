@@ -177,6 +177,24 @@ export default function PersonalInfoSection({
         </div>
 
         <div>
+          <label className={labelClass}>Machine Employee ID</label>
+          <input
+            type="text"
+            name="machine_code"
+            value={formData.machine_code || ""}
+            onChange={handleChange}
+            readOnly={ro || !isPrivilegedEditor}
+            placeholder="e.g. 102"
+            className={
+              ro || !isPrivilegedEditor
+                ? `${inputClass} bg-gray-100 cursor-not-allowed text-gray-500`
+                : inactive(inputClass)
+            }
+            title="eTimeOffice / attendance machine employee ID"
+          />
+        </div>
+
+        <div>
           <label className={labelClass}>Username *</label>
           <input
             type="text"

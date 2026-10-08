@@ -3,6 +3,7 @@ import { getDbConnection } from "@/lib/db";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 import { getSessionPayload } from "@/lib/auth";
+import { ensureEmployeeProfileMachineCodeColumn } from "@/lib/ensureEmployeeProfileMachineCode";
 import { v2 as cloudinary } from "cloudinary";
 
 // Initialize Cloudinary
@@ -56,6 +57,7 @@ export async function GET(request) {
     }
 
     const conn = await getDbConnection();
+    await ensureEmployeeProfileMachineCodeColumn(conn);
     console.log('[EMPCRM][GET] Incoming:', {
       requestedUsername: username,
       sessionUsername: session?.username || null,
@@ -365,6 +367,7 @@ async function saveProfile(request, methodType) {
     if (data.date_of_birth) data.date_of_birth = toYyyyMmDd(data.date_of_birth) || null;
 
     conn = await getDbConnection();
+    await ensureEmployeeProfileMachineCodeColumn(conn);
 
     // Check Existence
     const [existing] = await conn.execute(
