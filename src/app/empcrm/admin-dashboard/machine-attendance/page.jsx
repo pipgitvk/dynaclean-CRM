@@ -95,6 +95,7 @@ export default function MachineAttendancePage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
   const [viewMode, setViewMode] = useState("daily");
+  const [lastSync, setLastSync] = useState(null);
 
   const loadRows = useCallback(async () => {
     setLoading(true);
@@ -111,12 +112,14 @@ export default function MachineAttendancePage() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.message || "Failed to load data");
       setRows(data.rows || []);
+      setLastSync(data.lastSync || null);
       setPagination(
         data.pagination || { page: 1, limit: pageSize, total: 0, pages: 1 }
       );
     } catch (e) {
       toast.error(e.message);
       setRows([]);
+      setLastSync(null);
       setPagination({ page: 1, limit: pageSize, total: 0, pages: 1 });
     } finally {
       setLoading(false);
@@ -125,6 +128,11 @@ export default function MachineAttendancePage() {
 
   useEffect(() => {
     loadRows();
+  }, [loadRows]);
+
+  useEffect(() => {
+    const id = setInterval(() => loadRows(), 60_000);
+    return () => clearInterval(id);
   }, [loadRows]);
 
   const applyFilters = () => {
@@ -162,6 +170,7 @@ export default function MachineAttendancePage() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.message || "Sync failed");
+      if (data.lastSync) setLastSync(data.lastSync);
       toast.success(
         `Synced: ${data.fetched ?? 0} fetched, ${data.inserted ?? 0} new, ${data.updated ?? 0} updated.`
       );
@@ -194,6 +203,21 @@ export default function MachineAttendancePage() {
     <div className="p-4 md:p-6 max-w-[1600px] mx-auto">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Machine Attendance</h1>
+        <p className="text-sm text-gray-500 mt-1">
+          Auto-sync every hour at :00 IST (current month, all employees).
+        </p>
+        <p className="text-sm text-gray-700 mt-2">
+          <span className="font-medium text-gray-900">Last sync:</span>{" "}
+          {lastSync?.at
+            ? `${formatPunchDisplay(lastSync.at)}${
+                lastSync.source === "hourly"
+                  ? " · auto"
+                  : lastSync.source === "manual"
+                    ? " · manual"
+                    : ""
+              }`
+            : "Not synced yet"}
+        </p>
       </div>
 
       <div className="bg-white rounded-lg shadow border border-gray-100 p-4 mb-6">

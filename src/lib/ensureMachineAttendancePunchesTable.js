@@ -15,6 +15,21 @@ CREATE TABLE IF NOT EXISTS machine_attendance_punches (
   INDEX idx_machine_punch_emp_datetime (emp_code, punch_datetime)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`;
 
+const CREATE_SYNC_META = `
+CREATE TABLE IF NOT EXISTS machine_attendance_sync_meta (
+  id TINYINT PRIMARY KEY,
+  last_sync_at DATETIME NOT NULL,
+  source VARCHAR(32) NULL,
+  synced_by VARCHAR(128) NULL,
+  range_from DATE NULL,
+  range_to DATE NULL,
+  fetched INT NOT NULL DEFAULT 0,
+  inserted_count INT NOT NULL DEFAULT 0,
+  updated_count INT NOT NULL DEFAULT 0,
+  skipped INT NOT NULL DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`;
+
 export async function ensureMachineAttendancePunchesTable(conn) {
   await conn.execute(CREATE_TABLE);
+  await conn.execute(CREATE_SYNC_META);
 }

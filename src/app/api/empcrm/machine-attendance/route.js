@@ -1,14 +1,21 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { ensureMachineAttendancePunchesTable } from "@/lib/ensureMachineAttendancePunchesTable";
-import {
-  fetchEtimeOfficePunchData,
-  formatEtimeOfficeApiDate,
-  normalizeEtimeOfficePunchRow,
-} from "@/lib/etimeOfficePunchApi";
 import { requireMachineAttendanceSession } from "@/lib/empcrmMachineAttendanceAuth";
+import {
+  getLastMachineAttendanceSync,
+  syncMachineAttendanceFromEtimeOffice,
+} from "@/lib/syncMachineAttendance";
 
 export const dynamic = "force-dynamic";
+
+let machineAttendanceCronStarted = false;
+if (!machineAttendanceCronStarted) {
+  machineAttendanceCronStarted = true;
+  import("@/lib/cron/machineAttendanceSyncCron").then((mod) => {
+    mod.startMachineAttendanceSyncCron();
+  });
+}
 
 function parseYmd(s) {
   const t = String(s || "").trim();
@@ -61,6 +68,7 @@ export async function GET(request) {
     const conn = await getDbConnection();
     await ensureMachineAttendancePunchesTable(conn);
 
+    const lastSync = await getLastMachineAttendanceSync(conn);
     const { whereSql, params } = buildMachinePunchFilters(from, to, employeeSearch);
 
     if (view === "raw") {
@@ -82,6 +90,7 @@ export async function GET(request) {
       return NextResponse.json({
         view: "raw",
         rows: rows || [],
+        lastSync,
         pagination: { page, limit, total, pages: Math.ceil(total / limit) || 1 },
       });
     }
@@ -139,6 +148,7 @@ export async function GET(request) {
     return NextResponse.json({
       view: "daily",
       rows: normalized,
+      lastSync,
       pagination: { page, limit, total, pages: Math.ceil(total / limit) || 1 },
     });
   } catch (err) {
@@ -180,69 +190,26 @@ export async function POST(request) {
     const empCode = String(body.empCode ?? body.empcode ?? "ALL").trim() || "ALL";
     const dayStart = String(body.dayStart ?? "09:30").trim();
     const dayEnd = String(body.dayEnd ?? "18:30").trim();
-    const fromApiDate = formatEtimeOfficeApiDate(from, dayStart);
-    const toApiDate = formatEtimeOfficeApiDate(to, dayEnd);
-    if (!fromApiDate || !toApiDate) {
-      return NextResponse.json({ message: "Invalid date or time range." }, { status: 400 });
-    }
-
-    const { punches } = await fetchEtimeOfficePunchData({
-      empCode,
-      fromApiDate,
-      toApiDate,
-    });
-
-    const conn = await getDbConnection();
-    await ensureMachineAttendancePunchesTable(conn);
-
-    let inserted = 0;
-    let updated = 0;
-    let skipped = 0;
-
-    for (const raw of punches) {
-      const row = normalizeEtimeOfficePunchRow(raw);
-      if (!row) {
-        skipped += 1;
-        continue;
-      }
-      const [result] = await conn.execute(
-        `INSERT INTO machine_attendance_punches
-          (emp_code, employee_name, punch_datetime, m_flag, raw_punch_date, source_uid)
-         VALUES (?, ?, ?, ?, ?, ?)
-         ON DUPLICATE KEY UPDATE
-          employee_name = VALUES(employee_name),
-          punch_datetime = VALUES(punch_datetime),
-          m_flag = VALUES(m_flag),
-          raw_punch_date = VALUES(raw_punch_date),
-          synced_at = CURRENT_TIMESTAMP`,
-        [
-          row.emp_code,
-          row.employee_name,
-          row.punch_datetime,
-          row.m_flag,
-          row.raw_punch_date,
-          row.source_uid,
-        ]
-      );
-      const aff = Number(result?.affectedRows ?? 0);
-      if (aff === 1) inserted += 1;
-      else if (aff === 2) updated += 1;
-    }
-
     const syncedBy =
       auth.payload.username ||
       auth.payload.name ||
       auth.payload.email ||
       "unknown";
 
+    const result = await syncMachineAttendanceFromEtimeOffice({
+      from,
+      to,
+      empCode,
+      dayStart,
+      dayEnd,
+      source: "manual",
+      syncedBy,
+    });
+
     return NextResponse.json({
       success: true,
-      fetched: punches.length,
-      inserted,
-      updated,
-      skipped,
+      ...result,
       syncedBy,
-      range: { from, to, empCode, fromApiDate, toApiDate },
     });
   } catch (err) {
     console.error("machine-attendance POST:", err);

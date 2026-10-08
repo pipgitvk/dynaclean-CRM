@@ -14,6 +14,9 @@ if (typeof window === "undefined" && !cronStarted) {
   import("@/lib/cron/attendanceAutoCheckoutCron").then((mod) => {
     mod.startAttendanceAutoCheckoutCron();
   });
+  import("@/lib/cron/machineAttendanceSyncCron").then((mod) => {
+    mod.startMachineAttendanceSyncCron();
+  });
 }
 
 const geistSans = Geist({
