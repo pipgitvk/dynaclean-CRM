@@ -4,7 +4,7 @@
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
-import { Loader2, Search, Info, Pencil, Sun, History } from "lucide-react";
+import { Loader2, Search, Info, Pencil, Sun, History, AlertTriangle } from "lucide-react";
 import AttendanceEditHistoryPanel from "@/components/AttendanceEditHistoryPanel";
 import ExcelJS from "exceljs";
 import {
@@ -24,6 +24,10 @@ import AttendanceBulkImportPanel from "@/components/AttendanceBulkImportPanel";
 import AttendanceAddressMapModal, {
   ViewAddressLink,
 } from "@/components/AttendanceAddressMapModal";
+import {
+  AUTO_CHECKOUT_ATTENDANCE_ADDRESS,
+  isAutomaticCheckoutAddress,
+} from "@/lib/attendanceAutoCheckoutConstants";
 
 function attendanceDateYmd(value) {
   if (value == null || value === "") return "";
@@ -55,6 +59,53 @@ function combineDateAndTimeForDb(dateYmd, timeHHmm) {
   const hh = String(parseInt(h, 10)).padStart(2, "0");
   const mm = String(parseInt(m, 10)).padStart(2, "0");
   return `${dateYmd} ${hh}:${mm}:00`;
+}
+
+const AUTO_CHECKOUT_WARNING_TITLE =
+  "No manual check-out — automatic check-out at 9:00 PM only.";
+
+function CheckoutTimeDisplay({ log }) {
+  const time = formatTime(log.checkout_time);
+  if (!isAutomaticCheckoutAddress(log.checkout_address)) return time;
+  return (
+    <span
+      className="inline-flex items-center gap-1"
+      title={AUTO_CHECKOUT_WARNING_TITLE}
+    >
+      <AlertTriangle
+        className="w-4 h-4 shrink-0 text-red-600"
+        aria-label="Automatic checkout warning"
+      />
+      <span>{time}</span>
+    </span>
+  );
+}
+
+function CheckoutAddressCell({ log, title, onOpen, className = "" }) {
+  if (isAutomaticCheckoutAddress(log.checkout_address)) {
+    return (
+      <span
+        className={`inline-flex items-center gap-1 text-red-600 font-bold ${className}`}
+        title={AUTO_CHECKOUT_WARNING_TITLE}
+      >
+        <AlertTriangle
+          className="w-4 h-4 shrink-0"
+          aria-label="Automatic checkout warning"
+        />
+        {AUTO_CHECKOUT_ATTENDANCE_ADDRESS}
+      </span>
+    );
+  }
+  return (
+    <ViewAddressLink
+      title={title}
+      address={log.checkout_address}
+      latitude={log.checkout_latitude}
+      longitude={log.checkout_longitude}
+      onOpen={onOpen}
+      className={className}
+    />
+  );
 }
 
 function AdminTimeEditRemark({ remark, className = "" }) {
@@ -1234,6 +1285,9 @@ const AttendancePage = () => {
                         </span>
                         <span
                           className={`text-sm ${(() => {
+                            if (isAutomaticCheckoutAddress(log.checkout_address)) {
+                              return "text-red-600 font-bold";
+                            }
                             const status = getCheckoutStatus(log.checkout_time, log.username);
                             // Early checkout or missing checkout always shows as half-day for display
                             const isHalfDayStatus = isHalfDay(log);
@@ -1244,7 +1298,7 @@ const AttendancePage = () => {
                           })()
                             }`}
                         >
-                          {formatTime(log.checkout_time)}
+                          <CheckoutTimeDisplay log={log} />
                         </span>
                       </div>
                       <div className="flex items-center justify-between gap-2">
@@ -1252,11 +1306,9 @@ const AttendancePage = () => {
                           Check-out Address:
                         </span>
                         <span className="text-sm text-gray-700 flex items-center gap-1.5 justify-end text-right min-w-0">
-                          <ViewAddressLink
+                          <CheckoutAddressCell
+                            log={log}
                             title={`Check-out — ${log.username}`}
-                            address={log.checkout_address}
-                            latitude={log.checkout_latitude}
-                            longitude={log.checkout_longitude}
                             onOpen={openAddressMap}
                             className="text-sm"
                           />
@@ -1556,6 +1608,9 @@ const AttendancePage = () => {
                           </td>
                           <td
                             className={`px-6 py-4 whitespace-nowrap text-sm text-gray-500 ${(() => {
+                              if (isAutomaticCheckoutAddress(log.checkout_address)) {
+                                return "bg-red-100 text-red-700 font-bold";
+                              }
                               const status = getCheckoutStatus(log.checkout_time, log.username);
                               if (status === 'halfDay') return 'bg-yellow-100';
                               if (status === 'late') return 'bg-red-100';
@@ -1565,15 +1620,13 @@ const AttendancePage = () => {
                             })()
                               }`}
                           >
-                            {formatTime(log.checkout_time)}
+                            <CheckoutTimeDisplay log={log} />
                           </td>
                           <td className="px-6 py-4 text-sm text-gray-500">
                             <div className="flex flex-wrap items-center gap-1.5">
-                              <ViewAddressLink
+                              <CheckoutAddressCell
+                                log={log}
                                 title={`Check-out — ${log.username} (${attendanceDateYmd(log.date)})`}
-                                address={log.checkout_address}
-                                latitude={log.checkout_latitude}
-                                longitude={log.checkout_longitude}
                                 onOpen={openAddressMap}
                               />
                               {log.regularization ? (

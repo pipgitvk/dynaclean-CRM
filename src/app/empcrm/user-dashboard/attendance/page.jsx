@@ -4,7 +4,7 @@
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import toast from "react-hot-toast";
-import { Sun, BadgeCheck } from "lucide-react";
+import { Sun, BadgeCheck, AlertTriangle } from "lucide-react";
 import {
   DEFAULT_ATTENDANCE_RULES,
   getCheckinStatus as checkinStatusFromRules,
@@ -17,6 +17,31 @@ import { rowHasMeaningfulCheckinOrCheckout } from "@/lib/attendanceMeaningfulPun
 import { formatAttendanceTimeForDisplay as formatTime } from "@/lib/istDateTime";
 import { getAttendanceRegularizationAttachmentHref } from "@/lib/attendanceRegularizationAttachmentHref";
 import AttendanceRegularizeModal from "@/app/user-dashboard/attendance/AttendanceRegularizeModal";
+import {
+  AUTO_CHECKOUT_ATTENDANCE_ADDRESS,
+  isAutomaticCheckoutAddress,
+} from "@/lib/attendanceAutoCheckoutConstants";
+
+const AUTO_CHECKOUT_WARNING_TITLE =
+  "No manual check-out — automatic check-out at 9:00 PM only.";
+
+function CheckoutTimeDisplay({ log }) {
+  const time = formatTime(log.checkout_time);
+  if (!isAutomaticCheckoutAddress(log.checkout_address)) return time;
+  return (
+    <span
+      className="inline-flex items-center gap-1 text-red-600 font-bold"
+      title={AUTO_CHECKOUT_WARNING_TITLE}
+    >
+      <AlertTriangle
+        className="w-4 h-4 shrink-0"
+        aria-label="Automatic checkout warning"
+      />
+      <span>{time}</span>
+      <span className="text-xs sm:text-sm">{AUTO_CHECKOUT_ATTENDANCE_ADDRESS}</span>
+    </span>
+  );
+}
 
 function statusBadgeClass(status) {
   const s = String(status || "").toLowerCase();
@@ -845,6 +870,9 @@ const AttendancePage = () => {
                       </span>
                       <span
                         className={`text-sm ${(() => {
+                          if (isAutomaticCheckoutAddress(log.checkout_address)) {
+                            return "text-red-600 font-bold";
+                          }
                           const status = getCheckoutStatus(log.checkout_time);
                           if (status === "halfDay") return "text-yellow-300";
                           if (status === "late") return "text-red-600";
@@ -853,7 +881,7 @@ const AttendancePage = () => {
                         })()
                           }`}
                       >
-                        {formatTime(log.checkout_time)}
+                        <CheckoutTimeDisplay log={log} />
                       </span>
                     </div>
                   </>
@@ -1119,6 +1147,9 @@ const AttendancePage = () => {
                         </td>
                         <td
                           className={`px-6 py-4 whitespace-nowrap text-sm text-gray-500 ${(() => {
+                            if (isAutomaticCheckoutAddress(log.checkout_address)) {
+                              return "bg-red-100 text-red-700 font-bold";
+                            }
                             const status = getCheckoutStatus(log.checkout_time);
                             if (status === "halfDay") return "bg-yellow-100";
                             if (status === "late") return "bg-yellow-100";
@@ -1128,7 +1159,7 @@ const AttendancePage = () => {
                           })()
                             }`}
                         >
-                          {formatTime(log.checkout_time)}
+                          <CheckoutTimeDisplay log={log} />
                         </td>
                         {filterStatus === "regularize" && (
                           <td className="px-6 py-4 whitespace-nowrap text-sm">

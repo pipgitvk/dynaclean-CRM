@@ -6,6 +6,7 @@ import {
   rowToAttendanceRulesShape,
   mergeGlobalRulesWithEmployeeSchedule,
 } from "@/lib/attendanceRulesDb";
+import { applyAutomaticCheckouts } from "@/lib/attendanceAutoCheckout";
 
 export const dynamic = 'force-dynamic';
 
@@ -18,6 +19,7 @@ function normalizeUserKey(value) {
 export async function GET() {
   try {
     const db = await getDbConnection();
+    await applyAutomaticCheckouts(db);
 
     const [rows] = await db.query(
       `SELECT

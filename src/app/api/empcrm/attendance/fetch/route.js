@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
+import { applyAutomaticCheckouts } from "@/lib/attendanceAutoCheckout";
 
 export const dynamic = 'force-dynamic';
 
@@ -20,6 +21,7 @@ export async function GET(request) {
     console.log(`Fetching attendance logs for username: ${username}`);
 
     const db = await getDbConnection();
+    await applyAutomaticCheckouts(db, { username });
     console.log("Database connection established.");
 
     const [rows] = await db.query(
@@ -33,6 +35,7 @@ export async function GET(request) {
         break_lunch_end,
         break_evening_start,
         break_evening_end,
+        checkout_address,
         checkin_photo
       FROM attendance_logs
       WHERE username = ?
