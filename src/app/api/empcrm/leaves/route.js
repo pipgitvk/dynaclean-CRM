@@ -9,6 +9,10 @@ import {
   eachDayInLeaveRange,
   fetchCompanyHolidays,
 } from "@/lib/leaveContinuousDays";
+import {
+  buildUnpaidSandwichApprovalUpdate,
+  unpaidLeavesForApprovalSandwich,
+} from "@/lib/unpaidLeaveSandwich";
 
 // GET: Fetch leaves (admin sees all, users see only their own, reporting manager sees reportees only)
 export async function GET(request) {
@@ -322,6 +326,7 @@ export async function POST(request) {
     };
 
     const holidays = await fetchCompanyHolidays(conn);
+
     const continuousLeave = calculateContinuousLeaveDays(from_date, to_date, holidays);
     const calendarSpanDays = eachDayInLeaveRange(from_date, to_date).length;
 
@@ -609,9 +614,10 @@ export async function POST(request) {
         session.username,
         attachmentPath,
         attachmentFilename,
-        attachmentMimeType
+        attachmentMimeType,
       ]
     );
+    const leaveIdForResponse = result.insertId;
 
     // Send email notification to HR
     try {
@@ -694,7 +700,7 @@ export async function POST(request) {
     return NextResponse.json({
       success: true,
       message: "Leave application submitted successfully",
-      leaveId: result.insertId
+      leaveId: leaveIdForResponse,
     });
   } catch (error) {
     console.error("Error creating leave application:", error);
@@ -1000,9 +1006,59 @@ export async function PATCH(request) {
       }
     }
 
+    let skipDefaultStatusUpdate = false;
+
+    // Unpaid full-day: sandwich Sundays/holidays only when approved (not while pending)
+    if (status === "approved" && leave.leave_type === "unpaid" && leave.is_half_day != 1) {
+      const holidays = await fetchCompanyHolidays(conn);
+      const [unpaidRows] = await conn.execute(
+        `SELECT id, from_date, to_date, is_half_day, status
+         FROM employee_leaves
+         WHERE username = ?
+           AND leave_type = 'unpaid'
+           AND status IN ('pending', 'approved')`,
+        [leave.username]
+      );
+      const pool = unpaidLeavesForApprovalSandwich(unpaidRows, leaveId);
+      const plan = buildUnpaidSandwichApprovalUpdate(leave, pool, holidays);
+      if (plan.handled) {
+        await conn.execute(
+          `UPDATE employee_leaves
+           SET status = ?, reviewed_by = ?, reviewed_at = NOW(), rejection_reason = ?,
+               from_date = ?, to_date = ?, total_days = ?, leave_type = 'unpaid', is_half_day = 0
+           WHERE id = ?`,
+          [
+            status,
+            session.username,
+            rejection_reason || null,
+            plan.from_date,
+            plan.to_date,
+            plan.totalDays,
+            plan.primaryId,
+          ]
+        );
+        if (plan.deleteIds.length > 0) {
+          const placeholders = plan.deleteIds.map(() => "?").join(", ");
+          await conn.execute(
+            `DELETE FROM employee_leaves WHERE username = ? AND id IN (${placeholders})`,
+            [leave.username, ...plan.deleteIds]
+          );
+        }
+        overrideTotalDays = plan.totalDays;
+        overrideIsHalfDay = 0;
+        leave.from_date = plan.from_date;
+        leave.to_date = plan.to_date;
+        skipDefaultStatusUpdate = true;
+      }
+    }
+
     // Unpaid (full or half-day): sanitise total_days floor values on approval
     // Prevents total_days = 0 corruption from showing bogus numbers in Unpaid card
-    if (status === "approved" && leave.leave_type === "unpaid") {
+    if (
+      status === "approved" &&
+      leave.leave_type === "unpaid" &&
+      !skipDefaultStatusUpdate
+    ) {
       const unpaidHalfDay = leave.is_half_day == 1;
       const unpaidStored = Number(leave.total_days) || 0;
       overrideTotalDays = unpaidHalfDay
@@ -1013,17 +1069,23 @@ export async function PATCH(request) {
     // ─────────────────────────────────────────────────────────────────────────────
 
     // Update leave status (approve / reject), with smart-calculated total_days / leave_type
-    await conn.execute(
-      `UPDATE employee_leaves 
-       SET status = ?, reviewed_by = ?, reviewed_at = NOW(), rejection_reason = ?,
-           total_days = ?, leave_type = ?, is_half_day = ?
-       WHERE id = ?`,
-      [status, session.username, rejection_reason || null,
-       status === "approved" ? overrideTotalDays : (Number(leave.total_days) || 1),
-       status === "approved" ? overrideLeaveType : leave.leave_type,
-       status === "approved" ? overrideIsHalfDay : (leave.is_half_day == 1 ? 1 : 0),
-       leaveId]
-    );
+    if (!skipDefaultStatusUpdate) {
+      await conn.execute(
+        `UPDATE employee_leaves 
+         SET status = ?, reviewed_by = ?, reviewed_at = NOW(), rejection_reason = ?,
+             total_days = ?, leave_type = ?, is_half_day = ?
+         WHERE id = ?`,
+        [
+          status,
+          session.username,
+          rejection_reason || null,
+          status === "approved" ? overrideTotalDays : Number(leave.total_days) || 1,
+          status === "approved" ? overrideLeaveType : leave.leave_type,
+          status === "approved" ? overrideIsHalfDay : leave.is_half_day == 1 ? 1 : 0,
+          leaveId,
+        ]
+      );
+    }
 
     // If approving unpaid leave (full-day or half-day that was converted), create salary deduction
     // Use the final resolved values (overrideLeaveType / overrideTotalDays / overrideIsHalfDay)

@@ -5,6 +5,10 @@ import {
   calculateContinuousLeaveDays,
   fetchCompanyHolidays,
 } from "@/lib/leaveContinuousDays";
+import {
+  expandUnpaidSandwichSpan,
+  unpaidLeavesForPendingSandwichPreview,
+} from "@/lib/unpaidLeaveSandwich";
 
 export async function GET(request) {
   try {
@@ -16,6 +20,7 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const from_date = searchParams.get("from_date");
     const to_date = searchParams.get("to_date");
+    const leave_type = searchParams.get("leave_type") || "";
     const is_half_day = searchParams.get("is_half_day") === "1" || searchParams.get("is_half_day") === "true";
 
     if (!from_date) {
@@ -35,13 +40,63 @@ export async function GET(request) {
 
     const conn = await getDbConnection();
     const holidays = await fetchCompanyHolidays(conn);
-    const { totalDays, breakdown } = calculateContinuousLeaveDays(from_date, to, holidays);
+
+    const requested = calculateContinuousLeaveDays(from_date, to, holidays);
+
+    let totalDaysAfterApproval = null;
+    let afterApprovalBreakdown = null;
+    let sandwichAfterApproval = false;
+    let effectiveFromAfterApproval = null;
+    let effectiveToAfterApproval = null;
+
+    if (leave_type === "unpaid") {
+      const [existingUnpaid] = await conn.execute(
+        `SELECT id, from_date, to_date, is_half_day, status
+         FROM employee_leaves
+         WHERE username = ?
+           AND leave_type = 'unpaid'
+           AND status IN ('pending', 'approved')`,
+        [session.username]
+      );
+      const previewPool = unpaidLeavesForPendingSandwichPreview(existingUnpaid);
+      const hypotheticalPool = [
+        ...previewPool,
+        {
+          id: -1,
+          from_date,
+          to_date: to,
+          is_half_day: 0,
+          status: "pending",
+        },
+      ];
+      const sandwich = expandUnpaidSandwichSpan(
+        from_date,
+        to,
+        hypotheticalPool,
+        holidays
+      );
+      const after = calculateContinuousLeaveDays(
+        sandwich.from_date,
+        sandwich.to_date,
+        holidays
+      );
+      totalDaysAfterApproval = after.totalDays;
+      afterApprovalBreakdown = after.breakdown;
+      effectiveFromAfterApproval = sandwich.from_date;
+      effectiveToAfterApproval = sandwich.to_date;
+      sandwichAfterApproval = totalDaysAfterApproval > requested.totalDays;
+    }
 
     return NextResponse.json({
       success: true,
-      totalDays,
-      breakdown,
+      totalDays: requested.totalDays,
+      breakdown: requested.breakdown,
       rule: "continuous",
+      totalDaysAfterApproval,
+      afterApprovalBreakdown,
+      sandwichAfterApproval,
+      from_date_after_approval: effectiveFromAfterApproval,
+      to_date_after_approval: effectiveToAfterApproval,
     });
   } catch (error) {
     console.error("Leave preview-days error:", error);

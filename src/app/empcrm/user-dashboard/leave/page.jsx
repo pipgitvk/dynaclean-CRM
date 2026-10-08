@@ -70,6 +70,7 @@ export default function UserLeaveManagement() {
       from_date: formData.from_date,
       to_date: to,
       is_half_day: formData.is_half_day ? "1" : "0",
+      leave_type: formData.leave_type || "",
     });
     fetch(`/api/empcrm/leaves/preview-days?${params}`)
       .then((r) => r.json())
@@ -78,7 +79,7 @@ export default function UserLeaveManagement() {
         else setLeaveDayPreview(null);
       })
       .catch(() => setLeaveDayPreview(null));
-  }, [formData.from_date, formData.to_date, formData.is_half_day]);
+  }, [formData.from_date, formData.to_date, formData.is_half_day, formData.leave_type]);
 
   const checkEmailSettings = async () => {
     try {
@@ -780,6 +781,22 @@ export default function UserLeaveManagement() {
                         ? `, ${leaveDayPreview.breakdown.holidays} holiday${leaveDayPreview.breakdown.holidays !== 1 ? "s" : ""}`
                         : ""}
                       {" "}in this span (continuous leave — all days from start to end date).
+                    </p>
+                  )}
+                  {formData.leave_type === "unpaid" &&
+                    leaveDayPreview?.sandwichAfterApproval &&
+                    leaveDayPreview.totalDaysAfterApproval != null && (
+                    <p className="text-[11px] sm:text-xs text-blue-900 font-medium">
+                      Pending: {leaveDayPreview.totalDays} day
+                      {leaveDayPreview.totalDays !== 1 ? "s" : ""} for this application.
+                      After approval (sandwich rule):{" "}
+                      <span className="font-bold">
+                        {leaveDayPreview.totalDaysAfterApproval} days
+                      </span>
+                      {leaveDayPreview.from_date_after_approval &&
+                      leaveDayPreview.to_date_after_approval
+                        ? ` (${leaveDayPreview.from_date_after_approval} to ${leaveDayPreview.to_date_after_approval}, includes Sunday/holiday in between).`
+                        : " (includes Sunday/holiday between linked unpaid leaves)."}
                     </p>
                   )}
                 </div>
