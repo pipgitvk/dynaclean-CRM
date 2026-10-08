@@ -47,6 +47,7 @@ import {
   Truck,
   Landmark,
   FileSpreadsheet,
+  Fingerprint,
 } from "lucide-react";
 
 // Icon map
@@ -91,6 +92,7 @@ const iconMap = {
   Truck,
   Landmark,
   FileSpreadsheet,
+  Fingerprint,
 };
 
 export default function Sidebar({

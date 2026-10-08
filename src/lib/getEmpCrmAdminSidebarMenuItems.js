@@ -39,6 +39,7 @@ export const empCrmAdminMenuItems = [
   { path: "/empcrm/admin-dashboard/attendance-summary", name: "Attendance Summary", roles: ["SUPERADMIN", "HR HEAD", "HR", "Junior HR Executive", "HR Executive", "HR Recruiter"], icon: "LayoutGrid" },
   { path: "/empcrm/admin-dashboard/attendance-sheet", name: "Attendance Sheet", roles: ["SUPERADMIN", "HR HEAD", "HR", "Junior HR Executive", "HR Executive", "HR Recruiter", "ACCOUNTANT"], icon: "FileSpreadsheet" },
   { path: "/empcrm/admin-dashboard/attendance", name: "Attendance details", roles: ["SUPERADMIN", "HR HEAD", "HR", "Junior HR Executive", "HR Executive", "HR Recruiter"], icon: "Clock" },
+  { path: "/empcrm/admin-dashboard/machine-attendance", name: "Machine Attendance", roles: ["SUPERADMIN", "HR HEAD", "HR", "Junior HR Executive", "HR Executive", "HR Recruiter", "ACCOUNTANT"], icon: "Fingerprint" },
   { path: "/empcrm/admin-dashboard/attendance-rules", name: "Attendance Rules", roles: ["SUPERADMIN", "HR HEAD", "HR", "Junior HR Executive", "HR Executive", "HR Recruiter"], icon: "Settings" },
   { path: "/empcrm/admin-dashboard/documents", name: "Employee Documents", roles: ["SUPERADMIN", "HR HEAD", "HR", "Junior HR Executive", "HR Executive", "HR Recruiter"], icon: "FileText" },
   { path: "/empcrm/admin-dashboard/hiring", name: "Hiring", roles: ["HR HEAD", "HR", "Junior HR Executive", "HR Executive", "HR Recruiter"], icon: "UserPlus" },
