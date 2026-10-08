@@ -207,6 +207,33 @@ export async function withPool(callback, retry = true) {
   }
 }
 
+/** One pooled connection for the callback; always released (use in crons / transactions). */
+export async function withDbConnection(callback, retry = true) {
+  const pool = await getDbConnection();
+  const conn = await pool.getConnection();
+  try {
+    return await callback(conn);
+  } catch (error) {
+    if (retry && shouldRecreatePool(error)) {
+      try {
+        conn.release();
+      } catch {
+        /* ignore */
+      }
+      console.log("⚠️ [DB] Recreating pool and retrying withDbConnection...");
+      await recreatePool();
+      return withDbConnection(callback, false);
+    }
+    throw error;
+  } finally {
+    try {
+      conn.release();
+    } catch (releaseError) {
+      console.error("⚠️ [DB] Error releasing connection:", releaseError.message);
+    }
+  }
+}
+
 export async function getDbDebugInfo() {
   const db = await getDbConnection();
 

@@ -8,8 +8,6 @@ import {
   mergeGlobalRulesWithEmployeeSchedule,
 } from "@/lib/attendanceRulesDb";
 import { ensureAttendanceEditHistoryTable } from "@/lib/ensureAttendanceEditHistoryTable";
-import { applyAutomaticCheckouts } from "@/lib/attendanceAutoCheckout";
-
 export const dynamic = 'force-dynamic';
 
 function normalizeUserKey(value) {
@@ -42,7 +40,6 @@ export async function GET(request) {
 
     const db = await getDbConnection();
     await ensureAttendanceEditHistoryTable(db);
-    await applyAutomaticCheckouts(db);
     console.log("Database connection established.");
 
     // Query to fetch all attendance logs

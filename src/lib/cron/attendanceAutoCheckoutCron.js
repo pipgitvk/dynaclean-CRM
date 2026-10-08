@@ -1,5 +1,4 @@
 import cron from "node-cron";
-import { getDbConnection } from "@/lib/db";
 import { applyAutomaticCheckouts } from "@/lib/attendanceAutoCheckout";
 
 const GLOBAL_KEY = "__attendanceAutoCheckoutCronStarted__";
@@ -16,8 +15,7 @@ export async function startAttendanceAutoCheckoutCron() {
 
   const cronJob = cron.schedule("* * * * *", async () => {
     try {
-      const pool = await getDbConnection();
-      const updated = await applyAutomaticCheckouts(pool);
+      const updated = await applyAutomaticCheckouts();
       if (updated > 0) {
         console.log(`✅ Auto checkout applied for ${updated} attendance row(s)`);
       }
