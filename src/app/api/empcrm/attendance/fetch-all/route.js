@@ -7,6 +7,7 @@ import {
   rowToAttendanceRulesShape,
   mergeGlobalRulesWithEmployeeSchedule,
 } from "@/lib/attendanceRulesDb";
+import { ensureAttendanceEditHistoryTable } from "@/lib/ensureAttendanceEditHistoryTable";
 
 export const dynamic = 'force-dynamic';
 
@@ -39,6 +40,7 @@ export async function GET(request) {
     console.log(`Fetching all attendance logs for admin view.`);
 
     const db = await getDbConnection();
+    await ensureAttendanceEditHistoryTable(db);
     console.log("Database connection established.");
 
     // Query to fetch all attendance logs
@@ -46,6 +48,7 @@ export async function GET(request) {
       `SELECT
       a.date,
       a.username,
+      a.admin_time_edit_remark,
       a.checkin_time,
       a.checkout_time,
       a.break_morning_start,

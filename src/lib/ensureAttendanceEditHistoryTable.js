@@ -17,6 +17,22 @@ export async function ensureAttendanceEditHistoryTable(conn) {
   const db = conn || (await getDbConnection());
   try {
     await db.execute(CREATE_TABLE);
+    try {
+      await db.execute(
+        `ALTER TABLE attendance_log_edit_history
+         ADD COLUMN edit_remark VARCHAR(512) NULL AFTER changes_json`
+      );
+    } catch (e) {
+      if (e?.code !== "ER_DUP_FIELDNAME") throw e;
+    }
+    try {
+      await db.execute(
+        `ALTER TABLE attendance_logs
+         ADD COLUMN admin_time_edit_remark VARCHAR(512) NULL`
+      );
+    } catch (e) {
+      if (e?.code !== "ER_DUP_FIELDNAME") throw e;
+    }
   } catch (e) {
     console.error("ensureAttendanceEditHistoryTable:", e?.message);
   }

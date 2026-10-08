@@ -11,6 +11,7 @@ import {
   recordAttendanceEditHistory,
 } from "@/lib/attendanceEditHistory";
 import { ensureAttendanceCheckoutGpsTriggersAllowAdmin } from "@/lib/ensureAttendanceCheckoutGpsTriggers";
+import { ensureAttendanceEditHistoryTable } from "@/lib/ensureAttendanceEditHistoryTable";
 
 const HR_ATTENDANCE_ROLES = ["SUPERADMIN", "HR HEAD", "HR", "HR Executive"];
 
@@ -211,6 +212,7 @@ export async function PUT(req) {
     }
 
     const conn = await getDbConnection();
+    await ensureAttendanceEditHistoryTable(conn);
     await ensureAttendanceCheckoutGpsTriggersAllowAdmin(conn);
     const cols = ATTENDANCE_EDIT_TRACKED_FIELDS.join(", ");
     const [beforeRows] = await conn.execute(
@@ -222,6 +224,24 @@ export async function PUT(req) {
     }
 
     const changes = diffAttendanceEditFields(beforeRows[0], afterValues);
+    if (!changes.length) {
+      return NextResponse.json({ error: "No attendance time changes to save." }, { status: 400 });
+    }
+
+    const editRemark = String(body.edit_remark ?? "").trim();
+    if (!editRemark) {
+      return NextResponse.json(
+        { error: "Remark is required when changing attendance times." },
+        { status: 400 }
+      );
+    }
+    if (editRemark.length > 512) {
+      return NextResponse.json(
+        { error: "Remark must be 512 characters or less." },
+        { status: 400 }
+      );
+    }
+
     const checkinTimeEdited = changes.some((c) => c.field === "checkin_time");
     const checkoutTimeEdited = changes.some((c) => c.field === "checkout_time");
 
@@ -266,6 +286,8 @@ export async function PUT(req) {
       }
     }
 
+    fields.push("admin_time_edit_remark = ?");
+    values.push(editRemark);
     values.push(username);
     values.push(date);
 
@@ -282,6 +304,7 @@ export async function PUT(req) {
       editedBy,
       source: "admin_full_edit",
       changes,
+      editRemark,
     });
 
     return NextResponse.json({ success: true });

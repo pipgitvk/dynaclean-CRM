@@ -96,6 +96,11 @@ export default function AttendanceEditHistoryPanel({
               <p className="text-gray-600 mb-1.5">
                 By <span className="font-medium">{entry.edited_by}</span>
               </p>
+              {entry.edit_remark ? (
+                <p className="text-red-600 font-medium mb-1.5 break-words">
+                  Remark: {entry.edit_remark}
+                </p>
+              ) : null}
               <ul className="space-y-1">
                 {visibleChanges.map((ch, i) => (
                   <li key={`${entry.id}-${ch.field}-${i}`} className="text-gray-700">

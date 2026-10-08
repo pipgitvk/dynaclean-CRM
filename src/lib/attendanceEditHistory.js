@@ -107,20 +107,25 @@ export function diffAttendanceEditFields(beforeRow, afterValues, fields = ATTEND
 
 export async function recordAttendanceEditHistory(
   conn,
-  { username, logDate, editedBy, source, changes }
+  { username, logDate, editedBy, source, changes, editRemark = null }
 ) {
   if (!changes?.length) return;
   await ensureAttendanceEditHistoryTable(conn);
+  const remark =
+    editRemark != null && String(editRemark).trim() !== ""
+      ? String(editRemark).trim().slice(0, 512)
+      : null;
   await conn.execute(
     `INSERT INTO attendance_log_edit_history
-      (username, log_date, edited_by, edit_source, changes_json)
-     VALUES (?, ?, ?, ?, ?)`,
+      (username, log_date, edited_by, edit_source, changes_json, edit_remark)
+     VALUES (?, ?, ?, ?, ?, ?)`,
     [
       username,
       logDate,
       editedBy || "unknown",
       source || "edit",
       JSON.stringify(changes),
+      remark,
     ]
   );
 }
@@ -128,7 +133,7 @@ export async function recordAttendanceEditHistory(
 export async function fetchAttendanceEditHistory(conn, username, logDate) {
   await ensureAttendanceEditHistoryTable(conn);
   const [rows] = await conn.execute(
-    `SELECT id, edited_by, edit_source, changes_json, created_at
+    `SELECT id, edited_by, edit_source, changes_json, edit_remark, created_at
      FROM attendance_log_edit_history
      WHERE username = ? AND log_date = ?
      ORDER BY created_at DESC, id DESC
@@ -148,6 +153,7 @@ export async function fetchAttendanceEditHistory(conn, username, logDate) {
       edited_by: row.edited_by,
       edit_source: row.edit_source,
       edit_source_label: attendanceEditSourceLabel(row.edit_source),
+      edit_remark: row.edit_remark ? String(row.edit_remark).trim() : "",
       changes: visibleChanges,
       created_at: row.created_at,
     };

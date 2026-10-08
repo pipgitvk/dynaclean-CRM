@@ -57,6 +57,18 @@ function combineDateAndTimeForDb(dateYmd, timeHHmm) {
   return `${dateYmd} ${hh}:${mm}:00`;
 }
 
+function AdminTimeEditRemark({ remark, className = "" }) {
+  const text = String(remark ?? "").trim();
+  if (!text) {
+    return <span className={`text-gray-400 ${className}`}>—</span>;
+  }
+  return (
+    <span className={`text-red-600 font-medium break-words ${className}`}>
+      {text}
+    </span>
+  );
+}
+
 function toYmd(date) {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, "0");
@@ -154,6 +166,8 @@ const AttendancePage = () => {
   const [leaves, setLeaves] = useState([]);
   const [isHolidayModalOpen, setHolidayModalOpen] = useState(false);
   const [breakEditLog, setBreakEditLog] = useState(null);
+  const [breakEditInitialForm, setBreakEditInitialForm] = useState(null);
+  const [breakEditRemark, setBreakEditRemark] = useState("");
   const [breakEditForm, setBreakEditForm] = useState({
     checkin_time: "",
     checkout_time: "",
@@ -389,10 +403,14 @@ const AttendancePage = () => {
       break_evening_end: timeInputFromDbValue(log.break_evening_end),
     };
     setBreakEditForm(form);
+    setBreakEditInitialForm(form);
+    setBreakEditRemark("");
   };
 
   const closeBreakEditModal = () => {
     setBreakEditLog(null);
+    setBreakEditInitialForm(null);
+    setBreakEditRemark("");
     setBreakEditSaving(false);
   };
 
@@ -403,9 +421,23 @@ const AttendancePage = () => {
       toast.error("Invalid row.");
       return;
     }
+    const initial = breakEditInitialForm || breakEditForm;
+    const hasChanges = Object.keys(breakEditForm).some(
+      (key) => breakEditForm[key] !== initial[key]
+    );
+    if (!hasChanges) {
+      toast.error("No time changes to save.");
+      return;
+    }
+    const remarkTrimmed = breakEditRemark.trim();
+    if (!remarkTrimmed) {
+      toast.error("Remark is required when changing attendance times.");
+      return;
+    }
     setBreakEditSaving(true);
     try {
       const payload = {
+        edit_remark: remarkTrimmed,
         username: breakEditLog.username,
         date: dateYmd,
         checkin_time: combineDateAndTimeForDb(
@@ -792,6 +824,7 @@ const AttendancePage = () => {
         { header: "Evening Break", key: "EveningBreak", width: 20 },
         { header: "Checkin Address", key: "CheckinAddress", width: 30 },
         { header: "Checkout Address", key: "CheckoutAddress", width: 30 },
+        { header: "Admin Remark", key: "AdminRemark", width: 36 },
       ];
 
       // Map and add rows
@@ -814,6 +847,7 @@ const AttendancePage = () => {
             : "",
           CheckinAddress: log.checkin_address || "",
           CheckoutAddress: log.checkout_address || "",
+          AdminRemark: log.admin_time_edit_remark || "",
         });
       });
 
@@ -1258,6 +1292,14 @@ const AttendancePage = () => {
                           ) : null}
                         </span>
                       </div>
+                      {log.admin_time_edit_remark ? (
+                        <div className="rounded-md bg-red-50 border border-red-100 px-3 py-2">
+                          <p className="text-xs font-semibold text-red-800 mb-1">
+                            Admin remark
+                          </p>
+                          <AdminTimeEditRemark remark={log.admin_time_edit_remark} />
+                        </div>
+                      ) : null}
                       <div className="pt-2 border-t border-gray-100 space-y-2">
                             {/* <button
                               type="button"
@@ -1392,6 +1434,9 @@ const AttendancePage = () => {
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Check-out Address
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[140px]">
+                    Remark
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Actions
@@ -1563,6 +1608,9 @@ const AttendancePage = () => {
                               ) : null}
                             </div>
                           </td>
+                          <td className="px-6 py-4 text-sm max-w-[220px] align-top">
+                            <AdminTimeEditRemark remark={log.admin_time_edit_remark} />
+                          </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm">
                             <div className="flex flex-wrap gap-2">
                               {/* <button
@@ -1608,7 +1656,7 @@ const AttendancePage = () => {
                         </>
                       ) : (
                         <td
-                          colSpan="9"
+                          colSpan="8"
                           className={`px-6 py-4 text-center ${log.type === "absent"
                             ? "bg-orange-50 text-orange-700"
                             : log.type === "leave"
@@ -1652,12 +1700,20 @@ const AttendancePage = () => {
                           )}
                         </td>
                       )}
+                      {!logShowsAttendancePunchDetails(log) ? (
+                        <>
+                          <td className="px-6 py-4 text-sm max-w-[220px] align-top">
+                            <AdminTimeEditRemark remark={log.admin_time_edit_remark} />
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-400">—</td>
+                        </>
+                      ) : null}
                     </tr>
                   ))
                 ) : (
                   <tr>
                     <td
-                      colSpan="12"
+                      colSpan="13"
                       className="px-6 py-4 text-center text-gray-500"
                     >
                       No attendance logs found for the selected filter.
@@ -1761,6 +1817,21 @@ const AttendancePage = () => {
                 </div>
               ))}
             </div>
+            <label className="mt-4 flex flex-col gap-1.5 text-sm font-medium text-gray-700">
+              Remark
+              <span className="text-xs font-normal text-gray-500">
+                Required whenever you change any attendance time.
+              </span>
+              <textarea
+                value={breakEditRemark}
+                onChange={(e) => setBreakEditRemark(e.target.value)}
+                rows={3}
+                maxLength={512}
+                required
+                placeholder="Reason for this change…"
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm font-normal shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </label>
             <AttendanceEditHistoryPanel
               className="mt-5 pt-4 border-t border-gray-200"
               username={breakEditLog.username}
