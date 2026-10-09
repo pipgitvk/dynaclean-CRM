@@ -198,7 +198,7 @@ import ProfileApprovalsCard from "@/components/ProfileApprovalsCard";
 import ScheduleVisitCard from "@/components/scheduleVisit/ScheduleVisitCard";
 import OverduePaymentCard from "@/components/OverduePaymentCard";
 import KeywordPerformanceQuickCard from "@/components/keywords/KeywordPerformanceQuickCard";
-import { Package, BarChart3, Upload, DollarSign, Calendar, Plane, FileText, ClipboardList, Users, Wrench } from "lucide-react";
+import { Package, BarChart3, Upload, DollarSign, Calendar, Plane, FileText, ClipboardList, Users, Wrench, AlertTriangle } from "lucide-react";
 import ServiceTeamReportCard from "@/components/service/ServiceTeamReportCard";
 import ServiceSupportQuotesOrdersCard from "@/components/service/ServiceSupportQuotesOrdersCard";
 import ServiceSupportTotalCard from "@/components/service/ServiceSupportTotalCard";
@@ -209,6 +209,7 @@ import {
   ADMIN_SERVICE_HISTORY_PENDING_OVER_48H_HREF,
   getPendingServiceRecordsOver48hCount,
 } from "@/lib/serviceRecordsPendingOver48h";
+import { countPendingAutoCheckoutApprovals } from "@/lib/countPendingAutoCheckoutApprovals";
 
 // import UpcomingLeads from "@/components/Leads/UpcommingLeads";
 
@@ -285,6 +286,13 @@ export default async function UserDashboardPage() {
       regPending = Number(regPendingRows[0]?.c ?? 0);
     } catch (e) {
       console.warn("attendance regularization counts:", e.message);
+    }
+
+    let pendingAutoCheckoutCount = 0;
+    try {
+      pendingAutoCheckoutCount = await countPendingAutoCheckoutApprovals(connection);
+    } catch (e) {
+      console.warn("pending auto checkout approvals count:", e.message);
     }
 
     // Fetch pending leave approvals count
@@ -490,6 +498,35 @@ export default async function UserDashboardPage() {
                 </p>
                 <p className="text-xs text-gray-600 mt-0.5">
                   This month · {regTotal} total
+                </p>
+              </div>
+            </div>
+          </a>
+
+          {/* Automatic check-out approval */}
+          <a
+            href="/empcrm/admin-dashboard/auto-checkout-approvals"
+            className="bg-white rounded-lg shadow-md p-4 text-black hover:shadow-lg transition-shadow h-full cursor-pointer block border-l-4 border-rose-500 min-h-[140px]"
+          >
+            <div className="flex flex-col h-full justify-between">
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertTriangle className="w-5 h-5 text-rose-500 shrink-0" />
+                  <h2 className="text-sm font-bold text-black leading-tight">
+                    Auto check-out
+                  </h2>
+                </div>
+                <p
+                  className={`text-2xl font-bold mt-1 ${
+                    pendingAutoCheckoutCount === 0
+                      ? "text-green-600"
+                      : "text-red-600"
+                  }`}
+                >
+                  {pendingAutoCheckoutCount}
+                </p>
+                <p className="text-xs text-gray-600 mt-0.5">
+                  Pending · this month
                 </p>
               </div>
             </div>

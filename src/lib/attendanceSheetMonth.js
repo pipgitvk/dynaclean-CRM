@@ -7,6 +7,10 @@ import {
   pickDateOfJoining,
   pickEmployeeDesignation,
 } from "@/lib/employeeProfileLookup";
+import {
+  sanitizeAttendanceLogForPayroll,
+  isPayrollHalfDayFromUnapprovedAutoCheckout,
+} from "@/lib/attendanceLogForPayroll";
 
 const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -99,6 +103,10 @@ export function classifyAttendanceSheetDay(ctx) {
     return { code: "L", kind: "leave" };
   }
 
+  if (log && isPayrollHalfDayFromUnapprovedAutoCheckout(log)) {
+    return { code: "HD", kind: "half" };
+  }
+
   if (log && hasRealPunch) {
     const { isHalfDay, graceUsed } = isHalfDayWithGrace(log, rules, graceHalfDaysUsed);
     if (isHalfDay) return { code: "HD", kind: "half", graceHalfDaysUsed: graceUsed };
@@ -151,7 +159,7 @@ export function countAttendanceSheetHalfDaysInMonth({
   const dateMap = new Map();
   for (const log of logs || []) {
     const k = dateToYmdKey(log.date);
-    if (k) dateMap.set(k, log);
+    if (k) dateMap.set(k, sanitizeAttendanceLogForPayroll(log));
   }
 
   const leaveUsers =

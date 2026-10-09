@@ -6,6 +6,10 @@ import {
 } from "@/lib/attendanceRulesEngine";
 import { rowHasMeaningfulCheckinOrCheckout } from "@/lib/attendanceMeaningfulPunch";
 import { qualifiesOffDayExtraPayCredit } from "@/lib/serviceEngineerSundayPayroll";
+import {
+  sanitizeAttendanceLogForPayroll,
+  isPayrollHalfDayFromUnapprovedAutoCheckout,
+} from "@/lib/attendanceLogForPayroll";
 
 function startOfDay(d) {
   const x = new Date(d);
@@ -171,7 +175,7 @@ export function computeSalaryPayDaysForUser(p) {
   const dateMap = new Map();
   for (const log of logs || []) {
     const k = dateToYmdKey(log.date);
-    if (k) dateMap.set(k, log);
+    if (k) dateMap.set(k, sanitizeAttendanceLogForPayroll(log));
   }
 
   const leaveMap = buildLeaveDateMapForUser(leavesAll, username);
@@ -257,6 +261,17 @@ export function computeSalaryPayDaysForUser(p) {
     }
 
     const hasRealPunch = rowHasMeaningfulCheckinOrCheckout(existingLog);
+
+    if (existingLog && isPayrollHalfDayFromUnapprovedAutoCheckout(existingLog)) {
+      present++;
+      half_day++;
+      half_day_unpaid++;
+      if (!isSunday && !isHoliday) {
+        weekdayPayCredits += 0.5;
+      }
+      continue;
+    }
+
     if (paidLeaveMap.has(dateString)) {
       // PAID LEAVE DAY
       //  — treat as HALF-DAY when DB says half-day OR employee actually punched in on the leave day

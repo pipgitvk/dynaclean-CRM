@@ -14,6 +14,10 @@ import {
   getCalendarDaysInMonth,
 } from "@/lib/salaryPayDaysFromAttendance";
 import { rowHasMeaningfulCheckinOrCheckout } from "@/lib/attendanceMeaningfulPunch";
+import {
+  sanitizeAttendanceLogForPayroll,
+  isPayrollHalfDayFromUnapprovedAutoCheckout,
+} from "@/lib/attendanceLogForPayroll";
 import { eachDayInLeaveRange } from "@/lib/leaveContinuousDays";
 
 function startOfDay(d) {
@@ -65,7 +69,7 @@ export function computeAttendanceDetailsCardSummaryForMonth(p) {
   const dateMap = new Map();
   for (const log of logs || []) {
     const k = dateToYmdKey(log.date);
-    if (k) dateMap.set(k, log);
+    if (k) dateMap.set(k, sanitizeAttendanceLogForPayroll(log));
   }
 
   const leaveMap = buildLeaveMapForUser(leavesAll, username);
@@ -142,6 +146,12 @@ export function computeAttendanceDetailsCardSummaryForMonth(p) {
         summary.leaves += 1;
         leave_dates.push(dateString);
       }
+    } else if (
+      existingLog &&
+      isPayrollHalfDayFromUnapprovedAutoCheckout(existingLog)
+    ) {
+      summary.present += 0.5;
+      summary.halfDays++;
     } else if (existingLog && hasRealPunch) {
       // Punch wins over half-day leave on same date (attendance page)
       summary.present++;

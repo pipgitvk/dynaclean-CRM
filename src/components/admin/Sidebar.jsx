@@ -48,6 +48,7 @@ import {
   Landmark,
   FileSpreadsheet,
   Fingerprint,
+  AlertTriangle,
 } from "lucide-react";
 
 // Icon map
@@ -93,6 +94,7 @@ const iconMap = {
   Landmark,
   FileSpreadsheet,
   Fingerprint,
+  AlertTriangle,
 };
 
 export default function Sidebar({

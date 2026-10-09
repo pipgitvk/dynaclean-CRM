@@ -17,6 +17,7 @@ export const MODULE_KEY_TO_URL = {
   "fast-card": "/admin-dashboard/fast-card",
   "task-manager": "/admin-dashboard/task-manager",
   "attendance-details": "/empcrm/admin-dashboard/attendance",
+  "auto-checkout-approvals": "/empcrm/admin-dashboard/auto-checkout-approvals",
   "machine-attendance": "/empcrm/admin-dashboard/machine-attendance",
   "regularization-approvals": "/admin-dashboard/regularization-approvals",
 
