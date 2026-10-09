@@ -1743,6 +1743,11 @@ const INVOICE_PDF_WIDTH_MM = 210;
 const INVOICE_PDF_MIN_HEIGHT_MM = 297;
 const INVOICE_PDF_TOP_MARGIN_MM = 2;
 
+/** Match buyer / line-item table typography in footer blocks */
+const INVOICE_BODY_TEXT_PX = "10px";
+const INVOICE_BODY_LINE_HEIGHT = 1.5;
+const INVOICE_INR_WORDS_PX = "13px";
+
 const NewInvoice = ({ invoice }) => {
   // Determine invoice type label
   const invoiceTypeLabel = invoice.type === "performa" ? "Performa Invoice" : "Tax Invoice";
@@ -2176,18 +2181,18 @@ const NewInvoice = ({ invoice }) => {
         const key = block.getAttribute("data-pdf-footer-block");
         if (key === "notes") return;
         if (key === "terms" || key === "bank") {
-          block.style.fontSize = "14px";
-          block.style.lineHeight = "1.45";
+          block.style.fontSize = INVOICE_BODY_TEXT_PX;
+          block.style.lineHeight = String(INVOICE_BODY_LINE_HEIGHT);
           block.style.height = "auto";
           block.style.minHeight = "0";
           block.style.paddingTop = "2px";
           block.style.paddingBottom = "0px";
           block.style.verticalAlign = "top";
-          const rows = block.querySelectorAll("div");
-          rows.forEach((row, idx) => {
-            row.style.marginBottom = idx === rows.length - 1 ? "0px" : "6px";
-            row.style.fontSize = idx === 0 ? "15px" : "14px";
-            row.style.lineHeight = "1.45";
+          block.querySelectorAll("div").forEach((row, idx, list) => {
+            row.style.marginBottom =
+              idx === list.length - 1 ? "0px" : "4px";
+            row.style.fontSize = INVOICE_BODY_TEXT_PX;
+            row.style.lineHeight = String(INVOICE_BODY_LINE_HEIGHT);
           });
           return;
         }
@@ -2205,15 +2210,15 @@ const NewInvoice = ({ invoice }) => {
         const notesBody = notesFooter.querySelector("[data-pdf-notes-body]");
         const notesLabel = notesFooter.querySelector("[data-pdf-notes-label]");
         if (notesBody) {
-          notesBody.style.fontSize = "12px";
-          notesBody.style.lineHeight = "1.35";
+          notesBody.style.fontSize = INVOICE_BODY_TEXT_PX;
+          notesBody.style.lineHeight = String(INVOICE_BODY_LINE_HEIGHT);
           notesBody.style.whiteSpace = "pre-wrap";
           notesBody.style.wordBreak = "break-word";
           notesBody.style.overflowWrap = "break-word";
         }
         if (notesLabel) {
-          notesLabel.style.fontSize = "12px";
-          notesLabel.style.lineHeight = "1.35";
+          notesLabel.style.fontSize = INVOICE_BODY_TEXT_PX;
+          notesLabel.style.lineHeight = String(INVOICE_BODY_LINE_HEIGHT);
         }
         notesFooter.style.height = "auto";
         notesFooter.style.minHeight = "unset";
@@ -2440,7 +2445,7 @@ const NewInvoice = ({ invoice }) => {
         };
         const sigText = `for ${data.company.name}`;
         pdf.setFont("helvetica", "normal");
-        const sigFontSize = 9;
+        const sigFontSize = 10;
         pdf.setFontSize(sigFontSize);
         pdf.setTextColor(0, 0, 0);
         const sigOnPage = onPageRect(sigRect);
@@ -3383,7 +3388,7 @@ const NewInvoice = ({ invoice }) => {
             Amount Chargeable (in words) E. & O.E
           </div>
           <br />
-          <strong style={{ fontSize: "13px", fontWeight: "bold" }}>
+          <strong style={{ fontSize: INVOICE_INR_WORDS_PX, fontWeight: "bold" }}>
             INR- {numberToWords(data.total)}
           </strong>
         </div>
@@ -3497,11 +3502,17 @@ const NewInvoice = ({ invoice }) => {
             gap: "12px",
           }}
         >
-          <strong style={{ fontSize: "13px", fontWeight: "bold", lineHeight: 1.35 }}>
+          <strong
+            style={{
+              fontSize: INVOICE_INR_WORDS_PX,
+              fontWeight: "bold",
+              lineHeight: INVOICE_BODY_LINE_HEIGHT,
+            }}
+          >
             Tax Amount (in words) : INR- {numberToWords(data.taxAmount)}
           </strong>
           {data.roundOff !== 0 && (
-            <strong style={{ fontSize: "13px", whiteSpace: "nowrap" }}>
+            <strong style={{ fontSize: INVOICE_INR_WORDS_PX, whiteSpace: "nowrap" }}>
               Round Off: {data.roundOff > 0 ? `+₹${data.roundOff}` : `-₹${Math.abs(data.roundOff)}`}
             </strong>
           )}
@@ -3529,11 +3540,19 @@ const NewInvoice = ({ invoice }) => {
                   paddingRight: "16px",
                   paddingTop: "0px",
                   paddingBottom: (data.notes || "").trim() ? "8px" : "2px",
-                  fontSize: "14px",
-                  lineHeight: 1.55,
+                  fontSize: INVOICE_BODY_TEXT_PX,
+                  lineHeight: INVOICE_BODY_LINE_HEIGHT,
                 }}
               >
-                <div style={{ fontWeight: "bold", marginBottom: "10px", marginTop: "2px", fontSize: "15px" }}>
+                <div
+                  style={{
+                    fontWeight: "bold",
+                    marginBottom: "4px",
+                    marginTop: "2px",
+                    fontSize: INVOICE_BODY_TEXT_PX,
+                    lineHeight: INVOICE_BODY_LINE_HEIGHT,
+                  }}
+                >
                   Terms & Condition
                 </div>
                 {data.terms.length > 0 ? (
@@ -3542,8 +3561,8 @@ const NewInvoice = ({ invoice }) => {
                       key={index}
                       style={{
                         marginBottom:
-                          index === data.terms.length - 1 ? "4px" : "10px",
-                        lineHeight: 1.55,
+                          index === data.terms.length - 1 ? "4px" : "4px",
+                        lineHeight: INVOICE_BODY_LINE_HEIGHT,
                       }}
                     >
                       {term}
@@ -3560,21 +3579,28 @@ const NewInvoice = ({ invoice }) => {
                   verticalAlign: "top",
                   paddingLeft: "8px",
                   paddingBottom: "2px",
-                  fontSize: "14px",
-                  lineHeight: 1.55,
+                  fontSize: INVOICE_BODY_TEXT_PX,
+                  lineHeight: INVOICE_BODY_LINE_HEIGHT,
                 }}
               >
                 <div style={{ width: "100%" }}>
-                  <div style={{ fontWeight: "bold", marginBottom: "10px", fontSize: "15px" }}>
+                  <div
+                    style={{
+                      fontWeight: "bold",
+                      marginBottom: "4px",
+                      fontSize: INVOICE_BODY_TEXT_PX,
+                      lineHeight: INVOICE_BODY_LINE_HEIGHT,
+                    }}
+                  >
                     Company&apos;s Bank Details
                   </div>
-                  <div style={{ marginBottom: "8px", wordBreak: "break-word" }}>
+                  <div style={{ marginBottom: "2px", wordBreak: "break-word" }}>
                     A/C Holder Name : {data.bank.accountHolderName}
                   </div>
-                  <div style={{ marginBottom: "8px" }}>
+                  <div style={{ marginBottom: "2px" }}>
                     Bank Name : {data.bank.name}
                   </div>
-                  <div style={{ marginBottom: "8px" }}>
+                  <div style={{ marginBottom: "2px" }}>
                     A/c No. : {data.bank.accountNo}
                   </div>
                   <div>Branch &amp; IFSC Code: {data.bank.IFSC}</div>
@@ -3597,12 +3623,12 @@ const NewInvoice = ({ invoice }) => {
                       width: "100%",
                       boxSizing: "border-box",
                       border: "1px solid #000",
-                      padding: "3px 8px 6px",
+                      padding: "4px 5px 6px",
                       marginTop: "2px",
                       marginBottom: "6px",
                       overflow: "visible",
-                      fontSize: "12px",
-                      lineHeight: 1.35,
+                      fontSize: INVOICE_BODY_TEXT_PX,
+                      lineHeight: INVOICE_BODY_LINE_HEIGHT,
                     }}
                   >
                     <div
@@ -3611,8 +3637,8 @@ const NewInvoice = ({ invoice }) => {
                         fontWeight: "bold",
                         marginBottom: "2px",
                         marginTop: "0px",
-                        fontSize: "12px",
-                        lineHeight: 1.35,
+                        fontSize: INVOICE_BODY_TEXT_PX,
+                        lineHeight: INVOICE_BODY_LINE_HEIGHT,
                       }}
                     >
                       Notes :
@@ -3624,8 +3650,8 @@ const NewInvoice = ({ invoice }) => {
                         whiteSpace: "pre-wrap",
                         wordBreak: "break-word",
                         overflowWrap: "break-word",
-                        fontSize: "12px",
-                        lineHeight: 1.35,
+                        fontSize: INVOICE_BODY_TEXT_PX,
+                        lineHeight: INVOICE_BODY_LINE_HEIGHT,
                       }}
                     >
                       {data.notes}
@@ -3642,12 +3668,16 @@ const NewInvoice = ({ invoice }) => {
   style={{
     textAlign: "right",
     marginTop: (data.notes || "").trim() ? "8px" : "12px",
-    fontSize: "10px",
+    fontSize: INVOICE_BODY_TEXT_PX,
   }}
 >
   <div
     data-pdf-signature-for
-    style={{ whiteSpace: "nowrap", fontSize: "9px", lineHeight: 1.35 }}
+    style={{
+      whiteSpace: "nowrap",
+      fontSize: INVOICE_BODY_TEXT_PX,
+      lineHeight: INVOICE_BODY_LINE_HEIGHT,
+    }}
   >
     for {data.company.name}
   </div>
