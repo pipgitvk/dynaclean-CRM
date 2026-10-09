@@ -194,6 +194,7 @@ export default function ThirdPartyEngineersPage() {
                       <th className="px-6 py-3 text-left text-sm font-semibold text-slate-700">State</th>
                       <th className="px-6 py-3 text-left text-sm font-semibold text-slate-700">Geo Location</th>
                       <th className="px-6 py-3 text-left text-sm font-semibold text-slate-700">Status</th>
+                      <th className="px-6 py-3 text-left text-sm font-semibold text-slate-700">Created By</th>
                       <th className="px-6 py-3 text-left text-sm font-semibold text-slate-700">Actions</th>
                     </tr>
                   </thead>
@@ -222,6 +223,9 @@ export default function ThirdPartyEngineersPage() {
                           >
                             {engineer.status}
                           </span>
+                        </td>
+                        <td className="px-6 py-4 text-sm text-slate-700">
+                          {engineer.created_by || '—'}
                         </td>
                         <td className="px-6 py-4 text-sm">
                           <div className="flex gap-2">

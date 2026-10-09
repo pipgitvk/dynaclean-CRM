@@ -3,6 +3,11 @@ import { NextResponse } from "next/server";
 import { getSessionPayload } from "@/lib/auth";
 import { ensureThirdPartyEngineerColumns } from "@/lib/thirdPartyEngineerSchema";
 import crypto from "crypto";
+import {
+  canAccessThirdPartyEngineerById,
+  isThirdPartyEngineerModuleRole,
+} from "@/lib/thirdPartyEngineerAccess";
+import { normalizeRoleKey } from "@/lib/roleKeyUtils";
 
 /**
  * Helper to hash password
@@ -20,12 +25,9 @@ async function verifyAccess() {
     return { authorized: false, error: "Unauthorized", status: 401 };
   }
 
-  const roleNorm = String(payload.role || payload.userRole || "")
-    .toUpperCase()
-    .trim();
+  const roleNorm = normalizeRoleKey(payload.role || payload.userRole || "");
 
-  const allowed = ["SUPERADMIN", "ADMIN", "SERVICE SUPPORT"];
-  if (!allowed.includes(roleNorm)) {
+  if (!isThirdPartyEngineerModuleRole(roleNorm)) {
     return { authorized: false, error: "Forbidden: Only Super Admin, Admin, and Service Support can access this resource", status: 403 };
   }
 
@@ -81,11 +83,6 @@ export async function GET(req, context) {
 
     // Get current user
     const payload = await getSessionPayload();
-    const roleNorm = String(payload.role || payload.userRole || "")
-      .toUpperCase()
-      .trim();
-    const username = payload.username || payload.email || "";
-
     // Fetch engineer details
     const [engineers] = await conn.execute(
       `SELECT engineer_id, name, mobile, secondary_contact_number, email, address, state, geo_location, remark, service_charge, attachments, status, created_by, created_at, updated_at
@@ -103,11 +100,15 @@ export async function GET(req, context) {
 
     const engineer = engineers[0];
 
-    // Check access: SUPERADMIN can access all, others can only access their own
-    if (roleNorm !== "SUPERADMIN" && engineer.created_by !== username) {
+    const canAccess = await canAccessThirdPartyEngineerById(
+      conn,
+      engineer_id,
+      payload,
+    );
+    if (!canAccess) {
       return NextResponse.json(
         { error: "Forbidden: You can only access your own engineers" },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -172,14 +173,8 @@ export async function PUT(req, context) {
       );
     }
 
-    // Get current user
     const payload = await getSessionPayload();
-    const roleNorm = String(payload.role || payload.userRole || "")
-      .toUpperCase()
-      .trim();
-    const username = payload.username || payload.email || "";
 
-    // Check if engineer exists
     const [existing] = await conn.execute(
       "SELECT engineer_id, created_by FROM third_party_service_engineers WHERE engineer_id = ?",
       [engineer_id]
@@ -192,8 +187,12 @@ export async function PUT(req, context) {
       );
     }
 
-    // Check access: SUPERADMIN can update any, others can only update their own
-    if (roleNorm !== "SUPERADMIN" && existing[0].created_by !== username) {
+    const canUpdate = await canAccessThirdPartyEngineerById(
+      conn,
+      engineer_id,
+      payload,
+    );
+    if (!canUpdate) {
       return NextResponse.json(
         { error: "Forbidden: You can only update your own engineers" },
         { status: 403 }
@@ -353,14 +352,8 @@ export async function DELETE(req, context) {
       );
     }
 
-    // Get current user
     const payload = await getSessionPayload();
-    const roleNorm = String(payload.role || payload.userRole || "")
-      .toUpperCase()
-      .trim();
-    const username = payload.username || payload.email || "";
 
-    // Check if engineer exists
     const [existing] = await conn.execute(
       "SELECT engineer_id, created_by FROM third_party_service_engineers WHERE engineer_id = ?",
       [engineer_id]
@@ -373,8 +366,12 @@ export async function DELETE(req, context) {
       );
     }
 
-    // Check access: SUPERADMIN can delete any, others can only delete their own
-    if (roleNorm !== "SUPERADMIN" && existing[0].created_by !== username) {
+    const canDelete = await canAccessThirdPartyEngineerById(
+      conn,
+      engineer_id,
+      payload,
+    );
+    if (!canDelete) {
       return NextResponse.json(
         { error: "Forbidden: You can only delete your own engineers" },
         { status: 403 }

@@ -4,6 +4,11 @@ import { getSessionPayload } from "@/lib/auth";
 import { ensureThirdPartyEngineerColumns } from "@/lib/thirdPartyEngineerSchema";
 import { ensureThirdPartyEngineerFollowupsTable } from "@/lib/ensureThirdPartyEngineerFollowupsTable";
 import crypto from "crypto";
+import {
+  buildThirdPartyEngineerCreatedByWhere,
+  isThirdPartyEngineerModuleRole,
+} from "@/lib/thirdPartyEngineerAccess";
+import { normalizeRoleKey } from "@/lib/roleKeyUtils";
 
 /**
  * Helper to hash password
@@ -21,12 +26,9 @@ async function verifyAccess() {
     return { authorized: false, error: "Unauthorized", status: 401 };
   }
 
-  const roleNorm = String(payload.role || payload.userRole || "")
-    .toUpperCase()
-    .trim();
+  const roleNorm = normalizeRoleKey(payload.role || payload.userRole || "");
 
-  const allowed = ["SUPERADMIN", "ADMIN", "SERVICE SUPPORT"];
-  if (!allowed.includes(roleNorm)) {
+  if (!isThirdPartyEngineerModuleRole(roleNorm)) {
     return { authorized: false, error: "Forbidden: Only Super Admin, Admin, and Service Support can access this resource", status: 403 };
   }
 
@@ -37,7 +39,7 @@ async function verifyAccess() {
  * GET /api/third-party-engineers
  * List all third-party service engineers
  * Query params: search, status, limit, offset
- * SUPERADMIN sees all, others see only their own
+ * SUPERADMIN sees all; SERVICE SUPPORT sees team pool; others see only their own
  */
 export async function GET(req) {
   try {
@@ -80,21 +82,26 @@ export async function GET(req) {
 
     // Get current user info
     const payload = await getSessionPayload();
-    const roleNorm = String(payload.role || payload.userRole || "")
-      .toUpperCase()
-      .trim();
+    const roleNorm = normalizeRoleKey(payload.role || payload.userRole || "");
     const username = payload.username || payload.email || "";
 
     let whereClause = "WHERE 1=1";
     let listWhereClause = "WHERE 1=1";
     const params = [];
 
-    // If not SUPERADMIN, only show their own engineers
-    if (roleNorm !== "SUPERADMIN") {
-      whereClause += " AND created_by = ?";
-      listWhereClause += " AND e.created_by = ?";
-      params.push(username);
-    }
+    const createdByScope = buildThirdPartyEngineerCreatedByWhere({
+      roleNorm,
+      username,
+      columnExpr: "created_by",
+    });
+    const listCreatedByScope = buildThirdPartyEngineerCreatedByWhere({
+      roleNorm,
+      username,
+      columnExpr: "e.created_by",
+    });
+    whereClause += createdByScope.sql;
+    listWhereClause += listCreatedByScope.sql;
+    params.push(...createdByScope.params);
 
     if (status && status !== "all") {
       whereClause += " AND status = ?";

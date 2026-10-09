@@ -32,7 +32,6 @@ export async function GET(req, context) {
       conn,
       engineerId,
       auth.payload,
-      auth.roleNorm
     );
 
     if (forbidden) {
@@ -118,7 +117,6 @@ export async function POST(req, context) {
       conn,
       engineerId,
       auth.payload,
-      auth.roleNorm
     );
 
     if (forbidden) {
