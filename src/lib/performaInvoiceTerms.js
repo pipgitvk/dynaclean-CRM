@@ -18,7 +18,20 @@ export function isPerformaInvoiceType(type) {
   return String(type || "").trim().toLowerCase() === "performa";
 }
 
-const CAMC_TERMS_MARKER = "CAMC policy will not be included";
+export const CAMC_TERMS_MARKER = "CAMC policy will not be included";
+
+/** Avoid duplicate CAMC block in Terms when the same text is in Notes. */
+export function filterTermsWhenNotesHasCamc(termsLines, notesText) {
+  const notes = String(notesText || "").trim();
+  if (!notes.includes(CAMC_TERMS_MARKER)) return termsLines;
+  return termsLines.filter((line) => {
+    const t = String(line).trim();
+    if (!t) return false;
+    if (t.includes(CAMC_TERMS_MARKER)) return false;
+    if (t.includes("Proforma Invoice includes the cost of the product")) return false;
+    return true;
+  });
+}
 
 /** Terms for edit/create when type is performa; preserves saved text when present. */
 export function resolvePerformaInvoiceTerms(termsConditions) {

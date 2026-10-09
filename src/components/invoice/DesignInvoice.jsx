@@ -1731,11 +1731,17 @@ import DownloadPDFButton from "@/app/admin-dashboard/invoices/DownloadButton";
 import InvoicePDFPreview from "../Preview";
 import { numberToWords } from "@/utils/NumbertoWord";
 import { INVOICE_LETTERHEAD } from "@/lib/invoiceLetterhead";
+import { filterTermsWhenNotesHasCamc } from "@/lib/performaInvoiceTerms";
 
 const INVOICE_SIGNATURE_CANDIDATES = [
   "/s.png",
   "https://app.dynacleanindustries.com/s.png",
 ];
+
+/** PDF: A4 width, single page; height grows with content so sections are not stretched. */
+const INVOICE_PDF_WIDTH_MM = 210;
+const INVOICE_PDF_MIN_HEIGHT_MM = 297;
+const INVOICE_PDF_TOP_MARGIN_MM = 2;
 
 const NewInvoice = ({ invoice }) => {
   // Determine invoice type label
@@ -1808,9 +1814,10 @@ const NewInvoice = ({ invoice }) => {
   // Convert terms_conditions string to array
   const parseTerms = () => {
     if (invoice.terms_conditions) {
-      return invoice.terms_conditions
+      const lines = invoice.terms_conditions
         .split("\n")
         .filter((term) => term.trim() !== "");
+      return filterTermsWhenNotesHasCamc(lines, invoice.notes || "");
     }
     return [];
   };
@@ -2078,7 +2085,7 @@ const NewInvoice = ({ invoice }) => {
     // html2canvas captures the ENTIRE invoice height, not just what's visible.
     const offscreenWrapper = document.createElement("div");
     offscreenWrapper.style.cssText =
-      "position:fixed;left:-9999px;top:0;width:794px;background:#fff;z-index:-1;";
+      "position:fixed;left:-9999px;top:0;width:810px;background:#fff;z-index:-1;";
     document.body.appendChild(offscreenWrapper);
 
     let clonedEl = null;
@@ -2086,9 +2093,9 @@ const NewInvoice = ({ invoice }) => {
     try {
       // Deep-clone the invoice element into the off-screen wrapper
       clonedEl = el.cloneNode(true);
-      clonedEl.style.width = "794px";
-      clonedEl.style.maxWidth = "794px";
-      clonedEl.style.padding = "0";
+      clonedEl.style.width = "802px";
+      clonedEl.style.maxWidth = "802px";
+      clonedEl.style.padding = "4px";
       clonedEl.style.border = "none";
       clonedEl.style.overflow = "visible";
       clonedEl.style.boxSizing = "border-box";
@@ -2097,6 +2104,7 @@ const NewInvoice = ({ invoice }) => {
         borderedRoot.style.border = "1px solid rgb(0, 0, 0)";
         borderedRoot.style.boxSizing = "border-box";
         borderedRoot.style.overflow = "visible";
+        borderedRoot.style.paddingBottom = "10px";
       }
       offscreenWrapper.appendChild(clonedEl);
 
@@ -2163,8 +2171,26 @@ const NewInvoice = ({ invoice }) => {
         });
       }
 
-      // Improve footer text metrics before capture.
+      // Improve footer text metrics before capture (keep Notes box padding/border).
       clonedEl.querySelectorAll("[data-pdf-footer-block]").forEach((block) => {
+        const key = block.getAttribute("data-pdf-footer-block");
+        if (key === "notes") return;
+        if (key === "terms" || key === "bank") {
+          block.style.fontSize = "14px";
+          block.style.lineHeight = "1.45";
+          block.style.height = "auto";
+          block.style.minHeight = "0";
+          block.style.paddingTop = "2px";
+          block.style.paddingBottom = "0px";
+          block.style.verticalAlign = "top";
+          const rows = block.querySelectorAll("div");
+          rows.forEach((row, idx) => {
+            row.style.marginBottom = idx === rows.length - 1 ? "0px" : "6px";
+            row.style.fontSize = idx === 0 ? "15px" : "14px";
+            row.style.lineHeight = "1.45";
+          });
+          return;
+        }
         block.style.lineHeight = "1.55";
         block.style.paddingTop = "1px";
         block.style.paddingBottom = "1px";
@@ -2175,58 +2201,78 @@ const NewInvoice = ({ invoice }) => {
         notesFooter.style.width = "100%";
         notesFooter.style.boxSizing = "border-box";
         notesFooter.style.overflow = "visible";
+        notesFooter.style.border = "1px solid rgb(0, 0, 0)";
         const notesBody = notesFooter.querySelector("[data-pdf-notes-body]");
         const notesLabel = notesFooter.querySelector("[data-pdf-notes-label]");
         if (notesBody) {
+          notesBody.style.fontSize = "12px";
+          notesBody.style.lineHeight = "1.35";
           notesBody.style.whiteSpace = "pre-wrap";
           notesBody.style.wordBreak = "break-word";
           notesBody.style.overflowWrap = "break-word";
         }
-        const notesTotalHeight =
-          (notesLabel?.offsetHeight || 0) +
-          (notesBody?.scrollHeight || 0) +
-          16;
-        notesFooter.style.minHeight = `${notesTotalHeight}px`;
+        if (notesLabel) {
+          notesLabel.style.fontSize = "12px";
+          notesLabel.style.lineHeight = "1.35";
+        }
+        notesFooter.style.height = "auto";
+        notesFooter.style.minHeight = "unset";
+        notesFooter.style.paddingTop = "3px";
+        notesFooter.style.paddingBottom = "6px";
+        notesFooter.style.marginTop = "0px";
+        notesFooter.style.marginBottom = "6px";
+        const notesH = Math.max(
+          notesFooter.scrollHeight,
+          notesFooter.offsetHeight,
+          (notesLabel?.offsetHeight || 0) + (notesBody?.scrollHeight || 0) + 16,
+        );
+        notesFooter.style.minHeight = `${notesH}px`;
+      }
+
+      const termsBankTable = clonedEl.querySelector(
+        '[data-pdf-footer-block="terms"]',
+      )?.closest("table");
+      if (termsBankTable) {
+        termsBankTable.style.marginBottom = "0px";
+        termsBankTable.style.height = "auto";
+        termsBankTable.style.borderCollapse = "separate";
+        termsBankTable.style.borderSpacing = "0";
+        const notesRow = termsBankTable.querySelector(
+          '[data-pdf-footer-block="notes"]',
+        )?.closest("td");
+        if (notesRow) {
+          notesRow.style.paddingTop = "10px";
+        }
+        const termsCell = termsBankTable.querySelector(
+          '[data-pdf-footer-block="terms"]',
+        );
+        if (termsCell && clonedEl.querySelector('[data-pdf-footer-block="notes"]')) {
+          termsCell.style.paddingBottom = "8px";
+        }
       }
 
       // Force layout recalculation
       await new Promise((r) => setTimeout(r, 150));
-      const finalHeight = Math.max(
-        clonedEl.scrollHeight,
-        clonedEl.offsetHeight,
-        clonedEl.getBoundingClientRect().height
-      );
-      clonedEl.style.minHeight = `${finalHeight}px`;
+      const notesReflow = clonedEl.querySelector('[data-pdf-footer-block="notes"]');
+      if (notesReflow) {
+        notesReflow.style.minHeight = `${notesReflow.scrollHeight + 2}px`;
+      }
+      clonedEl.style.height = "auto";
+      clonedEl.style.minHeight = "0";
 
       const rootRect = clonedEl.getBoundingClientRect();
-      const footerBlockKeys = ["tax-words", "terms", "bank", "notes"];
-      const footerBlockBoxes = {};
-      if (rootRect.width > 0 && rootRect.height > 0) {
-        for (const key of footerBlockKeys) {
-          const blockEl = clonedEl.querySelector(
-            `[data-pdf-footer-block="${key}"]`,
-          );
-          if (!blockEl) continue;
-          const r = blockEl.getBoundingClientRect();
-          footerBlockBoxes[key] = {
-            relX: (r.left - rootRect.left) / rootRect.width,
-            relY: (r.top - rootRect.top) / rootRect.height,
-            relW: r.width / rootRect.width,
-            relH: r.height / rootRect.height,
-          };
-          blockEl.style.minHeight = `${Math.max(r.height, blockEl.scrollHeight)}px`;
-        }
-      }
 
-      // Hide footer text from html2canvas; redraw cleanly with jsPDF after capture.
-      clonedEl.querySelectorAll("[data-pdf-footer-block]").forEach((block) => {
-        block.style.color = "rgb(255,255,255)";
-        block.style.webkitTextFillColor = "rgb(255,255,255)";
-        block.querySelectorAll("*").forEach((child) => {
-          child.style.color = "rgb(255,255,255)";
-          child.style.webkitTextFillColor = "rgb(255,255,255)";
+      // Keep Terms/Bank/Notes as captured HTML (full text). Redraw signature only.
+      clonedEl
+        .querySelectorAll("[data-pdf-signature-for]")
+        .forEach((block) => {
+          block.style.color = "rgb(255,255,255)";
+          block.style.webkitTextFillColor = "rgb(255,255,255)";
+          block.querySelectorAll("*").forEach((child) => {
+            child.style.color = "rgb(255,255,255)";
+            child.style.webkitTextFillColor = "rgb(255,255,255)";
+          });
         });
-      });
 
       // Measure the FULL height of the off-screen cloned element after reflow
       const captureWidth = clonedEl.scrollWidth || 794;
@@ -2250,50 +2296,57 @@ const NewInvoice = ({ invoice }) => {
 
       const imgData = canvas.toDataURL("image/png", 1.0);
 
+      const imgProps = new jsPDF({ unit: "mm" }).getImageProperties(imgData);
+      const pageMarginMm = 6;
+      const contentWidthMm = INVOICE_PDF_WIDTH_MM - pageMarginMm * 2;
+      const scaleWidth = contentWidthMm / imgProps.width;
+      const naturalHmm = imgProps.height * scaleWidth;
+      const pageHeightMm = Math.ceil(
+        Math.max(
+          INVOICE_PDF_MIN_HEIGHT_MM,
+          naturalHmm + pageMarginMm * 2,
+        ),
+      );
+
       const pdf = new jsPDF({
         orientation: "portrait",
         unit: "mm",
-        format: "a4",
+        format: [INVOICE_PDF_WIDTH_MM, pageHeightMm],
         compress: true,
       });
 
       const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
-      const imgProps = pdf.getImageProperties(imgData);
-      /**
-       * Single-page export: scale the captured image to fit in one A4 page.
-       * This avoids tiny overflow triggering an extra mostly-blank page.
-       */
-      const scale = Math.min(
-        pdfWidth / imgProps.width,
-        pdfHeight / imgProps.height,
-      );
-      const drawW = imgProps.width * scale;
-      const drawH = imgProps.height * scale;
-      const x = (pdfWidth - drawW) / 2;
-      const y = 1.5;
-
+      const drawW = contentWidthMm;
+      const drawH = naturalHmm;
+      const x = pageMarginMm;
+      const y = pageMarginMm;
       pdf.addImage(imgData, "PNG", x, y, drawW, drawH, undefined, "FAST");
 
       const ptToMm = 0.352778;
+      const pageLocalY = (absTopMm) => absTopMm;
       const toBlockRect = (box) => ({
         left: x + drawW * box.relX,
         top: y + drawH * box.relY,
         width: drawW * box.relW,
         height: drawH * box.relH,
       });
+      const onPageRect = (rect) => ({
+        ...rect,
+        top: pageLocalY(rect.top),
+      });
       const wipeBlock = (rect, maxRight = null, extraPad = {}) => {
+        const r = onPageRect(rect);
         const sidePad = 0.4;
         const topPad = extraPad.top ?? sidePad;
         const bottomPad = extraPad.bottom ?? sidePad;
-        let right = rect.left + rect.width;
+        let right = r.left + r.width;
         if (maxRight != null) right = Math.min(right, maxRight);
         pdf.setFillColor(255, 255, 255);
         pdf.rect(
-          Math.max(0, rect.left - sidePad),
-          Math.max(0, rect.top - topPad),
-          Math.max(0, right - rect.left + sidePad * 2),
-          rect.height + topPad + bottomPad,
+          Math.max(0, r.left - sidePad),
+          Math.max(0, r.top - topPad),
+          Math.max(0, right - r.left + sidePad * 2),
+          r.height + topPad + bottomPad,
           "F",
         );
       };
@@ -2302,112 +2355,102 @@ const NewInvoice = ({ invoice }) => {
         paragraphs,
         startFontSize = 7,
         title,
+        titleFontSize = 7.5,
         maxRight = null,
         wipeTopPad = 0.4,
         titleTopInset = 0.9,
+        clipToRectHeight = false,
+        lineHeightFactor = 1.45,
+        paragraphGapFactor = 0.35,
       }) => {
+        rect = onPageRect(rect);
         const textWidth = Math.max(rect.width - 1, 20);
         const paragraphList = paragraphs;
-        const lineHeight = startFontSize * ptToMm * 1.45;
+        const lineHeight = startFontSize * ptToMm * lineHeightFactor;
+        const paragraphGap = startFontSize * ptToMm * paragraphGapFactor;
         let estimatedHeight = startFontSize * ptToMm * titleTopInset;
-        if (title) estimatedHeight += 7.5 * ptToMm * 1.55;
+        if (title) estimatedHeight += titleFontSize * ptToMm * 1.55;
         for (const paragraph of paragraphList) {
           const wrapped = pdf.splitTextToSize(paragraph, textWidth);
-          estimatedHeight +=
-            wrapped.length * lineHeight + startFontSize * ptToMm * 0.35;
+          estimatedHeight += wrapped.length * lineHeight + paragraphGap;
         }
+        const wipeHeight = clipToRectHeight
+          ? Math.max(rect.height - 0.3, 4)
+          : Math.max(rect.height, estimatedHeight + 1.5);
         wipeBlock(
-          { ...rect, height: Math.max(rect.height, estimatedHeight + 1.5) },
+          { ...rect, height: wipeHeight },
           maxRight,
-          { top: wipeTopPad, bottom: 0.8 },
+          { top: wipeTopPad, bottom: clipToRectHeight ? 0.15 : 0.8 },
         );
         pdf.setTextColor(0, 0, 0);
         let cursorY = rect.top + startFontSize * ptToMm * titleTopInset;
+        const maxY = rect.top + rect.height;
         if (title) {
           pdf.setFont("helvetica", "bold");
-          pdf.setFontSize(7.5);
-          pdf.text(title, rect.left, cursorY);
-          cursorY += 7.5 * ptToMm * 1.5;
+          pdf.setFontSize(titleFontSize);
+          if (!clipToRectHeight || cursorY <= maxY) {
+            pdf.text(title, rect.left, cursorY);
+          }
+          cursorY += titleFontSize * ptToMm * 1.5;
         }
         for (const paragraph of paragraphList) {
           pdf.setFont("helvetica", "normal");
           pdf.setFontSize(startFontSize);
           const wrapped = pdf.splitTextToSize(paragraph, textWidth);
           for (const line of wrapped) {
+            if (clipToRectHeight && cursorY > maxY) break;
             pdf.text(line, rect.left, cursorY);
             cursorY += lineHeight;
           }
-          cursorY += startFontSize * ptToMm * 0.35;
+          cursorY += paragraphGap;
         }
       };
 
       const pageRight = x + drawW - 1.5;
 
-      if (footerBlockBoxes["tax-words"]) {
-        const rect = toBlockRect(footerBlockBoxes["tax-words"]);
-        const taxText = `Tax Amount (in words) : INR- ${numberToWords(data.taxAmount)}`;
-        pdf.setFont("helvetica", "bold");
-        pdf.setFontSize(7.5);
-        const taxLines = pdf.splitTextToSize(taxText, Math.max(rect.width - 1, 20));
-        const taxLineHeight = 7.5 * ptToMm * 1.4;
-        const taxBlockHeight = taxLines.length * taxLineHeight + 1.2;
-        wipeBlock(
-          { ...rect, height: Math.max(rect.height, taxBlockHeight) },
-          null,
-          { top: 0.6, bottom: 0.8 },
+      const borderedRootEl = clonedEl.querySelector("[data-invoice-border-root]");
+      if (borderedRootEl && rootRect.width > 0 && rootRect.height > 0) {
+        const br = borderedRootEl.getBoundingClientRect();
+        const outerBox = onPageRect({
+          left: x + (drawW * (br.left - rootRect.left)) / rootRect.width,
+          top: y + (drawH * (br.top - rootRect.top)) / rootRect.height,
+          width: (drawW * br.width) / rootRect.width,
+          height: (drawH * br.height) / rootRect.height,
+        });
+        const edgePad = 0.2;
+        pdf.setDrawColor(0, 0, 0);
+        pdf.setLineWidth(0.35);
+        pdf.rect(
+          outerBox.left + edgePad,
+          outerBox.top + edgePad,
+          Math.max(outerBox.width - edgePad * 2, 4),
+          Math.max(outerBox.height - edgePad * 2, 4),
+          "S",
         );
+      }
+
+      const signatureForEl = clonedEl.querySelector("[data-pdf-signature-for]");
+      if (signatureForEl && rootRect.width > 0) {
+        const sr = signatureForEl.getBoundingClientRect();
+        const sigRect = {
+          left: x + (drawW * (sr.left - rootRect.left)) / rootRect.width,
+          top: y + (drawH * (sr.top - rootRect.top)) / rootRect.height,
+          width: (drawW * sr.width) / rootRect.width,
+          height: (drawH * sr.height) / rootRect.height,
+        };
+        const sigText = `for ${data.company.name}`;
+        pdf.setFont("helvetica", "normal");
+        const sigFontSize = 9;
+        pdf.setFontSize(sigFontSize);
         pdf.setTextColor(0, 0, 0);
-        let taxY = rect.top + 7.5 * ptToMm * 0.95;
-        for (const line of taxLines) {
-          pdf.text(line, rect.left, taxY);
-          taxY += taxLineHeight;
-        }
-      }
-
-      if (footerBlockBoxes.terms) {
-        const termsParagraphs =
-          data.terms.length > 0
-            ? data.terms
-            : ["No terms and conditions specified."];
-        drawFlowParagraphs({
-          rect: toBlockRect(footerBlockBoxes.terms),
-          paragraphs: termsParagraphs,
-          title: "Terms & Condition",
-          wipeTopPad: 2.2,
-          titleTopInset: 1.15,
-        });
-      }
-
-      if (footerBlockBoxes.bank) {
-        drawFlowParagraphs({
-          rect: toBlockRect(footerBlockBoxes.bank),
-          paragraphs: [
-            `A/C Holder Name : ${data.bank.accountHolderName}`,
-            `Bank Name : ${data.bank.name}`,
-            `A/c No. : ${data.bank.accountNo}`,
-            `Branch & IFSC Code: ${data.bank.IFSC}`,
-          ],
-          title: "Company's Bank Details",
-          maxRight: pageRight,
-        });
-      }
-
-      const notesPlain = String(invoice.notes || "")
-        .replace(/\*\*(.*?)\*\*/g, "$1")
-        .trim();
-      if (notesPlain && footerBlockBoxes.notes) {
-        const noteParagraphs = notesPlain
-          .split("\n")
-          .map((line) => line.trim())
-          .filter(Boolean);
-        drawFlowParagraphs({
-          rect: toBlockRect(footerBlockBoxes.notes),
-          paragraphs: noteParagraphs.length > 0 ? noteParagraphs : [notesPlain],
-          title: "Notes :",
-          maxRight: pageRight,
-          wipeTopPad: 0.6,
-          titleTopInset: 1.05,
-        });
+        const sigOnPage = onPageRect(sigRect);
+        wipeBlock(sigRect, pageRight, { top: 0.4, bottom: 0.5 });
+        pdf.text(
+          sigText,
+          sigOnPage.left + sigOnPage.width,
+          sigOnPage.top + sigFontSize * ptToMm,
+          { align: "right" },
+        );
       }
 
       const pdfFileName = invoice.type === "performa"
@@ -3340,7 +3383,9 @@ const NewInvoice = ({ invoice }) => {
             Amount Chargeable (in words) E. & O.E
           </div>
           <br />
-          <strong>INR- {numberToWords(data.total)}</strong>
+          <strong style={{ fontSize: "13px", fontWeight: "bold" }}>
+            INR- {numberToWords(data.total)}
+          </strong>
         </div>
 
         {/* Tax Summary Table */}
@@ -3441,22 +3486,22 @@ const NewInvoice = ({ invoice }) => {
           </tbody>
         </table>
 
-        {/* Tax Amount in Words */}
+        {/* Tax Amount in Words — same size as Amount Chargeable INR, one line */}
         <div
-          data-pdf-footer-block="tax-words"
           style={{
-            marginBottom: "12px",
-            fontSize: "9px",
+            marginBottom: "6px",
+            paddingBottom: "0px",
             display: "flex",
             justifyContent: "space-between",
-            lineHeight: 1.55,
+            alignItems: "baseline",
+            gap: "12px",
           }}
         >
-          <strong style={{ display: "block", lineHeight: 1.55 }}>
+          <strong style={{ fontSize: "13px", fontWeight: "bold", lineHeight: 1.35 }}>
             Tax Amount (in words) : INR- {numberToWords(data.taxAmount)}
           </strong>
           {data.roundOff !== 0 && (
-            <strong style={{ fontSize: "10px" }}>
+            <strong style={{ fontSize: "13px", whiteSpace: "nowrap" }}>
               Round Off: {data.roundOff > 0 ? `+₹${data.roundOff}` : `-₹${Math.abs(data.roundOff)}`}
             </strong>
           )}
@@ -3466,9 +3511,12 @@ const NewInvoice = ({ invoice }) => {
         <table
           style={{
             width: "100%",
-            borderCollapse: "collapse",
+            borderCollapse: "separate",
+            borderSpacing: 0,
             tableLayout: "fixed",
-            marginBottom: "10px",
+            marginTop: "0px",
+            marginBottom: "0px",
+            height: "auto",
           }}
         >
           <tbody>
@@ -3479,17 +3527,25 @@ const NewInvoice = ({ invoice }) => {
                   width: "58%",
                   verticalAlign: "top",
                   paddingRight: "16px",
-                  paddingTop: "6px",
-                  fontSize: "9px",
+                  paddingTop: "0px",
+                  paddingBottom: (data.notes || "").trim() ? "8px" : "2px",
+                  fontSize: "14px",
                   lineHeight: 1.55,
                 }}
               >
-                <div style={{ fontWeight: "bold", marginBottom: "6px", marginTop: "2px" }}>
+                <div style={{ fontWeight: "bold", marginBottom: "10px", marginTop: "2px", fontSize: "15px" }}>
                   Terms & Condition
                 </div>
                 {data.terms.length > 0 ? (
                   data.terms.map((term, index) => (
-                    <div key={index} style={{ marginBottom: "4px" }}>
+                    <div
+                      key={index}
+                      style={{
+                        marginBottom:
+                          index === data.terms.length - 1 ? "4px" : "10px",
+                        lineHeight: 1.55,
+                      }}
+                    >
                       {term}
                     </div>
                   ))
@@ -3503,78 +3559,98 @@ const NewInvoice = ({ invoice }) => {
                   width: "42%",
                   verticalAlign: "top",
                   paddingLeft: "8px",
-                  fontSize: "9px",
+                  paddingBottom: "2px",
+                  fontSize: "14px",
                   lineHeight: 1.55,
                 }}
               >
                 <div style={{ width: "100%" }}>
-                  <div style={{ fontWeight: "bold", marginBottom: "4px" }}>
+                  <div style={{ fontWeight: "bold", marginBottom: "10px", fontSize: "15px" }}>
                     Company&apos;s Bank Details
                   </div>
-                  <div style={{ marginBottom: "2px", wordBreak: "break-word" }}>
+                  <div style={{ marginBottom: "8px", wordBreak: "break-word" }}>
                     A/C Holder Name : {data.bank.accountHolderName}
                   </div>
-                  <div style={{ marginBottom: "2px" }}>
+                  <div style={{ marginBottom: "8px" }}>
                     Bank Name : {data.bank.name}
                   </div>
-                  <div style={{ marginBottom: "2px" }}>
+                  <div style={{ marginBottom: "8px" }}>
                     A/c No. : {data.bank.accountNo}
                   </div>
                   <div>Branch &amp; IFSC Code: {data.bank.IFSC}</div>
                 </div>
               </td>
             </tr>
+            {(data.notes || "").trim() ? (
+              <tr>
+                <td
+                  colSpan={2}
+                  style={{
+                    paddingTop: "10px",
+                    paddingBottom: "0px",
+                    verticalAlign: "top",
+                  }}
+                >
+                  <div
+                    data-pdf-footer-block="notes"
+                    style={{
+                      width: "100%",
+                      boxSizing: "border-box",
+                      border: "1px solid #000",
+                      padding: "3px 8px 6px",
+                      marginTop: "2px",
+                      marginBottom: "6px",
+                      overflow: "visible",
+                      fontSize: "12px",
+                      lineHeight: 1.35,
+                    }}
+                  >
+                    <div
+                      data-pdf-notes-label
+                      style={{
+                        fontWeight: "bold",
+                        marginBottom: "2px",
+                        marginTop: "0px",
+                        fontSize: "12px",
+                        lineHeight: 1.35,
+                      }}
+                    >
+                      Notes :
+                    </div>
+                    <div
+                      data-pdf-notes-body
+                      style={{
+                        fontWeight: "normal",
+                        whiteSpace: "pre-wrap",
+                        wordBreak: "break-word",
+                        overflowWrap: "break-word",
+                        fontSize: "12px",
+                        lineHeight: 1.35,
+                      }}
+                    >
+                      {data.notes}
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            ) : null}
           </tbody>
         </table>
-
-        {/* Notes — bottom of invoice (before signature) */}
-        {(data.notes || "").trim() ? (
-          <div
-            data-pdf-footer-block="notes"
-            style={{
-              width: "100%",
-              boxSizing: "border-box",
-              border: "1px solid #000",
-              padding: "6px 4px",
-              marginBottom: "10px",
-              fontSize: "9px",
-              lineHeight: 1.55,
-            }}
-          >
-            <div
-              data-pdf-notes-label
-              style={{
-                fontWeight: "bold",
-                marginBottom: "3px",
-                lineHeight: 1.55,
-              }}
-            >
-              Notes :
-            </div>
-            <div
-              data-pdf-notes-body
-              style={{
-                fontWeight: "normal",
-                whiteSpace: "pre-wrap",
-                wordBreak: "break-word",
-                overflowWrap: "break-word",
-                lineHeight: 1.55,
-              }}
-            >
-              {data.notes}
-            </div>
-          </div>
-        ) : null}
 
         {/* Signature */}
        <div
   style={{
     textAlign: "right",
-    marginTop: "24px",
-    fontSize: "9px",
+    marginTop: (data.notes || "").trim() ? "8px" : "12px",
+    fontSize: "10px",
   }}
 >
-  <div>for {data.company.name}</div>
+  <div
+    data-pdf-signature-for
+    style={{ whiteSpace: "nowrap", fontSize: "9px", lineHeight: 1.35 }}
+  >
+    for {data.company.name}
+  </div>
 
   {/* Signature Image */}
   <div
@@ -3587,7 +3663,7 @@ const NewInvoice = ({ invoice }) => {
     {signatureSrc ? (
       <img
         src={signatureSrc}
-        alt="Signature"
+        alt=""
         onError={handleSignatureError}
         style={{
           height: "60px",
@@ -3618,12 +3694,12 @@ const NewInvoice = ({ invoice }) => {
         <div
           style={{
             textAlign: "center",
-            marginTop: "12px",
+            marginTop: "18px",
             fontSize: "8px",
             fontStyle: "italic",
           }}
         >
-          This is a Computer Generated Invoice
+          *This is a Computer Generated Invoice*
         </div>
         </div>
       </div>
