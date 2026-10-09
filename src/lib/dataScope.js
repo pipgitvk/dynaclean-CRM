@@ -40,7 +40,7 @@ export function canViewAllEmployeeDailyReports(role) {
   return k === "SUPERADMIN" || k === "ADMIN" || k === "DIRECTOR";
 }
 
-/** Service Support Report: admins/managers see all; SERVICE SUPPORT is self-only. */
+/** Service Support Report: admins/managers see all; SERVICE SUPPORT sees full team pool. */
 export function canViewAllServiceSupportReport(role) {
   const k = normalizeRoleKey(role || "");
   return (

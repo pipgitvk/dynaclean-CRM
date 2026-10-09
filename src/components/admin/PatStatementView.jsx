@@ -22,6 +22,7 @@ function PatRow({
   onToggle,
   drillLoading,
   drillRows,
+  drillExpenseByMonth,
   indent = 0,
 }) {
   const toggleKey = row.toggleKey || row.id;
@@ -85,6 +86,60 @@ function PatRow({
               <p className="text-sm text-slate-500 flex items-center gap-2">
                 <Loader2 className="h-4 w-4 animate-spin" /> Loading…
               </p>
+            ) : row.drillSection === "expenses" && drillExpenseByMonth?.months?.length ? (
+              <div className="space-y-4">
+                <p className="text-xs text-slate-600">
+                  {drillExpenseByMonth.lineCount} expense
+                  {drillExpenseByMonth.lineCount === 1 ? "" : "s"} across{" "}
+                  {drillExpenseByMonth.months.length} month
+                  {drillExpenseByMonth.months.length === 1 ? "" : "s"} · Total{" "}
+                  <span className="font-semibold text-slate-800">
+                    {formatPatInr(drillExpenseByMonth.grandTotal)}
+                  </span>
+                </p>
+                {drillExpenseByMonth.months.map((month) => (
+                  <div
+                    key={month.monthKey}
+                    className="overflow-hidden rounded-lg border border-slate-200 bg-white"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-100/80 px-3 py-2">
+                      <span className="text-sm font-semibold text-slate-800">
+                        {month.label}
+                      </span>
+                      <span className="text-xs text-slate-600">
+                        {month.rows.length} line{month.rows.length === 1 ? "" : "s"} ·{" "}
+                        <span className="font-semibold tabular-nums text-teal-800">
+                          {formatPatInr(month.total)}
+                        </span>
+                      </span>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full min-w-[480px] text-left text-xs">
+                        <thead className="bg-slate-50 text-slate-600">
+                          <tr>
+                            <th className="px-2 py-1.5">Expense</th>
+                            <th className="px-2 py-1.5">Client</th>
+                            <th className="px-2 py-1.5">Head / Date</th>
+                            <th className="px-2 py-1.5 text-right">Amount</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {month.rows.map((d) => (
+                            <tr key={d.id} className="border-t border-slate-100">
+                              <td className="px-2 py-1.5">{d.col1}</td>
+                              <td className="px-2 py-1.5">{d.col2}</td>
+                              <td className="px-2 py-1.5">{d.col3}</td>
+                              <td className="px-2 py-1.5 text-right tabular-nums">
+                                {formatPatInr(d.amount)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ))}
+              </div>
             ) : drillRows?.length ? (
               <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
                 <table className="w-full min-w-[480px] text-left text-xs">
@@ -125,12 +180,17 @@ export default function PatStatementView({ initialRange = "thisMonth" }) {
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState(null);
   const [expanded, setExpanded] = useState({});
-  const [drill, setDrill] = useState({ section: null, rows: [], loading: false });
+  const [drill, setDrill] = useState({
+    section: null,
+    rows: [],
+    expenseByMonth: null,
+    loading: false,
+  });
 
   const loadSummary = useCallback(async () => {
     setLoading(true);
     setExpanded({});
-    setDrill({ section: null, rows: [], loading: false });
+    setDrill({ section: null, rows: [], expenseByMonth: null, loading: false });
     try {
       const res = await fetch(`/api/admin-dashboard/pat-summary?range=${range}`);
       const data = await res.json();
@@ -170,18 +230,38 @@ export default function PatStatementView({ initialRange = "thisMonth" }) {
     const next = !expanded[key];
     setExpanded((prev) => ({ ...prev, [key]: next }));
     if (!next || !drillSection) return;
-    setDrill({ section: drillSection, rows: [], loading: true });
+    setDrill({
+      section: drillSection,
+      rows: [],
+      expenseByMonth: null,
+      loading: true,
+    });
     try {
       const q = new URLSearchParams({ section: drillSection, range });
       const res = await fetch(`/api/admin-dashboard/pat-summary?${q}`);
       const data = await res.json();
+      if (data.success && data.expenseByMonth) {
+        setDrill({
+          section: drillSection,
+          rows: [],
+          expenseByMonth: data.expenseByMonth,
+          loading: false,
+        });
+      } else {
+        setDrill({
+          section: drillSection,
+          rows: data.success && Array.isArray(data.rows) ? data.rows : [],
+          expenseByMonth: null,
+          loading: false,
+        });
+      }
+    } catch {
       setDrill({
         section: drillSection,
-        rows: data.success && Array.isArray(data.rows) ? data.rows : [],
+        rows: [],
+        expenseByMonth: null,
         loading: false,
       });
-    } catch {
-      setDrill({ section: drillSection, rows: [], loading: false });
     }
   };
 
@@ -244,6 +324,11 @@ export default function PatStatementView({ initialRange = "thisMonth" }) {
                     }
                     drillRows={
                       drill.section === row.drillSection ? drill.rows : []
+                    }
+                    drillExpenseByMonth={
+                      drill.section === row.drillSection
+                        ? drill.expenseByMonth
+                        : null
                     }
                   />
                 ))}

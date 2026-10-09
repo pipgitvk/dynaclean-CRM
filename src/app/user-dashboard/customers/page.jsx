@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 import { getSessionPayload } from "@/lib/auth";
 import { buildGemCustomerScopeWhere } from "@/lib/dataScope";
+import { sqlServiceSupportCustomerScope } from "@/lib/serviceSupportTeamScope";
 import {
   appendLatestFollowedDateIstFilter,
   latestFollowedDateSelectSql,
@@ -91,11 +92,7 @@ export default async function CustomersPage({ searchParams }) {
 
   // Only filter by assigned fields based on role
   if (userRole === "SERVICE SUPPORT") {
-    // SERVICE SUPPORT: customers assigned to them OR customers they have followed up
-    customerConditions.push(`(c.service_lead_source = ? OR c.customer_id IN (
-      SELECT DISTINCT cf.customer_id FROM customers_followup cf WHERE cf.followed_by = ?
-    ))`);
-    customerParams.push(username, username);
+    customerConditions.push(sqlServiceSupportCustomerScope("c"));
   } else if (userRole === "GEM") {
     const gemScope = buildGemCustomerScopeWhere({ username, tableAlias: "c" });
     customerConditions.push(gemScope.sql);

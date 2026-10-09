@@ -1,4 +1,5 @@
 import { isSalesRole } from "@/lib/isSalesRole";
+import { sqlServiceSupportFollowedByScope } from "@/lib/serviceSupportTeamScope";
 
 export function collectHierarchyCustomerIds({
   customerId,
@@ -49,8 +50,7 @@ export async function fetchCustomerFollowupHistory(
   const params = [...ids];
 
   if (userRole === "SERVICE SUPPORT") {
-    sql += " AND cf.followed_by = ? AND cf.followed_by IS NOT NULL AND cf.followed_by != ''";
-    params.push(username);
+    sql += ` AND ${sqlServiceSupportFollowedByScope()}`;
   } else if (userRole === "TEAM LEADER" || userRole === "ACCOUNTANT") {
     sql += " AND cf.followed_by = ?";
     params.push(username);

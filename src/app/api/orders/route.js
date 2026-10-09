@@ -2,6 +2,10 @@ import { getDbConnection } from "@/lib/db";
 import { NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 import { canViewAllOrders } from "@/lib/dataScope";
+import {
+  isServiceSupportRole,
+  sqlColumnInActiveServiceSupportUsers,
+} from "@/lib/serviceSupportTeamScope";
 import { parseFormData } from "@/lib/parseForm";
 import fs from "fs/promises"; // Use fs.promises for async file operations
 import path from "path";
@@ -111,7 +115,9 @@ export async function GET(req) {
 
     const params = [];
 
-    if (!canViewAllOrders(userRole)) {
+    if (isServiceSupportRole(userRole)) {
+      sql += ` WHERE ${sqlColumnInActiveServiceSupportUsers("no.created_by")}`;
+    } else if (!canViewAllOrders(userRole)) {
       sql += " WHERE no.created_by = ?";
       params.push(username);
     }

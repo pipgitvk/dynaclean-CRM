@@ -3,6 +3,7 @@ import { getDbConnection } from "@/lib/db";
 import { NextResponse } from "next/server";
 import { getSessionPayload } from "@/lib/auth";
 import { canViewAllServiceSupportReport } from "@/lib/dataScope";
+import { isServiceSupportRole } from "@/lib/serviceSupportTeamScope";
 import { UNREGISTERED_PRODUCT_ORDER_SQL } from "@/lib/pendingProductRegistrationCount";
 
 const KPI_DETAIL_TYPES = new Set([
@@ -425,11 +426,23 @@ export async function GET(req) {
     );
     const employees = empRows.map((r) => r.username);
 
-    // SERVICE SUPPORT: always self-only; admins may filter or view all
+    // SERVICE SUPPORT teammates share the same pool; admins may filter or view all
     let empFilter;
     let complaintAssigneeFilter = null;
 
-    if (!canViewAll) {
+    if (isServiceSupportRole(roleNorm)) {
+      if (employeeParam !== "all") {
+        const picked = String(employeeParam).trim();
+        if (!employees.includes(picked)) {
+          return NextResponse.json({ error: "Invalid employee" }, { status: 400 });
+        }
+        empFilter = [picked];
+        complaintAssigneeFilter = [picked];
+      } else {
+        empFilter = employees;
+        complaintAssigneeFilter = employees;
+      }
+    } else if (!canViewAll) {
       if (!username) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }

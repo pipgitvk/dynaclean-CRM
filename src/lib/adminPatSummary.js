@@ -42,6 +42,17 @@ async function safeSum(conn, sql, params = []) {
   }
 }
 
+export async function fetchClientExpensesTotal(conn, dateFrom, dateTo) {
+  return safeSum(
+    conn,
+    `SELECT COALESCE(SUM(COALESCE(amount, 0)), 0) AS total
+     FROM client_expenses
+     WHERE DATE(created_at) >= ?
+       AND DATE(created_at) <= ?`,
+    [dateFrom, dateTo],
+  );
+}
+
 export async function fetchApprovedOrderTaxableRevenue(conn, dateFrom, dateTo) {
   const [result] = await conn.execute(
     `
@@ -152,17 +163,7 @@ export async function buildAdminPatSummary(conn, { dateFrom, dateTo, periodLabel
     [salaryMonth],
   );
 
-  const expensesApproved = await safeSum(
-    conn,
-    `SELECT COALESCE(SUM(COALESCE(approved_amount, 0)), 0) AS total
-     FROM expenses
-     WHERE LOWER(COALESCE(approval_status, '')) NOT IN ('rejected', 'pending')
-       AND DATE(COALESCE(TravelDate, payment_date)) >= ?
-       AND DATE(COALESCE(TravelDate, payment_date)) <= ?`,
-    [dateFrom, dateTo],
-  );
-
-  const nonSalaryExpenses = Math.max(0, expensesApproved - salaryBenefits);
+  const clientExpensesTotal = await fetchClientExpensesTotal(conn, dateFrom, dateTo);
 
   const expenseLines = [
     {
@@ -185,9 +186,9 @@ export async function buildAdminPatSummary(conn, { dateFrom, dateTo, periodLabel
     },
     {
       id: "F10",
-      label: "Rent & Utilities",
-      amount: 0,
-      expandHref: "/admin-dashboard/client-expenses",
+      label: "Client & company expenses (client_expenses)",
+      amount: clientExpensesTotal,
+      expandHref: "/admin-dashboard/client-expenses/cards",
     },
     {
       id: "F11",
@@ -209,13 +210,13 @@ export async function buildAdminPatSummary(conn, { dateFrom, dateTo, periodLabel
     },
     {
       id: "F14",
-      label: "Other expense categories (approved travel & expenses)",
-      amount: nonSalaryExpenses,
-      expandHref: "/admin-dashboard/all-expenses",
+      label: "Other expense categories",
+      amount: 0,
+      expandHref: "/admin-dashboard/client-expenses/cards",
     },
   ];
 
-  const totalExpenses = salaryBenefits + nonSalaryExpenses;
+  const totalExpenses = salaryBenefits + clientExpensesTotal;
   const ebit = grossProfit - totalExpenses;
   const interest = 0;
   const pbt = ebit - interest;
@@ -228,7 +229,7 @@ export async function buildAdminPatSummary(conn, { dateFrom, dateTo, periodLabel
     periodLabel,
     dateFrom,
     dateTo,
-    note: "All amounts ex-GST. Salary & approved expenses from CRM; other income / COGS use available tables. Tax & interest are zero until configured.",
+    note: "All amounts ex-GST. Salary from monthly_salary_records; operating expenses from client_expenses (by entry date). Tax & interest are zero until configured.",
     lines: {
       revenueSales: {
         id: "A",
@@ -314,26 +315,53 @@ export async function fetchPatDrillRows(conn, section, dateFrom, dateTo) {
   }
 
   if (section === "expenses") {
-    const [rows] = await conn.execute(
-      `
-        SELECT ID, username, TravelDate, approved_amount, approval_status
-        FROM expenses
-        WHERE LOWER(COALESCE(approval_status, '')) NOT IN ('rejected', 'pending')
-          AND DATE(COALESCE(TravelDate, payment_date)) >= ?
-          AND DATE(COALESCE(TravelDate, payment_date)) <= ?
-        ORDER BY TravelDate DESC
-        LIMIT 100
-      `,
-      [dateFrom, dateTo],
-    );
-    return rows.map((r) => ({
-      id: r.ID,
-      col1: r.username || "—",
-      col2: r.TravelDate ? String(r.TravelDate).slice(0, 10) : "—",
-      col3: r.approval_status || "—",
-      amount: Number(r.approved_amount) || 0,
-    }));
+    return fetchPatExpenseDrillByMonth(conn, dateFrom, dateTo);
   }
 
   return [];
+}
+
+/** Client expenses for PAT drill-down, grouped by calendar month (newest month first). */
+export async function fetchPatExpenseDrillByMonth(conn, dateFrom, dateTo) {
+  const [rows] = await conn.execute(
+    `
+      SELECT id, expense_name, client_name, head, amount, created_at
+      FROM client_expenses
+      WHERE DATE(created_at) >= ?
+        AND DATE(created_at) <= ?
+      ORDER BY created_at DESC
+    `,
+    [dateFrom, dateTo],
+  );
+
+  const monthMap = new Map();
+
+  for (const r of rows || []) {
+    const created = r.created_at ? dayjs(r.created_at) : null;
+    const monthKey = created?.isValid() ? created.format("YYYY-MM") : "unknown";
+    const label = created?.isValid() ? created.format("MMMM YYYY") : "Unknown date";
+
+    if (!monthMap.has(monthKey)) {
+      monthMap.set(monthKey, { monthKey, label, total: 0, rows: [] });
+    }
+    const bucket = monthMap.get(monthKey);
+    const amount = Number(r.amount) || 0;
+    bucket.total += amount;
+    bucket.rows.push({
+      id: r.id,
+      col1: r.expense_name || "—",
+      col2: r.client_name || "—",
+      col3: r.head ? String(r.head) : created?.format("DD MMM YYYY") || "—",
+      amount,
+    });
+  }
+
+  const months = [...monthMap.values()].sort((a, b) =>
+    b.monthKey.localeCompare(a.monthKey),
+  );
+
+  const grandTotal = months.reduce((s, m) => s + m.total, 0);
+  const lineCount = months.reduce((s, m) => s + m.rows.length, 0);
+
+  return { byMonth: true, months, grandTotal, lineCount };
 }

@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { uploadImage } from "../mediahandler";
+import {
+  isServiceSupportRole,
+  sqlColumnInActiveServiceSupportUsers,
+} from "@/lib/serviceSupportTeamScope";
 
 function phoneSegmentMatch(col, n) {
   return `RIGHT(REGEXP_REPLACE(TRIM(SUBSTRING_INDEX(SUBSTRING_INDEX(REPLACE(${col}, '/', ','), ',', ${n}), ',', -1)), '[^0-9]', ''), 10) = ?`;
@@ -88,6 +92,7 @@ export async function GET(req) {
     const role         = (payload.role || payload.userRole || "").toUpperCase();
     const isSuperAdmin = role === "SUPERADMIN";
     const isEA         = role === "EA"; // Add EA role check
+    const isServiceSupport = isServiceSupportRole(role);
 
     const pool = await getDbConnection();
 
@@ -105,8 +110,12 @@ export async function GET(req) {
             AND UPPER(TRIM(r.userRole)) = 'SERVICE SUPPORT'
         )`);
       } else if (!isSuperAdmin && !isEA) {
-        hCond.push("added_by = ?");
-        hParams.push(username);
+        if (isServiceSupport) {
+          hCond.push(sqlColumnInActiveServiceSupportUsers("added_by"));
+        } else {
+          hCond.push("added_by = ?");
+          hParams.push(username);
+        }
       }
 
       const [histRows] = await pool.execute(
@@ -143,7 +152,14 @@ export async function GET(req) {
     /* ── build WHERE for both modes (no mf. alias needed inside subquery) ── */
     const cond   = [];
     const params = [];
-    if (!isSuperAdmin && !isEA) { cond.push("added_by = ?");   params.push(username); } // EA sees all
+    if (!isSuperAdmin && !isEA) {
+      if (isServiceSupport) {
+        cond.push(sqlColumnInActiveServiceSupportUsers("added_by"));
+      } else {
+        cond.push("added_by = ?");
+        params.push(username);
+      }
+    }
     if (search) {
       const s = `%${search}%`;
       cond.push("(serial_number LIKE ? OR product_model LIKE ? OR added_by LIKE ? OR notes LIKE ? OR contact LIKE ? OR CAST(machine_id AS CHAR) LIKE ? OR CAST(service_id AS CHAR) LIKE ?)");

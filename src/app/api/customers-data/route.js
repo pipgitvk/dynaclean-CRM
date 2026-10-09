@@ -9,6 +9,11 @@ import {
   getScopedUsername,
 } from "@/lib/dataScope";
 import { normalizeRoleKey } from "@/lib/roleKeyUtils";
+import {
+  isServiceSupportRole,
+  sqlServiceSupportCustomerScope,
+  SQL_ACTIVE_SERVICE_SUPPORT_USERNAMES,
+} from "@/lib/serviceSupportTeamScope";
 
 export async function GET(req) {
   const conn = await getDbConnection();
@@ -45,7 +50,12 @@ export async function GET(req) {
     // Employee filter dropdown:
     // Privileged roles can filter by any rep; everyone else should only see themselves.
     if (!canViewAllCustomers(role)) {
-      employees = username ? [username] : [];
+      if (isServiceSupportRole(role)) {
+        const [ssRows] = await conn.execute(SQL_ACTIVE_SERVICE_SUPPORT_USERNAMES);
+        employees = ssRows.map((row) => row.username).filter(Boolean);
+      } else {
+        employees = username ? [username] : [];
+      }
     }
 
     let whereClause = " WHERE 1=1";
@@ -90,13 +100,7 @@ export async function GET(req) {
             AND dispatch_status = 1
         )`;
       } else if (normalizedRole === "SERVICE SUPPORT") {
-        // SERVICE SUPPORT sees only customers assigned to them via service_lead_source
-        if (username) {
-          whereClause += ` AND service_lead_source = ?`;
-          params.push(username);
-        } else {
-          whereClause += ` AND 1=0`;
-        }
+        whereClause += ` AND ${sqlServiceSupportCustomerScope()}`;
       } else if (normalizedRole === "GEM") {
         const gemScope = buildGemCustomerScopeWhere({ username });
         whereClause += ` AND ${gemScope.sql}`;

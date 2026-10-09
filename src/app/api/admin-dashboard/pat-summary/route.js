@@ -23,12 +23,16 @@ export async function GET(req) {
     const conn = await getDbConnection();
 
     if (section) {
-      const rows = await fetchPatDrillRows(
+      const drill = await fetchPatDrillRows(
         conn,
         section,
         period.dateFrom,
         period.dateTo,
       );
+      if (drill && typeof drill === "object" && drill.byMonth) {
+        return NextResponse.json({ success: true, expenseByMonth: drill, ...period });
+      }
+      const rows = Array.isArray(drill) ? drill : [];
       return NextResponse.json({ success: true, rows, ...period });
     }
 

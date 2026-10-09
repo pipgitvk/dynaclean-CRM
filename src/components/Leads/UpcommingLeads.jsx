@@ -5,6 +5,7 @@ import UpcomingLeadsCards from "./UpcomingLeadsCards";
 import UpcomingLeadsTableWithHeader from "./UpcomingLeadsTableWithHeader";
 import { Suspense } from "react";
 import Link from "next/link";
+import { sqlServiceSupportCustomerScope } from "@/lib/serviceSupportTeamScope";
 
 export default async function UpcomingLeads({
   leadSource,
@@ -15,24 +16,31 @@ export default async function UpcomingLeads({
 }) {
   const connection = await getDbConnection();
 
+  const isServiceSupport = userRole === "SERVICE SUPPORT";
+
   const [newStatusRows] = await connection.execute(
+    isServiceSupport
+      ? `
+    SELECT COUNT(*) as count
+    FROM customers c
+    WHERE ${sqlServiceSupportCustomerScope("c")}
+      AND TRIM(LOWER(c.status)) = 'new'
     `
+      : `
     SELECT COUNT(*) as count
     FROM customers c
     WHERE (c.lead_source = ? OR c.sales_representative = ? OR c.assigned_to = ?)
       AND TRIM(LOWER(c.status)) = 'new'
     `,
-    [leadSource, leadSource, leadSource]
+    isServiceSupport ? [] : [leadSource, leadSource, leadSource]
   );
 
   const newStatusCount = newStatusRows[0]?.count || 0;
 
   // Table rows query - different for Service Support
-  const isServiceSupport = userRole === "SERVICE SUPPORT";
   let Tablerows = [];
 
   if (isServiceSupport) {
-    // SERVICE SUPPORT: filter by service_lead_source
     [Tablerows] = await connection.execute(
       `
       SELECT cf.*, c.status, c.stage, c.company, c.customer_id, c.first_name, c.phone, c.products_interest
@@ -44,10 +52,9 @@ export default async function UpcomingLeads({
           FROM customers_followup 
           WHERE customer_id = c.customer_id
         )
-      WHERE c.service_lead_source = ?
+      WHERE ${sqlServiceSupportCustomerScope("c")}
       ORDER BY cf.service_next_followup ASC
-      `,
-      [leadSource]
+      `
     );
   } else {
     // All other roles: filter by lead_source

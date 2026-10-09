@@ -86,7 +86,7 @@ export default function ClientExpensesCardsClient({ rows }) {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [subHeadFilter, setSubHeadFilter] = useState("all");
-  const [sortConfig, setSortConfig] = useState({ key: "client_name", direction: "asc" });
+  const [sortConfig, setSortConfig] = useState({ key: "created_at", direction: "desc" });
   const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
@@ -131,40 +131,39 @@ export default function ClientExpensesCardsClient({ rows }) {
     return filtered;
   }, [rows, searchQuery, fromDate, toDate]);
 
-  const summaryRows = useMemo(() => {
-    let list = buildSummary(filteredRows);
-
-    if (subHeadFilter === "has") {
-      list = list.filter((r) => r.hasSubHead);
-    } else if (subHeadFilter === "none") {
-      list = list.filter((r) => !r.hasSubHead);
-    }
-
-    return list;
-  }, [filteredRows, subHeadFilter]);
-
-  const sortedSummaryRows = useMemo(() => {
+  const sortedExpenseLines = useMemo(() => {
     const dir = sortConfig.direction === "asc" ? 1 : -1;
     const key = sortConfig.key;
 
     const getVal = (row) => {
       switch (key) {
+        case "id":
+          return Number(row.id) || 0;
+        case "expense_name":
+          return (row.expense_name || "").toLowerCase();
         case "client_name":
           return (row.client_name || "").toLowerCase();
         case "group_name":
           return (row.group_name || "").toLowerCase();
-        case "expenseNamesLabel":
-          return (row.expenseNamesLabel || "").toLowerCase();
-        case "totalAmount":
-          return Number(row.totalAmount || 0);
-        case "subHeadLabel":
-          return (row.subHeadLabel || "").toLowerCase();
+        case "head":
+          return (row.head || "").toLowerCase();
+        case "amount":
+          return Number(row.amount || 0);
+        case "created_at":
+          return row.created_at ? new Date(row.created_at).getTime() : 0;
         default:
-          return (row.client_name || "").toLowerCase();
+          return row.created_at ? new Date(row.created_at).getTime() : 0;
       }
     };
 
-    return [...summaryRows].sort((a, b) => {
+    let list = filteredRows;
+    if (subHeadFilter === "has") {
+      list = list.filter((r) => r.sub_head && String(r.sub_head).trim() !== "");
+    } else if (subHeadFilter === "none") {
+      list = list.filter((r) => !r.sub_head || String(r.sub_head).trim() === "");
+    }
+
+    return [...list].sort((a, b) => {
       const va = getVal(a);
       const vb = getVal(b);
       if (typeof va === "number" && typeof vb === "number") {
@@ -172,7 +171,12 @@ export default function ClientExpensesCardsClient({ rows }) {
       }
       return String(va).localeCompare(String(vb)) * dir;
     });
-  }, [summaryRows, sortConfig]);
+  }, [filteredRows, sortConfig, subHeadFilter]);
+
+  const totalFilteredAmount = useMemo(
+    () => sortedExpenseLines.reduce((s, r) => s + Number(r.amount || 0), 0),
+    [sortedExpenseLines],
+  );
 
   const handleSort = (key) => {
     setSortConfig((prev) =>
@@ -196,7 +200,7 @@ export default function ClientExpensesCardsClient({ rows }) {
     setFromDate("");
     setToDate("");
     setSubHeadFilter("all");
-    setSortConfig({ key: "client_name", direction: "asc" });
+    setSortConfig({ key: "created_at", direction: "desc" });
   };
 
   const handleExportToExcel = async () => {
@@ -289,7 +293,7 @@ export default function ClientExpensesCardsClient({ rows }) {
     <div className="max-w-7xl mx-auto p-4 sm:p-6">
       <div className="flex flex-col gap-4 mb-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-700">Client Expenses – Summary</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-700">Client Expenses – All entries</h1>
           <button
             type="button"
             onClick={() => router.refresh()}
@@ -378,8 +382,11 @@ export default function ClientExpensesCardsClient({ rows }) {
             </div>
           </div>
           <p className="text-xs text-gray-500">
-            {sortedSummaryRows.length} group{sortedSummaryRows.length === 1 ? "" : "s"} ·{" "}
-            {filteredRows.length} expense line{filteredRows.length === 1 ? "" : "s"}
+            Showing {sortedExpenseLines.length} of {rows.length} expense
+            {rows.length === 1 ? "" : "s"}
+            {sortedExpenseLines.length > 0
+              ? ` · Total ₹${totalFilteredAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`
+              : ""}
           </p>
         </div>
       </div>
@@ -389,8 +396,22 @@ export default function ClientExpensesCardsClient({ rows }) {
           <thead className="bg-gradient-to-r from-slate-700 to-slate-800 sticky top-0 z-10">
             <tr className="text-left font-medium text-white">
               <th
-                onClick={() => handleSort("client_name")}
+                onClick={() => handleSort("id")}
                 className="p-3 cursor-pointer select-none hover:bg-slate-600/50 transition-colors rounded-tl-xl"
+              >
+                ID
+                <SortIcon column="id" />
+              </th>
+              <th
+                onClick={() => handleSort("expense_name")}
+                className="p-3 cursor-pointer select-none hover:bg-slate-600/50 transition-colors"
+              >
+                Expense
+                <SortIcon column="expense_name" />
+              </th>
+              <th
+                onClick={() => handleSort("client_name")}
+                className="p-3 cursor-pointer select-none hover:bg-slate-600/50 transition-colors"
               >
                 Client
                 <SortIcon column="client_name" />
@@ -403,73 +424,80 @@ export default function ClientExpensesCardsClient({ rows }) {
                 <SortIcon column="group_name" />
               </th>
               <th
-                onClick={() => handleSort("expenseNamesLabel")}
+                onClick={() => handleSort("head")}
                 className="p-3 cursor-pointer select-none hover:bg-slate-600/50 transition-colors"
               >
-                Expense names
-                <SortIcon column="expenseNamesLabel" />
+                Head
+                <SortIcon column="head" />
               </th>
               <th
-                onClick={() => handleSort("totalAmount")}
+                onClick={() => handleSort("amount")}
                 className="p-3 cursor-pointer select-none hover:bg-slate-600/50 transition-colors text-right"
               >
-                Total amount
-                <SortIcon column="totalAmount" />
+                Amount
+                <SortIcon column="amount" />
               </th>
               <th
-                onClick={() => handleSort("subHeadLabel")}
+                onClick={() => handleSort("created_at")}
                 className="p-3 cursor-pointer select-none hover:bg-slate-600/50 transition-colors"
               >
-                Sub-head
-                <SortIcon column="subHeadLabel" />
+                Date
+                <SortIcon column="created_at" />
               </th>
               <th className="p-3 rounded-tr-xl">Action</th>
             </tr>
           </thead>
           <tbody className="text-gray-800 bg-white divide-y divide-gray-100">
-            {sortedSummaryRows.length > 0 ? (
-              sortedSummaryRows.map((card) => {
-                const clientQs = encodeURIComponent(card.client_name);
-                const groupQs = encodeURIComponent(card.group_name);
-                const tableHref = `/admin-dashboard/client-expenses?client=${clientQs}&group=${groupQs}${txnParam}`;
-                const subHeadHref = `/admin-dashboard/client-expenses/sub-head-cards?client=${clientQs}&group=${groupQs}`;
-                const detailHref = card.hasSubHead ? subHeadHref : tableHref;
+            {sortedExpenseLines.length > 0 ? (
+              sortedExpenseLines.map((row) => {
+                const clientQs = encodeURIComponent(row.client_name || "—");
+                const groupQs = encodeURIComponent(row.group_name || "—");
+                const detailHref = `/admin-dashboard/client-expenses/${row.id}`;
 
                 return (
-                  <tr key={card.key} className="hover:bg-blue-50/40 transition-colors">
-                    <td className="p-3 font-medium text-gray-800">{card.client_name}</td>
-                    <td className="p-3 text-gray-600">{card.group_name}</td>
-                    <td className="p-3 text-gray-700 max-w-md" title={card.expenseNamesLabel}>
-                      {card.expenseNamesLabel}
+                  <tr key={row.id} className="hover:bg-blue-50/40 transition-colors">
+                    <td className="p-3 text-gray-500 tabular-nums">{row.id}</td>
+                    <td className="p-3 font-medium text-gray-800 max-w-[200px] truncate" title={row.expense_name}>
+                      {row.expense_name || "—"}
                     </td>
+                    <td className="p-3 text-gray-700">{row.client_name || "—"}</td>
+                    <td className="p-3 text-gray-600">{row.group_name || "—"}</td>
+                    <td className="p-3 text-gray-600">{row.head || "—"}</td>
                     <td className="p-3 text-right font-semibold text-emerald-700 tabular-nums">
-                      ₹{card.totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                      ₹{Number(row.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                    </td>
+                    <td className="p-3 text-gray-600 whitespace-nowrap">
+                      {row.created_at
+                        ? new Date(row.created_at).toLocaleDateString("en-IN", {
+                            day: "2-digit",
+                            month: "short",
+                            year: "numeric",
+                          })
+                        : "—"}
                     </td>
                     <td className="p-3">
-                      <span
-                        className={[
-                          "inline-flex px-2 py-0.5 rounded-full text-xs font-medium",
-                          card.hasSubHead ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-600",
-                        ].join(" ")}
-                      >
-                        {card.subHeadLabel}
-                      </span>
-                    </td>
-                    <td className="p-3">
-                      <Link
-                        href={detailHref}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 transition-colors"
-                      >
-                        <LayoutList className="w-3.5 h-3.5 shrink-0" />
-                        {card.hasSubHead ? "Sub-head summary" : "View expenses"}
-                      </Link>
+                      <div className="flex flex-wrap gap-1.5">
+                        <Link
+                          href={detailHref}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-600 text-white text-xs font-medium hover:bg-blue-700"
+                        >
+                          Open
+                        </Link>
+                        <Link
+                          href={`/admin-dashboard/client-expenses?client=${clientQs}&group=${groupQs}${txnParam}`}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-gray-200 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                        >
+                          <LayoutList className="w-3 h-3" />
+                          Group
+                        </Link>
+                      </div>
                     </td>
                   </tr>
                 );
               })
             ) : (
               <tr>
-                <td colSpan={6} className="p-12 text-center text-gray-500">
+                <td colSpan={8} className="p-12 text-center text-gray-500">
                   <div className="flex flex-col items-center gap-2">
                     <Inbox className="w-12 h-12 text-gray-300" />
                     <span className="font-medium">

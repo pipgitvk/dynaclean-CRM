@@ -3,6 +3,7 @@ import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import UserQuotationsListClient from "./UserQuotationsListClient";
 import { userHasModuleKey } from "@/lib/userModuleAccessServer";
+import { sqlColumnInActiveServiceSupportUsers } from "@/lib/serviceSupportTeamScope";
 
 export const dynamic = "force-dynamic";
 
@@ -30,11 +31,10 @@ async function getQuotations(username, role, { search, date_from, date_to, custo
   let values = [];
 
   // ---------------------------------------------------------
-  // ⭐ SERVICE SUPPORT → ALWAYS ONLY OWN QUOTATIONS (with optional customer_id filter)
+  // ⭐ SERVICE SUPPORT → all active teammates' quotations (optional customer_id filter)
   // ---------------------------------------------------------
   if (role === "SERVICE SUPPORT") {
-    conditions.push(`qr.emp_name = ?`);
-    values.push(username);
+    conditions.push(sqlColumnInActiveServiceSupportUsers("qr.emp_name"));
     if (customer_id) {
       conditions.push(`qr.customer_id = ?`);
       values.push(customer_id);

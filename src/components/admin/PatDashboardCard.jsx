@@ -8,11 +8,17 @@ import { formatPatInr } from "@/components/admin/PatStatementView";
 export default function PatDashboardCard() {
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState(null);
+  const [allowed, setAllowed] = useState(true);
 
   const loadSummary = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch("/api/admin-dashboard/pat-summary?range=thisMonth");
+      if (res.status === 403) {
+        setAllowed(false);
+        setLoading(false);
+        return;
+      }
       const data = await res.json();
       if (data.success) setSummary(data.summary);
     } catch {
@@ -28,6 +34,8 @@ export default function PatDashboardCard() {
 
   const patAmount = summary?.lines?.pat?.amount ?? 0;
   const patMargin = summary?.lines?.patMargin?.amount ?? 0;
+
+  if (!allowed) return null;
 
   return (
     <Link

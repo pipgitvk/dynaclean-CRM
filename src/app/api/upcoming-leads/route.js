@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
+import { sqlServiceSupportCustomerScope } from "@/lib/serviceSupportTeamScope";
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
@@ -9,14 +10,20 @@ export async function GET(request) {
   const endDate   = searchParams.get("endDate") || "";
   const isServiceSupport = userRole === "SERVICE SUPPORT";
   const dateField = isServiceSupport ? "service_next_followup" : "next_followup_date";
-  const sourceField = isServiceSupport ? "service_lead_source" : "lead_source";
   const excludedStatuses = isServiceSupport
     ? "('Invalid', 'Disqualified')"
     : "('DENIED', 'Invalid', 'Disqualified')";
 
   try {
     const connection = await getDbConnection();
-    const params = [leadSource];
+    const params = [];
+
+    const customerScope = isServiceSupport
+      ? sqlServiceSupportCustomerScope("c")
+      : "c.lead_source = ?";
+    if (!isServiceSupport) {
+      params.push(leadSource);
+    }
 
     let sql = `
       SELECT *
@@ -27,7 +34,7 @@ export async function GET(request) {
           ROW_NUMBER() OVER(PARTITION BY cf.customer_id ORDER BY cf.time_stamp DESC) AS rn
         FROM customers_followup cf
         INNER JOIN customers c ON cf.customer_id = c.customer_id
-        WHERE c.${sourceField} = ?
+        WHERE ${customerScope}
           AND c.status NOT IN ${excludedStatuses}
           AND (c.stage IS NULL OR c.stage != 'Disqualified / Invalid Lead')
       ) AS T

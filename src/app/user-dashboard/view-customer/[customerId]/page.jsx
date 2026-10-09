@@ -15,6 +15,7 @@ import {
   fetchCustomerFollowupHistory,
 } from "@/lib/customerHierarchyFollowups";
 import { isGemRole } from "@/lib/isGemRole";
+import { isServiceSupportRole, sqlColumnInActiveServiceSupportUsers } from "@/lib/serviceSupportTeamScope";
 import { userHasModuleKey } from "@/lib/userModuleAccessServer";
 import Link from "next/link";
 import axios from "axios";
@@ -94,11 +95,19 @@ export default async function CustomerPage({ params }) {
   const isPrivilegedRole = ["SUPERADMIN", "DIRECTOR"].includes(String(userRole).toUpperCase());
   const isAssignedOrLeadSourceOwner =
     customer.assigned_to === username || customer.lead_source === username;
-  const canSeeAllOrders = isPrivilegedRole || isAssignedOrLeadSourceOwner;
-  const orderCountQuery = canSeeAllOrders
-    ? `SELECT COUNT(*) AS orderCount FROM neworder WHERE customer_id = ?`
-    : `SELECT COUNT(*) AS orderCount FROM neworder WHERE customer_id = ? AND created_by = ?`;
-  const orderCountParams = canSeeAllOrders ? [customerId] : [customerId, username];
+  const isServiceSupport = isServiceSupportRole(userRole);
+  const canSeeAllOrders =
+    isPrivilegedRole || isAssignedOrLeadSourceOwner || isServiceSupport;
+  const orderCountQuery = isServiceSupport
+    ? `SELECT COUNT(*) AS orderCount FROM neworder WHERE customer_id = ? AND ${sqlColumnInActiveServiceSupportUsers("created_by")}`
+    : canSeeAllOrders
+      ? `SELECT COUNT(*) AS orderCount FROM neworder WHERE customer_id = ?`
+      : `SELECT COUNT(*) AS orderCount FROM neworder WHERE customer_id = ? AND created_by = ?`;
+  const orderCountParams = isServiceSupport
+    ? [customerId]
+    : canSeeAllOrders
+      ? [customerId]
+      : [customerId, username];
   const [[{ orderCount }]] = await conn.execute(orderCountQuery, orderCountParams);
 
   let latestQuoteNumber = "";

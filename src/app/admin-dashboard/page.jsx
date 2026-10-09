@@ -202,6 +202,7 @@ import { Package, BarChart3, Upload, DollarSign, Calendar, Plane, FileText, Clip
 import ServiceTeamReportCard from "@/components/service/ServiceTeamReportCard";
 import ServiceSupportQuotesOrdersCard from "@/components/service/ServiceSupportQuotesOrdersCard";
 import ServiceSupportTotalCard from "@/components/service/ServiceSupportTotalCard";
+import PatDashboardCard from "@/components/admin/PatDashboardCard";
 import { SPECIAL_PRICE_PENDING_CONDITION } from "@/lib/specialPriceDefaults";
 import { getPendingProspectSubmissionsCount } from "@/lib/prospectSubmissionCounts";
 import {
@@ -530,6 +531,7 @@ export default async function UserDashboardPage() {
 
           {/* Profile Approvals - Dynamic Card Component */}
           <ProfileApprovalsCard />
+          <PatDashboardCard />
           <ScheduleVisitCard href="/admin-dashboard/schedule-visits" alwaysShow />
           <OverduePaymentCard />
           <KeywordPerformanceQuickCard />
