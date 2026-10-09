@@ -49,9 +49,12 @@ export function gapIsSandwichOnly(leftToYmd, rightFromYmd, holidays = []) {
   return true;
 }
 
+/** Full-day leave types that use Sunday/holiday sandwich between separate applications. */
+export const SANDWICH_LEAVE_TYPES = ["unpaid", "paid", "sick", "casual"];
+
 /**
- * Expand unpaid leave span to include sandwiched Sundays/holidays between
- * this request and other pending/approved full-day unpaid leaves.
+ * Expand leave span to include sandwiched Sundays/holidays between
+ * this request and other pending/approved full-day leaves of the same type.
  */
 export function expandUnpaidSandwichSpan(fromYmd, toYmd, existingLeaves, holidays = []) {
   let from = normalizeLeaveYmd(fromYmd);
@@ -120,6 +123,76 @@ export function unpaidLeavesForApprovalSandwich(rows, currentLeaveId) {
   });
 }
 
+/**
+ * Days that count against balance if this full-day application is submitted
+ * (includes sandwich Sundays/holidays and pending/approved neighbours in the cluster).
+ */
+export function computeSandwichBalanceProjection({
+  takenCount,
+  existingRows,
+  from_date,
+  to_date,
+  newApplicationDays,
+  holidays = [],
+}) {
+  const previewPool = unpaidLeavesForPendingSandwichPreview(existingRows);
+  const hypothetical = [
+    ...previewPool,
+    {
+      id: -1,
+      from_date,
+      to_date,
+      is_half_day: 0,
+      status: "pending",
+    },
+  ];
+  const sandwich = expandUnpaidSandwichSpan(
+    from_date,
+    to_date,
+    hypothetical,
+    holidays
+  );
+  const clusterDays = calculateContinuousLeaveDays(
+    sandwich.from_date,
+    sandwich.to_date,
+    holidays
+  ).totalDays;
+
+  const mergedIds = new Set(
+    (sandwich.mergeLeaveIds || []).map((id) => Number(id))
+  );
+
+  let approvedInCluster = 0;
+  let pendingOutsideCluster = 0;
+
+  for (const row of existingRows || []) {
+    const rowDays = Number(row.total_days) || 0;
+    if (row.is_half_day == 1) {
+      if (row.status === "pending") pendingOutsideCluster += rowDays;
+      continue;
+    }
+    const id = Number(row.id);
+    if (mergedIds.has(id)) {
+      if (row.status === "approved") approvedInCluster += rowDays;
+    } else if (row.status === "pending") {
+      pendingOutsideCluster += rowDays;
+    }
+  }
+
+  const projectedCommitted =
+    Number(takenCount || 0) -
+    approvedInCluster +
+    pendingOutsideCluster +
+    clusterDays;
+
+  return {
+    projectedCommitted,
+    clusterDays,
+    balanceDaysForThisApplication: clusterDays,
+    sandwichLinksExisting: mergedIds.size > 0,
+  };
+}
+
 /** Preview: show calendar days while pending; after all linked leaves approved. */
 export function unpaidLeavesForPendingSandwichPreview(rows) {
   return (rows || []).filter(
@@ -131,8 +204,8 @@ export function unpaidLeavesForPendingSandwichPreview(rows) {
 }
 
 /**
- * On HR approval: merge sandwiched unpaid spans (approved + this row only).
- * @returns {{ handled: boolean, primaryId?: number, from_date?: string, to_date?: string, totalDays?: number }}
+ * On HR approval: merge sandwiched spans (approved + this row only).
+ * @returns {{ handled: boolean, primaryId?: number, from_date?: string, to_date?: string, totalDays?: number, deleteIds?: number[] }}
  */
 export function buildUnpaidSandwichApprovalUpdate(leave, poolRows, holidays) {
   if (!leave || leave.is_half_day == 1) {
@@ -156,6 +229,10 @@ export function buildUnpaidSandwichApprovalUpdate(leave, poolRows, holidays) {
   const primaryId = Math.min(...ids);
   const deleteIds = [...ids].filter((id) => id !== primaryId);
 
+  if (deleteIds.length === 0 && !sandwich.sandwichApplied) {
+    return { handled: false };
+  }
+
   return {
     handled: true,
     primaryId,
@@ -164,4 +241,44 @@ export function buildUnpaidSandwichApprovalUpdate(leave, poolRows, holidays) {
     to_date: sandwich.to_date,
     totalDays,
   };
+}
+
+/**
+ * Merge already-approved/pending sandwich-linked rows (fixes legacy separate applications).
+ * @returns {Promise<boolean>} true if any merge was applied
+ */
+export async function reconcileSandwichLeavesForUser(conn, username, holidays) {
+  let merged = false;
+  for (const leaveType of SANDWICH_LEAVE_TYPES) {
+    const [rows] = await conn.execute(
+      `SELECT id, from_date, to_date, is_half_day, status
+       FROM employee_leaves
+       WHERE username = ?
+         AND leave_type = ?
+         AND status IN ('pending', 'approved')
+         AND is_half_day != 1`,
+      [username, leaveType]
+    );
+    if (!rows || rows.length < 2) continue;
+
+    for (const row of rows) {
+      const plan = buildUnpaidSandwichApprovalUpdate(row, rows, holidays);
+      if (!plan.handled || !plan.deleteIds?.length) continue;
+
+      await conn.execute(
+        `UPDATE employee_leaves
+         SET from_date = ?, to_date = ?, total_days = ?, is_half_day = 0
+         WHERE id = ?`,
+        [plan.from_date, plan.to_date, plan.totalDays, plan.primaryId]
+      );
+      const placeholders = plan.deleteIds.map(() => "?").join(", ");
+      await conn.execute(
+        `DELETE FROM employee_leaves WHERE username = ? AND id IN (${placeholders})`,
+        [username, ...plan.deleteIds]
+      );
+      merged = true;
+      break;
+    }
+  }
+  return merged;
 }

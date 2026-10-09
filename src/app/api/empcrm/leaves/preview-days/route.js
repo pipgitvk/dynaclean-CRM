@@ -7,6 +7,7 @@ import {
 } from "@/lib/leaveContinuousDays";
 import {
   expandUnpaidSandwichSpan,
+  SANDWICH_LEAVE_TYPES,
   unpaidLeavesForPendingSandwichPreview,
 } from "@/lib/unpaidLeaveSandwich";
 
@@ -49,16 +50,16 @@ export async function GET(request) {
     let effectiveFromAfterApproval = null;
     let effectiveToAfterApproval = null;
 
-    if (leave_type === "unpaid") {
-      const [existingUnpaid] = await conn.execute(
+    if (SANDWICH_LEAVE_TYPES.includes(leave_type)) {
+      const [existingRows] = await conn.execute(
         `SELECT id, from_date, to_date, is_half_day, status
          FROM employee_leaves
          WHERE username = ?
-           AND leave_type = 'unpaid'
+           AND leave_type = ?
            AND status IN ('pending', 'approved')`,
-        [session.username]
+        [session.username, leave_type]
       );
-      const previewPool = unpaidLeavesForPendingSandwichPreview(existingUnpaid);
+      const previewPool = unpaidLeavesForPendingSandwichPreview(existingRows);
       const hypotheticalPool = [
         ...previewPool,
         {

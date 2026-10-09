@@ -783,7 +783,7 @@ export default function UserLeaveManagement() {
                       {" "}in this span (continuous leave — all days from start to end date).
                     </p>
                   )}
-                  {formData.leave_type === "unpaid" &&
+                  {["unpaid", "paid", "sick", "casual"].includes(formData.leave_type) &&
                     leaveDayPreview?.sandwichAfterApproval &&
                     leaveDayPreview.totalDaysAfterApproval != null && (
                     <p className="text-[11px] sm:text-xs text-blue-900 font-medium">
@@ -796,7 +796,7 @@ export default function UserLeaveManagement() {
                       {leaveDayPreview.from_date_after_approval &&
                       leaveDayPreview.to_date_after_approval
                         ? ` (${leaveDayPreview.from_date_after_approval} to ${leaveDayPreview.to_date_after_approval}, includes Sunday/holiday in between).`
-                        : " (includes Sunday/holiday between linked unpaid leaves)."}
+                        : " (includes Sunday/holiday between linked leaves of the same type)."}
                     </p>
                   )}
                 </div>

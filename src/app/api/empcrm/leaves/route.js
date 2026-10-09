@@ -11,6 +11,9 @@ import {
 } from "@/lib/leaveContinuousDays";
 import {
   buildUnpaidSandwichApprovalUpdate,
+  computeSandwichBalanceProjection,
+  reconcileSandwichLeavesForUser,
+  SANDWICH_LEAVE_TYPES,
   unpaidLeavesForApprovalSandwich,
 } from "@/lib/unpaidLeaveSandwich";
 
@@ -107,7 +110,26 @@ export async function GET(request) {
 
     query += ` ORDER BY el.created_at DESC`;
 
-    const [leaves] = await conn.execute(query, params);
+    let [leaves] = await conn.execute(query, params);
+
+    // Merge sandwich-linked approved rows for own dashboard (e.g. Sat leave + Sun + Mon leave)
+    const reconcileUsername =
+      !reportingManagerMode && !isAdmin
+        ? session.username
+        : isAdmin && usernameParam
+          ? usernameParam
+          : null;
+    if (reconcileUsername) {
+      const holidays = await fetchCompanyHolidays(conn);
+      const didMerge = await reconcileSandwichLeavesForUser(
+        conn,
+        reconcileUsername,
+        holidays
+      );
+      if (didMerge) {
+        [leaves] = await conn.execute(query, params);
+      }
+    }
 
     // Parse leave_policy JSON
     leaves.forEach((leave) => {
@@ -475,18 +497,24 @@ export async function POST(request) {
         );
       }
 
-      // Calculate already taken leaves of this type
-      const [takenLeaves] = await conn.execute(
-        `SELECT COALESCE(SUM(total_days), 0) as taken 
-         FROM employee_leaves 
-         WHERE username = ? 
-         AND leave_type = ? 
-         AND status = 'approved'
-         AND YEAR(from_date) = YEAR(CURDATE())`,
+      const [balanceRows] = await conn.execute(
+        `SELECT id, from_date, to_date, total_days, is_half_day, status
+         FROM employee_leaves
+         WHERE username = ?
+           AND leave_type = ?
+           AND status IN ('pending', 'approved')
+           AND YEAR(from_date) = YEAR(CURDATE())`,
         [session.username, leave_type]
       );
 
-      const takenCount = Number(takenLeaves[0].taken || 0);
+      const takenCount = (balanceRows || [])
+        .filter((r) => r.status === "approved")
+        .reduce((sum, r) => sum + Number(r.total_days || 0), 0);
+
+      const pendingCount = (balanceRows || [])
+        .filter((r) => r.status === "pending")
+        .reduce((sum, r) => sum + Number(r.total_days || 0), 0);
+
       const allowedKey = `${leave_type}_allowed`;
       const maxAllowed = Number(leavePolicy[allowedKey] || 0);
       
@@ -499,21 +527,53 @@ export async function POST(request) {
         leave_type
       ));
 
-      console.log('Leave validation debug:', {
+      let projectedCommitted;
+      let daysCountedForRequest = totalDays;
+
+      if (
+        SANDWICH_LEAVE_TYPES.includes(leave_type) &&
+        !isHalfDay
+      ) {
+        const projection = computeSandwichBalanceProjection({
+          takenCount,
+          existingRows: balanceRows,
+          from_date,
+          to_date,
+          newApplicationDays: totalDays,
+          holidays,
+        });
+        projectedCommitted = projection.projectedCommitted;
+        daysCountedForRequest = projection.clusterDays;
+      } else {
+        projectedCommitted = takenCount + pendingCount + totalDays;
+      }
+
+      console.log("Leave validation debug:", {
         leave_type,
         takenCount,
+        pendingCount,
         totalDays,
+        daysCountedForRequest,
+        projectedCommitted,
         accruedAllowed,
-        available: accruedAllowed - takenCount,
-        condition: takenCount + totalDays > accruedAllowed
+        available: accruedAllowed - takenCount - pendingCount,
       });
 
-      // Check if requesting leave exceeds available balance
-      if (takenCount + totalDays > accruedAllowed) {
+      if (projectedCommitted > accruedAllowed) {
+        const availableNow = Math.max(
+          0,
+          Number(
+            (accruedAllowed - (projectedCommitted - daysCountedForRequest)).toFixed(2)
+          )
+        );
+        const sandwichNote =
+          daysCountedForRequest > totalDays
+            ? ` (sandwich rule: ${daysCountedForRequest} days including Sunday/holiday between linked leaves)`
+            : "";
         return NextResponse.json(
           {
             success: false,
-            error: `Insufficient ${leave_type} leave balance. Available: ${accruedAllowed - takenCount} days, Requested: ${totalDays} days`
+            error: `Insufficient ${leave_type} leave balance. Available: ${availableNow} days, Required for this application: ${daysCountedForRequest} days${sandwichNote}`,
           },
           { status: 400 }
         );
@@ -1008,24 +1068,28 @@ export async function PATCH(request) {
 
     let skipDefaultStatusUpdate = false;
 
-    // Unpaid full-day: sandwich Sundays/holidays only when approved (not while pending)
-    if (status === "approved" && leave.leave_type === "unpaid" && leave.is_half_day != 1) {
+    // Full-day paid/sick/casual/unpaid: sandwich Sundays/holidays on approval (not while pending)
+    if (
+      status === "approved" &&
+      SANDWICH_LEAVE_TYPES.includes(leave.leave_type) &&
+      leave.is_half_day != 1
+    ) {
       const holidays = await fetchCompanyHolidays(conn);
-      const [unpaidRows] = await conn.execute(
+      const [typeRows] = await conn.execute(
         `SELECT id, from_date, to_date, is_half_day, status
          FROM employee_leaves
          WHERE username = ?
-           AND leave_type = 'unpaid'
+           AND leave_type = ?
            AND status IN ('pending', 'approved')`,
-        [leave.username]
+        [leave.username, leave.leave_type]
       );
-      const pool = unpaidLeavesForApprovalSandwich(unpaidRows, leaveId);
+      const pool = unpaidLeavesForApprovalSandwich(typeRows, leaveId);
       const plan = buildUnpaidSandwichApprovalUpdate(leave, pool, holidays);
       if (plan.handled) {
         await conn.execute(
           `UPDATE employee_leaves
            SET status = ?, reviewed_by = ?, reviewed_at = NOW(), rejection_reason = ?,
-               from_date = ?, to_date = ?, total_days = ?, leave_type = 'unpaid', is_half_day = 0
+               from_date = ?, to_date = ?, total_days = ?, leave_type = ?, is_half_day = 0
            WHERE id = ?`,
           [
             status,
@@ -1034,6 +1098,7 @@ export async function PATCH(request) {
             plan.from_date,
             plan.to_date,
             plan.totalDays,
+            leave.leave_type,
             plan.primaryId,
           ]
         );
