@@ -2170,51 +2170,26 @@ const NewInvoice = ({ invoice }) => {
         block.style.paddingBottom = "1px";
       });
 
-      const notesBlock = clonedEl.querySelector('[data-pdf-invoice-block="notes"]');
-      const notesTable = notesBlock?.closest("table");
-      if (notesTable) {
-        notesTable.style.tableLayout = "fixed";
-        notesTable.style.width = "100%";
-      }
-      if (notesBlock) {
-        notesBlock.style.overflow = "visible";
-        notesBlock.style.whiteSpace = "pre-wrap";
-        notesBlock.style.wordBreak = "break-word";
-        notesBlock.style.overflowWrap = "break-word";
-        notesBlock.style.display = "table-cell";
-        notesBlock.style.width = "100%";
-        notesBlock.setAttribute("colspan", "2");
-        const notesLabel = notesBlock.querySelector("[data-pdf-notes-label]");
-        if (notesLabel) {
-          notesLabel.style.display = "block";
-          notesLabel.style.fontWeight = "bold";
-          notesLabel.style.color = "rgb(0, 0, 0)";
-          notesLabel.style.webkitTextFillColor = "rgb(0, 0, 0)";
-        }
-        const notesBody = notesBlock.querySelector("[data-pdf-notes-body]");
+      const notesFooter = clonedEl.querySelector('[data-pdf-footer-block="notes"]');
+      if (notesFooter) {
+        notesFooter.style.width = "100%";
+        notesFooter.style.boxSizing = "border-box";
+        notesFooter.style.overflow = "visible";
+        const notesBody = notesFooter.querySelector("[data-pdf-notes-body]");
+        const notesLabel = notesFooter.querySelector("[data-pdf-notes-label]");
         if (notesBody) {
           notesBody.style.whiteSpace = "pre-wrap";
           notesBody.style.wordBreak = "break-word";
           notesBody.style.overflowWrap = "break-word";
-          notesBody.style.overflow = "visible";
-          notesBody.style.display = "block";
-          notesBody.style.color = "rgb(0, 0, 0)";
-          notesBody.style.webkitTextFillColor = "rgb(0, 0, 0)";
         }
         const notesTotalHeight =
           (notesLabel?.offsetHeight || 0) +
           (notesBody?.scrollHeight || 0) +
           16;
-        notesBlock.style.minHeight = `${notesTotalHeight}px`;
-        notesBlock.style.height = "auto";
-        const notesRow = notesBlock.closest("tr");
-        if (notesRow) {
-          notesRow.style.height = "auto";
-          notesRow.style.minHeight = `${notesTotalHeight}px`;
-        }
+        notesFooter.style.minHeight = `${notesTotalHeight}px`;
       }
 
-      // Force layout recalculation so line items sit below expanded notes
+      // Force layout recalculation
       await new Promise((r) => setTimeout(r, 150));
       const finalHeight = Math.max(
         clonedEl.scrollHeight,
@@ -2224,7 +2199,7 @@ const NewInvoice = ({ invoice }) => {
       clonedEl.style.minHeight = `${finalHeight}px`;
 
       const rootRect = clonedEl.getBoundingClientRect();
-      const footerBlockKeys = ["tax-words", "terms", "bank"];
+      const footerBlockKeys = ["tax-words", "terms", "bank", "notes"];
       const footerBlockBoxes = {};
       if (rootRect.width > 0 && rootRect.height > 0) {
         for (const key of footerBlockKeys) {
@@ -2414,6 +2389,24 @@ const NewInvoice = ({ invoice }) => {
           ],
           title: "Company's Bank Details",
           maxRight: pageRight,
+        });
+      }
+
+      const notesPlain = String(invoice.notes || "")
+        .replace(/\*\*(.*?)\*\*/g, "$1")
+        .trim();
+      if (notesPlain && footerBlockBoxes.notes) {
+        const noteParagraphs = notesPlain
+          .split("\n")
+          .map((line) => line.trim())
+          .filter(Boolean);
+        drawFlowParagraphs({
+          rect: toBlockRect(footerBlockBoxes.notes),
+          paragraphs: noteParagraphs.length > 0 ? noteParagraphs : [notesPlain],
+          title: "Notes :",
+          maxRight: pageRight,
+          wipeTopPad: 0.6,
+          titleTopInset: 1.05,
         });
       }
 
@@ -3096,52 +3089,6 @@ const NewInvoice = ({ invoice }) => {
                 </span>
               </td>
             </tr>
-            <tr>
-              <td
-                colSpan={2}
-                data-pdf-invoice-block="notes"
-                style={{
-                  border: "1px solid #000",
-                  padding: "6px 4px",
-                  verticalAlign: "top",
-                  lineHeight: 1.55,
-                  fontSize: "9px",
-                  boxSizing: "border-box",
-                }}
-              >
-                <div
-                  style={{
-                    width: "100%",
-                    maxWidth: "100%",
-                  }}
-                >
-                  <div
-                    data-pdf-notes-label
-                    style={{
-                      fontWeight: "bold",
-                      marginBottom: "3px",
-                      fontSize: "9px",
-                      lineHeight: 1.55,
-                    }}
-                  >
-                    Notes :
-                  </div>
-                  <div
-                    data-pdf-notes-body
-                    style={{
-                      fontWeight: "normal",
-                      whiteSpace: "pre-wrap",
-                      wordBreak: "break-word",
-                      overflowWrap: "break-word",
-                      lineHeight: 1.55,
-                      fontSize: "9px",
-                    }}
-                  >
-                    {data.notes || ""}
-                  </div>
-                </div>
-              </td>
-            </tr>
           </tbody>
         </table>
 
@@ -3164,7 +3111,6 @@ const NewInvoice = ({ invoice }) => {
                   textAlign: "left",
                   borderBottom: "0px",
                   borderRight: "0px",
-                  borderTop: "0px",
                 }}
               >
                 Sl No.
@@ -3580,6 +3526,45 @@ const NewInvoice = ({ invoice }) => {
             </tr>
           </tbody>
         </table>
+
+        {/* Notes — bottom of invoice (before signature) */}
+        {(data.notes || "").trim() ? (
+          <div
+            data-pdf-footer-block="notes"
+            style={{
+              width: "100%",
+              boxSizing: "border-box",
+              border: "1px solid #000",
+              padding: "6px 4px",
+              marginBottom: "10px",
+              fontSize: "9px",
+              lineHeight: 1.55,
+            }}
+          >
+            <div
+              data-pdf-notes-label
+              style={{
+                fontWeight: "bold",
+                marginBottom: "3px",
+                lineHeight: 1.55,
+              }}
+            >
+              Notes :
+            </div>
+            <div
+              data-pdf-notes-body
+              style={{
+                fontWeight: "normal",
+                whiteSpace: "pre-wrap",
+                wordBreak: "break-word",
+                overflowWrap: "break-word",
+                lineHeight: 1.55,
+              }}
+            >
+              {data.notes}
+            </div>
+          </div>
+        ) : null}
 
         {/* Signature */}
        <div
