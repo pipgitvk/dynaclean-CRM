@@ -1747,6 +1747,8 @@ const INVOICE_PDF_TOP_MARGIN_MM = 2;
 const INVOICE_BODY_TEXT_PX = "10px";
 const INVOICE_BODY_LINE_HEIGHT = 1.5;
 const INVOICE_INR_WORDS_PX = "13px";
+const INVOICE_SIGNATURE_FOR_PX = "8px";
+const INVOICE_SIGNATURE_FOR_PT = 8;
 
 const NewInvoice = ({ invoice }) => {
   // Determine invoice type label
@@ -2445,7 +2447,7 @@ const NewInvoice = ({ invoice }) => {
         };
         const sigText = `for ${data.company.name}`;
         pdf.setFont("helvetica", "normal");
-        const sigFontSize = 10;
+        const sigFontSize = INVOICE_SIGNATURE_FOR_PT;
         pdf.setFontSize(sigFontSize);
         pdf.setTextColor(0, 0, 0);
         const sigOnPage = onPageRect(sigRect);
@@ -3675,7 +3677,7 @@ const NewInvoice = ({ invoice }) => {
     data-pdf-signature-for
     style={{
       whiteSpace: "nowrap",
-      fontSize: INVOICE_BODY_TEXT_PX,
+      fontSize: INVOICE_SIGNATURE_FOR_PX,
       lineHeight: INVOICE_BODY_LINE_HEIGHT,
     }}
   >
