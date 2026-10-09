@@ -2,6 +2,7 @@ import path from "path";
 import { NextResponse } from "next/server";
 import { uploadAttendanceRegularizationAttachment } from "@/lib/uploadAttendanceRegularizationAttachment";
 import { getDbConnection } from "@/lib/db";
+import { lookupAttendanceEmployeeIds } from "@/lib/ensureAttendanceLogsEmployeeColumns";
 import { getSessionPayload } from "@/lib/auth";
 import {
   getReportees,
@@ -468,18 +469,21 @@ export async function PATCH(request) {
     }
 
     if (logRows.length === 0) {
+      const ids = await lookupAttendanceEmployeeIds(conn, reqRow.username);
       await conn.execute(
         `INSERT INTO attendance_logs (
-          username, date,
+          username, employee_id, machine_code, date,
           checkin_time, checkout_time,
           break_morning_start, break_morning_end,
           break_lunch_start, break_lunch_end,
           break_evening_start, break_evening_end,
           checkin_latitude, checkin_longitude, checkin_address,
           checkout_latitude, checkout_longitude, checkout_address
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           reqRow.username,
+          ids.employee_id,
+          ids.machine_code,
           reqRow.log_date,
           reqRow.proposed_checkin_time,
           reqRow.proposed_checkout_time,

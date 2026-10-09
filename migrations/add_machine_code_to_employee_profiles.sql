@@ -1,4 +1,1 @@
--- eTimeOffice / punch machine employee code (separate from CRM empId)
-ALTER TABLE employee_profiles
-  ADD COLUMN machine_code VARCHAR(32) NULL
-  AFTER employee_code;
+-- Superseded: use migrations/add_machine_code_to_rep_list.sql (machine_code on rep_list after empId)

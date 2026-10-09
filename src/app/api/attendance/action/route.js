@@ -1,4 +1,5 @@
 import { getDbConnection } from "@/lib/db";
+import { lookupAttendanceEmployeeIds } from "@/lib/ensureAttendanceLogsEmployeeColumns";
 import { getISTDateString, getISTDateTimeString } from "@/lib/istDateTime";
 import { jwtVerify } from "jose";
 import { cookies } from "next/headers";
@@ -98,17 +99,22 @@ export async function POST(req) {
             { status: 400 }
           );
         }
+        const ids = await lookupAttendanceEmployeeIds(connection, targetUsername);
         await connection.execute(
           `INSERT INTO attendance_logs
-            (username, date, checkin_time, checkin_latitude, checkin_longitude, checkin_address, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?)
+            (username, employee_id, machine_code, date, checkin_time, checkin_latitude, checkin_longitude, checkin_address, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
            ON DUPLICATE KEY UPDATE
             checkin_time = IF(checkin_time IS NULL, VALUES(checkin_time), checkin_time),
             checkin_latitude = COALESCE(checkin_latitude, VALUES(checkin_latitude)),
             checkin_longitude = COALESCE(checkin_longitude, VALUES(checkin_longitude)),
-            checkin_address = COALESCE(checkin_address, VALUES(checkin_address))`,
+            checkin_address = COALESCE(checkin_address, VALUES(checkin_address)),
+            employee_id = COALESCE(employee_id, VALUES(employee_id)),
+            machine_code = COALESCE(machine_code, VALUES(machine_code))`,
           [
             targetUsername,
+            ids.employee_id,
+            ids.machine_code,
             todayDate,
             currentDateTime,
             latitude ?? null,

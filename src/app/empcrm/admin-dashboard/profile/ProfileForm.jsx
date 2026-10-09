@@ -168,6 +168,7 @@ export default function ProfileForm({
         setFormData((prev) => ({
           ...prev,
           ...built.formData,
+          machine_code: data.profile.machine_code ?? prev.machine_code ?? "",
         }));
 
         setReferences(built.references);
@@ -189,6 +190,11 @@ export default function ProfileForm({
               )
             : prev
         );
+      } else if (data.success && data.machine_code != null && data.machine_code !== "") {
+        setFormData((prev) => ({
+          ...prev,
+          machine_code: String(data.machine_code),
+        }));
       }
     } catch (error) {
       console.error("Error fetching profile:", error);

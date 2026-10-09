@@ -8,6 +8,7 @@ import {
 } from "@/lib/attendanceImportParse";
 import { canBulkImportAttendance } from "@/lib/attendanceBulkImportRoles";
 import { rowHasMeaningfulCheckinOrCheckout } from "@/lib/attendanceMeaningfulPunch";
+import { lookupAttendanceEmployeeIds } from "@/lib/ensureAttendanceLogsEmployeeColumns";
 
 /**
  * Match rep_list.username, then employee_profiles.full_name (exact, case-insensitive).
@@ -342,18 +343,21 @@ export async function POST(request) {
         const coutLon = cout != null ? 0 : null;
         const coutA = cout != null ? checkoutAddr || "HR bulk import" : null;
 
+        const ids = await lookupAttendanceEmployeeIds(conn, username);
         await conn.execute(
           `INSERT INTO attendance_logs (
-              username, date,
+              username, employee_id, machine_code, date,
               checkin_time, checkout_time,
               break_morning_start, break_morning_end,
               break_lunch_start, break_lunch_end,
               break_evening_start, break_evening_end,
               checkin_latitude, checkin_longitude, checkin_address,
               checkout_latitude, checkout_longitude, checkout_address
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             username,
+            ids.employee_id,
+            ids.machine_code,
             dateStr,
             cin,
             cout,

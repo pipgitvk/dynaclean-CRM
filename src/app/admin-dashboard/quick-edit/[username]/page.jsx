@@ -161,6 +161,7 @@ const QuickEditPage = () => {
     address: "",
     state: "",
     userRole: "",
+    machine_code: "",
     profile_pic: "",
     status: 0,
   });
@@ -643,6 +644,7 @@ const QuickEditPage = () => {
     formData.append("address", employee.address);
     formData.append("state", employee.state);
     formData.append("userRole", employee.userRole);
+    formData.append("machine_code", employee.machine_code ?? "");
     if (canEditEmployeeStatus)
       formData.append("status", String(employee.status === 1 ? 1 : 0));
     if (canEditModuleAccess) {
@@ -844,6 +846,19 @@ const QuickEditPage = () => {
               <option value="MACHINE OPERATOR">MACHINE OPERATOR</option>
               <option value="PRODUCTION ENGINEER">PRODUCTION ENGINEER</option>
             </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              Machine Employee ID
+            </label>
+            <input
+              type="text"
+              name="machine_code"
+              value={employee.machine_code || ""}
+              onChange={handleInputChange}
+              placeholder="e.g. 102"
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+            />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700">Status</label>

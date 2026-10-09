@@ -11,6 +11,14 @@ import {
   autoCheckoutSkipKey,
   buildAutoCheckoutSkipKeySet,
 } from "@/lib/attendanceAutoCheckoutLeave";
+import {
+  insertAutoMachineCheckoutPunch,
+  loadMachineCodeMaps,
+  loadMachineDailyByUsername,
+  mergeCrmAndMachineDay,
+  mergedHasCheckout,
+} from "@/lib/attendanceMachineMerge";
+import { lookupAttendanceEmployeeIds } from "@/lib/ensureAttendanceLogsEmployeeColumns";
 
 const MYSQL_AUTO_CHECKOUT_LOCK = "crm_attendance_auto_checkout";
 let autoCheckoutChain = Promise.resolve();
@@ -120,19 +128,20 @@ async function applyAutomaticCheckoutsOnConn(conn, options = {}) {
     const [normalizeResult] = await conn.query(normalizeSql, normalizeParams);
     let updated = normalizeResult?.affectedRows ?? 0;
 
+    const { usernameToMachineCode, machineCodeToUsername } =
+      await loadMachineCodeMaps(conn);
+    const machineByUserDate = await loadMachineDailyByUsername(
+      conn,
+      machineCodeToUsername
+    );
+
     let sql = `
     SELECT a.username, a.date, a.checkin_time, a.checkout_time, a.checkout_address
     FROM attendance_logs a
     INNER JOIN rep_list r
       ON a.username COLLATE utf8mb4_unicode_ci = r.username COLLATE utf8mb4_unicode_ci
     WHERE r.status = 1
-      AND a.checkin_time IS NOT NULL
       AND a.date <= ?
-      AND (
-        a.checkout_time IS NULL
-        OR a.checkout_time = ''
-        OR TRIM(COALESCE(a.checkout_address, '')) = ${autoAddrLit}
-      )
   `;
     const params = [todayIst];
     if (filterUsername) {
@@ -140,20 +149,62 @@ async function applyAutomaticCheckoutsOnConn(conn, options = {}) {
       params.push(filterUsername);
     }
 
-    const [rows] = await conn.query(sql, params);
+    const [crmRows] = await conn.query(sql, params);
+    const candidates = [];
+    const seen = new Set();
 
-    for (const row of rows || []) {
-      if (!isMeaningfulAttendancePunch(row.checkin_time)) continue;
-
+    for (const row of crmRows || []) {
       const dateYmd = attendanceDateKey(row.date);
       if (!dateYmd) continue;
+      const key = `${row.username}|${dateYmd}`;
+      seen.add(key);
+      candidates.push({
+        username: row.username,
+        dateYmd,
+        crm: row,
+        machineDay: machineByUserDate.get(key) || null,
+      });
+    }
 
-      const skipKey = autoCheckoutSkipKey(row.username, dateYmd);
+    for (const [key, machineDay] of machineByUserDate.entries()) {
+      if (seen.has(key)) continue;
+      const [username, dateYmd] = key.split("|");
+      if (filterUsername && username !== filterUsername) continue;
+      if (dateYmd > todayIst) continue;
+      if (!isMeaningfulAttendancePunch(machineDay.machine_checkin)) continue;
+      candidates.push({
+        username,
+        dateYmd,
+        crm: null,
+        machineDay,
+      });
+    }
+
+    const displayNameByUser = new Map();
+    const [allNames] = await conn.query(
+      `SELECT username, username AS display_name FROM rep_list WHERE status = 1`
+    );
+    for (const n of allNames || []) {
+      displayNameByUser.set(n.username, n.display_name || n.username);
+    }
+
+    for (const cand of candidates) {
+      const { username, dateYmd, crm, machineDay } = cand;
+      const merged = mergeCrmAndMachineDay(
+        crm || { username, date: dateYmd },
+        machineDay
+      );
+
+      if (!isMeaningfulAttendancePunch(merged.checkin_time)) continue;
+
+      const skipKey = autoCheckoutSkipKey(username, dateYmd);
       const isHalfDayLeaveDay = skipAutoCheckout.has(skipKey);
+      const crmCheckout = crm?.checkout_time ?? null;
+      const machineCheckout = machineDay?.machine_checkout ?? null;
 
       if (
         isHalfDayLeaveDay &&
-        isAutomaticCheckoutAddress(row.checkout_address)
+        isAutomaticCheckoutAddress(crm?.checkout_address)
       ) {
         const [revertResult] = await conn.query(
           `UPDATE attendance_logs
@@ -164,7 +215,7 @@ async function applyAutomaticCheckoutsOnConn(conn, options = {}) {
          WHERE username = ?
            AND date = ?
            AND TRIM(COALESCE(checkout_address, '')) = ?`,
-          [row.username, dateYmd, AUTO_CHECKOUT_ATTENDANCE_ADDRESS]
+          [username, dateYmd, AUTO_CHECKOUT_ATTENDANCE_ADDRESS]
         );
         if (revertResult?.affectedRows > 0) updated += revertResult.affectedRows;
         continue;
@@ -175,22 +226,76 @@ async function applyAutomaticCheckoutsOnConn(conn, options = {}) {
       const autoAt = autoCheckoutDateTimeForDate(dateYmd);
       if (!autoAt || autoAt > nowIst) continue;
 
-      if (isAutomaticCheckoutAddress(row.checkout_address)) continue;
+      if (mergedHasCheckout(crmCheckout, machineCheckout)) continue;
 
-      if (isMeaningfulAttendancePunch(row.checkout_time)) continue;
+      if (
+        isAutomaticCheckoutAddress(crm?.checkout_address) &&
+        isMeaningfulAttendancePunch(crmCheckout)
+      ) {
+        continue;
+      }
+
+      const checkinForRow = merged.checkin_time;
 
       const [result] = await conn.query(
         `UPDATE attendance_logs
-       SET checkout_time = TIMESTAMP(date, ?),
+       SET checkin_time = COALESCE(checkin_time, ?),
+           checkout_time = TIMESTAMP(?, ?),
            checkout_latitude = NULL,
            checkout_longitude = NULL,
            checkout_address = ?
        WHERE username = ?
          AND date = ?
          AND (checkout_time IS NULL OR checkout_time = '')`,
-        [AUTO_CHECKOUT_WALL_TIME, AUTO_CHECKOUT_ATTENDANCE_ADDRESS, row.username, dateYmd]
+        [
+          checkinForRow,
+          dateYmd,
+          AUTO_CHECKOUT_WALL_TIME,
+          AUTO_CHECKOUT_ATTENDANCE_ADDRESS,
+          username,
+          dateYmd,
+        ]
       );
-      if (result?.affectedRows > 0) updated += result.affectedRows;
+
+      if (result?.affectedRows === 0) {
+        const ids = await lookupAttendanceEmployeeIds(conn, username);
+        await conn.query(
+          `INSERT INTO attendance_logs
+            (username, employee_id, machine_code, date, checkin_time, checkout_time, checkout_address)
+           VALUES (?, ?, ?, ?, ?, TIMESTAMP(?, ?), ?)
+           ON DUPLICATE KEY UPDATE
+            checkin_time = COALESCE(checkin_time, VALUES(checkin_time)),
+            checkout_time = VALUES(checkout_time),
+            checkout_address = VALUES(checkout_address),
+            checkout_latitude = NULL,
+            checkout_longitude = NULL,
+            employee_id = COALESCE(employee_id, VALUES(employee_id)),
+            machine_code = COALESCE(machine_code, VALUES(machine_code))`,
+          [
+            username,
+            ids.employee_id,
+            ids.machine_code,
+            dateYmd,
+            checkinForRow,
+            dateYmd,
+            AUTO_CHECKOUT_WALL_TIME,
+            AUTO_CHECKOUT_ATTENDANCE_ADDRESS,
+          ]
+        );
+        updated += 1;
+      } else {
+        updated += result.affectedRows;
+      }
+
+      const empCode = usernameToMachineCode.get(username);
+      if (empCode) {
+        const punched = await insertAutoMachineCheckoutPunch(conn, {
+          empCode,
+          employeeName: displayNameByUser.get(username) || username,
+          dateYmd,
+        });
+        if (punched) updated += 1;
+      }
     }
 
     return updated;

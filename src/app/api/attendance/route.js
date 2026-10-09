@@ -1,6 +1,7 @@
 // pages/api/attendance.js or src/app/api/attendance/route.js
 
 import { withPool, dbExecute } from "@/lib/db";
+import { lookupAttendanceEmployeeIds } from "@/lib/ensureAttendanceLogsEmployeeColumns";
 import { getISTDateString, getISTDateTimeString } from "@/lib/istDateTime";
 import { NextResponse } from "next/server";
 
@@ -83,9 +84,10 @@ export async function POST(req) {
               { status: 400 }
             );
           }
+          const ids = await lookupAttendanceEmployeeIds(conn, username);
           await conn.execute(
-            "INSERT INTO attendance_logs (username, date, checkin_time, checkin_latitude, checkin_longitude, checkin_address) VALUES (?, ?, ?, ?, ?, ?)",
-            [username, today, now, latitude, longitude, locationAddress]
+            "INSERT INTO attendance_logs (username, employee_id, machine_code, date, checkin_time, checkin_latitude, checkin_longitude, checkin_address) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            [username, ids.employee_id, ids.machine_code, today, now, latitude, longitude, locationAddress]
           );
           break;
         }

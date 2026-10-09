@@ -54,6 +54,7 @@ export default function CreateEmployeeForm() {
     profile_pic: "default.png",
     userRole: USER_ROLE_OPTIONS[0] ?? "",
     employeeType: EMPLOYEE_TYPE_OPTIONS[0] ?? "",
+    machineCode: "",
   });
   const [isCreating, setIsCreating] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
@@ -124,6 +125,7 @@ export default function CreateEmployeeForm() {
           profile_pic: "default.png",
           userRole: USER_ROLE_OPTIONS[0] || "",
           employeeType: "Select Type",
+          machineCode: "",
         });
         setTimeout(() => {
           router.push("/admin-dashboard/employees");
@@ -344,6 +346,23 @@ export default function CreateEmployeeForm() {
               </option>
             ))}
           </select>
+        </div>
+        <div>
+          <label
+            htmlFor="machineCode"
+            className="block text-sm font-medium text-gray-700"
+          >
+            Machine Employee ID
+          </label>
+          <input
+            type="text"
+            id="machineCode"
+            name="machineCode"
+            value={formData.machineCode}
+            onChange={handleChange}
+            placeholder="e.g. 102"
+            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+          />
         </div>
         <div className="col-span-2">
           <button

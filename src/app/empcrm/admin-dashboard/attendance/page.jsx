@@ -16,7 +16,10 @@ import {
   isLateDaySummary,
   isHalfDayWithGrace,
 } from "@/lib/attendanceRulesEngine";
-import { rowHasMeaningfulCheckinOrCheckout } from "@/lib/attendanceMeaningfulPunch";
+import {
+  rowHasMeaningfulCheckinOrCheckout,
+  isMeaningfulAttendancePunch,
+} from "@/lib/attendanceMeaningfulPunch";
 import { weeklyOffSundayCountsAsPaid } from "@/lib/salaryPayDaysFromAttendance";
 import { formatAttendanceTimeForDisplay as formatTime } from "@/lib/istDateTime";
 import AttendanceRegularizeModal from "@/app/user-dashboard/attendance/AttendanceRegularizeModal";
@@ -28,6 +31,7 @@ import {
   AUTO_CHECKOUT_ATTENDANCE_ADDRESS,
   isAutomaticCheckoutAddress,
 } from "@/lib/attendanceAutoCheckoutConstants";
+import { MACHINE_ATTENDANCE_ADDRESS } from "@/lib/attendanceMachineMerge";
 
 function attendanceDateYmd(value) {
   if (value == null || value === "") return "";
@@ -64,6 +68,124 @@ function combineDateAndTimeForDb(dateYmd, timeHHmm) {
 const AUTO_CHECKOUT_WARNING_TITLE =
   "No manual check-out — automatic check-out at 9:00 PM only.";
 
+function isMachineAttendanceAddress(address) {
+  return (
+    String(address || "").trim().toLowerCase() ===
+    MACHINE_ATTENDANCE_ADDRESS.toLowerCase()
+  );
+}
+
+function getAttendanceSourcesDetail(log) {
+  if (log?.attendance_sources_detail) return log.attendance_sources_detail;
+  const md = log?.machine_day;
+  const sources = log?.merge_sources;
+  const detail = {
+    crm: {
+      checkin: log?.crm_checkin_time ?? null,
+      checkout: log?.crm_checkout_time ?? null,
+    },
+    machine: {
+      checkin: md?.machine_checkin ?? null,
+      checkout: md?.machine_checkout ?? null,
+    },
+  };
+  if (!detail.crm.checkin && sources?.checkin === "crm") {
+    detail.crm.checkin = log?.checkin_time ?? null;
+  }
+  if (!detail.crm.checkout && sources?.checkout === "crm") {
+    detail.crm.checkout = log?.checkout_time ?? null;
+  }
+  if (!detail.machine.checkin && sources?.checkin === "machine") {
+    detail.machine.checkin = log?.checkin_time ?? null;
+  }
+  if (!detail.machine.checkout && sources?.checkout === "machine") {
+    detail.machine.checkout = log?.checkout_time ?? null;
+  }
+  if (
+    isMachineAttendanceAddress(log?.checkout_address) &&
+    !isMeaningfulAttendancePunch(detail.machine.checkout)
+  ) {
+    detail.machine.checkout = log?.checkout_time ?? null;
+  }
+  const hasAny =
+    isMeaningfulAttendancePunch(detail.crm.checkin) ||
+    isMeaningfulAttendancePunch(detail.crm.checkout) ||
+    isMeaningfulAttendancePunch(detail.machine.checkin) ||
+    isMeaningfulAttendancePunch(detail.machine.checkout);
+  return hasAny ? detail : null;
+}
+
+function logHasMachineAttendanceData(log) {
+  if (!log) return false;
+  if (isMachineAttendanceAddress(log.checkout_address)) return true;
+  if (isMachineAttendanceAddress(log.checkin_address)) return true;
+  if (log.merge_sources?.checkin === "machine" || log.merge_sources?.checkout === "machine") {
+    return true;
+  }
+  const detail = getAttendanceSourcesDetail(log);
+  if (!detail) return false;
+  return (
+    isMeaningfulAttendancePunch(detail.machine?.checkin) ||
+    isMeaningfulAttendancePunch(detail.machine?.checkout)
+  );
+}
+
+function formatSourceTime(value) {
+  return isMeaningfulAttendancePunch(value) ? formatTime(value) : "—";
+}
+
+/** Info icon — hover shows CRM vs machine check-in and check-out. */
+function AttendanceSourceInfo({ log }) {
+  if (!logHasMachineAttendanceData(log)) return null;
+
+  const detail = getAttendanceSourcesDetail(log);
+  if (!detail) return null;
+
+  const titleText = [
+    `CRM in: ${formatSourceTime(detail.crm?.checkin)}`,
+    `CRM out: ${formatSourceTime(detail.crm?.checkout)}`,
+    `Machine in: ${formatSourceTime(detail.machine?.checkin)}`,
+    `Machine out: ${formatSourceTime(detail.machine?.checkout)}`,
+  ].join(" · ");
+
+  return (
+    <span
+      className="relative ml-1 inline-flex shrink-0 align-middle group/attmerge"
+      title={titleText}
+    >
+      <Info
+        className="h-4 w-4 cursor-help text-indigo-600"
+        aria-label="CRM and machine attendance details"
+      />
+      <span
+        className="pointer-events-none absolute right-0 bottom-full z-[200] mb-1 w-56 rounded-md bg-gray-900 px-3 py-2 text-left text-xs text-white opacity-0 shadow-xl transition-opacity invisible group-hover/attmerge:visible group-hover/attmerge:opacity-100"
+      >
+        <p className="mb-1.5 font-semibold text-gray-200">CRM vs machine</p>
+        <p>
+          <span className="text-gray-400">CRM check-in:</span>{" "}
+          {formatSourceTime(detail.crm?.checkin)}
+        </p>
+        <p>
+          <span className="text-gray-400">CRM check-out:</span>{" "}
+          {formatSourceTime(detail.crm?.checkout)}
+        </p>
+        <p className="mt-1.5 border-t border-gray-700 pt-1.5">
+          <span className="text-gray-400">Machine check-in:</span>{" "}
+          {formatSourceTime(detail.machine?.checkin)}
+        </p>
+        <p>
+          <span className="text-gray-400">Machine check-out:</span>{" "}
+          {formatSourceTime(detail.machine?.checkout)}
+        </p>
+        <p className="mt-1.5 border-t border-gray-700 pt-1.5 text-[10px] text-gray-400">
+          Table: in {formatTime(log.checkin_time) || "—"} · out{" "}
+          {formatTime(log.checkout_time) || "—"}
+        </p>
+      </span>
+    </span>
+  );
+}
+
 function CheckoutTimeDisplay({ log }) {
   const time = formatTime(log.checkout_time);
   if (!isAutomaticCheckoutAddress(log.checkout_address)) return time;
@@ -82,6 +204,13 @@ function CheckoutTimeDisplay({ log }) {
 }
 
 function CheckoutAddressCell({ log, title, onOpen, className = "" }) {
+  if (isMachineAttendanceAddress(log.checkout_address)) {
+    return (
+      <span className={`text-indigo-700 font-medium ${className}`}>
+        {MACHINE_ATTENDANCE_ADDRESS}
+      </span>
+    );
+  }
   if (isAutomaticCheckoutAddress(log.checkout_address)) {
     return (
       <span
@@ -866,6 +995,8 @@ const AttendancePage = () => {
       worksheet.columns = [
         { header: "Date", key: "Date", width: 15 },
         { header: "User", key: "User", width: 20 },
+        { header: "Emp ID", key: "EmpId", width: 12 },
+        { header: "Machine code", key: "MachineCode", width: 14 },
         { header: "Type", key: "Type", width: 12 },
         { header: "Checkin", key: "Checkin", width: 12 },
         { header: "Checkin Photo", key: "CheckinPhoto", width: 30 },
@@ -883,6 +1014,8 @@ const AttendancePage = () => {
         worksheet.addRow({
           Date: new Date(log.date).toLocaleDateString(),
           User: log.username,
+          EmpId: log.employee_id ?? "",
+          MachineCode: log.machine_code || "",
           Type: log.type === "present" ? "Present" : log.type === "absent" ? "Absent" : log.type === "leave" ? "Leave" : "Holiday",
           Checkin: log.checkin_time ? formatTime(log.checkin_time) : "",
           CheckinPhoto: log.checkin_photo || "",
@@ -1192,7 +1325,19 @@ const AttendancePage = () => {
                     <span className="text-sm font-semibold text-gray-900">
                       User:
                     </span>
-                    <span className="text-sm text-gray-700">{log.username}</span>
+                    <span className="text-sm text-gray-700 text-right">
+                      {log.username}
+                      {log.employee_id != null ? (
+                        <span className="block text-xs text-gray-500">
+                          Emp ID: {log.employee_id}
+                        </span>
+                      ) : null}
+                      {log.machine_code ? (
+                        <span className="block text-xs text-gray-500">
+                          Machine: {log.machine_code}
+                        </span>
+                      ) : null}
+                    </span>
                   </div>
                   {logShowsAttendancePunchDetails(log) ? (
                     <>
@@ -1211,21 +1356,30 @@ const AttendancePage = () => {
                           })()
                             }`}
                         >
-                          {formatTime(log.checkin_time)}
+                          <span className="inline-flex items-center gap-0.5">
+                            {formatTime(log.checkin_time)}
+                            <AttendanceSourceInfo log={log} />
+                          </span>
                         </span>
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-semibold text-gray-900">
                           Check-in Address:
                         </span>
-                        <ViewAddressLink
-                          title={`Check-in — ${log.username}`}
-                          address={log.checkin_address}
-                          latitude={log.checkin_latitude}
-                          longitude={log.checkin_longitude}
-                          onOpen={openAddressMap}
-                          className="text-sm"
-                        />
+                        {isMachineAttendanceAddress(log.checkin_address) ? (
+                          <span className="text-sm font-medium text-indigo-700">
+                            {MACHINE_ATTENDANCE_ADDRESS}
+                          </span>
+                        ) : (
+                          <ViewAddressLink
+                            title={`Check-in — ${log.username}`}
+                            address={log.checkin_address}
+                            latitude={log.checkin_latitude}
+                            longitude={log.checkin_longitude}
+                            onOpen={openAddressMap}
+                            className="text-sm"
+                          />
+                        )}
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-semibold text-gray-900">
@@ -1464,6 +1618,12 @@ const AttendancePage = () => {
                     User
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Emp ID
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Machine code
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Check-in
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -1530,10 +1690,18 @@ const AttendancePage = () => {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {log.username}
                       </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {log.employee_id != null && log.employee_id !== ""
+                          ? log.employee_id
+                          : "—"}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {log.machine_code || "—"}
+                      </td>
                       {logShowsAttendancePunchDetails(log) ? (
                         <>
                           <td
-                            className={`px-6 py-4 whitespace-nowrap text-sm text-gray-500 ${(() => {
+                            className={`relative overflow-visible px-6 py-4 whitespace-nowrap text-sm text-gray-500 ${(() => {
                               const status = getCheckinStatus(log.checkin_time, log.username);
                               if (status === 'halfDay') return 'bg-yellow-100';
                               if (status === 'late') return 'bg-red-100';
@@ -1543,7 +1711,10 @@ const AttendancePage = () => {
                             })()
                               }`}
                           >
-                            {formatTime(log.checkin_time)}
+                            <span className="inline-flex items-center gap-0.5">
+                              {formatTime(log.checkin_time)}
+                              <AttendanceSourceInfo log={log} />
+                            </span>
                           </td>
                           <td className="px-6 py-4 text-sm text-gray-500">
                             {log.checkin_photo ? (
@@ -1565,13 +1736,19 @@ const AttendancePage = () => {
                             )}
                           </td>
                           <td className="px-6 py-4 text-sm text-gray-500">
-                            <ViewAddressLink
-                              title={`Check-in — ${log.username} (${attendanceDateYmd(log.date)})`}
-                              address={log.checkin_address}
-                              latitude={log.checkin_latitude}
-                              longitude={log.checkin_longitude}
-                              onOpen={openAddressMap}
-                            />
+                            {isMachineAttendanceAddress(log.checkin_address) ? (
+                              <span className="font-medium text-indigo-700">
+                                {MACHINE_ATTENDANCE_ADDRESS}
+                              </span>
+                            ) : (
+                              <ViewAddressLink
+                                title={`Check-in — ${log.username} (${attendanceDateYmd(log.date)})`}
+                                address={log.checkin_address}
+                                latitude={log.checkin_latitude}
+                                longitude={log.checkin_longitude}
+                                onOpen={openAddressMap}
+                              />
+                            )}
                           </td>
                           <td
                             className={`px-6 py-4 whitespace-nowrap text-sm text-gray-500 ${(() => {
@@ -1766,7 +1943,7 @@ const AttendancePage = () => {
                 ) : (
                   <tr>
                     <td
-                      colSpan="13"
+                      colSpan="15"
                       className="px-6 py-4 text-center text-gray-500"
                     >
                       No attendance logs found for the selected filter.

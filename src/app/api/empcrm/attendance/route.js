@@ -12,6 +12,7 @@ import {
 } from "@/lib/attendanceEditHistory";
 import { ensureAttendanceCheckoutGpsTriggersAllowAdmin } from "@/lib/ensureAttendanceCheckoutGpsTriggers";
 import { ensureAttendanceEditHistoryTable } from "@/lib/ensureAttendanceEditHistoryTable";
+import { lookupAttendanceEmployeeIds } from "@/lib/ensureAttendanceLogsEmployeeColumns";
 
 const HR_ATTENDANCE_ROLES = ["SUPERADMIN", "HR HEAD", "HR", "HR Executive"];
 
@@ -101,9 +102,10 @@ export async function POST(req) {
             { status: 400 }
           );
         }
+        const ids = await lookupAttendanceEmployeeIds(conn, username);
         await conn.execute(
-          "INSERT INTO attendance_logs (username, date, checkin_time, checkin_latitude, checkin_longitude, checkin_address) VALUES (?, ?, ?, ?, ?, ?)",
-          [username, today, now, latitude, longitude, locationAddress]
+          "INSERT INTO attendance_logs (username, employee_id, machine_code, date, checkin_time, checkin_latitude, checkin_longitude, checkin_address) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+          [username, ids.employee_id, ids.machine_code, today, now, latitude, longitude, locationAddress]
         );
         break;
       }
