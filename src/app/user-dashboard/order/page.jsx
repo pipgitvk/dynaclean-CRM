@@ -1,7 +1,6 @@
 import { getDbConnection } from "@/lib/db";
 import OrderTable from "./OrderTable";
 import { getSessionPayload } from "@/lib/auth";
-import { sqlColumnInActiveServiceSupportUsers } from "@/lib/serviceSupportTeamScope";
 
 // Secret for verifying JWT
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -100,8 +99,6 @@ export default async function OrdersPage() {
         WHERE userRole LIKE '%SALES%'
       )`;
     params.push(username);
-  } else if (String(userRole).trim().toUpperCase() === "SERVICE SUPPORT") {
-    sql += ` WHERE ${sqlColumnInActiveServiceSupportUsers("no.created_by")}`;
   } else if (
     !["ACCOUNTANT", "ADMIN", "WAREHOUSE INCHARGE", "TEAM LEADER", "DIRECTOR"].includes(String(userRole).toUpperCase())
   ) {

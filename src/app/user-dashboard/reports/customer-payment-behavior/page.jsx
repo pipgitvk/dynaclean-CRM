@@ -1,27 +1,19 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
-import {
-  filterCustomerPaymentBehaviorOrders,
-  sortCustomerPaymentBehaviorOrders,
-} from "@/lib/filterCustomerPaymentBehaviorOrders";
-import ManualFilterSearchButton, {
-  MANUAL_FILTER_HINT,
-} from "@/components/ui/ManualFilterSearchButton";
+import { useState, useEffect } from "react";
 import dayjs from "dayjs";
 import { Download, Search, Calendar, DollarSign, AlertTriangle, ChevronLeft, ChevronRight, ArrowUp, ArrowDown } from "lucide-react";
 
 export default function CustomerPaymentBehaviorReport() {
     const [orders, setOrders] = useState([]);
+    const [filteredOrders, setFilteredOrders] = useState([]);
     const [paginatedOrders, setPaginatedOrders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
-    const [appliedSearchQuery, setAppliedSearchQuery] = useState("");
     const [userRole, setUserRole] = useState("");
     const [summary, setSummary] = useState({});
     const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
     const [filterStatus, setFilterStatus] = useState('all');
-    const [appliedFilterStatus, setAppliedFilterStatus] = useState('all');
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 20;
 
@@ -37,6 +29,7 @@ export default function CustomerPaymentBehaviorReport() {
 
             if (data.success) {
                 setOrders(data.orders || []);
+                setFilteredOrders(data.orders || []);
                 setUserRole(data.userRole || "");
                 setSummary(data.summary || {});
             } else {
@@ -50,19 +43,58 @@ export default function CustomerPaymentBehaviorReport() {
         }
     };
 
-    const handleApplySearch = useCallback(() => {
-        setAppliedSearchQuery(searchQuery);
-        setAppliedFilterStatus(filterStatus);
-        setCurrentPage(1);
-    }, [searchQuery, filterStatus]);
+    useEffect(() => {
+        let filtered = orders;
 
-    const filteredOrders = useMemo(() => {
-        const filtered = filterCustomerPaymentBehaviorOrders(orders, {
-            searchQuery: appliedSearchQuery,
-            filterStatus: appliedFilterStatus,
-        });
-        return sortCustomerPaymentBehaviorOrders(filtered, sortConfig);
-    }, [orders, appliedSearchQuery, appliedFilterStatus, sortConfig]);
+        if (filterStatus !== 'all') {
+            if (filterStatus === 'late') {
+                filtered = filtered.filter(o => o.payment_behavior === 'late_payment');
+            } else if (filterStatus === 'missing') {
+                filtered = filtered.filter(o =>
+                    o.payment_behavior === 'missing_payment' ||
+                    o.payment_behavior === 'partial_overdue'
+                );
+            } else if (filterStatus === 'on_time') {
+                filtered = filtered.filter(o => o.payment_behavior === 'on_time');
+            }
+        }
+
+        if (searchQuery.trim()) {
+            const query = searchQuery.toLowerCase();
+            filtered = filtered.filter(order =>
+                order.order_id?.toLowerCase().includes(query) ||
+                order.client_name?.toLowerCase().includes(query) ||
+                order.company_name?.toLowerCase().includes(query) ||
+                order.contact?.toLowerCase().includes(query) ||
+                order.created_by?.toLowerCase().includes(query)
+            );
+        }
+
+        if (sortConfig.key) {
+            filtered = [...filtered].sort((a, b) => {
+                let aVal = a[sortConfig.key];
+                let bVal = b[sortConfig.key];
+
+                if (['due_date', 'payment_date'].includes(sortConfig.key)) {
+                    aVal = aVal ? dayjs(aVal).unix() : 0;
+                    bVal = bVal ? dayjs(bVal).unix() : 0;
+                } else if (['total_amount', 'paid_amount', 'remaining_amount', 'days_overdue'].includes(sortConfig.key)) {
+                    aVal = parseFloat(aVal) || 0;
+                    bVal = parseFloat(bVal) || 0;
+                } else {
+                    aVal = (aVal || '').toString().toLowerCase();
+                    bVal = (bVal || '').toString().toLowerCase();
+                }
+
+                if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+                if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+                return 0;
+            });
+        }
+
+        setFilteredOrders(filtered);
+        setCurrentPage(1);
+    }, [searchQuery, orders, sortConfig, filterStatus]);
 
     useEffect(() => {
         const startIndex = (currentPage - 1) * itemsPerPage;
@@ -265,17 +297,11 @@ export default function CustomerPaymentBehaviorReport() {
                             placeholder="Search orders..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            onKeyDown={(e) => {
-                                if (e.key === "Enter") {
-                                    e.preventDefault();
-                                    handleApplySearch();
-                                }
-                            }}
                             className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                     </div>
 
-                    <div className="flex gap-2 flex-wrap items-center">
+                    <div className="flex gap-2">
                         <select
                             value={filterStatus}
                             onChange={(e) => setFilterStatus(e.target.value)}
@@ -287,8 +313,6 @@ export default function CustomerPaymentBehaviorReport() {
                             <option value="on_time">On Time</option>
                         </select>
 
-                        <ManualFilterSearchButton onClick={handleApplySearch} />
-
                         <button
                             onClick={exportToCSV}
                             className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-3 md:px-4 py-2 rounded-lg transition-colors text-sm"
@@ -298,7 +322,6 @@ export default function CustomerPaymentBehaviorReport() {
                         </button>
                     </div>
                 </div>
-                <p className="text-xs text-gray-500 mt-2">{MANUAL_FILTER_HINT}</p>
             </div>
 
             {/* Mobile Card View */}
@@ -319,8 +342,7 @@ export default function CustomerPaymentBehaviorReport() {
                 ) : paginatedOrders.length > 0 ? (
                     <div>
                         {paginatedOrders.map((order, index) => (
-                            <MobileCard key={index} order={order} />
-                        ))}
+                            <MobileCard key={index} order={order} />))}
                     </div>
                 ) : (
                     <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">

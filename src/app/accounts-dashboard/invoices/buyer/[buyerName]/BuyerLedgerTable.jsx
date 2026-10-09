@@ -1,6 +1,5 @@
 "use client";
 
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useMemo, useEffect } from "react";
 import { Trash2, ArrowUp, ArrowDown, Download, FileText } from "lucide-react";
 import dayjs from "dayjs";
@@ -458,13 +457,23 @@ right(fmtAmt(finalTotal), col.creditEnd, y, 9, true);
             <label className="block text-xs font-medium text-gray-700 mb-2">
               From Date
             </label>
-            <TypeableDateFilterInput value={dateFrom} onChange={setDateFrom} className="px-3 py-2 border border-gray-300 rounded-lg outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"/>
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
+            />
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-2">
               To Date
             </label>
-            <TypeableDateFilterInput value={dateTo} onChange={setDateTo} className="px-3 py-2 border border-gray-300 rounded-lg outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"/>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
+            />
           </div>
           <button
             onClick={() => {
@@ -624,8 +633,6 @@ function VchBadge({ type }) {
     "Credit Note": "bg-teal-100 text-teal-700",
     "Debit Note":  "bg-pink-100 text-pink-700",
     Opening:       "bg-gray-100 text-gray-700",
-    Return:        "bg-rose-100 text-rose-700",
-    "Return Completed": "bg-orange-100 text-orange-800",
     Other:         "bg-slate-100 text-slate-700",
   };
   const cls = colorMap[type] || "bg-gray-100 text-gray-600";

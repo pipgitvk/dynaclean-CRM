@@ -1,9 +1,7 @@
 "use client";
 
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect } from "react";
-import { useRouter, usePathname } from "next/navigation";
-import { getGemCrmBasePath } from "@/lib/gemCrmBasePath";
+import { useRouter } from "next/navigation";
 import {
   Save,
   X,
@@ -15,15 +13,11 @@ import {
   Building2,
   AlertCircle,
   CheckCircle,
-  Trash2,
 } from "lucide-react";
 import toast from "react-hot-toast";
-import { BID_DOCUMENT_MAX_FILE_SIZE_MB } from "@/lib/bidDocuments";
 
 export default function NewBidPage() {
   const router = useRouter();
-  const pathname = usePathname();
-  const gemCrmBase = getGemCrmBasePath(pathname);
   const [isLoading, setIsLoading] = useState(false);
   const [employees, setEmployees] = useState([]);
   const [bidNumberStatus, setBidNumberStatus] = useState(null); // null, 'checking', 'exists', 'available'
@@ -61,7 +55,7 @@ export default function NewBidPage() {
     assigned_employee_id: "",
     dd_id: "",
     remarks: "",
-    bid_document: [],
+    bid_document: null,
     ra_participated: "no",
     ra_start_date: "",
     ra_end_date: "",
@@ -117,11 +111,7 @@ export default function NewBidPage() {
   const handleChange = (e) => {
     const { name, value, type, files } = e.target;
     if (type === "file") {
-      if (name === "bid_document") {
-        setFormData((prev) => ({ ...prev, [name]: Array.from(files) }));
-      } else {
-        setFormData((prev) => ({ ...prev, [name]: files[0] }));
-      }
+      setFormData((prev) => ({ ...prev, [name]: files[0] }));
     } else {
       setFormData((prev) => ({ ...prev, [name]: value }));
       
@@ -146,12 +136,6 @@ export default function NewBidPage() {
     try {
       const formDataToSend = new FormData();
       Object.keys(formData).forEach((key) => {
-        if (key === "bid_document") {
-          (formData.bid_document || []).forEach((file) => {
-            formDataToSend.append("bid_document", file);
-          });
-          return;
-        }
         if (formData[key] !== null && formData[key] !== "") {
           formDataToSend.append(key, formData[key]);
         }
@@ -165,7 +149,7 @@ export default function NewBidPage() {
       const result = await res.json();
       if (result.success) {
         toast.success("Bid created successfully");
-        router.push(`${gemCrmBase}/bids`);
+        router.push("/admin-dashboard/gem-crm/bids");
       } else {
         toast.error(result.error || "Failed to create bid");
       }
@@ -186,7 +170,7 @@ export default function NewBidPage() {
           <p className="text-gray-600 mt-1">Add a new government tender/bid</p>
         </div>
         <button
-          onClick={() => router.push(`${gemCrmBase}/bids`)}
+          onClick={() => router.push("/admin-dashboard/gem-crm/bids")}
           className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
         >
           <X className="w-4 h-4" />
@@ -352,37 +336,11 @@ export default function NewBidPage() {
                     name="bid_document"
                     onChange={handleChange}
                     accept=".pdf,.doc,.docx"
-                    multiple
                     className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   />
                   <Upload className="w-5 h-5 text-gray-400" />
                 </div>
-                <p className="text-xs text-gray-500 mt-1">PDF, DOC, DOCX — you can select multiple files (Max {BID_DOCUMENT_MAX_FILE_SIZE_MB}MB each)</p>
-                {Array.isArray(formData.bid_document) && formData.bid_document.length > 0 && (
-                  <ul className="mt-2 space-y-1">
-                    {formData.bid_document.map((file, index) => (
-                      <li
-                        key={`${file.name}-${index}`}
-                        className="flex items-center justify-between text-sm bg-gray-50 px-3 py-2 rounded-lg"
-                      >
-                        <span className="truncate">{file.name}</span>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              bid_document: prev.bid_document.filter((_, i) => i !== index),
-                            }))
-                          }
-                          className="p-1 text-red-600 hover:bg-red-50 rounded"
-                          title="Remove"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
+                <p className="text-xs text-gray-500 mt-1">PDF, DOC, DOCX (Max 10MB)</p>
               </div>
             </div>
           </div>
@@ -398,21 +356,39 @@ export default function NewBidPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Bid Start Date
                 </label>
-                <TypeableDateFilterInput value={formData.bid_start_date} onChange={(v) => handleChange({ target: { name: "bid_start_date", value: v } })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"/>
+                <input
+                  type="date"
+                  name="bid_start_date"
+                  value={formData.bid_start_date}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Bid End Date
                 </label>
-                <TypeableDateFilterInput value={formData.bid_end_date} onChange={(v) => handleChange({ target: { name: "bid_end_date", value: v } })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"/>
+                <input
+                  type="date"
+                  name="bid_end_date"
+                  value={formData.bid_end_date}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Bid Open Date
                 </label>
-                <TypeableDateFilterInput value={formData.bid_open_date} onChange={(v) => handleChange({ target: { name: "bid_open_date", value: v } })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"/>
+                <input
+                  type="date"
+                  name="bid_open_date"
+                  value={formData.bid_open_date}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
               </div>
 
               <div>
@@ -642,13 +618,25 @@ export default function NewBidPage() {
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         RA Start Date *
                       </label>
-                      <TypeableDateFilterInput value={formData.ra_start_date} onChange={(v) => handleChange({ target: { name: "ra_start_date", value: v } })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"/>
+                      <input
+                        type="date"
+                        name="ra_start_date"
+                        value={formData.ra_start_date}
+                        onChange={handleChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         RA End Date *
                       </label>
-                      <TypeableDateFilterInput value={formData.ra_end_date} onChange={(v) => handleChange({ target: { name: "ra_end_date", value: v } })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"/>
+                      <input
+                        type="date"
+                        name="ra_end_date"
+                        value={formData.ra_end_date}
+                        onChange={handleChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      />
                     </div>
                   </div>
                 </div>
@@ -689,7 +677,7 @@ export default function NewBidPage() {
         <div className="flex justify-end gap-3 mt-6 pt-6 border-t border-gray-200">
           <button
             type="button"
-            onClick={() => router.push(`${gemCrmBase}/bids`)}
+            onClick={() => router.push("/admin-dashboard/gem-crm/bids")}
             className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
           >
             Cancel

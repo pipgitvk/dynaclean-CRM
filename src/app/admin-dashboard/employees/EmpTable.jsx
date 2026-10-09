@@ -5,8 +5,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Cookies from "js-cookie";
 import Link from "next/link";
-import { LogIn, Key, Edit, Shield, UserPlus, X, ExternalLink, Clock } from "lucide-react";
-import { getRoleDashboardPath } from "@/lib/getRoleDashboardPath";
+import { LogIn, Key, Edit, Shield, UserPlus, X, ExternalLink } from "lucide-react";
 import SearchableSelect from "@/components/ui/SearchableSelect";
 import toast from "react-hot-toast";
 import {
@@ -16,17 +15,9 @@ import {
   buildModuleUiSearchIndex,
 } from "@/lib/moduleAccess";
 import { getModuleUrl } from "@/lib/moduleUrlMapping";
-import { getRoleDefaultModuleKeys } from "@/lib/roleDefaultModuleAccess";
-import { ADMIN_EMPLOYEES_RELOAD_MESSAGE } from "@/lib/employeesPageReload";
 
 function uniqueStrings(arr) {
   return [...new Set((arr || []).map((v) => String(v || "").trim()).filter(Boolean))];
-}
-
-function isSuperAdminEmployee(employee) {
-  const role = String(employee?.userRole || "").trim().toUpperCase();
-  const username = String(employee?.username || "").trim().toLowerCase();
-  return role === "SUPERADMIN" || username === "admin";
 }
 
 /** Global Module Access: mirrors super-admin sidebar (single row vs nested groups). */
@@ -71,7 +62,7 @@ function ModuleUiBlock({
             <input
               type="checkbox"
               checked={isChecked}
-              onChange={(e) => !disabled && onToggleChild(node.key, e.target.checked)}
+              onChange={() => !disabled && onToggleChild(node.key)}
               disabled={disabled}
               className="w-4 h-4 accent-blue-600 flex-shrink-0"
             />
@@ -170,7 +161,7 @@ function ModuleUiBlock({
                     <input
                       type="checkbox"
                       checked={selected.includes(ch.key)}
-                      onChange={(e) => !disabled && onToggleChild(ch.key, e.target.checked)}
+                      onChange={() => !disabled && onToggleChild(ch.key)}
                       disabled={disabled}
                       className="w-3.5 h-3.5 accent-blue-600 flex-shrink-0"
                     />
@@ -200,12 +191,9 @@ const EmployeeCard = ({
   employee,
   handleImpersonateLogin,
   handleOpenReportingManagerModal,
-  handleToggleLoginTimeRestriction,
-  togglingTimeRestriction,
   maskEmail,
   maskNumber,
   maskStatus,
-  onOpenIframe,
 }) => (
   <div className="bg-white shadow-md rounded-lg p-4 mb-4 border border-gray-200">
     <div className="mb-2">
@@ -245,36 +233,36 @@ const EmployeeCard = ({
 
     <div className="flex flex-wrap gap-2 sm:gap-3 justify-between items-center pt-2 border-t border-gray-100">
       <button
-        onClick={() => handleImpersonateLogin(employee.empId, employee.userRole)}
+        onClick={() => handleImpersonateLogin(employee.empId)}
         className="text-blue-600 hover:text-blue-900 font-medium flex items-center space-x-1 text-sm"
       >
         <LogIn size={16} />
         <span>Login</span>
       </button>
 
-      <button
-        onClick={() => onOpenIframe(`/admin-dashboard/password/${employee.username}`, `Change Password — ${employee.username}`)}
+      <Link
+        href={`/admin-dashboard/password/${employee.username}`}
         className="text-yellow-600 hover:text-yellow-900 font-medium flex items-center space-x-1 text-sm"
       >
         <Key size={16} />
         <span>Password</span>
-      </button>
+      </Link>
 
-      <button
-        onClick={() => onOpenIframe(`/admin-dashboard/quick-edit/${employee.username}`, `Edit Employee — ${employee.username}`)}
+      <Link
+        href={`/admin-dashboard/quick-edit/${employee.username}`}
         className="text-green-600 hover:text-green-900 font-medium flex items-center space-x-1 text-sm"
       >
         <Edit size={16} />
         <span>Edit</span>
-      </button>
+      </Link>
 
-      <button
-        onClick={() => onOpenIframe(`/admin-dashboard/ip-restrictions/${employee.username}`, `IP Restrictions — ${employee.username}`)}
+      <Link
+        href={`/admin-dashboard/ip-restrictions/${employee.username}`}
         className="text-purple-600 hover:text-purple-900 font-medium flex items-center space-x-1 text-sm"
       >
         <Shield size={16} />
         <span>IP</span>
-      </button>
+      </Link>
 
       <button
         onClick={() => handleOpenReportingManagerModal(employee)}
@@ -285,26 +273,6 @@ const EmployeeCard = ({
         <span>Manager</span>
       </button>
 
-      {!isSuperAdminEmployee(employee) && (
-      <button
-        onClick={() => handleToggleLoginTimeRestriction(employee)}
-        disabled={togglingTimeRestriction === employee.username}
-        className={`font-medium flex items-center space-x-1 text-sm disabled:opacity-50 ${
-          employee.login_time_restriction_enabled === 1
-            ? "text-green-600 hover:text-green-800"
-            : "text-red-600 hover:text-red-800"
-        }`}
-        title={
-          employee.login_time_restriction_enabled === 1
-            ? "Login time restriction ON (09:00–19:15 IST) — click to disable"
-            : "Login time restriction OFF — click to enable (09:00–19:15 IST)"
-        }
-      >
-        <Clock size={16} />
-        <span>Time</span>
-      </button>
-      )}
-
     </div>
   </div>
 );
@@ -313,7 +281,6 @@ const EmpTable = ({ employees }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("active");
   const [isMobile, setIsMobile] = useState(false);
-  const [iframePopup, setIframePopup] = useState({ open: false, url: "", title: "" });
   const [showReportingManagerModal, setShowReportingManagerModal] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState("");
   const [selectedReportingManager, setSelectedReportingManager] = useState("");
@@ -328,9 +295,6 @@ const EmpTable = ({ employees }) => {
   const [bulkTouched, setBulkTouched] = useState(false);
   const [bulkSaving, setBulkSaving] = useState(false);
   const [bulkModuleSearch, setBulkModuleSearch] = useState("");
-  const [togglingTimeRestriction, setTogglingTimeRestriction] = useState("");
-  const [timeRestrictionMap, setTimeRestrictionMap] = useState({});
-  const bulkUserEditedRef = useRef(false);
   const router = useRouter();
 
   const persistBulkSelectionForRole = useCallback((role, modules) => {
@@ -342,7 +306,7 @@ const EmpTable = ({ employees }) => {
     }));
   }, []);
 
-  const fetchRoleModulesFromDB = useCallback(async (role, { applyToSelection = false } = {}) => {
+  const fetchRoleModulesFromDB = useCallback(async (role) => {
     const key = String(role || "").trim();
     if (!key) return [];
     setBulkRoleLoading(true);
@@ -355,9 +319,6 @@ const EmpTable = ({ employees }) => {
       const data = await res.json();
       const modules = Array.isArray(data?.moduleKeys) ? data.moduleKeys : [];
       setBulkRoleSelections((prev) => ({ ...(prev || {}), [key]: modules }));
-      if (applyToSelection && !bulkUserEditedRef.current) {
-        setBulkSelectedModules(modules);
-      }
       return modules;
     } catch {
       return [];
@@ -373,66 +334,6 @@ const EmpTable = ({ employees }) => {
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
-
-  useEffect(() => {
-    const onMessage = (event) => {
-      if (event.origin !== window.location.origin) return;
-      if (event.data?.type !== ADMIN_EMPLOYEES_RELOAD_MESSAGE) return;
-      setIframePopup({ open: false, url: "", title: "" });
-      window.location.reload();
-    };
-    window.addEventListener("message", onMessage);
-    return () => window.removeEventListener("message", onMessage);
-  }, []);
-
-  useEffect(() => {
-    const map = {};
-    employees.forEach((emp) => {
-      map[emp.username] = emp.login_time_restriction_enabled === 0 ? 0 : 1;
-    });
-    setTimeRestrictionMap(map);
-  }, [employees]);
-
-  const handleToggleLoginTimeRestriction = async (employee) => {
-    const username = employee?.username;
-    if (!username) return;
-
-    const current = timeRestrictionMap[username] === 1 ? 1 : 0;
-    const next = current === 1 ? 0 : 1;
-
-    setTogglingTimeRestriction(username);
-    try {
-      const res = await fetch("/api/employees/set-login-time-restriction", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          username,
-          login_time_restriction_enabled: next,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to update login time restriction.");
-      }
-      setTimeRestrictionMap((prev) => ({ ...prev, [username]: next }));
-      toast.success(
-        next === 1
-          ? `${username}: login restricted to 09:00–19:15 IST`
-          : `${username}: login time restriction removed`,
-      );
-      window.location.reload();
-    } catch (err) {
-      toast.error(err.message || "Failed to update login time restriction.");
-    } finally {
-      setTogglingTimeRestriction("");
-    }
-  };
-
-  const getEmployeeWithTimeRestriction = (employee) => ({
-    ...employee,
-    login_time_restriction_enabled:
-      timeRestrictionMap[employee.username] === 0 ? 0 : 1,
-  });
 
   const handleOpenReportingManagerModal = (employee) => {
     setSelectedEmployee(employee?.username || "");
@@ -459,7 +360,7 @@ const EmpTable = ({ employees }) => {
       const data = await res.json();
       if (res.ok) {
         setShowReportingManagerModal(false);
-        window.location.reload();
+        router.refresh();
       } else {
         alert(data.error || "Failed to update reporting manager.");
       }
@@ -470,7 +371,7 @@ const EmpTable = ({ employees }) => {
     }
   };
 
-  const handleImpersonateLogin = async (empId, userRole) => {
+  const handleImpersonateLogin = async (empId) => {
     console.log("Impersonate login for empId:", empId);
     try {
       const response = await fetch("/api/impersonate", {
@@ -483,7 +384,7 @@ const EmpTable = ({ employees }) => {
 
       if (response.ok) {
         Cookies.set("impersonation_token", data.token, { expires: 1 / 24 });
-        router.push(getRoleDashboardPath(userRole));
+        router.push("/user-dashboard");
       } else {
         console.log("error data :", data.error);
         // alert(data.error);
@@ -553,15 +454,9 @@ const EmpTable = ({ employees }) => {
     "WELDER HELPER",
     "WAREHOUSE INCHARGE",
     "EA",
-    "MACHINE OPERATOR",
-    "PRODUCTION ENGINEER",
-    "BUSINESS DEVELOPMENT OFFICER",
   ];
 
-  const bulkModuleTree = useMemo(
-    () => getModuleTreeForEmployeeBulkUi(bulkRole),
-    [bulkRole],
-  );
+  const bulkModuleTree = useMemo(() => getModuleTreeForEmployeeBulkUi(), []);
 
   const bulkModuleIndex = useMemo(
     () => buildModuleUiSearchIndex(bulkModuleTree || []),
@@ -593,7 +488,6 @@ const EmpTable = ({ employees }) => {
   const setRoleAndResetSelection = async (role) => {
     // Persist the in-progress selection for the current role before switching.
     persistBulkSelectionForRole(bulkRole, bulkSelectedModules);
-    bulkUserEditedRef.current = false;
     setBulkRole(role);
     setBulkTouched(false);
     const key = String(role || "").trim();
@@ -601,23 +495,19 @@ const EmpTable = ({ employees }) => {
     if (Array.isArray(cached)) {
       setBulkSelectedModules(cached);
     } else {
-      await fetchRoleModulesFromDB(role, { applyToSelection: true });
+      const fromDB = await fetchRoleModulesFromDB(role);
+      setBulkSelectedModules(fromDB);
     }
   };
 
-  const toggleBulkChild = (key, checked) => {
-    bulkUserEditedRef.current = true;
+  const toggleBulkChild = (key) => {
     setBulkTouched(true);
-    setBulkSelectedModules((prev) => {
-      if (checked) {
-        return prev.includes(key) ? prev : [...prev, key];
-      }
-      return prev.filter((k) => k !== key);
-    });
+    setBulkSelectedModules((prev) =>
+      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key],
+    );
   };
 
   const toggleBulkGroup = (node) => {
-    bulkUserEditedRef.current = true;
     setBulkTouched(true);
     const keys = collectModuleKeysFromUiNode(node);
     if (keys.length === 0) return;
@@ -633,17 +523,279 @@ const EmpTable = ({ employees }) => {
   };
 
   const toggleBulkAll = () => {
-    bulkUserEditedRef.current = true;
     setBulkTouched(true);
     const allSelected = ALL_MODULE_KEYS.every((k) => bulkSelectedModules.includes(k));
     setBulkSelectedModules(allSelected ? [] : [...ALL_MODULE_KEYS]);
   };
 
+  const roleDefaultModules = {
+    SALES: [
+      "dashboard-home",
+      "task-manager",
+      "fast-card",
+      "view-customers",
+      "add-customer",
+      "daily-report",
+      "lead-reports",
+      "demo-details",
+      "quotations",
+      "orders-process",
+      "product-stock",
+      "expenses",
+      "employee-crm",
+      "prospects-view",
+      "prospects-add",
+      "installation-videos",
+    ],
+    ACCOUNTANT: [
+      "dashboard-home",
+      "task-manager",
+      "regularization-approvals",
+      "view-customers",
+      "add-customer",
+      "daily-report",
+      "demo-details",
+      "quotations",
+      "orders-process",
+      "invoices",
+      "product-stock",
+      "product-accessories",
+      "spare-parts",
+      "purchase-direct-in",
+      "purchase-request",
+      "purchase-warehouse-in",
+      "purchases",
+      "spare-direct-in",
+      "spare-request",
+      "spare-warehouse-in",
+      "spare-purchases",
+      "payment-pending",
+      "manual-payments",
+      "expenses",
+      "view-expenses",
+      "dd-management",
+      "other-income",
+      "client-expenses",
+      "delivery-challan",
+      "statements",
+      "salary-slips",
+      "employee-crm",
+      "company-documents",
+      "assets",
+      "attendance-log",
+    ],
+    "TEAM LEADER": [
+      "dashboard-home",
+      "task-manager",
+      "regularization-approvals",
+      "view-customers",
+      "add-customer",
+      "my-leads",
+      "daily-report",
+      "customer-payment-behavior",
+      "leads-upload",
+      "denied-leads",
+      "warranty-console",
+      "registered-products",
+      "service-followups",
+      "warranty-map",
+      "service-records",
+      "upcoming-installations",
+      "service-map",
+      "payment-pending",
+      "employee-crm",
+    ],
+    "DIGITAL MARKETER": [
+      "dashboard-home",
+      "task-manager",
+      "view-customers",
+      "my-leads",
+      "leads-upload",
+      "keywords-management",
+      "backlinks-management",
+      "daily-report",
+      "blog",
+      "employee-crm",
+    ],
+    HR: [
+      "dashboard-home",
+      "task-manager",
+      "regularization-approvals",
+      "salary-slips",
+      "employee-list",
+      "employee-crm",
+      "hiring-process",
+      "hr-daily-report",
+      "attendance-log",
+    ],
+    "HR HEAD": [
+      "dashboard-home",
+      "task-manager",
+      "regularization-approvals",
+      "salary-slips",
+      "employee-list",
+      "employee-crm",
+      "hiring-process",
+      "hr-daily-report",
+      "attendance-log",
+    ],
+    "JUNIOR HR EXECUTIVE": [
+      "dashboard-home",
+      "task-manager",
+      "regularization-approvals",
+      "salary-slips",
+      "employee-list",
+      "employee-crm",
+      "hiring-process",
+      "hr-daily-report",
+      "attendance-log",
+    ],
+    "HR EXECUTIVE": [
+      "dashboard-home",
+      "task-manager",
+      "regularization-approvals",
+      "salary-slips",
+      "employee-list",
+      "employee-crm",
+      "hiring-process",
+      "hr-daily-report",
+      "attendance-log",
+    ],
+    "HR RECRUITER": [
+      "dashboard-home",
+      "task-manager",
+      "regularization-approvals",
+      "salary-slips",
+      "employee-list",
+      "employee-crm",
+      "hiring-process",
+      "hr-daily-report",
+      "attendance-log",
+    ],
+    GEM: [
+      "dashboard-home",
+      "task-manager",
+      "add-customer",
+      "view-customers",
+      "quotations",
+      "orders-process",
+      "payment-pending",
+      "dd-management",
+      "employee-crm",
+      "gem-crm-dashboard",
+      "gem-crm-bids",
+      "gem-crm-reports",
+      "installation-videos",
+    ],
+    "GRAPHIC DESIGNER": [
+      "dashboard-home",
+      "task-manager",
+      "daily-report",
+      "employee-crm",
+      "installation-videos",
+      "installation-videos-manage",
+      "assets",
+    ],
+    "DESIGN ENGINEER": [
+      "dashboard-home",
+      "task-manager",
+      "spare-parts",
+      "spare-direct-in",
+      "spare-request",
+      "spare-warehouse-in",
+      "spare-purchases",
+      "production-status",
+      "bom-list",
+      "expenses",
+      "employee-crm",
+    ],
+    DEVELOPER: [
+      "dashboard-home",
+      "task-manager",
+      "regularization-approvals",
+      "employee-crm",
+    ],
+    "SERVICE ENGINEER": [
+      "dashboard-home",
+      "task-manager",
+      "regularization-approvals",
+      "employee-crm",
+    ],
+    "SERVICE TECHNICIAN": [
+      "dashboard-home",
+      "task-manager",
+      "regularization-approvals",
+      "employee-crm",
+    ],
+    "SERVICE HEAD": [
+      "dashboard-home",
+      "task-manager",
+      "add-customer",
+      "view-customers",
+      "employee-crm",
+      "quotations",
+      "orders-process",
+      "orders-delay",
+      "warranty-console",
+      "registered-products",
+      "service-followups",
+      "warranty-map",
+      "service-records",
+      "upcoming-installations",
+      "service-map",
+      "product-stock",
+      "spare-parts",
+      "installation-videos",
+      "return-products",
+    ],
+    "SERVICE SUPPORT": [
+      "dashboard-home",
+      "task-manager",
+      "add-customer",
+      "view-customers",
+      "employee-crm",
+      "quotations",
+      "orders-process",
+      "orders-delay",
+      "warranty-console",
+      "registered-products",
+      "service-followups",
+      "warranty-map",
+      "service-records",
+      "upcoming-installations",
+      "service-map",
+      "product-stock",
+      "spare-parts",
+      "installation-videos",
+      "return-products",
+    ],
+    "SALES CUM BACKOFFICE": [
+      "dashboard-home",
+      "daily-report",
+      "add-customer",
+      "view-customers",
+      "my-leads",
+      "bulk-reassign",
+      "denied-leads",
+      "task-manager",
+      "fast-card",
+      "quotations",
+      "orders-process",
+      "product-stock",
+      "spare-parts",
+      "payment-pending",
+      "manual-payments",
+      "employee-crm",
+      "prospects-add",
+      "prospects-ne",
+      "installation-videos",
+    ],
+  };
+
   const applyDefaultModules = () => {
-    bulkUserEditedRef.current = true;
     setBulkTouched(true);
     const trimmedRole = String(bulkRole || "").trim();
-    const defaults = getRoleDefaultModuleKeys(trimmedRole);
+    const defaults = roleDefaultModules[trimmedRole] || [];
     setBulkSelectedModules(defaults);
   };
 
@@ -669,13 +821,15 @@ const EmpTable = ({ employees }) => {
         throw new Error(data?.message || "Failed to apply module access.");
       }
       toast.success(`Applied to ${data.updated ?? 0} users`);
+      // Clear cached state so next open fetches fresh from DB
       const key = String(bulkRole || "").trim();
-      setBulkRoleSelections((prev) => ({
-        ...(prev || {}),
-        [key]: [...bulkSelectedModules],
-      }));
+      setBulkRoleSelections((prev) => {
+        const next = { ...(prev || {}) };
+        delete next[key];
+        return next;
+      });
       setShowGlobalModulesModal(false);
-      window.location.reload();
+      router.refresh();
     } catch (e) {
       toast.error(e.message || "Failed to apply module access.");
     } finally {
@@ -685,28 +839,6 @@ const EmpTable = ({ employees }) => {
 
   return (
     <div className="bg-white shadow-md rounded-lg p-4 sm:p-6 overflow-hidden">
-
-      {/* Iframe Popup Modal */}
-      {iframePopup.open && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100] p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl flex flex-col" style={{ height: "90vh" }}>
-            <div className="flex justify-between items-center px-4 py-3 border-b">
-              <h2 className="text-base font-semibold text-gray-800">{iframePopup.title}</h2>
-              <button
-                onClick={() => setIframePopup({ open: false, url: "", title: "" })}
-                className="text-gray-500 hover:text-gray-700 p-1"
-              >
-                <X size={22} />
-              </button>
-            </div>
-            <iframe
-              src={iframePopup.url}
-              className="flex-1 w-full rounded-b-lg"
-              title={iframePopup.title}
-            />
-          </div>
-        </div>
-      )}
       {/* ⭐ KPI SECTION */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <div className="p-4 bg-blue-100 rounded shadow text-center">
@@ -742,17 +874,16 @@ const EmpTable = ({ employees }) => {
         <button
           type="button"
           onClick={async () => {
-            bulkUserEditedRef.current = false;
             setBulkTouched(false);
             const key = String(bulkRole || "").trim();
             const cached = bulkRoleSelections?.[key];
             if (Array.isArray(cached)) {
               setBulkSelectedModules(cached);
-              setShowGlobalModulesModal(true);
             } else {
-              setShowGlobalModulesModal(true);
-              await fetchRoleModulesFromDB(bulkRole, { applyToSelection: true });
+              const fromDB = await fetchRoleModulesFromDB(bulkRole);
+              setBulkSelectedModules(fromDB);
             }
+            setShowGlobalModulesModal(true);
           }}
           className="text-white bg-emerald-600 hover:bg-emerald-700 font-medium whitespace-nowrap rounded-lg text-sm px-5 py-2.5 flex items-center justify-center space-x-2 shadow-md"
         >
@@ -877,7 +1008,7 @@ const EmpTable = ({ employees }) => {
                       key={node.id}
                       node={node}
                       selected={bulkSelectedModules}
-                      disabled={bulkSaving || bulkRoleLoading}
+                      disabled={bulkSaving}
                       onToggleGroup={toggleBulkGroup}
                       onToggleChild={toggleBulkChild}
                     />
@@ -1005,15 +1136,12 @@ const EmpTable = ({ employees }) => {
             filteredEmployees.map((employee) => (
               <EmployeeCard
                 key={employee.empId}
-                employee={getEmployeeWithTimeRestriction(employee)}
+                employee={employee}
                 handleImpersonateLogin={handleImpersonateLogin}
                 handleOpenReportingManagerModal={handleOpenReportingManagerModal}
-                handleToggleLoginTimeRestriction={handleToggleLoginTimeRestriction}
-                togglingTimeRestriction={togglingTimeRestriction}
                 maskEmail={maskEmail}
                 maskNumber={maskNumber}
                 maskStatus={maskStatus}
-                onOpenIframe={(url, title) => setIframePopup({ open: true, url: url + "?embed=1", title })}
               />
             ))
           ) : (
@@ -1056,9 +1184,7 @@ const EmpTable = ({ employees }) => {
 
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredEmployees.length ? (
-                filteredEmployees.map((employee) => {
-                  const emp = getEmployeeWithTimeRestriction(employee);
-                  return (
+                filteredEmployees.map((employee) => (
                   <tr key={employee.empId} className="hover:bg-gray-50">
                     <td className="px-3 sm:px-6 py-3 sm:py-4 text-sm">{employee.username}</td>
                     <td className="px-3 sm:px-6 py-3 sm:py-4 text-sm">{maskEmail(employee.email)}</td>
@@ -1072,37 +1198,33 @@ const EmpTable = ({ employees }) => {
                     <td className="px-3 sm:px-6 py-3 sm:py-4">
                       <div className="flex flex-wrap gap-2 sm:gap-4">
                         <button
-                          onClick={() =>
-                            handleImpersonateLogin(employee.empId, employee.userRole)
-                          }
+                          onClick={() => handleImpersonateLogin(employee.empId)}
                           className="text-blue-600"
                         >
                           <LogIn size={20} />
                         </button>
 
-                        <button
-                          onClick={() => setIframePopup({ open: true, url: `/admin-dashboard/password/${employee.username}?embed=1`, title: `Change Password — ${employee.username}` })}
-                          className="text-yellow-600 hover:text-yellow-800"
-                          title="Change Password"
+                        <Link
+                          href={`/admin-dashboard/password/${employee.username}`}
+                          className="text-yellow-600"
                         >
                           <Key size={20} />
-                        </button>
+                        </Link>
 
-                        <button
-                          onClick={() => setIframePopup({ open: true, url: `/admin-dashboard/quick-edit/${employee.username}?embed=1`, title: `Edit Employee — ${employee.username}` })}
-                          className="text-green-600 hover:text-green-800"
-                          title="Edit Employee"
+                        <Link
+                          href={`/admin-dashboard/quick-edit/${employee.username}`}
+                          className="text-green-600"
                         >
                           <Edit size={20} />
-                        </button>
+                        </Link>
 
-                        <button
-                          onClick={() => setIframePopup({ open: true, url: `/admin-dashboard/ip-restrictions/${employee.username}?embed=1`, title: `IP Restrictions — ${employee.username}` })}
-                          className="text-purple-600 hover:text-purple-800"
+                        <Link
+                          href={`/admin-dashboard/ip-restrictions/${employee.username}`}
+                          className="text-purple-600"
                           title="IP Restriction Settings"
                         >
                           <Shield size={20} />
-                        </button>
+                        </Link>
 
                         <button
                           onClick={() => handleOpenReportingManagerModal(employee)}
@@ -1111,30 +1233,10 @@ const EmpTable = ({ employees }) => {
                         >
                           <UserPlus size={20} />
                         </button>
-
-                        {!isSuperAdminEmployee(employee) && (
-                        <button
-                          onClick={() => handleToggleLoginTimeRestriction(employee)}
-                          disabled={togglingTimeRestriction === employee.username}
-                          className={`disabled:opacity-50 ${
-                            emp.login_time_restriction_enabled === 1
-                              ? "text-green-600 hover:text-green-800"
-                              : "text-red-600 hover:text-red-800"
-                          }`}
-                          title={
-                            emp.login_time_restriction_enabled === 1
-                              ? "Login time restriction ON (09:00–19:15 IST) — click to disable"
-                              : "Login time restriction OFF — click to enable (09:00–19:15 IST)"
-                          }
-                        >
-                          <Clock size={20} />
-                        </button>
-                        )}
                       </div>
                     </td>
                   </tr>
-                  );
-                })
+                ))
               ) : (
                 <tr>
                   <td colSpan="8" className="text-center py-4 text-gray-500">

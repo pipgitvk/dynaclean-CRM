@@ -1,7 +1,6 @@
 "use client";
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import {
   FileText,
   UploadCloud,
@@ -14,9 +13,8 @@ import {
   Truck,
   Download,
   ArrowUp,
-  Pencil,
 } from "lucide-react";
-import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import dayjs from "dayjs";
 
 import DeleteButton from "@/components/accounts/DeleteButton";
@@ -60,7 +58,6 @@ const SkeletonLoader = () => (
 );
 
 export default function OrderTable({ orders, userRole }) {
-  const searchParams = useSearchParams();
   // Initialize from localStorage with defaults
   const [searchQuery, setSearchQuery] = useState(() => {
     if (typeof window !== "undefined") {
@@ -68,19 +65,8 @@ export default function OrderTable({ orders, userRole }) {
     }
     return "";
   });
-  const [appliedSearchQuery, setAppliedSearchQuery] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("accountsOrderTable_searchQuery") || "";
-    }
-    return "";
-  });
+  const [filteredOrders, setFilteredOrders] = useState([]);
   const [statusFilter, setStatusFilter] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("accountsOrderTable_statusFilter") || "";
-    }
-    return "";
-  });
-  const [appliedStatusFilter, setAppliedStatusFilter] = useState(() => {
     if (typeof window !== "undefined") {
       return localStorage.getItem("accountsOrderTable_statusFilter") || "";
     }
@@ -92,19 +78,7 @@ export default function OrderTable({ orders, userRole }) {
     }
     return "";
   });
-  const [appliedPaymentTermsFilter, setAppliedPaymentTermsFilter] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("accountsOrderTable_paymentTermsFilter") || "";
-    }
-    return "";
-  });
   const [dateFrom, setDateFrom] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("accountsOrderTable_dateFrom") || "";
-    }
-    return "";
-  });
-  const [appliedDateFrom, setAppliedDateFrom] = useState(() => {
     if (typeof window !== "undefined") {
       return localStorage.getItem("accountsOrderTable_dateFrom") || "";
     }
@@ -116,76 +90,75 @@ export default function OrderTable({ orders, userRole }) {
     }
     return "";
   });
-  const [appliedDateTo, setAppliedDateTo] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("accountsOrderTable_dateTo") || "";
-    }
-    return "";
-  });
   const [createdByFilter, setCreatedByFilter] = useState(() => {
     if (typeof window !== "undefined") {
       return localStorage.getItem("accountsOrderTable_createdByFilter") || "";
     }
     return "";
   });
-  const [appliedCreatedByFilter, setAppliedCreatedByFilter] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("accountsOrderTable_createdByFilter") || "";
-    }
-    return "";
-  });
   const [openMenuId, setOpenMenuId] = useState(null); // State to track which menu is open
-
-  const handleApplySearch = useCallback(() => {
-    setAppliedSearchQuery(searchQuery);
-    setAppliedStatusFilter(statusFilter);
-    setAppliedPaymentTermsFilter(paymentTermsFilter);
-    setAppliedDateFrom(dateFrom);
-    setAppliedDateTo(dateTo);
-    setAppliedCreatedByFilter(createdByFilter);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("accountsOrderTable_searchQuery", searchQuery);
-      localStorage.setItem("accountsOrderTable_statusFilter", statusFilter);
-      localStorage.setItem("accountsOrderTable_paymentTermsFilter", paymentTermsFilter);
-      localStorage.setItem("accountsOrderTable_dateFrom", dateFrom);
-      localStorage.setItem("accountsOrderTable_dateTo", dateTo);
-      localStorage.setItem("accountsOrderTable_createdByFilter", createdByFilter);
-    }
-  }, [
-    searchQuery,
-    statusFilter,
-    paymentTermsFilter,
-    dateFrom,
-    dateTo,
-    createdByFilter,
-  ]);
   const [paymentPendingData, setPaymentPendingData] = useState({}); // Maps order_id to remaining amount
   const [loadingPendingData, setLoadingPendingData] = useState(true);
+  // const canShowInstall = ["ADMIN", "SALES", "SERVICE"].includes(userRole);
+
+  // Save filter states to localStorage whenever they change
   useEffect(() => {
-    const statusFromCard = searchParams.get("status");
-    const fromCard = searchParams.get("fromCard");
-
-    if (statusFromCard) {
-      setStatusFilter(statusFromCard);
-      setAppliedStatusFilter(statusFromCard);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("accountsOrderTable_searchQuery", searchQuery);
     }
+  }, [searchQuery]);
 
-    if (fromCard === "1") {
-      setSearchQuery("");
-      setDateFrom("");
-      setDateTo("");
-      setCreatedByFilter("");
-      setPaymentTermsFilter("");
-      setAppliedSearchQuery("");
-      setAppliedDateFrom("");
-      setAppliedDateTo("");
-      setAppliedCreatedByFilter("");
-      setAppliedPaymentTermsFilter("");
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("accountsOrderTable_statusFilter", statusFilter);
     }
-  }, [searchParams]);
+  }, [statusFilter]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("accountsOrderTable_paymentTermsFilter", paymentTermsFilter);
+    }
+  }, [paymentTermsFilter]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("accountsOrderTable_dateFrom", dateFrom);
+    }
+  }, [dateFrom]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("accountsOrderTable_dateTo", dateTo);
+    }
+  }, [dateTo]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("accountsOrderTable_createdByFilter", createdByFilter);
+    }
+  }, [createdByFilter]);
 
   const toggleMenu = (id) => {
     setOpenMenuId(openMenuId === id ? null : id);
+  };
+
+  const handleResetFilters = () => {
+    setSearchQuery("");
+    setStatusFilter("");
+    setPaymentTermsFilter("");
+    setDateFrom("");
+    setDateTo("");
+    setCreatedByFilter("");
+    
+    // Clear localStorage
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("accountsOrderTable_searchQuery");
+      localStorage.removeItem("accountsOrderTable_statusFilter");
+      localStorage.removeItem("accountsOrderTable_paymentTermsFilter");
+      localStorage.removeItem("accountsOrderTable_dateFrom");
+      localStorage.removeItem("accountsOrderTable_dateTo");
+      localStorage.removeItem("accountsOrderTable_createdByFilter");
+    }
   };
 
   // Fetch payment pending data on component mount
@@ -214,6 +187,108 @@ export default function OrderTable({ orders, userRole }) {
     fetchPaymentPendingData();
   }, []);
 
+  // Filter orders based on search query, status filter, and date range
+  useEffect(() => {
+    if (!orders) return;
+
+    const lowercasedQuery = searchQuery.toLowerCase();
+    const result = orders.filter((order) => {
+      // Step 1: Filter by status
+      if (statusFilter) {
+        const orderStatus = getStatusText(order)
+          .text.toLowerCase()
+          .replace(/\s+/g, "");
+        if (orderStatus !== statusFilter.toLowerCase()) return false;
+      }
+
+      // Step 2: Date range filter (created_at)
+      if (dateFrom || dateTo) {
+        const created = order.created_at ? new Date(order.created_at) : null;
+        if (!created || isNaN(created)) return false;
+        if (dateFrom) {
+          const from = new Date(dateFrom + "T00:00:00");
+          if (created < from) return false;
+        }
+        if (dateTo) {
+          const to = new Date(dateTo + "T23:59:59");
+          if (created > to) return false;
+        }
+      }
+
+      // Step 2.5: Filter by created_by
+      if (createdByFilter && order.created_by !== createdByFilter) {
+        return false;
+      }
+
+      // Step 2.6: Filter by approval_status (User Dashboard specific)
+      if (order.approval_status === 'pending') {
+        return false;
+      }
+
+      // Step 2.7: Filter by payment_terms
+      if (paymentTermsFilter && order.payment_terms !== paymentTermsFilter) {
+        return false;
+      }
+
+      // Step 3: Search across multiple fields
+      return (
+        order.order_id?.toLowerCase().includes(lowercasedQuery) ||
+        order.client_name?.toLowerCase().includes(lowercasedQuery) ||
+        order.company_name?.toLowerCase().includes(lowercasedQuery) ||
+        order.contact?.toLowerCase().includes(lowercasedQuery) ||
+        order.state?.toLowerCase().includes(lowercasedQuery)
+      );
+    });
+    setFilteredOrders(result);
+  }, [searchQuery, orders, statusFilter, paymentTermsFilter, dateFrom, dateTo, createdByFilter]);
+
+  const exportToCSV = () => {
+    const headers = [
+      "Order ID", "Quotation", "Created By", "Order Date", "Client Name", "Company Name", 
+      "Contact", "Location", "Item Name", "Item Code", "Status", "Payment Status", "Due Date", "Total Amount", "Paid Amount"
+    ];
+    const csvData = filteredOrders.map(order => {
+      // Calculate total paid amount
+      const prevAmounts = (order.payment_amount || "")
+        .toString()
+        .split(",")
+        .map(s => s.trim())
+        .filter(Boolean)
+        .map(x => Number(x))
+        .filter(n => !isNaN(n));
+      const totalPaid = prevAmounts.reduce((sum, n) => sum + n, 0);
+      
+      return [
+        order.order_id,
+        order.quote_number,
+        order.created_by,
+        dayjs(order.created_at).format("DD/MM/YYYY"),
+        order.client_name,
+        order.company_name,
+        order.contact,
+        order.state,
+        order.item_name,
+        order.item_code,
+        getStatusText(order).text,
+        order.payment_status,
+        dayjs(order.duedate).format("DD/MM/YYYY"),
+        order.totalamt || 0,
+        totalPaid
+      ];
+    });
+
+    const csvContent = [
+      headers.join(","),
+      ...csvData.map(row => row.map(cell => `"${cell || ""}"`).join(","))
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `orders-${dayjs().format("YYYY-MM-DD")}.csv`;
+    link.click();
+  };
+
   const getStatusText = (order) => {
     // Check for return status first (highest priority)
     if (Number(order.is_returned) === 3) {
@@ -236,8 +311,8 @@ export default function OrderTable({ orders, userRole }) {
       if (Number(order.warehouse_in_done) === 1) {
         return {
           text: "Return Completed",
-          bg: "bg-orange-100",
-          textCol: "text-orange-800",
+          bg: "bg-teal-100",
+          textCol: "text-teal-800",
           icon: <CheckCircle size={14} className="mr-1" />,
         };
       }
@@ -363,107 +438,6 @@ export default function OrderTable({ orders, userRole }) {
     );
   };
 
-  const filteredOrders = useMemo(() => {
-    if (!orders) return [];
-
-    const lowercasedQuery = appliedSearchQuery.toLowerCase();
-    return orders.filter((order) => {
-      if (appliedStatusFilter) {
-        const orderStatus = getStatusText(order)
-          .text.toLowerCase()
-          .replace(/\s+/g, "");
-        if (orderStatus !== appliedStatusFilter.toLowerCase()) return false;
-      }
-
-      if (appliedDateFrom || appliedDateTo) {
-        const created = order.created_at ? new Date(order.created_at) : null;
-        if (!created || isNaN(created)) return false;
-        if (appliedDateFrom) {
-          const from = new Date(appliedDateFrom + "T00:00:00");
-          if (created < from) return false;
-        }
-        if (appliedDateTo) {
-          const to = new Date(appliedDateTo + "T23:59:59");
-          if (created > to) return false;
-        }
-      }
-
-      if (appliedCreatedByFilter && order.created_by !== appliedCreatedByFilter) {
-        return false;
-      }
-
-      if (order.approval_status === "pending") {
-        return false;
-      }
-
-      if (appliedPaymentTermsFilter && order.payment_terms !== appliedPaymentTermsFilter) {
-        return false;
-      }
-
-      return (
-        order.order_id?.toLowerCase().includes(lowercasedQuery) ||
-        order.client_name?.toLowerCase().includes(lowercasedQuery) ||
-        order.company_name?.toLowerCase().includes(lowercasedQuery) ||
-        order.contact?.toLowerCase().includes(lowercasedQuery) ||
-        order.state?.toLowerCase().includes(lowercasedQuery)
-      );
-    });
-  }, [
-    orders,
-    appliedSearchQuery,
-    appliedStatusFilter,
-    appliedPaymentTermsFilter,
-    appliedDateFrom,
-    appliedDateTo,
-    appliedCreatedByFilter,
-  ]);
-
-  const exportToCSV = () => {
-    const headers = [
-      "Order ID", "Quotation", "Created By", "Order Date", "Client Name", "Company Name",
-      "Contact", "Location", "Item Name", "Item Code", "Status", "Payment Status", "Due Date", "Total Amount", "Paid Amount",
-    ];
-    const csvData = filteredOrders.map((order) => {
-      const prevAmounts = (order.payment_amount || "")
-        .toString()
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean)
-        .map((x) => Number(x))
-        .filter((n) => !isNaN(n));
-      const totalPaid = prevAmounts.reduce((sum, n) => sum + n, 0);
-
-      return [
-        order.order_id,
-        order.quote_number,
-        order.created_by,
-        dayjs(order.created_at).format("DD/MM/YYYY"),
-        order.client_name,
-        order.company_name,
-        order.contact,
-        order.state,
-        order.item_name,
-        order.item_code,
-        getStatusText(order).text,
-        order.payment_status,
-        dayjs(order.duedate).format("DD/MM/YYYY"),
-        order.totalamt || 0,
-        totalPaid,
-      ];
-    });
-
-    const csvContent = [
-      headers.join(","),
-      ...csvData.map((row) => row.map((cell) => `"${cell || ""}"`).join(",")),
-    ].join("\n");
-
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = `orders-${dayjs().format("YYYY-MM-DD")}.csv`;
-    link.click();
-  };
-
   if (!orders) {
     return <SkeletonLoader />;
   }
@@ -484,22 +458,15 @@ export default function OrderTable({ orders, userRole }) {
             placeholder="Search by ID, client, company, etc."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                handleApplySearch();
-              }
-            }}
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200 ease-in-out"
           />
         </div>
         <div className="flex gap-2">
           <button
-            type="button"
-            onClick={handleApplySearch}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+            onClick={handleResetFilters}
+            className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm font-medium rounded-lg transition-colors"
           >
-            Search
+            Reset Filters
           </button>
           <button
             onClick={exportToCSV}
@@ -537,11 +504,21 @@ export default function OrderTable({ orders, userRole }) {
         </div>
         <div>
           <label className="block text-xs text-gray-600 mb-1">From Date</label>
-          <TypeableDateFilterInput value={dateFrom} onChange={setDateFrom} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"/>
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+          />
         </div>
         <div>
           <label className="block text-xs text-gray-600 mb-1">To Date</label>
-          <TypeableDateFilterInput value={dateTo} onChange={setDateTo} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"/>
+          <input
+            type="date"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+          />
         </div>
         <div>
           <label className="block text-xs text-gray-600 mb-1">Created By</label>
@@ -578,7 +555,6 @@ export default function OrderTable({ orders, userRole }) {
           </select>
         </div>
       </div>
-      <p className="text-xs text-gray-500">Set filters, then click Search to update the list.</p>
 
       {/* 👨‍💼 TABLE VIEW for large screens */}
       <div className="hidden lg:block overflow-x-auto overflow-y-auto max-h-[calc(100vh-300px)] bg-white rounded-xl shadow-lg">
@@ -832,7 +808,6 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
   const isTeamLeader = role === "team leader";
   const isWarehouse = role === "warehouse incharge";
   const canManageReturns = isAdmin || isAccountant || isTeamLeader;
-  const canEditBooking = isAdmin || role === "superadmin";
   const hasBooking =
     r.booking_id !== undefined &&
     r.booking_id !== null &&
@@ -893,32 +868,19 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
             )}
             {["accountant", "admin", "team leader"].includes(role) &&
               (r.report_file ? (
-                <>
-                  <Link
-                    href={`/accounts-dashboard/order/view/${r.order_id}`}
-                    className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
-                    title="View Report"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <FileText size={16} />
-                    <span>View Report</span>
-                  </Link>
-                  {dispatchStatus === 0 && (
-                    <Link
-                      href={`/accounts-dashboard/order/upload/${r.order_id}`}
-                      className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-blue-700"
-                      title="Edit Invoice"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <Pencil size={16} />
-                      <span>Edit Invoice</span>
-                    </Link>
-                  )}
-                </>
+                <Link
+                  href={`/user-dashboard/order/view/${r.order_id}`}
+                  className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
+                  title="View Report"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <FileText size={16} />
+                  <span>View Report</span>
+                </Link>
               ) : (
                 <div className="flex items-center">
                   <Link
-                    href={`/accounts-dashboard/order/upload/${r.order_id}`}
+                    href={`/user-dashboard/order/upload/${r.order_id}`}
                     className="flex-1 flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-yellow-700"
                     title="Upload Report"
                     onClick={(e) => e.stopPropagation()}
@@ -931,29 +893,8 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                   </div>
                 </div>
               ))}
-            {canManageReturns && !hasBooking && (
-                <Link
-                  href={`/accounts-dashboard/order/upload-booking/${r.order_id}`}
-                  className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-green-700"
-                  title="Create Booking"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <UploadCloud size={16} />
-                  <span>Create Booking</span>
-                </Link>
-              )}
-            {canEditBooking && hasBooking && dispatchStatus === 0 && (
-              <Link
-                href={`/accounts-dashboard/order/upload-booking/${r.order_id}`}
-                className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-blue-700"
-                title="Edit Booking"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <Pencil size={16} />
-                <span>Edit Booking</span>
-              </Link>
-            )}
-            {canManageReturns && hasBooking && (
+            {canManageReturns &&
+              (hasBooking ? (
                 <Link
                   href={`/accounts-dashboard/order/view-booking/${r.order_id}`}
                   className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
@@ -963,7 +904,17 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                   <FileCheck size={16} />
                   <span>View Booking</span>
                 </Link>
-              )}
+              ) : (
+                <Link
+                  href={`/accounts-dashboard/order/upload-booking/${r.order_id}`}
+                  className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-green-700"
+                  title="Create Booking"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <UploadCloud size={16} />
+                  <span>Create Booking</span>
+                </Link>
+              ))}
             {isWarehouse && hasBooking && dispatchStatus === 0 && (
               <>
                 <Link
@@ -1496,8 +1447,13 @@ function UpdateDeliveryMenuItem({ order }) {
                     <label className="block text-sm text-gray-700 font-medium mb-1">
                       Actual Delivery Date *
                     </label>
-                    <TypeableDateFilterInput value={deliveredOn} onChange={setDeliveredOn} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      required/>
+                    <input
+                      type="date"
+                      value={deliveredOn}
+                      onChange={(e) => setDeliveredOn(e.target.value)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      required
+                    />
                   </div>
 
                   <div>

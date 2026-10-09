@@ -2,11 +2,6 @@ import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { EXCLUDE_PROFORMA_INVOICE_SQL_I } from "@/lib/ledgerInvoiceFilters";
-import {
-  loadPartyLedgerNetMaps,
-  resolveCustomerIdForParty,
-  resolveLedgerNetForParty,
-} from "@/lib/partyLedgerListBalances";
 
 export const dynamic = "force-dynamic";
 
@@ -65,36 +60,6 @@ function mergeContactField(existing, incoming) {
   if (existing != null && String(existing).trim() !== "") return existing;
   if (incoming != null && String(incoming).trim() !== "") return incoming;
   return existing;
-}
-
-function clientContactNameFromCustomerRow(r) {
-  const company = String(r.company || "").trim();
-  const full = String(r.full_name || "").trim();
-  const first = String(r.first_name || "").trim();
-  if (full && keyFor(full) !== keyFor(company)) return full;
-  if (first && keyFor(first) !== keyFor(company)) return first;
-  return "";
-}
-
-function buildCustomerIdByPartyName(custRows, invBuyerRows) {
-  const map = new Map();
-  for (const r of custRows) {
-    const cid =
-      r.customer_id != null ? String(r.customer_id).trim() : "";
-    if (!cid || cid === "0") continue;
-    for (const raw of [r.company, r.full_name, r.first_name]) {
-      const k = keyFor(raw);
-      if (k) map.set(k, cid);
-    }
-  }
-  for (const r of invBuyerRows) {
-    const cid =
-      r.customer_id != null ? String(r.customer_id).trim() : "";
-    if (!cid || cid === "0") continue;
-    const k = keyFor(r.buyer_name);
-    if (k) map.set(k, cid);
-  }
-  return map;
 }
 
 function groupPartiesByCustomerId(parties, canonicalNameByCustomerId) {
@@ -167,17 +132,12 @@ export async function GET(req) {
     const conn = await getDbConnection();
 
     const rows = new Map();
-    let customerIdByPartyName = new Map();
 
     const addRow = (rawName, customerId, extras = {}) => {
       const name = String(rawName || "").trim();
       if (!name) return;
       const cidRaw = customerId != null ? String(customerId).trim() : "";
-      let cid = cidRaw && cidRaw !== "0" ? cidRaw : "";
-      if (!cid) {
-        const byName = customerIdByPartyName.get(keyFor(name));
-        if (byName) cid = byName;
-      }
+      const cid = cidRaw && cidRaw !== "0" ? cidRaw : "";
       const k = cid ? `cid:${cid}` : `name:${keyFor(name)}`;
       if (!rows.has(k)) {
         rows.set(k, {
@@ -400,8 +360,6 @@ export async function GET(req) {
     console.timeEnd("[parties-list] queries");
 
     console.time("[parties-list] merge");
-    customerIdByPartyName = buildCustomerIdByPartyName(custRows, invBuyerRows);
-
     for (const r of invNameRows) {
       invoicesByName.set(String(r.buyer_name).trim().toLowerCase(), {
         phone: r.customer_phone || undefined,
@@ -448,17 +406,13 @@ export async function GET(req) {
 
     const canonicalNameByCustomerId = buildCanonicalNameByCustomerId(custRows);
     const contactByCustomerId = new Map();
-    const clientNameByCustomerId = new Map();
     for (const r of custRows) {
       const cid = r.customer_id != null ? String(r.customer_id).trim() : "";
       if (!cid || contactByCustomerId.has(cid)) continue;
-      const clientName = clientContactNameFromCustomerRow(r);
-      if (clientName) clientNameByCustomerId.set(cid, clientName);
       contactByCustomerId.set(cid, {
         phone: r.phone ? String(r.phone).trim() : "",
         billing_address: r.billing_address ? String(r.billing_address).trim() : "",
         gstin: r.gstin ? String(r.gstin).trim() : "",
-        client_name: clientName,
       });
     }
 
@@ -505,7 +459,8 @@ export async function GET(req) {
       const nmLow = nm.toLowerCase();
       manualDrByName.set(nmLow, Number(r.dr) || 0);
       manualCrByName.set(nmLow, Number(r.cr) || 0);
-      addRow(nm, customerIdByPartyName.get(keyFor(nm)) || null, {});
+      const hasAny = rows.has(nmLow);
+      if (!hasAny) addRow(nm, null, {});
     }
 
     const returnCrByName = new Map();
@@ -555,27 +510,12 @@ export async function GET(req) {
       canonicalNameByCustomerId,
     );
 
-    const ledgerBalanceMaps = await loadPartyLedgerNetMaps(conn);
-    const customerIdLookup = {
-      ledgerCustomerIdByPartyName: ledgerBalanceMaps.ledgerCustomerIdByPartyName,
-      customerIdByPartyName,
-    };
-
-    // ── Balance: party_ledger_lines when available, else approximate
+    // ── Fast approximate balance for list (exact net loaded per-party on client)
     const out = [];
     for (const p of partiesArr) {
       const aliasNames = Array.from(
         new Set((p.aliasNames || [p.name]).map((name) => String(name || "").trim()).filter(Boolean)),
       );
-
-      const resolvedCustomerId = resolveCustomerIdForParty(
-        p,
-        aliasNames,
-        customerIdLookup,
-      );
-      if (resolvedCustomerId) {
-        p.customer_id = resolvedCustomerId;
-      }
 
       let invTotal = 0;
       let invPaid = 0;
@@ -597,7 +537,7 @@ export async function GET(req) {
           invBalance = Number(invAgg._invBalance || 0);
         }
       }
-      if (!usedCustomerIdInv && !customerIdKey) {
+      if (!usedCustomerIdInv) {
         for (const alias of aliasNames) {
           const invAgg = invoicesByName.get(alias.toLowerCase());
           if (!invAgg) continue;
@@ -651,27 +591,9 @@ export async function GET(req) {
 
       const debitSide = receivableFromInvoices + mDr;
       const creditSide = purchasesPayable + mCr + returnCr;
-      let net = debitSide - creditSide;
-
-      const ledgerResolved = resolveLedgerNetForParty(p, ledgerBalanceMaps);
-      let balanceFromLedger = false;
-      let balanceSide = null;
-      if (ledgerResolved.fromLedger && ledgerResolved.net != null) {
-        net = Number(ledgerResolved.net);
-        balanceFromLedger = true;
-        balanceSide = ledgerResolved.balance_side || null;
-      }
-
-      const hasLedgerSnapshot =
-        (customerIdKey &&
-          ledgerBalanceMaps.hasSnapshotByCustomerId.has(customerIdKey)) ||
-        (!customerIdKey &&
-          ledgerBalanceMaps.netByPartyName.has(
-            String(p.name || "").trim().toLowerCase(),
-          ));
+      const net = debitSide - creditSide;
 
       const hasActivity =
-        hasLedgerSnapshot ||
         (hasInvoiceAgg && (invTotal > 0 || invBalance > 0)) ||
         purchaseCount > 0 ||
         mDr > 0 ||
@@ -689,18 +611,11 @@ export async function GET(req) {
       let phoneOut = p.phone;
       let billingOut = p.billing_address;
       let gstinOut = p.gstin;
-      let clientNameOut =
-        customerIdKey && clientNameByCustomerId.has(customerIdKey)
-          ? clientNameByCustomerId.get(customerIdKey)
-          : "";
       if (customerIdKey && contactByCustomerId.has(customerIdKey)) {
         const contact = contactByCustomerId.get(customerIdKey);
         phoneOut = contact.phone;
         billingOut = contact.billing_address;
         gstinOut = contact.gstin;
-        if (!clientNameOut && contact.client_name) {
-          clientNameOut = contact.client_name;
-        }
       } else if (invAggForContact) {
         if (!phoneOut && invAggForContact.phone) phoneOut = invAggForContact.phone;
         if (!billingOut && invAggForContact.billing_address) {
@@ -729,12 +644,8 @@ export async function GET(req) {
         phone: phoneOut,
         billing_address: billingOut,
         gstin: gstinOut,
-        client_name: clientNameOut || undefined,
         balance: Number(net.toFixed(2)),
-        net_balance: Number(net.toFixed(2)),
-        balance_side: balanceSide,
         amountType,
-        balanceFromLedger,
         hasActivity,
         searchableNames: aliasNames,
       });

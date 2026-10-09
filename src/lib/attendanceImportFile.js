@@ -16,76 +16,28 @@ export const IMPORT_TIME_FIELDS = [
   "break_evening_end",
 ];
 
-function pad2(n) {
-  return String(n).padStart(2, "0");
-}
-
-/** Excel time-only serial (fraction of day) → HH:mm:ss wall clock (no TZ shift). */
-function excelDayFractionToHms(fraction) {
-  const f = ((Number(fraction) % 1) + 1) % 1;
-  const totalSec = Math.round(f * 86400);
-  const h = Math.floor(totalSec / 3600) % 24;
-  const m = Math.floor((totalSec % 3600) / 60);
-  const s = totalSec % 60;
-  return `${pad2(h)}:${pad2(m)}:${pad2(s)}`;
-}
-
-/** ExcelJS time cells use 1899/1900 phantom dates; wall clock is in UTC fields. */
-function isExcelPhantomDate(d) {
-  const y = d.getFullYear();
-  return y === 1899 || y === 1900;
-}
-
-function dateCellToYmd(d) {
-  if (isExcelPhantomDate(d)) {
-    const y = d.getUTCFullYear();
-    const m = d.getUTCMonth() + 1;
-    const day = d.getUTCDate();
-    return `${y}-${pad2(m)}-${pad2(day)}`;
-  }
-  return d.toLocaleDateString("en-CA");
-}
-
-function timeDateToHms(d) {
-  const useUtc = isExcelPhantomDate(d);
-  const h = useUtc ? d.getUTCHours() : d.getHours();
-  const m = useUtc ? d.getUTCMinutes() : d.getMinutes();
-  const s = useUtc ? d.getUTCSeconds() : d.getSeconds();
-  return `${pad2(h)}:${pad2(m)}:${pad2(s)}`;
-}
-
 export function cellValueToImportString(cellValue, fieldKey) {
   if (cellValue == null || cellValue === "") return "";
-  const isTimeField = IMPORT_TIME_FIELDS.includes(fieldKey);
-
-  if (typeof cellValue === "number" && Number.isFinite(cellValue)) {
-    if (fieldKey === "date" && cellValue > 59 && cellValue < 2000000) {
-      const ymd = parseImportDateToYmd(cellValue);
-      if (ymd) return ymd;
-    }
-    if (isTimeField && cellValue >= 0 && cellValue < 1) {
-      return excelDayFractionToHms(cellValue);
-    }
-    if (isTimeField && cellValue >= 1) {
-      const frac = cellValue % 1;
-      if (frac > 0) return excelDayFractionToHms(frac);
-    }
+  if (
+    fieldKey === "date" &&
+    typeof cellValue === "number" &&
+    Number.isFinite(cellValue) &&
+    cellValue > 20000 &&
+    cellValue < 100000
+  ) {
+    const base = new Date(1899, 11, 30);
+    const d = new Date(base.getTime() + cellValue * 86400000);
+    if (!Number.isNaN(d.getTime())) return d.toLocaleDateString("en-CA");
   }
-
   if (cellValue instanceof Date) {
     if (fieldKey === "date") {
-      return dateCellToYmd(cellValue);
+      return cellValue.toLocaleDateString("en-CA");
     }
-    if (isTimeField) {
-      const h = cellValue.getHours();
-      const m = cellValue.getMinutes();
-      const looksLikeDateOnly =
-        h === 0 && m === 0 && cellValue.getSeconds() === 0;
-      if (looksLikeDateOnly && !isExcelPhantomDate(cellValue)) {
-        return dateCellToYmd(cellValue);
-      }
-      return timeDateToHms(cellValue);
-    }
+    return cellValue.toLocaleTimeString("en-GB", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
   }
   if (typeof cellValue === "object" && cellValue.text != null) {
     return String(cellValue.text).trim();
@@ -164,53 +116,23 @@ export async function parseAttendanceImportFile(file) {
   return rows;
 }
 
-/** When date column is empty but check-in holds a date (Excel column shift). */
-function healMisalignedImportRow(obj) {
-  const out = { ...obj };
-  let dateYmd = parseImportDateToYmd(out.date ?? "");
-  if (dateYmd) return out;
-
-  const checkinCell = out.checkin_time != null ? String(out.checkin_time).trim() : "";
-  const dateFromCheckin = parseImportDateToYmd(checkinCell);
-  if (!dateFromCheckin) return out;
-
-  dateYmd = dateFromCheckin;
-  const shifted = {
-    ...out,
-    date: dateYmd,
-    checkin_time: out.checkout_time ?? "",
-    checkout_time: out.break_morning_start ?? "",
-    break_morning_start: out.break_morning_end ?? "",
-    break_morning_end: out.break_lunch_start ?? "",
-    break_lunch_start: out.break_lunch_end ?? "",
-    break_lunch_end: out.break_evening_start ?? "",
-    break_evening_start: out.break_evening_end ?? "",
-    break_evening_end: "",
-  };
-  if (!shifted.checkin_address && out.checkout_address) {
-    shifted.checkin_address = out.checkout_address;
-  }
-  return shifted;
-}
-
 export function buildImportPayloadRows(parsed) {
   return parsed.map((obj) => {
-    const healed = healMisalignedImportRow(obj);
     const row = {
-      username: String(healed.username ?? "").trim(),
-      date: parseImportDateToYmd(healed.date ?? ""),
+      username: String(obj.username ?? "").trim(),
+      date: parseImportDateToYmd(obj.date ?? ""),
     };
     for (const key of IMPORT_TIME_FIELDS) {
-      const v = healed[key];
+      const v = obj[key];
       if (v != null && String(v).trim() !== "") {
         row[key] = String(v).trim();
       }
     }
-    if (healed.checkin_address != null && String(healed.checkin_address).trim() !== "") {
-      row.checkin_address = String(healed.checkin_address).trim();
+    if (obj.checkin_address != null && String(obj.checkin_address).trim() !== "") {
+      row.checkin_address = String(obj.checkin_address).trim();
     }
-    if (healed.checkout_address != null && String(healed.checkout_address).trim() !== "") {
-      row.checkout_address = String(healed.checkout_address).trim();
+    if (obj.checkout_address != null && String(obj.checkout_address).trim() !== "") {
+      row.checkout_address = String(obj.checkout_address).trim();
     }
     return row;
   });

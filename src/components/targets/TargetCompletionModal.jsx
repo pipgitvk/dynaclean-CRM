@@ -1,5 +1,4 @@
 "use client";
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect } from "react";
 import {
   BarChart,
@@ -128,13 +127,23 @@ const TargetCompletionModal = ({ isOpen, onClose, targetData }) => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Start Date
                 </label>
-                <TypeableDateFilterInput value={startDate} onChange={setStartDate} className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   End Date
                 </label>
-                <TypeableDateFilterInput value={endDate} onChange={setEndDate} className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
               </div>
             </div>
           </div>

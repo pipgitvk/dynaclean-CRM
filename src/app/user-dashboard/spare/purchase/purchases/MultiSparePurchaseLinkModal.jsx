@@ -1,6 +1,5 @@
 "use client";
 
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import React, { useEffect, useState, useMemo } from "react";
 import { Search, X, Link2 } from "lucide-react";
 import { toast } from "react-hot-toast";
@@ -451,8 +450,18 @@ export default function MultiSparePurchaseLinkModal({
               />
             </div>
             <div className="flex gap-2">
-              <TypeableDateFilterInput value={stmtStartDate} onChange={setStmtStartDate} className="px-3 py-1.5 border rounded-md text-sm"/>
-              <TypeableDateFilterInput value={stmtEndDate} onChange={setStmtEndDate} className="px-3 py-1.5 border rounded-md text-sm"/>
+              <input
+                type="date"
+                value={stmtStartDate}
+                onChange={(e) => setStmtStartDate(e.target.value)}
+                className="px-3 py-1.5 border rounded-md text-sm"
+              />
+              <input
+                type="date"
+                value={stmtEndDate}
+                onChange={(e) => setStmtEndDate(e.target.value)}
+                className="px-3 py-1.5 border rounded-md text-sm"
+              />
               {(stmtStartDate || stmtEndDate) && (
                 <button
                   onClick={() => {

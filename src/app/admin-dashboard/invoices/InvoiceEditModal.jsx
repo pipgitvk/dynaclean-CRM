@@ -6,12 +6,6 @@ import toast from "react-hot-toast";
 import InvoiceItemsTable from "./new/invoice-table";
 import TaxAndSummary from "./new/Tax-invoice";
 import PaymentLinkModal from "@/app/user-dashboard/invoices/new/PaymentLinkModal";
-import { useUser } from "@/context/UserContext";
-import { canEditInvoiceHsn } from "@/lib/performaInvoiceAccess";
-import {
-  isPerformaInvoiceType,
-  resolvePerformaInvoiceTerms,
-} from "@/lib/performaInvoiceTerms";
 
 const emptyItem = () => ({
   item_name: "",
@@ -87,8 +81,6 @@ export default function InvoiceEditModal({
   onSaved,
   viewHrefBase = "/admin-dashboard/invoices",
 }) {
-  const { user } = useUser();
-  const canEditHsn = canEditInvoiceHsn(user?.userRole);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [invoiceNumber, setInvoiceNumber] = useState("");
@@ -112,7 +104,6 @@ export default function InvoiceEditModal({
     due_date: "",
     amount_paid: 0,
     payment_status: "UNPAID",
-    status: "",
     quotation_id: "",
     buyers_order_no: "",
     eway_bill_no: "",
@@ -203,7 +194,6 @@ export default function InvoiceEditModal({
           due_date: dateInputValue(inv.due_date) || "",
           amount_paid: Number(inv.amount_paid) || 0,
           payment_status: inv.payment_status || "UNPAID",
-          status: inv.status || "",
           quotation_id:
             inv.quotation_id != null && inv.quotation_id !== ""
               ? String(inv.quotation_id)
@@ -215,11 +205,7 @@ export default function InvoiceEditModal({
         });
         setShowPaymentLinkModal(false);
         setNotes(inv.notes || "");
-        setEditableTerms(
-          isPerformaInvoiceType(inv.type)
-            ? resolvePerformaInvoiceTerms(inv.terms_conditions)
-            : inv.terms_conditions || "",
-        );
+        setEditableTerms(inv.terms_conditions || "");
         setRoundOff(Number(inv.round_off) || 0);
         // setIsAutoRoundOff(false); // Keep it true by default as requested
 
@@ -342,7 +328,6 @@ export default function InvoiceEditModal({
         amount_paid: amountPaid,
         balance_amount: balanceAmount,
         payment_status: finalPaymentStatus,
-        status: form.status || null,
         notes: notes || null,
         terms_conditions: editableTerms || null,
         buyers_order_no: form.buyers_order_no?.trim() || null,
@@ -354,9 +339,9 @@ export default function InvoiceEditModal({
         cgst_rate: cgstRate,
         sgst_rate: sgstRate,
         igst_rate: igstRate,
-        send_customer_payment_notice:
-          invoiceType !== "performa" &&
-          Boolean(String(form.customer_email || "").trim()),
+        send_customer_payment_notice: Boolean(
+          String(form.customer_email || "").trim(),
+        ),
       };
 
       const removedTransIds = originalLinkedTransIdsRef.current.filter(tid => !linkedTransIds.includes(tid));
@@ -414,9 +399,7 @@ export default function InvoiceEditModal({
           }
         }
       }
-      const mailed =
-        invoiceType !== "performa" &&
-        !!String(form.customer_email || "").trim();
+      const mailed = !!String(form.customer_email || "").trim();
       const n = out.customerEmailNotice;
       if (mailed && n) {
         if (n.sent) {
@@ -746,31 +729,9 @@ export default function InvoiceEditModal({
                     <option value="PAID">Paid</option>
                   </select>
                 </div>
-                <div>
-                  <label className="block text-gray-600 mb-1">
-                    Status
-                  </label>
-                  <select
-                    className="w-full border rounded px-2 py-1.5"
-                    value={form.status}
-                    onChange={(e) =>
-                      setForm({ ...form, status: e.target.value })
-                    }
-                  >
-                    <option value="">Select Status</option>
-                    <option value="PAID">Paid</option>
-                    <option value="PARTIAL PAID">Partial Paid</option>
-                    <option value="CANCELLED">Cancelled</option>
-                  </select>
-                </div>
               </div>
 
-              <InvoiceItemsTable
-                items={items}
-                setItems={setItems}
-                isEditMode={true}
-                canEditHsn={canEditHsn}
-              />
+              <InvoiceItemsTable items={items} setItems={setItems} isEditMode={true} />
 
               <TaxAndSummary
                 items={items}
@@ -808,7 +769,7 @@ export default function InvoiceEditModal({
                     Terms &amp; conditions
                   </label>
                   <textarea
-                    rows={invoiceType === "performa" ? 10 : 5}
+                    rows={5}
                     className="w-full border rounded px-2 py-1.5 resize-y"
                     value={editableTerms}
                     onChange={(e) => setEditableTerms(e.target.value)}

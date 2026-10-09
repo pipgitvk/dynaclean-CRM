@@ -1,6 +1,5 @@
 "use client";
 
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect } from "react";
 import { toast } from "react-hot-toast";
 
@@ -473,9 +472,15 @@ export default function SpareDirectInForm() {
                         </div>
                         <div>
                             <label className="block mb-1 font-medium">Received Date *</label>
-                            <TypeableDateFilterInput value={formData.received_date} onChange={(v) => handleChange({ target: { name: "received_date", value: v } })} max={new Date().toISOString().split("T")[0]}
+                            <input
+                                type="date"
+                                name="received_date"
+                                value={formData.received_date}
+                                onChange={handleChange}
+                                max={new Date().toISOString().split("T")[0]}
                                 className="w-full border p-2 rounded"
-                                required/>
+                                required
+                            />
                         </div>
                         <div>
                             <label className="block mb-1 font-medium">Received Quantity *</label>

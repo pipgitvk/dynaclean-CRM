@@ -58,21 +58,17 @@ export async function GET(request) {
     const arrayBuffer = await response.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    const hintedName = String(searchParams.get("filename") || "")
-      .replace(/[\r\n"]/g, "")
-      .slice(0, 180);
-    const urlName = decodedUrl.split("/").pop().split("?")[0] || "file";
-    const filename = hintedName || urlName;
-    const ext = (filename.split(".").pop() || urlName.split(".").pop() || "").toLowerCase();
-
-    // Raw Cloudinary PDFs are served as octet-stream and force a download.
-    // Use the original filename so the browser opens them inline.
+    // Determine content type
     let contentType = response.headers.get("content-type") || "application/octet-stream";
-    if (ext === "pdf") contentType = "application/pdf";
-    else if (ext === "jpg" || ext === "jpeg") contentType = "image/jpeg";
-    else if (ext === "png") contentType = "image/png";
-    else if (ext === "gif") contentType = "image/gif";
-    else if (ext === "webp") contentType = "image/webp";
+    const lower = decodedUrl.toLowerCase();
+    if (lower.endsWith(".pdf")) contentType = "application/pdf";
+    else if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) contentType = "image/jpeg";
+    else if (lower.endsWith(".png")) contentType = "image/png";
+    else if (lower.endsWith(".gif")) contentType = "image/gif";
+    else if (lower.endsWith(".webp")) contentType = "image/webp";
+
+    // Extract filename from URL
+    const filename = decodedUrl.split("/").pop().split("?")[0] || "file";
 
     return new NextResponse(buffer, {
       status: 200,

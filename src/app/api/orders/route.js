@@ -1,27 +1,12 @@
 import { getDbConnection } from "@/lib/db";
 import { NextResponse } from "next/server";
 import { jwtVerify } from "jose";
-import { canViewAllOrders } from "@/lib/dataScope";
-import {
-  isServiceSupportRole,
-  sqlColumnInActiveServiceSupportUsers,
-} from "@/lib/serviceSupportTeamScope";
 import { parseFormData } from "@/lib/parseForm";
 import fs from "fs/promises"; // Use fs.promises for async file operations
 import path from "path";
 import { sendTemplatedEmail } from "@/lib/template-utils";
-import { syncPreBookingsForOrder } from "@/lib/syncPreBookingsForOrder";
 
 const UPLOAD_DIR = path.join(process.cwd(), "public", "uploads");
-
-function sanitizeFilename(filename) {
-  if (!filename) return "unnamed";
-  const ext = path.extname(filename);
-  let base = filename.slice(0, -ext.length) || "unnamed";
-  base = base.replace(/[#?[\]{}<>|\\^`~:;@&=+$,"'/*\s]+/g, "_").replace(/^_+|_+$/g, "");
-  if (!base) base = "file";
-  return base + ext;
-}
 
 // Helper function to save a file locally
 async function saveFileLocally(file, subfolder) {
@@ -34,8 +19,7 @@ async function saveFileLocally(file, subfolder) {
   const targetSubfolder = path.join(UPLOAD_DIR, subfolder);
   await fs.mkdir(targetSubfolder, { recursive: true });
 
-  const safeName = sanitizeFilename(file.originalFilename);
-  const fileName = `${Date.now()}-${safeName}`; // Ensure unique filename
+  const fileName = `${Date.now()}-${file.originalFilename}`; // Ensure unique filename
   const targetPath = path.join(targetSubfolder, fileName);
 
   try {
@@ -59,19 +43,6 @@ function generateOrderId(todayCount) {
   return date + String(todayCount + 1).padStart(3, "0");
 }
 
-/** Works on MySQL/MariaDB versions that do not support ADD COLUMN IF NOT EXISTS. */
-async function ensureNeworderQuotationIdColumn(conn) {
-  const [cols] = await conn.execute(
-    `SELECT 1 AS ok FROM information_schema.COLUMNS
-     WHERE TABLE_SCHEMA = DATABASE()
-       AND TABLE_NAME = 'neworder'
-       AND COLUMN_NAME = 'quotation_id'
-     LIMIT 1`,
-  );
-  if (cols?.length) return;
-  await conn.execute(`ALTER TABLE neworder ADD COLUMN quotation_id INT NULL`);
-}
-
 // GET endpoint to fetch orders
 export async function GET(req) {
   try {
@@ -89,8 +60,6 @@ export async function GET(req) {
     const conn = await getDbConnection();
 
     // Ensure new columns exist (safe, runs only if missing)
-    await ensureNeworderQuotationIdColumn(conn);
-
     const safeAlters = [
       "ALTER TABLE neworder ADD COLUMN IF NOT EXISTS return_booking_done TINYINT(1) DEFAULT 0",
       "ALTER TABLE neworder ADD COLUMN IF NOT EXISTS return_booking_date DATE NULL",
@@ -130,9 +99,7 @@ export async function GET(req) {
 
     const params = [];
 
-    if (isServiceSupportRole(userRole)) {
-      sql += ` WHERE ${sqlColumnInActiveServiceSupportUsers("no.created_by")}`;
-    } else if (!canViewAllOrders(userRole)) {
+    if (!["SUPERADMIN", "DIRECTOR"].includes(String(userRole).toUpperCase())) {
       sql += " WHERE no.created_by = ?";
       params.push(username);
     }
@@ -239,7 +206,7 @@ export async function POST(req) {
       );
     }
 
-    if (!files.paymentProofFiles || files.paymentProofFiles.length === 0) {
+    if (!files.paymentProof || !files.paymentProof[0]) {
       return NextResponse.json(
         { error: "Payment Proof is required" },
         { status: 400 },
@@ -247,27 +214,18 @@ export async function POST(req) {
     }
 
     // 3. Save files locally instead of uploading to Cloudinary
-    // Handle multiple PO files
-    let poFileUrls = [];
-    if (files.poFiles && files.poFiles.length > 0) {
-      for (const file of files.poFiles) {
-        const url = await saveFileLocally(file, "po_files");
-        poFileUrls.push(url);
-      }
+    let poFileUrl = "";
+    if (files.poFile && files.poFile[0]) {
+      poFileUrl = await saveFileLocally(files.poFile[0], "po_files");
     }
 
-    // Handle multiple payment proof files
-    let paymentProofUrls = [];
-    if (files.paymentProofFiles && files.paymentProofFiles.length > 0) {
-      for (const file of files.paymentProofFiles) {
-        const url = await saveFileLocally(file, "payment_files");
-        paymentProofUrls.push(url);
-      }
+    let paymentProofUrl = "";
+    if (files.paymentProof && files.paymentProof[0]) {
+      paymentProofUrl = await saveFileLocally(
+        files.paymentProof[0],
+        "payment_files",
+      );
     }
-
-    // Join URLs into comma-separated strings for storage
-    const poFileUrl = poFileUrls.join(", ");
-    const paymentProofUrl = paymentProofUrls.join(", ");
 
     // 4. Approval Logic
     const isAutoApproved = ["SUPERADMIN"].includes(userRole);
@@ -283,34 +241,38 @@ export async function POST(req) {
     const orderId = generateOrderId(count);
     // console.log("Generated Order ID:", orderId);
 
-    await ensureNeworderQuotationIdColumn(conn);
-
-    const [quotationRows] = await conn.execute(
-      `SELECT customer_id, payment_term_days, \`S.No.\` AS quotation_id
-       FROM quotations_records WHERE quote_number = ? LIMIT 1`,
-      [quote_number],
-    );
-    const quotationRecord = quotationRows?.[0] || {};
-    const customerIdFromQuotation = quotationRecord.customer_id ?? null;
-    const quotationIdFromBody = fields.quotation_id
-      ? Number(fields.quotation_id)
-      : null;
-    const quotationId =
-      Number.isFinite(quotationIdFromBody) && quotationIdFromBody > 0
-        ? quotationIdFromBody
-        : quotationRecord.quotation_id != null
-          ? Number(quotationRecord.quotation_id)
-          : null;
-
     // Compute duedate = (client may send) OR today + payment_term_days from quotation
     let duedateISO = fields.duedate;
     if (!duedateISO) {
-      const days = Number(quotationRecord.payment_term_days) || 0;
+      let days = 0;
+      if (quotation && quotation.payment_term_days) {
+        days = Number(quotation.payment_term_days) || 0;
+      } else {
+        // attempt to fetch from quotations_records
+        const [qRows] = await conn.execute(
+          `SELECT payment_term_days FROM quotations_records WHERE quote_number = ? LIMIT 1`,
+          [quote_number],
+        );
+        days =
+          (Array.isArray(qRows) &&
+            qRows.length &&
+            Number(qRows[0]?.payment_term_days)) ||
+          0;
+      }
       const today = new Date();
       const due = new Date(today);
       due.setDate(due.getDate() + days);
       duedateISO = due.toISOString().slice(0, 10);
     }
+
+    // Get customer_id from quotation
+    const [quotationRecordForCustomer] = await conn.execute(
+      `SELECT customer_id FROM quotations_records WHERE quote_number = ? LIMIT 1`,
+      [quote_number]
+    );
+    const customerIdFromQuotation = quotationRecordForCustomer.length > 0 
+      ? quotationRecordForCustomer[0].customer_id 
+      : null;
 
     // console here
     console.log("INSERT PARAMS", {
@@ -327,16 +289,15 @@ export async function POST(req) {
 
     const [result] = await conn.execute(
       `INSERT INTO neworder
-         (order_id, quote_number, quotation_id, po_file, payment_proof, client_name,
+         (order_id, quote_number, po_file, payment_proof, client_name,
           contact, email, delivery_location, company_name, company_address,
           state, sales_status, sales_remark, ship_to, created_by, duedate, client_delivery_date, approval_status,
           po_number, payment_date, transaction_id, payment_amount, item_name, item_code, specification,
           quantity, unit, price_per_unit, taxable_price, gst, total_price, img_url, customer_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         orderId,
         quote_number,
-        quotationId,
         poFileUrl,
         paymentProofUrl,
         client_name,
@@ -402,15 +363,66 @@ export async function POST(req) {
       }
     }
 
-    // 7. Auto-update pre-bookings for this customer & product/item_code
+    // 7. Auto-update pre-bookings for this customer & product
+    // Match pre-bookings where:
+    // - customer_id matches (from quotation, now saved in neworder)
+    // - product_name matches (from quotation items)
+    // - status is still 'pending'
+    // - delivery date is on or before expected_date
+    // - Update to 'received' if qty matches, or 'partial' if qty is less
     try {
       const deliveryDate = clientDeliveryDate || duedateISO;
-      await syncPreBookingsForOrder(conn, {
-        orderId,
-        quoteNumber: quote_number,
-        customerId: customerIdFromQuotation,
-        deliveryDate,
-      });
+      const customerIdStr = String(customerIdFromQuotation); // Convert to string for matching
+      console.log(`📋 Order ${orderId}: Looking for pre-bookings with customer_id=${customerIdStr}, deliveryDate=${deliveryDate}`);
+
+      // Get first product from quotation to match
+      const [quotationItems] = await conn.execute(
+        `SELECT item_name, quantity FROM quotation_items WHERE quote_number = ? LIMIT 1`,
+        [quote_number]
+      );
+
+      if (quotationItems.length > 0) {
+        const productName = quotationItems[0].item_name;
+        const orderQuantity = Number(quotationItems[0].quantity) || 0;
+        console.log(`📦 Order ${orderId}: Looking for product="${productName}", quantity=${orderQuantity}`);
+
+        // Find matching pre-bookings using customer_id from quotation (convert to string)
+        const [preBookings] = await conn.execute(
+          `SELECT id, expected_date, quantity FROM pre_booking 
+           WHERE customer_id = ? AND product_name = ? AND status = 'pending' AND expected_date IS NOT NULL`,
+          [customerIdStr, productName]
+        );
+
+        console.log(`🔍 Order ${orderId}: Found ${preBookings.length} matching pre-bookings`);
+
+        // Update each matching pre-booking regardless of delivery date
+        // (even if order is processed after expected date, it will still get 'received' status)
+        for (const preBooking of preBookings) {
+          const expectedDate = new Date(preBooking.expected_date);
+          const deliveryDateTime = new Date(deliveryDate);
+          const preBookingQty = Number(preBooking.quantity) || 0;
+          const isLateDelivery = deliveryDateTime > expectedDate;
+
+          console.log(`📅 Pre-booking ${preBooking.id}: Expected=${preBooking.expected_date}, Delivery=${deliveryDate}, IsLate=${isLateDelivery}`);
+
+          // Determine status based on quantity
+          let newStatus = 'received';
+          if (orderQuantity < preBookingQty) {
+            newStatus = 'partial';
+            console.log(`⚠️ Pre-booking ${preBooking.id}: Partial fulfillment (order qty: ${orderQuantity} < pre-booking qty: ${preBookingQty})`);
+          } else {
+            console.log(`✅ Pre-booking ${preBooking.id}: Full fulfillment (order qty: ${orderQuantity} >= pre-booking qty: ${preBookingQty})`);
+          }
+
+          await conn.execute(
+            `UPDATE pre_booking SET status = ?, order_id = ?, received_date = ? WHERE id = ?`,
+            [newStatus, orderId, deliveryDate, preBooking.id]
+          );
+          console.log(`✅ Pre-booking ${preBooking.id} updated to ${newStatus} for order ${orderId}${isLateDelivery ? ' (Late delivery)' : ''}`);
+        }
+      } else {
+        console.log(`⚠️ Order ${orderId}: No quotation items found for quote ${quote_number}`);
+      }
     } catch (preBookingErr) {
       console.error("⚠️ Error updating pre-bookings:", preBookingErr);
       // Don't fail the order creation if pre-booking update fails
@@ -463,14 +475,6 @@ export async function POST(req) {
             params,
           );
         }
-      }
-
-      // 5) Auto-add dispatch rows for accessories marked as "added" (separate dispatch)
-      try {
-        const { seedAddedAccessoryDispatchRows } = await import("@/lib/seedAddedAccessoryDispatch");
-        await seedAddedAccessoryDispatchRows(conn, quote_number, quotationItems);
-      } catch (accessoryDispatchErr) {
-        console.error("⚠️ Error seeding added accessory dispatch rows:", accessoryDispatchErr);
       }
     } else {
       console.log(`⚠️ Dispatch rows already exist for quote: ${quote_number}. Skipping seeding.`);

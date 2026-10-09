@@ -1,6 +1,5 @@
 import { getDbConnection } from "@/lib/db";
 import { NextResponse } from "next/server";
-import { ensureRepListMachineCodeColumn } from "@/lib/ensureRepListMachineCode";
 import { HR_TARGET_ALLOWED_DESIGNATIONS } from "@/lib/designationDedupe";
 
 const ALLOWED_USER_ROLES = new Set([
@@ -30,24 +29,11 @@ const ALLOWED_USER_ROLES = new Set([
   "WELDER HELPER",
   "WAREHOUSE INCHARGE",
   "EA",
-  "MACHINE OPERATOR",
-  "PRODUCTION ENGINEER",
-  "BUSINESS DEVELOPMENT OFFICER",
 ]);
 
 export async function POST(request) {
   try {
-    const {
-      username,
-      email,
-      gender,
-      dob,
-      password,
-      number,
-      userRole,
-      employeeType,
-      machineCode,
-    } = await request.json();
+    const { username, email, gender, dob, password, number, userRole } = await request.json();
 
     // Basic validation
     if (!username || !email || !password ) {
@@ -59,31 +45,12 @@ export async function POST(request) {
       return NextResponse.json({ error: "Invalid user role." }, { status: 400 });
     }
 
-    // Validate employee type
-    const empTypeStr = String(employeeType ?? "").trim();
-    if (!empTypeStr || empTypeStr === "Select Type") {
-      return NextResponse.json({ error: "Please select a valid employee type." }, { status: 400 });
-    }
-
     const conn = await getDbConnection();
-    await ensureRepListMachineCodeColumn(conn);
-    const machineCodeStr = String(machineCode ?? "").trim() || null;
     const query = `
-      INSERT INTO rep_list (username, email, gender, dob, password, number, userRole, employeeType, machine_code, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO rep_list (username, email, gender, dob, password, number, userRole , status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `;
-    const values = [
-      username,
-      email,
-      gender,
-      dob,
-      password,
-      number,
-      roleStr,
-      empTypeStr,
-      machineCodeStr,
-      1,
-    ];
+    const values = [username, email, gender, dob, password, number, roleStr, 1];
     
     const [result] = await conn.execute(query, values);
         // await conn.end();

@@ -14,16 +14,11 @@ export async function getReportees(managerUsername) {
     );
     if (columns.length === 0) return [];
 
-    const manager = String(managerUsername || "").trim();
-    if (!manager) return [];
-
     const [rows] = await conn.execute(
-      `SELECT username FROM rep_list
-       WHERE LOWER(TRIM(COALESCE(reporting_manager, ''))) = LOWER(?)
-         AND (status = 1 OR status IS NULL)`,
-      [manager]
+      `SELECT username FROM rep_list WHERE reporting_manager = ? AND status = 1`,
+      [managerUsername]
     );
-    return rows.map((r) => r.username).filter(Boolean);
+    return rows.map((r) => r.username);
   } catch (e) {
     return [];
   }

@@ -2,8 +2,6 @@ import Link from "next/link";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import UserQuotationsListClient from "./UserQuotationsListClient";
-import { userHasModuleKey } from "@/lib/userModuleAccessServer";
-import { sqlColumnInActiveServiceSupportUsers } from "@/lib/serviceSupportTeamScope";
 
 export const dynamic = "force-dynamic";
 
@@ -31,20 +29,10 @@ async function getQuotations(username, role, { search, date_from, date_to, custo
   let values = [];
 
   // ---------------------------------------------------------
-  // ⭐ SERVICE SUPPORT → all active teammates' quotations (optional customer_id filter)
-  // ---------------------------------------------------------
-  if (role === "SERVICE SUPPORT") {
-    conditions.push(sqlColumnInActiveServiceSupportUsers("qr.emp_name"));
-    if (customer_id) {
-      conditions.push(`qr.customer_id = ?`);
-      values.push(customer_id);
-    }
-  }
-  // ---------------------------------------------------------
   // ⭐ IF customer_id IS PROVIDED → SHOW ALL QUOTATIONS FOR THAT CUSTOMER
   // (Regardless of user role)
   // ---------------------------------------------------------
-  else if (customer_id) {
+  if (customer_id) {
     conditions.push(`qr.customer_id = ?`);
     values.push(customer_id);
   }
@@ -129,7 +117,6 @@ export default async function QuotationPage({ searchParams }) {
   };
 
   const quotations = await getQuotations(username, role, filters);
-  const canPerformaInvoice = await userHasModuleKey(username, role, "performa-invoices");
 
   return (
     <div className="max-w-7xl mx-auto p-6 space-y-4">
@@ -137,26 +124,16 @@ export default async function QuotationPage({ searchParams }) {
         <h1 className="text-2xl font-bold text-gray-800">
           Quotation Management
         </h1>
-        <div className="flex items-center gap-3">
-          <Link
-            href={
-              filters.customer_id
-                ? `/user-dashboard/quotations/new?customerId=${encodeURIComponent(filters.customer_id)}`
-                : "/user-dashboard/quotations/new"
-            }
-            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-center"
-          >
-            + New Quotation
-          </Link>
-          {canPerformaInvoice ? (
-            <Link
-              href="/user-dashboard/invoices/performa"
-              className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 text-center"
-            >
-              Performa Invoice
-            </Link>
-          ) : null}
-        </div>
+        <Link
+          href={
+            filters.customer_id
+              ? `/user-dashboard/quotations/new?customerId=${encodeURIComponent(filters.customer_id)}`
+              : "/user-dashboard/quotations/new"
+          }
+          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-center"
+        >
+          + New Quotation
+        </Link>
       </div>
 
       <form

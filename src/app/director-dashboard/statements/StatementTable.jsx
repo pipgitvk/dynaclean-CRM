@@ -1,6 +1,5 @@
 "use client";
 
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import dayjs from "dayjs";
@@ -886,10 +885,20 @@ export default function StatementTable({ rows }) {
             className="pl-9 pr-4 py-2 border border-gray-200 rounded-lg w-full text-sm focus:ring-2 focus:ring-blue-500/25 focus:border-blue-500 outline-none"
           />
         </div>
-        <TypeableDateFilterInput value={dateFrom} onChange={setDateFrom} className="px-4 py-2 border rounded-lg w-full sm:w-36 text-sm"
-          title="From date"/>
-        <TypeableDateFilterInput value={dateTo} onChange={setDateTo} className="px-4 py-2 border rounded-lg w-full sm:w-36 text-sm"
-          title="To date"/>
+        <input
+          type="date"
+          value={dateFrom}
+          onChange={(e) => setDateFrom(e.target.value)}
+          className="px-4 py-2 border rounded-lg w-full sm:w-36 text-sm"
+          title="From date"
+        />
+        <input
+          type="date"
+          value={dateTo}
+          onChange={(e) => setDateTo(e.target.value)}
+          className="px-4 py-2 border rounded-lg w-full sm:w-36 text-sm"
+          title="To date"
+        />
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}

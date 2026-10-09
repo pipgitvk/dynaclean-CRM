@@ -1,18 +1,13 @@
 "use client";
 
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect, useCallback } from "react";
 import SummaryBox from "@/components/SummaryBox";
 import Modal from "@/components/ModalUser";
 import { Search, ArrowLeft } from "lucide-react";
 import dayjs from "dayjs";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { getDirectorDashboardHome } from "@/lib/directorHrPaths";
 
 export default function HrTodayReportPage() {
-  const pathname = usePathname();
-  const dashboardHome = getDirectorDashboardHome(pathname);
   const [data, setData] = useState({
     entries: [],
     stats: {
@@ -143,7 +138,7 @@ export default function HrTodayReportPage() {
   return (
     <div className="container mx-auto p-4 sm:p-6 lg:p-8 space-y-8">
       <div className="flex items-center gap-4 border-b-2 pb-2">
-        <Link href={dashboardHome} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+        <Link href="/user-dashboard" className="p-2 hover:bg-gray-100 rounded-full transition-colors">
           <ArrowLeft size={24} />
         </Link>
         <h1 className="text-3xl font-bold text-gray-800">
@@ -185,9 +180,19 @@ export default function HrTodayReportPage() {
           </div>
           {/* Custom Date Picker */}
           <div className="flex flex-col sm:flex-row items-center gap-2">
-            <TypeableDateFilterInput value={customFromDate} onChange={setCustomFromDate} className="px-3 py-2 border rounded-lg text-sm w-full sm:w-auto"/>
+            <input
+              type="date"
+              value={customFromDate}
+              onChange={(e) => setCustomFromDate(e.target.value)}
+              className="px-3 py-2 border rounded-lg text-sm w-full sm:w-auto"
+            />
             <span className="text-gray-500 hidden sm:block">to</span>
-            <TypeableDateFilterInput value={customToDate} onChange={setCustomToDate} className="px-3 py-2 border rounded-lg text-sm w-full sm:w-auto"/>
+            <input
+              type="date"
+              value={customToDate}
+              onChange={(e) => setCustomToDate(e.target.value)}
+              className="px-3 py-2 border rounded-lg text-sm w-full sm:w-auto"
+            />
             <button
               onClick={() => {
                 if (customFromDate && customToDate) {

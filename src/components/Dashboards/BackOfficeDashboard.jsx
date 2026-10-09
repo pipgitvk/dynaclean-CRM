@@ -7,9 +7,8 @@ import UpcomingLeads from "@/components/Leads/UpcommingLeads";
 import FastCardsWidget from "@/components/FastCardsWidget";
 import TodayReportButton from "@/components/TodayReportButton";
 import LeaveApprovalButton from "@/components/LeaveApprovalButton";
-import ScheduleVisitCard from "@/components/scheduleVisit/ScheduleVisitCard";
 
-export default function BackOfficeDashboard({ user, reportingManager }) {
+export default function BackOfficeDashboard({ user }) {
   return (
     <div className="space-y-4 md:space-y-6">
 
@@ -26,19 +25,13 @@ export default function BackOfficeDashboard({ user, reportingManager }) {
                   Welcome, <span className="text-green-700">{user.username}</span>
                 </h1>
                 <p className="text-gray-500 text-sm">Role: {user.userRole}</p>
-                {reportingManager && (
-                  <p className="text-gray-500 text-sm">
-                    Reporting Manager: {reportingManager}
-                  </p>
-                )}
               </div>
             </div>
 
             {/* Buttons row - separate on mobile */}
-            <div className="flex flex-row gap-2 justify-start sm:justify-end flex-wrap">
+            <div className="flex flex-row gap-2 justify-start sm:justify-end">
               <TodayReportButton />
               <LeaveApprovalButton />
-              <ScheduleVisitCard variant="sales" href="/user-dashboard/schedule-visits" />
             </div>
 
             {/* Fast Cards */}

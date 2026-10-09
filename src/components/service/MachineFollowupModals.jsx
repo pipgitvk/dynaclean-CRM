@@ -52,8 +52,6 @@ export function FollowUpModal({ fu, onClose, onSaved, allowEditIdentity = false 
     notes: "",
     next_followup_date: "",
     image: null,
-    contact_mode: fu.contact_mode || "",
-    purpose: fu.purpose || "",
   });
   const [submitting, setSubmitting] = useState(false);
 
@@ -92,8 +90,6 @@ export function FollowUpModal({ fu, onClose, onSaved, allowEditIdentity = false 
     fd.append("product_model", form.product_model);
     fd.append("contact", form.contact);
     fd.append("followed_at", form.followed_at);
-    fd.append("contact_mode", form.contact_mode);
-    fd.append("purpose", form.purpose);
     fd.append("notes", form.notes);
     fd.append("next_followup_date", form.next_followup_date);
     if (form.image) fd.append("image", form.image);
@@ -236,41 +232,6 @@ export function FollowUpModal({ fu, onClose, onSaved, allowEditIdentity = false 
               onChange={set("followed_at")}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Contact Mode *</label>
-            <select
-              value={form.contact_mode}
-              onChange={set("contact_mode")}
-              required
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">Select contact mode...</option>
-              <option value="Call">Call</option>
-              <option value="Email">Email</option>
-              <option value="WhatsApp">WhatsApp</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Purpose *</label>
-            <select
-              value={form.purpose}
-              onChange={set("purpose")}
-              required
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">Select purpose...</option>
-              <option value="Feedback">Feedback</option>
-              <option value="Service">Service</option>
-              <option value="Complaint">Complaint</option>
-              <option value="Installation">Installation</option>
-              <option value="Preventive Maintenance">Preventive Maintenance</option>
-              <option value="AMC">AMC</option>
-              <option value="Spare Parts">Spare Parts</option>
-              <option value="Consumables">Consumables</option>
-            </select>
           </div>
 
           <div>

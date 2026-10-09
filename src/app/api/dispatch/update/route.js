@@ -1,13 +1,6 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
-import { deductCheckedAccessoryStock } from "@/lib/deductAccessoryStock";
-import { isSpare1110 } from "@/lib/isSpare1110";
-import {
-  getGodownLocationColumn,
-  isDelhiGodown,
-  pickRowColumn,
-} from "@/lib/godownStock";
 import { v2 as cloudinary } from "cloudinary";
 
 cloudinary.config({
@@ -28,19 +21,6 @@ async function uploadPhotoToCloudinary(file) {
   return result.secure_url;
 }
 
-async function ensureAccessoriesStockDeductedColumn(conn) {
-  const [cols] = await conn.execute(
-    `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
-     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'dispatch' AND COLUMN_NAME = 'accessories_stock_deducted'`,
-  );
-  if (cols.length === 0) {
-    await conn.execute(
-      `ALTER TABLE dispatch ADD COLUMN accessories_stock_deducted TINYINT(1) NOT NULL DEFAULT 0
-       COMMENT '1 = accessory spare stock deducted for this dispatch row' AFTER stock_deducted`,
-    );
-  }
-}
-
 export async function POST(req) {
   try {
     const tokenPayload = await getSessionPayload();
@@ -48,8 +28,7 @@ export async function POST(req) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const role = tokenPayload.role;
     const username = tokenPayload.username;
-    const roleUpperUpdate = String(role).toUpperCase();
-    if (!["WAREHOUSE INCHARGE", "ADMIN"].includes(roleUpperUpdate)) {
+    if (role !== "warehouse incharge" && role !== "WAREHOUSE INCHARGE") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -79,19 +58,16 @@ export async function POST(req) {
     }
 
     const conn = await getDbConnection();
-    await ensureAccessoriesStockDeductedColumn(conn);
 
-    // Retrieve previous photos and deduction flags
+    // Retrieve previous photos and check if stock already deducted
     const [rows] = await conn.execute(
-      `SELECT photos, stock_deducted, accessories_stock_deducted FROM dispatch WHERE id = ?`,
-      [id],
+      `SELECT photos, stock_deducted FROM dispatch WHERE id = ?`,
+      [id]
     );
     const prevPhotos =
       rows && rows[0] && rows[0].photos ? rows[0].photos : null;
     const stockAlreadyDeducted =
       rows && rows[0] && rows[0].stock_deducted === 1;
-    const accessoriesStockAlreadyDeducted =
-      rows && rows[0] && rows[0].accessories_stock_deducted === 1;
 
     let newPhotos = null;
     if (photoUrls.length) {
@@ -138,33 +114,12 @@ export async function POST(req) {
     );
 
     const orderRow = orderRows[0];
-    const orderNumber = orderRow?.order_id;
-
-    const [quoteMetaRows] = await conn.execute(
-      `SELECT company_name, company_address FROM quotations_records WHERE quote_number = ?`,
-      [quoteNumber],
-    );
-    const companyName =
-      quoteMetaRows && quoteMetaRows[0] ? quoteMetaRows[0].company_name : null;
-    const companyAddress =
-      quoteMetaRows && quoteMetaRows[0]
-        ? quoteMetaRows[0].company_address
-        : null;
-
-    const isProduct = /[a-zA-Z]/.test(itemCode);
-    const [spareMetaRows] = await conn.execute(
-      `SELECT id, spare_number FROM spare_list
-       WHERE CAST(spare_number AS CHAR) = ? OR CAST(id AS CHAR) = ?
-       LIMIT 1`,
-      [String(dispatchRow.item_code), String(dispatchRow.item_code)],
-    );
-    const skipStockDeduction = isSpare1110(
-      dispatchRow.item_code,
-      spareMetaRows[0]?.spare_number,
-    );
+    const orderNumber = orderRow.order_id;
 
     // STEP 1: Validate and update dispatch details FIRST (this checks serial_no uniqueness)
+    // This ensures we don't deduct stock if there's a duplicate serial number error
     if (stockAlreadyDeducted) {
+      // If stock already deducted, only update dispatch details
       await conn.execute(
         `UPDATE dispatch SET serial_no = ?, remarks = ?, photos = ?, accessories_checklist = ?, updated_at = NOW() WHERE id = ?`,
         [
@@ -173,40 +128,8 @@ export async function POST(req) {
           newPhotos ?? null,
           accessoriesChecklist ?? null,
           id,
-        ],
+        ]
       );
-
-      // Product stock already deducted — still deduct accessory stock if pending
-      if (
-        !accessoriesStockAlreadyDeducted &&
-        accessoriesChecklist &&
-        isProduct
-      ) {
-        const accessoryResult = await deductCheckedAccessoryStock(conn, {
-          accessoriesChecklistJson: accessoriesChecklist,
-          productCode: itemCode,
-          godown,
-          quoteNumber,
-          orderNumber,
-          username,
-          dispatchRowId: id,
-          companyName,
-          companyAddress,
-          partial: true,
-        });
-
-        await conn.execute(
-          `UPDATE dispatch SET accessories_stock_deducted = 1, updated_at = NOW() WHERE id = ?`,
-          [id],
-        );
-
-        return NextResponse.json({
-          success: true,
-          note: "Accessory stock deducted",
-          accessories_deducted: accessoryResult.deducted,
-        });
-      }
-
       return NextResponse.json({
         success: true,
         note: "Stock already deducted, only updated dispatch details",
@@ -226,18 +149,6 @@ export async function POST(req) {
       ]
     );
 
-    if (skipStockDeduction) {
-      await conn.execute(
-        `UPDATE dispatch SET stock_deducted = 1, updated_at = NOW() WHERE id = ?`,
-        [id],
-      );
-
-      return NextResponse.json({
-        success: true,
-        note: "Spare 1110 saved without stock deduction",
-      });
-    }
-
     // STEP 2: If we reach here, serial_no is valid. Now proceed with stock deduction
     // Determine item info from quotation
     // Note: Each dispatch row represents ONE item, so quantity is always 1
@@ -246,9 +157,9 @@ export async function POST(req) {
       [quoteNumber, itemCode]
     );
 
-    const [quoteMetaRowsFull] = await conn.execute(
+    const [quoteMetaRows] = await conn.execute(
       `SELECT company_name, company_address, gstin FROM quotations_records WHERE quote_number = ?`,
-      [quoteNumber],
+      [quoteNumber]
     );
 
     if (!itemRows || !itemRows[0]) {
@@ -260,13 +171,20 @@ export async function POST(req) {
 
     const { total_price, hsn_sac } = itemRows[0];
     const quantity = 1; // Each dispatch row is for ONE item
-    const gstin =
-      quoteMetaRowsFull && quoteMetaRowsFull[0]
-        ? quoteMetaRowsFull[0].gstin
+    const companyName =
+      quoteMetaRows && quoteMetaRows[0] ? quoteMetaRows[0].company_name : null;
+    const companyAddress =
+      quoteMetaRows && quoteMetaRows[0]
+        ? quoteMetaRows[0].company_address
         : null;
+    const gstin =
+      quoteMetaRows && quoteMetaRows[0] ? quoteMetaRows[0].gstin : null;
 
-    const locationColumn = getGodownLocationColumn(godown);
-    const isDelhi = isDelhiGodown(godown);
+    const locationColumn = godown === "Delhi - Mundka" ? "Delhi" : "South";
+    const locationColumnLower = godown === "Delhi - Mundka" ? "delhi" : "south";
+
+    // Reduce stock now based on whether item is product or spare
+    const isProduct = /[a-zA-Z]/.test(itemCode);
 
     if (isProduct) {
       const [rows] = await conn.execute(
@@ -277,19 +195,17 @@ export async function POST(req) {
 
       let totalDB = 0;
       let locationDB = 0;
-      let delhiDB = 0;
-      let southDB = 0;
       if (rows.length > 0) {
-        totalDB = Number(rows[0].total_quantity || 0);
-        locationDB = pickRowColumn(rows[0], locationColumn);
-        delhiDB = pickRowColumn(rows[0], "Delhi");
-        southDB = pickRowColumn(rows[0], "South");
+        totalDB = rows[0].total_quantity;
+        locationDB = rows[0][locationColumn];
       }
 
-      const newLocationStock = locationDB - quantity;
+      let newLocationStock = locationDB - quantity;
       const totalD = totalDB - quantity;
-      const delhiD = isDelhi ? newLocationStock : delhiDB;
-      const southD = isDelhi ? southDB : newLocationStock;
+
+      // Calculate both delhi and south for the INSERT (lowercase for product_stock table)
+      let delhiD = locationColumnLower === "delhi" ? newLocationStock : locationDB;
+      let southD = locationColumnLower === "south" ? newLocationStock : locationDB;
 
       await conn.execute(
         `INSERT INTO product_stock
@@ -322,9 +238,9 @@ export async function POST(req) {
         [itemCode]
       );
       if (summary.length > 0) {
-        const prevTotal = Number(summary[0].total_quantity || 0);
+        const prevTotal = summary[0].total_quantity;
         const newTotal = Math.max(prevTotal - quantity, 0);
-        const prev = pickRowColumn(summary[0], locationColumn);
+        const prev = summary[0][locationColumn];
         const newv = Math.max(prev - quantity, 0);
         await conn.execute(
           `UPDATE product_stock_summary 
@@ -336,25 +252,23 @@ export async function POST(req) {
     } else {
       // Verify the spare_id actually exists in spare_list before inserting into stock_list
       const [spareCheck] = await conn.execute(
-        `SELECT id, spare_number FROM spare_list
-         WHERE CAST(spare_number AS CHAR) = ? OR CAST(id AS CHAR) = ?
-         LIMIT 1`,
-        [String(itemCode), String(itemCode)],
+        `SELECT id FROM spare_list WHERE id = ? LIMIT 1`,
+        [itemCode]
       );
 
       if (spareCheck.length === 0) {
-        // spare not found in spare_list — could be a product with a numeric code
+        // spare_id not found in spare_list — could be a product with a numeric code
         // Fall back to product_stock deduction using item_name lookup
-        console.warn(`spare ${itemCode} not found in spare_list. Attempting product stock fallback.`);
+        console.warn(`spare_id ${itemCode} not found in spare_list. Attempting product stock fallback.`);
 
         const [productFallback] = await conn.execute(
-          `SELECT item_code FROM products_list WHERE item_name LIKE ? LIMIT 1`,
+          `SELECT product_code FROM products_list WHERE item_name LIKE ? LIMIT 1`,
           [`%${dispatchRow.item_name}%`]
         );
 
         if (productFallback.length > 0) {
-          const fallbackCode = productFallback[0].item_code;
-          console.log(`Fallback item_code found: ${fallbackCode} for item: ${dispatchRow.item_name}`);
+          const fallbackCode = productFallback[0].product_code;
+          console.log(`Fallback product_code found: ${fallbackCode} for item: ${dispatchRow.item_name}`);
 
           const [fallbackStock] = await conn.execute(
             `SELECT total_quantity, ${locationColumn} FROM product_stock_summary WHERE product_code = ?`,
@@ -363,19 +277,15 @@ export async function POST(req) {
 
           let totalDB = 0;
           let locationDB = 0;
-          let delhiDB = 0;
-          let southDB = 0;
           if (fallbackStock.length > 0) {
-            totalDB = Number(fallbackStock[0].total_quantity || 0);
-            locationDB = pickRowColumn(fallbackStock[0], locationColumn);
-            delhiDB = pickRowColumn(fallbackStock[0], "Delhi");
-            southDB = pickRowColumn(fallbackStock[0], "South");
+            totalDB = fallbackStock[0].total_quantity;
+            locationDB = fallbackStock[0][locationColumn];
           }
 
           const newLocationStock = locationDB - quantity;
           const totalD = totalDB - quantity;
-          const delhiD = isDelhi ? newLocationStock : delhiDB;
-          const southD = isDelhi ? southDB : newLocationStock;
+          const delhiD = locationColumnLower === "delhi" ? newLocationStock : locationDB;
+          const southD = locationColumnLower === "south" ? newLocationStock : locationDB;
 
           await conn.execute(
             `INSERT INTO product_stock
@@ -404,9 +314,9 @@ export async function POST(req) {
           );
 
           if (fallbackStock.length > 0) {
-            const prevTotal = Number(fallbackStock[0].total_quantity || 0);
+            const prevTotal = fallbackStock[0].total_quantity;
             const newTotal = Math.max(prevTotal - quantity, 0);
-            const prev = pickRowColumn(fallbackStock[0], locationColumn);
+            const prev = fallbackStock[0][locationColumn];
             const newv = Math.max(prev - quantity, 0);
             await conn.execute(
               `UPDATE product_stock_summary 
@@ -420,36 +330,33 @@ export async function POST(req) {
           console.warn(`No product or spare found for item_code=${itemCode}, item_name=${dispatchRow.item_name}. Skipping stock deduction.`);
         }
       } else {
-        // spare exists — proceed normally
-        const spareId = spareCheck[0].id;
+        // spare_id exists — proceed normally
         const [rows] = await conn.execute(
           `SELECT total_quantity, ${locationColumn} FROM stock_summary
            WHERE spare_id = ?`,
-          [spareId]
+          [itemCode]
         );
 
         let totalDB = 0;
         let locationDB = 0;
-        let delhiDB = 0;
-        let southDB = 0;
         if (rows.length > 0) {
-          totalDB = Number(rows[0].total_quantity || 0);
-          locationDB = pickRowColumn(rows[0], locationColumn);
-          delhiDB = pickRowColumn(rows[0], "Delhi");
-          southDB = pickRowColumn(rows[0], "South");
+          totalDB = rows[0].total_quantity;
+          locationDB = rows[0][locationColumn];
         }
 
-        const newLocationStock = locationDB - quantity;
+        let newLocationStock = locationDB - quantity;
         const totalD = totalDB - quantity;
-        const delhiD = isDelhi ? newLocationStock : delhiDB;
-        const southD = isDelhi ? southDB : newLocationStock;
+
+        // Calculate both delhi and south for the INSERT (lowercase for stock_list table)
+        let delhiD = locationColumnLower === "delhi" ? newLocationStock : locationDB;
+        let southD = locationColumnLower === "south" ? newLocationStock : locationDB;
 
         await conn.execute(
           `INSERT INTO stock_list
             (spare_id, quantity, amount_per_unit, net_amount, note, location, stock_status, to_company, delivery_address, quotation_id, order_id, added_by, godown, total, delhi, south)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
-            spareId,
+            itemCode,
             quantity,
             total_price,
             total_price,
@@ -470,49 +377,27 @@ export async function POST(req) {
 
         const [summary] = await conn.execute(
           `SELECT total_quantity, ${locationColumn} FROM stock_summary WHERE spare_id = ?`,
-          [spareId]
+          [itemCode]
         );
         if (summary.length > 0) {
-          const prevTotal = Number(summary[0].total_quantity || 0);
+          const prevTotal = summary[0].total_quantity;
           const newTotal = Math.max(prevTotal - quantity, 0);
-          const prev = pickRowColumn(summary[0], locationColumn);
+          const prev = summary[0][locationColumn];
           const newv = Math.max(prev - quantity, 0);
           await conn.execute(
             `UPDATE stock_summary 
               SET last_updated_quantity = ?, total_quantity = ?, last_status = ?, updated_at = NOW(), ${locationColumn} = ?
               WHERE spare_id = ?`,
-            [quantity, newTotal, "OUT", newv, spareId]
+            [quantity, newTotal, "OUT", newv, itemCode]
           );
         }
       }
     }
 
-    // Deduct spare stock for checked product accessories (by product_accessories.qty)
-    if (isProduct && accessoriesChecklist) {
-      const accessoryResult = await deductCheckedAccessoryStock(conn, {
-        accessoriesChecklistJson: accessoriesChecklist,
-        productCode: itemCode,
-        godown,
-        quoteNumber,
-        orderNumber,
-        username,
-        dispatchRowId: id,
-        companyName,
-        companyAddress,
-        partial: true,
-      });
-      if (accessoryResult.deducted.length > 0) {
-        console.log(
-          `Accessory stock deducted for dispatch #${id}:`,
-          accessoryResult.deducted,
-        );
-      }
-    }
-
     // STEP 3: Mark stock as deducted (dispatch details already updated in STEP 1)
     await conn.execute(
-      `UPDATE dispatch SET stock_deducted = 1, accessories_stock_deducted = ?, updated_at = NOW() WHERE id = ?`,
-      [accessoriesChecklist && isProduct ? 1 : 0, id],
+      `UPDATE dispatch SET stock_deducted = 1, updated_at = NOW() WHERE id = ?`,
+      [id]
     );
 
     // Send dispatch update email

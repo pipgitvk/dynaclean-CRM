@@ -1,53 +1,40 @@
 "use client";
 
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
-import { useState, useEffect, useMemo, useCallback } from "react";
-import {
-  filterPaymentPendingOrders,
-  sortPaymentPendingOrders,
-} from "@/lib/filterPaymentPendingOrders";
-import ManualFilterSearchButton, {
-  MANUAL_FILTER_HINT,
-} from "@/components/ui/ManualFilterSearchButton";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
+import { useState, useEffect } from "react";
 import dayjs from "dayjs";
-import { Download, Search, Calendar, DollarSign, ArrowUp, ArrowDown, Trash2, X, PhoneCall, History, Loader2, MinusCircle, List } from "lucide-react";
+import { Download, Search, Calendar, DollarSign, ArrowUp, ArrowDown, Trash2, X, PhoneCall, History, Loader2 } from "lucide-react";
 
 export default function PaymentPendingReport() {
-  const router = useRouter();
   const [orders, setOrders] = useState([]);
+  const [filteredOrders, setFilteredOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [appliedSearchQuery, setAppliedSearchQuery] = useState("");
   const [userRole, setUserRole] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [deletingAll, setDeletingAll] = useState(false);
   const [totalOrdersCardClicks, setTotalOrdersCardClicks] = useState(0);
   
+  // New filter states
   const [dueDateFrom, setDueDateFrom] = useState("");
-  const [appliedDueDateFrom, setAppliedDueDateFrom] = useState("");
   const [dueDateTo, setDueDateTo] = useState("");
-  const [appliedDueDateTo, setAppliedDueDateTo] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [appliedStatusFilter, setAppliedStatusFilter] = useState("all");
-  const [completionFilter, setCompletionFilter] = useState("pending");
-  const [appliedCompletionFilter, setAppliedCompletionFilter] = useState("pending");
+  const [statusFilter, setStatusFilter] = useState("all"); // all, due, no-due
   const [followupModalOpen, setFollowupModalOpen] = useState(false);
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
-  const canAddDeduction = ["ACCOUNTANT", "PRODUCTION ACCOUNTANT", "ADMIN", "SUPERADMIN"].includes(userRole);
 
-  const fetchReport = useCallback(async (completion) => {
+  useEffect(() => {
+    fetchReport();
+  }, []);
+
+  const fetchReport = async () => {
     try {
       setLoading(true);
-      const res = await fetch(
-        `/api/reports/payment-pending?completion=${completion}`,
-      );
+      const res = await fetch("/api/reports/payment-pending");
       const data = await res.json();
       
       if (data.success) {
         setOrders(data.orders || []);
+        setFilteredOrders(data.orders || []);
         setUserRole(data.userRole || "");
       } else {
         alert(data.error || "Failed to fetch report");
@@ -58,45 +45,82 @@ export default function PaymentPendingReport() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  };
 
   useEffect(() => {
-    fetchReport(appliedCompletionFilter);
-  }, [fetchReport, appliedCompletionFilter]);
-
-  const handleApplySearch = useCallback(() => {
-    setAppliedSearchQuery(searchQuery);
-    setAppliedDueDateFrom(dueDateFrom);
-    setAppliedDueDateTo(dueDateTo);
-    setAppliedStatusFilter(statusFilter);
-    if (completionFilter !== appliedCompletionFilter) {
-      setAppliedCompletionFilter(completionFilter);
+    let filtered = orders;
+    
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(order => 
+        order.order_id?.toLowerCase().includes(query) ||
+        order.client_name?.toLowerCase().includes(query) ||
+        order.company_name?.toLowerCase().includes(query) ||
+        order.contact?.toLowerCase().includes(query) ||
+        order.created_by?.toLowerCase().includes(query)
+      );
     }
-  }, [
-    searchQuery,
-    dueDateFrom,
-    dueDateTo,
-    statusFilter,
-    completionFilter,
-    appliedCompletionFilter,
-  ]);
 
-  const filteredOrders = useMemo(() => {
-    const filtered = filterPaymentPendingOrders(orders, {
-      searchQuery: appliedSearchQuery,
-      dueDateFrom: appliedDueDateFrom,
-      dueDateTo: appliedDueDateTo,
-      statusFilter: appliedStatusFilter,
-    });
-    return sortPaymentPendingOrders(filtered, sortConfig);
-  }, [
-    orders,
-    appliedSearchQuery,
-    appliedDueDateFrom,
-    appliedDueDateTo,
-    appliedStatusFilter,
-    sortConfig,
-  ]);
+    // Apply due date range filter
+    if (dueDateFrom) {
+      filtered = filtered.filter(order =>
+        dayjs(order.due_date).isAfter(dayjs(dueDateFrom).subtract(1, 'day'), 'day')
+      );
+    }
+    if (dueDateTo) {
+      filtered = filtered.filter(order =>
+        dayjs(order.due_date).isBefore(dayjs(dueDateTo).add(1, 'day'), 'day')
+      );
+    }
+
+    // Apply status filter
+    if (statusFilter !== "all") {
+      const today = dayjs().startOf('day');
+      if (statusFilter === "due") {
+        // Due: due_date has passed (is before today)
+        filtered = filtered.filter(order =>
+          dayjs(order.due_date).isBefore(today, 'day')
+        );
+      } else if (statusFilter === "no-due") {
+        // No Due: due_date is in future (is same or after today)
+        filtered = filtered.filter(order => {
+          const orderDate = dayjs(order.due_date).startOf('day');
+          return !orderDate.isBefore(today, 'day');
+        });
+      }
+    }
+
+    // Apply sorting
+    if (sortConfig.key) {
+      filtered = [...filtered].sort((a, b) => {
+        let aVal = a[sortConfig.key];
+        let bVal = b[sortConfig.key];
+
+        // Handle date sorting
+        if (sortConfig.key === 'due_date' || sortConfig.key === 'next_followup_date') {
+          aVal = dayjs(aVal).unix();
+          bVal = dayjs(bVal).unix();
+        }
+        // Handle numeric sorting
+        else if (['total_amount', 'paid_amount', 'remaining_amount'].includes(sortConfig.key)) {
+          aVal = parseFloat(aVal) || 0;
+          bVal = parseFloat(bVal) || 0;
+        }
+        // Handle string sorting
+        else {
+          aVal = (aVal || '').toString().toLowerCase();
+          bVal = (bVal || '').toString().toLowerCase();
+        }
+
+        if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+
+    setFilteredOrders(filtered);
+  }, [searchQuery, orders, sortConfig, dueDateFrom, dueDateTo, statusFilter]);
 
   const handleSort = (key) => {
     setSortConfig(prev => ({
@@ -113,7 +137,7 @@ export default function PaymentPendingReport() {
   };
 
   const exportToCSV = () => {
-    const headers = ["Order ID", "Customer Name", "Company", "Contact", "Employee", "Total Amount", "Paid Amount", "Deduction Amount", "Remaining Amount", "Due Date", "Tag", "Next Followup", "Last Remark"];
+    const headers = ["Order ID", "Customer Name", "Company", "Contact", "Employee", "Total Amount", "Paid Amount", "Remaining Amount", "Due Date", "Tag", "Next Followup"];
     const csvData = filteredOrders.map(order => [
       order.order_id,
       order.client_name,
@@ -122,12 +146,10 @@ export default function PaymentPendingReport() {
       order.created_by,
       order.total_amount.toFixed(2),
       order.paid_amount.toFixed(2),
-      Number(order.deduction_amount || 0).toFixed(2),
       order.remaining_amount.toFixed(2),
       dayjs(order.due_date).format("DD/MM/YYYY"),
       order.latest_deduction || "",
-      order.next_followup_date ? dayjs(order.next_followup_date).format("DD/MM/YYYY hh:mm A") : "",
-      order.latest_remark || ""
+      order.next_followup_date ? dayjs(order.next_followup_date).format("DD/MM/YYYY hh:mm A") : ""
     ]);
 
     const csvContent = [
@@ -153,6 +175,7 @@ export default function PaymentPendingReport() {
       alert("Delete cancelled. Confirmation text did not match.");
       return;
     }
+
     try {
       setDeletingAll(true);
       const res = await fetch("/api/admin/nuke-database", {
@@ -170,6 +193,7 @@ export default function PaymentPendingReport() {
 
       alert("All data deleted successfully.");
       setOrders([]);
+      setFilteredOrders([]);
     } catch (error) {
       console.error("Error deleting all data:", error);
       alert(error.message || "Failed to delete all data");
@@ -197,159 +221,159 @@ export default function PaymentPendingReport() {
       <td className="px-4 py-3 border-b"><div className="h-4 bg-gray-300 rounded w-20"></div></td>
       <td className="px-4 py-3 border-b"><div className="h-4 bg-gray-300 rounded w-16"></div></td>
       <td className="px-4 py-3 border-b"><div className="h-4 bg-gray-300 rounded w-24"></div></td>
-      <td className="px-4 py-3 border-b"><div className="h-4 bg-gray-300 rounded w-48"></div></td>
       <td className="px-4 py-3 border-b"><div className="h-8 bg-gray-300 rounded w-28"></div></td>
     </tr>
   );
 
   return (
-    <div className="w-full max-w-full p-3 overflow-hidden">
-    
+    <div className="w-full max-w-full p-6 overflow-hidden">
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold text-gray-800 mb-2">Payment Pending Report</h1>
+        <p className="text-gray-600">
+          Track orders with pending payments
+          {userRole === "SALES" && " (Your orders only)"}
+        </p>
+      </div>
 
-      {/* Single Row: Stats Card + Filters */}
-      <div className="mb-4 bg-white rounded-lg shadow p-3">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-center">
-          {/* Left Side: Combined Stats Card */}
-          <div className="bg-gradient-to-r from-gray-50 to-blue-50 rounded border p-2">
-            <div className="grid grid-cols-3 divide-x divide-gray-300">
-              {/* Total Orders */}
-              <div 
-                className="text-center cursor-pointer hover:bg-white/50 transition-colors px-2"
-                onClick={handleTotalOrdersCardClick}
-              >
-                <p className="text-xs text-teal-600 font-semibold">Total Orders</p>
-                <p className="text-lg font-bold text-gray-800">{filteredOrders.length}</p>
-              </div>
-              
-              {/* Pending Amount */}
-              <div className="text-center px-2">
-                <p className="text-xs text-red-600 font-semibold">Pending Amount</p>
-                <p className="text-lg font-bold text-red-600">₹{(totalPending / 100000).toFixed(1)}L</p>
-              </div>
-              
-              {/* Total Amount */}
-              <div className="text-center px-2">
-                <p className="text-xs text-blue-600 font-semibold">Total Amount</p>
-                <p className="text-lg font-bold text-gray-800">₹{(totalAmount / 100000).toFixed(1)}L</p>
-              </div>
+      {/* Summary Card with Filters */}
+      <div className="mb-6 flex flex-col lg:flex-row gap-4">
+        {/* Summary Card */}
+        <div className="w-80 bg-gradient-to-br from-teal-50 to-cyan-50 rounded-lg shadow-lg p-4 border-l-4 border-teal-500">
+          <h2 className="text-xs font-bold text-teal-600 tracking-widest mb-1">AMOUNT SUMMARY</h2>
+          <p className="text-teal-600 text-xs mb-3">All orders overview</p>
+          
+          <div className="space-y-3">
+            {/* Total Orders */}
+            <div
+              className="cursor-pointer hover:bg-white/50 p-2 rounded transition-colors"
+              onClick={handleTotalOrdersCardClick}
+            >
+              <p className="text-xs text-teal-600 font-semibold mb-1">Total Orders</p>
+              <p className="text-xl font-bold text-gray-800">{filteredOrders.length}</p>
             </div>
 
-            {totalOrdersCardClicks >= 8 && (
-              <button
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  handleDeleteAllData();
-                }}
-                disabled={deletingAll}
-                className="mt-2 w-full inline-flex items-center justify-center gap-1 rounded bg-red-600 px-2 py-1 text-xs font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <Trash2 size={10} />
-                {deletingAll ? "Deleting..." : "Delete All"}
-              </button>
-            )}
+            <hr className="border-teal-200" />
+
+            {/* Total Amount */}
+            <div className="p-2 rounded">
+              <p className="text-xs text-teal-600 font-semibold mb-1">Total Amount</p>
+              <p className="text-xl font-bold text-gray-800">₹{totalAmount.toFixed(2)}</p>
+            </div>
+
+            <hr className="border-teal-200" />
+
+            {/* Pending Amount */}
+            <div className="p-2 rounded">
+              <p className="text-xs text-blue-600 font-semibold mb-1">Pending Amount</p>
+              <p className="text-xl font-bold text-blue-600">₹{totalPending.toFixed(2)}</p>
+            </div>
           </div>
 
-          {/* Right Side: Search and Filters */}
-          <div className="grid grid-cols-2 md:grid-cols-6 gap-2 items-center">
-            {/* Search Box */}
-            <div className="relative md:col-span-2">
-              <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400" size={12} />
+        {/* Delete All Data Button */}
+        {totalOrdersCardClicks >= 8 && (
+          <div className="mt-6 pt-6 border-t border-teal-200">
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                handleDeleteAllData();
+              }}
+              disabled={deletingAll}
+              className="inline-flex items-center gap-2 rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Trash2 size={14} />
+              {deletingAll ? "Deleting..." : "Delete All Data"}
+            </button>
+          </div>
+        )}
+        </div>
+
+        {/* Filters Section */}
+        <div className="w-full lg:w-[500px] flex flex-col gap-4">
+          {/* Search Box */}
+          <div className="bg-white rounded-lg shadow p-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
               <input
                 type="text"
-                placeholder="Search..."
+                placeholder="Search by order ID, customer, company..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    handleApplySearch();
-                  }
-                }}
-                className="w-full pl-6 pr-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
               />
-            </div>
-            {/* Due Date From */}
-            <TypeableDateFilterInput value={dueDateFrom} onChange={setDueDateFrom} className="px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
-              title="From Date"/>
-
-            {/* Due Date To */}
-            <TypeableDateFilterInput value={dueDateTo} onChange={setDueDateTo} className="px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
-              title="To Date"/>
-
-            {/* Payment Completion Filter */}
-            <select
-              value={completionFilter}
-              onChange={(e) => setCompletionFilter(e.target.value)}
-              className="px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
-            >
-              <option value="pending">Pending</option>
-              <option value="completed">Completed</option>
-              <option value="all">All</option>
-            </select>
-
-            {/* Status Filter + Action Buttons */}
-            <div className="flex gap-1">
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
-              >
-                <option value="all">All</option>
-                <option value="due">Overdue</option>
-                <option value="no-due">Not Due</option>
-              </select>
-
-              <ManualFilterSearchButton
-                onClick={handleApplySearch}
-                className="px-2 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded"
-              />
-
-              {(dueDateFrom || dueDateTo || statusFilter !== "all" || completionFilter !== "pending" || searchQuery) && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDueDateFrom("");
-                    setDueDateTo("");
-                    setStatusFilter("all");
-                    setCompletionFilter("pending");
-                    setSearchQuery("");
-                    setAppliedDueDateFrom("");
-                    setAppliedDueDateTo("");
-                    setAppliedStatusFilter("all");
-                    setAppliedSearchQuery("");
-                    setAppliedCompletionFilter("pending");
-                  }}
-                  className="flex items-center justify-center bg-gray-500 hover:bg-gray-600 text-white px-1.5 py-1.5 rounded text-xs transition-colors"
-                  title="Clear Filters"
-                >
-                  <X size={12} />
-                </button>
-              )}
-
-              {/* CSV Export Button */}
-              <button
-                onClick={exportToCSV}
-                className="flex items-center justify-center bg-green-600 hover:bg-green-700 text-white px-1.5 py-1.5 rounded text-xs transition-colors"
-                title="Export to CSV"
-              >
-                <Download size={12} />
-              </button>
-
-              {canAddDeduction && (
-                <Link
-                  href="/accounts-dashboard/reports/deductions"
-                  className="flex items-center justify-center bg-orange-600 hover:bg-orange-700 text-white px-1.5 py-1.5 rounded text-xs transition-colors"
-                  title="View Deductions"
-                >
-                  <List size={12} />
-                </Link>
-              )}
             </div>
           </div>
-          <p className="text-xs text-gray-500 mt-2">{MANUAL_FILTER_HINT}</p>
+
+          {/* Date and Status Filters */}
+          <div className="bg-white rounded-lg shadow p-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Due Date From */}
+              <div className="flex flex-col">
+                <label className="text-xs font-semibold text-gray-700 mb-1">Due Date From</label>
+                <input
+                  type="date"
+                  value={dueDateFrom}
+                  onChange={(e) => setDueDateFrom(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                />
+              </div>
+
+              {/* Due Date To */}
+              <div className="flex flex-col">
+                <label className="text-xs font-semibold text-gray-700 mb-1">Due Date To</label>
+                <input
+                  type="date"
+                  value={dueDateTo}
+                  onChange={(e) => setDueDateTo(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                />
+              </div>
+
+              {/* Status Filter */}
+              <div className="flex flex-col">
+                <label className="text-xs font-semibold text-gray-700 mb-1">Payment Status</label>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                >
+                  <option value="all">All Orders</option>
+                  <option value="due">Due (Overdue)</option>
+                  <option value="no-due">Not Due</option>
+                </select>
+              </div>
+
+              {/* Clear Filters Button */}
+              <div className="flex flex-col justify-end">
+                {(dueDateFrom || dueDateTo || statusFilter !== "all" || searchQuery) && (
+                  <button
+                    onClick={() => {
+                      setDueDateFrom("");
+                      setDueDateTo("");
+                      setStatusFilter("all");
+                      setSearchQuery("");
+                    }}
+                    className="flex items-center justify-center gap-2 bg-gray-500 hover:bg-gray-600 text-white px-3 py-2 rounded-lg transition-colors duration-200 text-sm"
+                  >
+                    <X size={14} />
+                    Clear
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Export CSV Button */}
+            <button
+              onClick={exportToCSV}
+              className="w-full mt-3 flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors duration-200 text-sm font-semibold"
+            >
+              <Download size={16} />
+              Export CSV
+            </button>
+          </div>
         </div>
       </div>
+
       {/* Table */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-200px)]">
@@ -416,12 +440,6 @@ export default function PaymentPendingReport() {
                 >
                   Next Followup <SortIcon columnKey="next_followup_date" />
                 </th>
-                <th
-                  className="px-4 py-3 text-left font-semibold cursor-pointer hover:bg-gray-700 transition-colors"
-                  onClick={() => handleSort('latest_remark')}
-                >
-                  Last Remark <SortIcon columnKey="latest_remark" />
-                </th>
                 <th className="px-4 py-3 text-center font-semibold">Actions</th>
               </tr>
             </thead>
@@ -434,16 +452,7 @@ export default function PaymentPendingReport() {
                   return (
                     <tr key={index} className="hover:bg-gray-50 transition-colors">
                       <td className="px-4 py-3 border-b font-medium text-gray-800">
-                        <div>{order.order_id}</div>
-                        {order.quote_number && (
-                          <Link
-                            href={`/accounts-dashboard/quotations/${encodeURIComponent(order.quote_number)}`}
-                            className="text-[11px] font-medium text-blue-600 hover:text-blue-800 hover:underline mt-0.5 inline-block"
-                            title="View Quotation"
-                          >
-                            {order.quote_number}
-                          </Link>
-                        )}
+                        {order.order_id}
                       </td>
                       <td className="px-4 py-3 border-b">
                         <div className="text-xs">
@@ -460,12 +469,7 @@ export default function PaymentPendingReport() {
                         ₹{order.paid_amount.toFixed(2)}
                       </td>
                       <td className="px-4 py-3 border-b text-right font-semibold text-red-600">
-                        <div>₹{order.remaining_amount.toFixed(2)}</div>
-                        {Number(order.deduction_amount || 0) > 0 && (
-                          <div className="text-[11px] font-medium text-orange-600">
-                            Deducted ₹{Number(order.deduction_amount).toFixed(2)}
-                          </div>
-                        )}
+                        ₹{order.remaining_amount.toFixed(2)}
                       </td>
                       <td className="px-4 py-3 border-b text-center">
                         <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
@@ -494,15 +498,6 @@ export default function PaymentPendingReport() {
                           ? dayjs(order.next_followup_date).format("DD/MM/YYYY hh:mm A")
                           : "-"}
                       </td>
-                      <td className="px-4 py-3 border-b text-sm text-gray-700 min-w-xs">
-                        {order.latest_remark ? (
-                          <div className="line-clamp-3 hover:line-clamp-none hover:whitespace-normal cursor-help" title={order.latest_remark}>
-                            {order.latest_remark}
-                          </div>
-                        ) : (
-                          <span className="text-xs text-gray-400">—</span>
-                        )}
-                      </td>
                       <td className="px-4 py-3 border-b">
                         <div className="flex items-center justify-center gap-2">
                           <button
@@ -527,20 +522,6 @@ export default function PaymentPendingReport() {
                             <History size={14} />
                             History
                           </button>
-                          {canAddDeduction && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                router.push(
-                                  `/accounts-dashboard/reports/deductions?order_id=${encodeURIComponent(order.order_id)}`
-                                );
-                              }}
-                              className="inline-flex items-center gap-2 rounded-md bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-700"
-                            >
-                              <MinusCircle size={14} />
-                              Deduction
-                            </button>
-                          )}
                         </div>
                       </td>
                     </tr>
@@ -557,6 +538,7 @@ export default function PaymentPendingReport() {
           </table>
         </div>
       </div>
+
       <FollowupModal
         open={followupModalOpen}
         onClose={() => {
@@ -619,6 +601,7 @@ function FollowupModal({ open, onClose, order, onSaved }) {
             <X size={18} />
           </button>
         </div>
+
         <div className="space-y-4 px-5 py-4">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div className="flex flex-col">
@@ -670,6 +653,7 @@ function FollowupModal({ open, onClose, order, onSaved }) {
               </div>
             </div>
           </div>
+
           <div className="flex flex-col">
             <label className="mb-1 text-xs font-semibold text-gray-700">Notes</label>
             <textarea
@@ -780,6 +764,7 @@ function HistoryModal({ open, onClose, order }) {
   }, [open, order?.order_id]);
 
   if (!open) return null;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
       <div className="w-full max-w-2xl rounded-lg bg-white shadow-xl">

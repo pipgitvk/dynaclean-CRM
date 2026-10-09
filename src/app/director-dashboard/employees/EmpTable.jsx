@@ -542,10 +542,7 @@ const EmpTable = ({ employees }) => {
     "PRODUCTION ENGINEER",
   ];
 
-  const bulkModuleTree = useMemo(
-    () => getModuleTreeForEmployeeBulkUi(bulkRole),
-    [bulkRole],
-  );
+  const bulkModuleTree = useMemo(() => getModuleTreeForEmployeeBulkUi(), []);
 
   const bulkModuleIndex = useMemo(
     () => buildModuleUiSearchIndex(bulkModuleTree || []),

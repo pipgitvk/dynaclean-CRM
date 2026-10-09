@@ -1,6 +1,5 @@
 "use client";
 
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import Link from "next/link";
 import dayjs from "dayjs";
 import { useState } from "react";
@@ -106,12 +105,22 @@ export default function OtherIncomeTable({ rows, role, isAdmin }) {
 
           <div>
             <label className="block text-sm font-medium mb-1">From Date</label>
-            <TypeableDateFilterInput value={fromDate} onChange={setFromDate} className="w-full border p-2 rounded-md"/>
+            <input
+              type="date"
+              value={fromDate}
+              onChange={(e) => setFromDate(e.target.value)}
+              className="w-full border p-2 rounded-md"
+            />
           </div>
 
           <div>
             <label className="block text-sm font-medium mb-1">To Date</label>
-            <TypeableDateFilterInput value={toDate} onChange={setToDate} className="w-full border p-2 rounded-md"/>
+            <input
+              type="date"
+              value={toDate}
+              onChange={(e) => setToDate(e.target.value)}
+              className="w-full border p-2 rounded-md"
+            />
           </div>
 
           <div>

@@ -1,7 +1,6 @@
 "use client";
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import {
   FileText,
   UploadCloud,
@@ -13,9 +12,8 @@ import {
   MoreVertical,
   Truck,
 } from "lucide-react";
-import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import dayjs from "dayjs";
-import { isSalesRole } from "@/lib/isSalesRole";
 
 import DeleteButton from "@/components/accounts/DeleteButton";
 
@@ -52,57 +50,68 @@ const SkeletonLoader = () => (
 );
 
 export default function OrderTable({ orders, userRole }) {
-  const searchParams = useSearchParams();
   const [searchQuery, setSearchQuery] = useState("");
-  const [appliedSearchQuery, setAppliedSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [appliedStatusFilter, setAppliedStatusFilter] = useState("");
+  const [filteredOrders, setFilteredOrders] = useState([]);
+  const [statusFilter, setStatusFilter] = useState(""); // '', pendinginvoice, invoiceuploaded, bookingdone, dispatchdone, canceled
   const [dateFrom, setDateFrom] = useState("");
-  const [appliedDateFrom, setAppliedDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [appliedDateTo, setAppliedDateTo] = useState("");
   const [createdByFilter, setCreatedByFilter] = useState("");
-  const [appliedCreatedByFilter, setAppliedCreatedByFilter] = useState("");
-  const [hasInvoiceFilter, setHasInvoiceFilter] = useState(false);
-  const [appliedHasInvoiceFilter, setAppliedHasInvoiceFilter] = useState(false);
-
-  const handleApplySearch = useCallback(() => {
-    setAppliedSearchQuery(searchQuery);
-    setAppliedStatusFilter(statusFilter);
-    setAppliedDateFrom(dateFrom);
-    setAppliedDateTo(dateTo);
-    setAppliedCreatedByFilter(createdByFilter);
-    setAppliedHasInvoiceFilter(hasInvoiceFilter);
-  }, [
-    searchQuery,
-    statusFilter,
-    dateFrom,
-    dateTo,
-    createdByFilter,
-    hasInvoiceFilter,
-  ]);
   const [openMenuId, setOpenMenuId] = useState(null); // State to track which menu is open
   // const canShowInstall = ["ADMIN", "SALES", "SERVICE"].includes(userRole);
-
-  useEffect(() => {
-    const from = searchParams.get("date_from");
-    const to = searchParams.get("date_to");
-    if (from) {
-      setDateFrom(from);
-      setAppliedDateFrom(from);
-    }
-    if (to) {
-      setDateTo(to);
-      setAppliedDateTo(to);
-    }
-    const hasInv = searchParams.get("has_invoice") === "1";
-    setHasInvoiceFilter(hasInv);
-    setAppliedHasInvoiceFilter(hasInv);
-  }, [searchParams]);
 
   const toggleMenu = (id) => {
     setOpenMenuId(openMenuId === id ? null : id);
   };
+
+  // Filter orders based on search query, status filter, and date range
+  useEffect(() => {
+    if (!orders) return;
+
+    const lowercasedQuery = searchQuery.toLowerCase();
+    const result = orders.filter((order) => {
+      // Step 1: Filter by status
+      if (statusFilter) {
+        const orderStatus = getStatusText(order)
+          .text.toLowerCase()
+          .replace(/\s+/g, "");
+        if (orderStatus !== statusFilter.toLowerCase()) return false;
+      }
+
+      // Step 2: Date range filter (created_at)
+      if (dateFrom || dateTo) {
+        const created = order.created_at ? new Date(order.created_at) : null;
+        if (!created || isNaN(created)) return false;
+        if (dateFrom) {
+          const from = new Date(dateFrom + "T00:00:00");
+          if (created < from) return false;
+        }
+        if (dateTo) {
+          const to = new Date(dateTo + "T23:59:59");
+          if (created > to) return false;
+        }
+      }
+
+      // Step 2.5: Filter by created_by
+      if (createdByFilter && order.created_by !== createdByFilter) {
+        return false;
+      }
+
+      // Step 2.6: Filter by approval_status (User Dashboard specific)
+      if (order.approval_status === 'pending') {
+        return false;
+      }
+
+      // Step 3: Search across multiple fields
+      return (
+        order.order_id?.toLowerCase().includes(lowercasedQuery) ||
+        order.client_name?.toLowerCase().includes(lowercasedQuery) ||
+        order.company_name?.toLowerCase().includes(lowercasedQuery) ||
+        order.contact?.toLowerCase().includes(lowercasedQuery) ||
+        order.state?.toLowerCase().includes(lowercasedQuery)
+      );
+    });
+    setFilteredOrders(result);
+  }, [searchQuery, orders, statusFilter, dateFrom, dateTo, createdByFilter]);
 
   const getStatusText = (order) => {
     // Check for return status first (highest priority)
@@ -229,62 +238,6 @@ export default function OrderTable({ orders, userRole }) {
     );
   };
 
-  const filteredOrders = useMemo(() => {
-    if (!orders) return [];
-
-    const lowercasedQuery = appliedSearchQuery.toLowerCase();
-    return orders.filter((order) => {
-      if (appliedStatusFilter) {
-        const orderStatus = getStatusText(order)
-          .text.toLowerCase()
-          .replace(/\s+/g, "");
-        if (orderStatus !== appliedStatusFilter.toLowerCase()) return false;
-      }
-
-      if (appliedDateFrom || appliedDateTo) {
-        if (!order.created_at) return false;
-        const createdKey = new Date(order.created_at).toLocaleDateString(
-          "en-CA",
-          { timeZone: "Asia/Kolkata" },
-        );
-        if (appliedDateFrom && createdKey < appliedDateFrom) return false;
-        if (appliedDateTo && createdKey > appliedDateTo) return false;
-      }
-
-      if (
-        appliedCreatedByFilter &&
-        order.created_by !== appliedCreatedByFilter
-      ) {
-        return false;
-      }
-
-      if (appliedHasInvoiceFilter) {
-        const invoiceNumber = String(order.invoice_number || "").trim();
-        if (!invoiceNumber) return false;
-      }
-
-      if (order.approval_status === "pending") {
-        return false;
-      }
-
-      return (
-        order.order_id?.toLowerCase().includes(lowercasedQuery) ||
-        order.client_name?.toLowerCase().includes(lowercasedQuery) ||
-        order.company_name?.toLowerCase().includes(lowercasedQuery) ||
-        order.contact?.toLowerCase().includes(lowercasedQuery) ||
-        order.state?.toLowerCase().includes(lowercasedQuery)
-      );
-    });
-  }, [
-    orders,
-    appliedSearchQuery,
-    appliedStatusFilter,
-    appliedDateFrom,
-    appliedDateTo,
-    appliedCreatedByFilter,
-    appliedHasInvoiceFilter,
-  ]);
-
   if (!orders) {
     return <SkeletonLoader />;
   }
@@ -305,22 +258,9 @@ export default function OrderTable({ orders, userRole }) {
             placeholder="Search by ID, client, company, etc."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                handleApplySearch();
-              }
-            }}
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200 ease-in-out"
           />
         </div>
-        <button
-          type="button"
-          onClick={handleApplySearch}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg w-full sm:w-auto"
-        >
-          Search
-        </button>
       </div>
 
       {/* 🧰 Filters */}
@@ -346,11 +286,21 @@ export default function OrderTable({ orders, userRole }) {
         </div>
         <div>
           <label className="block text-xs text-gray-600 mb-1">From Date</label>
-          <TypeableDateFilterInput value={dateFrom} onChange={setDateFrom} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"/>
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+          />
         </div>
         <div>
           <label className="block text-xs text-gray-600 mb-1">To Date</label>
-          <TypeableDateFilterInput value={dateTo} onChange={setDateTo} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"/>
+          <input
+            type="date"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+          />
         </div>
         <div>
           <label className="block text-xs text-gray-600 mb-1">Created By</label>
@@ -370,9 +320,6 @@ export default function OrderTable({ orders, userRole }) {
           </select>
         </div>
       </div>
-      <p className="text-xs text-gray-500">
-        Set filters, then click Search to update the list.
-      </p>
 
       {/* 👨‍💼 TABLE VIEW for large screens */}
       <div className="hidden lg:block overflow-x-auto overflow-y-auto max-h-[calc(100vh-300px)] bg-white rounded-xl shadow-lg">
@@ -572,18 +519,16 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
 
   const popRef = useRef(null);
   const role = (userRole || "").toString().trim().toLowerCase();
-  const canViewSales =
-    isSalesRole(userRole) ||
-    [
-      "back office",
-      "accountant",
-      "admin",
-      "warehouse incharge",
-      "gem portal",
-      "team leader",
-      "service head",
-    ].includes(role) ||
-    role.includes("gem");
+  const canViewSales = [
+    "back office",
+    "accountant",
+    "admin",
+    "sales",
+    "warehouse incharge",
+    "gem portal",
+    "team leader",
+    "service head",
+  ].includes(role);
   const isAdmin = role === "admin";
   const isTeamLeader = role === "team leader";
   const isWarehouse = role === "warehouse incharge";
@@ -636,7 +581,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
           <div className="py-1 text-sm">
             {canViewSales && (
               <Link
-                href={`/sales-dashboard/order/${r.order_id}`}
+                href={`/user-dashboard/order/${r.order_id}`}
                 className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
                 title="View Sales"
                 onClick={(e) => e.stopPropagation()}
@@ -707,12 +652,12 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                 </Link>
               </>
             )}
-            {canViewSales &&
+            {(isWarehouse || isAdmin || isTeamLeader) &&
               hasBooking &&
               dispatchStatus === 1 && (
                 <>
                   <Link
-                    href={`/sales-dashboard/order/dispatch/view/${r.order_id}`}
+                    href={`/user-dashboard/order/dispatch/view/${r.order_id}`}
                     className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
                     title="View Dispatch"
                     onClick={(e) => e.stopPropagation()}
@@ -1178,8 +1123,13 @@ function UpdateDeliveryMenuItem({ order }) {
                     <label className="block text-sm text-gray-700 font-medium mb-1">
                       Actual Delivery Date *
                     </label>
-                    <TypeableDateFilterInput value={deliveredOn} onChange={setDeliveredOn} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      required/>
+                    <input
+                      type="date"
+                      value={deliveredOn}
+                      onChange={(e) => setDeliveredOn(e.target.value)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      required
+                    />
                   </div>
 
                   <div>

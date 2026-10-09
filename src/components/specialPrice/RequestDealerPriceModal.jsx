@@ -3,11 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DEALER_PRICE_TERM_OPTIONS } from "@/lib/specialPriceDefaults";
-import SpecialPriceItemFilterBar from "@/components/specialPrice/SpecialPriceItemFilterBar";
-import {
-  filterSpecialPriceItems,
-  getSpecialPriceItemKey,
-} from "@/components/specialPrice/specialPriceItemListUtils";
 
 export default function RequestDealerPriceModal({
   customerId,
@@ -20,7 +15,6 @@ export default function RequestDealerPriceModal({
   const [allItems, setAllItems] = useState([]);
   const [loadingItems, setLoadingItems] = useState(false);
   const [search, setSearch] = useState("");
-  const [typeFilter, setTypeFilter] = useState("all");
   const [selectedItems, setSelectedItems] = useState([]);
   const [submitting, setSubmitting] = useState(false);
 
@@ -28,7 +22,6 @@ export default function RequestDealerPriceModal({
     setStep("term");
     setPriceTerm("");
     setSearch("");
-    setTypeFilter("all");
     setSelectedItems([]);
     setAllItems([]);
   };
@@ -79,12 +72,24 @@ export default function RequestDealerPriceModal({
     fetchItems();
   }, [open, step]);
 
-  const filteredItems = useMemo(
-    () => filterSpecialPriceItems(allItems, { search, typeFilter }),
-    [allItems, search, typeFilter],
-  );
+  const filteredItems = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return allItems;
+    return allItems.filter((p) => {
+      const name = String(p.item_name ?? "").toLowerCase();
+      const spec = String(p.specification ?? "").toLowerCase();
+      const model = String(p._model ?? "").toLowerCase();
+      const code = String(p._code ?? "").toLowerCase();
+      return (
+        name.includes(q) ||
+        spec.includes(q) ||
+        model.includes(q) ||
+        code.includes(q)
+      );
+    });
+  }, [allItems, search]);
 
-  const getKey = getSpecialPriceItemKey;
+  const getKey = (item) => `${item._type}-${item.id}`;
 
   const toggleSelect = (item) => {
     const key = getKey(item);
@@ -101,19 +106,6 @@ export default function RequestDealerPriceModal({
       return Array.from(map.values());
     });
   };
-
-  const deselectAllFiltered = () => {
-    const visible = new Set(filteredItems.map((item) => getKey(item)));
-    setSelectedItems((prev) => prev.filter((item) => !visible.has(getKey(item))));
-  };
-
-  const selectedInViewCount = useMemo(
-    () =>
-      filteredItems.filter((item) =>
-        selectedItems.some((p) => getKey(p) === getKey(item)),
-      ).length,
-    [filteredItems, selectedItems],
-  );
 
   const handleContinueToModels = () => {
     if (!priceTerm) {
@@ -230,7 +222,6 @@ export default function RequestDealerPriceModal({
                       setStep("term");
                       setSelectedItems([]);
                       setSearch("");
-                      setTypeFilter("all");
                     }}
                     className="text-sm text-gray-600 hover:text-gray-900 mb-2"
                   >
@@ -242,19 +233,29 @@ export default function RequestDealerPriceModal({
                   </p>
                 </div>
 
-                <SpecialPriceItemFilterBar
-                  search={search}
-                  onSearchChange={setSearch}
-                  typeFilter={typeFilter}
-                  onTypeFilterChange={setTypeFilter}
-                  onSelectAllFiltered={selectAllFiltered}
-                  onDeselectAllFiltered={deselectAllFiltered}
-                  onClearAll={() => setSelectedItems([])}
-                  shownCount={filteredItems.length}
-                  selectedInViewCount={selectedInViewCount}
-                  selectedTotalCount={selectedItems.length}
-                  searchPlaceholder="Search models..."
-                />
+                <div className="mb-3 flex flex-wrap gap-2 items-center">
+                  <input
+                    type="text"
+                    placeholder="Search models..."
+                    className="border p-2 rounded flex-1 min-w-[200px]"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    onClick={selectAllFiltered}
+                    className="px-3 py-2 text-sm border rounded hover:bg-gray-50"
+                  >
+                    Select All
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedItems([])}
+                    className="px-3 py-2 text-sm border rounded hover:bg-gray-50"
+                  >
+                    Clear
+                  </button>
+                </div>
 
                 <div className="flex-1 overflow-y-auto border rounded mb-3 min-h-[240px]">
                   {loadingItems ? (

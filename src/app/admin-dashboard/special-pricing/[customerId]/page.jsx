@@ -1,9 +1,7 @@
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import AddSpecialPriceModal from "@/components/specialPrice/AddSpecialPriceModal";
-import RequestDealerPriceModal from "@/components/specialPrice/RequestDealerPriceModal";
 import DeleteButton from "@/components/specialPrice/DeleteButton";
-import ApprovedPriceListPdfButton from "@/components/specialPrice/ApprovedPriceListPdfButton";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -121,15 +119,8 @@ export default async function CustomerSpecialPrice({ params }) {
       
  
         </div>
-        <div className="flex flex-wrap gap-2 items-center">
-          <ApprovedPriceListPdfButton
-            customerId={customerId}
-            customerName={customerInfo?.name || ""}
-            rows={rows}
-          />
-          <RequestDealerPriceModal customerId={customerId} />
-          <AddSpecialPriceModal customerId={customerId} />
-        </div>
+         <AddSpecialPriceModal customerId={customerId} />
+      
       </div>
 
       {customerInfo && (

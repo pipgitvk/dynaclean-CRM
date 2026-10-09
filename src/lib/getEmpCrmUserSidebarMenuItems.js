@@ -1,22 +1,10 @@
-import { getSessionPayload } from "@/lib/auth";
+import { cookies } from "next/headers";
+import { jwtVerify } from "jose";
 import { getReportees } from "@/lib/reportingManager";
 import { getDbConnection } from "@/lib/db";
 import { normalizeRoleKey } from "@/lib/roleKeyUtils";
 
-/** Shown when user has reportees — not gated by Global Module Access keys. */
-export const EMPCRM_REPORTING_MANAGER_PATH_PREFIXES = [
-  "/empcrm/user-dashboard/leave-approvals",
-  "/empcrm/user-dashboard/attendance-regularization",
-  "/empcrm/user-dashboard/overtime",
-  "/empcrm/user-dashboard/employee-expenses",
-];
-
-export function isEmpCrmReportingManagerMenuPath(path) {
-  const p = String(path || "");
-  return EMPCRM_REPORTING_MANAGER_PATH_PREFIXES.some(
-    (prefix) => p === prefix || p.startsWith(`${prefix}/`),
-  );
-}
+const JWT_SECRET = process.env.JWT_SECRET || "your-secret";
 
 const empCrmUserMenuItems = [
   { path: "/empcrm/user-dashboard", name: "EMPCRM Dashboard", roles: ["ALL"], icon: "Home" },
@@ -26,9 +14,8 @@ const empCrmUserMenuItems = [
   { path: "/empcrm/user-dashboard/leave-approvals", name: "Leave Approvals", roles: ["REPORTING_MANAGER"], icon: "CheckSquare" },
   { path: "/empcrm/user-dashboard/attendance-summary", name: "Attendance Summary", roles: ["ALL"], icon: "Grid3x3" },
   { path: "/empcrm/user-dashboard/attendance", name: "Attendance details", roles: ["ALL"], icon: "Clock" },
-  { path: "/empcrm/user-dashboard/attendance-regularization", name: "Attendance Regularization", roles: ["REPORTING_MANAGER"], icon: "ClipboardCheck" },
-  { path: "/empcrm/user-dashboard/overtime", name: "Overtime", roles: ["REPORTING_MANAGER"], icon: "Clock" },
-  { path: "/empcrm/user-dashboard/employee-expenses", name: "Employee Expenses", roles: ["REPORTING_MANAGER"], icon: "Receipt" },
+  { path: "/empcrm/user-dashboard/attendance-regularization", name: "Attendance Regularization", roles: ["REPORTING_MANAGER"], moduleKey: "regularization-approvals", icon: "ClipboardCheck" },
+  { path: "/empcrm/user-dashboard/overtime", name: "Overtime", roles: ["REPORTING_MANAGER"], moduleKey: "overtime-management", icon: "Clock" },
   { path: "/empcrm/user-dashboard/documents", name: "Documents", roles: ["ALL"], icon: "FileText" },
   { path: "/empcrm/user-dashboard/salary", name: "Salary", roles: ["ALL"], icon: "DollarSign" },
   { path: "/empcrm/user-dashboard/payslips", name: "Payslips", roles: ["ALL"], icon: "Receipt" },
@@ -55,63 +42,45 @@ async function getPendingOvertimeCount(username) {
   }
 }
 
-async function getEmpCrmUserSessionContext() {
-  const payload = await getSessionPayload();
+export default async function getEmpCrmUserSidebarMenuItems() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get("token")?.value;
 
-  const role = payload?.role || payload?.userRole || "GUEST";
-  const username = payload?.username || null;
+  let role = "GUEST";
   let hasReportees = false;
+  let username = null;
 
-  if (username) {
-    const reportees = await getReportees(username);
-    hasReportees = reportees.length > 0;
+  if (token) {
+    try {
+      const { payload } = await jwtVerify(token, new TextEncoder().encode(JWT_SECRET));
+      role = payload?.role || "GUEST";
+      username = payload?.username;
+      if (username) {
+        const reportees = await getReportees(username);
+        hasReportees = reportees.length > 0;
+      }
+    } catch (error) {
+      console.error("JWT decode error:", error.message);
+    }
   }
 
   const roleKey = normalizeRoleKey(role || "GUEST") || "GUEST";
+
+  // Get pending overtime count
   const pendingOvertimeCount = await getPendingOvertimeCount(username);
 
-  return { roleKey, hasReportees, pendingOvertimeCount };
-}
-
-function filterEmpCrmUserMenuItems(roleKey, hasReportees) {
-  return empCrmUserMenuItems.filter((item) => {
+  const filteredItems = empCrmUserMenuItems.filter((item) => {
     if (item.roles.includes("ALL")) return true;
     if (item.roles.some((r) => normalizeRoleKey(r) === roleKey)) return true;
     if (item.roles.includes("REPORTING_MANAGER") && hasReportees) return true;
     return false;
   });
-}
 
-function mapEmpCrmUserMenuItems(filteredItems, pendingOvertimeCount, forMainCrmSidebar) {
+  // Add badge count to attendance regularization menu item
   return filteredItems.map((item) => {
-    let result = item;
     if (item.path === "/empcrm/user-dashboard/attendance-regularization") {
-      result = { ...item, badge: pendingOvertimeCount };
+      return { ...item, badge: pendingOvertimeCount };
     }
-    // Main CRM runs filterByRole on Employee CRM children; REPORTING_MANAGER is not a real
-    // userRole — items are already limited to users with reportees above.
-    if (
-      forMainCrmSidebar &&
-      Array.isArray(item.roles) &&
-      item.roles.includes("REPORTING_MANAGER")
-    ) {
-      result = { ...result, roles: ["ALL"] };
-    }
-    return result;
+    return item;
   });
-}
-
-/** Nested under main CRM sidebar “Employee CRM” (same links as /empcrm/user-dashboard sidebar). */
-export async function getEmpCrmUserMenuChildrenForRole() {
-  const { roleKey, hasReportees, pendingOvertimeCount } =
-    await getEmpCrmUserSessionContext();
-  const filteredItems = filterEmpCrmUserMenuItems(roleKey, hasReportees);
-  return mapEmpCrmUserMenuItems(filteredItems, pendingOvertimeCount, true);
-}
-
-export default async function getEmpCrmUserSidebarMenuItems() {
-  const { roleKey, hasReportees, pendingOvertimeCount } =
-    await getEmpCrmUserSessionContext();
-  const filteredItems = filterEmpCrmUserMenuItems(roleKey, hasReportees);
-  return mapEmpCrmUserMenuItems(filteredItems, pendingOvertimeCount, false);
 }

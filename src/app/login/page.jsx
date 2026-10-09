@@ -3,29 +3,10 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, Mail, Lock, ShieldAlert } from "lucide-react";
+import { apiFetch } from "@/lib/apiClient";
 
 const ACCENT_COLOR = "#1F454A";
 const SERVICE_APP_LOGIN_URL = "https://service.dynacleanindustries.com/login";
-
-const getDashboardRouteByRole = (roleNorm) => {
-  if (roleNorm === "SUPERADMIN" || roleNorm === "EA") {
-    return "/admin-dashboard";
-  }
-  if (roleNorm === "ADMIN") return "/user-dashboard";
-  if (roleNorm === "DIRECTOR") return "/director-dashboard";
-  if (roleNorm === "GEM" || roleNorm.includes("GEM")) return "/user-dashboard";
-  if (roleNorm.includes("SALES")) return "/sales-dashboard";
-  if (roleNorm.includes("SERVICE") && roleNorm.includes("HEAD")) {
-    return "/service-head-dashboard";
-  }
-  if (roleNorm.includes("HR")) return "/hr-dashboard";
-  if (roleNorm.includes("DIGITAL") || roleNorm.includes("MARKETER")) {
-    return "/digital-marketing-dashboard";
-  }
-  if (roleNorm.includes("ACCOUNTANT")) return "/accounts-dashboard";
-  if (roleNorm === "THIRD PARTY ENGINEER") return "/third-party-engineer-dashboard";
-  return "/user-dashboard";
-};
 
 const LoginPage = () => {
   const router = useRouter();
@@ -51,21 +32,21 @@ const LoginPage = () => {
     setIsSubmitting(true);
 
     try {
-      const res = await fetch("/api/login", {
+      // Soft-normalize credentials before they hit the shared API client.
+      const normalizedUser = username.trim().toLowerCase();
+      const normalizedPass = password
+        .normalize("NFKC")
+        .replace(/[\u200B-\u200D\uFEFF]/g, "");
+
+      const data = await apiFetch("/api/login", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
+        body: {
+          username: normalizedUser,
+          password: normalizedPass,
+        },
       });
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        setError(data.error || "Login failed");
-        setIsSubmitting(false);
-        return;
-      }
-
-      localStorage.setItem("username", username);
+      localStorage.setItem("username", normalizedUser);
 
       const roleNorm = String(data.role ?? "").trim().toUpperCase();
       if (roleNorm === "SERVICE ENGINEER") {
@@ -73,18 +54,19 @@ const LoginPage = () => {
         return;
       }
 
-      const isSalesUser =
-        roleNorm === "SALES" ||
-        roleNorm === "SALES EXECUTIVE" ||
-        roleNorm === "SALES REPRESENTATIVE" ||
-        roleNorm === "SALES CUM BACKOFFICE";
-      const targetRoute = isSalesUser
-        ? "/sales-dashboard"
-        : getDashboardRouteByRole(roleNorm);
-      router.push(targetRoute);
+      // Soft navigation — cookie is available on the next document request.
+      if (data.role === "SUPERADMIN") {
+        router.push("/admin-dashboard");
+      } else if (roleNorm === "DIRECTOR") {
+        router.push("/director-dashboard");
+      } else if (roleNorm.includes("SALES")) {
+        router.push("/sales-dashboard");
+      } else {
+        router.push("/user-dashboard");
+      }
     } catch (err) {
       console.error("Login error:", err);
-      setError("An unexpected error occurred");
+      setError(err?.data?.error || err.message || "An unexpected error occurred");
     } finally {
       setIsSubmitting(false);
     }
@@ -147,11 +129,15 @@ const LoginPage = () => {
                   type={showPassword ? "text" : "password"}
                   placeholder="Enter your password"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) =>
+                    // Keep printable ASCII only — blocks paste of enriched / RTL marks.
+                    setPassword(e.target.value.replace(/[^\x20-\x7E]/g, ""))
+                  }
                   className="w-full pl-11 pr-12 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1F454A]/30 focus:border-[#1F454A] transition placeholder:text-gray-400"
                   required
                   disabled={isSubmitting}
                   autoComplete="off"
+                  maxLength={64}
                 />
                 <button
                   type="button"

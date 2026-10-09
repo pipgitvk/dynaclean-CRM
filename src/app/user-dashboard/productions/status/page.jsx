@@ -1,6 +1,5 @@
 "use client";
 
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -578,7 +577,7 @@ function AddProductionModal({ onClose, onSaved }) {
             </div>
             <div className="flex items-center gap-3">
               <label className="w-28 text-sm">Expected Date<span className="text-red-600">*</span></label>
-              <TypeableDateFilterInput value={expected} onChange={setExpected} required className="w-48 border p-2 rounded"/>
+              <input required type="date" value={expected} onChange={(e)=>setExpected(e.target.value)} className="w-48 border p-2 rounded" />
             </div>
 
             <div className="flex justify-end gap-2">

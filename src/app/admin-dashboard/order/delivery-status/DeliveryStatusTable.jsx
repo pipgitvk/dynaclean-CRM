@@ -1,21 +1,13 @@
 "use client";
-import { useState, useMemo, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { Search, Truck, Clock, CheckCircle, AlertCircle } from "lucide-react";
 import dayjs from "dayjs";
 
 export default function DeliveryStatusTable({ orders }) {
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
+  const [filteredOrders, setFilteredOrders] = useState([]);
+  const [statusFilter, setStatusFilter] = useState(""); // '', timely, delayed
   const [createdByFilter, setCreatedByFilter] = useState("");
-  const [appliedSearchQuery, setAppliedSearchQuery] = useState("");
-  const [appliedStatusFilter, setAppliedStatusFilter] = useState("");
-  const [appliedCreatedByFilter, setAppliedCreatedByFilter] = useState("");
-
-  const handleApplySearch = useCallback(() => {
-    setAppliedSearchQuery(searchQuery);
-    setAppliedStatusFilter(statusFilter);
-    setAppliedCreatedByFilter(createdByFilter);
-  }, [searchQuery, statusFilter, createdByFilter]);
 
   // Calculate delivery statistics
   const deliveryStats = orders.reduce(
@@ -35,27 +27,32 @@ export default function DeliveryStatusTable({ orders }) {
     { timely: 0, delayed: 0 }
   );
 
-  const filteredOrders = useMemo(() => {
-    if (!orders) return [];
+  // Filter orders based on search and status
+  useEffect(() => {
+    if (!orders) return;
 
-    const lowercasedQuery = appliedSearchQuery.toLowerCase();
-    return orders.filter((order) => {
+    const lowercasedQuery = searchQuery.toLowerCase();
+    const result = orders.filter((order) => {
+      // Only show delivered orders
       if (order.delivery_status !== 1) return false;
       if (!order.delivered_on || !order.delivery_date) return false;
 
-      if (appliedStatusFilter) {
+      // Filter by delivery status (timely/delayed)
+      if (statusFilter) {
         const expectedDate = new Date(order.delivery_date);
         const actualDate = new Date(order.delivered_on);
         const isDelayed = actualDate > expectedDate;
 
-        if (appliedStatusFilter === "delayed" && !isDelayed) return false;
-        if (appliedStatusFilter === "timely" && isDelayed) return false;
+        if (statusFilter === "delayed" && !isDelayed) return false;
+        if (statusFilter === "timely" && isDelayed) return false;
       }
 
-      if (appliedCreatedByFilter && order.created_by !== appliedCreatedByFilter) {
+      // Filter by created_by
+      if (createdByFilter && order.created_by !== createdByFilter) {
         return false;
       }
 
+      // Search filter
       return (
         order.order_id?.toLowerCase().includes(lowercasedQuery) ||
         order.client_name?.toLowerCase().includes(lowercasedQuery) ||
@@ -64,7 +61,9 @@ export default function DeliveryStatusTable({ orders }) {
         order.booking_by?.toLowerCase().includes(lowercasedQuery)
       );
     });
-  }, [orders, appliedSearchQuery, appliedStatusFilter, appliedCreatedByFilter]);
+
+    setFilteredOrders(result);
+  }, [searchQuery, orders, statusFilter, createdByFilter]);
 
   const getDeliveryStatus = (order) => {
     const expectedDate = new Date(order.delivery_date);
@@ -125,32 +124,17 @@ export default function DeliveryStatusTable({ orders }) {
 
       {/* Search and Filters */}
       <div className="flex flex-col gap-4">
-        <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
-          <div className="relative w-full sm:flex-1">
-            <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-              <Search size={20} className="text-gray-400" />
-            </div>
-            <input
-              type="text"
-              placeholder="Search by Order ID, Client, Company, etc."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  handleApplySearch();
-                }
-              }}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200 ease-in-out"
-            />
+        <div className="relative w-full">
+          <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+            <Search size={20} className="text-gray-400" />
           </div>
-          <button
-            type="button"
-            onClick={handleApplySearch}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg"
-          >
-            Search
-          </button>
+          <input
+            type="text"
+            placeholder="Search by Order ID, Client, Company, etc."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200 ease-in-out"
+          />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
@@ -179,7 +163,6 @@ export default function DeliveryStatusTable({ orders }) {
             </select>
           </div>
         </div>
-        <p className="text-xs text-gray-500">Set filters, then click Search to update the list.</p>
       </div>
 
       {/* Desktop Table */}

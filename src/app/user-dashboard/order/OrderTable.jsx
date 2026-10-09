@@ -1,5 +1,4 @@
 "use client";
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -13,15 +12,13 @@ import {
   MoreVertical,
   Truck,
   ArrowUp,
-  Pencil,
 } from "lucide-react";
-import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import dayjs from "dayjs";
 
 import DeleteButton from "@/components/accounts/DeleteButton";
 import toast from "react-hot-toast";
 import ReturnInitiateMenuItem from "@/components/orders/ReturnInitiateMenuItem";
-import { isSalesRole } from "@/lib/isSalesRole";
 
 // 👻 A sleek skeleton loader for a modern feel
 const SkeletonLoader = () => (
@@ -57,39 +54,68 @@ const SkeletonLoader = () => (
 
 export default function OrderTable({ orders, userRole }) {
   const [searchQuery, setSearchQuery] = useState("");
-  const [appliedSearchQuery, setAppliedSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [appliedStatusFilter, setAppliedStatusFilter] = useState("");
+  const [filteredOrders, setFilteredOrders] = useState([]);
+  const [statusFilter, setStatusFilter] = useState(""); // '', pendinginvoice, invoiceuploaded, bookingdone, dispatchdone, canceled
   const [paymentTermsFilter, setPaymentTermsFilter] = useState("");
-  const [appliedPaymentTermsFilter, setAppliedPaymentTermsFilter] = useState("");
   const [dateFrom, setDateFrom] = useState("");
-  const [appliedDateFrom, setAppliedDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [appliedDateTo, setAppliedDateTo] = useState("");
   const [createdByFilter, setCreatedByFilter] = useState("");
-  const [appliedCreatedByFilter, setAppliedCreatedByFilter] = useState("");
-
-  const handleApplySearch = useCallback(() => {
-    setAppliedSearchQuery(searchQuery);
-    setAppliedStatusFilter(statusFilter);
-    setAppliedPaymentTermsFilter(paymentTermsFilter);
-    setAppliedDateFrom(dateFrom);
-    setAppliedDateTo(dateTo);
-    setAppliedCreatedByFilter(createdByFilter);
-  }, [
-    searchQuery,
-    statusFilter,
-    paymentTermsFilter,
-    dateFrom,
-    dateTo,
-    createdByFilter,
-  ]);
   const [openMenuId, setOpenMenuId] = useState(null); // State to track which menu is open
   // const canShowInstall = ["ADMIN", "SALES", "SERVICE"].includes(userRole);
 
   const toggleMenu = (id) => {
     setOpenMenuId(openMenuId === id ? null : id);
   };
+
+  // Filter orders based on search query, status filter, and date range
+  useEffect(() => {
+    if (!orders) return;
+
+    const lowercasedQuery = searchQuery.toLowerCase();
+    const result = orders.filter((order) => {
+      // Step 1: Filter by status
+      if (statusFilter) {
+        const orderStatus = getStatusText(order)
+          .text.toLowerCase()
+          .replace(/\s+/g, "");
+        if (orderStatus !== statusFilter.toLowerCase()) return false;
+      }
+
+      // Step 2: Date range filter (created_at)
+      if (dateFrom || dateTo) {
+        const created = order.created_at ? new Date(order.created_at) : null;
+        if (!created || isNaN(created)) return false;
+        if (dateFrom) {
+          const from = new Date(dateFrom + "T00:00:00");
+          if (created < from) return false;
+        }
+        if (dateTo) {
+          const to = new Date(dateTo + "T23:59:59");
+          if (created > to) return false;
+        }
+      }
+
+      // Step 2.5: Filter by created_by
+      if (createdByFilter && order.created_by !== createdByFilter) {
+        return false;
+      }
+
+      // Step 2.7: Filter by payment_terms
+      if (paymentTermsFilter && order.payment_terms !== paymentTermsFilter) {
+        return false;
+      }
+
+      // Step 3: Search across multiple fields
+      return (
+        order.order_id?.toLowerCase().includes(lowercasedQuery) ||
+        order.client_name?.toLowerCase().includes(lowercasedQuery) ||
+        order.company_name?.toLowerCase().includes(lowercasedQuery) ||
+        order.contact?.toLowerCase().includes(lowercasedQuery) ||
+        order.state?.toLowerCase().includes(lowercasedQuery)
+      );
+    });
+    setFilteredOrders(result);
+  }, [searchQuery, orders, statusFilter, paymentTermsFilter, dateFrom, dateTo, createdByFilter]);
 
   const getStatusText = (order) => {
     // Check for pending approval first
@@ -116,8 +142,8 @@ export default function OrderTable({ orders, userRole }) {
       if (Number(order.warehouse_in_done) === 1) {
         return {
           text: "Return Completed",
-          bg: "bg-orange-100",
-          textCol: "text-orange-800",
+          bg: "bg-teal-100",
+          textCol: "text-teal-800",
           icon: <CheckCircle size={14} className="mr-1" />,
         };
       }
@@ -259,57 +285,6 @@ export default function OrderTable({ orders, userRole }) {
     );
   };
 
-  const filteredOrders = useMemo(() => {
-    if (!orders) return [];
-
-    const lowercasedQuery = appliedSearchQuery.toLowerCase();
-    return orders.filter((order) => {
-      if (appliedStatusFilter) {
-        const orderStatus = getStatusText(order)
-          .text.toLowerCase()
-          .replace(/\s+/g, "");
-        if (orderStatus !== appliedStatusFilter.toLowerCase()) return false;
-      }
-
-      if (appliedDateFrom || appliedDateTo) {
-        const created = order.created_at ? new Date(order.created_at) : null;
-        if (!created || isNaN(created)) return false;
-        if (appliedDateFrom) {
-          const from = new Date(appliedDateFrom + "T00:00:00");
-          if (created < from) return false;
-        }
-        if (appliedDateTo) {
-          const to = new Date(appliedDateTo + "T23:59:59");
-          if (created > to) return false;
-        }
-      }
-
-      if (appliedCreatedByFilter && order.created_by !== appliedCreatedByFilter) {
-        return false;
-      }
-
-      if (appliedPaymentTermsFilter && order.payment_terms !== appliedPaymentTermsFilter) {
-        return false;
-      }
-
-      return (
-        order.order_id?.toLowerCase().includes(lowercasedQuery) ||
-        order.client_name?.toLowerCase().includes(lowercasedQuery) ||
-        order.company_name?.toLowerCase().includes(lowercasedQuery) ||
-        order.contact?.toLowerCase().includes(lowercasedQuery) ||
-        order.state?.toLowerCase().includes(lowercasedQuery)
-      );
-    });
-  }, [
-    orders,
-    appliedSearchQuery,
-    appliedStatusFilter,
-    appliedPaymentTermsFilter,
-    appliedDateFrom,
-    appliedDateTo,
-    appliedCreatedByFilter,
-  ]);
-
   if (!orders) {
     return <SkeletonLoader />;
   }
@@ -330,22 +305,9 @@ export default function OrderTable({ orders, userRole }) {
             placeholder="Search by ID, client, company, etc."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                handleApplySearch();
-              }
-            }}
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200 ease-in-out"
           />
         </div>
-        <button
-          type="button"
-          onClick={handleApplySearch}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg w-full sm:w-auto"
-        >
-          Search
-        </button>
       </div>
 
       {/* 🧰 Filters */}
@@ -375,11 +337,21 @@ export default function OrderTable({ orders, userRole }) {
         </div>
         <div>
           <label className="block text-xs text-gray-600 mb-1">From Date</label>
-          <TypeableDateFilterInput value={dateFrom} onChange={setDateFrom} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"/>
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+          />
         </div>
         <div>
           <label className="block text-xs text-gray-600 mb-1">To Date</label>
-          <TypeableDateFilterInput value={dateTo} onChange={setDateTo} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"/>
+          <input
+            type="date"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+          />
         </div>
         <div>
           <label className="block text-xs text-gray-600 mb-1">Created By</label>
@@ -416,7 +388,6 @@ export default function OrderTable({ orders, userRole }) {
           </select>
         </div>
       </div>
-      <p className="text-xs text-gray-500">Set filters, then click Search to update the list.</p>
 
       {/* 👨‍💼 TABLE VIEW for large screens */}
       <div className="hidden lg:block overflow-x-auto overflow-y-auto max-h-[calc(100vh-300px)] bg-white rounded-xl shadow-lg">
@@ -724,24 +695,21 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
   const popRef = useRef(null);
   const role = (userRole || "").toString().trim().toLowerCase();
   const isGem = role.includes("gem");
-  const canViewSales =
-    isSalesRole(userRole) ||
-    [
-      "back office",
-      "accountant",
-      "admin",
-      "warehouse incharge",
-      "gem portal",
-      "team leader",
-      "service head",
-    ].includes(role) ||
-    isGem;
+  const canViewSales = [
+    "back office",
+    "accountant",
+    "admin",
+    "sales",
+    "warehouse incharge",
+    "gem portal",
+    "team leader",
+    "service head",
+  ].includes(role) || isGem;
   const isAdmin = role === "admin";
   const isAccountant = role.includes("accountant");
   const isTeamLeader = role === "team leader";
   const isWarehouse = role === "warehouse incharge";
   const canManageReturns = isAdmin || isAccountant || isTeamLeader;
-  const canEditBooking = isAdmin || role === "superadmin";
   const hasBooking =
     r.booking_id !== undefined &&
     r.booking_id !== null &&
@@ -798,17 +766,6 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
               <ClipboardList size={16} />
               <span>View Sales</span>
             </Link>
-            {hasBooking && dispatchStatus === 1 && (
-              <Link
-                href={`/user-dashboard/order/dispatch/view/${r.order_id}`}
-                className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700 w-full block"
-                title="View Dispatch"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <Search size={16} />
-                <span>View Dispatch</span>
-              </Link>
-            )}
             {!isGem && (
               <>
                 {["accountant", "admin", "team leader"].includes(role) &&
@@ -838,29 +795,8 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                       </div>
                     </div>
                   ))}
-                {(canManageReturns) && !hasBooking && (
-                    <Link
-                      href={`/user-dashboard/order/upload-booking/${r.order_id}`}
-                      className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-green-700 w-full block"
-                      title="Create Booking"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <UploadCloud size={16} />
-                      <span>Create Booking</span>
-                    </Link>
-                  )}
-                {canEditBooking && hasBooking && dispatchStatus === 0 && (
-                  <Link
-                    href={`/user-dashboard/order/upload-booking/${r.order_id}`}
-                    className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-blue-700 w-full block"
-                    title="Edit Booking"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <Pencil size={16} />
-                    <span>Edit Booking</span>
-                  </Link>
-                )}
-                {(canManageReturns) && hasBooking && (
+                {(canManageReturns) &&
+                  (hasBooking ? (
                     <Link
                       href={`/user-dashboard/order/view-booking/${r.order_id}`}
                       className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700 w-full block"
@@ -870,8 +806,18 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                       <FileCheck size={16} />
                       <span>View Booking</span>
                     </Link>
-                  )}
-                {(isWarehouse || isAdmin) && hasBooking && dispatchStatus === 0 && (
+                  ) : (
+                    <Link
+                      href={`/user-dashboard/order/upload-booking/${r.order_id}`}
+                      className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-green-700 w-full block"
+                      title="Create Booking"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <UploadCloud size={16} />
+                      <span>Create Booking</span>
+                    </Link>
+                  ))}
+                {isWarehouse && hasBooking && dispatchStatus === 0 && (
                   <Link
                     href={`/user-dashboard/order/dispatch/${r.order_id}`}
                     className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700 w-full block"
@@ -882,6 +828,19 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                     <span>Dispatch</span>
                   </Link>
                 )}
+                {(isWarehouse || canManageReturns) &&
+                  hasBooking &&
+                  dispatchStatus === 1 && (
+                    <Link
+                      href={`/user-dashboard/order/dispatch/view/${r.order_id}`}
+                      className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700 w-full block"
+                      title="View Dispatch"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Search size={16} />
+                      <span>View Dispatch</span>
+                    </Link>
+                  )}
                 {["accountant", "admin"].includes(role) && r.report_file && (
                   <div className="px-3 py-2 w-full block" onClick={(e) => e.stopPropagation()}>
                     <EditPaymentButton order={r} />
@@ -1409,8 +1368,13 @@ function UpdateDeliveryMenuItem({ order }) {
                     <label className="block text-sm text-gray-700 font-medium mb-1">
                       Actual Delivery Date *
                     </label>
-                    <TypeableDateFilterInput value={deliveredOn} onChange={setDeliveredOn} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      required/>
+                    <input
+                      type="date"
+                      value={deliveredOn}
+                      onChange={(e) => setDeliveredOn(e.target.value)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      required
+                    />
                   </div>
 
                   <div>
@@ -1837,16 +1801,28 @@ function ReturnBookingMenuItem({ order }) {
                   <label className="block text-sm font-medium text-gray-700">
                     Return Booking Date
                   </label>
-                  <TypeableDateFilterInput value={formData.return_booking_date} onChange={(v) => handleChange({ target: { name: "return_booking_date", value: v } })} required
-                    className="mt-1 w-full border px-3 py-2 rounded-md"/>
+                  <input
+                    type="date"
+                    name="return_booking_date"
+                    value={formData.return_booking_date}
+                    onChange={handleChange}
+                    required
+                    className="mt-1 w-full border px-3 py-2 rounded-md"
+                  />
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
                     Expected Pickup Date
                   </label>
-                  <TypeableDateFilterInput value={formData.expected_pickup_date} onChange={(v) => handleChange({ target: { name: "expected_pickup_date", value: v } })} required
-                    className="mt-1 w-full border px-3 py-2 rounded-md"/>
+                  <input
+                    type="date"
+                    name="expected_pickup_date"
+                    value={formData.expected_pickup_date}
+                    onChange={handleChange}
+                    required
+                    className="mt-1 w-full border px-3 py-2 rounded-md"
+                  />
                 </div>
 
                 <input

@@ -1,19 +1,323 @@
-  
 "use client";
 
-import { useState, useEffect, useMemo, useRef } from "react";
+// import { useState, useEffect } from "react";
+// import { useRouter } from "next/navigation";
+// import toast from "react-hot-toast";
+
+// export default function FollowupForm({ customerId }) {
+//   const router = useRouter();
+//   const [formData, setFormData] = useState({
+//     followed_date: "",
+//     next_followup_date: "",
+//     notes: "",
+//     communication_mode: "",
+//   });
+
+//   const [isSubmitting, setIsSubmitting] = useState(false); // NEW state
+
+//   const formatLocalDateTime = (date) => {
+//     const year = date.getFullYear();
+//     const month = String(date.getMonth() + 1).padStart(2, "0");
+//     const day = String(date.getDate()).padStart(2, "0");
+//     const hours = String(date.getHours()).padStart(2, "0");
+//     const minutes = String(date.getMinutes()).padStart(2, "0");
+//     return `${year}-${month}-${day}T${hours}:${minutes}`;
+//   };
+
+//   useEffect(() => {
+//     const now = new Date();
+//     setFormData((prevData) => ({
+//       ...prevData,
+//       followed_date: formatLocalDateTime(now),
+//       next_followup_date: formatLocalDateTime(now),
+//     }));
+//   }, []);
+
+//   const handleChange = (e) => {
+//     setFormData({ ...formData, [e.target.name]: e.target.value });
+//   };
+
+//   const handleSubmit = async (e) => {
+//     e.preventDefault();
+
+//     setIsSubmitting(true); // Disable button
+
+//     try {
+//       const res = await fetch(`/api/followup/${customerId}`, {
+//         method: "POST",
+//         headers: { "Content-Type": "application/json" },
+//         body: JSON.stringify(formData),
+//       });
+
+//       if (res.ok) {
+//         router.push(`/user-dashboard/view-customer/${customerId}`);
+//       } else {
+//         toast.error("Something went wrong.");
+//       }
+//     } catch (error) {
+//       toast.error("Submission failed.");
+//     } finally {
+//       setIsSubmitting(false); // Optional: set false only if staying on form
+//     }
+//   };
+
+//   return (
+//     <form onSubmit={handleSubmit} className="space-y-4 text-gray-700">
+//       <div>
+//         <label className="block text-sm font-medium text-gray-700">
+//           Followed Date
+//         </label>
+//         <input
+//           type="datetime-local"
+//           name="followed_date"
+//           value={formData.followed_date}
+//           onChange={handleChange}
+//           className="w-full px-4 py-2 border rounded-lg"
+//           required
+//         />
+//       </div>
+
+//       <div>
+//         <label className="block text-sm font-medium text-gray-700">Notes</label>
+//         <textarea
+//           name="notes"
+//           rows={4}
+//           value={formData.notes}
+//           onChange={handleChange}
+//           className="w-full px-4 py-2 border rounded-lg"
+//           required
+//         />
+//       </div>
+
+//       <div>
+//         <label className="block text-sm font-medium text-gray-700">
+//           Communication Mode
+//         </label>
+//         <select
+//           name="communication_mode"
+//           value={formData.communication_mode}
+//           onChange={handleChange}
+//           className="w-full px-4 py-2 border rounded-lg"
+//           required
+//         >
+//           <option value="" disabled>
+//             Select
+//           </option>
+//           <option value="Call">Call</option>
+//           <option value="WhatsApp">WhatsApp</option>
+//           <option value="Visit">Visit</option>
+//           <option value="Email">Email</option>
+//         </select>
+//       </div>
+
+//       <div>
+//         <label className="block text-sm font-medium text-gray-700">
+//           Next Follow-up Date
+//         </label>
+//         <input
+//           type="datetime-local"
+//           name="next_followup_date"
+//           value={formData.next_followup_date}
+//           onChange={handleChange}
+//           className="w-full px-4 py-2 border rounded-lg"
+//           required
+//         />
+//       </div>
+
+//       <button
+//         type="submit"
+//         disabled={isSubmitting}
+//         className={`w-full py-2 rounded-lg text-white ${
+//           isSubmitting
+//             ? "bg-gray-400 cursor-not-allowed"
+//             : "bg-gray-600 hover:bg-gray-700"
+//         }`}
+//       >
+//         {isSubmitting ? "Submitting..." : "Submit"}
+//       </button>
+//     </form>
+//   );
+// }
+
+// "use client";
+
+// import { useState, useEffect } from "react";
+// import { useRouter } from "next/navigation";
+// import toast from "react-hot-toast";
+
+// export default function FollowupForm({ customerId }) {
+//   const router = useRouter();
+//   const [formData, setFormData] = useState({
+//     followed_date: "",
+//     next_followup_date: "",
+//     notes: "",
+//     communication_mode: "",
+//     status: "", // NEW field
+//   });
+
+//   const [isSubmitting, setIsSubmitting] = useState(false);
+
+//   const statusList = ["Very Good", "Average", "Poor", "Denied"];
+
+//   const formatLocalDateTime = (date) => {
+//     const year = date.getFullYear();
+//     const month = String(date.getMonth() + 1).padStart(2, "0");
+//     const day = String(date.getDate()).padStart(2, "0");
+//     const hours = String(date.getHours()).padStart(2, "0");
+//     const minutes = String(date.getMinutes()).padStart(2, "0");
+//     return `${year}-${month}-${day}T${hours}:${minutes}`;
+//   };
+
+//   useEffect(() => {
+//     const now = new Date();
+//     setFormData((prevData) => ({
+//       ...prevData,
+//       followed_date: formatLocalDateTime(now),
+//       next_followup_date: formatLocalDateTime(now),
+//     }));
+//   }, []);
+
+//   const handleChange = (e) => {
+//     setFormData({ ...formData, [e.target.name]: e.target.value });
+//   };
+
+//   const handleSubmit = async (e) => {
+//     e.preventDefault();
+
+//     setIsSubmitting(true);
+
+//     try {
+//       const res = await fetch(`/api/followup/${customerId}`, {
+//         method: "POST",
+//         headers: { "Content-Type": "application/json" },
+//         body: JSON.stringify(formData),
+//       });
+
+//       if (res.ok) {
+//         router.push(`/user-dashboard/view-customer/${customerId}`);
+//       } else {
+//         toast.error("Something went wrong.");
+//       }
+//     } catch (error) {
+//       toast.error("Submission failed.");
+//     } finally {
+//       setIsSubmitting(false);
+//     }
+//   };
+
+//   return (
+//     <form onSubmit={handleSubmit} className="space-y-4 text-gray-700">
+//       <div>
+//         <label className="block text-sm font-medium text-gray-700">
+//           Followed Date
+//         </label>
+//         <input
+//           type="datetime-local"
+//           name="followed_date"
+//           value={formData.followed_date}
+//           onChange={handleChange}
+//           className="w-full px-4 py-2 border rounded-lg"
+//           required
+//         />
+//       </div>
+
+//       <div>
+//         <label className="block text-sm font-medium text-gray-700">Notes</label>
+//         <textarea
+//           name="notes"
+//           rows={4}
+//           value={formData.notes}
+//           onChange={handleChange}
+//           className="w-full px-4 py-2 border rounded-lg"
+//           required
+//         />
+//       </div>
+
+//       <div>
+//         <label className="block text-sm font-medium text-gray-700">
+//           Communication Mode
+//         </label>
+//         <select
+//           name="communication_mode"
+//           value={formData.communication_mode}
+//           onChange={handleChange}
+//           className="w-full px-4 py-2 border rounded-lg"
+//           required
+//         >
+//           <option value="" disabled>
+//             Select
+//           </option>
+//           <option value="Call">Call</option>
+//           <option value="WhatsApp">WhatsApp</option>
+//           <option value="Visit">Visit</option>
+//           <option value="Email">Email</option>
+//         </select>
+//       </div>
+
+//       {/* ✅ New Status Dropdown */}
+//       <div>
+//         <label className="block text-sm font-medium text-gray-700">
+//           Status
+//         </label>
+//         <select
+//           name="status"
+//           value={formData.status}
+//           onChange={handleChange}
+//           className="w-full px-4 py-2 border rounded-lg"
+//           required
+//         >
+//           <option value="" disabled>
+//             Select Status
+//           </option>
+//           {statusList.map((status) => (
+//             <option key={status} value={status}>
+//               {status}
+//             </option>
+//           ))}
+//         </select>
+//       </div>
+
+//       <div>
+//         <label className="block text-sm font-medium text-gray-700">
+//           Next Follow-up Date
+//         </label>
+//         <input
+//           type="datetime-local"
+//           name="next_followup_date"
+//           value={formData.next_followup_date}
+//           onChange={handleChange}
+//           className="w-full px-4 py-2 border rounded-lg"
+//           required
+//         />
+//       </div>
+
+//       <button
+//         type="submit"
+//         disabled={isSubmitting}
+//         className={`w-full py-2 rounded-lg text-white ${
+//           isSubmitting
+//             ? "bg-gray-400 cursor-not-allowed"
+//             : "bg-gray-600 hover:bg-gray-700"
+//         }`}
+//       >
+//         {isSubmitting ? "Submitting..." : "Submit"}
+//       </button>
+//     </form>
+//   );
+// }
+
+"use client";
+
+import { useState, useEffect, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import toast from "react-hot-toast";
-
-import { isGemRole } from "@/lib/isGemRole";
-import { isSalesRole } from "@/lib/isSalesRole";
 
 export default function FollowupForm({ customerId, userRole = "" }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const isFromUpcoming = searchParams.get("source") === "upcoming";
   const isServiceSupport = userRole === "SERVICE SUPPORT";
-  const isGEM = isGemRole(userRole);
+  const isGEM = userRole === "GEM";
   const isRestrictedRole = isServiceSupport || isGEM;
   const [formData, setFormData] = useState({
     followed_date: "",
@@ -24,8 +328,7 @@ export default function FollowupForm({ customerId, userRole = "" }) {
     communication_mode: "",
     status: "",
     multi_tag: [],
-    stage: "New",
-    purpose: "",
+    stage: "New"
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -34,230 +337,9 @@ export default function FollowupForm({ customerId, userRole = "" }) {
   const [customerCreatedAt, setCustomerCreatedAt] = useState(null);
   const [isLoadingCustomer, setIsLoadingCustomer] = useState(true);
   const [hasOrder, setHasOrder] = useState(false);
-  const [notesLanguage, setNotesLanguage] = useState("");
-
-  // Languages supported by Google Input Tools (GOOGLE_ITC map in transliterate API)
-  const notesLanguageOptions = [
-    { code: "en", name: "English" },
-    { code: "as", name: "Assamese" },
-    { code: "bn", name: "Bengali" },
-    { code: "gu", name: "Gujarati" },
-    { code: "gom", name: "Konkani" },
-    { code: "hi", name: "Hindi" },
-    { code: "kn", name: "Kannada" },
-    { code: "mai", name: "Maithili" },
-    { code: "ml", name: "Malayalam" },
-    { code: "mr", name: "Marathi" },
-    { code: "ne", name: "Nepali" },
-    { code: "or", name: "Odia" },
-    { code: "pa", name: "Punjabi" },
-    { code: "sa", name: "Sanskrit" },
-    { code: "sd", name: "Sindhi" },
-    { code: "si", name: "Sinhala" },
-    { code: "ta", name: "Tamil" },
-    { code: "te", name: "Telugu" },
-    { code: "ur", name: "Urdu" },
-  ];
-
-  const notesTextareaRef = useRef(null);
-  const notesFetchTimerRef = useRef(null);
-  const XLIT_API = "/api/transliterate/tl/";
-
-  const fetchTransliteration = async (phrase, lang) => {
-    if (!phrase || !lang || lang === "en") return [];
-    try {
-      const res = await fetch(
-        `${XLIT_API}${lang}/${encodeURIComponent(phrase.trim()).replace(".", "%2E")}`
-      );
-      const data = await res.json();
-      return data?.result?.length ? data.result : [];
-    } catch {
-      return [];
-    }
-  };
-
-  const transliterateFullText = async (text, lang) => {
-    if (!text || lang === "en") return text;
-
-    const regex = /[a-zA-Z]+(?:\s+[a-zA-Z]+)*/g;
-    let result = text;
-    const matches = [...text.matchAll(regex)];
-
-    for (let i = matches.length - 1; i >= 0; i--) {
-      const match = matches[i];
-      const suggestions = await fetchTransliteration(match[0], lang);
-      if (suggestions[0]) {
-        result =
-          result.slice(0, match.index) +
-          suggestions[0] +
-          result.slice(match.index + match[0].length);
-      }
-    }
-
-    return result;
-  };
-
-  const [notesSuggestions, setNotesSuggestions] = useState([]);
-  const [notesSuggestionIndex, setNotesSuggestionIndex] = useState(0);
-  const [notesPhraseRange, setNotesPhraseRange] = useState({ start: -1, end: -1 });
-  const [isNotesTransliterating, setIsNotesTransliterating] = useState(false);
-
-  const getRomanPhraseBeforeCursor = (text, cursorPos) => {
-    const textBefore = text.slice(0, cursorPos);
-    const lastBreak = Math.max(
-      textBefore.lastIndexOf(" "),
-      textBefore.lastIndexOf("\n"),
-      -1
-    );
-    const phraseStart = lastBreak + 1;
-    const phrase = textBefore.slice(phraseStart);
-    if (!phrase || !/^[a-zA-Z\s]+$/.test(phrase)) return null;
-    return { phrase, start: phraseStart, end: cursorPos };
-  };
-
-  const loadNotesSuggestions = (text, cursorPos, lang) => {
-    if (lang === "en") {
-      setNotesSuggestions([]);
-      return;
-    }
-
-    clearTimeout(notesFetchTimerRef.current);
-    notesFetchTimerRef.current = setTimeout(async () => {
-      const info = getRomanPhraseBeforeCursor(text, cursorPos);
-      if (!info?.phrase.trim()) {
-        setNotesSuggestions([]);
-        setNotesPhraseRange({ start: -1, end: -1 });
-        return;
-      }
-
-      const suggestions = await fetchTransliteration(info.phrase, lang);
-      if (suggestions.length) {
-        setNotesPhraseRange({ start: info.start, end: info.end });
-        setNotesSuggestions(suggestions);
-        setNotesSuggestionIndex(0);
-      } else {
-        setNotesSuggestions([]);
-        setNotesPhraseRange({ start: -1, end: -1 });
-      }
-    }, 120);
-  };
-
-  const applyNotesSuggestion = (suffixChar = " ", index = notesSuggestionIndex) => {
-    const replacement = notesSuggestions[index] ?? notesSuggestions[0];
-    if (!replacement || notesPhraseRange.start < 0) return;
-
-    const fullText = notesTextareaRef.current?.value ?? formData.notes;
-    const { start, end } = notesPhraseRange;
-    const newText =
-      fullText.slice(0, start) +
-      replacement +
-      suffixChar +
-      fullText.slice(end);
-
-    setFormData((prev) => ({ ...prev, notes: newText }));
-    setNotesCursor(start + replacement.length + suffixChar.length);
-    setNotesSuggestions([]);
-    setNotesPhraseRange({ start: -1, end: -1 });
-  };
-
-  const handleNotesLanguageChange = async (e) => {
-    const newLang = e.target.value;
-    const currentNotes = formData.notes;
-    setNotesLanguage(newLang);
-    setNotesSuggestions([]);
-
-    if (!currentNotes.trim() || newLang === "en") return;
-
-    setIsNotesTransliterating(true);
-    try {
-      const converted = await transliterateFullText(currentNotes, newLang);
-      setFormData((prev) => ({ ...prev, notes: converted }));
-    } finally {
-      setIsNotesTransliterating(false);
-    }
-  };
-
-  const handleNotesChange = (e) => {
-    handleChange(e);
-    const { value, selectionStart } = e.target;
-    loadNotesSuggestions(value, selectionStart ?? value.length, notesLanguage);
-  };
-
-  const handleNotesKeyDown = (e) => {
-    if (notesLanguage === "en") return;
-
-    if (notesSuggestions.length > 0) {
-      if (e.key === " " || e.key === "Tab") {
-        e.preventDefault();
-        applyNotesSuggestion(" ");
-        return;
-      }
-      if (e.key === "Enter") {
-        e.preventDefault();
-        applyNotesSuggestion("\n");
-        return;
-      }
-      if (e.key === "ArrowDown" || e.key === "ArrowRight") {
-        e.preventDefault();
-        setNotesSuggestionIndex(
-          (prev) => (prev + 1) % notesSuggestions.length
-        );
-        return;
-      }
-      if (e.key === "ArrowUp" || e.key === "ArrowLeft") {
-        e.preventDefault();
-        setNotesSuggestionIndex(
-          (prev) => (prev - 1 + notesSuggestions.length) % notesSuggestions.length
-        );
-        return;
-      }
-      if (e.key === "Escape") {
-        e.preventDefault();
-        setNotesSuggestions([]);
-        return;
-      }
-    }
-  };
-
-  const [notesCursor, setNotesCursor] = useState(null);
-
-  useEffect(() => {
-    if (notesCursor !== null && notesTextareaRef.current) {
-      notesTextareaRef.current.selectionStart = notesCursor;
-      notesTextareaRef.current.selectionEnd = notesCursor;
-      setNotesCursor(null);
-    }
-  }, [formData.notes, notesCursor]);
-
+  
   const statusList = ["Very Good", "Average", "Poor", "Denied", "Invalid"];
-  const baseTagOptions = [
-    "Visiting factory",
-    "Service Issue",
-    "Payment Follow-Up",
-    "Trucks Follow-Up",
-    "Cancel Order",
-    "Order received",
-    "Prime",
-    "Repeat Order",
-    "Running Order",
-    "Strong Follow-Up",
-    "Reseller",
-    "Contractor",
-    "N/A",
-  ];
-  const salesOnlyTags = [
-    "Delhi Visiting",
-    "Tamilnadu Visiting",
-    "Online Demo",
-    "Physical Demo",
-  ];
-  const tagOptions = useMemo(() => {
-    const isSalesUser =
-      isSalesRole(userRole) && !isServiceSupport && !isGEM;
-    if (!isSalesUser) return baseTagOptions;
-    const withoutNA = baseTagOptions.filter((tag) => tag !== "N/A");
-    return [...withoutNA, ...salesOnlyTags, "N/A"];
-  }, [userRole, isServiceSupport, isGEM]);
+  const tagOptions = ["Visiting factory", "Service Issue", "Payment Follow-Up", "Trucks Follow-Up", "Cancel Order", "Order received", "Prime", "Repeat Order", "Running Order", "Strong Follow-Up", "N/A"];
   const stageOptions = [
     "New",
     "Contacted",
@@ -372,15 +454,6 @@ export default function FollowupForm({ customerId, userRole = "" }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [customerCreatedAt, hasOrder, isFromUpcoming, formData.stage]);
 
-  // GEM follow-up always allows 15 days (not tied to lead-age 48h rule)
-  const gemFollowupDateLimits = useMemo(() => {
-    const now = new Date();
-    return {
-      min: formatISTDateTime(now),
-      max: formatISTDateTime(new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000)),
-    };
-  }, []);
-
   // Fetch customer's current stage, status, comm_mode from database
   useEffect(() => {
     const fetchCustomerData = async () => {
@@ -409,46 +482,16 @@ export default function FollowupForm({ customerId, userRole = "" }) {
         if (stageResponse.ok) {
           const stageData = await stageResponse.json();
           const dbStage = stageData.stage || "New";
-          const serviceStage = stageData.service_stage || "New";
-          const serviceStatus = stageData.service_status || "";
-          const gemStage = stageData.gem_stage || "New";
-          const gemStatus = stageData.gem_status || "";
-          const serviceTags = stageData.service_tags
-            ? String(stageData.service_tags)
-                .split(",")
-                .map((tag) => tag.trim())
-                .filter(Boolean)
-            : [];
-          const gemTags = stageData.gem_tags
-            ? String(stageData.gem_tags)
-                .split(",")
-                .map((tag) => tag.trim())
-                .filter(Boolean)
-            : [];
+          const dbStatus = stageData.status || "";
 
-          setCustomerCurrentStage(
-            isServiceSupport ? serviceStage : isGEM ? gemStage : dbStage,
-          );
+          setCustomerCurrentStage(dbStage);
           setCustomerCreatedAt(stageData.date_created || null);
           setHasOrder(stageData.has_order === 1 || stageData.has_order === true);
 
-          if (stageData.notes_language) {
-            setNotesLanguage(stageData.notes_language);
-          }
-
-          setFormData((prev) => ({
+          // Set all fields from DB in one atomic update
+          setFormData(prev => ({
             ...prev,
-            stage: isServiceSupport ? serviceStage : isGEM ? gemStage : dbStage,
-            status: isServiceSupport
-              ? serviceStatus
-              : isGEM
-                ? gemStatus
-                : prev.status,
-            multi_tag: isServiceSupport
-              ? serviceTags
-              : isGEM
-                ? gemTags
-                : prev.multi_tag,
+            stage: dbStage,
           }));
         }
       } catch (error) {
@@ -462,7 +505,7 @@ export default function FollowupForm({ customerId, userRole = "" }) {
     if (customerId) {
       fetchCustomerData();
     }
-  }, [customerId, isServiceSupport, isGEM]);
+  }, [customerId]);
 
   // Re-calculate limits when customerCreatedAt changes (triggers re-render automatically via state)
 
@@ -477,7 +520,28 @@ export default function FollowupForm({ customerId, userRole = "" }) {
     }));
   }, []);
 
-  const availableStages = stageOptions;
+  // Filter stages based on customer's current stage from database
+  const getAvailableStages = (currentStage) => {
+    // Use formData.stage as fallback if customerCurrentStage hasn't updated yet
+    const effectiveStage = currentStage || formData.stage || "New";
+
+    const stageOrder = stageOptions;
+    const currentIndex = stageOrder.indexOf(effectiveStage);
+
+    // For final stages, only allow staying in the same stage
+    if (effectiveStage === "Won (Order Received)" || effectiveStage === "Lost" || effectiveStage === "Disqualified / Invalid Lead") {
+      return [effectiveStage];
+    }
+
+    // If stage not found in list, return all options
+    if (currentIndex === -1) return stageOptions;
+
+    // Show current stage and all stages after it (progressive flow)
+    return stageOrder.slice(currentIndex);
+  };
+
+  // Recompute whenever customerCurrentStage OR formData.stage changes
+  const availableStages = getAvailableStages(customerCurrentStage);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -493,18 +557,6 @@ export default function FollowupForm({ customerId, userRole = "" }) {
           toast.error("You can schedule a follow-up for a maximum of 15 days from now.");
         }
         setFormData({ ...formData, [name]: nextFollowupDateLimits.max });
-        return;
-      }
-    }
-
-    if (name === "gem_next_followup" && value) {
-      const maxDate = gemFollowupDateLimits.max
-        ? new Date(gemFollowupDateLimits.max)
-        : null;
-
-      if (maxDate && new Date(value) > maxDate) {
-        toast.error("You can schedule a GEM follow-up for a maximum of 15 days from now.");
-        setFormData({ ...formData, [name]: gemFollowupDateLimits.max });
         return;
       }
     }
@@ -542,45 +594,6 @@ export default function FollowupForm({ customerId, userRole = "" }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!notesLanguage) {
-      toast.error("Please select a language.");
-      return;
-    }
-
-    if (isServiceSupport) {
-      if (!formData.status) {
-        toast.error("Please select service status.");
-        return;
-      }
-      if (!formData.stage) {
-        toast.error("Please select service stage.");
-        return;
-      }
-    }
-
-    if (isGEM) {
-      if (!formData.status) {
-        toast.error("Please select GEM status.");
-        return;
-      }
-      if (!formData.stage) {
-        toast.error("Please select GEM stage.");
-        return;
-      }
-    }
-
-    if (isGEM && formData.gem_next_followup) {
-      const selected = new Date(formData.gem_next_followup);
-      const maxDate = gemFollowupDateLimits.max
-        ? new Date(gemFollowupDateLimits.max)
-        : null;
-
-      if (maxDate && selected > maxDate) {
-        toast.error("You can schedule a GEM follow-up for a maximum of 15 days from now.");
-        return;
-      }
-    }
-
     // Final validation for next_followup_date before submitting
     if (formData.status !== "Denied" && formData.status !== "Invalid" && formData.next_followup_date) {
       const selected = new Date(formData.next_followup_date);
@@ -602,14 +615,11 @@ export default function FollowupForm({ customerId, userRole = "" }) {
       // ✅ Send datetime-local values directly (no UTC conversion)
       const payload = {
         ...formData,
-        multi_tag: formData.multi_tag.join(", "),
-        notes_language: notesLanguage,
+        multi_tag: formData.multi_tag.join(", "), // Convert array to comma-separated string
       };
 
+      // SERVICE SUPPORT को next_followup_date की जरूरत नहीं, सिर्फ service_next_followup भेजेंगे
       if (isServiceSupport) {
-        payload.service_status = formData.status;
-        payload.service_stage = formData.stage;
-        payload.service_tags = formData.multi_tag.join(", ");
         delete payload.next_followup_date;
         delete payload.status;
         delete payload.stage;
@@ -617,10 +627,8 @@ export default function FollowupForm({ customerId, userRole = "" }) {
         delete payload.gem_next_followup;
       }
 
+      // GEM को next_followup_date की जरूरत नहीं, सिर्फ gem_next_followup भेजेंगे
       if (isGEM) {
-        payload.gem_status = formData.status;
-        payload.gem_stage = formData.stage;
-        payload.gem_tags = formData.multi_tag.join(", ");
         delete payload.next_followup_date;
         delete payload.status;
         delete payload.stage;
@@ -628,13 +636,10 @@ export default function FollowupForm({ customerId, userRole = "" }) {
         delete payload.service_next_followup;
       }
 
-      // Normal Sales / other roles - gem_next_followup nahi bhejna
-      // service_next_followup sirf tab bhejna jab status "Denied" ho
+      // Normal Sales / other roles - service_next_followup aur gem_next_followup nahi bhejna
       if (!isServiceSupport && !isGEM) {
+        delete payload.service_next_followup;
         delete payload.gem_next_followup;
-        if (formData.status !== "Denied") {
-          delete payload.service_next_followup;
-        }
       }
 
       const res = await fetch(`/api/followup/${customerId}`, {
@@ -677,74 +682,15 @@ export default function FollowupForm({ customerId, userRole = "" }) {
       </div>
 
       <div>
-        <div className="flex items-center justify-between mb-1">
-          <label className="block text-sm font-medium text-gray-700">Notes</label>
-          <div className="flex items-center gap-2">
-            <label className="text-xs text-gray-600">
-              Language <span className="text-red-500">*</span>:
-            </label>
-            <select
-              value={notesLanguage}
-              onChange={handleNotesLanguageChange}
-              disabled={isNotesTransliterating}
-              required
-              className="text-sm px-2 py-1 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-gray-400 disabled:opacity-60"
-            >
-              <option value="">Select Language</option>
-              {notesLanguageOptions.map((lang) => (
-                <option key={lang.code} value={lang.code}>
-                  {lang.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-        <div className="relative">
-          <textarea
-            ref={notesTextareaRef}
-            name="notes"
-            rows={4}
-            value={formData.notes}
-            onChange={handleNotesChange}
-            onKeyDown={handleNotesKeyDown}
-            onClick={(e) =>
-              loadNotesSuggestions(
-                e.target.value,
-                e.target.selectionStart ?? e.target.value.length,
-                notesLanguage
-              )
-            }
-            disabled={isNotesTransliterating}
-            className="w-full px-4 py-2 border rounded-lg disabled:opacity-60"
-            required
-          />
-          {notesSuggestions.length > 0 && notesLanguage !== "en" && (
-            <ul className="absolute left-0 right-0 top-full z-50 mt-1 flex flex-wrap gap-1 rounded-md border border-gray-200 bg-white p-1 shadow-lg text-sm">
-              {notesSuggestions.map((item, index) => (
-                <li
-                  key={`${item}-${index}`}
-                  onMouseEnter={() => setNotesSuggestionIndex(index)}
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    applyNotesSuggestion(" ", index);
-                  }}
-                  className={`cursor-pointer rounded px-2 py-1 ${
-                    index === notesSuggestionIndex
-                      ? "bg-sky-500 text-white"
-                      : "hover:bg-gray-100"
-                  }`}
-                >
-                  {item}
-                </li>
-              ))}
-            </ul>
-          )}
-          {notesLanguage !== "en" && (
-            <p className="mt-1 text-xs text-gray-500">
-              Type in English letters, use ↑↓ to pick suggestions, Space to confirm
-            </p>
-          )}
-        </div>
+        <label className="block text-sm font-medium text-gray-700">Notes</label>
+        <textarea
+          name="notes"
+          rows={4}
+          value={formData.notes}
+          onChange={handleChange}
+          className="w-full px-4 py-2 border rounded-lg"
+          required
+        />
       </div>
 
       <div>
@@ -768,43 +714,20 @@ export default function FollowupForm({ customerId, userRole = "" }) {
         </select>
       </div>
 
-      {/* Calling Purpose - Only for SERVICE SUPPORT */}
-      {isServiceSupport && (
-        <div>
-          <label className="block text-sm font-medium text-gray-700">
-            Calling Purpose <span className="text-red-500">*</span>
-          </label>
-          <select
-            name="purpose"
-            value={formData.purpose}
-            onChange={handleChange}
-            className="w-full px-4 py-2 border rounded-lg"
-            required
-          >
-            <option value="" disabled>Select Purpose</option>
-            <option value="Service">Service</option>
-            <option value="CAMC">CAMC</option>
-            <option value="Installation">Installation</option>
-            <option value="Sales">Sales</option>
-            <option value="Denied follow-up">Denied follow-up</option>
-          </select>
-        </div>
-      )}
-
       <div>
         <label className="block text-sm font-medium text-gray-700">
-          {isGEM ? "GEM Status" : isServiceSupport ? "Service Status" : "Status"}
+          Status
         </label>
         <select
           name="status"
           value={formData.status}
           onChange={handleChange}
-          disabled={false}
-          className="w-full px-4 py-2 border rounded-lg"
+          disabled={isRestrictedRole}
+          className={`w-full px-4 py-2 border rounded-lg ${isRestrictedRole ? "bg-gray-100 cursor-not-allowed opacity-60" : ""}`}
           required
         >
           <option value="" disabled>
-            Select Status
+            {isRestrictedRole ? "Not allowed" : "Select Status"}
           </option>
           {statusList.map((status) => (
             <option key={status} value={status}>
@@ -817,33 +740,26 @@ export default function FollowupForm({ customerId, userRole = "" }) {
       {/* Stage Field */}
       <div>
         <label className="block text-sm font-medium text-gray-700">
-          {isGEM ? "GEM Stage" : isServiceSupport ? "Service Stage" : "Stage"}{" "}
-          <span className="text-red-500">*</span>
+          Stage <span className="text-red-500">*</span>
         </label>
         <select
           name="stage"
           value={formData.stage}
           onChange={handleChange}
-          disabled={isLoadingCustomer}
-          className={`w-full px-4 py-2 border rounded-lg ${isLoadingCustomer ? "bg-gray-100 cursor-not-allowed opacity-60" : ""}`}
+          disabled={isLoadingCustomer || isRestrictedRole}
+          className={`w-full px-4 py-2 border rounded-lg ${(isLoadingCustomer || isRestrictedRole) ? "bg-gray-100 cursor-not-allowed opacity-60" : ""}`}
           required
         >
-          <option value="">
-            {isLoadingCustomer ? "Loading..." : "Select Stage"}
-          </option>
+          <option value="">{isLoadingCustomer ? "Loading..." : isRestrictedRole ? "Not allowed" : "Select Stage"}</option>
           {availableStages.map((stage) => (
             <option key={stage} value={stage}>
               {stage}
             </option>
           ))}
         </select>
-        {!isLoadingCustomer && (
+        {!isLoadingCustomer && !isRestrictedRole && (
           <p className="mt-1 text-xs text-gray-500">
-            Current {isServiceSupport ? "service " : isGEM ? "GEM " : ""}stage:{" "}
-            <strong>{customerCurrentStage}</strong>.
-            {isServiceSupport || isGEM
-              ? " Saved in follow-up history."
-              : " Only forward progression allowed."}
+            Current stage: <strong>{customerCurrentStage}</strong>. Only forward progression allowed.
           </p>
         )}
       </div>
@@ -851,13 +767,10 @@ export default function FollowupForm({ customerId, userRole = "" }) {
       {/* Multi-Tag Selection */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          {isGEM
-            ? "GEM Tags (Multiple Selection)"
-            : isServiceSupport
-              ? "Service Tags (Multiple Selection)"
-              : "Tags (Multiple Selection)"}
+          Tags (Multiple Selection)
+          {isRestrictedRole && <span className="text-red-500 ml-1">- Not allowed</span>}
         </label>
-        <div className="flex flex-wrap gap-2">
+        <div className={`flex flex-wrap gap-2 ${isRestrictedRole ? "opacity-50 pointer-events-none" : ""}`}>
           {tagOptions.map((tag) => (
             <label
               key={tag}
@@ -872,7 +785,8 @@ export default function FollowupForm({ customerId, userRole = "" }) {
               <input
                 type="checkbox"
                 checked={formData.multi_tag.includes(tag)}
-                onChange={() => handleTagChange(tag)}
+                onChange={() => !isRestrictedRole && handleTagChange(tag)}
+                disabled={isRestrictedRole}
                 className="hidden"
               />
               <span className="text-sm font-medium">{tag}</span>
@@ -919,13 +833,11 @@ export default function FollowupForm({ customerId, userRole = "" }) {
         </div>
       )}
 
-      {/* Service Next Follow-up Date - Always for SERVICE SUPPORT (regardless of purpose),
-          OR for normal roles when status is Denied */}
-      {(isServiceSupport ||
-        (!isServiceSupport && !isGEM && formData.status === "Denied")) && (
+      {/* Service Next Follow-up Date - Only for SERVICE SUPPORT */}
+      {isServiceSupport && (
         <div>
           <label className="block text-sm font-medium text-gray-700">
-            Service Next Follow-up Date (IST) <span className="text-red-500">*</span>
+            Service Next Follow-up Date (IST)
           </label>
           <input
             type="datetime-local"
@@ -933,17 +845,14 @@ export default function FollowupForm({ customerId, userRole = "" }) {
             value={formData.service_next_followup}
             onChange={handleChange}
             min={nextFollowupDateLimits.min}
-            max={formatISTDateTime(new Date(Date.now() + 60 * 24 * 60 * 60 * 1000))}
+            max={nextFollowupDateLimits.max}
             disabled={isLoadingCustomer}
             className={`w-full px-4 py-2 border rounded-lg ${isLoadingCustomer ? "bg-gray-100 cursor-not-allowed" : ""}`}
-            required
           />
           <p className="mt-1 text-xs text-blue-600">
             {isLoadingCustomer
               ? "Loading lead information..."
-              : formData.status === "Denied"
-              ? "Schedule when to follow up again on this denied lead (maximum 2 months from now)."
-              : "Schedule your next service follow-up (maximum 2 months from now)."}
+              : "Schedule your next service follow-up (maximum 15 days from now)."}
           </p>
         </div>
       )}
@@ -959,8 +868,8 @@ export default function FollowupForm({ customerId, userRole = "" }) {
             name="gem_next_followup"
             value={formData.gem_next_followup}
             onChange={handleChange}
-            min={gemFollowupDateLimits.min}
-            max={gemFollowupDateLimits.max}
+            min={nextFollowupDateLimits.min}
+            max={nextFollowupDateLimits.max}
             disabled={isLoadingCustomer}
             className={`w-full px-4 py-2 border rounded-lg ${isLoadingCustomer ? "bg-gray-100 cursor-not-allowed" : ""}`}
           />

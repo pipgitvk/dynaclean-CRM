@@ -177,7 +177,7 @@ export default async function ProspectsPage({ searchParams }) {
     <div className="mx-auto w-full max-w-screen-2xl rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6 md:p-8 dark:border-slate-200 dark:bg-white">
       {!viewerIsAdmin && (
         <Link
-          href="/director-dashboard"
+          href="/user-dashboard"
           className="mb-3 inline-flex items-center gap-1 text-sm font-medium text-blue-700 hover:text-blue-900 hover:underline"
         >
           ← Back to user dashboard

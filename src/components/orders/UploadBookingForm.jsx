@@ -1,6 +1,5 @@
 "use client";
 
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -122,8 +121,15 @@ export default function UploadBookingForm({
           <label htmlFor="booking_date" className="block text-sm font-medium text-gray-700">
             Booking Date
           </label>
-          <TypeableDateFilterInput value={formData.booking_date} onChange={(v) => handleChange({ target: { name: "booking_date", value: v } })} id="booking_date" required
-            className="mt-1 w-full border px-3 py-2 rounded-md"/>
+          <input
+            type="date"
+            id="booking_date"
+            name="booking_date"
+            value={formData.booking_date}
+            onChange={handleChange}
+            required
+            className="mt-1 w-full border px-3 py-2 rounded-md"
+          />
         </div>
 
         <div>
@@ -133,8 +139,15 @@ export default function UploadBookingForm({
           >
             Expected Delivery Date
           </label>
-          <TypeableDateFilterInput value={formData.expected_delivery_date} onChange={(v) => handleChange({ target: { name: "expected_delivery_date", value: v } })} id="expected_delivery_date" required
-            className="mt-1 w-full border px-3 py-2 rounded-md"/>
+          <input
+            type="date"
+            id="expected_delivery_date"
+            name="expected_delivery_date"
+            value={formData.expected_delivery_date}
+            onChange={handleChange}
+            required
+            className="mt-1 w-full border px-3 py-2 rounded-md"
+          />
         </div>
 
         <input

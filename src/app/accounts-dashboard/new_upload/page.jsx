@@ -1,6 +1,5 @@
 "use client";
 
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect } from "react";
 import ManualLeadModal from "@/components/models/ManualLeadModal";
 // Inline table for assigned customers (no external table component)
@@ -57,11 +56,21 @@ export default function LeadDistributionPage() {
         <div className="flex flex-col md:flex-row gap-3 items-start md:items-end">
           <div className="flex flex-col">
             <label className="text-xs text-gray-600 mb-1">From</label>
-            <TypeableDateFilterInput value={fromDate} onChange={setFromDate} className="border border-gray-300 rounded px-3 py-2"/>
+            <input
+              type="date"
+              value={fromDate}
+              onChange={(e) => setFromDate(e.target.value)}
+              className="border border-gray-300 rounded px-3 py-2"
+            />
           </div>
           <div className="flex flex-col">
             <label className="text-xs text-gray-600 mb-1">To</label>
-            <TypeableDateFilterInput value={toDate} onChange={setToDate} className="border border-gray-300 rounded px-3 py-2"/>
+            <input
+              type="date"
+              value={toDate}
+              onChange={(e) => setToDate(e.target.value)}
+              className="border border-gray-300 rounded px-3 py-2"
+            />
           </div>
           {/* <button
             onClick={() => {

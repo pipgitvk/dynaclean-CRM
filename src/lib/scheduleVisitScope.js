@@ -1,6 +1,5 @@
 import { normalizeRoleKey } from "@/lib/roleKeyUtils";
 import { buildGemCustomerScopeWhere, getScopedUsername } from "@/lib/dataScope";
-import { sqlServiceSupportCustomerScope } from "@/lib/serviceSupportTeamScope";
 
 export function isScheduleVisitSuperAdmin(role) {
   return normalizeRoleKey(role) === "SUPERADMIN";
@@ -16,15 +15,15 @@ export function canShowScheduleVisitOnCustomerProfile(role) {
 }
 
 function buildCustomerOwnershipSql({ role, username }) {
-  const roleKey = normalizeRoleKey(role);
-
-  if (roleKey === "SERVICE SUPPORT") {
-    return { sql: sqlServiceSupportCustomerScope(), params: [] };
-  }
-
   const u = String(username ?? "").trim();
   if (!u) {
     return { sql: "1=0", params: [] };
+  }
+
+  const roleKey = normalizeRoleKey(role);
+
+  if (roleKey === "SERVICE SUPPORT") {
+    return { sql: "service_lead_source = ?", params: [u] };
   }
 
   if (roleKey === "GEM") {

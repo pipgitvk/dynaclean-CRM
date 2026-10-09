@@ -4,10 +4,6 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Shield, ArrowLeft, Save } from "lucide-react";
 import Link from "next/link";
-import {
-  notifyEmployeesListReload,
-  reloadEmployeesAdminPage,
-} from "@/lib/employeesPageReload";
 
 export default function UserIpRestrictionPage() {
    
@@ -57,9 +53,7 @@ export default function UserIpRestrictionPage() {
             const result = await res.json();
             if (res.ok) {
                 alert("Settings saved successfully!");
-                if (!notifyEmployeesListReload()) {
-                    reloadEmployeesAdminPage();
-                }
+                router.back();
             } else {
                 alert(result.error || "Failed to save settings");
             }

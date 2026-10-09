@@ -1,6 +1,5 @@
 "use client";
 
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
@@ -445,8 +444,13 @@ export default function QuotationSalesEditForm({ quoteId, hasOrder = false, redi
         </div>
         <div>
           <label className="text-sm text-gray-600">Date</label>
-          <TypeableDateFilterInput value={quoteDate} onChange={setQuoteDate} className="input w-full"
-            disabled={hasOrder}/>
+          <input
+            type="date"
+            value={quoteDate}
+            onChange={(e) => setQuoteDate(e.target.value)}
+            className="input w-full"
+            disabled={hasOrder}
+          />
         </div>
       </div>
 
@@ -576,7 +580,6 @@ export default function QuotationSalesEditForm({ quoteId, hasOrder = false, redi
         cgstRate={cgstRate}
         sgstRate={sgstRate}
         igstRate={igstRate}
-        editableSpecification={false}
       />
 
       <TaxAndSummary

@@ -1,6 +1,5 @@
 "use client";
 
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect, useMemo } from "react";
 import {
     Pencil,
@@ -77,7 +76,6 @@ export default function DDManagementPage() {
         mode_of_payment: "DD",
         contract_no: "",
         security_type: "",
-        overdue_date: "",
         bid_document: null,
         remark: "",
 
@@ -134,10 +132,7 @@ export default function DDManagementPage() {
         status: "Assigned",
         original_dd_location: "Self",
         sent_to_client_date: "",
-        claim_from_bank: false,
-        claim_date: "",
-        other_deduction_amount: "",
-        other_deduction_remark: ""
+        claim_from_bank: false
     });
 
     const fetchUser = async () => {
@@ -195,17 +190,6 @@ export default function DDManagementPage() {
         fetchCreditStatements();
     }, [statusFilter, search]);
 
-    // Handle URL parameters on component mount
-    useEffect(() => {
-        const urlParams = new URLSearchParams(window.location.search);
-        const statusParam = urlParams.get('status');
-        const fromCardParam = urlParams.get('fromCard');
-        
-        if (statusParam && fromCardParam === '1') {
-            setStatusFilter(statusParam);
-        }
-    }, []);
-
     const handleInputChange = (e) => {
         const { name, value, type, checked } = e.target;
         // Prevent non-authorized users from changing Step 2/3 fields if they somehow bypass UI
@@ -220,13 +204,6 @@ export default function DDManagementPage() {
             ...prev,
             [name]: type === "checkbox" ? checked : value
         }));
-    };
-
-    // Helper function to calculate net amount after deduction
-    const getNetAmount = (mainAmount, deductionAmount) => {
-        const main = Number(mainAmount) || 0;
-        const deduction = Number(deductionAmount) || 0;
-        return main - deduction;
     };
 
     const handleFileChange = (e) => {
@@ -306,13 +283,11 @@ export default function DDManagementPage() {
     const linkPayment = async (statementId, type, action = 'link') => {
         const isUnlink = action === 'unlink';
         const selectedStatement = (type === 'debit' ? statements : creditStatements).find((s) => Number(s.id) === Number(statementId));
-        const mainAmount = Number(selectedDD?.amount || 0);
-        const deductionAmount = Number(selectedDD?.other_deduction_amount || 0);
-        const netAmount = getNetAmount(mainAmount, deductionAmount);
+        const ddAmount = Number(selectedDD?.amount || 0);
         const statementAmount = Math.abs(Number(selectedStatement?.amount || 0));
 
-        if (!isUnlink && netAmount !== statementAmount) {
-            toast.error(`Amount mismatch: DD net amount ₹${netAmount.toLocaleString('en-IN')} (₹${mainAmount.toLocaleString('en-IN')} - ₹${deductionAmount.toLocaleString('en-IN')}) and statement amount ₹${statementAmount.toLocaleString('en-IN')} must match`);
+        if (!isUnlink && ddAmount !== statementAmount) {
+            toast.error(`Amount mismatch: DD net amount ₹${ddAmount.toLocaleString('en-IN')} and statement amount ₹${statementAmount.toLocaleString('en-IN')} must match`);
             return;
         }
 
@@ -367,17 +342,6 @@ export default function DDManagementPage() {
 
     const handleSubmit = async (step, shouldClose = true) => {
         try {
-            // Validation: If deduction amount > 0, remark is mandatory
-            if (step === 2) {
-                const deductionAmount = Number(formData.other_deduction_amount) || 0;
-                const remark = (formData.other_deduction_remark || "").trim();
-                
-                if (deductionAmount > 0 && !remark) {
-                    toast.error("Remark is mandatory when Other Deduction Amount is greater than 0");
-                    return false;
-                }
-            }
-
             const uploadedPaths = await uploadFiles();
 
             const payload = { ...formData, ...uploadedPaths };
@@ -481,7 +445,6 @@ export default function DDManagementPage() {
                 expiry_date: dd.expiry_date ? dayjs(dd.expiry_date).format("YYYY-MM-DD") : "",
                 claim_expiry_date: dd.claim_expiry_date ? dayjs(dd.claim_expiry_date).format("YYYY-MM-DD") : "",
                 claim_from_bank: !!dd.claim_from_bank,
-                claim_date: dd.claim_date ? dayjs(dd.claim_date).format("YYYY-MM-DD") : "",
                 payment_date: dd.payment_date ? dayjs(dd.payment_date).format("YYYY-MM-DD") : "",
                 dd_date: dd.dd_date ? dayjs(dd.dd_date).format("YYYY-MM-DD") : "",
                 cheque_upload: dd.cheque_upload,
@@ -561,10 +524,7 @@ export default function DDManagementPage() {
             status: "Assigned",
             original_dd_location: "Self",
             sent_to_client_date: "",
-            claim_from_bank: false,
-            claim_date: "",
-            other_deduction_amount: "",
-            other_deduction_remark: ""
+            claim_from_bank: false
         });
 
     const resetForm = () => {
@@ -589,7 +549,6 @@ export default function DDManagementPage() {
         setFormData(prev => ({
             ...prev,
             claim_from_bank: checked,
-            claim_date: checked ? dayjs().format("YYYY-MM-DD") : "",
             status: checked ? "Claimed" : prev.status
         }));
     };
@@ -631,7 +590,6 @@ export default function DDManagementPage() {
                     <option value="Filled">Filled</option>
                     <option value="Issued">Issued</option>
                     <option value="Sent to Client">Sent to Client</option>
-                    <option value="overdue">Overdue</option>
                 </select>
                 <div className="flex items-center gap-2 text-sm text-gray-500 justify-end">
                     <Clock size={16} /> Total Records: <span className="font-bold text-gray-900">{data.length}</span>
@@ -646,19 +604,16 @@ export default function DDManagementPage() {
                             <tr>
                                 <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Details</th>
                                 <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Amount & Date</th>
-                                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Overdue Date</th>
                                 <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Bank Info & Docs</th>
                                 <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Issued Details</th>
                                 <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
-                                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">Other Deduction</th>
                                 <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">Claimed From Bank</th>
-                                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">Claim Date</th>
                                 <th className="px-6 py-4 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
                             {isLoading ? (
-                                <tr><td colSpan="10" className="px-6 py-10 text-center animate-pulse text-gray-400">Loading records...</td></tr>
+                                <tr><td colSpan="7" className="px-6 py-10 text-center animate-pulse text-gray-400">Loading records...</td></tr>
                             ) : data.length > 0 ? (
                                 data.map((dd) => (
                                     <tr key={dd.id} className="hover:bg-gray-50/80 transition-colors group">
@@ -677,22 +632,8 @@ export default function DDManagementPage() {
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="text-xs">
-                                                <div className="font-bold text-gray-800">₹{parseFloat(getNetAmount(dd.amount, dd.other_deduction_amount)).toLocaleString()}</div>
-                                                {dd.other_deduction_amount && Number(dd.other_deduction_amount) > 0 && (
-                                                    <div className="text-orange-600 text-[11px] font-semibold">(₹{parseFloat(dd.amount).toLocaleString()} - ₹{parseFloat(dd.other_deduction_amount).toLocaleString()})</div>
-                                                )}
+                                                <div className="font-bold text-gray-800">₹{parseFloat(dd.amount).toLocaleString()}</div>
                                                 <div className="text-gray-500 font-medium">{dayjs(dd.assign_date).format("DD MMM YYYY")}</div>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="text-xs">
-                                                {dd.overdue_date ? (
-                                                    <div className={`font-bold ${new Date(dd.overdue_date) < new Date() ? 'text-red-600' : 'text-gray-800'}`}>
-                                                        {dayjs(dd.overdue_date).format("DD MMM YYYY")}
-                                                    </div>
-                                                ) : (
-                                                    <div className="text-gray-400 italic">Not set</div>
-                                                )}
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
@@ -742,39 +683,10 @@ export default function DDManagementPage() {
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
-                                            <div className="flex flex-col items-center gap-1">
-                                                {dd.other_deduction_amount ? (
-                                                    <>
-                                                        <span className="text-sm font-bold text-orange-600">
-                                                            ₹{parseFloat(dd.other_deduction_amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                                        </span>
-                                                        {dd.other_deduction_remark && (
-                                                            <span className="text-xs text-gray-600 italic max-w-[150px] truncate" title={dd.other_deduction_remark}>
-                                                                {dd.other_deduction_remark}
-                                                            </span>
-                                                        )}
-                                                    </>
-                                                ) : (
-                                                    <span className="text-xs text-gray-400">—</span>
-                                                )}
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4">
                                             <div className="flex justify-center items-center gap-2">
                                                 <span className={`text-xs font-bold px-2 py-1 rounded ${dd.claim_from_bank ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}>
                                                     {dd.claim_from_bank ? "Yes" : "No"}
                                                 </span>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex justify-center items-center">
-                                                {dd.claim_date ? (
-                                                    <span className="text-xs text-gray-700 font-medium">
-                                                        {dayjs(dd.claim_date).format("DD MMM YYYY")}
-                                                    </span>
-                                                ) : (
-                                                    <span className="text-xs text-gray-400">—</span>
-                                                )}
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 text-right">
@@ -796,15 +708,23 @@ export default function DDManagementPage() {
                                                             Step 2
                                                         </button>
                                                         {(() => {
-                                                            // Only show statement-linked payments, not reference_no field data
+                                                            const hasDirectPayment = dd.reference_no && dd.payment_amount && dd.payment_date;
                                                             const linkedDebitPayment = creditStatements.find(s => s.type === "Debit" && Number(s.dd_id) === Number(dd.id) && String(s.invoice_status || "").trim() === "DD Management Linked");
                                                             
-                                                            if (linkedDebitPayment) {
+                                                            if (hasDirectPayment) {
+                                                                return (
+                                                                    <div className="flex flex-col items-start gap-1 text-[10px] text-emerald-700">
+                                                                        <span className="font-semibold">TransID: {dd.reference_no}</span>
+                                                                        <span className="font-semibold">Amount: {dd.payment_amount}</span>
+                                                                        <span className="font-semibold">Date: {dayjs(dd.payment_date).format('DD-MM-YYYY')}</span>
+                                                                    </div>
+                                                                );
+                                                            } else if (linkedDebitPayment) {
                                                                 return (
                                                                     <div className="flex flex-col items-start gap-1 text-[10px] text-emerald-700">
                                                                         <span className="font-semibold">TransID: {linkedDebitPayment.trans_id}</span>
-                                                                        <span className="font-semibold">Amount: {Math.abs(linkedDebitPayment.amount).toLocaleString('en-IN')}</span>
-                                                                        <span className="font-semibold">Date: {dayjs(linkedDebitPayment.date).format('DD-MM-YYYY')}</span>
+                                                                        <span className="font-semibold">Amount: {linkedDebitPayment.amount}</span>
+                                                                        <span className="font-semibold">Date: {dayjs().format('DD-MM-YYYY')}</span>
                                                                     </div>
                                                                 );
                                                             } else {
@@ -823,8 +743,9 @@ export default function DDManagementPage() {
                                                         })()}
                                                         {(() => {
                                                             const linkedPayment = creditStatements.find(s => s.type === "Credit" && Number(s.dd_id) === Number(dd.id) && String(s.invoice_status || "").trim() === "DD Management Linked");
+                                                            const hasDirectPayment = dd.reference_no && dd.payment_amount && dd.payment_date;
                                                             const hasDebitPayment = creditStatements.some(s => s.type === "Debit" && Number(s.dd_id) === Number(dd.id) && String(s.invoice_status || "").trim() === "DD Management Linked");
-                                                            const canLinkPayment = hasDebitPayment; // Remove reference_no dependency
+                                                            const canLinkPayment = hasDirectPayment || hasDebitPayment;
                                                             if (linkedPayment) {
                                                                 return (
                                                                     <div className="flex flex-col items-start gap-1 text-[10px] text-blue-700">
@@ -852,7 +773,7 @@ export default function DDManagementPage() {
                                     </tr>
                                 ))
                             ) : (
-                                <tr><td colSpan="9" className="px-6 py-10 text-center text-gray-400">No records found matching your filters.</td></tr>
+                                <tr><td colSpan="5" className="px-6 py-10 text-center text-gray-400">No records found matching your filters.</td></tr>
                             )}
                         </tbody>
                     </table>
@@ -927,17 +848,17 @@ export default function DDManagementPage() {
                                         </div>
                                         <div>
                                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Assign Date</label>
-                                            <TypeableDateFilterInput value={formData.assign_date} onChange={(v) => handleInputChange({ target: { name: "assign_date", value: v } })} disabled={selectedDD?.assign_date} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"/>
+                                            <input disabled={selectedDD?.assign_date} type="date" name="assign_date" value={formData.assign_date} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" />
                                         </div>
                                     </div>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
                                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Expiry Date</label>
-                                            <TypeableDateFilterInput value={formData.expiry_date} onChange={(v) => handleInputChange({ target: { name: "expiry_date", value: v } })} disabled={selectedDD?.expiry_date} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"/>
+                                            <input disabled={selectedDD?.expiry_date} type="date" name="expiry_date" value={formData.expiry_date} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" />
                                         </div>
                                         <div>
                                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Claim Expiry Date</label>
-                                            <TypeableDateFilterInput value={formData.claim_expiry_date} onChange={(v) => handleInputChange({ target: { name: "claim_expiry_date", value: v } })} disabled={selectedDD?.claim_expiry_date} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"/>
+                                            <input disabled={selectedDD?.claim_expiry_date} type="date" name="claim_expiry_date" value={formData.claim_expiry_date} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" />
                                         </div>
                                     </div>
                                     <div>
@@ -963,10 +884,6 @@ export default function DDManagementPage() {
                                                 <option value="BG">BG</option>
                                             </select>
                                         </div>
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Overdue Date</label>
-                                        <TypeableDateFilterInput value={formData.overdue_date || ""} onChange={(v) => handleInputChange({ target: { name: "overdue_date", value: v } })} disabled={selectedDD?.overdue_date} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"/>
                                     </div>
                                     <div>
                                         <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Upload BG Format</label>
@@ -1014,7 +931,7 @@ export default function DDManagementPage() {
                                         </div>
                                         <div>
                                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Assign Date</label>
-                                            <TypeableDateFilterInput value={formData.assign_date} onChange={(v) => handleInputChange({ target: { name: "assign_date", value: v } })} disabled={selectedDD?.assign_date} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`}/>
+                                            <input disabled={selectedDD?.assign_date} type="date" name="assign_date" value={formData.assign_date} onChange={handleInputChange} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`} />
                                         </div>
                                     </div>
                                     <div>
@@ -1040,10 +957,6 @@ export default function DDManagementPage() {
                                                 <option value="BG">BG</option>
                                             </select>
                                         </div>
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Overdue Date</label>
-                                        <TypeableDateFilterInput value={formData.overdue_date || ""} onChange={(v) => handleInputChange({ target: { name: "overdue_date", value: v } })} disabled={selectedDD?.overdue_date} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`}/>
                                     </div>
                                     <div>
                                         <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Bid Document</label>
@@ -1180,7 +1093,7 @@ export default function DDManagementPage() {
                                             <div className="grid grid-cols-2 gap-4">
                                                 <div>
                                                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Date</label>
-                                                    <TypeableDateFilterInput value={formData.payment_date} onChange={(v) => handleInputChange({ target: { name: "payment_date", value: v } })} disabled={selectedDD?.payment_date} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none disabled:bg-gray-100"/>
+                                                    <input disabled={selectedDD?.payment_date} type="date" name="payment_date" value={formData.payment_date} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none disabled:bg-gray-100" />
                                                 </div>
                                                 <div>
                                                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">From Bank Account No</label>
@@ -1221,7 +1134,7 @@ export default function DDManagementPage() {
                                             <div className="grid grid-cols-2 gap-4">
                                                 <div>
                                                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Date</label>
-                                                    <TypeableDateFilterInput value={formData.bg_date} onChange={(v) => handleInputChange({ target: { name: "bg_date", value: v } })} disabled={selectedDD?.bg_date} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none disabled:bg-gray-100"/>
+                                                    <input disabled={selectedDD?.bg_date} type="date" name="bg_date" value={formData.bg_date} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none disabled:bg-gray-100" />
                                                 </div>
                                                 <div>
                                                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Amount</label>
@@ -1235,7 +1148,7 @@ export default function DDManagementPage() {
                                                 </div>
                                                 <div>
                                                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Validity Upto</label>
-                                                    <TypeableDateFilterInput value={formData.validity_upto} onChange={(v) => handleInputChange({ target: { name: "validity_upto", value: v } })} disabled={selectedDD?.validity_upto} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none disabled:bg-gray-100"/>
+                                                    <input disabled={selectedDD?.validity_upto} type="date" name="validity_upto" value={formData.validity_upto} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none disabled:bg-gray-100" />
                                                 </div>
                                             </div>
                                             <div className="grid grid-cols-2 gap-4">
@@ -1288,20 +1201,7 @@ export default function DDManagementPage() {
                                         </div>
                                         <div>
                                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Filled Date</label>
-                                            <TypeableDateFilterInput value={formData.filled_date} onChange={(v) => handleInputChange({ target: { name: "filled_date", value: v } })} className="w-full p-2.5 border rounded-lg outline-none"/>
-                                        </div>
-                                    </div>
-                                    <div className="space-y-4 pt-4 border-t">
-                                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Other Deduction</label>
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div>
-                                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Deduction Amount</label>
-                                                <input type="number" name="other_deduction_amount" value={formData.other_deduction_amount} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none" placeholder="0.00" step="0.01" />
-                                            </div>
-                                            <div>
-                                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Remark {Number(formData.other_deduction_amount) > 0 && <span className="text-red-500">*</span>}</label>
-                                                <input type="text" name="other_deduction_remark" value={formData.other_deduction_remark} onChange={handleInputChange} className={`w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none ${Number(formData.other_deduction_amount) > 0 && !formData.other_deduction_remark ? "border-red-500 bg-red-50" : ""}`} placeholder="Enter deduction reason" />
-                                            </div>
+                                            <input type="date" name="filled_date" value={formData.filled_date} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg outline-none" />
                                         </div>
                                     </div>
                                     <div className="pt-4 border-t">
@@ -1402,7 +1302,7 @@ export default function DDManagementPage() {
                                             <div className="grid grid-cols-2 gap-4">
                                                 <div>
                                                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Date</label>
-                                                    <TypeableDateFilterInput value={formData.payment_date} onChange={(v) => handleInputChange({ target: { name: "payment_date", value: v } })} disabled={selectedDD?.payment_date} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none disabled:bg-gray-100 ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`}/>
+                                                    <input disabled={selectedDD?.payment_date} type="date" name="payment_date" value={formData.payment_date} onChange={handleInputChange} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none disabled:bg-gray-100 ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`} />
                                                 </div>
                                                 <div>
                                                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">From Bank Account No</label>
@@ -1447,7 +1347,7 @@ export default function DDManagementPage() {
                                                 </div>
                                                 <div>
                                                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">DD Date</label>
-                                                    <TypeableDateFilterInput value={formData.dd_date} onChange={(v) => handleInputChange({ target: { name: "dd_date", value: v } })} disabled={selectedDD?.dd_date} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none disabled:bg-gray-100 ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`}/>
+                                                    <input disabled={selectedDD?.dd_date} type="date" name="dd_date" value={formData.dd_date} onChange={handleInputChange} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none disabled:bg-gray-100 ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`} />
                                                 </div>
                                             </div>
                                             <div className="grid grid-cols-2 gap-4">
@@ -1463,7 +1363,7 @@ export default function DDManagementPage() {
                                             <div className="grid grid-cols-2 gap-4">
                                                 <div>
                                                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Expiry Bank Date</label>
-                                                    <TypeableDateFilterInput value={formData.expiry_bank} onChange={(v) => handleInputChange({ target: { name: "expiry_bank", value: v } })} disabled={selectedDD?.expiry_bank} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none disabled:bg-gray-100 ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`}/>
+                                                    <input disabled={selectedDD?.expiry_bank} type="date" name="expiry_bank" value={formData.expiry_bank} onChange={handleInputChange} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none disabled:bg-gray-100 ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`} />
                                                 </div>
                                                 <div>
                                                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Issuing Branch</label>
@@ -1504,7 +1404,7 @@ export default function DDManagementPage() {
                                             <div className="grid grid-cols-2 gap-4">
                                                 <div>
                                                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Date</label>
-                                                    <TypeableDateFilterInput value={formData.bg_date} onChange={(v) => handleInputChange({ target: { name: "bg_date", value: v } })} disabled={selectedDD?.bg_date} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100"/>
+                                                    <input disabled={selectedDD?.bg_date} type="date" name="bg_date" value={formData.bg_date} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100" />
                                                 </div>
                                                 <div>
                                                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Amount</label>
@@ -1518,7 +1418,7 @@ export default function DDManagementPage() {
                                                 </div>
                                                 <div>
                                                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Validity Upto</label>
-                                                    <TypeableDateFilterInput value={formData.validity_upto} onChange={(v) => handleInputChange({ target: { name: "validity_upto", value: v } })} disabled={selectedDD?.validity_upto} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100"/>
+                                                    <input disabled={selectedDD?.validity_upto} type="date" name="validity_upto" value={formData.validity_upto} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100" />
                                                 </div>
                                             </div>
                                             <div className="grid grid-cols-2 gap-4">
@@ -1577,12 +1477,6 @@ export default function DDManagementPage() {
                                                     <input disabled={!isAuthorized} type="checkbox" id="claim_from_bank" name="claim_from_bank" checked={formData.claim_from_bank} onChange={handleClaimFromBankChange} className="w-4 h-4 text-blue-600 rounded disabled:opacity-50" />
                                                     <label htmlFor="claim_from_bank" className="text-sm font-medium text-gray-700">Claim from bank?</label>
                                                 </div>
-                                                {formData.claim_from_bank && (
-                                                    <div>
-                                                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Claim Date</label>
-                                                        <TypeableDateFilterInput value={formData.claim_date} onChange={(v) => handleInputChange({ target: { name: "claim_date", value: v } })} disabled={!isAuthorized} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none disabled:bg-gray-100 ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`}/>
-                                                    </div>
-                                                )}
                                                 {formData.original_dd_location === "Client" && (
                                                     <div className="space-y-4 pt-4 border-t">
                                                         <div>
@@ -1602,7 +1496,7 @@ export default function DDManagementPage() {
                                                         </div>
                                                         <div>
                                                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Delivery Date</label>
-                                                            <TypeableDateFilterInput value={formData.delivery_date || ""} onChange={(v) => handleInputChange({ target: { name: "delivery_date", value: v } })} disabled={!isAuthorized} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none disabled:bg-gray-100 ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`}/>
+                                                            <input disabled={!isAuthorized} type="date" name="delivery_date" value={formData.delivery_date || ""} onChange={handleInputChange} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none disabled:bg-gray-100 ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`} />
                                                         </div>
                                                     </div>
                                                 )}
@@ -1629,20 +1523,7 @@ export default function DDManagementPage() {
                                         </div>
                                         <div>
                                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Filled Date</label>
-                                            <TypeableDateFilterInput value={formData.filled_date} onChange={(v) => handleInputChange({ target: { name: "filled_date", value: v } })} disabled={selectedDD?.filled_date} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`}/>
-                                        </div>
-                                    </div>
-                                    <div className="space-y-4 pt-4 border-t">
-                                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Other Deduction</label>
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div>
-                                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Deduction Amount</label>
-                                                <input type="number" name="other_deduction_amount" value={formData.other_deduction_amount} onChange={handleInputChange} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`} placeholder="0.00" step="0.01" />
-                                            </div>
-                                            <div>
-                                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Remark {Number(formData.other_deduction_amount) > 0 && <span className="text-red-500">*</span>}</label>
-                                                <input type="text" name="other_deduction_remark" value={formData.other_deduction_remark} onChange={handleInputChange} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"} ${Number(formData.other_deduction_amount) > 0 && !formData.other_deduction_remark ? "border-red-500 bg-red-50" : ""}`} placeholder="Enter deduction reason" />
-                                            </div>
+                                            <input disabled={selectedDD?.filled_date} type="date" name="filled_date" value={formData.filled_date} onChange={handleInputChange} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`} />
                                         </div>
                                     </div>
                                 </>
@@ -1714,12 +1595,6 @@ export default function DDManagementPage() {
                                         <input disabled={!isAuthorized} type="checkbox" id="claim_from_bank" name="claim_from_bank" checked={formData.claim_from_bank} onChange={handleInputChange} className="w-4 h-4 text-blue-600 rounded disabled:opacity-50" />
                                         <label htmlFor="claim_from_bank" className="text-sm font-medium text-gray-700">Claim from bank?</label>
                                     </div>
-                                    {formData.claim_from_bank && (
-                                        <div>
-                                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Claim Date</label>
-                                            <TypeableDateFilterInput value={formData.claim_date} onChange={(v) => handleInputChange({ target: { name: "claim_date", value: v } })} disabled={!isAuthorized} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100"/>
-                                        </div>
-                                    )}
                                 </div>
                                 <div className="space-y-4">
                                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Status Update</label>
@@ -1772,7 +1647,7 @@ export default function DDManagementPage() {
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <div>
                                         <span className="text-xs font-medium text-emerald-600 uppercase">Net Amount:</span>
-                                        <div className="text-lg font-bold text-emerald-900">₹{Number(getNetAmount(selectedDD?.amount, selectedDD?.other_deduction_amount)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+                                        <div className="text-lg font-bold text-emerald-900">₹{Number(selectedDD?.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
                                     </div>
                                     <div>
                                         <span className="text-xs font-medium text-emerald-600 uppercase">Total Linked:</span>
@@ -1780,7 +1655,7 @@ export default function DDManagementPage() {
                                     </div>
                                     <div>
                                         <span className="text-xs font-medium text-emerald-600 uppercase">Remaining:</span>
-                                        <div className="text-lg font-bold text-emerald-900">₹{(getNetAmount(selectedDD?.amount, selectedDD?.other_deduction_amount) - statements.filter(s => s.type === "Debit" && Number(s.dd_id) === Number(selectedDD?.id)).reduce((sum, s) => sum + Number(s.amount || 0), 0)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+                                        <div className="text-lg font-bold text-emerald-900">₹{(Number(selectedDD?.amount || 0) - statements.filter(s => s.type === "Debit" && Number(s.dd_id) === Number(selectedDD?.id)).reduce((sum, s) => sum + Number(s.amount || 0), 0)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
                                     </div>
                                 </div>
                             </div>
@@ -1797,11 +1672,21 @@ export default function DDManagementPage() {
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium text-gray-500 uppercase mb-1">From Date</label>
-                                    <TypeableDateFilterInput value={paymentDateFrom} onChange={setPaymentDateFrom} className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none"/>
+                                    <input
+                                        type="date"
+                                        value={paymentDateFrom}
+                                        onChange={(e) => setPaymentDateFrom(e.target.value)}
+                                        className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
+                                    />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium text-gray-500 uppercase mb-1">To Date</label>
-                                    <TypeableDateFilterInput value={paymentDateTo} onChange={setPaymentDateTo} className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none"/>
+                                    <input
+                                        type="date"
+                                        value={paymentDateTo}
+                                        onChange={(e) => setPaymentDateTo(e.target.value)}
+                                        className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
+                                    />
                                 </div>
                                 <div className="flex items-end">
                                     <button
@@ -1946,7 +1831,7 @@ export default function DDManagementPage() {
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <div>
                                         <span className="text-xs font-medium text-blue-600 uppercase">Net Amount:</span>
-                                        <div className="text-lg font-bold text-blue-900">₹{Number(getNetAmount(selectedDD?.amount, selectedDD?.other_deduction_amount)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+                                        <div className="text-lg font-bold text-blue-900">₹{Number(selectedDD?.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
                                     </div>
                                     <div>
                                         <span className="text-xs font-medium text-blue-600 uppercase">Total Linked:</span>
@@ -1954,7 +1839,7 @@ export default function DDManagementPage() {
                                     </div>
                                     <div>
                                         <span className="text-xs font-medium text-blue-600 uppercase">Remaining:</span>
-                                        <div className="text-lg font-bold text-blue-900">₹{(getNetAmount(selectedDD?.amount, selectedDD?.other_deduction_amount) - creditStatements.filter(s => s.type === "Credit" && Number(s.dd_id) === Number(selectedDD?.id)).reduce((sum, s) => sum + Number(s.amount || 0), 0)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+                                        <div className="text-lg font-bold text-blue-900">₹{(Number(selectedDD?.amount || 0) - creditStatements.filter(s => s.type === "Credit" && Number(s.dd_id) === Number(selectedDD?.id)).reduce((sum, s) => sum + Number(s.amount || 0), 0)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
                                     </div>
                                 </div>
                             </div>
@@ -1971,11 +1856,21 @@ export default function DDManagementPage() {
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium text-gray-500 uppercase mb-1">From Date</label>
-                                    <TypeableDateFilterInput value={creditDateFrom} onChange={setCreditDateFrom} className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"/>
+                                    <input
+                                        type="date"
+                                        value={creditDateFrom}
+                                        onChange={(e) => setCreditDateFrom(e.target.value)}
+                                        className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                                    />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium text-gray-500 uppercase mb-1">To Date</label>
-                                    <TypeableDateFilterInput value={creditDateTo} onChange={setCreditDateTo} className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"/>
+                                    <input
+                                        type="date"
+                                        value={creditDateTo}
+                                        onChange={(e) => setCreditDateTo(e.target.value)}
+                                        className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                                    />
                                 </div>
                                 <div className="flex items-end">
                                     <button

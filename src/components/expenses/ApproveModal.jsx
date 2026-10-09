@@ -1,6 +1,5 @@
 "use client";
 
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState } from "react";
 
 export default function ApproveModal({ expenseId, initialAmount, approver }) {
@@ -67,8 +66,13 @@ export default function ApproveModal({ expenseId, initialAmount, approver }) {
 
               <div>
                 <label className="block font-medium">Approval Date</label>
-                <TypeableDateFilterInput value={approvalDate} onChange={setApprovalDate} className="w-full border rounded px-3 py-2"
-                  required/>
+                <input
+                  type="date"
+                  value={approvalDate}
+                  onChange={(e) => setApprovalDate(e.target.value)}
+                  className="w-full border rounded px-3 py-2"
+                  required
+                />
               </div>
 
               <div>

@@ -4,11 +4,9 @@ import { getSessionPayload } from "@/lib/auth";
 import {
   parseImportDateToYmd,
   isSundayWeeklyOffIndia,
-  normalizeWallClockTimeForImport,
 } from "@/lib/attendanceImportParse";
 import { canBulkImportAttendance } from "@/lib/attendanceBulkImportRoles";
 import { rowHasMeaningfulCheckinOrCheckout } from "@/lib/attendanceMeaningfulPunch";
-import { lookupAttendanceEmployeeIds } from "@/lib/ensureAttendanceLogsEmployeeColumns";
 
 /**
  * Match rep_list.username, then employee_profiles.full_name (exact, case-insensitive).
@@ -78,12 +76,14 @@ function normalizeMysqlDatetime(s) {
 function combineDateAndTimeForDb(dateYmd, timeVal) {
   if (!dateYmd || timeVal == null || String(timeVal).trim() === "") return null;
   const t = String(timeVal).trim();
-  if (parseImportDateToYmd(t)) return null;
   const full = normalizeMysqlDatetime(t);
   if (full) return full;
-  const wall = normalizeWallClockTimeForImport(t);
-  if (!wall) return null;
-  return normalizeMysqlDatetime(`${dateYmd} ${wall}`);
+  const hm = t.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  if (!hm) return null;
+  const hh = String(parseInt(hm[1], 10)).padStart(2, "0");
+  const mm = String(parseInt(hm[2], 10)).padStart(2, "0");
+  const ss = hm[3] != null ? String(parseInt(hm[3], 10)).padStart(2, "0") : "00";
+  return normalizeMysqlDatetime(`${dateYmd} ${hh}:${mm}:${ss}`);
 }
 
 /** True if this log already has a real check-in or check-out punch (do not overwrite via import). */
@@ -232,7 +232,10 @@ export async function POST(request) {
 
       const hasAnyTime = TIME_FIELDS.some((col) => times[col] != null);
       if (!hasAnyTime) {
-        skipped++;
+        errors.push({
+          row: rowNum,
+          message: "Provide at least one time field to import.",
+        });
         continue;
       }
 
@@ -343,21 +346,18 @@ export async function POST(request) {
         const coutLon = cout != null ? 0 : null;
         const coutA = cout != null ? checkoutAddr || "HR bulk import" : null;
 
-        const ids = await lookupAttendanceEmployeeIds(conn, username);
         await conn.execute(
           `INSERT INTO attendance_logs (
-              username, employee_id, machine_code, date,
+              username, date,
               checkin_time, checkout_time,
               break_morning_start, break_morning_end,
               break_lunch_start, break_lunch_end,
               break_evening_start, break_evening_end,
               checkin_latitude, checkin_longitude, checkin_address,
               checkout_latitude, checkout_longitude, checkout_address
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             username,
-            ids.employee_id,
-            ids.machine_code,
             dateStr,
             cin,
             cout,

@@ -1,6 +1,5 @@
 "use client";
 
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Save, X } from "lucide-react";
@@ -398,7 +397,13 @@ export default function AddDeliveryChallanPage() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Expected Delivery Date
               </label>
-              <TypeableDateFilterInput value={formData.expected_delivery_date} onChange={(v) => handleChange({ target: { name: "expected_delivery_date", value: v } })} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"/>
+              <input
+                type="date"
+                name="expected_delivery_date"
+                value={formData.expected_delivery_date}
+                onChange={handleChange}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+              />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -442,8 +447,14 @@ export default function AddDeliveryChallanPage() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Challan Date *
               </label>
-              <TypeableDateFilterInput value={formData.challan_date} onChange={(v) => handleChange({ target: { name: "challan_date", value: v } })} required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"/>
+              <input
+                type="date"
+                name="challan_date"
+                value={formData.challan_date}
+                onChange={handleChange}
+                required
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+              />
             </div>
 
             <div>

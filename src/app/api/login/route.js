@@ -2,16 +2,11 @@ import { NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import { getDbConnection } from "@/lib/db";
 import { getCurrentISTTime } from "@/lib/timezone";
-import { ensureLoginTimeRestrictionColumn } from "@/lib/ensureLoginTimeRestrictionColumn";
-import { verifyThirdPartyEngineerPassword } from "@/lib/thirdPartyEngineerPassword";
-import { THIRD_PARTY_ENGINEER_ROLE } from "@/lib/thirdPartyEngineerPortalSession";
 
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret";
 
 export async function POST(request) {
-  console.log("--- API Route Execution Start ---");
-
   const userAgent = request.headers.get("user-agent") || "unknown";
 
   // Get client IP address
@@ -80,7 +75,26 @@ export async function POST(request) {
       return res;
     }
 
-    await ensureLoginTimeRestrictionColumn();
+    // --- 1. Time-based Restriction (9:00 AM - 7:00 PM IST) ---
+    const { hour, minute } = getCurrentISTTime();
+    const currentTimeMinutes = hour * 60 + minute;
+    const startRange = 9 * 60; // 9:00 AM
+    const endRange = 19 * 60; // 7:00 PM
+
+    if (username !== "admin" && username !== "VK") {
+      if (currentTimeMinutes < startRange || currentTimeMinutes > endRange) {
+        await recordActivity(
+          username,
+          "UNKNOWN",
+          "FAILED",
+          `Login attempted outside allowed hours (09:00 - 19:00 IST). Current IST time: ${hour}:${minute}`,
+        );
+        return NextResponse.json(
+          { error: "Login allowed only between 09:00 and 19:00 IST" },
+          { status: 403 },
+        );
+      }
+    }
 
     // Step 1: Try emplist
     const [empRows] = await conn.execute(
@@ -111,101 +125,16 @@ export async function POST(request) {
     
 
 
-    const inputPassword = password.trim();
-
     if (!user) {
-      const [tpeRows] = await conn.execute(
-        `SELECT engineer_id, email, password, status
-         FROM third_party_service_engineers
-         WHERE LOWER(email) = LOWER(?)
-         LIMIT 1`,
-        [username.trim()]
-      );
-
-      if (tpeRows.length > 0) {
-        const eng = tpeRows[0];
-        if (eng.status !== "active") {
-          await recordActivity(
-            username,
-            THIRD_PARTY_ENGINEER_ROLE,
-            "FAILED",
-            "Third-party engineer account inactive"
-          );
-          return NextResponse.json({ error: "Account is inactive" }, { status: 403 });
-        }
-        if (!verifyThirdPartyEngineerPassword(inputPassword, eng.password)) {
-          await recordActivity(
-            username,
-            THIRD_PARTY_ENGINEER_ROLE,
-            "FAILED",
-            "Incorrect password"
-          );
-          return NextResponse.json({ error: "Incorrect password" }, { status: 401 });
-        }
-
-        const token = jwt.sign(
-          {
-            id: eng.engineer_id,
-            engineerId: eng.engineer_id,
-            username: eng.email,
-            role: THIRD_PARTY_ENGINEER_ROLE,
-          },
-          JWT_SECRET,
-          { expiresIn: "7d" }
-        );
-
-        const res = NextResponse.json({
-          message: "Login successful",
-          role: THIRD_PARTY_ENGINEER_ROLE,
-        });
-        res.cookies.set("token", token, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === "production",
-          sameSite: "strict",
-          path: "/",
-          maxAge: 7 * 24 * 60 * 60,
-        });
-        await recordActivity(
-          eng.email,
-          THIRD_PARTY_ENGINEER_ROLE,
-          "SUCCESS",
-          `Third-party engineer login from IP: ${ip}`
-        );
-        return res;
-      }
-
       await recordActivity(username, "UNKNOWN", "FAILED", "User not found");
       return NextResponse.json({ error: "User not found" }, { status: 401 });
     }
+   
+    
 
     const userRole = user.userRole || user.role || "UNKNOWN";
-    const isSuperAdmin =
-      String(userRole).trim().toUpperCase() === "SUPERADMIN" ||
-      String(username).trim().toLowerCase() === "admin";
-
-    // Time-based restriction when enabled per employee (not for SUPERADMIN)
-    const isTimeRestrictionEnabled =
-      !isSuperAdmin && user.login_time_restriction_enabled !== 0;
-    if (isTimeRestrictionEnabled) {
-      const { hour, minute } = getCurrentISTTime();
-      const currentTimeMinutes = hour * 60 + minute;
-      const startRange = 9 * 60; // 09:00 IST
-      const endRange = 19 * 60 + 15; // 19:15 IST
-
-      if (currentTimeMinutes < startRange || currentTimeMinutes > endRange) {
-        await recordActivity(
-          username,
-          userRole,
-          "FAILED",
-          `Login attempted outside allowed hours (09:00 - 19:15 IST). Current IST time: ${hour}:${String(minute).padStart(2, "0")}`,
-        );
-        return NextResponse.json(
-          { error: "Login allowed only between 09:00 and 19:15 IST" },
-          { status: 403 },
-        );
-      }
-    }
     const dbPassword = user.password || "";
+    const inputPassword = password.trim();
 
     console.log("inputPassword",inputPassword);
     console.log("dbPassword",dbPassword);
@@ -276,6 +205,27 @@ console.log('✅ User ',user);
     return res;
   } catch (error) {
     console.error("🔥 Error during login:", error);
+    const code = error?.code || "";
+    const message = String(error?.message || "").toLowerCase();
+
+    // Map infrastructure failures to a credential-shaped response so the UI
+    // does not leak connection details to the client.
+    if (
+      code === "ER_ACCESS_DENIED_ERROR" ||
+      code === "ECONNREFUSED" ||
+      code === "ENOTFOUND" ||
+      code === "ETIMEDOUT" ||
+      code === "HANDSHAKE_SSL_ERROR" ||
+      message.includes("ssl") ||
+      message.includes("access denied") ||
+      message.includes("unable to connect")
+    ) {
+      return NextResponse.json(
+        { error: "Invalid username or password" },
+        { status: 401 },
+      );
+    }
+
     return NextResponse.json(
       { error: "Internal Server Error" },
       { status: 500 },

@@ -1,7 +1,6 @@
 "use client";
 
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
-import { useEffect, useState, useMemo, useRef, useCallback } from "react";
+import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { Search, Download, Eye, Plus, Edit2 } from "lucide-react";
 import MultiPurchaseLinkModal from "./MultiPurchaseLinkModal";
@@ -10,24 +9,12 @@ import ExcelJS from "exceljs";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { useUser } from "@/context/UserContext";
-import { parseLinkedStatementIds } from "@/lib/statementLinkedPurchases";
 
 const formatDisplayDate = (value) => {
   if (!value) return "—";
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return String(value);
   return parsed.toLocaleDateString("en-IN");
-};
-
-const resolvePurchaseCategory = (purchase) => {
-  const category =
-    purchase?.category === "Product" || purchase?.category === "Spare"
-      ? purchase.category
-      : null;
-  return {
-    category,
-    sub_category: purchase?.sub_category || null,
-  };
 };
 
 const FILE_SERVE_PREFIX = "/api/serve/";
@@ -481,118 +468,6 @@ function EditCustomerModal({ open, onClose, record, onSaved }) {
   );
 }
 
-const parseLinkedPurchaseIds = (raw) => {
-  if (raw == null || String(raw).trim() === "") return [];
-  let arr = null;
-  try {
-    const parsed = JSON.parse(String(raw));
-    if (Array.isArray(parsed)) arr = parsed;
-  } catch {
-    arr = String(raw).split(",");
-  }
-  const ids = [];
-  for (const v of arr) {
-    if (v == null) continue;
-    if (typeof v === "number" && Number.isFinite(v) && v > 0) {
-      ids.push(Math.trunc(v));
-      continue;
-    }
-    const s = String(v).trim().toUpperCase();
-    if (!s) continue;
-    if (/^PP\d+$/.test(s)) {
-      const n = Number(s.slice(2));
-      if (Number.isFinite(n) && n > 0) ids.push(n);
-      continue;
-    }
-    if (/^\d+$/.test(s)) {
-      const n = Number(s);
-      if (Number.isFinite(n) && n > 0) ids.push(n);
-      continue;
-    }
-  }
-  return ids;
-};
-
-function buildPaymentLinkMaps(statements, purchases) {
-  const next = new Set();
-  const transMap = {};
-  const stmtMap = {};
-
-  const addLink = (pid, stmt) => {
-    if (!Number.isFinite(pid) || pid <= 0) return;
-    next.add(pid);
-    if (!transMap[pid]) transMap[pid] = [];
-    if (stmt?.trans_id && !transMap[pid].includes(stmt.trans_id)) {
-      transMap[pid].push(stmt.trans_id);
-    }
-    if (!stmtMap[pid]) stmtMap[pid] = [];
-    if (stmt?.id != null && !stmtMap[pid].includes(Number(stmt.id))) {
-      stmtMap[pid].push(Number(stmt.id));
-    }
-  };
-
-  const addTransToken = (pid, token) => {
-    if (!Number.isFinite(pid) || pid <= 0 || token == null) return;
-    const value = String(token).trim();
-    if (!value) return;
-    next.add(pid);
-    if (!transMap[pid]) transMap[pid] = [];
-    if (!transMap[pid].includes(value)) {
-      transMap[pid].push(value);
-    }
-  };
-
-  for (const s of statements) {
-    const ids = parseLinkedPurchaseIds(s?.linked_purchase_ids);
-    for (const id of ids) {
-      addLink(id, s);
-    }
-  }
-
-  const byTransId = new Map();
-  const byId = new Map();
-  for (const s of statements) {
-    if (s?.trans_id != null) byTransId.set(String(s.trans_id), s);
-    if (s?.id != null) byId.set(Number(s.id), s);
-  }
-
-  for (const p of purchases) {
-    const pid = Number(p?.id);
-    const tokens = parseLinkedStatementIds(p?.linked_statement_ids);
-    for (const token of tokens) {
-      const value = String(token).trim();
-      if (!value) continue;
-
-      const matchedByTransId = byTransId.get(value);
-      if (matchedByTransId) {
-        addLink(pid, matchedByTransId);
-        continue;
-      }
-
-      if (/^\d+$/.test(value)) {
-        const matchedById = byId.get(Number(value));
-        if (matchedById) {
-          addLink(pid, matchedById);
-          continue;
-        }
-      }
-
-      addTransToken(pid, value);
-    }
-  }
-
-  const transDisplayMap = {};
-  for (const pid in transMap) {
-    transDisplayMap[pid] = transMap[pid].join(", ");
-  }
-
-  return {
-    linkedPurchaseIds: next,
-    transDisplayMap,
-    stmtMap,
-  };
-}
-
 function LinkPaymentModal({ open, onClose, purchase, onLinked, currentStatementIds, userRole }) {
   const [loading, setLoading] = useState(false);
   const [statements, setStatements] = useState([]);
@@ -648,17 +523,6 @@ function LinkPaymentModal({ open, onClose, purchase, onLinked, currentStatementI
     return keys;
   };
 
-  const hasPurchaseId = (stmt) => {
-    const pid = Number(purchase?.id);
-    if (!Number.isFinite(pid) || pid <= 0) return false;
-    return getLinkedKeys(stmt).includes(`PP${pid}`);
-  };
-
-  const isStatementLinkedToPurchase = (stmt) => {
-    if (hasPurchaseId(stmt)) return true;
-    return Array.isArray(currentStatementIds) && currentStatementIds.includes(Number(stmt?.id));
-  };
-
   const { currentTotal, myKey } = useMemo(() => {
     const pid = Number(purchase?.id);
     const key = Number.isFinite(pid) && pid > 0 ? `PP${pid}` : "";
@@ -666,13 +530,16 @@ function LinkPaymentModal({ open, onClose, purchase, onLinked, currentStatementI
       if (getLinkedKeys(s).includes(key)) {
         return acc + Number(s.amount || 0);
       }
-      if (Array.isArray(currentStatementIds) && currentStatementIds.includes(Number(s?.id))) {
-        return acc + Number(s.amount || 0);
-      }
       return acc;
     }, 0);
     return { currentTotal: total, myKey: key };
-  }, [statements, purchase?.id, currentStatementIds]);
+  }, [statements, purchase?.id]);
+
+  const hasPurchaseId = (stmt) => {
+    const pid = Number(purchase?.id);
+    if (!Number.isFinite(pid) || pid <= 0) return false;
+    return getLinkedKeys(stmt).includes(`PP${pid}`);
+  };
 
   const eligibleStatements = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -696,7 +563,7 @@ function LinkPaymentModal({ open, onClose, purchase, onLinked, currentStatementI
 
     // Filter to show only selected (linked to current purchase) if checkbox is checked
     if (showOnlySelected) {
-      rows = rows.filter((s) => isStatementLinkedToPurchase(s));
+      rows = rows.filter((s) => hasPurchaseId(s));
     }
 
     if (q) {
@@ -854,7 +721,7 @@ function LinkPaymentModal({ open, onClose, purchase, onLinked, currentStatementI
                 </tr>
               ) : (
                 eligibleStatements.map((s) => {
-                  const alreadyLinkedToThis = isStatementLinkedToPurchase(s);
+                  const alreadyLinkedToThis = hasPurchaseId(s);
                   const linkedKeys = getLinkedKeys(s);
                   const myKey = purchase?.id != null ? `PP${Number(purchase.id)}` : "";
                   const linkedToOther = linkedKeys.length > 0 && !linkedKeys.includes(myKey);
@@ -907,16 +774,10 @@ export default function PurchasesPage() {
   const userRole = user?.userRole;
   
   const [purchases, setPurchases] = useState([]);
-  const [hoveredImg, setHoveredImg] = useState(null); // { src, x, y }
-  const hoverTimerRef = useRef(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [categoryFilter, setCategoryFilter] = useState("all");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [invoiceNumberFilter, setInvoiceNumberFilter] = useState("");
-  const [invoiceDateStart, setInvoiceDateStart] = useState("");
-  const [invoiceDateEnd, setInvoiceDateEnd] = useState("");
   const [sortColumn, setSortColumn] = useState("created_at");
   const [sortDirection, setSortDirection] = useState("desc");
   const [showExportOptions, setShowExportOptions] = useState(false);
@@ -936,7 +797,8 @@ export default function PurchasesPage() {
   const [editCustomerRecord, setEditCustomerRecord] = useState(null);
 
   useEffect(() => {
-    loadPurchaseData();
+    loadPurchases();
+    loadLinkedPurchaseIds();
   }, []);
 
   const loadPurchases = async () => {
@@ -945,12 +807,7 @@ export default function PurchasesPage() {
       const res = await fetch("/api/stock-request");
       if (res.ok) {
         const data = await res.json();
-        const rows = (Array.isArray(data) ? data : []).map((row) => {
-          const { category, sub_category } = resolvePurchaseCategory(row);
-          return { ...row, category, sub_category };
-        });
-        setPurchases(rows);
-        return rows;
+        setPurchases(data);
       }
     } catch (error) {
       console.error("Error loading purchases:", error);
@@ -958,25 +815,78 @@ export default function PurchasesPage() {
     } finally {
       setLoading(false);
     }
-    return [];
   };
 
-  const loadLinkedPurchaseIds = async (purchaseRows = purchases) => {
+  const parseLinkedPurchaseIds = (raw) => {
+    if (raw == null || String(raw).trim() === "") return [];
+    let arr = null;
+    try {
+      const parsed = JSON.parse(String(raw));
+      if (Array.isArray(parsed)) arr = parsed;
+    } catch {
+      arr = String(raw).split(",");
+    }
+    const ids = [];
+    for (const v of arr) {
+      if (v == null) continue;
+      if (typeof v === "number" && Number.isFinite(v) && v > 0) {
+        ids.push(Math.trunc(v));
+        continue;
+      }
+      const s = String(v).trim().toUpperCase();
+      if (!s) continue;
+      if (/^PP\d+$/.test(s)) {
+        const n = Number(s.slice(2));
+        if (Number.isFinite(n) && n > 0) ids.push(n);
+        continue;
+      }
+      if (/^\d+$/.test(s)) {
+        const n = Number(s);
+        if (Number.isFinite(n) && n > 0) ids.push(n);
+        continue;
+      }
+    }
+    return ids;
+  };
+
+  const loadLinkedPurchaseIds = async () => {
     try {
       const res = await fetch("/api/statements", { credentials: "include" });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) return;
       const rows = Array.isArray(data?.statements) ? data.statements : [];
-      const maps = buildPaymentLinkMaps(rows, purchaseRows);
-      setLinkedPurchaseIds(maps.linkedPurchaseIds);
-      setPaymentTransByPurchaseId(maps.transDisplayMap);
-      setPaymentStatementByPurchaseId(maps.stmtMap);
-    } catch {}
-  };
+      const next = new Set();
+      const transMap = {};
+      const stmtMap = {};
+      for (const s of rows) {
+        const ids = parseLinkedPurchaseIds(s?.linked_purchase_ids);
+        for (const id of ids) {
+          next.add(id);
+          const pid = Number(id);
+          if (Number.isFinite(pid) && pid > 0) {
+            // Aggregate trans IDs
+            if (!transMap[pid]) transMap[pid] = [];
+            if (s.trans_id && !transMap[pid].includes(s.trans_id)) {
+              transMap[pid].push(s.trans_id);
+            }
+            // Aggregate statement IDs
+            if (!stmtMap[pid]) stmtMap[pid] = [];
+            if (s.id && !stmtMap[pid].includes(Number(s.id))) {
+              stmtMap[pid].push(Number(s.id));
+            }
+          }
+        }
+      }
+      // Convert arrays to comma-separated strings for display
+      const transDisplayMap = {};
+      for (const pid in transMap) {
+        transDisplayMap[pid] = transMap[pid].join(", ");
+      }
 
-  const loadPurchaseData = async () => {
-    const rows = await loadPurchases();
-    await loadLinkedPurchaseIds(rows);
+      setLinkedPurchaseIds(next);
+      setPaymentTransByPurchaseId(transDisplayMap);
+      setPaymentStatementByPurchaseId(stmtMap);
+    } catch {}
   };
 
   const markPurchaseLinked = (purchaseId, statementId, transId, action = "link") => {
@@ -1032,15 +942,6 @@ export default function PurchasesPage() {
       filtered = filtered.filter((p) => p.status === statusFilter);
     }
 
-    // Category filter (Product / Spare / Other)
-    if (categoryFilter !== "all") {
-      filtered = filtered.filter((p) => {
-        const { category } = resolvePurchaseCategory(p);
-        if (categoryFilter === "Other") return !category;
-        return category === categoryFilter;
-      });
-    }
-
     // Search filter
     if (search) {
       const q = search.toLowerCase();
@@ -1063,26 +964,6 @@ export default function PurchasesPage() {
     }
     if (endDate) {
       filtered = filtered.filter((p) => new Date(p.created_at) <= new Date(endDate + 'T23:59:59'));
-    }
-
-    // Invoice number filter
-    if (invoiceNumberFilter.trim()) {
-      const q = invoiceNumberFilter.trim().toLowerCase();
-      filtered = filtered.filter((p) =>
-        String(p.invoice_number || "").toLowerCase().includes(q)
-      );
-    }
-
-    // Invoice date filter
-    if (invoiceDateStart) {
-      filtered = filtered.filter((p) =>
-        p.invoice_date && new Date(p.invoice_date) >= new Date(invoiceDateStart)
-      );
-    }
-    if (invoiceDateEnd) {
-      filtered = filtered.filter((p) =>
-        p.invoice_date && new Date(p.invoice_date) <= new Date(invoiceDateEnd + 'T23:59:59')
-      );
     }
 
     // Sorting
@@ -1135,7 +1016,7 @@ export default function PurchasesPage() {
       .sort((a, b) => b.id - a.id)
       .forEach(p => sortedFiltered.push(p));
     return sortedFiltered;
-  }, [purchases, search, statusFilter, categoryFilter, paymentTransByPurchaseId, startDate, endDate, invoiceNumberFilter, invoiceDateStart, invoiceDateEnd, sortColumn, sortDirection]);
+  }, [purchases, search, statusFilter, paymentTransByPurchaseId, startDate, endDate, sortColumn, sortDirection]);
 
   const totals = useMemo(() => {
     return filteredPurchases.reduce((acc, p) => {
@@ -1228,8 +1109,6 @@ export default function PurchasesPage() {
     worksheet.columns = [
       { header: "Request ID", key: "id", width: 12 },
       { header: "Product Code", key: "product_code", width: 15 },
-      { header: "Category", key: "category", width: 12 },
-      { header: "Sub Category", key: "sub_category", width: 18 },
       { header: "Product Name", key: "product_name", width: 25 },
       { header: "Quantity", key: "quantity", width: 10 },
       { header: "Price/Unit", key: "price_per_unit", width: 12 },
@@ -1246,8 +1125,6 @@ export default function PurchasesPage() {
     filteredPurchases.forEach((row) =>
       worksheet.addRow({
         ...row,
-        category: row.category === "Product" || row.category === "Spare" ? row.category : "",
-        sub_category: row.sub_category || "",
         status_label: row.status_label || row.status,
         created_at: new Date(row.created_at).toLocaleString(),
         invoice_date: formatDisplayDate(row.invoice_date),
@@ -1310,23 +1187,6 @@ export default function PurchasesPage() {
 
   return (
     <div className="max-w-full mx-auto p-6">
-      {/* Fixed hover image portal — desktop only */}
-      {hoveredImg && (
-        <div
-          className="pointer-events-none fixed z-[9999]"
-          style={{
-            left: hoveredImg.x,
-            top: hoveredImg.y - 8,
-            transform: "translate(-50%, -100%)",
-          }}
-        >
-          <img
-            src={hoveredImg.src}
-            alt="preview"
-            className="w-52 h-52 object-contain rounded-xl border-2 border-gray-300 shadow-2xl bg-white p-1"
-          />
-        </div>
-      )}
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-800">All Purchase Requests</h1>
         <p className="text-gray-600 mt-1">View and manage all stock purchase requests</p>
@@ -1346,62 +1206,28 @@ export default function PurchasesPage() {
                 className="pl-8 pr-3 py-1.5 border rounded-md text-sm w-64"
               />
             </div>
-            <div className="flex gap-2 items-center">
-              <span className="text-xs text-gray-500 whitespace-nowrap">Created Date:</span>
-              <TypeableDateFilterInput value={startDate} onChange={setStartDate} className="px-3 py-1.5 border rounded-md text-sm"/>
-              <span className="text-xs text-gray-400">to</span>
-              <TypeableDateFilterInput value={endDate} onChange={setEndDate} className="px-3 py-1.5 border rounded-md text-sm"/>
+            <div className="flex gap-2">
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="px-3 py-1.5 border rounded-md text-sm"
+              />
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="px-3 py-1.5 border rounded-md text-sm"
+              />
               {(startDate || endDate) && (
                 <button
                   onClick={() => { setStartDate(""); setEndDate(""); }}
-                  className="px-2 py-1.5 text-sm rounded bg-red-100 text-red-700 hover:bg-red-200"
+                  className="px-3 py-1.5 text-sm rounded bg-red-100 text-red-700 hover:bg-red-200"
                 >
-                  ✕
+                  Clear Dates
                 </button>
               )}
             </div>
-            <div className="flex gap-2 items-center">
-              <span className="text-xs text-gray-500 whitespace-nowrap">Invoice No:</span>
-              <input
-                type="text"
-                placeholder="Search invoice no..."
-                value={invoiceNumberFilter}
-                onChange={(e) => setInvoiceNumberFilter(e.target.value)}
-                className="px-3 py-1.5 border rounded-md text-sm w-44"
-              />
-              {invoiceNumberFilter && (
-                <button
-                  onClick={() => setInvoiceNumberFilter("")}
-                  className="px-2 py-1.5 text-sm rounded bg-red-100 text-red-700 hover:bg-red-200"
-                >
-                  ✕
-                </button>
-              )}
-            </div>
-            <div className="flex gap-2 items-center">
-              <span className="text-xs text-gray-500 whitespace-nowrap">Invoice Date:</span>
-              <TypeableDateFilterInput value={invoiceDateStart} onChange={setInvoiceDateStart} className="px-3 py-1.5 border rounded-md text-sm"/>
-              <span className="text-xs text-gray-400">to</span>
-              <TypeableDateFilterInput value={invoiceDateEnd} onChange={setInvoiceDateEnd} className="px-3 py-1.5 border rounded-md text-sm"/>
-              {(invoiceDateStart || invoiceDateEnd) && (
-                <button
-                  onClick={() => { setInvoiceDateStart(""); setInvoiceDateEnd(""); }}
-                  className="px-2 py-1.5 text-sm rounded bg-red-100 text-red-700 hover:bg-red-200"
-                >
-                  ✕
-                </button>
-              )}
-            </div>
-            <select
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-              className="px-3 py-1.5 border rounded-md text-sm bg-white"
-            >
-              <option value="all">All Categories</option>
-              <option value="Product">Product</option>
-              <option value="Spare">Spare</option>
-              <option value="Other">Other</option>
-            </select>
             <div className="flex gap-2">
               <button
                 onClick={() => setStatusFilter("all")}
@@ -1514,7 +1340,7 @@ export default function PurchasesPage() {
           <div className="p-8 text-center text-gray-500">Loading...</div>
         ) : filteredPurchases.length === 0 ? (
           <div className="p-8 text-center text-gray-500">
-            {search || statusFilter !== "all" || categoryFilter !== "all" ? "No purchases found matching your filters" : "No purchase requests yet"}
+            {search || statusFilter !== "all" ? "No purchases found matching your filters" : "No purchase requests yet"}
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -1531,9 +1357,6 @@ export default function PurchasesPage() {
                   </th>
                   <th className="p-3 border-b font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleSort('id')}>ID {sortColumn === 'id' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
                   <th className="p-3 border-b font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleSort('product_code')}>Product Code {sortColumn === 'product_code' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
-                  <th className="p-3 border-b font-semibold">Image</th>
-                  <th className="p-3 border-b font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleSort('category')}>Category {sortColumn === 'category' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
-                  <th className="p-3 border-b font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleSort('sub_category')}>Sub Category {sortColumn === 'sub_category' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
                   <th className="p-3 border-b font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleSort('product_name')}>Product Name {sortColumn === 'product_name' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
                   <th className="p-3 border-b font-semibold">Customer Details</th>
                   <th className="p-3 border-b font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleSort('quantity')}>Qty {sortColumn === 'quantity' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
@@ -1548,6 +1371,7 @@ export default function PurchasesPage() {
                   <th className="p-3 border-b font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleSort('status')}>Status {sortColumn === 'status' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
                   <th className="p-3 border-b font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleSort('created_by')}>Created By {sortColumn === 'created_by' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
                   <th className="p-3 border-b font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleSort('created_at')}>Created At {sortColumn === 'created_at' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
+                  <th className="p-3 border-b font-semibold">Image</th>
                   <th className="p-3 border-b font-semibold">Payment Trans ID</th>
                   <th className="p-3 border-b font-semibold">Action</th>
                 </tr>
@@ -1556,7 +1380,6 @@ export default function PurchasesPage() {
                 {filteredPurchases.map((purchase) => {
                   const isChild = !!purchase.parent_id;
                   const isParent = purchases.some(p => p.parent_id === purchase.id);
-                  const { category, sub_category } = resolvePurchaseCategory(purchase);
                   return (
                     <tr key={purchase.id} className={`border-t hover:bg-gray-50 ${isChild ? 'bg-gray-50' : ''}`}>
                       <td className="p-3">
@@ -1575,64 +1398,6 @@ export default function PurchasesPage() {
                         </div>
                       </td>
                       <td className="p-3 font-medium">{purchase.product_code}</td>
-                      <td className="p-3 text-center">
-                        {(() => {
-                          const imgSrc = purchase.catalog_image
-                            ? resolvePurchaseFileUrl(purchase.catalog_image)
-                            : purchase.product_image
-                            ? resolvePurchaseFileUrl(purchase.product_image)
-                            : null;
-                          if (!imgSrc) return <span className="text-gray-400">—</span>;
-                          return (
-                            <div className="relative inline-block group">
-                              <button
-                                onClick={() =>
-                                  setPreviewImage({
-                                    url: imgSrc,
-                                    type: getFileType(imgSrc),
-                                  })
-                                }
-                                onMouseEnter={(e) => {
-                                  if (window.innerWidth < 768) return;
-                                  const rect = e.currentTarget.getBoundingClientRect();
-                                  setHoveredImg({ src: imgSrc, x: rect.left + rect.width / 2, y: rect.top });
-                                }}
-                                onMouseLeave={() => setHoveredImg(null)}
-                                title="Click to view full"
-                              >
-                                <img
-                                  src={imgSrc}
-                                  alt="Product"
-                                  className="w-12 h-12 object-cover rounded border"
-                                  onError={(e) => { e.currentTarget.parentElement.parentElement.style.display = "none"; }}
-                                />
-                              </button>
-                            </div>
-                          );
-                        })()}
-                      </td>
-                      <td className="p-3">
-                        {category === 'Product' ? (
-                          <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">
-                            Product
-                          </span>
-                        ) : category === 'Spare' ? (
-                          <span className="px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-700">
-                            Spare
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">—</span>
-                        )}
-                      </td>
-                      <td className="p-3">
-                        {sub_category ? (
-                          <span className="px-2 py-0.5 rounded text-xs font-medium bg-violet-100 text-violet-700 border border-violet-200">
-                            {sub_category}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">—</span>
-                        )}
-                      </td>
                       <td className="p-3">{purchase.product_name}</td>
                       <td className="p-3">
                         <div className="flex items-start gap-2">
@@ -1647,6 +1412,8 @@ export default function PurchasesPage() {
                           </div>
                           {(() => {
                             const isChild = !!purchase.parent_id;
+                            const isParent = purchases.some(p => p.parent_id === purchase.id);
+                            if (isChild) return null;
                             return (
                               <button
                                 onClick={() => { setEditCustomerRecord(purchase); setEditCustomerOpen(true); }}
@@ -1671,6 +1438,26 @@ export default function PurchasesPage() {
                       <td className="p-3">{getStatusBadge(purchase.status)}</td>
                       <td className="p-3">{purchase.created_by}</td>
                       <td className="p-3">{new Date(purchase.created_at).toLocaleDateString('en-IN', { timeZone: 'UTC' })}</td>
+                      <td className="p-3 text-center">
+                        {purchase.product_image ? (
+                          <button
+                            onClick={() =>
+                              {
+                                const fileUrl = resolvePurchaseFileUrl(purchase.product_image);
+                                setPreviewImage({
+                                  url: fileUrl,
+                                  type: getFileType(fileUrl || purchase.product_image),
+                                });
+                              }
+                            }
+                            className="text-gray-600 hover:text-blue-700"
+                          >
+                            <Eye className="w-5 h-5 inline" />
+                          </button>
+                        ) : (
+                          <span className="text-gray-400">—</span>
+                        )}
+                      </td>
                       <td className="p-3 font-mono text-xs">
                         {paymentTransByPurchaseId?.[Number(purchase.id)] ? paymentTransByPurchaseId[Number(purchase.id)] : "—"}
                       </td>
@@ -1763,14 +1550,6 @@ export default function PurchasesPage() {
             <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
               {[
                 ["Product Code", detailPurchase.product_code],
-                ["Category", (() => {
-                  const { category } = resolvePurchaseCategory(detailPurchase);
-                  return category || "—";
-                })()],
-                ["Sub Category", (() => {
-                  const { sub_category } = resolvePurchaseCategory(detailPurchase);
-                  return sub_category || "—";
-                })()],
                 ["Product Name", detailPurchase.product_name],
                 ["Customer ID", detailPurchase.customer_id],
                 ["Client Name", detailPurchase.client_name],
@@ -1827,26 +1606,13 @@ export default function PurchasesPage() {
                   ["Received Image", detailPurchase.received_image],
                   ["Supporting Doc", detailPurchase.supporting_doc],
                 ].filter(([, url]) => !!url).map(([label, url]) => (
-                  <div key={label} className="border rounded p-3 relative group">
-                    <div className="flex justify-between items-start mb-2">
-                      <div className="text-xs text-gray-500">{label}</div>
-                      <a 
-                        href={resolvePurchaseFileUrl(url)} 
-                        target="_blank" 
-                        rel="noreferrer"
-                        className="text-blue-600 hover:text-blue-800 opacity-0 group-hover:opacity-100 transition-opacity"
-                        title="Open in new tab"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                        </svg>
-                      </a>
-                    </div>
+                  <div key={label} className="border rounded p-3">
+                    <div className="text-xs text-gray-500 mb-2">{label}</div>
                     {(() => {
                       const safeUrl = resolvePurchaseFileUrl(url);
                       const type = getFileType(safeUrl || url);
                       if (type === "image") {
-                        return <img src={safeUrl} alt={label} className="w-full h-40 object-cover rounded cursor-pointer hover:opacity-80" onClick={() => setPreviewImage({ url: safeUrl, type: 'image' })} />;
+                        return <img src={safeUrl} alt={label} className="w-full h-40 object-cover rounded" />;
                       }
                       if (type === "pdf") {
                         return <iframe src={safeUrl} title={label} className="w-full h-40" />;
@@ -1866,14 +1632,14 @@ export default function PurchasesPage() {
       )}
 
       {/* Edit Transport Modal */}
-      <EditTransportModal open={editOpen} onClose={() => setEditOpen(false)} record={editRecord} onSaved={loadPurchaseData} />
+      <EditTransportModal open={editOpen} onClose={() => setEditOpen(false)} record={editRecord} onSaved={loadPurchases} />
 
       {/* Edit Customer Modal */}
       <EditCustomerModal 
         open={editCustomerOpen} 
         onClose={() => { setEditCustomerOpen(false); setEditCustomerRecord(null); }} 
         record={editCustomerRecord} 
-        onSaved={loadPurchaseData} 
+        onSaved={loadPurchases} 
       />
 
       {/* Link Payment Modal */}
@@ -1893,7 +1659,7 @@ export default function PurchasesPage() {
         selectedPurchaseIds={selectedPurchaseIds}
         selectedNetAmount={selectedTotals.selectedNetAmount}
         purchases={purchases}
-        onLinkSuccess={() => { setSelectedPurchaseIds(new Set()); loadPurchaseData(); }}
+        onLinkSuccess={() => { setSelectedPurchaseIds(new Set()); loadLinkedPurchaseIds(); }}
       />
 
       {/* Preview Modal */}

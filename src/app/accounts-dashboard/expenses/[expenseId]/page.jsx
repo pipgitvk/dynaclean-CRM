@@ -6,7 +6,6 @@ import FallbackLink from "@/components/attachments/FallbackLink";
 import { normalizeAttachmentPathParam, splitAttachmentList } from "@/lib/attachmentPathUtils";
 import dayjs from "dayjs";
 import ApproveModal from "@/components/expenses/ApproveModal";
-import { isJwtAccountingRole } from "@/lib/roleKeyUtils";
 
 export const dynamic = "force-dynamic";
 
@@ -164,9 +163,9 @@ export default async function ExpenseDetailPage({ params }) {
       <div className="flex flex-col sm:flex-row gap-4 justify-between mt-10">
         <Link
           href={
-            isJwtAccountingRole(role) || role === "ADMIN" || role === "HR_MANAGER"
-              ? `/accounts-dashboard/all-expenses?username=${encodeURIComponent(expense.username)}`
-              : "/accounts-dashboard/expenses"
+            role === "ACCOUNTANT" || role === "ADMIN" || role === "HR_MANAGER"
+              ? "/user-dashboard/all-expenses"
+              : "/user-dashboard/expenses"
           }
           className="inline-block px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-center"
         >
@@ -174,13 +173,13 @@ export default async function ExpenseDetailPage({ params }) {
         </Link>
 
         <Link
-          href={`/accounts-dashboard/expenses/edit/${expenseId}`}
+          href={`/user-dashboard/expenses/edit/${expenseId}`}
           className="inline-block px-6 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700 text-center"
         >
           Edit
         </Link>
 
-        {(isJwtAccountingRole(role) || role === "ADMIN" || role === "HR_MANAGER") &&
+        {(role === "ACCOUNTANT" || role === "ADMIN" || role === "HR_MANAGER") &&
           (!expense.approval_status ||
             expense.approval_status === "Pending") && (
             <ApproveModal

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo, useRef } from "react";
+import { useEffect, useState, useMemo } from "react";
 import InvoiceItemsTable from "./invoice-table";
 import TaxAndSummary from "./Tax-invoice";
 import { useRouter } from "next/navigation";
@@ -8,27 +8,16 @@ import Image from "next/image";
 import toast from "react-hot-toast";
 import AddSpecialPriceModal from "@/components/specialPrice/AddSpecialPriceModal";
 import dynacleanLogo from "@/components/logo1.jpg";
-import { LetterheadCompanyInfo, LetterheadBankLine, LetterheadSignatoryLine } from "@/components/invoice/InvoiceLetterheadSection";
-import { useUser } from "@/context/UserContext";
-import { canEditInvoiceHsn } from "@/lib/performaInvoiceAccess";
-import {
-  DEFAULT_TAX_INVOICE_TERMS,
-  getDefaultPerformaInvoiceTerms,
-} from "@/lib/performaInvoiceTerms";
 
-
-export default function InvoiceForm({ invoiceNumber, invoiceDate, invoiceType = "tax", onBack, onSuccessRedirect, initialQuotationNumber = "" }) {
+export default function InvoiceForm({ invoiceNumber, invoiceDate, invoiceType = "tax", onBack }) {
   const router = useRouter();
-  const { user } = useUser();
-  const canEditHsn = canEditInvoiceHsn(user?.userRole);
-  const autoFilledQuoteRef = useRef(false);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Determine the display label based on invoice type
   const invoiceTypeLabel = invoiceType === "performa" ? "Performa Invoice" : "Invoice";
   const [ showQuotationModal, setShowQuotationModal]= useState(false)
-  const [quotationNumber, setQuotationNumber] = useState(String(initialQuotationNumber || "").trim());
+  const [quotationNumber, setQuotationNumber] = useState("")
   const [isFromQuotation, setIsFromQuotation] = useState(false);
 
 
@@ -61,7 +50,6 @@ export default function InvoiceForm({ invoiceNumber, invoiceDate, invoiceType = 
     state_code: "",
     customer_id: "",
     payment_status: "UNPAID",
-    status: "",
     due_date: "",
     amount_paid: 0,
     buyers_order_no: "",
@@ -194,55 +182,72 @@ export default function InvoiceForm({ invoiceNumber, invoiceDate, invoiceType = 
 
   const [isGeneratingInvoice, setIsGeneratingInvoice] = useState(true);
 
-  // Auto-set state from GSTIN + apply CGST/SGST vs IGST — skip if loaded from quotation
+  // Auto-set state + state_code from GSTIN when valid.
+  // Skip when form is pre-filled from a quotation (quotation already has correct state + GST rates).
   useEffect(() => {
     if (isFromQuotation) return;
+    const st = getStateFromGSTIN(form.gst_number?.trim());
+    if (!st) return;
+    setForm((prev) => ({
+      ...prev,
+      state: st.display,
+      state_code: st.code,
+    }));
+    setStateSearch(st.display);
+    setShowStateSuggestions(false);
+  }, [form.gst_number, isFromQuotation]);
 
-    const gstinValue = form.gst_number?.trim();
-
-    if (gstinValue) {
-      // GSTIN provided → use its first 2 digits to determine tax type
-      const st = getStateFromGSTIN(gstinValue);
-      if (!st) return;
-
-      // Auto-fill state field
-      setForm((prev) => ({ ...prev, state: st.display, state_code: st.code }));
-      setStateSearch(st.display);
-      setShowStateSuggestions(false);
-
-      // Same state as supplier (07 Delhi) → CGST + SGST; else → IGST
-      if (st.code === SUPPLIER_STATE_CODE) {
-        setCgstRate(9); setSgstRate(9); setIgstRate(0);
-        setItems((prev) => prev.map((item) => ({ ...item, cgst_percent: 9, sgst_percent: 9, igst_percent: 0 })));
-      } else {
-        setCgstRate(0); setSgstRate(0); setIgstRate(18);
-        setItems((prev) => prev.map((item) => ({ ...item, cgst_percent: 0, sgst_percent: 0, igst_percent: 18 })));
-      }
-    } else {
-      // No GSTIN → use manually selected state to decide
-      // Try: state_code field → parse code from "Name (XX)" format → match by state name
-      const code = form.state_code?.trim()
-        || parseCodeFromDisplay(form.state)
-        || Object.entries(stateCodeToName).find(
-            ([, name]) => name.toLowerCase() === form.state?.trim().toLowerCase()
-          )?.[0];
-
-      if (!code || code === SUPPLIER_STATE_CODE) {
-        // No state or same state (Delhi 07) → CGST + SGST
-        setCgstRate(9); setSgstRate(9); setIgstRate(0);
-        setItems((prev) => prev.map((item) => ({ ...item, cgst_percent: 9, sgst_percent: 9, igst_percent: 0 })));
-      } else {
-        // Different state, no GSTIN → IGST (interstate supply)
-        setCgstRate(0); setSgstRate(0); setIgstRate(18);
-        setItems((prev) => prev.map((item) => ({ ...item, cgst_percent: 0, sgst_percent: 0, igst_percent: 18 })));
-      }
+  // State-based rate setting - only when NOT from quotation
+  useEffect(() => {
+    console.log("[State Effect]", { isFromQuotation, state: form.state, state_code: form.state_code });
+    
+    if (isFromQuotation) {
+      console.log("[State Effect] Skipping because isFromQuotation=true");
+      return; // Skip entirely if from quotation
     }
-  }, [form.gst_number, form.state, form.state_code, isFromQuotation]);
+
+    const code = form.state_code || parseCodeFromDisplay(form.state);
+    if (!code) return;
+
+    console.log("[State Effect] Setting rates based on state code:", code);
+
+    if (code === SUPPLIER_STATE_CODE) {
+      setCgstRate(9);
+      setSgstRate(9);
+      setIgstRate(0);
+
+      setItems((prev) =>
+        prev.map((item) => ({
+          ...item,
+          cgst_percent: 9,
+          sgst_percent: 9,
+          igst_percent: 0,
+        })),
+      );
+    } else {
+      console.log("[State Effect] State code", code, "!= SUPPLIER_STATE_CODE", SUPPLIER_STATE_CODE, "-> setting 18%");
+      setCgstRate(0);
+      setSgstRate(0);
+      setIgstRate(18);
+
+      setItems((prev) =>
+        prev.map((item) => ({
+          ...item,
+          cgst_percent: 0,
+          sgst_percent: 0,
+          igst_percent: 18,
+        })),
+      );
+    }
+  }, [form.state, form.state_code, isFromQuotation, SUPPLIER_STATE_CODE]);
 
   const [editableTerms, setEditableTerms] = useState(
-    invoiceType === "performa"
-      ? getDefaultPerformaInvoiceTerms()
-      : DEFAULT_TAX_INVOICE_TERMS,
+    `1. Payment due within specified due date.
+2. Late payment charges: Interest charges at the rate of 1.5% per month or as per MSME act 2006, whichever is higher will be charged on overdue amounts from the invoice due date.
+3. All disputes subject to Delhi jurisdiction.
+4. Goods once sold will not be taken back.
+
+Thanks for doing business with us!`,
   );
 
   const [notes, setNotes] = useState("");
@@ -328,7 +333,6 @@ export default function InvoiceForm({ invoiceNumber, invoiceDate, invoiceType = 
         amount_paid: amountPaid,
         balance_amount: balanceAmount < 0 ? 0 : balanceAmount,
         payment_status: finalPaymentStatus,
-        status: form.status || null,
         notes: notes,
         terms_conditions: editableTerms,
         cgst_rate: cgstRate,
@@ -347,13 +351,7 @@ export default function InvoiceForm({ invoiceNumber, invoiceDate, invoiceType = 
       const data = await res.json();
       if (data.success) {
         toast.success("Invoice created successfully");
-        if (onSuccessRedirect) {
-          router.push(onSuccessRedirect);
-        } else if (invoiceType === "performa") {
-          router.push("/admin-dashboard/performa-invoices");
-        } else {
-          router.push("/admin-dashboard/invoices");
-        }
+        router.push("/admin-dashboard/invoices");
       } else {
         alert("Error: " + data.error);
       }
@@ -375,20 +373,15 @@ export default function InvoiceForm({ invoiceNumber, invoiceDate, invoiceType = 
 
 
   // fetch data with quotation number 
-const fetchQuotationAndFill = async (quoteNoArg) => {
-  const raw =
-    typeof quoteNoArg === "string" || typeof quoteNoArg === "number"
-      ? quoteNoArg
-      : quotationNumber;
-  const qn = String(raw ?? "").trim();
-  if (!qn) {
+const fetchQuotationAndFill = async () => {
+  if (!quotationNumber) {
     toast.error("Enter quotation number");
     return;
   }
 
   try {
     const res = await fetch(
-      `/api/get-quotation?quotation_number=${encodeURIComponent(qn)}`
+      `/api/get-quotation?quotation_number=${quotationNumber}`
     );
     const data = await res.json();
     console.log("check what data :", data);
@@ -475,20 +468,15 @@ const fetchQuotationAndFill = async (quoteNoArg) => {
 
     toast.success("Quotation loaded successfully");
     setShowQuotationModal(false);
-    setQuotationNumber(qn);
+    // Clear the input field but keep isFromQuotation flag for rate logic
+    setTimeout(() => setQuotationNumber(""), 500);
   } catch (err) {
     console.error(err);
     toast.error("Failed to load quotation");
   }
 };
 
-  useEffect(() => {
-    const qn = String(initialQuotationNumber || "").trim();
-    if (!qn || autoFilledQuoteRef.current) return;
-    autoFilledQuoteRef.current = true;
-    void fetchQuotationAndFill(qn);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-time autofill from URL/customer page
-  }, [initialQuotationNumber]);
+
 
   return (
     <>
@@ -528,8 +516,29 @@ const fetchQuotationAndFill = async (quoteNoArg) => {
           </div>
         )}
 
-        <LetterheadCompanyInfo />
-        
+        <div className="flex-1 text-sm text-gray-700">
+          <h2 className="text-xl font-bold text-red-600 mb-1">
+            Dynaclean Industries Pvt Ltd
+          </h2>
+          <p className="leading-relaxed">
+            <span className="block">
+              1st Floor, 13-B, Kattabomman Street, Gandhi Nagar Main Road,
+            </span>
+            <span className="block">
+              Gandhi Nagar, Ganapathy, Coimbatore, Tamil Nadu, 641006
+            </span>
+            <span className="block mt-1">
+              <strong>Phone:</strong> 011-45143666, +91-7982456944
+            </span>
+            <span className="block">
+              <strong>Email:</strong> sales@dynacleanindustries.com
+            </span>
+            <span className="block mt-1">
+              <strong>GSTIN:</strong> 07AAKCD6495M1ZV | <strong>State:</strong>{" "}
+              Tamil Nadu (33)
+            </span>
+          </p>
+        </div>
       </div>
 
       {/* Invoice Info */}
@@ -817,22 +826,6 @@ const fetchQuotationAndFill = async (quoteNoArg) => {
           </select>
         </div>
 
-        <div>
-          <label className="text-sm text-gray-600">Status</label>
-          <select
-            className="input w-full"
-            value={form.status}
-            onChange={(e) =>
-              setForm({ ...form, status: e.target.value })
-            }
-          >
-            <option value="">Select Status</option>
-            <option value="PAID">Paid</option>
-            <option value="PARTIAL PAID">Partial Paid</option>
-            <option value="CANCELLED">Cancelled</option>
-          </select>
-        </div>
-
       </div>
 
       {/* Set Special Price for this customer */}
@@ -844,11 +837,7 @@ const fetchQuotationAndFill = async (quoteNoArg) => {
       </div>
 
       {/* Invoice Items Table */}
-      <InvoiceItemsTable
-        items={items}
-        setItems={setItems}
-        canEditHsn={canEditHsn}
-      />
+      <InvoiceItemsTable items={items} setItems={setItems} />
 
       {/* Tax Summary */}
       <TaxAndSummary
@@ -901,7 +890,7 @@ const fetchQuotationAndFill = async (quoteNoArg) => {
         <div className="lg:col-span-1 space-y-4">
           <div className="border p-4 rounded bg-gray-50 text-sm">
             <h4 className="font-semibold mb-2">Bank Details</h4>
-            <LetterheadBankLine />
+            <p>A/C Holder: Dynaclean Industries Private Limited</p>
             <p>ICICI Bank</p>
             <p>Account: 343405500379</p>
             <p>IFSC: ICIC0003434</p>
@@ -909,7 +898,7 @@ const fetchQuotationAndFill = async (quoteNoArg) => {
 
           <div className="border p-4 rounded bg-gray-50 text-sm text-center flex flex-col justify-between">
             <div>
-              <LetterheadSignatoryLine />
+              <p>For Dynaclean Industries Pvt Ltd</p>
               <Image
                 src="/images/sign.png"
                 alt="Sign"
@@ -965,7 +954,7 @@ const fetchQuotationAndFill = async (quoteNoArg) => {
 
         <button
           className="px-4 py-2 bg-emerald-600 text-white rounded"
-          onClick={() => fetchQuotationAndFill()}
+          onClick={fetchQuotationAndFill}
         >
           Load Quotation
         </button>

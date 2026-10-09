@@ -4,21 +4,6 @@ import NextTopLoader from "nextjs-toploader";
 import { UserProvider } from "@/context/UserContext";
 import "./globals.css";
 
-// Import and start the recurring task cron job (only on server side)
-let cronStarted = false;
-if (typeof window === "undefined" && !cronStarted) {
-  cronStarted = true;
-  import("@/lib/cron/recurringTaskCron").then((mod) => {
-    mod.startRecurringTaskCron();
-  });
-  import("@/lib/cron/attendanceAutoCheckoutCron").then((mod) => {
-    mod.startAttendanceAutoCheckoutCron();
-  });
-  import("@/lib/cron/machineAttendanceSyncCron").then((mod) => {
-    mod.startMachineAttendanceSyncCron();
-  });
-}
-
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -33,8 +18,8 @@ export const metadata = {
   title: "CRM | Dynaclean",
   description: "Manage your customers and leads efficiently",
   icons: {
-    icon: [{ url: "/logo.png", type: "image/png" }],
-    apple: [{ url: "/logo.png", sizes: "180x180", type: "image/png" }],
+    icon: [{ url: '/dynaclean_logo.png', type: 'image/png' }],
+    apple: [{ url: '/dynaclean_logo.png', sizes: '180x180', type: 'image/png' }],
   },
 };
 

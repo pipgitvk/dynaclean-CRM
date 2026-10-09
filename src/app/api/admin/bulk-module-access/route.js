@@ -5,11 +5,9 @@ import { getDbConnection } from "@/lib/db";
 import { getMainSessionPayload } from "@/lib/auth";
 import {
   ALL_MODULE_KEYS,
-  getModuleAccessForDisplay,
-  parseStoredModuleAccess,
-  stripParentSectionKeys,
-  applyRoleDenyModuleRestrictions,
+  parseModuleAccess,
   applySuperadminOnlyModuleRestrictions,
+  applyRoleDenyModuleRestrictions,
 } from "@/lib/moduleAccess";
 
 const VALID_OPERATIONS = new Set(["REPLACE", "MERGE", "REMOVE"]);
@@ -66,11 +64,10 @@ export async function GET(req) {
     return NextResponse.json({ role, moduleKeys: [] });
   }
 
+  // Union of all users' module_access for this role
   const unionSet = new Set();
   for (const row of rows) {
-    const stored = parseStoredModuleAccess(row.module_access ?? null);
-    const keys =
-      stored === null ? getModuleAccessForDisplay(null, row.userRole) : stored;
+    const keys = parseModuleAccess(row.module_access ?? null);
     for (const k of keys) unionSet.add(k);
   }
 
@@ -132,11 +129,7 @@ export async function POST(req) {
       continue;
     }
 
-    const stored = parseStoredModuleAccess(row?.module_access ?? null);
-    const existing =
-      stored === null
-        ? getModuleAccessForDisplay(null, userRole)
-        : stored;
+    const existing = parseModuleAccess(row?.module_access ?? null);
     let next;
 
     if (operation === "REPLACE") {
@@ -153,7 +146,7 @@ export async function POST(req) {
 
     next = applySuperadminOnlyModuleRestrictions(next, userRole) ?? [];
     next = applyRoleDenyModuleRestrictions(next, userRole) ?? [];
-    next = stripParentSectionKeys(uniqueStrings(next));
+    next = uniqueStrings(next);
 
     await db.query(
       `UPDATE rep_list SET module_access = ? WHERE username = ?`,

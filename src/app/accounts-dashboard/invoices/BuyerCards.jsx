@@ -1,6 +1,5 @@
 "use client";
 
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Search, Users, FileText, IndianRupee, X } from "lucide-react";
@@ -42,8 +41,6 @@ export default function BuyerCards() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState("");
-  const [buyerPage, setBuyerPage] = useState(1);
-  const buyerPageSize = 20;
   const [showViewModal, setShowViewModal] = useState(false);
   const [allInvoices, setAllInvoices] = useState([]);
   const [loadingInvoices, setLoadingInvoices] = useState(false);
@@ -66,17 +63,10 @@ export default function BuyerCards() {
   }, []);
 
   const filtered = useMemo(() => {
-    setBuyerPage(1);
     if (!search.trim()) return buyers;
     const q = search.trim().toLowerCase();
     return buyers.filter((b) => b.buyer_name?.toLowerCase().includes(q));
   }, [buyers, search]);
-
-  const totalBuyerPages = Math.ceil(filtered.length / buyerPageSize);
-  const paginatedBuyers = filtered.slice(
-    (buyerPage - 1) * buyerPageSize,
-    buyerPage * buyerPageSize
-  );
 
   const totals = useMemo(() => ({
     buyers: buyers.length,
@@ -138,7 +128,6 @@ export default function BuyerCards() {
       const params = new URLSearchParams({
         fromDate: fromDate || "",
         toDate: toDate || "",
-        search: invoiceSearch || "",
       });
       const res = await fetch(`/api/invoices-export?${params}`, { credentials: "include" });
       if (!res.ok) {
@@ -262,76 +251,13 @@ export default function BuyerCards() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {paginatedBuyers.map((buyer) => (
+          {filtered.map((buyer) => (
             <BuyerCard
               key={buyer.buyer_name}
               buyer={buyer}
               onClick={() => handleCardClick(buyer.buyer_name)}
             />
           ))}
-        </div>
-      )}
-
-      {/* Buyer Cards Pagination */}
-      {totalBuyerPages > 1 && (
-        <div className="flex items-center justify-between pt-2 border-t border-gray-200">
-          <p className="text-sm text-gray-500">
-            Showing {(buyerPage - 1) * buyerPageSize + 1}–{Math.min(buyerPage * buyerPageSize, filtered.length)} of {filtered.length} buyers
-          </p>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setBuyerPage(1)}
-              disabled={buyerPage === 1}
-              className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              «
-            </button>
-            <button
-              onClick={() => setBuyerPage((p) => p - 1)}
-              disabled={buyerPage === 1}
-              className="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              Prev
-            </button>
-            {Array.from({ length: totalBuyerPages }, (_, i) => i + 1)
-              .filter((p) => p === 1 || p === totalBuyerPages || Math.abs(p - buyerPage) <= 2)
-              .reduce((acc, p, idx, arr) => {
-                if (idx > 0 && p - arr[idx - 1] > 1) acc.push("...");
-                acc.push(p);
-                return acc;
-              }, [])
-              .map((item, idx) =>
-                item === "..." ? (
-                  <span key={`ellipsis-${idx}`} className="px-2 py-1 text-xs text-gray-400">…</span>
-                ) : (
-                  <button
-                    key={item}
-                    onClick={() => setBuyerPage(item)}
-                    className={`px-3 py-1 text-xs border rounded ${
-                      buyerPage === item
-                        ? "bg-blue-600 text-white border-blue-600 font-semibold"
-                        : "border-gray-300 hover:bg-gray-50"
-                    }`}
-                  >
-                    {item}
-                  </button>
-                )
-              )}
-            <button
-              onClick={() => setBuyerPage((p) => p + 1)}
-              disabled={buyerPage === totalBuyerPages}
-              className="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              Next
-            </button>
-            <button
-              onClick={() => setBuyerPage(totalBuyerPages)}
-              disabled={buyerPage === totalBuyerPages}
-              className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              »
-            </button>
-          </div>
         </div>
       )}
 
@@ -363,11 +289,21 @@ export default function BuyerCards() {
               <div className="flex gap-4 flex-wrap items-end">
                 <div>
                   <label className="block text-xs font-semibold text-gray-600 mb-1">From Date</label>
-                  <TypeableDateFilterInput value={fromDate} onChange={setFromDate} className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"/>
+                  <input
+                    type="date"
+                    value={fromDate}
+                    onChange={(e) => setFromDate(e.target.value)}
+                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-gray-600 mb-1">To Date</label>
-                  <TypeableDateFilterInput value={toDate} onChange={setToDate} className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"/>
+                  <input
+                    type="date"
+                    value={toDate}
+                    onChange={(e) => setToDate(e.target.value)}
+                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  />
                 </div>
                 <button
                   onClick={handleFilterChange}

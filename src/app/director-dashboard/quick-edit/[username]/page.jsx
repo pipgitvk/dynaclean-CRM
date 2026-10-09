@@ -1,7 +1,6 @@
 // app/director-dashboard/quick-edit/[username]/page.jsx
 "use client";
 
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
@@ -13,7 +12,6 @@ import {
   applySuperadminOnlyModuleRestrictions,
   applyRoleDenyModuleRestrictions,
 } from "@/lib/moduleAccess";
-import { getRoleDefaultModuleKeys } from "@/lib/roleDefaultModuleAccess";
 
 function uniqueStrings(arr) {
   return [...new Set((arr || []).map((v) => String(v || "").trim()).filter(Boolean))];
@@ -594,7 +592,26 @@ const QuickEditPage = () => {
 
   const setServiceHeadDefaults = () => {
     userEditedModulesRef.current = true;
-    const defaults = getRoleDefaultModuleKeys("SERVICE HEAD")
+    const defaults = [
+      "dashboard-home",
+      "task-manager",
+      "add-customer",
+      "view-customers",
+      "employee-crm",
+      "quotations",
+      "orders-process",
+      "orders-delay",
+      "warranty-console",
+      "registered-products",
+      "service-followups",
+      "warranty-map",
+      "service-records",
+      "upcoming-installations",
+      "service-map",
+      "product-stock",
+      "spare-parts",
+      "installation-videos",
+    ]
       .filter((k) => ALL_MODULE_KEYS.includes(k))
       .filter((k) => k !== "dm-fresh-leads");
 
@@ -604,7 +621,26 @@ const QuickEditPage = () => {
 
   const setServiceSupportDefaults = () => {
     userEditedModulesRef.current = true;
-    const defaults = getRoleDefaultModuleKeys("SERVICE SUPPORT")
+    const defaults = [
+      "dashboard-home",
+      "task-manager",
+      "add-customer",
+      "view-customers",
+      "employee-crm",
+      "quotations",
+      "orders-process",
+      "orders-delay",
+      "warranty-console",
+      "registered-products",
+      "service-followups",
+      "warranty-map",
+      "service-records",
+      "upcoming-installations",
+      "service-map",
+      "product-stock",
+      "spare-parts",
+      "installation-videos",
+    ]
       .filter((k) => ALL_MODULE_KEYS.includes(k))
       .filter((k) => k !== "dm-fresh-leads");
 
@@ -766,8 +802,14 @@ const QuickEditPage = () => {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700">Date of Birth</label>
-            <TypeableDateFilterInput value={employee.dob || ""} onChange={(v) => handleInputChange({ target: { name: "dob", value: v } })} max={today}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"/>
+            <input
+              type="date"
+              name="dob"
+              value={employee.dob || ""}
+              onChange={handleInputChange}
+              max={today}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+            />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700">Number</label>

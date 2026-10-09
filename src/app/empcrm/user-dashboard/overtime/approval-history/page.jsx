@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import toast from "react-hot-toast";
 import { formatAttendanceTimeForDisplay as formatTime } from "@/lib/istDateTime";
-import { getAttendanceRegularizationAttachmentHref } from "@/lib/attendanceRegularizationAttachmentHref";
 
 function formatLogDate(v) {
   if (v == null) return "";
@@ -183,10 +182,7 @@ export default function OvertimeApprovalHistoryPage() {
                       {request.attachment_url && (
                         <div className="mt-3">
                           <a
-                            href={getAttendanceRegularizationAttachmentHref(
-                              request.attachment_url,
-                              request.id,
-                            )}
+                            href={request.attachment_url}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-blue-600 hover:text-blue-800 text-sm"

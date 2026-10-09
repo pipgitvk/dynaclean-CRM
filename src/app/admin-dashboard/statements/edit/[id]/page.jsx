@@ -1,6 +1,5 @@
 "use client";
 
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -16,7 +15,6 @@ export default function EditStatementPage() {
   const [error, setError] = useState("");
   const [statementType, setStatementType] = useState("");
   const [isTypeLocked, setIsTypeLocked] = useState(false);
-  const [userRole, setUserRole] = useState("");
   const [form, setForm] = useState({
     trans_id: "",
     date: "",
@@ -34,14 +32,6 @@ export default function EditStatementPage() {
   const [selectedCredit, setSelectedCredit] = useState(null);
   const [selectedDebit, setSelectedDebit] = useState(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
-
-  useEffect(() => {
-    // Fetch current user role
-    fetch("/api/me", { credentials: "include" })
-      .then(r => r.json())
-      .then(data => setUserRole((data?.role || data?.userRole || "").toUpperCase()))
-      .catch(() => {});
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -315,28 +305,7 @@ export default function EditStatementPage() {
         <label className="block text-sm font-semibold mb-2">Statement Type *</label>
         <select
           value={statementType}
-          onChange={(e) => {
-            const value = e.target.value;
-            if (value === "invoices") {
-              if (userRole.includes("ACCOUNTANT") || userRole === "USER") {
-                router.push("/user-dashboard/invoices");
-              } else {
-                router.push("/admin-dashboard/statements/invoices");
-              }
-            } else if (value === "purchase_billings") {
-              router.push("/admin-dashboard/statements/purchase-billings");
-            } else if (value === "dd_management") {
-              if (userRole.includes("ACCOUNTANT")) {
-                router.push("/accounts-dashboard/dd-management");
-              } else {
-                router.push("/admin-dashboard/dd-management");
-              }
-            } else if (value === "employee_expenses") {
-              router.push("/admin-dashboard/client-expenses/employee-cards");
-            } else {
-              setStatementType(value);
-            }
-          }}
+          onChange={(e) => setStatementType(e.target.value)}
           disabled={isTypeLocked}
           className="w-full sm:w-1/2 border p-2 rounded disabled:bg-gray-200 disabled:cursor-not-allowed"
           required
@@ -345,10 +314,6 @@ export default function EditStatementPage() {
           <option value="expense">Expense</option>
           <option value="failed_transaction">Failed Transaction</option>
           <option value="cancelled_transaction">Cancelled Transaction</option>
-          <option value="invoices">Invoices</option>
-          <option value="purchase_billings">Purchase Billings</option>
-          <option value="dd_management">DD Management</option>
-          <option value="employee_expenses">Employee Expenses</option>
         </select>
         {isTypeLocked && (
           <p className="text-xs text-red-600 mt-2">
@@ -373,18 +338,36 @@ export default function EditStatementPage() {
             </div>
             <div>
               <label className="block text-sm mb-1">Date *</label>
-              <TypeableDateFilterInput value={form.date} onChange={(v) => handleChange({ target: { name: "date", value: v } })} readOnly
+              <input
+                name="date"
+                type="date"
+                value={form.date}
+                onChange={handleChange}
+                readOnly
                 className="w-full border p-2 rounded bg-gray-50 cursor-not-allowed"
-                required/>
+                required
+              />
             </div>
             <div>
               <label className="block text-sm mb-1">Txn Dated Deb</label>
-              <TypeableDateFilterInput value={form.txn_dated_deb} onChange={(v) => handleChange({ target: { name: "txn_dated_deb", value: v } })} readOnly
-                className="w-full border p-2 rounded bg-gray-50 cursor-not-allowed"/>
+              <input
+                name="txn_dated_deb"
+                type="date"
+                value={form.txn_dated_deb}
+                onChange={handleChange}
+                readOnly
+                className="w-full border p-2 rounded bg-gray-50 cursor-not-allowed"
+              />
             </div>
             <div>
               <label className="block text-sm mb-1">Txn Posted Date</label>
-              <TypeableDateFilterInput value={form.txn_posted_date} onChange={(v) => handleChange({ target: { name: "txn_posted_date", value: v } })} className="w-full border p-2 rounded"/>
+              <input
+                name="txn_posted_date"
+                type="date"
+                value={form.txn_posted_date}
+                onChange={handleChange}
+                className="w-full border p-2 rounded"
+              />
             </div>
             <div>
               <label className="block text-sm mb-1">Cheq No</label>
@@ -1037,11 +1020,21 @@ function AllStatementsTable({ type = "Credit", statementType = "failed_transacti
         <div className="flex flex-col sm:flex-row gap-3 items-end">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
-            <TypeableDateFilterInput value={startDate} onChange={setStartDate} className="px-4 py-2 border rounded"/>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="px-4 py-2 border rounded"
+            />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
-            <TypeableDateFilterInput value={endDate} onChange={setEndDate} className="px-4 py-2 border rounded"/>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="px-4 py-2 border rounded"
+            />
           </div>
           <button
             onClick={handleDateFilter}

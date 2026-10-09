@@ -1,6 +1,5 @@
 "use client";
 
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import Link from "next/link";
 import dayjs from "dayjs";
 import { useState, useEffect } from "react";
@@ -343,11 +342,21 @@ export default function ExpenseTable({ rows, role }) {
         </select>
         <div className="flex items-center gap-2 w-full sm:w-auto">
           <span className="text-sm text-gray-500 hidden sm:inline">From:</span>
-          <TypeableDateFilterInput value={fromDate} onChange={setFromDate} className="px-4 py-2 border rounded-lg w-full sm:w-auto focus:ring-blue-500 focus:border-blue-500"/>
+          <input
+            type="date"
+            value={fromDate}
+            onChange={(e) => setFromDate(e.target.value)}
+            className="px-4 py-2 border rounded-lg w-full sm:w-auto focus:ring-blue-500 focus:border-blue-500"
+          />
         </div>
         <div className="flex items-center gap-2 w-full sm:w-auto">
           <span className="text-sm text-gray-500 hidden sm:inline">To:</span>
-          <TypeableDateFilterInput value={toDate} onChange={setToDate} className="px-4 py-2 border rounded-lg w-full sm:w-auto focus:ring-blue-500 focus:border-blue-500"/>
+          <input
+            type="date"
+            value={toDate}
+            onChange={(e) => setToDate(e.target.value)}
+            className="px-4 py-2 border rounded-lg w-full sm:w-auto focus:ring-blue-500 focus:border-blue-500"
+          />
         </div>
         <button
           onClick={handleReset}

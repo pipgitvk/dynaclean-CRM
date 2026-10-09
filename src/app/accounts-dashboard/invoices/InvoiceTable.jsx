@@ -1,6 +1,5 @@
 "use client";
 
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import React, { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
@@ -10,27 +9,11 @@ import ExcelJS from "exceljs";
 const InvoiceEditModal = dynamic(() => import("@/app/admin-dashboard/invoices/InvoiceEditModal"), { ssr: false });
 
 export default function InvoiceTable() {
-  const getMonthStartEnd = () => {
-    const now = new Date();
-    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    return { firstDay, lastDay };
-  };
-
-  const formatDateForInput = (date) => {
-    const y = date.getFullYear();
-    const m = String(date.getMonth() + 1).padStart(2, "0");
-    const d = String(date.getDate()).padStart(2, "0");
-    return `${y}-${m}-${d}`;
-  };
-
-  const { firstDay: firstDayOfMonth, lastDay: lastDayOfMonth } = getMonthStartEnd();
-
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [fromDate, setFromDate] = useState(formatDateForInput(firstDayOfMonth));
-  const [toDate, setToDate] = useState(formatDateForInput(lastDayOfMonth));
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
   const [invoiceTypeFilter, setInvoiceTypeFilter] = useState("");
 
   // Single page — fetch all records
@@ -101,7 +84,7 @@ export default function InvoiceTable() {
         { header: "ID", key: "id", width: 10 },
         { header: "Invoice Number", key: "invoice_number", width: 25 },
         { header: "GSTIN No", key: "gst_number", width: 20 },
-        { header: "Created By", key: "employee_name", width: 20 },
+        { header: "Employee Name", key: "employee_name", width: 20 },
         { header: "Buyer Name", key: "buyer_name", width: 30 },
         { header: "Order Date", key: "order_date", width: 15 },
         { header: "Tax Amount", key: "tax_amount", width: 15 },
@@ -303,10 +286,9 @@ export default function InvoiceTable() {
   }, [search]);
 
   const handleReset = () => {
-    const { firstDay, lastDay } = getMonthStartEnd();
     setSearch("");
-    setFromDate(formatDateForInput(firstDay));
-    setToDate(formatDateForInput(lastDay));
+    setFromDate("");
+    setToDate("");
     setInvoiceTypeFilter("");
     setSortBy("created_at");
     setSortOrder("desc");
@@ -406,8 +388,18 @@ export default function InvoiceTable() {
           >
             Reset
           </button>
-          <TypeableDateFilterInput value={fromDate} onChange={setFromDate} className="border px-3 py-1 rounded"/>
-          <TypeableDateFilterInput value={toDate} onChange={setToDate} className="border px-3 py-1 rounded"/>
+          <input
+            type="date"
+            value={fromDate}
+            onChange={(e) => setFromDate(e.target.value)}
+            className="border px-3 py-1 rounded"
+          />
+          <input
+            type="date"
+            value={toDate}
+            onChange={(e) => setToDate(e.target.value)}
+            className="border px-3 py-1 rounded"
+          />
           <select
             value={invoiceTypeFilter}
             onChange={(e) => setInvoiceTypeFilter(e.target.value)}

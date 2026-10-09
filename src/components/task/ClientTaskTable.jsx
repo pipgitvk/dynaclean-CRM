@@ -1,12 +1,7 @@
 // src/components/ClientTaskTable.jsx
 "use client";
 
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
-import { useState, useEffect, useMemo, useCallback } from "react";
-import ManualFilterSearchButton, {
-  MANUAL_FILTER_HINT,
-} from "@/components/ui/ManualFilterSearchButton";
-import { useSearchParams } from "next/navigation";
+import { useState, useEffect } from "react";
 import dayjs from "dayjs";
 import isSameOrBefore from "dayjs/plugin/isSameOrBefore";
 import isSameOrAfter from "dayjs/plugin/isSameOrAfter";
@@ -17,154 +12,97 @@ import {
 import { Repeat } from "lucide-react";
 import ReassignModal from "@/components/models/ReassignModal";
 import AutoTaskBadge, { isAutoTask } from "@/components/task/AutoTaskBadge";
-import AutomatedTasksList from "@/components/task/AutomatedTasksList";
-import TaskFollowupPlusButton from "@/components/task/TaskFollowupPlusButton";
-import { usePathname } from "next/navigation";
 
 dayjs.extend(isSameOrBefore);
 dayjs.extend(isSameOrAfter);
 
 export default function ClientTaskTable({ initialTasks, currentUser = "" }) {
-  const searchParams = useSearchParams();
-  const pathname = usePathname();
-  const dashboardSegment =
-    pathname?.split("/").filter(Boolean)[0] || "user-dashboard";
-  const viewTaskPrefix =
-    dashboardSegment === "admin-dashboard"
-      ? "admin-dashboard"
-      : "user-dashboard";
   const [reassignOpen, setReassignOpen] = useState(false);
   const [modalTask, setModalTask] = useState(null);
   const [search, setSearch] = useState("");
-  const [appliedSearch, setAppliedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
-  const [appliedStatusFilter, setAppliedStatusFilter] = useState("");
   const [assignedToFilter, setAssignedToFilter] = useState("");
-  const [appliedAssignedToFilter, setAppliedAssignedToFilter] = useState("");
   const [fromDate, setFromDate] = useState("");
-  const [appliedFromDate, setAppliedFromDate] = useState("");
   const [toDate, setToDate] = useState("");
-  const [appliedToDate, setAppliedToDate] = useState("");
   const [sortBy, setSortBy] = useState("task_id");
   const [sortOrder, setSortOrder] = useState("desc");
-  const [taskView, setTaskView] = useState("tasks");
+  const [filteredTasks, setFilteredTasks] = useState(initialTasks);
 
   useEffect(() => {
-    const statusFromCard = searchParams.get("status");
-    const fromCard = searchParams.get("fromCard");
-    if (statusFromCard === "Pending" || statusFromCard === "Working" || statusFromCard === "Completed") {
-      setStatusFilter(statusFromCard);
-      setAppliedStatusFilter(statusFromCard);
-    }
-    if (fromCard === "1") {
-      setSearch("");
-      setAppliedSearch("");
-      setAssignedToFilter("");
-      setAppliedAssignedToFilter("");
-      setFromDate("");
-      setAppliedFromDate("");
-      setToDate("");
-      setAppliedToDate("");
-    }
-  }, [searchParams]);
-
-  const handleApplySearch = useCallback(() => {
-    setAppliedSearch(search);
-    setAppliedStatusFilter(statusFilter);
-    setAppliedAssignedToFilter(assignedToFilter);
-    setAppliedFromDate(fromDate);
-    setAppliedToDate(toDate);
-  }, [search, statusFilter, assignedToFilter, fromDate, toDate]);
-
-  const filteredTasks = useMemo(() => {
     let filtered = initialTasks.filter((task) => {
-      const matchesSearch =
-        !appliedSearch ||
-        (task.taskname?.toLowerCase() || "").includes(appliedSearch.toLowerCase()) ||
-        (task.taskassignto?.toLowerCase() || "").includes(appliedSearch.toLowerCase()) ||
-        (task.createdby?.toLowerCase() || "").includes(appliedSearch.toLowerCase()) ||
-        (task.status?.toLowerCase() || "").includes(appliedSearch.toLowerCase()) ||
-        (task.first_assignto?.toLowerCase() || "").includes(appliedSearch.toLowerCase());
-
-      const matchesStatus =
-        !appliedStatusFilter || task.status === appliedStatusFilter;
-
-      const matchesAssignedTo =
-        !appliedAssignedToFilter ||
-        task.taskassignto === appliedAssignedToFilter ||
-        task.first_assignto === appliedAssignedToFilter ||
-        task.reassign === appliedAssignedToFilter;
-
+      // Search filter
+      const matchesSearch = !search || 
+        (task.taskname?.toLowerCase() || "").includes(search.toLowerCase()) ||
+        (task.taskassignto?.toLowerCase() || "").includes(search.toLowerCase()) ||
+        (task.createdby?.toLowerCase() || "").includes(search.toLowerCase()) ||
+        (task.status?.toLowerCase() || "").includes(search.toLowerCase()) ||
+        (task.first_assignto?.toLowerCase() || "").includes(search.toLowerCase());
+      
+      // Status filter
+      const matchesStatus = !statusFilter || task.status === statusFilter;
+      
+      // Assigned To filter (check taskassignto, first_assignto, AND reassign)
+      const matchesAssignedTo = !assignedToFilter || 
+        task.taskassignto === assignedToFilter || 
+        task.first_assignto === assignedToFilter ||
+        task.reassign === assignedToFilter;
+      
+      // Date range filter
       let matchesDateRange = true;
-      if (appliedFromDate || appliedToDate) {
+      if (fromDate || toDate) {
         const assignDate = task.followed_date
           ? dayjsTaskCalendarStart(task.followed_date)
           : null;
         if (assignDate && assignDate.isValid()) {
-          if (appliedFromDate && appliedToDate) {
-            matchesDateRange =
-              assignDate.isSameOrAfter(dayjs(appliedFromDate), "day") &&
-              assignDate.isSameOrBefore(dayjs(appliedToDate), "day");
-          } else if (appliedFromDate) {
-            matchesDateRange = assignDate.isSameOrAfter(
-              dayjs(appliedFromDate),
-              "day",
-            );
-          } else if (appliedToDate) {
-            matchesDateRange = assignDate.isSameOrBefore(
-              dayjs(appliedToDate),
-              "day",
-            );
+          if (fromDate && toDate) {
+            matchesDateRange = assignDate.isSameOrAfter(dayjs(fromDate), 'day') && 
+                              assignDate.isSameOrBefore(dayjs(toDate), 'day');
+          } else if (fromDate) {
+            matchesDateRange = assignDate.isSameOrAfter(dayjs(fromDate), 'day');
+          } else if (toDate) {
+            matchesDateRange = assignDate.isSameOrBefore(dayjs(toDate), 'day');
           }
-        } else if (appliedFromDate || appliedToDate) {
-          matchesDateRange = false;
+        } else if (fromDate || toDate) {
+          matchesDateRange = false; // Exclude tasks without valid date when date filter is active
         }
       }
-
+      
       return matchesSearch && matchesStatus && matchesAssignedTo && matchesDateRange;
     });
 
+    // Sorting
     filtered.sort((a, b) => {
       let aVal, bVal;
-
-      switch (sortBy) {
-        case "taskname":
-          aVal = (a.taskname || "").toLowerCase();
-          bVal = (b.taskname || "").toLowerCase();
+      
+      switch(sortBy) {
+        case 'taskname':
+          aVal = (a.taskname || '').toLowerCase();
+          bVal = (b.taskname || '').toLowerCase();
           break;
-        case "status":
-          aVal = (a.status || "").toLowerCase();
-          bVal = (b.status || "").toLowerCase();
+        case 'status':
+          aVal = (a.status || '').toLowerCase();
+          bVal = (b.status || '').toLowerCase();
           break;
-        case "deadline":
+        case 'deadline':
           aVal = a.next_followup_date ? dayjs(a.next_followup_date).unix() : 0;
           bVal = b.next_followup_date ? dayjs(b.next_followup_date).unix() : 0;
           break;
-        case "assignedTo":
-          aVal = (a.first_assignto || a.taskassignto || "").toLowerCase();
-          bVal = (b.first_assignto || b.taskassignto || "").toLowerCase();
+        case 'assignedTo':
+          aVal = (a.first_assignto || a.taskassignto || '').toLowerCase();
+          bVal = (b.first_assignto || b.taskassignto || '').toLowerCase();
           break;
-        default:
+        default: // task_id
           aVal = a.task_id;
           bVal = b.task_id;
       }
-
-      if (aVal < bVal) return sortOrder === "asc" ? -1 : 1;
-      if (aVal > bVal) return sortOrder === "asc" ? 1 : -1;
+      
+      if (aVal < bVal) return sortOrder === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortOrder === 'asc' ? 1 : -1;
       return 0;
     });
 
-    return filtered;
-  }, [
-    initialTasks,
-    appliedSearch,
-    appliedStatusFilter,
-    appliedAssignedToFilter,
-    appliedFromDate,
-    appliedToDate,
-    sortBy,
-    sortOrder,
-  ]);
+    setFilteredTasks(filtered);
+  }, [search, statusFilter, assignedToFilter, fromDate, toDate, sortBy, sortOrder, initialTasks]);
 
   // Calculate KPIs
   const today = dayjs().startOf("day");
@@ -201,11 +139,6 @@ export default function ClientTaskTable({ initialTasks, currentUser = "" }) {
     setAssignedToFilter("");
     setFromDate("");
     setToDate("");
-    setAppliedSearch("");
-    setAppliedStatusFilter("");
-    setAppliedAssignedToFilter("");
-    setAppliedFromDate("");
-    setAppliedToDate("");
   };
 
   const getTableRowColor = (task) => {
@@ -264,35 +197,6 @@ export default function ClientTaskTable({ initialTasks, currentUser = "" }) {
 
   return (
     <>
-      <div className="mb-4 flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={() => setTaskView("tasks")}
-          className={`px-4 py-2 rounded-md text-sm font-medium ${
-            taskView === "tasks"
-              ? "bg-blue-600 text-white"
-              : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-          }`}
-        >
-          Tasks
-        </button>
-        <button
-          type="button"
-          onClick={() => setTaskView("automated")}
-          className={`px-4 py-2 rounded-md text-sm font-medium ${
-            taskView === "automated"
-              ? "bg-blue-600 text-white"
-              : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-          }`}
-        >
-          Automated Tasks
-        </button>
-      </div>
-
-      {taskView === "automated" ? (
-        <AutomatedTasksList />
-      ) : (
-        <>
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
         <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded">
@@ -328,12 +232,6 @@ export default function ClientTaskTable({ initialTasks, currentUser = "" }) {
               className="border p-2 rounded-md w-full"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  handleApplySearch();
-                }
-              }}
             />
           </div>
           <div>
@@ -364,27 +262,31 @@ export default function ClientTaskTable({ initialTasks, currentUser = "" }) {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">From Date</label>
-            <TypeableDateFilterInput value={fromDate} onChange={setFromDate} className="border p-2 rounded-md w-full"/>
+            <input
+              type="date"
+              className="border p-2 rounded-md w-full"
+              value={fromDate}
+              onChange={(e) => setFromDate(e.target.value)}
+            />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">To Date</label>
-            <TypeableDateFilterInput value={toDate} onChange={setToDate} className="border p-2 rounded-md w-full"/>
-          </div>
-          <div className="flex items-end gap-2">
-            <ManualFilterSearchButton
-              onClick={handleApplySearch}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md w-full"
+            <input
+              type="date"
+              className="border p-2 rounded-md w-full"
+              value={toDate}
+              onChange={(e) => setToDate(e.target.value)}
             />
+          </div>
+          <div className="flex items-end">
             <button
-              type="button"
               onClick={resetFilters}
               className="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600 w-full"
             >
-              Clear
+              Reset Filters
             </button>
           </div>
         </div>
-        <p className="text-xs text-gray-500 mt-2">{MANUAL_FILTER_HINT}</p>
       </div>
 
       {/* Sleek Color Key */}
@@ -491,12 +393,11 @@ export default function ClientTaskTable({ initialTasks, currentUser = "" }) {
                   <td className="px-4 py-2">
                     <div className="flex items-center gap-2">
                       <a
-                        href={`/${viewTaskPrefix}/view-task/${task.task_id}`}
+                        href={`/user-dashboard/view-task/${task.task_id}`}
                         className="text-blue-600 hover:underline"
                       >
                         View
                       </a>
-                      <TaskFollowupPlusButton task={task} />
                       {currentUser && (task.createdby || "").trim().toLowerCase() === currentUser.trim().toLowerCase() && (
                         <button
                           onClick={() => {
@@ -573,14 +474,13 @@ export default function ClientTaskTable({ initialTasks, currentUser = "" }) {
                     ? formatTaskDateOnly(task.task_completion_date)
                     : "-"}
                 </div>
-                <div className="text-sm mt-2 flex items-center gap-2 flex-wrap">
+                <div className="text-sm mt-2 flex items-center gap-2">
                   <a
-                    href={`/${viewTaskPrefix}/view-task/${task.task_id}`}
+                    href={`/user-dashboard/view-task/${task.task_id}`}
                     className="text-blue-600 hover:underline font-medium"
                   >
                     View Task →
                   </a>
-                  <TaskFollowupPlusButton task={task} />
                   {currentUser && (task.createdby || "").trim().toLowerCase() === currentUser.trim().toLowerCase() && (
                     <button
                       onClick={() => {
@@ -603,8 +503,6 @@ export default function ClientTaskTable({ initialTasks, currentUser = "" }) {
           )}
         </div>
       </div>
-        </>
-      )}
       <ReassignModal
         open={reassignOpen}
         onClose={() => {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Users, UserCheck, UserX, TrendingUp, AlertTriangle } from "lucide-react";
+import { Users, UserCheck, UserX, TrendingUp } from "lucide-react";
 import { Settings } from "lucide-react";
 import { canViewHrTargetChart } from "@/lib/hrTargetEligibleRoles";
 
@@ -14,27 +14,11 @@ export default function EmpCrmDashboard() {
   });
   const [loading, setLoading] = useState(true);
   const [userData, setUserData] = useState(null);
-  const [autoCheckoutPending, setAutoCheckoutPending] = useState(null);
 
   useEffect(() => {
     fetchStats();
     fetchUserData();
-    fetchAutoCheckoutPendingCount();
   }, []);
-
-  const fetchAutoCheckoutPendingCount = async () => {
-    try {
-      const response = await fetch(
-        "/api/empcrm/attendance/auto-checkout-approvals?countOnly=1&status=pending"
-      );
-      const data = await response.json();
-      if (response.ok) {
-        setAutoCheckoutPending(data.pendingCount ?? 0);
-      }
-    } catch {
-      setAutoCheckoutPending(null);
-    }
-  };
 
 
   const fetchUserData = async () => {
@@ -174,27 +158,6 @@ export default function EmpCrmDashboard() {
             >
               <h3 className="font-semibold text-blue-900">Attendance details</h3>
               <p className="text-sm text-blue-700">Monitor employee attendance records</p>
-            </a>
-            <a
-              href="/empcrm/admin-dashboard/auto-checkout-approvals"
-              className="block p-4 bg-red-50 hover:bg-red-100 rounded-lg transition-colors border border-red-200"
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <h3 className="font-semibold text-red-900 flex items-center gap-2">
-                    <AlertTriangle className="w-4 h-4 shrink-0" />
-                    Automatic check-out approval
-                  </h3>
-                  <p className="text-sm text-red-700 mt-1">
-                    Review 9:00 PM system check-outs before they count as confirmed
-                  </p>
-                </div>
-                {autoCheckoutPending != null && autoCheckoutPending > 0 && (
-                  <span className="shrink-0 rounded-full bg-red-600 px-2.5 py-0.5 text-xs font-bold text-white">
-                    {autoCheckoutPending} pending
-                  </span>
-                )}
-              </div>
             </a>
             <a
               href="/admin-dashboard/stats"

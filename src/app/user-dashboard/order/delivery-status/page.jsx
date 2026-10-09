@@ -1,5 +1,5 @@
 import { getDbConnection } from "@/lib/db";
-import DeliveryStatusTable from "@/components/orders/DeliveryStatusTable";
+import DeliveryStatusTable from "./DeliveryStatusTable";
 import { getSessionPayload } from "@/lib/auth";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";

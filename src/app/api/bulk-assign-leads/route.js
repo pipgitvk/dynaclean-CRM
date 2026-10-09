@@ -18,8 +18,7 @@ export async function POST(request) {
         }
 
         const body = await request.json();
-        const { customer_ids, employee_username, lead_type = "sales" } = body;
-        const normalizedType = String(lead_type || "sales").toLowerCase();
+        const { customer_ids, employee_username } = body;
 
         if (!customer_ids || !Array.isArray(customer_ids) || customer_ids.length === 0) {
             return NextResponse.json(
@@ -50,70 +49,25 @@ export async function POST(request) {
             // Update customers in bulk
             for (const customer_id of customer_ids) {
                 try {
-                    const [existing] = await connection.execute(
-                        `SELECT customer_id, lead_source, service_lead_source, gem_lead_source, first_name, last_name, phone, email
-                         FROM customers WHERE customer_id = ?`,
-                        [customer_id]
+                    // Update the customer's lead_source to the new employee
+                    await connection.execute(
+                        `UPDATE customers
+                         SET
+                           lead_source = ?,
+                           assigned_to = ?,
+                           sales_representative = ?,
+                           status = CASE
+                             WHEN LOWER(COALESCE(status, '')) = 'denied' THEN 'old_reassign'
+                             ELSE status
+                           END
+                         WHERE customer_id = ?`,
+                        [employee_username, payload.username, employee_username, customer_id]
                     );
 
-                    if (!existing.length) {
-                        failureCount++;
-                        errors.push({ customer_id, error: "Customer not found" });
-                        continue;
-                    }
-
-                    const prev = existing[0];
-                    const customerName =
-                        [prev.first_name, prev.last_name].filter(Boolean).join(" ") || "—";
-
-                    let reassignNote;
-                    if (normalizedType === "service") {
-                        const previousEmployee = prev.service_lead_source || "—";
-                        await connection.execute(
-                            `UPDATE customers SET service_lead_source = ? WHERE customer_id = ?`,
-                            [employee_username, customer_id]
-                        );
-                        reassignNote = `Service lead source changed from ${previousEmployee} to ${employee_username} by ${payload.username}`;
-                    } else if (normalizedType === "gem") {
-                        const previousEmployee = prev.gem_lead_source || "—";
-                        await connection.execute(
-                            `UPDATE customers SET gem_lead_source = ? WHERE customer_id = ?`,
-                            [employee_username, customer_id]
-                        );
-                        reassignNote = `GEM lead source changed from ${previousEmployee} to ${employee_username} by ${payload.username}`;
-                    } else {
-                        const previousEmployee = prev.lead_source || "—";
-                        await connection.execute(
-                            `UPDATE customers
-                             SET
-                               lead_source = ?,
-                               assigned_to = ?,
-                               sales_representative = ?,
-                               status = 'New',
-                               stage = 'New',
-                               next_follow_date = NOW()
-                             WHERE customer_id = ?`,
-                            [employee_username, payload.username, employee_username, customer_id]
-                        );
-                        await connection.execute(
-                            `UPDATE TL_followups SET assigned_employee = ? WHERE customer_id = ? ORDER BY created_at DESC LIMIT 1`,
-                            [employee_username, customer_id]
-                        );
-                        reassignNote = `Re-assigned lead from ${previousEmployee} to ${employee_username} by ${payload.username}`;
-                    }
+                    // Also update in TL_followups if exists
                     await connection.execute(
-                        `INSERT INTO customers_followup
-                         (customer_id, name, contact, email, next_followup_date, followed_date, comm_mode, notes, followed_by)
-                         VALUES (?, ?, ?, ?, NOW(), NULL, ?, ?, ?)`,
-                        [
-                            customer_id,
-                            customerName,
-                            prev.phone || "",
-                            prev.email || "",
-                            "System",
-                            reassignNote,
-                            payload.username,
-                        ]
+                        `UPDATE TL_followups SET assigned_employee = ? WHERE customer_id = ? ORDER BY created_at DESC LIMIT 1`,
+                        [employee_username, customer_id]
                     );
 
                     successCount++;

@@ -1,7 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useAsyncClick } from "@/lib/useAsyncClick";
-import { buildChecklistAccessoriesUrl } from "@/lib/dispatchChecklistAccessories";
 import { useParams, useRouter } from "next/navigation";
 
 export default function DispatchFormPage({ params }) {
@@ -116,21 +115,15 @@ export default function DispatchFormPage({ params }) {
     }
   };
 
-  const loadAccessoriesForProduct = async (itemCode, godown = null) => {
+  const loadAccessoriesForProduct = async (itemCode) => {
     try {
-      const res = await fetch(buildChecklistAccessoriesUrl(itemCode, godown));
+      const res = await fetch(
+        `/api/product-accessories?product_code=${itemCode}`,
+      );
       if (res.ok) {
         const json = await res.json();
         if (json.success) {
-          const accessoryList = json.data || [];
-          const resolvedProductCode = accessoryList[0]?.product_code || itemCode;
-          setAccessories((prev) => {
-            const next = { ...prev, [itemCode]: accessoryList };
-            if (resolvedProductCode !== itemCode) {
-              next[resolvedProductCode] = accessoryList;
-            }
-            return next;
-          });
+          setAccessories((prev) => ({ ...prev, [itemCode]: json.data || [] }));
         }
       }
     } catch (err) {
@@ -150,9 +143,6 @@ export default function DispatchFormPage({ params }) {
         if (value) {
           // Godown selected - fetch stock for this specific item
           fetchStockForRow(id, row.quote_number, value, row.item_code);
-          if (/[a-zA-Z]/.test(row.item_code || "")) {
-            loadAccessoriesForProduct(row.item_code, value);
-          }
         } else {
           // Godown cleared - clear stock info
           setStockInfo((prev) => ({ ...prev, [id]: null }));
@@ -270,15 +260,6 @@ export default function DispatchFormPage({ params }) {
           "Please resolve all stock warnings before completing dispatch",
         );
       }
-
-      for (const row of rows) {
-        const alreadyPersisted =
-          initialSerialNos.has(row.id) || savedIds.has(row.id);
-        if (!alreadyPersisted) {
-          await uploadForRow(row);
-        }
-      }
-
       // mark order dispatch complete
       const doneRes = await fetch("/api/dispatch/complete", {
         method: "POST",
@@ -435,7 +416,7 @@ export default function DispatchFormPage({ params }) {
                   accessories[r.item_code].length > 0 && (
                     <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-md">
                       <h4 className="text-sm font-medium text-blue-800 mb-2">
-                        In-package accessories (checklist only):
+                        Accessories Checklist:
                       </h4>
                       <div className="space-y-1">
                         {accessories[r.item_code].map((acc) => (

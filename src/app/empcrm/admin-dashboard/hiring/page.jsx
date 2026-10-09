@@ -1,13 +1,10 @@
 "use client";
 
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { Eye, Filter, Loader2, Pencil, UserPlus, X } from "lucide-react";
 import { HR_SCORE_RATING_OPTIONS, HIRING_TAG_OPTIONS as TAG_OPTIONS, HAVE_NOT_TALKED_REASONS } from "@/lib/hiringPayload";
 import { HR_TARGET_ALLOWED_DESIGNATIONS, mergeDesignationOptions, normalizeDesignationKey, resolveCanonicalDesignation } from "@/lib/designationDedupe";
-import { getDirectorHrHiringBase } from "@/lib/directorHrPaths";
 
 /** Shared field styles */
 const fieldClass =
@@ -144,8 +141,6 @@ function StatusChip({ status, tag }) {
 }
 
 export default function HiringPage() {
-  const pathname = usePathname();
-  const hiringBase = getDirectorHrHiringBase(pathname);
   const [candidate_name, setCandidateName] = useState("");
   const [emp_contact, setEmpContact] = useState("");
   const [designation, setDesignation] = useState("");
@@ -632,11 +627,22 @@ export default function HiringPage() {
               Joining date (from – to)
             </label>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <TypeableDateFilterInput value={filterJoinFrom} onChange={setFilterJoinFrom} className={`${fieldClass} min-h-[44px] w-full min-w-0 flex-1 sm:min-h-0`}
-                title="Joining from"/>
+              <input
+                type="date"
+                value={filterJoinFrom}
+                onChange={(e) => setFilterJoinFrom(e.target.value)}
+                className={`${fieldClass} min-h-[44px] w-full min-w-0 flex-1 sm:min-h-0`}
+                title="Joining from"
+              />
               <span className="hidden text-xs text-slate-400 sm:inline">–</span>
-              <TypeableDateFilterInput value={filterJoinTo} onChange={setFilterJoinTo} min={filterJoinFrom || undefined} className={`${fieldClass} min-h-[44px] w-full min-w-0 flex-1 sm:min-h-0`}
-                title="Joining to"/>
+              <input
+                type="date"
+                value={filterJoinTo}
+                min={filterJoinFrom || undefined}
+                onChange={(e) => setFilterJoinTo(e.target.value)}
+                className={`${fieldClass} min-h-[44px] w-full min-w-0 flex-1 sm:min-h-0`}
+                title="Joining to"
+              />
             </div>
           </div>
 
@@ -646,11 +652,22 @@ export default function HiringPage() {
               Interview date (from – to)
             </label>
             <div className="flex items-center gap-2">
-              <TypeableDateFilterInput value={filterInterviewFrom} onChange={setFilterInterviewFrom} className={`${fieldClass} flex-1 min-w-0`}
-                title="Interview from"/>
+              <input
+                type="date"
+                value={filterInterviewFrom}
+                onChange={(e) => setFilterInterviewFrom(e.target.value)}
+                className={`${fieldClass} flex-1 min-w-0`}
+                title="Interview from"
+              />
               <span className="text-xs text-slate-400">–</span>
-              <TypeableDateFilterInput value={filterInterviewTo} onChange={setFilterInterviewTo} min={filterInterviewFrom || undefined} className={`${fieldClass} flex-1 min-w-0`}
-                title="Interview to"/>
+              <input
+                type="date"
+                value={filterInterviewTo}
+                min={filterInterviewFrom || undefined}
+                onChange={(e) => setFilterInterviewTo(e.target.value)}
+                className={`${fieldClass} flex-1 min-w-0`}
+                title="Interview to"
+              />
             </div>
           </div>
 
@@ -660,11 +677,22 @@ export default function HiringPage() {
               Next follow-up date (from – to)
             </label>
             <div className="flex items-center gap-2">
-              <TypeableDateFilterInput value={filterNextFollowupFrom} onChange={setFilterNextFollowupFrom} className={`${fieldClass} flex-1 min-w-0`}
-                title="Next follow-up from"/>
+              <input
+                type="date"
+                value={filterNextFollowupFrom}
+                onChange={(e) => setFilterNextFollowupFrom(e.target.value)}
+                className={`${fieldClass} flex-1 min-w-0`}
+                title="Next follow-up from"
+              />
               <span className="text-xs text-slate-400">–</span>
-              <TypeableDateFilterInput value={filterNextFollowupTo} onChange={setFilterNextFollowupTo} min={filterNextFollowupFrom || undefined} className={`${fieldClass} flex-1 min-w-0`}
-                title="Next follow-up to"/>
+              <input
+                type="date"
+                value={filterNextFollowupTo}
+                min={filterNextFollowupFrom || undefined}
+                onChange={(e) => setFilterNextFollowupTo(e.target.value)}
+                className={`${fieldClass} flex-1 min-w-0`}
+                title="Next follow-up to"
+              />
             </div>
           </div>
         </div>
@@ -795,14 +823,14 @@ export default function HiringPage() {
                       <td className="px-3 py-2.5 text-right sm:px-4">
                         <div className="inline-flex flex-wrap items-center justify-end gap-1.5">
                           <Link
-                            href={`${hiringBase}/${row.id}/view`}
+                            href={`/empcrm/admin-dashboard/hiring/${row.id}/view`}
                             className="inline-flex items-center gap-1 rounded-lg border border-indigo-200/90 bg-indigo-50/90 px-2 py-1 text-xs font-medium text-indigo-800 transition hover:bg-indigo-100"
                           >
                             <Eye className="h-3.5 w-3.5 shrink-0" />
                             View
                           </Link>
                           <Link
-                            href={`${hiringBase}/${row.id}/edit`}
+                            href={`/empcrm/admin-dashboard/hiring/${row.id}/edit`}
                             className="inline-flex items-center gap-1 rounded-lg border border-emerald-200/80 bg-emerald-50/80 px-2 py-1 text-xs font-medium text-emerald-800 transition hover:bg-emerald-100"
                           >
                             <Pencil className="h-3.5 w-3.5 shrink-0" />
@@ -1128,7 +1156,13 @@ export default function HiringPage() {
                       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <div>
                           <label className="mb-1 block text-sm font-medium text-slate-700">Joining date *</label>
-                          <TypeableDateFilterInput value={hire_date} onChange={setHireDate} required={status === "Hired"} className={formFieldClass}/>
+                          <input
+                            type="date"
+                            required={status === "Hired"}
+                            value={hire_date}
+                            onChange={(e) => setHireDate(e.target.value)}
+                            className={formFieldClass}
+                          />
                         </div>
                         <div>
                           <label className="mb-1 block text-sm font-medium text-slate-700">Package *</label>
@@ -1199,7 +1233,13 @@ export default function HiringPage() {
                       <p className="text-sm font-semibold text-teal-900">Joined Info</p>
                       <div>
                         <label className="mb-1 block text-sm font-medium text-slate-700">Joined date *</label>
-                        <TypeableDateFilterInput value={hire_date} onChange={setHireDate} required={status === "Joined"} className={formFieldClass}/>
+                        <input
+                          type="date"
+                          required={status === "Joined"}
+                          value={hire_date}
+                          onChange={(e) => setHireDate(e.target.value)}
+                          className={formFieldClass}
+                        />
                       </div>
                     </div>
                   )}

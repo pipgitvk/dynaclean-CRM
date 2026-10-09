@@ -1,5 +1,4 @@
 "use client";
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useEffect, useState } from "react";
 import TaskCard from "./TLTaskCard";
 import { getGradientColor } from "@/utils/getGradientColor";
@@ -24,7 +23,7 @@ export default function UpcomingTeamLeaderFollowupsCards({ teamLeader }) {
     async function fetchFollowups() {
       setLoading(true);
       try {
-        const res = await fetch(`/api/upcoming-tl-followups?teamLeader=${teamLeader}`);
+        const res = await fetch(`/api/upcoming-tl-followups?teamLeader=:${teamLeader}`);
         const data = await res.json();
         setFollowups(data.followups || []);
         console.log("Fetched TL followups:", data.followups);
@@ -141,11 +140,21 @@ export default function UpcomingTeamLeaderFollowupsCards({ teamLeader }) {
           </div>
           <div className="flex flex-col">
             <label className="text-xs text-gray-600 mb-1">Start date</label>
-            <TypeableDateFilterInput value={startDate} onChange={setStartDate} className="border rounded-md px-3 py-2 text-sm"/>
+            <input
+              type="date"
+              className="border rounded-md px-3 py-2 text-sm"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+            />
           </div>
           <div className="flex flex-col">
             <label className="text-xs text-gray-600 mb-1">End date</label>
-            <TypeableDateFilterInput value={endDate} onChange={setEndDate} className="border rounded-md px-3 py-2 text-sm"/>
+            <input
+              type="date"
+              className="border rounded-md px-3 py-2 text-sm"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+            />
           </div>
           {(startDate || endDate) && (
             <button

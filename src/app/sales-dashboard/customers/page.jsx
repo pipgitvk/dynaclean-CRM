@@ -1,15 +1,8 @@
 import { getDbConnection } from "@/lib/db";
 import CustomerTable from "./CustomerTable";
-import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
+import { jwtVerify } from "jose";
 import { getSessionPayload } from "@/lib/auth";
-import { notesLanguageExistsSql } from "@/constants/notesLanguageOptions";
-import { mysqlBoundsForIstDateRange } from "@/lib/timezone";
-import { appendVeryGoodFollowupTodayFilter } from "@/lib/veryGoodFollowupTodaySql";
-import { getTodayYmdIST } from "@/lib/prospectCommitmentRules";
-import {
-  appendLatestFollowedDateIstFilter,
-  latestFollowedDateSelectSql,
-} from "@/lib/customerFollowupNotesLanguage";
 
 export const dynamic = "force-dynamic";
 
@@ -41,11 +34,8 @@ export default async function CustomersPage({ searchParams }) {
     date_to,
     sort,
     next_follow_date,
-    followed_date,
     employee,
     tags,
-    tag_filter,
-    notes_language,
     filter,
     reporting_date_from,
     reporting_date_to,
@@ -53,17 +43,6 @@ export default async function CustomersPage({ searchParams }) {
   } = searchParamsResolved;
 
   const status = resolveStatusForQuery(statusParam);
-  const isVeryGoodFollowupToday = filter === "very_good_followup_today";
-  const todayIst = getTodayYmdIST();
-
-  if (
-    !isVeryGoodFollowupToday &&
-    status === "Very Good" &&
-    date_from === todayIst &&
-    date_to === todayIst
-  ) {
-    redirect("/sales-dashboard/customers?filter=very_good_followup_today");
-  }
 
   const currentPage = parseInt(page);
   const pageSize = 50;
@@ -91,14 +70,7 @@ export default async function CustomersPage({ searchParams }) {
 
   if (isSalesCumBackoffice) {
     // No condition added — all customers visible, same as SUPERADMIN
-  } else if (
-    !isVeryGoodFollowupToday &&
-    userRole !== "ADMIN" &&
-    userRole !== "SUPERADMIN" &&
-    userRole !== "SERVICE HEAD" &&
-    userRole !== "TEAM LEADER" &&
-    userRole !== "EA"
-  ) {
+  } else if (userRole !== "ADMIN" && userRole !== "SUPERADMIN" && userRole !== "SERVICE HEAD" && userRole !== "TEAM LEADER" && userRole !== "EA") {
     // Only filter by assigned fields for non-admin roles
     customerConditions.push("(c.lead_source = ? OR c.sales_representative = ? OR c.assigned_to = ?)");
     customerParams.push(username, username, username);
@@ -117,14 +89,6 @@ export default async function CustomersPage({ searchParams }) {
   const followupConditions = [];
   const followupParams = [];
 
-  if (isVeryGoodFollowupToday) {
-    appendVeryGoodFollowupTodayFilter({
-      conditions: customerConditions,
-      params: customerParams,
-      restrictToFollowedBy: isSalesCumBackoffice ? null : username,
-    });
-  }
-
   // Handle today_reporting filter - show customers with today's TL followup
   if (filter === "today_reporting") {
     const today = new Date().toISOString().split("T")[0];
@@ -140,37 +104,28 @@ export default async function CustomersPage({ searchParams }) {
     followupParams.push(today);
   }
 
-  // Latest customers_followup row is exposed as cf (or tlf for today_reporting).
-  if (next_follow_date) {
-    if (filter === "today_reporting") {
-      followupConditions.push("DATE(tlf.next_followup_date) = ?");
+  // Build INNER JOIN for filtering by next_follow_date or tags
+  if (next_follow_date || tags) {
+    joinClause = `
+      INNER JOIN (
+        SELECT customer_id, multi_tag, next_followup_date
+        FROM customers_followup
+        WHERE time_stamp = (
+          SELECT MAX(time_stamp) FROM customers_followup cf2
+          WHERE cf2.customer_id = customers_followup.customer_id
+        )
+      ) cf_filter ON c.customer_id = cf_filter.customer_id
+    `;
+
+    if (next_follow_date) {
+      followupConditions.push("DATE(cf_filter.next_followup_date) = ?");
       followupParams.push(next_follow_date);
-    } else {
-      customerConditions.push("DATE(cf.next_followup_date) = ?");
-      customerParams.push(next_follow_date);
     }
-  }
 
-  if (tags) {
-    const tagPattern = `%${tags}%`;
-    if (filter === "today_reporting") {
-      followupConditions.push("tlf.multi_tag LIKE ?");
-      followupParams.push(tagPattern);
-    } else {
-      customerConditions.push("cf.multi_tag LIKE ?");
-      customerParams.push(tagPattern);
+    if (tags) {
+      followupConditions.push("cf_filter.multi_tag LIKE ?");
+      followupParams.push(`%${tags}%`);
     }
-  }
-
-  if (tag_filter) {
-    customerConditions.push("c.tags LIKE ?");
-    customerParams.push(`%${tag_filter}%`);
-  }
-
-  // Notes language: any follow-up row with matching notes_language
-  if (notes_language) {
-    customerConditions.push(notesLanguageExistsSql("?"));
-    customerParams.push(notes_language);
   }
 
   if (effectiveStatus) {
@@ -217,25 +172,14 @@ export default async function CustomersPage({ searchParams }) {
   }
 
   if (date_from && date_to) {
-    const createdBounds = mysqlBoundsForIstDateRange(date_from, date_to);
-    if (createdBounds) {
-      customerConditions.push("c.date_created >= ? AND c.date_created <= ?");
-      customerParams.push(createdBounds.start, createdBounds.end);
-    }
+    customerConditions.push("c.date_created BETWEEN ? AND ?");
+    customerParams.push(date_from, date_to);
   }
 
   if (reporting_date_from && reporting_date_to) {
     const reportingTable = filter === "today_reporting" ? "tlf" : "tl_report";
     customerConditions.push(`DATE(${reportingTable}.next_followup_date) BETWEEN ? AND ?`);
     customerParams.push(reporting_date_from, reporting_date_to);
-  }
-
-  if (followed_date) {
-    appendLatestFollowedDateIstFilter({
-      conditions: customerConditions,
-      params: customerParams,
-      followedDateYmd: followed_date,
-    });
   }
 
   // Combine all WHERE clauses
@@ -260,12 +204,10 @@ export default async function CustomersPage({ searchParams }) {
       c.date_created,
       c.lead_campaign,
       c.products_interest,
-      COALESCE(c.tags, '') AS tags,
       COALESCE(${filter === "today_reporting" ? "tlf.multi_tag" : "cf.multi_tag"}, '') AS multi_tag,
       ${filter === "today_reporting" ? "tlf.next_followup_date" : "cf.next_followup_date"} AS next_follow_date,
       ${filter === "today_reporting" ? "tlf.notes" : "cf.notes"} AS latest_followup_notes,
-      COALESCE(${filter === "today_reporting" ? "tlf" : "tl_report"}.next_followup_date, '') AS reporting_date,
-      ${latestFollowedDateSelectSql}
+      COALESCE(${filter === "today_reporting" ? "tlf" : "tl_report"}.next_followup_date, '') AS reporting_date
     FROM customers c
     ${filter === "today_reporting" ? "" : `
     LEFT JOIN (
@@ -349,11 +291,7 @@ export default async function CustomersPage({ searchParams }) {
 
     return (
       <div className="p-6 max-w-7xl mx-auto text-gray-700 border">
-        <h1 className="text-2xl font-bold mb-4">
-          {filter === "very_good_followup_today"
-            ? "Very Good Customers (Today's Follow-up)"
-            : "Customers"}
-        </h1>
+        <h1 className="text-2xl font-bold mb-4">Customers</h1>
         <CustomerTable
           rows={rows}
           searchParams={searchParamsResolved}

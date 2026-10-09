@@ -1,52 +1,13 @@
 "use client";
 
-import { useState, useRef, useMemo } from "react";
-import { FileDown } from "lucide-react";
+import { useState } from "react";
 import QuotationViewModal from "@/components/Quotation/QuotationViewModal";
 import QuickQuotationModal from "@/components/Quotation/QuickQuotationModal";
-import QuotationViewer from "@/components/Quotation/QuotationViewer";
-import { useSearchParams } from "next/navigation";
-import Link from "next/link";
 
 export default function UserQuotationsListClient({ quotations, isServiceSupport = false }) {
-  const searchParams = useSearchParams();
-  const customerId = searchParams.get("customer_id") || "";
-
   const [modalQuote, setModalQuote] = useState(null);
   const [showQuickModal, setShowQuickModal] = useState(false);
   const [statusFilter, setStatusFilter] = useState("");
-  const [downloadingQuote, setDownloadingQuote] = useState(null);
-  const [hiddenPayload, setHiddenPayload] = useState(null);
-  const viewerRef = useRef(null);
-
-  const editHref = (quoteNumber) => {
-    return `/user-dashboard/quotations/${encodeURIComponent(quoteNumber)}/edit`;
-  };
-
-  const handleDownloadPdf = async (quoteNumber) => {
-    if (downloadingQuote) return;
-    setDownloadingQuote(quoteNumber);
-    try {
-      const res = await fetch(`/api/quotations/${encodeURIComponent(quoteNumber)}`);
-      const data = await res.json();
-      if (!res.ok || !data.success || !data.header) {
-        alert("Could not load quotation data.");
-        return;
-      }
-      setHiddenPayload(data);
-      setTimeout(async () => {
-        if (viewerRef.current?.downloadPDF) {
-          await viewerRef.current.downloadPDF();
-        }
-        setHiddenPayload(null);
-        setDownloadingQuote(null);
-      }, 300);
-    } catch (e) {
-      console.error(e);
-      alert("PDF generation failed.");
-      setDownloadingQuote(null);
-    }
-  };
 
   const displayed = statusFilter === "completed"
     ? quotations.filter(q => q.has_order)
@@ -148,34 +109,13 @@ export default function UserQuotationsListClient({ quotations, isServiceSupport 
                     )}
                   </td>
                   <td className="px-4 py-2 text-center">
-                    <div className="flex items-center justify-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setModalQuote(q.quote_number)}
-                        className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700"
-                      >
-                        View
-                      </button>
-                      {!q.has_order ? (
-                        <Link
-                          href={editHref(q.quote_number)}
-                          className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700"
-                        >
-                          Edit
-                        </Link>
-                      ) : null}
-                      <button
-                        type="button"
-                        onClick={() => handleDownloadPdf(q.quote_number)}
-                        disabled={downloadingQuote === q.quote_number}
-                        title="Download PDF"
-                        className="inline-flex items-center justify-center p-1.5 rounded bg-red-100 hover:bg-red-200 text-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {downloadingQuote === q.quote_number
-                          ? <span className="w-4 h-4 border-2 border-red-400 border-t-transparent rounded-full animate-spin inline-block" />
-                          : <FileDown className="w-4 h-4" />}
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setModalQuote(q.quote_number)}
+                      className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700"
+                    >
+                      View
+                    </button>
                   </td>
                 </tr>
               ))
@@ -235,32 +175,13 @@ export default function UserQuotationsListClient({ quotations, isServiceSupport 
                   </span>
                 )}
               </div>
-              <div className="text-right flex items-center justify-end gap-2 flex-wrap">
+              <div className="text-right">
                 <button
                   type="button"
                   onClick={() => setModalQuote(q.quote_number)}
                   className="inline-block bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700"
                 >
                   View
-                </button>
-                {!q.has_order ? (
-                  <Link
-                    href={editHref(q.quote_number)}
-                    className="inline-block bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700"
-                  >
-                    Edit
-                  </Link>
-                ) : null}
-                <button
-                  type="button"
-                  onClick={() => handleDownloadPdf(q.quote_number)}
-                  disabled={downloadingQuote === q.quote_number}
-                  title="Download PDF"
-                  className="inline-flex items-center justify-center p-1.5 rounded bg-red-100 hover:bg-red-200 text-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {downloadingQuote === q.quote_number
-                    ? <span className="w-4 h-4 border-2 border-red-400 border-t-transparent rounded-full animate-spin inline-block" />
-                    : <FileDown className="w-4 h-4" />}
                 </button>
               </div>
             </div>
@@ -269,20 +190,6 @@ export default function UserQuotationsListClient({ quotations, isServiceSupport 
           <p className="text-center text-gray-500 italic">No entries found.</p>
         )}
       </div>
-
-      {hiddenPayload && (
-        <div className="fixed -top-[9999px] -left-[9999px] w-[1123px] pointer-events-none opacity-0 overflow-hidden">
-          <QuotationViewer
-            ref={viewerRef}
-            header={hiddenPayload.header}
-            items={hiddenPayload.items || []}
-            customerEmail={hiddenPayload.customerEmail || ""}
-            customerPhone={hiddenPayload.customerPhone || ""}
-            customerFirstName={hiddenPayload.customerFirstName || ""}
-            showAddProspectLink={false}
-          />
-        </div>
-      )}
     </>
   );
 }

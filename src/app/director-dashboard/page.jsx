@@ -44,8 +44,6 @@ export default async function DirectorDashboardPage() {
 
     let regTotal = 0;
     let regPending = 0;
-    let leaveTotal = 0;
-    let leavePending = 0;
     try {
       const [regTotalRows] = await connection.execute(
         `SELECT COUNT(*) AS c FROM attendance_regularization_requests`,
@@ -59,28 +57,7 @@ export default async function DirectorDashboardPage() {
       console.warn("attendance regularization counts:", e.message);
     }
 
-    try {
-      const [leaveTotalRows] = await connection.execute(
-        `SELECT COUNT(*) AS c FROM employee_leaves`,
-      );
-      const [leavePendingRows] = await connection.execute(
-        `SELECT COUNT(*) AS c FROM employee_leaves WHERE status = 'pending'`,
-      );
-      leaveTotal = Number(leaveTotalRows[0]?.c ?? 0);
-      leavePending = Number(leavePendingRows[0]?.c ?? 0);
-    } catch (e) {
-      console.warn("employee leave counts:", e.message);
-    }
-
-    return (
-      <DirectorDashboard
-        user={user}
-        regTotal={regTotal}
-        regPending={regPending}
-        leaveTotal={leaveTotal}
-        leavePending={leavePending}
-      />
-    );
+    return <DirectorDashboard user={user} regTotal={regTotal} regPending={regPending} />;
   } catch (error) {
     console.error("Dashboard error:", error.message);
     return <p className="text-red-600">Failed to load dashboard</p>;

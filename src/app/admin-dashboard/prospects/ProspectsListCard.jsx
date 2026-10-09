@@ -9,14 +9,13 @@ import {
 } from "react";
 import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { Eye, Pencil, Search, X } from "lucide-react";
+import { ChevronRight, Eye, Pencil, Search, User } from "lucide-react";
 import ProspectsSearchBar from "./ProspectsSearchBar";
 // import { deleteProspect } from "./actions";
 import {
   buildProspectsRowsApiUrl,
   extractQuoteNumberFromProspectSearch,
 } from "@/lib/prospectFilterUtils";
-import { aggregateProspectsByEmployee } from "@/lib/prospectEmployeeAggregates";
 
 function formatAmount(value) {
   const n = Number(value);
@@ -127,7 +126,6 @@ function normalizeAdminFilterState(initial) {
       commitmentDay: null,
       createdBy: null,
       adminSearch: null,
-      tlFollowupOnly: false,
     };
   }
   return {
@@ -139,7 +137,6 @@ function normalizeAdminFilterState(initial) {
       initial.adminSearch != null && String(initial.adminSearch).trim() !== ""
         ? String(initial.adminSearch).trim().slice(0, 200)
         : null,
-    tlFollowupOnly: Boolean(initial.tlFollowupOnly),
   };
 }
 
@@ -184,6 +181,19 @@ function initialMonthSelectFromAdmin(initialFilters) {
   return "";
 }
 
+function buildByCreatorHref(name, sp) {
+  const base = `/admin-dashboard/prospects/by-creator/${encodeURIComponent(name)}`;
+  const q = new URLSearchParams();
+  const cy = sp.get("commitment_year");
+  const cm = sp.get("commitment_month");
+  const cd = sp.get("commitment_day");
+  if (cy) q.set("commitment_year", cy);
+  if (cm) q.set("commitment_month", cm);
+  if (cd) q.set("commitment_day", cd);
+  const qs = q.toString();
+  return qs ? `${base}?${qs}` : base;
+}
+
 /** True when the user did a full browser reload (F5 / refresh), not client-side navigation. */
 function isBrowserReload() {
   if (typeof window === "undefined") return false;
@@ -200,303 +210,170 @@ function isBrowserReload() {
   return false;
 }
 
-function ProspectEmployeeViewModal({ employeeName, rows, onClose }) {
-  if (!employeeName) return null;
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="prospect-employee-modal-title"
-      onClick={onClose}
-    >
-      <div
-        className="flex max-h-[min(90vh,720px)] w-full max-w-5xl flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-start justify-between gap-3 border-b border-slate-200 px-4 py-3 sm:px-5">
-          <div>
-            <h2
-              id="prospect-employee-modal-title"
-              className="text-lg font-semibold text-slate-900"
-            >
-              Prospects — {employeeName}
-            </h2>
-            <p className="text-sm text-slate-500">
-              {rows.length} record{rows.length === 1 ? "" : "s"}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800"
-            aria-label="Close"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-        <div className="min-h-0 flex-1 overflow-auto">
-          <table className="w-full min-w-[640px] text-left text-sm">
-            <thead className="sticky top-0 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-              <tr>
-                <th className="px-3 py-2.5 font-medium sm:px-4">Customer</th>
-                <th className="px-3 py-2.5 font-medium sm:px-4">Quote</th>
-                <th className="px-3 py-2.5 font-medium sm:px-4">Model</th>
-                <th className="px-3 py-2.5 font-medium sm:px-4">Qty</th>
-                <th className="px-3 py-2.5 font-medium sm:px-4">Amount</th>
-                <th className="px-3 py-2.5 font-medium sm:px-4">Commitment</th>
-                <th className="px-3 py-2.5 font-medium sm:px-4">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {rows.map((row) => (
-                <tr key={row.id} className="text-slate-800">
-                  <td className="px-3 py-2.5 sm:px-4">
-                    <div className="font-medium">{row.customer_id}</div>
-                    {row.customer_name ? (
-                      <div className="text-xs text-slate-500">{row.customer_name}</div>
-                    ) : null}
-                  </td>
-                  <td className="whitespace-nowrap px-3 py-2.5 sm:px-4">
-                    {row.quote_number || "—"}
-                  </td>
-                  <td className="max-w-[12rem] px-3 py-2.5 sm:max-w-xs sm:px-4">
-                    <ModelCodesChips rowId={row.id} model={row.model} />
-                  </td>
-                  <td className="whitespace-nowrap px-3 py-2.5 sm:px-4">{row.qty}</td>
-                  <td className="whitespace-nowrap px-3 py-2.5 sm:px-4">
-                    {formatAmount(row.amount)}
-                  </td>
-                  <td className="whitespace-nowrap px-3 py-2.5 sm:px-4">
-                    {formatDate(row.commitment_date)}
-                  </td>
-                  <td className="px-3 py-2.5 sm:px-4">
-                    {row.order_payment_target?.label ? (
-                      <span
-                        className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${row.order_payment_target.cls}`}
-                      >
-                        {row.order_payment_target.label}
-                      </span>
-                    ) : (
-                      String(row.status || "open")
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ProspectEmployeeSummaryTable({
-  rows,
+function ProspectCreatorCardsGrid({
+  summaries,
+  selectedCreatorFromPath,
   commitmentYearSelect,
   commitmentMonthSelect,
   onCommitmentYearChange,
   onCommitmentMonthChange,
-  tlFollowupOnly,
-  onTlFollowupChange,
 }) {
+  const sp = useSearchParams();
   const [customerIdQuery, setCustomerIdQuery] = useState("");
-  const [viewEmployee, setViewEmployee] = useState(null);
 
-  const employeeRows = useMemo(
-    () => aggregateProspectsByEmployee(rows),
-    [rows],
-  );
-
-  const filteredEmployees = useMemo(() => {
+  const filteredSummaries = useMemo(() => {
     const q = customerIdQuery.trim();
-    if (!q) return employeeRows;
-    return employeeRows.filter((s) =>
-      s.customerIds.some((id) => String(id).trim() === q),
-    );
-  }, [employeeRows, customerIdQuery]);
-
-  const totals = useMemo(() => {
-    let count = 0;
-    let totalQty = 0;
-    let totalAmount = 0;
-    for (const e of filteredEmployees) {
-      count += e.count;
-      totalQty += e.totalQty;
-      totalAmount += e.totalAmount;
-    }
-    return { count, totalQty, totalAmount };
-  }, [filteredEmployees]);
-
-  const modalRows = useMemo(() => {
-    if (!viewEmployee) return [];
-    const hit = employeeRows.find((e) => e.name === viewEmployee);
-    return hit?.rows ?? [];
-  }, [viewEmployee, employeeRows]);
+    if (!q) return summaries;
+    return summaries.filter((s) => {
+      const ids = Array.isArray(s.customerIds) ? s.customerIds : [];
+      return ids.some((id) => String(id).trim() === q);
+    });
+  }, [summaries, customerIdQuery]);
 
   return (
-    <>
-      <div className="overflow-hidden rounded-[10px] border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-200 bg-slate-50/90 px-3 py-4 sm:px-5">
-          <div className="flex flex-wrap gap-3">
-            <div className="inline-flex min-w-[7rem] rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm">
-              <div>
-                <p className="text-[10px] font-medium uppercase tracking-wide text-slate-500">
-                  Prospects
-                </p>
-                <p className="text-sm font-semibold tabular-nums text-slate-900">
-                  {totals.count}
-                </p>
-              </div>
-            </div>
-            <div className="inline-flex min-w-[7rem] rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm">
-              <div>
-                <p className="text-[10px] font-medium uppercase tracking-wide text-slate-500">
-                  Qty
-                </p>
-                <p className="text-sm font-semibold tabular-nums text-slate-900">
-                  {totals.totalQty}
-                </p>
-              </div>
-            </div>
-            <div className="inline-flex min-w-[7rem] rounded-lg border border-emerald-200/80 bg-gradient-to-br from-white to-emerald-50/50 px-3 py-2 shadow-sm">
-              <div>
-                <p className="text-[10px] font-medium uppercase tracking-wide text-emerald-700/90">
-                  Value
-                </p>
-                <p className="text-sm font-semibold tabular-nums text-emerald-800">
-                  {formatAmount(totals.totalAmount)}
-                </p>
-              </div>
-            </div>
-          </div>
-          <div className="mt-4 flex flex-wrap items-end gap-3">
-            <div className="min-w-0 flex-1 sm:min-w-[12rem]">
-              <label htmlFor="employee-table-customer-id" className="sr-only">
-                Search by customer ID
-              </label>
-              <div className="relative">
-                <Search
-                  className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
-                  aria-hidden
-                />
-                <input
-                  id="employee-table-customer-id"
-                  type="search"
-                  autoComplete="off"
-                  value={customerIdQuery}
-                  onChange={(e) => setCustomerIdQuery(e.target.value)}
-                  placeholder="Filter by customer ID…"
-                  className="h-11 w-full rounded-xl border border-slate-200 bg-white py-2 pl-10 pr-3 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
-                />
-              </div>
-            </div>
-            <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 shadow-sm">
-              <input
-                type="checkbox"
-                checked={tlFollowupOnly}
-                onChange={(e) => onTlFollowupChange(e.target.checked)}
-                className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-              />
-              TL follow-up clients only
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-[10px] font-medium uppercase tracking-wide text-slate-500">
-                Year
-              </span>
-              <select
-                className={adminTableSelectClass}
-                value={commitmentYearSelect}
-                onChange={onCommitmentYearChange}
-                aria-label="Filter by commitment year"
-              >
-                <option value="all">All years</option>
-                {buildCommitmentYearOptions().map((y) => (
-                  <option key={y} value={String(y)}>
-                    {y}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-[10px] font-medium uppercase tracking-wide text-slate-500">
-                Month
-              </span>
-              <select
-                className={adminTableSelectClass}
-                value={commitmentMonthSelect}
-                onChange={onCommitmentMonthChange}
-                aria-label="Filter by commitment month"
-              >
-                <option value="">All months</option>
-                {MONTH_LABELS.map((label, i) => (
-                  <option key={label} value={String(i + 1)}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </label>
+    <div className="rounded-2xl border border-slate-200/90 bg-gradient-to-b from-slate-50/90 to-white p-5 shadow-sm sm:p-6 md:p-8">
+      <div className="mb-5 border-b border-slate-200/80 pb-4">
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <div>
+            <h2 className="text-[11px] font-bold uppercase tracking-[0.2em] text-blue-600">
+              Created by
+            </h2>
+            <p className="mt-1 text-sm text-slate-600">
+              Choose a team member to open their prospects
+            </p>
           </div>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px] text-left text-sm">
-            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-              <tr>
-                <th className="px-3 py-3 font-medium sm:px-4">Employee name</th>
-                <th className="px-3 py-3 font-medium sm:px-4">Amount</th>
-                <th className="px-3 py-3 font-medium sm:px-4">Machine models (qty)</th>
-                <th className="px-3 py-3 font-medium sm:px-4">View</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filteredEmployees.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={4}
-                    className="px-4 py-10 text-center text-sm text-slate-500"
-                  >
-                    No prospects for this period
-                    {tlFollowupOnly ? " (TL follow-up filter on)" : ""}.
-                  </td>
-                </tr>
-              ) : (
-                filteredEmployees.map((emp) => (
-                  <tr key={emp.name} className="text-slate-800">
-                    <td className="px-3 py-3 font-medium sm:px-4">{emp.name}</td>
-                    <td className="whitespace-nowrap px-3 py-3 tabular-nums sm:px-4">
-                      {formatAmount(emp.totalAmount)}
-                    </td>
-                    <td
-                      className="max-w-md px-3 py-3 text-xs leading-relaxed text-slate-700 sm:max-w-xl sm:px-4 sm:text-sm"
-                      title={emp.modelsText}
-                    >
-                      <span className="line-clamp-3">{emp.modelsText || "—"}</span>
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-3 sm:px-4">
-                      <button
-                        type="button"
-                        onClick={() => setViewEmployee(emp.name)}
-                        className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 shadow-sm transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-800"
-                      >
-                        <Eye className="h-4 w-4" aria-hidden />
-                        View
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+        <div className="mt-4 flex flex-wrap items-end gap-3">
+          <div className="min-w-0 flex-1 sm:min-w-[12rem]">
+            <label htmlFor="creator-cards-customer-id-search" className="sr-only">
+              Search by customer ID
+            </label>
+            <div className="relative">
+              <Search
+                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+                aria-hidden
+              />
+              <input
+                id="creator-cards-customer-id-search"
+                type="search"
+                autoComplete="off"
+                value={customerIdQuery}
+                onChange={(e) => setCustomerIdQuery(e.target.value)}
+                placeholder="Search by customer ID…"
+                className="h-11 w-full rounded-xl border border-slate-200 bg-white py-2 pl-10 pr-3 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+              />
+            </div>
+          </div>
+          <label className="flex flex-col gap-1">
+            <span className="text-[10px] font-medium uppercase tracking-wide text-slate-500">
+              Year
+            </span>
+            <select
+              className={adminTableSelectClass}
+              value={commitmentYearSelect}
+              onChange={onCommitmentYearChange}
+              aria-label="Filter creator cards by commitment year"
+            >
+              <option value="all">All years</option>
+              {buildCommitmentYearOptions().map((y) => (
+                <option key={y} value={String(y)}>
+                  {y}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-[10px] font-medium uppercase tracking-wide text-slate-500">
+              Month
+            </span>
+            <select
+              className={adminTableSelectClass}
+              value={commitmentMonthSelect}
+              onChange={onCommitmentMonthChange}
+              aria-label="Filter creator cards by commitment month"
+            >
+              <option value="">All months</option>
+              {MONTH_LABELS.map((label, i) => (
+                <option key={label} value={String(i + 1)}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
       </div>
-      {viewEmployee ? (
-        <ProspectEmployeeViewModal
-          employeeName={viewEmployee}
-          rows={modalRows}
-          onClose={() => setViewEmployee(null)}
-        />
-      ) : null}
-    </>
+      {!summaries.length ? (
+        <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/60 px-4 py-10 text-center">
+          <p className="text-sm font-medium text-slate-600">
+            No creator cards for this period. Try another year or month, or add
+            prospects.
+          </p>
+        </div>
+      ) : filteredSummaries.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/60 px-4 py-10 text-center">
+          <p className="text-sm font-medium text-slate-600">
+            No creator matches this customer ID.
+          </p>
+        </div>
+      ) : (
+      <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {filteredSummaries.map(({ name, count, totalAmount = 0 }) => {
+          const selected = selectedCreatorFromPath === name;
+          const amount = Number(totalAmount ?? 0);
+          return (
+            <li key={name}>
+              <Link
+                href={buildByCreatorHref(name, sp)}
+                scroll={false}
+                className={[
+                  "group relative flex flex-col gap-3 rounded-2xl border p-5 text-left transition-all duration-200",
+                  "outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2",
+                  selected
+                    ? "border-blue-400 bg-gradient-to-br from-blue-50/50 to-white shadow-md ring-2 ring-blue-500/30"
+                    : "border-slate-200/90 bg-gradient-to-br from-white via-slate-50/40 to-blue-50/50 shadow-sm hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-lg",
+                ].join(" ")}
+              >
+                <div className="flex items-start gap-3">
+                  <span
+                    className={[
+                      "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-100 text-blue-600 transition group-hover:bg-blue-600 group-hover:text-white",
+                      selected ? "bg-blue-600 text-white" : "",
+                    ].join(" ")}
+                  >
+                    <User className="h-5 w-5" strokeWidth={2} aria-hidden />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <span
+                      className="line-clamp-2 text-base font-semibold leading-snug text-slate-900"
+                      title={name}
+                    >
+                      {name}
+                    </span>
+                    <p className="mt-1 text-xs font-medium uppercase tracking-wide text-slate-500">
+                      {count} {count === 1 ? "prospect" : "prospects"}
+                    </p>
+                    <p className="mt-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                      Total amount
+                    </p>
+                    <p className="text-sm font-semibold tabular-nums text-emerald-700">
+                      {formatAmount(amount)}
+                    </p>
+                  </div>
+                  <ChevronRight
+                    className={[
+                      "h-5 w-5 shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-blue-500",
+                      selected ? "text-blue-500" : "",
+                    ].join(" ")}
+                    aria-hidden
+                  />
+                </div>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+      )}
+    </div>
   );
 }
 
@@ -506,6 +383,7 @@ export default function ProspectsListCard({
   initialCustomerIds = [],
   initialQuoteNumbers = [],
   initialAdminFilters = null,
+  prospectCreatorSummaries = [],
   loadError = null,
   viewerUsername = "",
   viewerIsAdmin = false,
@@ -515,11 +393,17 @@ export default function ProspectsListCard({
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
+  const selectedCreatorFromPath = useMemo(() => {
+    const mark = "/admin-dashboard/prospects/by-creator/";
+    if (!pathname.startsWith(mark)) return null;
+    return decodeURIComponent(pathname.slice(mark.length));
+  }, [pathname]);
+
   const isMainProspectsList =
     pathname === "/admin-dashboard/prospects" ||
     pathname === "/admin-dashboard/prospects/";
 
-  /** Admins see employee summary table on the main list; detail table on by-creator. */
+  /** Admins use creator cards → by-creator page; hide the big table on the main list only. */
   const hideDataTable =
     viewerIsAdmin && lockedCreatorName == null && isMainProspectsList;
   const [rows, setRows] = useState(initialRows);
@@ -538,9 +422,6 @@ export default function ProspectsListCard({
   );
   const [commitmentMonthSelect, setCommitmentMonthSelect] = useState(() =>
     initialMonthSelectFromAdmin(initialAdminFilters),
-  );
-  const [tlFollowupOnly, setTlFollowupOnly] = useState(
-    () => normalizeAdminFilterState(initialAdminFilters).tlFollowupOnly,
   );
 
   const searchTextRef = useRef(searchText);
@@ -569,9 +450,6 @@ export default function ProspectsListCard({
     adminFiltersRef.current = normalizeAdminFilterState(initialAdminFilters);
     setCommitmentYearSelect(initialYearSelectFromAdmin(initialAdminFilters));
     setCommitmentMonthSelect(initialMonthSelectFromAdmin(initialAdminFilters));
-    setTlFollowupOnly(
-      normalizeAdminFilterState(initialAdminFilters).tlFollowupOnly,
-    );
   }, [viewerIsAdmin, adminFilterKey, initialAdminFilters]);
 
   useEffect(() => {
@@ -589,7 +467,6 @@ export default function ProspectsListCard({
       "commitment_day",
       "admin_search",
       "created_by",
-      "tl_followup",
     ];
     let changed = false;
     for (const k of stripKeys) {
@@ -640,11 +517,6 @@ export default function ProspectsListCard({
         p.set("admin_search", snapshot.adminSearch);
       } else {
         p.delete("admin_search");
-      }
-      if (snapshot.tlFollowupOnly) {
-        p.set("tl_followup", "1");
-      } else {
-        p.delete("tl_followup");
       }
       const qs = p.toString();
       const base = lockedCreatorName
@@ -712,26 +584,6 @@ export default function ProspectsListCard({
       void refreshRows(
         sel.map((c) => c.customer_id),
         "",
-        sel.map((c) => c.quote_number ?? ""),
-        next,
-      );
-    },
-    [syncAdminFiltersToUrl, refreshRows],
-  );
-
-  const onTlFollowupChange = useCallback(
-    (checked) => {
-      setTlFollowupOnly(checked);
-      const next = {
-        ...adminFiltersRef.current,
-        tlFollowupOnly: checked,
-      };
-      adminFiltersRef.current = next;
-      syncAdminFiltersToUrl(next);
-      const sel = selectedRef.current;
-      void refreshRows(
-        sel.map((c) => c.customer_id),
-        searchTextRef.current.trim(),
         sel.map((c) => c.quote_number ?? ""),
         next,
       );
@@ -857,7 +709,6 @@ export default function ProspectsListCard({
     if (norm.commitmentDay != null) return true;
     if (norm.adminSearch && String(norm.adminSearch).trim() !== "") return true;
     if (!lockedCreatorName && norm.createdBy) return true;
-    if (norm.tlFollowupOnly) return true;
     return false;
   }, [viewerIsAdmin, adminFilterKey, initialAdminFilters, lockedCreatorName]);
 
@@ -869,6 +720,15 @@ export default function ProspectsListCard({
     }
     return sum;
   }, [rows]);
+
+  const allCreatorsCardsTotalAmount = useMemo(() => {
+    let sum = 0;
+    for (const s of prospectCreatorSummaries) {
+      const n = Number(s.totalAmount);
+      if (Number.isFinite(n)) sum += n;
+    }
+    return sum;
+  }, [prospectCreatorSummaries]);
 
   if (loadError) {
     return (
@@ -939,61 +799,77 @@ export default function ProspectsListCard({
         </span>
       </div>
 
-      {viewerIsAdmin && !hideDataTable ? (
+      {viewerIsAdmin ? (
         <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50/90 p-3 sm:p-4">
-          <div className="flex flex-wrap items-end gap-3">
+          {!hideDataTable ? (
+            <div className="flex flex-wrap items-end gap-3">
+              <div
+                className="inline-flex rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm"
+                title="Sum of Total amount for rows currently shown in the table"
+              >
+                <div>
+                  <p className="text-[10px] font-medium uppercase tracking-wide text-slate-500">
+                    Total amount
+                  </p>
+                  <p className="text-sm font-semibold tabular-nums text-slate-900">
+                    {formatAmount(tableTotalAmount)}
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-end gap-2 sm:ml-auto">
+                <label className="flex flex-col gap-1">
+                  <span className="text-[10px] font-medium uppercase tracking-wide text-slate-500">
+                    Year
+                  </span>
+                  <select
+                    className={adminTableSelectClass}
+                    value={commitmentYearSelect}
+                    onChange={onCommitmentYearChange}
+                    aria-label="Filter by commitment year"
+                  >
+                    <option value="all">All years</option>
+                    {buildCommitmentYearOptions().map((y) => (
+                      <option key={y} value={String(y)}>
+                        {y}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-[10px] font-medium uppercase tracking-wide text-slate-500">
+                    Month
+                  </span>
+                  <select
+                    className={adminTableSelectClass}
+                    value={commitmentMonthSelect}
+                    onChange={onCommitmentMonthChange}
+                    aria-label="Filter by commitment month"
+                  >
+                    <option value="">All months</option>
+                    {MONTH_LABELS.map((label, i) => (
+                      <option key={label} value={String(i + 1)}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            </div>
+          ) : (
             <div
-              className="inline-flex rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm"
-              title="Sum of Total amount for rows currently shown in the table"
+              className="inline-flex rounded-lg border border-emerald-200/80 bg-gradient-to-br from-white to-emerald-50/50 px-3 py-2 shadow-sm"
+              title="Sum of total amount across all creator cards below"
             >
               <div>
-                <p className="text-[10px] font-medium uppercase tracking-wide text-slate-500">
-                  Total amount
+                <p className="text-[10px] font-medium uppercase tracking-wide text-emerald-700/90">
+                  All creators total
                 </p>
-                <p className="text-sm font-semibold tabular-nums text-slate-900">
-                  {formatAmount(tableTotalAmount)}
+                <p className="text-sm font-semibold tabular-nums text-emerald-800">
+                  {formatAmount(allCreatorsCardsTotalAmount)}
                 </p>
               </div>
             </div>
-            <div className="flex flex-wrap items-end gap-2 sm:ml-auto">
-              <label className="flex flex-col gap-1">
-                <span className="text-[10px] font-medium uppercase tracking-wide text-slate-500">
-                  Year
-                </span>
-                <select
-                  className={adminTableSelectClass}
-                  value={commitmentYearSelect}
-                  onChange={onCommitmentYearChange}
-                  aria-label="Filter by commitment year"
-                >
-                  <option value="all">All years</option>
-                  {buildCommitmentYearOptions().map((y) => (
-                    <option key={y} value={String(y)}>
-                      {y}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="flex flex-col gap-1">
-                <span className="text-[10px] font-medium uppercase tracking-wide text-slate-500">
-                  Month
-                </span>
-                <select
-                  className={adminTableSelectClass}
-                  value={commitmentMonthSelect}
-                  onChange={onCommitmentMonthChange}
-                  aria-label="Filter by commitment month"
-                >
-                  <option value="">All months</option>
-                  {MONTH_LABELS.map((label, i) => (
-                    <option key={label} value={String(i + 1)}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-          </div>
+          )}
         </div>
       ) : null}
 
@@ -1165,22 +1041,14 @@ export default function ProspectsListCard({
         </div>
       </div>
       ) : (
-        <div className="relative">
-          {tableLoading ? (
-            <div className="absolute inset-0 z-10 flex items-center justify-center rounded-[10px] bg-white/60 text-sm text-slate-500">
-              Updating…
-            </div>
-          ) : null}
-          <ProspectEmployeeSummaryTable
-            rows={rows}
-            commitmentYearSelect={commitmentYearSelect}
-            commitmentMonthSelect={commitmentMonthSelect}
-            onCommitmentYearChange={onCommitmentYearChange}
-            onCommitmentMonthChange={onCommitmentMonthChange}
-            tlFollowupOnly={tlFollowupOnly}
-            onTlFollowupChange={onTlFollowupChange}
-          />
-        </div>
+        <ProspectCreatorCardsGrid
+          summaries={prospectCreatorSummaries}
+          selectedCreatorFromPath={selectedCreatorFromPath}
+          commitmentYearSelect={commitmentYearSelect}
+          commitmentMonthSelect={commitmentMonthSelect}
+          onCommitmentYearChange={onCommitmentYearChange}
+          onCommitmentMonthChange={onCommitmentMonthChange}
+        />
       )}
     </>
   );

@@ -1,6 +1,5 @@
 "use client";
 
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect } from "react";
 import dayjs from "dayjs";
 
@@ -100,11 +99,21 @@ export default function ItemWiseSalesPage() {
       >
         <div className="flex-1 min-w-[200px]">
           <label className="text-sm font-medium block mb-2 text-gray-700">From date</label>
-          <TypeableDateFilterInput value={from} onChange={setFrom} className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"/>
+          <input
+            type="date"
+            value={from}
+            onChange={(e) => setFrom(e.target.value)}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
+          />
         </div>
         <div className="flex-1 min-w-[200px]">
           <label className="text-sm font-medium block mb-2 text-gray-700">To date</label>
-          <TypeableDateFilterInput value={to} onChange={setTo} className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"/>
+          <input
+            type="date"
+            value={to}
+            onChange={(e) => setTo(e.target.value)}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
+          />
         </div>
         <button
           type="submit"

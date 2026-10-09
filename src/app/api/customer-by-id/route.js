@@ -38,9 +38,8 @@ export async function POST(req) {
 
     let query, params;
 
-    // Privileged roles can access any customer
-    const privilegedRoles = new Set(["SUPERADMIN", "ADMIN", "DIRECTOR", "SERVICE HEAD", "SERVICE SUPPORT", "SALES CUM BACKOFFICE", "SALES", "SALES HEAD", "TEAM LEADER"]);
-    if (privilegedRoles.has(role)) {
+    // If SUPERADMIN, ADMIN, SERVICE HEAD, SERVICE SUPPORT, or SALES CUM BACKOFFICE can access all customers
+    if (role === "SUPERADMIN" || role === "ADMIN" || role === "SERVICE HEAD" || role === "SERVICE SUPPORT" || role === "SALES CUM BACKOFFICE") {
       query = `
         SELECT customer_id, company, first_name, last_name, address, gstin, state, lead_source
         FROM customers
@@ -49,14 +48,14 @@ export async function POST(req) {
       `;
       params = [customer_id];
     } else {
-      // Regular users can access customers where they are the lead_source OR assigned_to
+      // Regular users can only access their own customers
       query = `
         SELECT customer_id, company, first_name, last_name, address, gstin, state, lead_source
         FROM customers
-        WHERE customer_id = ? AND (lead_source = ? OR assigned_to = ?)
+        WHERE customer_id = ? AND lead_source = ?
         LIMIT 1
       `;
-      params = [customer_id, username, username];
+      params = [customer_id, username];
     }
 
     const [rows] = await pool.execute(query, params);

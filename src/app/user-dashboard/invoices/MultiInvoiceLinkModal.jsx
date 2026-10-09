@@ -1,6 +1,5 @@
 "use client";
 
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import React, { useEffect, useState, useMemo } from "react";
 import { Search } from "lucide-react";
 import { toast } from "react-hot-toast";
@@ -13,7 +12,6 @@ const MultiInvoiceLinkModal = ({ isOpen, closeModal, selectedInvoiceIds, selecte
   const [initialLinkedStatementIds, setInitialLinkedStatementIds] = useState(new Set());
   const [initialLinkedTotal, setInitialLinkedTotal] = useState(0);
   const [saving, setSaving] = useState(false);
-  const [showOnlyLinked, setShowOnlyLinked] = useState(true);
   
   const getLinkedKeys = (stmt) => {
     const raw = stmt?.linked_purchase_ids;
@@ -58,7 +56,6 @@ const MultiInvoiceLinkModal = ({ isOpen, closeModal, selectedInvoiceIds, selecte
     if (!isOpen) return;
     setStatements([]);
     setSearch("");
-    setShowOnlyLinked(true);
     // Initialize selected statements with those already linked to our selected invoices
     const initialSelected = new Set();
     const initialLinked = new Set();
@@ -124,11 +121,7 @@ const MultiInvoiceLinkModal = ({ isOpen, closeModal, selectedInvoiceIds, selecte
       const isLinkedById = linked.some(key => selectedInvoiceKeys.has(key));
       const isLinkedByNumber = s.invoice_number && selectedInvoiceNumbers.has(s.invoice_number);
       const isLinkedToSelected = isLinkedById || isLinkedByNumber;
-
-      if (showOnlyLinked) {
-        return isLinkedToSelected;
-      }
-
+      
       // ALWAYS show selected statements OR statements linked to selected invoices
       if (selectedStatementIds.has(s.id) || isLinkedToSelected) {
         // Date filter for these statements too, to keep consistency
@@ -188,7 +181,7 @@ const MultiInvoiceLinkModal = ({ isOpen, closeModal, selectedInvoiceIds, selecte
     }
 
     return rows;
-  }, [statements, search, stmtStartDate, stmtEndDate, selectedStatementIds, selectedInvoiceIds, invoices, showOnlyLinked]);
+  }, [statements, search, stmtStartDate, stmtEndDate, selectedStatementIds, selectedInvoiceIds, invoices]);
 
   const { totalSelectedAmount, statementDistribution, selectedGroups, remainingAmount, totalNewSelectedAmount } = useMemo(() => {
     const selectedStatementsList = statements.filter(s => selectedStatementIds.has(s.id)).sort((a, b) => a.id - b.id);
@@ -458,18 +451,19 @@ const MultiInvoiceLinkModal = ({ isOpen, closeModal, selectedInvoiceIds, selecte
                 className="pl-8 pr-3 py-1.5 border rounded-md text-sm w-72 focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
             </div>
-            <TypeableDateFilterInput value={stmtStartDate} onChange={setStmtStartDate} className="px-3 py-1.5 border rounded-md text-sm"/>
+            <input
+              type="date"
+              value={stmtStartDate}
+              onChange={(e) => setStmtStartDate(e.target.value)}
+              className="px-3 py-1.5 border rounded-md text-sm"
+            />
             <span className="text-gray-500">to</span>
-            <TypeableDateFilterInput value={stmtEndDate} onChange={setStmtEndDate} className="px-3 py-1.5 border rounded-md text-sm"/>
-            <label className="flex items-center gap-2 text-sm text-gray-700 whitespace-nowrap">
-              <input
-                type="checkbox"
-                checked={showOnlyLinked}
-                onChange={(e) => setShowOnlyLinked(e.target.checked)}
-                className="w-4 h-4 cursor-pointer"
-              />
-              Linked payments only
-            </label>
+            <input
+              type="date"
+              value={stmtEndDate}
+              onChange={(e) => setStmtEndDate(e.target.value)}
+              className="px-3 py-1.5 border rounded-md text-sm"
+            />
           </div>
           <div className="text-xs text-gray-600 font-medium">
             {loading ? "Loading..." : `Showing ${eligibleStatements.length} statement(s)`}
@@ -502,9 +496,7 @@ const MultiInvoiceLinkModal = ({ isOpen, closeModal, selectedInvoiceIds, selecte
                 </tr>
               ) : eligibleStatements.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="p-10 text-center text-gray-500">
-                    {showOnlyLinked ? "No linked payments for this invoice" : "No matching unsettled statements found"}
-                  </td>
+                  <td colSpan={8} className="p-10 text-center text-gray-500">No matching unsettled statements found</td>
                 </tr>
               ) : (
                 eligibleStatements.map((s) => {

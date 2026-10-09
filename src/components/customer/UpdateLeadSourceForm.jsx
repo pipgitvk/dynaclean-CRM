@@ -17,16 +17,6 @@ export default function UpdateLeadSourceForm({ initialData, leadSources, service
   const [isUpdating, setIsUpdating] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
 
-  const isSalesCumBackoffice = userRole === "SALES CUM BACKOFFICE";
-  const canManageGemAssignment =
-    userRole === "SUPERADMIN" || userRole === "EA" || isSalesCumBackoffice;
-  const canManageServiceLeadSource =
-    userRole === "SUPERADMIN" ||
-    userRole === "SERVICE SUPPORT" ||
-    userRole === "SERVICE HEAD" ||
-    userRole === "EA" ||
-    isSalesCumBackoffice;
-
   const handleUpdate = async (e) => {
     e.preventDefault();
     setIsUpdating(true);
@@ -37,8 +27,9 @@ export default function UpdateLeadSourceForm({ initialData, leadSources, service
       if (!(userRole === "SERVICE SUPPORT" || userRole === "SERVICE HEAD")) {
         requestBody.lead_source = selectedLeadSource;
       }
-
-      if (canManageGemAssignment) {
+      
+      // Add GEM assignment if selected (SUPERADMIN and EA only)
+      if (selectedGemEmployee && (userRole === "SUPERADMIN" || userRole === "EA")) {
         requestBody.gem_lead_source = selectedGemEmployee;
       }
 
@@ -106,7 +97,7 @@ export default function UpdateLeadSourceForm({ initialData, leadSources, service
               </select>
             </div>
           )}
-          {canManageServiceLeadSource && (
+          {(userRole === "SUPERADMIN" || userRole === "SERVICE SUPPORT" || userRole === "SERVICE HEAD" || userRole === "EA") && (
             <div>
               <label
                 htmlFor="service_lead_source_select"
@@ -131,7 +122,8 @@ export default function UpdateLeadSourceForm({ initialData, leadSources, service
             </div>
           )}
           
-          {canManageGemAssignment && gemEmployees.length > 0 && (
+          {/* GEM Assignment - Only for SUPERADMIN and EA */}
+          {(userRole === "SUPERADMIN" || userRole === "EA") && gemEmployees.length > 0 && (
             <div>
               <label
                 htmlFor="gem_employee_select"

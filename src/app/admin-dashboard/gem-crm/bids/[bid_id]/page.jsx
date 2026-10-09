@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter, usePathname } from "next/navigation";
-import { getGemCrmBasePath } from "@/lib/gemCrmBasePath";
+import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   Pencil,
@@ -19,7 +18,6 @@ import {
   History,
 } from "lucide-react";
 import toast from "react-hot-toast";
-import { parseBidDocuments } from "@/lib/bidDocuments";
 
 const StatusBadge = ({ status }) => {
   const styles = {
@@ -47,8 +45,6 @@ const StatusBadge = ({ status }) => {
 
 export default function BidDetailsPage({ params }) {
   const router = useRouter();
-  const pathname = usePathname();
-  const gemCrmBase = getGemCrmBasePath(pathname);
   const [bid, setBid] = useState(null);
   const [documents, setDocuments] = useState([]);
   const [logs, setLogs] = useState([]);
@@ -113,7 +109,7 @@ export default function BidDetailsPage({ params }) {
       const result = await res.json();
       if (result.success) {
         toast.success("Bid deleted successfully");
-        router.push(`${gemCrmBase}/bids`);
+        router.push("/admin-dashboard/gem-crm/bids");
       } else {
         toast.error(result.error || "Failed to delete bid");
       }
@@ -199,7 +195,7 @@ export default function BidDetailsPage({ params }) {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <button
-            onClick={() => router.push(`${gemCrmBase}/bids`)}
+            onClick={() => router.push("/admin-dashboard/gem-crm/bids")}
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
           >
             <ArrowLeft className="w-5 h-5" />
@@ -216,7 +212,7 @@ export default function BidDetailsPage({ params }) {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => router.push(`${gemCrmBase}/bids/${bidId}/edit`)}
+            onClick={() => router.push(`/admin-dashboard/gem-crm/bids/${bidId}/edit`)}
             className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
           >
             <Pencil className="w-4 h-4" />
@@ -300,25 +296,19 @@ export default function BidDetailsPage({ params }) {
                 }
               />
             )}
-            {parseBidDocuments(bid.bid_documents || bid.bid_document).length > 0 && (
-              <div className="py-2 border-b border-gray-100 last:border-0">
-                <div className="flex justify-between items-start gap-4">
-                  <span className="text-sm text-gray-500">Bid Documents</span>
-                  <div className="flex flex-col items-end gap-1 max-w-xs">
-                    {parseBidDocuments(bid.bid_documents || bid.bid_document).map((doc, index) => (
-                      <button
-                        key={`${doc.url}-${index}`}
-                        type="button"
-                        onClick={() => handleViewFile(doc.url)}
-                        className="text-blue-600 hover:underline flex items-center gap-1 text-sm font-medium"
-                      >
-                        <Download className="w-4 h-4" />
-                        {doc.name}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
+            {bid.bid_document && (
+              <DetailRow
+                label="Bid Document"
+                value={
+                  <button
+                    onClick={() => handleViewFile(bid.bid_document)}
+                    className="text-blue-600 hover:underline flex items-center gap-1"
+                  >
+                    <Download className="w-4 h-4" />
+                    Download
+                  </button>
+                }
+              />
             )}
           </div>
         </div>

@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import AssignToInput from "@/components/AssigneInput/AssignToInput";
-import TaskCategorySelect from "@/components/task/TaskCategorySelect";
 
 /** Current local time for `datetime-local` (minute precision). */
 function nowDatetimeLocal() {
@@ -218,13 +217,21 @@ export default function TaskForm({ username }) {
       <div className="flex flex-wrap gap-4">
         <div className="flex-1">
           <label className="block font-semibold">Category</label>
-          <TaskCategorySelect
-            value={formData.task_catg}
-            onChange={(val) =>
-              setFormData((prev) => ({ ...prev, task_catg: val }))
-            }
+          <select
+            name="task_catg"
             required
-          />
+            value={formData.task_catg}
+            onChange={handleChange}
+            className="input border border-gray-300 rounded-md p-2 w-full"
+          >
+            <option value="">Select</option>
+            <option value="Dispatch">Dispatch</option>
+            <option value="Payment Collection">Payment Collection</option>
+            <option value="Service">Service</option>
+            <option value="Complaint">Complaint</option>
+            <option value="Other General Task">Other General Task</option>
+            <option value="Software Development">Software Development</option>
+          </select>
         </div>
 
         <div className="flex-1">

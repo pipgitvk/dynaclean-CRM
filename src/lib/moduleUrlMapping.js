@@ -13,12 +13,9 @@ export const MODULE_KEY_TO_URL = {
   "item-wise-sales": "/admin-dashboard/reports/item-wise-sales",
   "customer-payment-behavior": "/admin-dashboard/reports/customer-payment-behavior",
   "demo-followups": "/admin-dashboard/demo-registrations",
-  "schedule-visits": "/admin-dashboard/schedule-visits",
   "fast-card": "/admin-dashboard/fast-card",
   "task-manager": "/admin-dashboard/task-manager",
   "attendance-details": "/empcrm/admin-dashboard/attendance",
-  "auto-checkout-approvals": "/empcrm/admin-dashboard/auto-checkout-approvals",
-  "machine-attendance": "/empcrm/admin-dashboard/machine-attendance",
   "regularization-approvals": "/admin-dashboard/regularization-approvals",
 
   // TL Management
@@ -37,15 +34,12 @@ export const MODULE_KEY_TO_URL = {
   // Sales
   "quotations": "/admin-dashboard/quotations",
   "invoices": "/admin-dashboard/invoices/list",
-  "performa-invoices": "/admin-dashboard/performa-invoices",
   "orders-process": "/admin-dashboard/order",
   "orders-delay": "/admin-dashboard/order/delivery-status",
   "estimate-delivery": "/admin-dashboard/estimate-delivery",
   "demo-details": "/admin-dashboard/demo_details",
 
   // Products & Inventory
-  "parties": "/admin-dashboard/parties",
-  "purchase-products": "/accounts-dashboard/purchase-products",
   "product-stock": "/admin-dashboard/product-stock",
   "product-accessories": "/admin-dashboard/product-accessories",
   "purchase-direct-in": "/admin-dashboard/purchase/direct-in",
@@ -65,7 +59,6 @@ export const MODULE_KEY_TO_URL = {
   "warranty-console": "/admin-dashboard/warranty",
   "registered-products": "/admin-dashboard/warranty/products",
   "service-followups": "/admin-dashboard/service-followups",
-  "service-support-report": "/admin-dashboard/service-support-report",
   "warranty-map": "/admin-dashboard/warranty/map",
   "service-records": "/admin-dashboard/view_service_reports",
   "upcoming-installations": "/admin-dashboard/view_service_reports/upcoming-installation",
@@ -80,12 +73,9 @@ export const MODULE_KEY_TO_URL = {
   "view-expenses": "/admin-dashboard/all-expenses",
   "dd-management": "/admin-dashboard/dd-management",
   "other-income": "/admin-dashboard/other-income",
-  "delivery-challan": "/accounts-dashboard/delivery-challan",
+  "delivery-challan": "/admin-dashboard/delivery-challan",
   "statements": "/admin-dashboard/statements",
   "salary-slips": "/empcrm/admin-dashboard/salary-slips",
-  "salary-management": "/empcrm/admin-dashboard/salary",
-  "salary-sheet": "/empcrm/admin-dashboard/salary-sheet",
-  "attendance-sheet": "/empcrm/admin-dashboard/attendance-sheet",
   "ledger": "/admin-dashboard/ledger",
 
   // Resource Center
@@ -101,14 +91,7 @@ export const MODULE_KEY_TO_URL = {
 
   // Employees
   "employee-list": "/admin-dashboard/employees",
-  "hr-employee-registry": "/hr-dashboard/employees",
-  "admin-crm-dashboard": "/hr-dashboard/admin-crm",
-  "admin-crm-profile": "/hr-dashboard/admin-crm/profile",
-  "admin-crm-profile-approvals": "/hr-dashboard/admin-crm/profile/approvals",
-  "admin-crm-leave": "/hr-dashboard/admin-crm/leave",
-  "admin-crm-attendance-summary": "/hr-dashboard/admin-crm/attendance-summary",
-  "admin-crm-documents": "/hr-dashboard/admin-crm/documents",
-  "employee-crm": "/empcrm/user-dashboard",
+  "employee-crm": "/empcrm",
   "attendance-log": "/empcrm/admin-dashboard/attendance ",
 
   // HR Operations
@@ -117,14 +100,11 @@ export const MODULE_KEY_TO_URL = {
   "hr-daily-report": "/empcrm/admin-dashboard/salary",
   "attendance-rules": "/admin-dashboard/attendance-rules",
   "all-hr-report": "/admin-dashboard/all-hr-report",
-  "add-paid-leaves": "/empcrm/user-dashboard/add-paid-leave",
-  "paid-leave-ledger": "/admin-dashboard/paid-leave-ledger",
 
   // Digital Marketing
   "keywords-management": "/admin-dashboard/keywords",
   "backlinks-management": "/admin-dashboard/backlinks",
   "backlinks-excel-data": "/admin-dashboard/backlinks-excel",
-  "meta-credentials-add": "/digital-marketing-dashboard/meta-credentials/add",
 
   // Import CRM
   "import-agents": "/admin-dashboard/import-crm/agents",

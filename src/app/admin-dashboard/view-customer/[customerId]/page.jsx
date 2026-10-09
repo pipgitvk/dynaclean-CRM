@@ -1,37 +1,25 @@
 // app/user-dashboard/view-customer/[customerId]/page.tsx
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
-import { ensureCustomersFollowupNotesText } from "@/lib/ensureCustomersFollowupNotesText";
 import dayjs from "dayjs";
 import FollowUpHistory from "@/components/Leads/FollowUpHistory";
 import CustomerContactsModal from "@/components/Customers/CustomerContactsModal";
 import ViewCustomerQuotationsLink from "@/components/Customers/ViewCustomerQuotationsLink";
-import CustomerPerformaInvoiceButton from "@/components/invoice/CustomerPerformaInvoiceButton";
-import ScheduleVisitModal from "@/components/scheduleVisit/ScheduleVisitModal";
-import { canShowScheduleVisitOnCustomerProfile } from "@/lib/scheduleVisitScope";
-import { userHasModuleKey } from "@/lib/userModuleAccessServer";
 import Link from "next/link";
 import axios from "axios";
 import { notFound } from "next/navigation";
-import {
-  collectHierarchyCustomerIds,
-  fetchCustomerFollowupHistory,
-} from "@/lib/customerHierarchyFollowups";
 
 export default async function CustomerPage({ params }) {
   const { customerId } = await params;
   const conn = await getDbConnection();
-  await ensureCustomersFollowupNotesText(conn);
 
   // Fetch current user info
   const payload = await getSessionPayload();
   const userRole = payload?.role || "";
-  const username = payload?.username || "";
-  const showScheduleVisitBtn = canShowScheduleVisitOnCustomerProfile(userRole);
 
   // Explicitly select all columns including service_lead_source
   const [custs] = await conn.execute(
-    `SELECT c.customer_id, c.first_name, c.last_name, c.email, c.phone, c.company, c.address, c.tags, c.status, c.stage, c.lead_source, c.assigned_to, c.service_lead_source, c.lead_campaign, c.date_created, c.notes, c.parent_customer_id,
+    `SELECT c.customer_id, c.first_name, c.last_name, c.email, c.phone, c.company, c.address, c.tags, c.status, c.stage, c.lead_source, c.service_lead_source, c.lead_campaign, c.date_created, c.notes, c.parent_customer_id,
       p.customer_id AS parent_id,
       CONCAT(TRIM(p.first_name), ' ', TRIM(COALESCE(p.last_name, ''))) AS parent_name,
       p.phone AS parent_phone,
@@ -48,97 +36,13 @@ export default async function CustomerPage({ params }) {
     notFound();
   }
 
-  const customerDisplayName = [customer.first_name, customer.last_name]
-    .filter(Boolean)
-    .join(" ")
-    .trim();
-
-  // Fetch child contacts (members under this customer)
-  const [childContacts] = await conn.execute(
-    `SELECT customer_id, first_name, last_name, phone 
-     FROM customers 
-     WHERE parent_customer_id = ?
-     ORDER BY first_name ASC`,
+  // Fetch followup history
+  const [fups] = await conn.execute(
+    `SELECT next_followup_date, service_next_followup, followed_date, followed_by, notes, comm_mode 
+     FROM customers_followup
+     WHERE customer_id = ?
+     ORDER BY time_stamp DESC`,
     [customerId],
-  );
-  console.log(`[View Customer] Fetched ${childContacts?.length || 0} child contacts for customer ${customerId}:`, childContacts);
-
-  // Also fetch parent and siblings if this customer has a parent
-  let parentContact = null;
-  let siblingContacts = [];
-  const [selfRows] = await conn.execute(
-    `SELECT customer_id, first_name, last_name, phone, parent_customer_id
-     FROM customers
-     WHERE customer_id = ?`,
-    [customerId],
-  );
-  const selfData = selfRows?.[0];
-  if (selfData?.parent_customer_id) {
-    const [parentRows] = await conn.execute(
-      `SELECT customer_id, first_name, last_name, phone
-       FROM customers
-       WHERE customer_id = ?`,
-      [selfData.parent_customer_id],
-    );
-    parentContact = parentRows?.[0];
-    
-    // Fetch siblings (other children of the same parent)
-    const [siblingRows] = await conn.execute(
-      `SELECT customer_id, first_name, last_name, phone
-       FROM customers
-       WHERE parent_customer_id = ? AND customer_id != ?
-       ORDER BY first_name ASC`,
-      [selfData.parent_customer_id, customerId],
-    );
-    siblingContacts = siblingRows || [];
-    console.log(`[View Customer] Customer ${customerId} has parent ${selfData.parent_customer_id}, ${siblingContacts.length} siblings`);
-  }
-  const hierarchyCustomerIds = collectHierarchyCustomerIds({
-    customerId,
-    parentContact,
-    siblingContacts,
-    childContacts,
-  });
-  const fups = await fetchCustomerFollowupHistory(conn, {
-    customerIds: hierarchyCustomerIds,
-    userRole,
-    username,
-  });
-
-  // Fetch orders count for this customer
-  // SUPERADMIN/DIRECTOR: see all orders for customer
-  // Assigned user (assigned_to) or lead_source = username: also see all orders for customer
-  // Others: only their own orders (created_by = username)
-  const isPrivilegedRole = ["SUPERADMIN", "DIRECTOR"].includes(String(userRole).toUpperCase());
-  const isAssignedOrLeadSourceOwner =
-    customer.assigned_to === username || customer.lead_source === username;
-  const canSeeAllOrders = isPrivilegedRole || isAssignedOrLeadSourceOwner;
-  const orderCountQuery = canSeeAllOrders
-    ? `SELECT COUNT(*) AS orderCount FROM neworder WHERE customer_id = ?`
-    : `SELECT COUNT(*) AS orderCount FROM neworder WHERE customer_id = ? AND created_by = ?`;
-  const orderCountParams = canSeeAllOrders ? [customerId] : [customerId, username];
-  const [[{ orderCount }]] = await conn.execute(orderCountQuery, orderCountParams);
-
-  let latestQuoteNumber = "";
-  try {
-    const [quoteRows] = await conn.execute(
-      `SELECT quote_number
-       FROM quotations_records
-       WHERE customer_id = ?
-       ORDER BY quote_date DESC, quote_number DESC
-       LIMIT 1`,
-      [customerId],
-    );
-    latestQuoteNumber = quoteRows[0]?.quote_number
-      ? String(quoteRows[0].quote_number).trim()
-      : "";
-  } catch {
-    latestQuoteNumber = "";
-  }
-  const canCreatePerformaInvoice = await userHasModuleKey(
-    username,
-    userRole,
-    "performa-invoices",
   );
 
   let cust_analysis_external = {};
@@ -161,14 +65,6 @@ export default async function CustomerPage({ params }) {
       // Optional external service — page must still render if API is down or returns an error
     }
   }
-
-  // Fetch machine follow-up history for SUPERADMIN and SALES roles only
-  const roleUpper = String(userRole).toUpperCase().trim();
-  const canSeeMachineFollowup =
-    roleUpper === "SUPERADMIN" ||
-    roleUpper === "SALES" ||
-    roleUpper === "SALES HEAD" ||
-    roleUpper === "SALES CUM BACKOFFICE";
 
   // await conn.end();
 
@@ -336,85 +232,6 @@ export default async function CustomerPage({ params }) {
       </p>
 
     </div>
-
-    {/* Contact Hierarchy Section */}
-    <div className="p-2 rounded-xl h-fit max-h-96 overflow-y-auto">
-      <h3 className="text-lg font-semibold text-gray-800 mb-3">
-        Contact Hierarchy
-      </h3>
-      <div className="space-y-2">
-        {/* Parent */}
-        {parentContact && (
-          <div className="p-3 bg-blue-50 rounded border border-blue-200">
-            <p className="text-xs text-blue-600 font-medium mb-2">Parent:</p>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-800">
-                  {[parentContact.first_name, parentContact.last_name].filter(Boolean).join(" ") || "—"}
-                </p>
-                <p className="text-sm text-gray-600">{parentContact.phone || "—"}</p>
-              </div>
-              <Link
-                href={`/admin-dashboard/view-customer/${parentContact.customer_id}/follow-up`}
-                className="ml-2 px-3 py-1 text-xs whitespace-nowrap bg-green-600 text-white rounded hover:bg-green-700 transition"
-              >
-                Follow
-              </Link>
-            </div>
-          </div>
-        )}
-
-        {/* Siblings */}
-        {siblingContacts && siblingContacts.length > 0 && (
-          <>
-            <p className="text-xs text-gray-600 font-medium">Siblings ({siblingContacts.length}):</p>
-            {siblingContacts.map((contact) => (
-              <div key={contact.customer_id} className="flex items-center justify-between p-3 bg-gray-50 rounded border border-gray-200">
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-800">
-                    {[contact.first_name, contact.last_name].filter(Boolean).join(" ") || "—"}
-                  </p>
-                  <p className="text-sm text-gray-600">{contact.phone || "—"}</p>
-                </div>
-                <Link
-                  href={`/admin-dashboard/view-customer/${contact.customer_id}/follow-up`}
-                  className="ml-2 px-3 py-1 text-xs whitespace-nowrap bg-green-600 text-white rounded hover:bg-green-700 transition"
-                >
-                  Follow
-                </Link>
-              </div>
-            ))}
-          </>
-        )}
-
-        {/* Children */}
-        {childContacts && childContacts.length > 0 && (
-          <>
-            <p className="text-xs text-gray-600 font-medium">Members ({childContacts.length}):</p>
-            {childContacts.map((contact) => (
-              <div key={contact.customer_id} className="flex items-center justify-between p-3 bg-purple-50 rounded border border-purple-200">
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-800">
-                    {[contact.first_name, contact.last_name].filter(Boolean).join(" ") || "—"}
-                  </p>
-                  <p className="text-sm text-gray-600">{contact.phone || "—"}</p>
-                </div>
-                <Link
-                  href={`/admin-dashboard/view-customer/${contact.customer_id}/follow-up`}
-                  className="ml-2 px-3 py-1 text-xs whitespace-nowrap bg-green-600 text-white rounded hover:bg-green-700 transition"
-                >
-                  Follow
-                </Link>
-              </div>
-            ))}
-          </>
-        )}
-
-        {!parentContact && (!childContacts || childContacts.length === 0) && (!siblingContacts || siblingContacts.length === 0) && (
-          <p className="text-sm text-gray-600">No contact hierarchy available.</p>
-        )}
-      </div>
-    </div>
   </div>
   
 
@@ -461,13 +278,6 @@ export default async function CustomerPage({ params }) {
               >
                 add Quotation
               </Link>
-              {canCreatePerformaInvoice && (
-                <CustomerPerformaInvoiceButton
-                  quotationNumber={latestQuoteNumber}
-                  href={`/admin-dashboard/invoices/performa?quotation_number=${encodeURIComponent(latestQuoteNumber)}`}
-                  className="btn w-full md:w-auto md:flex-shrink-0 whitespace-nowrap text-white bg-violet-700 hover:bg-violet-800 py-2 px-4 rounded-md text-center transition duration-300"
-                />
-              )}
               <Link
                 href={`/admin-dashboard/special-pricing/${customerId}`}
                 className="btn w-full md:w-auto md:flex-shrink-0 whitespace-nowrap text-white bg-pink-600 hover:bg-pink-700 py-2 px-4 rounded-md text-center transition duration-300"
@@ -480,32 +290,6 @@ export default async function CustomerPage({ params }) {
               >
                 View Ledger
               </Link>
-              {showScheduleVisitBtn && (
-                <ScheduleVisitModal
-                  customerId={customerId}
-                  customerName={customerDisplayName}
-                  contact={customer.phone}
-                  address={customer.address}
-                  buttonLabel="Schedule Visit"
-                  prefillVisitAddress={false}
-                />
-              )}
-              {orderCount > 0 && (
-                <Link
-                  href={`/admin-dashboard/view-customer/${customerId}/orders`}
-                  className="btn w-full md:w-auto md:flex-shrink-0 whitespace-nowrap text-white bg-teal-600 hover:bg-teal-700 py-2 px-4 rounded-md text-center transition duration-300"
-                >
-                  Orders ({orderCount})
-                </Link>
-              )}
-              {canSeeMachineFollowup && (
-                <Link
-                  href={`/admin-dashboard/view-customer/${customerId}/machine-followup`}
-                  className="btn w-full md:w-auto md:flex-shrink-0 whitespace-nowrap text-white bg-purple-600 hover:bg-purple-700 py-2 px-4 rounded-md text-center transition duration-300"
-                >
-                  Machine Follow-up
-                </Link>
-              )}
             </div>
           </div>
 

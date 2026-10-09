@@ -1,5 +1,4 @@
 "use client";
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect } from "react";
 import { X } from "lucide-react";
 
@@ -136,8 +135,14 @@ const EditTargetModal = ({ isOpen, onClose, targetData, onSuccess }) => {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Start Date
             </label>
-            <TypeableDateFilterInput value={formData.target_start_date} onChange={(v) => handleChange({ target: { name: "target_start_date", value: v } })} required
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+            <input
+              type="date"
+              name="target_start_date"
+              value={formData.target_start_date}
+              onChange={handleChange}
+              required
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
           </div>
 
           {/* End Date */}
@@ -145,8 +150,14 @@ const EditTargetModal = ({ isOpen, onClose, targetData, onSuccess }) => {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               End Date
             </label>
-            <TypeableDateFilterInput value={formData.target_end_date} onChange={(v) => handleChange({ target: { name: "target_end_date", value: v } })} required
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+            <input
+              type="date"
+              name="target_end_date"
+              value={formData.target_end_date}
+              onChange={handleChange}
+              required
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
           </div>
 
           {/* Assigned By (Read-only) */}

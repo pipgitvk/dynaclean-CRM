@@ -1725,30 +1725,14 @@ import React from "react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import Image from "next/image";
+import signImg from "../../../public/s.png"
 import dynacleanLogo from "@/components/logo1.jpg";
 import html2canvas from "html2canvas";
 import DownloadPDFButton from "@/app/admin-dashboard/invoices/DownloadButton";
 import InvoicePDFPreview from "../Preview";
 import { numberToWords } from "@/utils/NumbertoWord";
 import { INVOICE_LETTERHEAD } from "@/lib/invoiceLetterhead";
-import { filterTermsWhenNotesHasCamc } from "@/lib/performaInvoiceTerms";
-
-const INVOICE_SIGNATURE_CANDIDATES = [
-  "/s.png",
-  "https://app.dynacleanindustries.com/s.png",
-];
-
-/** PDF: A4 width, single page; height grows with content so sections are not stretched. */
-const INVOICE_PDF_WIDTH_MM = 210;
-const INVOICE_PDF_MIN_HEIGHT_MM = 297;
-const INVOICE_PDF_TOP_MARGIN_MM = 2;
-
-/** Match buyer / line-item table typography in footer blocks */
-const INVOICE_BODY_TEXT_PX = "10px";
-const INVOICE_BODY_LINE_HEIGHT = 1.5;
-const INVOICE_INR_WORDS_PX = "13px";
-const INVOICE_SIGNATURE_FOR_PX = "8px";
-const INVOICE_SIGNATURE_FOR_PT = 8;
+console.log(signImg);
 
 const NewInvoice = ({ invoice }) => {
   // Determine invoice type label
@@ -1821,10 +1805,9 @@ const NewInvoice = ({ invoice }) => {
   // Convert terms_conditions string to array
   const parseTerms = () => {
     if (invoice.terms_conditions) {
-      const lines = invoice.terms_conditions
+      return invoice.terms_conditions
         .split("\n")
         .filter((term) => term.trim() !== "");
-      return filterTermsWhenNotesHasCamc(lines, invoice.notes || "");
     }
     return [];
   };
@@ -2013,7 +1996,7 @@ const NewInvoice = ({ invoice }) => {
     terms: parseTerms(),
     notes: invoice.notes || "",
     bank: {
-      accountHolderName: "DYNACLEAN INDUSTRIES PRIVATE LIMITED",
+      accountHolderName: "Dynaclean Industries Private Limited",
       name: "ICICI Bank",
       accountNo: "343405500379",
       IFSC: "ICIC0003434",
@@ -2037,10 +2020,6 @@ const NewInvoice = ({ invoice }) => {
 
   const [logoSrc, setLogoSrc] = React.useState(dynacleanLogo.src);
   const [logoErrorStep, setLogoErrorStep] = React.useState(0);
-  const [signatureSrc, setSignatureSrc] = React.useState(
-    INVOICE_SIGNATURE_CANDIDATES[0],
-  );
-  const [signatureErrorStep, setSignatureErrorStep] = React.useState(0);
 
   const handleLogoError = () => {
     if (logoErrorStep === 0) {
@@ -2066,16 +2045,6 @@ const NewInvoice = ({ invoice }) => {
     setLogoSrc("");
   };
 
-  const handleSignatureError = () => {
-    const next = signatureErrorStep + 1;
-    if (next < INVOICE_SIGNATURE_CANDIDATES.length) {
-      setSignatureErrorStep(next);
-      setSignatureSrc(INVOICE_SIGNATURE_CANDIDATES[next]);
-      return;
-    }
-    setSignatureSrc("");
-  };
-
   const containerRef = React.useRef(null);
 
   const generatePDF = async () => {
@@ -2088,38 +2057,21 @@ const NewInvoice = ({ invoice }) => {
       "position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.8);color:white;padding:20px;border-radius:8px;z-index:9999;font-family:Arial,sans-serif;";
     document.body.appendChild(loadingDiv);
 
-    // Off-screen container: renders at full invoice width outside viewport so
-    // html2canvas captures the ENTIRE invoice height, not just what's visible.
-    const offscreenWrapper = document.createElement("div");
-    offscreenWrapper.style.cssText =
-      "position:fixed;left:-9999px;top:0;width:810px;background:#fff;z-index:-1;";
-    document.body.appendChild(offscreenWrapper);
-
-    let clonedEl = null;
+    let styleTag;
 
     try {
-      // Deep-clone the invoice element into the off-screen wrapper
-      clonedEl = el.cloneNode(true);
-      clonedEl.style.width = "802px";
-      clonedEl.style.maxWidth = "802px";
-      clonedEl.style.padding = "4px";
-      clonedEl.style.border = "none";
-      clonedEl.style.overflow = "visible";
-      clonedEl.style.boxSizing = "border-box";
-      const borderedRoot = clonedEl.querySelector("[data-invoice-border-root]");
-      if (borderedRoot) {
-        borderedRoot.style.border = "1px solid rgb(0, 0, 0)";
-        borderedRoot.style.boxSizing = "border-box";
-        borderedRoot.style.overflow = "visible";
-        borderedRoot.style.paddingBottom = "10px";
-      }
-      offscreenWrapper.appendChild(clonedEl);
+      const originalWidth = el.style.width;
+      const originalMaxWidth = el.style.maxWidth;
+      const originalPadding = el.style.padding;
+      const originalBorder = el.style.border;
 
-      // Let the browser reflow the cloned element at 794px width
-      await new Promise((r) => setTimeout(r, 300));
+      el.style.width = "794px";
+      el.style.maxWidth = "794px";
+      el.style.padding = "25px";
+      el.style.border = "none";
 
-      // Convert images to base64 in the cloned element
-      const images = clonedEl.querySelectorAll("img");
+      // Convert images to base64
+      const images = el.querySelectorAll("img");
       await Promise.all(
         Array.from(images).map(async (img) => {
           if (!img.src || img.src.startsWith("data:")) return;
@@ -2129,7 +2081,6 @@ const NewInvoice = ({ invoice }) => {
               mode: "cors",
               cache: "force-cache",
             });
-            if (!res.ok) return;
             const blob = await res.blob();
             const base64 = await new Promise((resolve, reject) => {
               const reader = new FileReader();
@@ -2147,330 +2098,113 @@ const NewInvoice = ({ invoice }) => {
 
       await new Promise((r) => setTimeout(r, 200));
 
-      // Apply color overrides — avoid painting every cell white (can clip text in html2canvas).
-      clonedEl.querySelectorAll("*").forEach((elem) => {
-        elem.style.color = "rgb(0, 0, 0)";
-        elem.style.webkitTextFillColor = "rgb(0, 0, 0)";
-        elem.style.borderColor = "rgb(0, 0, 0)";
-        const tag = elem.tagName?.toLowerCase();
-        if (tag !== "img" && tag !== "td" && tag !== "th" && tag !== "tr" && tag !== "table") {
-          elem.style.backgroundColor = "rgb(255, 255, 255)";
-        }
-        if (tag !== "img") {
-          elem.style.overflow = "visible";
-          elem.style.overflowY = "visible";
-        }
-      });
-
-      const taxSummaryTable = clonedEl.querySelector("[data-invoice-tax-summary]");
-      if (taxSummaryTable) {
-        taxSummaryTable.style.borderCollapse = "separate";
-        taxSummaryTable.style.borderSpacing = "0";
-        taxSummaryTable.querySelectorAll("th, td").forEach((cell) => {
-          cell.style.border = "1px solid rgb(0, 0, 0)";
-          cell.style.paddingTop = "7px";
-          cell.style.paddingBottom = "7px";
-          cell.style.paddingLeft = "5px";
-          cell.style.paddingRight = "5px";
-          cell.style.lineHeight = "1.55";
-          cell.style.verticalAlign = "middle";
-          cell.style.boxSizing = "border-box";
-        });
+      // CRITICAL FIX: Override ALL color functions
+      styleTag = document.createElement("style");
+      styleTag.setAttribute("data-pdf-override", "true");
+      styleTag.innerHTML = `
+      [data-pdf-capture-root],
+      [data-pdf-capture-root] * {
+        color: rgb(0, 0, 0) !important;
+        background-color: rgb(255, 255, 255) !important;
+        border-color: rgb(0, 0, 0) !important;
+        outline-color: rgb(0, 0, 0) !important;
+        box-shadow: none !important;
+        text-shadow: none !important;
       }
 
-      // Improve footer text metrics before capture (keep Notes box padding/border).
-      clonedEl.querySelectorAll("[data-pdf-footer-block]").forEach((block) => {
-        const key = block.getAttribute("data-pdf-footer-block");
-        if (key === "notes") return;
-        if (key === "terms" || key === "bank") {
-          block.style.fontSize = INVOICE_BODY_TEXT_PX;
-          block.style.lineHeight = String(INVOICE_BODY_LINE_HEIGHT);
-          block.style.height = "auto";
-          block.style.minHeight = "0";
-          block.style.paddingTop = "2px";
-          block.style.paddingBottom = "0px";
-          block.style.verticalAlign = "top";
-          block.querySelectorAll("div").forEach((row, idx, list) => {
-            row.style.marginBottom =
-              idx === list.length - 1 ? "0px" : "4px";
-            row.style.fontSize = INVOICE_BODY_TEXT_PX;
-            row.style.lineHeight = String(INVOICE_BODY_LINE_HEIGHT);
-          });
-          return;
-        }
-        block.style.lineHeight = "1.55";
-        block.style.paddingTop = "1px";
-        block.style.paddingBottom = "1px";
-      });
-
-      const notesFooter = clonedEl.querySelector('[data-pdf-footer-block="notes"]');
-      if (notesFooter) {
-        notesFooter.style.width = "100%";
-        notesFooter.style.boxSizing = "border-box";
-        notesFooter.style.overflow = "visible";
-        notesFooter.style.border = "1px solid rgb(0, 0, 0)";
-        const notesBody = notesFooter.querySelector("[data-pdf-notes-body]");
-        const notesLabel = notesFooter.querySelector("[data-pdf-notes-label]");
-        if (notesBody) {
-          notesBody.style.fontSize = INVOICE_BODY_TEXT_PX;
-          notesBody.style.lineHeight = String(INVOICE_BODY_LINE_HEIGHT);
-          notesBody.style.whiteSpace = "pre-wrap";
-          notesBody.style.wordBreak = "break-word";
-          notesBody.style.overflowWrap = "break-word";
-        }
-        if (notesLabel) {
-          notesLabel.style.fontSize = INVOICE_BODY_TEXT_PX;
-          notesLabel.style.lineHeight = String(INVOICE_BODY_LINE_HEIGHT);
-        }
-        notesFooter.style.height = "auto";
-        notesFooter.style.minHeight = "unset";
-        notesFooter.style.paddingTop = "3px";
-        notesFooter.style.paddingBottom = "6px";
-        notesFooter.style.marginTop = "0px";
-        notesFooter.style.marginBottom = "6px";
-        const notesH = Math.max(
-          notesFooter.scrollHeight,
-          notesFooter.offsetHeight,
-          (notesLabel?.offsetHeight || 0) + (notesBody?.scrollHeight || 0) + 16,
-        );
-        notesFooter.style.minHeight = `${notesH}px`;
+      [data-pdf-capture-root] *::before,
+      [data-pdf-capture-root] *::after {
+        color: rgb(0, 0, 0) !important;
+        background-color: rgb(255, 255, 255) !important;
+        border-color: rgb(0, 0, 0) !important;
       }
 
-      const termsBankTable = clonedEl.querySelector(
-        '[data-pdf-footer-block="terms"]',
-      )?.closest("table");
-      if (termsBankTable) {
-        termsBankTable.style.marginBottom = "0px";
-        termsBankTable.style.height = "auto";
-        termsBankTable.style.borderCollapse = "separate";
-        termsBankTable.style.borderSpacing = "0";
-        const notesRow = termsBankTable.querySelector(
-          '[data-pdf-footer-block="notes"]',
-        )?.closest("td");
-        if (notesRow) {
-          notesRow.style.paddingTop = "10px";
-        }
-        const termsCell = termsBankTable.querySelector(
-          '[data-pdf-footer-block="terms"]',
-        );
-        if (termsCell && clonedEl.querySelector('[data-pdf-footer-block="notes"]')) {
-          termsCell.style.paddingBottom = "8px";
-        }
+      [data-pdf-capture-root] table {
+        border-collapse: collapse !important;
       }
 
-      // Force layout recalculation
-      await new Promise((r) => setTimeout(r, 150));
-      const notesReflow = clonedEl.querySelector('[data-pdf-footer-block="notes"]');
-      if (notesReflow) {
-        notesReflow.style.minHeight = `${notesReflow.scrollHeight + 2}px`;
+      [data-pdf-capture-root] td,
+      [data-pdf-capture-root] th {
+        page-break-inside: avoid !important;
+        overflow: visible !important;
+        vertical-align: top !important;
       }
-      clonedEl.style.height = "auto";
-      clonedEl.style.minHeight = "0";
+    `;
+      document.head.appendChild(styleTag);
 
-      const rootRect = clonedEl.getBoundingClientRect();
+      await new Promise((r) => setTimeout(r, 100));
 
-      // Keep Terms/Bank/Notes as captured HTML (full text). Redraw signature only.
-      clonedEl
-        .querySelectorAll("[data-pdf-signature-for]")
-        .forEach((block) => {
-          block.style.color = "rgb(255,255,255)";
-          block.style.webkitTextFillColor = "rgb(255,255,255)";
-          block.querySelectorAll("*").forEach((child) => {
-            child.style.color = "rgb(255,255,255)";
-            child.style.webkitTextFillColor = "rgb(255,255,255)";
-          });
-        });
-
-      // Measure the FULL height of the off-screen cloned element after reflow
-      const captureWidth = clonedEl.scrollWidth || 794;
-      const captureHeight = clonedEl.scrollHeight || clonedEl.offsetHeight;
-
-      const canvas = await html2canvas(clonedEl, {
-        scale: 3,
+      const canvas = await html2canvas(el, {
+        scale: 2,
         useCORS: true,
         allowTaint: false,
         foreignObjectRendering: false,
         backgroundColor: "#ffffff",
         logging: false,
         imageTimeout: 15000,
-        width: captureWidth,
-        height: captureHeight,
-        windowWidth: captureWidth,
-        windowHeight: captureHeight,
-        x: 0,
-        y: 0,
+        onclone: (clonedDoc) => {
+          const root = clonedDoc.querySelector(
+            '[data-pdf-capture-root="true"]',
+          );
+          if (root) {
+            root.style.width = "794px";
+            root.style.maxWidth = "794px";
+            root.style.boxSizing = "border-box";
+            root.style.overflow = "visible";
+            const h = Math.max(root.scrollHeight, root.offsetHeight);
+            root.style.minHeight = `${Math.ceil(h + 4)}px`;
+
+            root.querySelectorAll("*").forEach((elem) => {
+              elem.style.color = "rgb(0, 0, 0)";
+              elem.style.backgroundColor = "rgb(255, 255, 255)";
+              elem.style.borderColor = "rgb(0, 0, 0)";
+            });
+          }
+        },
       });
 
       const imgData = canvas.toDataURL("image/png", 1.0);
 
-      const imgProps = new jsPDF({ unit: "mm" }).getImageProperties(imgData);
-      const pageMarginMm = 6;
-      const contentWidthMm = INVOICE_PDF_WIDTH_MM - pageMarginMm * 2;
-      const scaleWidth = contentWidthMm / imgProps.width;
-      const naturalHmm = imgProps.height * scaleWidth;
-      const pageHeightMm = Math.ceil(
-        Math.max(
-          INVOICE_PDF_MIN_HEIGHT_MM,
-          naturalHmm + pageMarginMm * 2,
-        ),
-      );
-
       const pdf = new jsPDF({
         orientation: "portrait",
         unit: "mm",
-        format: [INVOICE_PDF_WIDTH_MM, pageHeightMm],
+        format: "a4",
         compress: true,
       });
 
       const pdfWidth = pdf.internal.pageSize.getWidth();
-      const drawW = contentWidthMm;
-      const drawH = naturalHmm;
-      const x = pageMarginMm;
-      const y = pageMarginMm;
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const imgProps = pdf.getImageProperties(imgData);
+      /**
+       * Single-page export: scale the captured image to fit in one A4 page.
+       * This avoids tiny overflow triggering an extra mostly-blank page.
+       */
+      const scale = Math.min(
+        pdfWidth / imgProps.width,
+        pdfHeight / imgProps.height,
+      );
+      const drawW = imgProps.width * scale;
+      const drawH = imgProps.height * scale;
+      const x = (pdfWidth - drawW) / 2;
+      const y = (pdfHeight - drawH) / 2;
+
       pdf.addImage(imgData, "PNG", x, y, drawW, drawH, undefined, "FAST");
 
-      const ptToMm = 0.352778;
-      const pageLocalY = (absTopMm) => absTopMm;
-      const toBlockRect = (box) => ({
-        left: x + drawW * box.relX,
-        top: y + drawH * box.relY,
-        width: drawW * box.relW,
-        height: drawH * box.relH,
-      });
-      const onPageRect = (rect) => ({
-        ...rect,
-        top: pageLocalY(rect.top),
-      });
-      const wipeBlock = (rect, maxRight = null, extraPad = {}) => {
-        const r = onPageRect(rect);
-        const sidePad = 0.4;
-        const topPad = extraPad.top ?? sidePad;
-        const bottomPad = extraPad.bottom ?? sidePad;
-        let right = r.left + r.width;
-        if (maxRight != null) right = Math.min(right, maxRight);
-        pdf.setFillColor(255, 255, 255);
-        pdf.rect(
-          Math.max(0, r.left - sidePad),
-          Math.max(0, r.top - topPad),
-          Math.max(0, right - r.left + sidePad * 2),
-          r.height + topPad + bottomPad,
-          "F",
-        );
-      };
-      const drawFlowParagraphs = ({
-        rect,
-        paragraphs,
-        startFontSize = 7,
-        title,
-        titleFontSize = 7.5,
-        maxRight = null,
-        wipeTopPad = 0.4,
-        titleTopInset = 0.9,
-        clipToRectHeight = false,
-        lineHeightFactor = 1.45,
-        paragraphGapFactor = 0.35,
-      }) => {
-        rect = onPageRect(rect);
-        const textWidth = Math.max(rect.width - 1, 20);
-        const paragraphList = paragraphs;
-        const lineHeight = startFontSize * ptToMm * lineHeightFactor;
-        const paragraphGap = startFontSize * ptToMm * paragraphGapFactor;
-        let estimatedHeight = startFontSize * ptToMm * titleTopInset;
-        if (title) estimatedHeight += titleFontSize * ptToMm * 1.55;
-        for (const paragraph of paragraphList) {
-          const wrapped = pdf.splitTextToSize(paragraph, textWidth);
-          estimatedHeight += wrapped.length * lineHeight + paragraphGap;
-        }
-        const wipeHeight = clipToRectHeight
-          ? Math.max(rect.height - 0.3, 4)
-          : Math.max(rect.height, estimatedHeight + 1.5);
-        wipeBlock(
-          { ...rect, height: wipeHeight },
-          maxRight,
-          { top: wipeTopPad, bottom: clipToRectHeight ? 0.15 : 0.8 },
-        );
-        pdf.setTextColor(0, 0, 0);
-        let cursorY = rect.top + startFontSize * ptToMm * titleTopInset;
-        const maxY = rect.top + rect.height;
-        if (title) {
-          pdf.setFont("helvetica", "bold");
-          pdf.setFontSize(titleFontSize);
-          if (!clipToRectHeight || cursorY <= maxY) {
-            pdf.text(title, rect.left, cursorY);
-          }
-          cursorY += titleFontSize * ptToMm * 1.5;
-        }
-        for (const paragraph of paragraphList) {
-          pdf.setFont("helvetica", "normal");
-          pdf.setFontSize(startFontSize);
-          const wrapped = pdf.splitTextToSize(paragraph, textWidth);
-          for (const line of wrapped) {
-            if (clipToRectHeight && cursorY > maxY) break;
-            pdf.text(line, rect.left, cursorY);
-            cursorY += lineHeight;
-          }
-          cursorY += paragraphGap;
-        }
-      };
-
-      const pageRight = x + drawW - 1.5;
-
-      const borderedRootEl = clonedEl.querySelector("[data-invoice-border-root]");
-      if (borderedRootEl && rootRect.width > 0 && rootRect.height > 0) {
-        const br = borderedRootEl.getBoundingClientRect();
-        const outerBox = onPageRect({
-          left: x + (drawW * (br.left - rootRect.left)) / rootRect.width,
-          top: y + (drawH * (br.top - rootRect.top)) / rootRect.height,
-          width: (drawW * br.width) / rootRect.width,
-          height: (drawH * br.height) / rootRect.height,
-        });
-        const edgePad = 0.2;
-        pdf.setDrawColor(0, 0, 0);
-        pdf.setLineWidth(0.35);
-        pdf.rect(
-          outerBox.left + edgePad,
-          outerBox.top + edgePad,
-          Math.max(outerBox.width - edgePad * 2, 4),
-          Math.max(outerBox.height - edgePad * 2, 4),
-          "S",
-        );
-      }
-
-      const signatureForEl = clonedEl.querySelector("[data-pdf-signature-for]");
-      if (signatureForEl && rootRect.width > 0) {
-        const sr = signatureForEl.getBoundingClientRect();
-        const sigRect = {
-          left: x + (drawW * (sr.left - rootRect.left)) / rootRect.width,
-          top: y + (drawH * (sr.top - rootRect.top)) / rootRect.height,
-          width: (drawW * sr.width) / rootRect.width,
-          height: (drawH * sr.height) / rootRect.height,
-        };
-        const sigText = `for ${data.company.name}`;
-        pdf.setFont("helvetica", "normal");
-        const sigFontSize = INVOICE_SIGNATURE_FOR_PT;
-        pdf.setFontSize(sigFontSize);
-        pdf.setTextColor(0, 0, 0);
-        const sigOnPage = onPageRect(sigRect);
-        wipeBlock(sigRect, pageRight, { top: 0.4, bottom: 0.5 });
-        pdf.text(
-          sigText,
-          sigOnPage.left + sigOnPage.width,
-          sigOnPage.top + sigFontSize * ptToMm,
-          { align: "right" },
-        );
-      }
-
-      const pdfFileName = invoice.type === "performa"
+      const pdfFileName = invoice.type === "performa" 
         ? `Performa-Invoice-${data.invoice.number.replace(/[/\\]/g, "_")}.pdf`
         : `Invoice-${data.invoice.number.replace(/[/\\]/g, "_")}.pdf`;
       pdf.save(pdfFileName);
 
+      el.style.width = originalWidth;
+      el.style.maxWidth = originalMaxWidth;
+      el.style.padding = originalPadding;
+      el.style.border = originalBorder;
     } catch (err) {
       console.error("PDF generation failed:", err);
       alert("Failed to generate PDF. Check console for details.");
     } finally {
-      if (offscreenWrapper && offscreenWrapper.parentNode) {
-        document.body.removeChild(offscreenWrapper);
+      if (styleTag && styleTag.parentNode) {
+        document.head.removeChild(styleTag);
       }
       if (loadingDiv && loadingDiv.parentNode) {
         document.body.removeChild(loadingDiv);
@@ -2531,23 +2265,6 @@ const NewInvoice = ({ invoice }) => {
   const formatInvoiceTaxRate = (raw) => {
     const n = parseFloat(String(raw ?? "").replace(/,/g, ""));
     return Number.isFinite(n) ? n.toFixed(2) : "0.00";
-  };
-
-  const taxSummaryThStyle = {
-    border: "1px solid #000",
-    padding: "6px 5px",
-    textAlign: "center",
-    lineHeight: "1.45",
-    verticalAlign: "middle",
-    fontWeight: "bold",
-    backgroundColor: "#f0f0f0",
-  };
-  const taxSummaryTdStyle = {
-    border: "1px solid #000",
-    padding: "6px 5px",
-    textAlign: "center",
-    lineHeight: "1.45",
-    verticalAlign: "middle",
   };
 
   // Function to render tax rows based on available tax data
@@ -2698,13 +2415,11 @@ const NewInvoice = ({ invoice }) => {
           </h1>
         </div>
         <div
-          data-invoice-border-root="true"
           style={{
             padding: "6mm",
             background: "#fff",
             backgroundColor: "#fff",
             border: "1px solid #000",
-            boxSizing: "border-box",
           }}
         >
         {/* Logo flush left; company block left of row but lines centre-aligned within block */}
@@ -2735,7 +2450,7 @@ const NewInvoice = ({ invoice }) => {
                     display: "flex",
                     flexDirection: "row",
                     alignItems: "flex-start",
-                    gap: "120px",
+                    gap: "44px",
                     width: "100%",
                     boxSizing: "border-box",
                   }}
@@ -2834,22 +2549,11 @@ const NewInvoice = ({ invoice }) => {
                     style={{
                       fontSize: "10px",
                       lineHeight: 1.45,
-                      marginBottom: "3px",
                       color: "#000",
                       fontWeight: 400,
                     }}
                   >
-                    GST: {INVOICE_LETTERHEAD.gstin}, State: {INVOICE_LETTERHEAD.state}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: "10px",
-                      lineHeight: 1.45,
-                      color: "#000",
-                      fontWeight: 400,
-                    }}
-                  >
-                    CIN: {INVOICE_LETTERHEAD.cin}
+                    GST: {INVOICE_LETTERHEAD.gstin}
                   </div>
                     </div>
                   </div>
@@ -2954,12 +2658,9 @@ const NewInvoice = ({ invoice }) => {
                   textAlign: "left",
                 }}
               >
-                <div style={{ fontWeight: "bold", lineHeight: "1.3" }}>
-                  Buyer's Order No. :
-                </div>
-                <div style={{ fontWeight: "normal", marginTop: "4px", lineHeight: "1.3" }}>
-                  {data.invoice.buyersOrderNo || "-"}
-                </div>
+                <b>Buyer's Order No. : <span style={{
+                  fontWeight: "normal",
+                }}>{data.invoice.buyersOrderNo}</span></b>
               </td>
               <td
                 style={{
@@ -3040,31 +2741,33 @@ const NewInvoice = ({ invoice }) => {
           </tbody>
         </table>
 
-        {/* Buyer, state/amount, notes — single grid (full-width notes row) */}
-        <table
-          style={{
+        {/* Buyer Consignee Table */}
+
+<table
+  style={{
             width: "100%",
             borderCollapse: "collapse",
             fontSize: "10px",
-            tableLayout: "fixed",
           }}
-        >
-          <tbody>
-            <tr>
-              {/* BUYER COLUMN */}
-              <td
-                style={{
-                  border: "1px solid #000",
-                  padding: "4px",
-                  width: "50%",
-                  verticalAlign: "top",
-                  wordBreak: "break-word",
-                  overflowWrap: "break-word",
-                  borderRight: "0px",
-                  whiteSpace: "normal",
-                  lineHeight: "1.5",
-                }}
-              >
+>
+  <tbody>
+    <tr>
+      {/* BUYER COLUMN */}
+ <td
+  style={{
+    border: "1px solid #000",
+    padding: "4px",
+    width: "50%",
+    borderBottom: "0px",
+    verticalAlign: "top",
+    wordBreak: "break-word",
+    overflowWrap: "break-word",
+    borderRight: "0px",
+    whiteSpace: "normal",
+    lineHeight: "1.5",
+    overflow: "hidden"
+  }}
+>
   <div style={{ marginBottom: "4px" }}><b>Buyer (Bill To) : {data.buyer.name}</b></div>
 
   <div style={{ marginBottom: "3px" }}><b>Address: </b>{data.buyer.address}</div>
@@ -3086,19 +2789,21 @@ const NewInvoice = ({ invoice }) => {
 
 
 
-              {/* CONSIGNEE COLUMN */}
-              <td
-                style={{
-                  border: "1px solid #000",
-                  padding: "4px",
-                  width: "50%",
-                  lineHeight: "1.5",
-                  verticalAlign: "top",
-                  wordBreak: "break-word",
-                  overflowWrap: "break-word",
-                  whiteSpace: "normal",
-                }}
-              >
+      {/* CONSIGNEE COLUMN */}
+  <td
+  style={{
+    border: "1px solid #000",
+    padding: "4px",               // increased from 3px
+    width: "50%",
+    borderBottom: "0px",
+    lineHeight: "1.5",
+    verticalAlign: "top",
+    wordBreak: "break-word",
+    overflowWrap: "break-word",
+    whiteSpace: "normal",
+    overflow: "hidden"
+  }}
+>
   <div style={{ marginBottom: "4px" }}><b>Consignee (Ship To) : {data.consignee.name}</b></div>
 
   <div style={{ marginBottom: "3px" }}><b>Address: </b>{data.consignee.address}</div>
@@ -3108,8 +2813,28 @@ const NewInvoice = ({ invoice }) => {
   <div style={{ marginBottom: "3px" }}><b>State: </b>{data.consignee.state}</div>
 
   <div style={{ marginBottom: "3px" }}><b>Contact: </b>{data.consignee.contactPerson} ({data.consignee.phone})</div>
-              </td>
-            </tr>
+</td>
+
+
+
+
+
+ 
+    </tr>
+  </tbody>
+</table>
+
+
+
+        {/* Additional Info Row */}
+        <table
+          style={{
+            width: "100%",
+            borderCollapse: "collapse",
+            fontSize: "10px",
+          }}
+        >
+          <tbody>
             <tr>
               <td
                 style={{
@@ -3117,13 +2842,11 @@ const NewInvoice = ({ invoice }) => {
                   padding: "4px",
                   width: "50%",
                   fontWeight: "bold",
+                  borderBottom: "0px",
                   borderRight: "0px",
                 }}
               >
-                State Code :{" "}
-                <span style={{ fontWeight: "normal" }}>
-                  {data.invoice.stateCode || ""}
-                </span>
+                State Code : <span style={{ fontWeight: "normal" }}> {data.invoice.stateCode || ""}</span>
               </td>
               <td
                 style={{
@@ -3131,14 +2854,27 @@ const NewInvoice = ({ invoice }) => {
                   padding: "4px",
                   width: "50%",
                   fontWeight: "bold",
+                  borderBottom: "0px",
                 }}
               >
-                Amount Paid :{" "}
-                <span style={{ fontWeight: "normal" }}>
-                  ₹{data.paymentInfo.amountPaid || "0.00"}
-                </span>
+                Amount Paid : <span style={{ fontWeight: "normal" }}> ₹{data.paymentInfo.amountPaid || "0.00"}</span>
               </td>
             </tr>
+            
+            <tr>
+              <td
+                colSpan="2"
+                style={{
+                  border: "1px solid #000",
+                  padding: "4px",
+                  fontWeight: "bold",
+                  borderBottom: "0px",
+                }}
+              >
+                Notes : <span style={{ fontWeight: "normal" }}>{data.notes || ""}</span>
+              </td>
+            </tr>
+            
           </tbody>
         </table>
 
@@ -3149,7 +2885,6 @@ const NewInvoice = ({ invoice }) => {
             borderCollapse: "collapse",
             marginBottom: "10px",
             fontSize: "10px",
-            marginTop: "0px",
           }}
         >
           <thead>
@@ -3390,81 +3125,296 @@ const NewInvoice = ({ invoice }) => {
             Amount Chargeable (in words) E. & O.E
           </div>
           <br />
-          <strong style={{ fontSize: INVOICE_INR_WORDS_PX, fontWeight: "bold" }}>
-            INR- {numberToWords(data.total)}
-          </strong>
+          <strong>INR- {numberToWords(data.total)}</strong>
         </div>
 
         {/* Tax Summary Table */}
         <table
-          data-invoice-tax-summary
           style={{
             width: "100%",
-            borderCollapse: "separate",
-            borderSpacing: 0,
+            borderCollapse: "collapse",
             marginBottom: "10px",
             fontSize: "9px",
           }}
         >
           <thead>
-            <tr>
-              <th style={taxSummaryThStyle}>HSN/SAC</th>
-              <th style={taxSummaryThStyle}>Taxable Value</th>
+            <tr style={{ backgroundColor: "#f0f0f0" }}>
+              <th
+                style={{
+                  border: "1px solid #000",
+                  padding: "4px",
+                  textAlign: "center",
+                  borderBottom: "0px",
+                  borderRight: "0px",
+                }}
+              >
+                HSN/SAC
+              </th>
+              <th
+                style={{
+                  border: "1px solid #000",
+                  padding: "4px",
+                  textAlign: "center",
+                  borderBottom: "0px",
+                  borderRight: "0px",
+                }}
+              >
+                Taxable Value
+              </th>
               {parseFloat(itemTotals.totalIGST) > 0 ? (
                 <>
-                  <th style={taxSummaryThStyle}>IGST</th>
-                  <th style={taxSummaryThStyle}>Rate</th>
-                  <th style={taxSummaryThStyle}>Amount</th>
+                  <th
+                    style={{
+                      border: "1px solid #000",
+                      padding: "4px",
+                      textAlign: "center",
+                      borderBottom: "0px",
+                      borderRight: "0px",
+                    }}
+                  >
+                    IGST
+                  </th>
+                  <th
+                    style={{
+                      border: "1px solid #000",
+                      padding: "4px",
+                      textAlign: "center",
+                      borderBottom: "0px",
+                      borderRight: "0px",
+                    }}
+                  >
+                    Rate
+                  </th>
+                  <th
+                    style={{
+                      border: "1px solid #000",
+                      padding: "4px",
+                      textAlign: "center",
+                      borderBottom: "0px",
+                      borderRight: "0px",
+                    }}
+                  >
+                    Amount
+                  </th>
                 </>
               ) : (
                 <>
-                  <th style={taxSummaryThStyle}>CGST</th>
-                  <th style={taxSummaryThStyle}>Rate</th>
-                  <th style={taxSummaryThStyle}>Amount</th>
-                  <th style={taxSummaryThStyle}>SGST/UTGST</th>
-                  <th style={taxSummaryThStyle}>Rate</th>
-                  <th style={taxSummaryThStyle}>Amount</th>
+                  <th
+                    style={{
+                      border: "1px solid #000",
+                      padding: "4px",
+                      textAlign: "center",
+                      borderBottom: "0px",
+                      borderRight: "0px",
+                    }}
+                  >
+                    CGST
+                  </th>
+                  <th
+                    style={{
+                      border: "1px solid #000",
+                      padding: "4px",
+                      textAlign: "center",
+                      borderBottom: "0px",
+                      borderRight: "0px",
+                    }}
+                  >
+                    Rate
+                  </th>
+                  <th
+                    style={{
+                      border: "1px solid #000",
+                      padding: "4px",
+                      textAlign: "center",
+                      borderBottom: "0px",
+                      borderRight: "0px",
+                    }}
+                  >
+                    Amount
+                  </th>
+                  <th
+                    style={{
+                      border: "1px solid #000",
+                      padding: "4px",
+                      textAlign: "center",
+                      borderBottom: "0px",
+                      borderRight: "0px",
+                    }}
+                  >
+                    SGST/UTGST
+                  </th>
+                  <th
+                    style={{
+                      border: "1px solid #000",
+                      padding: "4px",
+                      textAlign: "center",
+                      borderBottom: "0px",
+                      borderRight: "0px",
+                    }}
+                  >
+                    Rate
+                  </th>
+                  <th
+                    style={{
+                      border: "1px solid #000",
+                      padding: "4px",
+                      textAlign: "center",
+                      borderBottom: "0px",
+                      borderRight: "0px",
+                    }}
+                  >
+                    Amount
+                  </th>
                 </>
               )}
-              <th style={taxSummaryThStyle}>Total Tax Amount</th>
+              <th
+                style={{
+                  border: "1px solid #000",
+                  padding: "4px",
+                  textAlign: "center",
+                  borderBottom: "0px",
+                }}
+              >
+                Total Tax Amount
+              </th>
             </tr>
           </thead>
           <tbody>
             {hsnSummary.map((row, idx) => (
               <tr key={idx}>
-                <td style={taxSummaryTdStyle}>{row.hsn}</td>
-                <td style={taxSummaryTdStyle}>
+                <td
+                  style={{
+                    border: "1px solid #000",
+                    padding: "4px",
+                    borderBottom: "0px",
+                    textAlign: "center",
+                    borderRight: "0px",
+                  }}
+                >
+                  {row.hsn}
+                </td>
+
+                <td
+                  style={{
+                    border: "1px solid #000",
+                    padding: "4px",
+                    textAlign: "center",
+                    borderBottom: "0px",
+                    borderRight: "0px",
+                  }}
+                >
                   {formatCurrency(row.taxableValue)}
                 </td>
+
                 {parseFloat(itemTotals.totalIGST) > 0 ? (
                   <>
-                    <td style={taxSummaryTdStyle}>IGST</td>
-                    <td style={taxSummaryTdStyle}>
+                    <td
+                      style={{
+                        border: "1px solid #000",
+                        padding: "4px",
+                        textAlign: "center",
+                      }}
+                    >
+                      IGST
+                    </td>
+                    <td
+                      style={{
+                        border: "1px solid #000",
+                        padding: "4px",
+                        textAlign: "center",
+                      }}
+                    >
                       {formatInvoiceTaxRate(row.igstPercent)}%
                     </td>
-                    <td style={taxSummaryTdStyle}>
+                    <td
+                      style={{
+                        border: "1px solid #000",
+                        padding: "4px",
+                        textAlign: "center",
+                      }}
+                    >
                       {formatCurrency(row.igst)}
                     </td>
                   </>
                 ) : (
                   <>
-                    <td style={taxSummaryTdStyle}>CGST</td>
-                    <td style={taxSummaryTdStyle}>
+                    <td
+                      style={{
+                        border: "1px solid #000",
+                        padding: "4px",
+                        textAlign: "center",
+                        borderBottom: "0px",
+                        borderRight: "0px",
+                      }}
+                    >
+                      CGST
+                    </td>
+                    <td
+                      style={{
+                        border: "1px solid #000",
+                        padding: "4px",
+                        textAlign: "center",
+                        borderBottom: "0px",
+                        borderRight: "0px",
+                      }}
+                    >
                       {formatInvoiceTaxRate(row.cgstPercent)}%
                     </td>
-                    <td style={taxSummaryTdStyle}>
+                    <td
+                      style={{
+                        border: "1px solid #000",
+                        padding: "4px",
+                        textAlign: "center",
+                        borderBottom: "0px",
+                        borderRight: "0px",
+                      }}
+                    >
                       {formatCurrency(row.cgst)}
                     </td>
-                    <td style={taxSummaryTdStyle}>SGST/UTGST</td>
-                    <td style={taxSummaryTdStyle}>
+                    <td
+                      style={{
+                        border: "1px solid #000",
+                        padding: "4px",
+                        textAlign: "center",
+                        borderBottom: "0px",
+                        borderRight: "0px",
+                      }}
+                    >
+                      SGST/UTGST
+                    </td>
+                    <td
+                      style={{
+                        border: "1px solid #000",
+                        padding: "4px",
+                        textAlign: "center",
+                        borderBottom: "0px",
+                        borderRight: "0px",
+                      }}
+                    >
                       {formatInvoiceTaxRate(row.sgstPercent)}%
                     </td>
-                    <td style={taxSummaryTdStyle}>
+                    <td
+                      style={{
+                        border: "1px solid #000",
+                        padding: "4px",
+                        textAlign: "center",
+                        borderBottom: "0px",
+                        borderRight: "0px",
+                      }}
+                    >
                       {formatCurrency(row.sgst)}
                     </td>
                   </>
                 )}
-                <td style={taxSummaryTdStyle}>
+
+                <td
+                  style={{
+                    border: "1px solid #000",
+                    padding: "4px",
+                    textAlign: "center",
+                    borderBottom: "0px",
+                  }}
+                >
                   {parseFloat(itemTotals.totalIGST) > 0
                     ? formatCurrency(row.igst)
                     : formatCurrency(row.cgst + row.sgst)}
@@ -3472,217 +3422,170 @@ const NewInvoice = ({ invoice }) => {
               </tr>
             ))}
 
+            {/* TOTAL ROW */}
             <tr style={{ fontWeight: "bold" }}>
-              <td style={taxSummaryTdStyle}>Total</td>
-              <td style={taxSummaryTdStyle}>{data.subtotal}</td>
+              <td
+                style={{
+                  border: "1px solid #000",
+                  padding: "4px",
+                  borderRight: "0px",
+                  textAlign: "center",
+                  marginBottom:"2px"
+                }}
+              >
+                Total
+              </td>
+              <td
+                style={{
+                  border: "1px solid #000",
+                  padding: "4px",
+                  textAlign: "center",
+                  borderRight: "0px",
+                }}
+              >
+                {data.subtotal}
+              </td>
               {parseFloat(itemTotals.totalIGST) > 0 ? (
                 <>
-                  <td colSpan={2} style={taxSummaryTdStyle} />
-                  <td style={taxSummaryTdStyle}>{data.igst}</td>
+                  <td
+                    colSpan="2"
+                    style={{
+                      border: "1px solid #000",
+                      padding: "4px",
+                      textAlign: "center",
+                      borderRight: "0px",
+                    }}
+                  ></td>
+                  <td
+                    style={{
+                      border: "1px solid #000",
+                      padding: "4px",
+                      textAlign: "center",
+                      borderRight: "0px",
+                    }}
+                  >
+                    {data.igst}
+                  </td>
                 </>
               ) : (
                 <>
-                  <td colSpan={2} style={taxSummaryTdStyle} />
-                  <td style={taxSummaryTdStyle}>{data.cgst}</td>
-                  <td colSpan={2} style={taxSummaryTdStyle} />
-                  <td style={taxSummaryTdStyle}>{data.sgst}</td>
+                  <td
+                    colSpan="2"
+                    style={{
+                      border: "1px solid #000",
+                      padding: "4px",
+                      textAlign: "center",
+                      borderRight: "0px",
+                    }}
+                  ></td>
+                  <td
+                    style={{
+                      border: "1px solid #000",
+                      padding: "4px",
+                      textAlign: "center",
+                      borderRight: "0px",
+                    }}
+                  >
+                    {data.cgst}
+                  </td>
+                  <td
+                    colSpan="2"
+                    style={{
+                      border: "1px solid #000",
+                      padding: "4px",
+                      textAlign: "center",
+                      borderRight: "0px",
+                    }}
+                  ></td>
+                  <td
+                    style={{
+                      border: "1px solid #000",
+                      padding: "4px",
+                      textAlign: "center",
+                      borderRight: "0px",
+                    }}
+                  >
+                    {data.sgst}
+                  </td>
                 </>
               )}
-              <td style={taxSummaryTdStyle}>{data.taxAmount}</td>
+              <td
+                style={{
+                  border: "1px solid #000",
+                  padding: "4px",
+                  textAlign: "center",
+                }}
+              >
+                {data.taxAmount}
+              </td>
             </tr>
           </tbody>
         </table>
 
-        {/* Tax Amount in Words — same size as Amount Chargeable INR, one line */}
-        <div
-          style={{
-            marginBottom: "6px",
-            paddingBottom: "0px",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "baseline",
-            gap: "12px",
-          }}
-        >
-          <strong
-            style={{
-              fontSize: INVOICE_INR_WORDS_PX,
-              fontWeight: "bold",
-              lineHeight: INVOICE_BODY_LINE_HEIGHT,
-            }}
-          >
+        {/* Tax Amount in Words */}
+        <div style={{ marginBottom: "15px", fontSize: "9px", display: "flex", justifyContent: "space-between" }}>
+          <strong>
             Tax Amount (in words) : INR- {numberToWords(data.taxAmount)}
           </strong>
           {data.roundOff !== 0 && (
-            <strong style={{ fontSize: INVOICE_INR_WORDS_PX, whiteSpace: "nowrap" }}>
+            <strong style={{ fontSize: "10px" }}>
               Round Off: {data.roundOff > 0 ? `+₹${data.roundOff}` : `-₹${Math.abs(data.roundOff)}`}
             </strong>
           )}
         </div>
 
         {/* Terms & Bank Details */}
-        <table
-          style={{
-            width: "100%",
-            borderCollapse: "separate",
-            borderSpacing: 0,
-            tableLayout: "fixed",
-            marginTop: "0px",
-            marginBottom: "0px",
-            height: "auto",
-          }}
-        >
-          <tbody>
-            <tr>
-              <td
-                data-pdf-footer-block="terms"
-                style={{
-                  width: "58%",
-                  verticalAlign: "top",
-                  paddingRight: "16px",
-                  paddingTop: "0px",
-                  paddingBottom: (data.notes || "").trim() ? "8px" : "2px",
-                  fontSize: INVOICE_BODY_TEXT_PX,
-                  lineHeight: INVOICE_BODY_LINE_HEIGHT,
-                }}
-              >
-                <div
-                  style={{
-                    fontWeight: "bold",
-                    marginBottom: "4px",
-                    marginTop: "2px",
-                    fontSize: INVOICE_BODY_TEXT_PX,
-                    lineHeight: INVOICE_BODY_LINE_HEIGHT,
-                  }}
-                >
-                  Terms & Condition
+        <div style={{ display: "flex", gap: "20px", marginBottom: "15px" }}>
+          <div style={{ flex: "1", fontSize: "9px" }}>
+            <div style={{ fontWeight: "bold", marginBottom: "5px" }}>
+              Terms & Condition
+            </div>
+            {data.terms.length > 0 ? (
+              data.terms.map((term, index) => (
+                <div key={index} style={{ marginBottom: "3px" }}>
+                  {term}
                 </div>
-                {data.terms.length > 0 ? (
-                  data.terms.map((term, index) => (
-                    <div
-                      key={index}
-                      style={{
-                        marginBottom:
-                          index === data.terms.length - 1 ? "4px" : "4px",
-                        lineHeight: INVOICE_BODY_LINE_HEIGHT,
-                      }}
-                    >
-                      {term}
-                    </div>
-                  ))
-                ) : (
-                  <div>No terms and conditions specified.</div>
-                )}
-              </td>
-              <td
-                data-pdf-footer-block="bank"
-                style={{
-                  width: "42%",
-                  verticalAlign: "top",
-                  paddingLeft: "8px",
-                  paddingBottom: "2px",
-                  fontSize: INVOICE_BODY_TEXT_PX,
-                  lineHeight: INVOICE_BODY_LINE_HEIGHT,
-                }}
-              >
-                <div style={{ width: "100%" }}>
-                  <div
-                    style={{
-                      fontWeight: "bold",
-                      marginBottom: "4px",
-                      fontSize: INVOICE_BODY_TEXT_PX,
-                      lineHeight: INVOICE_BODY_LINE_HEIGHT,
-                    }}
-                  >
-                    Company&apos;s Bank Details
-                  </div>
-                  <div style={{ marginBottom: "2px", wordBreak: "break-word" }}>
-                    A/C Holder Name : {data.bank.accountHolderName}
-                  </div>
-                  <div style={{ marginBottom: "2px" }}>
-                    Bank Name : {data.bank.name}
-                  </div>
-                  <div style={{ marginBottom: "2px" }}>
-                    A/c No. : {data.bank.accountNo}
-                  </div>
-                  <div>Branch &amp; IFSC Code: {data.bank.IFSC}</div>
-                </div>
-              </td>
-            </tr>
-            {(data.notes || "").trim() ? (
-              <tr>
-                <td
-                  colSpan={2}
-                  style={{
-                    paddingTop: "10px",
-                    paddingBottom: "0px",
-                    verticalAlign: "top",
-                  }}
-                >
-                  <div
-                    data-pdf-footer-block="notes"
-                    style={{
-                      width: "100%",
-                      boxSizing: "border-box",
-                      border: "1px solid #000",
-                      padding: "4px 5px 6px",
-                      marginTop: "2px",
-                      marginBottom: "6px",
-                      overflow: "visible",
-                      fontSize: INVOICE_BODY_TEXT_PX,
-                      lineHeight: INVOICE_BODY_LINE_HEIGHT,
-                    }}
-                  >
-                    <div
-                      data-pdf-notes-label
-                      style={{
-                        fontWeight: "bold",
-                        marginBottom: "2px",
-                        marginTop: "0px",
-                        fontSize: INVOICE_BODY_TEXT_PX,
-                        lineHeight: INVOICE_BODY_LINE_HEIGHT,
-                      }}
-                    >
-                      Notes :
-                    </div>
-                    <div
-                      data-pdf-notes-body
-                      style={{
-                        fontWeight: "normal",
-                        whiteSpace: "pre-wrap",
-                        wordBreak: "break-word",
-                        overflowWrap: "break-word",
-                        fontSize: INVOICE_BODY_TEXT_PX,
-                        lineHeight: INVOICE_BODY_LINE_HEIGHT,
-                      }}
-                    >
-                      {data.notes}
-                    </div>
-                  </div>
-                </td>
-              </tr>
-            ) : null}
-          </tbody>
-        </table>
+              ))
+            ) : (
+              <div>No terms and conditions specified.</div>
+            )}
+          </div>
+          <div
+            style={{
+              width: "250px",
+              display: "flex",
+              justifyContent: "flex-end",
+            }}
+          >
+            <div style={{ width: "100%", fontSize: "9px" }}>
+              <div style={{ fontWeight: "bold", marginBottom: "5px" }}>
+                Company's Bank Details
+              </div>
+              <div style={{ fontSize: "10px", marginBottom: "2px" }}>
+                A/C Holder Name : {data.bank.accountHolderName}
+              </div>
+              <div style={{ fontSize: "10px", marginBottom: "2px" }}>
+                Bank Name : {data.bank.name}
+              </div>
+              <div style={{ fontSize: "10px", marginBottom: "2px" }}>
+                A/c No. : {data.bank.accountNo}
+              </div>
+              <div style={{ fontSize: "10px", marginBottom: "2px" }}>
+                Branch & IFS Code: {data.bank.IFSC}
+              </div>
+            </div>
+          </div>
+        </div>
 
         {/* Signature */}
        <div
   style={{
     textAlign: "right",
-    marginTop: (data.notes || "").trim() ? "8px" : "12px",
-    fontSize: INVOICE_BODY_TEXT_PX,
+    marginTop: "40px",
+    fontSize: "9px",
   }}
 >
-  <div
-    data-pdf-signature-for
-    style={{
-      whiteSpace: "nowrap",
-      fontSize: INVOICE_SIGNATURE_FOR_PX,
-      lineHeight: INVOICE_BODY_LINE_HEIGHT,
-    }}
-  >
-    for {data.company.name}
-  </div>
+  <div>for {data.company.name}</div>
 
   {/* Signature Image */}
   <div
@@ -3692,18 +3595,15 @@ const NewInvoice = ({ invoice }) => {
       justifyContent: "flex-end",
     }}
   >
-    {signatureSrc ? (
-      <img
-        src={signatureSrc}
-        alt=""
-        onError={handleSignatureError}
-        style={{
-          height: "60px",
-          width: "120px",
-          objectFit: "contain",
-        }}
-      />
-    ) : null}
+    <img
+      src={signImg.src}
+      alt="Signature"
+      style={{
+        height: "60px",
+        width: "120px",
+        objectFit: "contain",
+      }}
+    />
   </div>
 
   {/* Signatory Text */}
@@ -3726,12 +3626,12 @@ const NewInvoice = ({ invoice }) => {
         <div
           style={{
             textAlign: "center",
-            marginTop: "18px",
+            marginTop: "20px",
             fontSize: "8px",
             fontStyle: "italic",
           }}
         >
-          *This is a Computer Generated Invoice*
+          This is a Computer Generated Invoice
         </div>
         </div>
       </div>

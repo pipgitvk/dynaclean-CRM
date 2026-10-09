@@ -1,6 +1,5 @@
 "use client";
 
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useMemo, useEffect } from "react";
 import { ArrowUp, ArrowDown, Download, FileText } from "lucide-react";
 import dayjs from "dayjs";
@@ -371,11 +370,21 @@ export default function LedgerTableClient({
         <div className="flex items-end gap-4 flex-wrap">
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">From Date</label>
-            <TypeableDateFilterInput value={dateFrom} onChange={setDateFrom} className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">To Date</label>
-            <TypeableDateFilterInput value={dateTo} onChange={setDateTo} className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
           </div>
           <button
             onClick={() => { setDateFrom(minDate); setDateTo(maxDate); }}

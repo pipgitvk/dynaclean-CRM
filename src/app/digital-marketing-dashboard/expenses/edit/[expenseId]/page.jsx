@@ -1,6 +1,5 @@
 "use client";
 
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import dayjs from "dayjs";
@@ -110,7 +109,13 @@ export default function EditExpensePage() {
       >
         <div>
           <label className="block text-sm mb-1">Expense Date</label>
-          <TypeableDateFilterInput value={form.TravelDate} onChange={(v) => handleChange({ target: { name: "TravelDate", value: v } })} className="w-full border p-2 rounded"/>
+          <input
+            name="TravelDate"
+            type="date"
+            value={form.TravelDate}
+            onChange={handleChange}
+            className="w-full border p-2 rounded"
+          />
         </div>
         <div>
           <label className="block text-sm mb-1">From Location</label>

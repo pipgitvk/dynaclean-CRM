@@ -9,9 +9,7 @@ import {
   Phone,
   Bell,
   Loader2,
-  Database,
 } from "lucide-react";
-import toast from "react-hot-toast";
 import LedgerTableClient from "@/app/admin-dashboard/ledger/[companyName]/LedgerTableClient";
 
 function formatAmount(n) {
@@ -24,59 +22,15 @@ function formatAmount(n) {
   );
 }
 
-function computeLedgerNet(entries) {
-  const debit = (entries || []).reduce(
-    (sum, row) => sum + Number(row.debit || 0),
-    0,
-  );
-  const credit = (entries || []).reduce(
-    (sum, row) => sum + Number(row.credit || 0),
-    0,
-  );
-  return debit - credit;
-}
-
-/** Same Dr/Cr as LedgerTableClient net balance card */
-function formatLedgerNet(net) {
+function balanceMeta(net) {
   const value = Number(net || 0);
   if (Math.abs(value) <= 0.01) {
-    return { amount: 0, suffix: null, colorClass: "text-gray-500" };
+    return { balance: 0, amountType: "flat" };
   }
-  if (value >= 0) {
-    return { amount: value, suffix: "Dr", colorClass: "text-red-600" };
+  if (value > 0) {
+    return { balance: value, amountType: "receivable" };
   }
-  return { amount: Math.abs(value), suffix: "Cr", colorClass: "text-green-600" };
-}
-
-function formatSidebarNetBalance(p) {
-  const net = Number(p.net_balance ?? p.balance ?? 0);
-  if (p.balanceFromLedger && p.balance_side) {
-    if (p.balance_side === "flat") {
-      return { amount: 0, suffix: null, colorClass: "text-gray-500" };
-    }
-    if (p.balance_side === "Dr") {
-      return {
-        amount: Math.abs(net),
-        suffix: "Dr",
-        colorClass: "text-red-600",
-      };
-    }
-    return {
-      amount: Math.abs(net),
-      suffix: "Cr",
-      colorClass: "text-green-600",
-    };
-  }
-  return formatLedgerNet(net);
-}
-
-async function fetchPartiesList() {
-  const res = await fetch("/api/parties/list");
-  const data = await res.json();
-  if (!res.ok || !data.success) {
-    throw new Error(data.error || data.message || "Failed to load parties");
-  }
-  return data.parties || [];
+  return { balance: value, amountType: "payable" };
 }
 
 function rowKey(p) {
@@ -84,20 +38,6 @@ function rowKey(p) {
     p.customer_id != null ? String(p.customer_id).trim() : "";
   if (cid) return `cid:${cid}`;
   return `name:${(p.name || "").toLowerCase()}`;
-}
-
-function displayCustomerId(p) {
-  if (p?.customer_id == null) return "";
-  const id = String(p.customer_id).trim();
-  return id && id !== "0" ? id : "";
-}
-
-function formatSidebarCustomerMeta(p) {
-  const id = displayCustomerId(p);
-  const clientName = String(p?.client_name || "").trim();
-  if (!id) return clientName;
-  if (clientName) return `${clientName} (${id})`;
-  return `(${id})`;
 }
 
 export default function PartiesPage() {
@@ -110,25 +50,6 @@ export default function PartiesPage() {
   const [ledgerEntries, setLedgerEntries] = useState([]);
   const [ledgerLoading, setLedgerLoading] = useState(false);
   const [ledgerError, setLedgerError] = useState(null);
-  const [ledgerSyncLoading, setLedgerSyncLoading] = useState(false);
-  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch("/api/me");
-        const data = await res.json();
-        if (!cancelled && res.ok) {
-          const role = String(data.userRole || data.role || "").toUpperCase();
-          setIsSuperAdmin(role === "SUPERADMIN");
-        }
-      } catch (_) {}
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -136,8 +57,13 @@ export default function PartiesPage() {
       setListLoading(true);
       setListError(null);
       try {
-        const loaded = await fetchPartiesList();
+        const res = await fetch("/api/parties/list");
+        const data = await res.json();
         if (cancelled) return;
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || data.message || "Failed to load parties");
+        }
+        const loaded = data.parties || [];
         setParties(loaded);
         if (loaded.length > 0 && !selectedKey) {
           setSelectedKey(rowKey(loaded[0]));
@@ -151,6 +77,7 @@ export default function PartiesPage() {
     return () => {
       cancelled = true;
     };
+     
   }, []);
 
   const selected = useMemo(
@@ -161,20 +88,15 @@ export default function PartiesPage() {
   useEffect(() => {
     if (!selected || !selected.name) {
       setLedgerEntries([]);
-      setLedgerLoading(false);
       return;
     }
-    setLedgerLoading(true);
-    setLedgerEntries([]);
-    setLedgerError(null);
-
     let cancelled = false;
     (async () => {
+      setLedgerLoading(true);
+      setLedgerError(null);
       try {
         const params = new URLSearchParams({ name: selected.name });
-        if (selected.customer_id) {
-          params.set("customer_id", String(selected.customer_id));
-        }
+        if (selected.customer_id) params.set("customer_id", String(selected.customer_id));
         const url = "/api/parties/__unused__/ledger?" + params.toString();
         const res = await fetch(url);
         const data = await res.json();
@@ -182,11 +104,22 @@ export default function PartiesPage() {
         if (!res.ok || !data.success) {
           throw new Error(data.error || data.message || "Failed to load ledger");
         }
-        setLedgerEntries(data.entries || []);
-        try {
-          const loaded = await fetchPartiesList();
-          if (!cancelled) setParties(loaded);
-        } catch (_) {}
+        const entries = data.entries || [];
+        setLedgerEntries(entries);
+        const debit = entries.reduce(
+          (sum, row) => sum + Number(row.debit || 0),
+          0,
+        );
+        const credit = entries.reduce(
+          (sum, row) => sum + Number(row.credit || 0),
+          0,
+        );
+        const { balance, amountType } = balanceMeta(debit - credit);
+        setParties((prev) =>
+          prev.map((p) =>
+            rowKey(p) === selectedKey ? { ...p, balance, amountType } : p,
+          ),
+        );
       } catch (err) {
         if (!cancelled) {
           setLedgerError(err?.message || String(err));
@@ -199,12 +132,21 @@ export default function PartiesPage() {
     return () => {
       cancelled = true;
     };
+     
   }, [selectedKey, selected?.name, selected?.customer_id]);
 
-  const selectedLedgerNet = useMemo(() => {
-    if (!selectedKey || ledgerLoading) return null;
-    return computeLedgerNet(ledgerEntries);
-  }, [selectedKey, ledgerEntries, ledgerLoading]);
+  const handleLedgerTotals = useCallback(
+    (totals) => {
+      if (!selectedKey) return;
+      const { balance, amountType } = balanceMeta(totals?.balance ?? 0);
+      setParties((prev) =>
+        prev.map((p) =>
+          rowKey(p) === selectedKey ? { ...p, balance, amountType } : p,
+        ),
+      );
+    },
+    [selectedKey],
+  );
 
   const filteredParties = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -226,66 +168,12 @@ export default function PartiesPage() {
     });
   }, [parties, search]);
 
-  const handleSyncAllLedgers = useCallback(async () => {
-    if (
-      !window.confirm(
-        "Save all party ledgers to the database? This may take several minutes.",
-      )
-    ) {
-      return;
-    }
-    setLedgerSyncLoading(true);
-    try {
-      const res = await fetch("/api/parties/ledger/sync", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ syncAll: true }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(
-          data.error || data.message || "Failed to save ledgers to database",
-        );
-      }
-      const failed = Number(data.parties_failed || 0);
-      const synced = Number(data.parties_synced || 0);
-      if (synced === 0 && failed > 0) {
-        const hint =
-          Array.isArray(data.error_messages) && data.error_messages[0]
-            ? data.error_messages[0]
-            : "See console for details";
-        toast.error(`Ledger sync failed: ${hint}`);
-        console.warn("[ledger sync errors]", data.errors, data.error_messages);
-        return;
-      }
-      const skippedParties = Number(data.parties_skipped || 0);
-      const inserted = Number(data.lines_inserted || 0);
-      toast.success(
-        skippedParties > 0
-          ? `Added ${inserted} new lines; ${skippedParties} parties already in DB (skipped)`
-          : `Saved ${data.total_lines ?? 0} lines for ${synced} parties` +
-            (failed > 0 ? ` (${failed} failed)` : ""),
-      );
-      if (failed > 0 && Array.isArray(data.errors) && data.errors.length > 0) {
-        console.warn("[ledger sync errors]", data.errors);
-      }
-      try {
-        const loaded = await fetchPartiesList();
-        setParties(loaded);
-      } catch (_) {}
-    } catch (err) {
-      toast.error(err?.message || "Ledger sync failed");
-    } finally {
-      setLedgerSyncLoading(false);
-    }
-  }, []);
-
   return (
     <div className="h-[calc(100vh-2rem)] w-full bg-gray-50 flex flex-col">
       <div className="flex-1 flex gap-3 p-3 overflow-hidden">
         {/* Left Panel – Party List */}
         <aside className="w-[320px] flex flex-col bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-          <div className="p-3 border-b border-gray-100 space-y-2">
+          <div className="p-3 border-b border-gray-100">
             <div className="relative">
               <Search
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
@@ -298,22 +186,6 @@ export default function PartiesPage() {
                 className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
-            {isSuperAdmin && (
-              <button
-                type="button"
-                onClick={handleSyncAllLedgers}
-                disabled={ledgerSyncLoading}
-                title="Save all party ledgers to party_ledger_lines table"
-                className="w-full inline-flex items-center justify-center gap-2 rounded-md border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-800 hover:bg-indigo-100 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
-              >
-                {ledgerSyncLoading ? (
-                  <Loader2 size={14} className="animate-spin shrink-0" />
-                ) : (
-                  <Database size={14} className="shrink-0" />
-                )}
-                {ledgerSyncLoading ? "Saving ledgers…" : "Save all ledgers to DB"}
-              </button>
-            )}
           </div>
 
           <div className="grid grid-cols-[1fr_auto] text-xs font-medium text-gray-600 bg-gray-50 border-b border-gray-100">
@@ -322,7 +194,7 @@ export default function PartiesPage() {
               <Filter size={12} className="text-red-500" />
             </div>
             <div className="flex items-center gap-1 px-3 py-2">
-              Net Balance
+              Amount
               <Filter size={12} className="text-gray-400" />
             </div>
           </div>
@@ -344,24 +216,6 @@ export default function PartiesPage() {
             ) : (
               filteredParties.map((p) => {
                 const isSelected = rowKey(p) === selectedKey;
-                const partyForNet =
-                  isSelected && selectedLedgerNet !== null
-                    ? {
-                        ...p,
-                        net_balance: selectedLedgerNet,
-                        balance: selectedLedgerNet,
-                        balanceFromLedger: true,
-                        balance_side:
-                          Math.abs(selectedLedgerNet) <= 0.01
-                            ? "flat"
-                            : selectedLedgerNet >= 0
-                              ? "Dr"
-                              : "Cr",
-                      }
-                    : p;
-                const { amount, suffix, colorClass } =
-                  formatSidebarNetBalance(partyForNet);
-                const customerMeta = formatSidebarCustomerMeta(p);
                 return (
                   <button
                     key={rowKey(p)}
@@ -380,24 +234,35 @@ export default function PartiesPage() {
                       >
                         {p.name}
                       </span>
-                      {customerMeta ? (
+                      {p.customer_id != null && String(p.customer_id).trim() !== "" && (
                         <span
-                          className={`text-xs mt-0.5 block truncate ${
+                          className={`text-xs mt-0.5 block ${
                             isSelected ? "text-gray-500" : "text-gray-400"
                           }`}
-                          title={customerMeta}
                         >
-                          {customerMeta}
+                          ID: {p.customer_id}
                         </span>
-                      ) : null}
+                      )}
                     </div>
                     <span
-                      className={`font-semibold tabular-nums whitespace-nowrap self-start text-right ${colorClass}`}
+                      className={`font-semibold tabular-nums whitespace-nowrap self-start text-right ${
+                        p.amountType === "receivable"
+                          ? "text-green-600"
+                          : p.amountType === "payable"
+                            ? "text-red-500"
+                            : "text-gray-500"
+                      }`}
                     >
-                      <div className="leading-tight">{formatAmount(amount)}</div>
-                      {suffix && (
+                      <div className="leading-tight">
+                        {formatAmount(
+                          p.amountType === "flat"
+                            ? 0
+                            : Math.abs(p.balance || 0),
+                        )}
+                      </div>
+                      {p.amountType !== "flat" && (
                         <div className="text-[10px] font-medium opacity-75 mt-0.5">
-                          {suffix}
+                          {p.amountType === "receivable" ? "Dr" : "Cr"}
                         </div>
                       )}
                     </span>
@@ -443,14 +308,16 @@ export default function PartiesPage() {
                       {selected?.billing_address || "—"}
                     </div>
                   </div>
-                  <div>
-                    <div className="text-gray-400 text-xs uppercase tracking-wide">
-                      Customer ID
+                  {selected?.customer_id && (
+                    <div>
+                      <div className="text-gray-400 text-xs uppercase tracking-wide">
+                        Customer ID
+                      </div>
+                      <div className="text-gray-800 font-medium mt-0.5">
+                        {selected.customer_id}
+                      </div>
                     </div>
-                    <div className="text-gray-800 font-medium mt-0.5">
-                      {displayCustomerId(selected) || "—"}
-                    </div>
-                  </div>
+                  )}
                   {selected?.gstin && (
                     <div>
                       <div className="text-gray-400 text-xs uppercase tracking-wide">
@@ -518,10 +385,10 @@ export default function PartiesPage() {
             ) : selected ? (
               <div className="p-4 w-full">
                 <LedgerTableClient
-                  key={selectedKey}
                   rows={ledgerEntries}
                   companyName={selected.name}
                   customerId={selected.customer_id || null}
+                  onTotalsChange={handleLedgerTotals}
                 />
               </div>
             ) : (

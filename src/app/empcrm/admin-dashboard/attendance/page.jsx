@@ -1,11 +1,9 @@
 // app/empcrm/admin-dashboard/attendance/page.jsx
 "use client";
 
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
-import { Loader2, Search, Info, Pencil, Sun, History, AlertTriangle } from "lucide-react";
-import AttendanceEditHistoryPanel from "@/components/AttendanceEditHistoryPanel";
+import { Loader2, Search, Info, Pencil } from "lucide-react";
 import ExcelJS from "exceljs";
 import {
   DEFAULT_ATTENDANCE_RULES,
@@ -16,22 +14,11 @@ import {
   isLateDaySummary,
   isHalfDayWithGrace,
 } from "@/lib/attendanceRulesEngine";
-import {
-  rowHasMeaningfulCheckinOrCheckout,
-  isMeaningfulAttendancePunch,
-} from "@/lib/attendanceMeaningfulPunch";
+import { rowHasMeaningfulCheckinOrCheckout } from "@/lib/attendanceMeaningfulPunch";
 import { weeklyOffSundayCountsAsPaid } from "@/lib/salaryPayDaysFromAttendance";
 import { formatAttendanceTimeForDisplay as formatTime } from "@/lib/istDateTime";
 import AttendanceRegularizeModal from "@/app/user-dashboard/attendance/AttendanceRegularizeModal";
 import AttendanceBulkImportPanel from "@/components/AttendanceBulkImportPanel";
-import AttendanceAddressMapModal, {
-  ViewAddressLink,
-} from "@/components/AttendanceAddressMapModal";
-import {
-  AUTO_CHECKOUT_ATTENDANCE_ADDRESS,
-  isAutomaticCheckoutAddress,
-} from "@/lib/attendanceAutoCheckoutConstants";
-import { MACHINE_ATTENDANCE_ADDRESS } from "@/lib/attendanceMachineMerge";
 
 function attendanceDateYmd(value) {
   if (value == null || value === "") return "";
@@ -65,277 +52,11 @@ function combineDateAndTimeForDb(dateYmd, timeHHmm) {
   return `${dateYmd} ${hh}:${mm}:00`;
 }
 
-const AUTO_CHECKOUT_WARNING_TITLE =
-  "No manual check-out — automatic check-out at 9:00 PM only.";
-
-function isMachineAttendanceAddress(address) {
-  return (
-    String(address || "").trim().toLowerCase() ===
-    MACHINE_ATTENDANCE_ADDRESS.toLowerCase()
-  );
-}
-
-function getAttendanceSourcesDetail(log) {
-  if (log?.attendance_sources_detail) return log.attendance_sources_detail;
-  const md = log?.machine_day;
-  const sources = log?.merge_sources;
-  const detail = {
-    crm: {
-      checkin: log?.crm_checkin_time ?? null,
-      checkout: log?.crm_checkout_time ?? null,
-    },
-    machine: {
-      checkin: md?.machine_checkin ?? null,
-      checkout: md?.machine_checkout ?? null,
-    },
-  };
-  if (!detail.crm.checkin && sources?.checkin === "crm") {
-    detail.crm.checkin = log?.checkin_time ?? null;
-  }
-  if (!detail.crm.checkout && sources?.checkout === "crm") {
-    detail.crm.checkout = log?.checkout_time ?? null;
-  }
-  if (!detail.machine.checkin && sources?.checkin === "machine") {
-    detail.machine.checkin = log?.checkin_time ?? null;
-  }
-  if (!detail.machine.checkout && sources?.checkout === "machine") {
-    detail.machine.checkout = log?.checkout_time ?? null;
-  }
-  if (
-    isMachineAttendanceAddress(log?.checkout_address) &&
-    !isMeaningfulAttendancePunch(detail.machine.checkout)
-  ) {
-    detail.machine.checkout = log?.checkout_time ?? null;
-  }
-  const hasAny =
-    isMeaningfulAttendancePunch(detail.crm.checkin) ||
-    isMeaningfulAttendancePunch(detail.crm.checkout) ||
-    isMeaningfulAttendancePunch(detail.machine.checkin) ||
-    isMeaningfulAttendancePunch(detail.machine.checkout);
-  return hasAny ? detail : null;
-}
-
-function logHasMachineAttendanceData(log) {
-  if (!log) return false;
-  if (isMachineAttendanceAddress(log.checkout_address)) return true;
-  if (isMachineAttendanceAddress(log.checkin_address)) return true;
-  if (log.merge_sources?.checkin === "machine" || log.merge_sources?.checkout === "machine") {
-    return true;
-  }
-  const detail = getAttendanceSourcesDetail(log);
-  if (!detail) return false;
-  return (
-    isMeaningfulAttendancePunch(detail.machine?.checkin) ||
-    isMeaningfulAttendancePunch(detail.machine?.checkout)
-  );
-}
-
-function formatSourceTime(value) {
-  return isMeaningfulAttendancePunch(value) ? formatTime(value) : "—";
-}
-
-/** Info icon — hover shows CRM vs machine check-in and check-out. */
-function AttendanceSourceInfo({ log }) {
-  if (!logHasMachineAttendanceData(log)) return null;
-
-  const detail = getAttendanceSourcesDetail(log);
-  if (!detail) return null;
-
-  const titleText = [
-    `CRM in: ${formatSourceTime(detail.crm?.checkin)}`,
-    `CRM out: ${formatSourceTime(detail.crm?.checkout)}`,
-    `Machine in: ${formatSourceTime(detail.machine?.checkin)}`,
-    `Machine out: ${formatSourceTime(detail.machine?.checkout)}`,
-  ].join(" · ");
-
-  return (
-    <span
-      className="relative ml-1 inline-flex shrink-0 align-middle group/attmerge"
-      title={titleText}
-    >
-      <Info
-        className="h-4 w-4 cursor-help text-indigo-600"
-        aria-label="CRM and machine attendance details"
-      />
-      <span
-        className="pointer-events-none absolute right-0 bottom-full z-[200] mb-1 w-56 rounded-md bg-gray-900 px-3 py-2 text-left text-xs text-white opacity-0 shadow-xl transition-opacity invisible group-hover/attmerge:visible group-hover/attmerge:opacity-100"
-      >
-        <p className="mb-1.5 font-semibold text-gray-200">CRM vs machine</p>
-        <p>
-          <span className="text-gray-400">CRM check-in:</span>{" "}
-          {formatSourceTime(detail.crm?.checkin)}
-        </p>
-        <p>
-          <span className="text-gray-400">CRM check-out:</span>{" "}
-          {formatSourceTime(detail.crm?.checkout)}
-        </p>
-        <p className="mt-1.5 border-t border-gray-700 pt-1.5">
-          <span className="text-gray-400">Machine check-in:</span>{" "}
-          {formatSourceTime(detail.machine?.checkin)}
-        </p>
-        <p>
-          <span className="text-gray-400">Machine check-out:</span>{" "}
-          {formatSourceTime(detail.machine?.checkout)}
-        </p>
-        <p className="mt-1.5 border-t border-gray-700 pt-1.5 text-[10px] text-gray-400">
-          Table: in {formatTime(log.checkin_time) || "—"} · out{" "}
-          {formatTime(log.checkout_time) || "—"}
-        </p>
-      </span>
-    </span>
-  );
-}
-
-function CheckoutTimeDisplay({ log }) {
-  const time = formatTime(log.checkout_time);
-  if (!isAutomaticCheckoutAddress(log.checkout_address)) return time;
-  return (
-    <span
-      className="inline-flex items-center gap-1"
-      title={AUTO_CHECKOUT_WARNING_TITLE}
-    >
-      <AlertTriangle
-        className="w-4 h-4 shrink-0 text-red-600"
-        aria-label="Automatic checkout warning"
-      />
-      <span>{time}</span>
-    </span>
-  );
-}
-
-function CheckoutAddressCell({ log, title, onOpen, className = "" }) {
-  if (isMachineAttendanceAddress(log.checkout_address)) {
-    return (
-      <span className={`text-indigo-700 font-medium ${className}`}>
-        {MACHINE_ATTENDANCE_ADDRESS}
-      </span>
-    );
-  }
-  if (isAutomaticCheckoutAddress(log.checkout_address)) {
-    return (
-      <span
-        className={`inline-flex items-center gap-1 text-red-600 font-bold ${className}`}
-        title={AUTO_CHECKOUT_WARNING_TITLE}
-      >
-        <AlertTriangle
-          className="w-4 h-4 shrink-0"
-          aria-label="Automatic checkout warning"
-        />
-        {AUTO_CHECKOUT_ATTENDANCE_ADDRESS}
-      </span>
-    );
-  }
-  return (
-    <ViewAddressLink
-      title={title}
-      address={log.checkout_address}
-      latitude={log.checkout_latitude}
-      longitude={log.checkout_longitude}
-      onOpen={onOpen}
-      className={className}
-    />
-  );
-}
-
-function AdminTimeEditRemark({ remark, className = "" }) {
-  const text = String(remark ?? "").trim();
-  if (!text) {
-    return <span className={`text-gray-400 ${className}`}>—</span>;
-  }
-  return (
-    <span className={`text-red-600 font-medium break-words ${className}`}>
-      {text}
-    </span>
-  );
-}
-
-function toYmd(date) {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
-
-function currentMonthRange() {
-  const now = new Date();
-  const first = new Date(now.getFullYear(), now.getMonth(), 1);
-  return { from: toYmd(first), to: toYmd(now) };
-}
-
-function formatLeaveSummaryDays(value) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return "0";
-  if (Math.abs(n - Math.round(n)) < 1e-9) return String(Math.round(n));
-  return n.toFixed(1);
-}
-
-function isPaidLeaveRow(log) {
-  return (
-    log.type === "paidleave" ||
-    log.leaveType === "Paid" ||
-    log.leave_type === "paid"
-  );
-}
-
-function logShowsAttendancePunchDetails(log) {
-  if (log.type === "present") return true;
-  if (log.has_punch_on_leave == 1) return true;
-  if (
-    (log.type === "leave" ||
-      log.type === "paidleave" ||
-      log.type === "unpaidleave") &&
-    rowHasMeaningfulCheckinOrCheckout(log)
-  ) {
-    return true;
-  }
-  return false;
-}
-
-function LeaveDayStatusBlock({ log, className = "" }) {
-  if (
-    !(
-      log.type === "leave" ||
-      log.type === "paidleave" ||
-      log.type === "unpaidleave"
-    )
-  ) {
-    return null;
-  }
-  const alignLeft = className.includes("text-left");
-  return (
-    <div className={`${alignLeft ? "text-left" : "text-center"} ${className}`}>
-      <p
-        className={`${alignLeft ? "text-base" : "text-lg"} font-bold ${log.is_half_day == 1 ? "text-orange-600" : ""}`}
-      >
-        {log.is_half_day == 1
-          ? "Half Day"
-          : log.type === "unpaidleave"
-            ? "Unpaid Leave"
-            : "Leave"}
-      </p>
-      {log.is_half_day == 1 && (
-        <span className="inline-flex items-center gap-1 mt-2 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-orange-100 text-orange-700 border border-orange-200">
-          <Sun className="w-3 h-3" />
-          {log.half_day_type === "2nd_half" ? "2nd Half" : "1st Half"}
-        </span>
-      )}
-      {log.leaveType && (
-        <p
-          className={`text-sm text-gray-600 capitalize ${log.is_half_day == 1 ? "mt-2" : "mt-1"}`}
-        >
-          {log.leaveType} Leave
-        </p>
-      )}
-    </div>
-  );
-}
-
 const AttendancePage = () => {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const initialRange = currentMonthRange();
-  const [fromDate, setFromDate] = useState(initialRange.from);
-  const [toDate, setToDate] = useState(initialRange.to);
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [selectedUser, setSelectedUser] = useState("all");
   /** Set only after clicking Search; drives summary + table */
@@ -346,11 +67,7 @@ const AttendancePage = () => {
   const [leaves, setLeaves] = useState([]);
   const [isHolidayModalOpen, setHolidayModalOpen] = useState(false);
   const [breakEditLog, setBreakEditLog] = useState(null);
-  const [breakEditInitialForm, setBreakEditInitialForm] = useState(null);
-  const [breakEditRemark, setBreakEditRemark] = useState("");
   const [breakEditForm, setBreakEditForm] = useState({
-    checkin_time: "",
-    checkout_time: "",
     break_morning_start: "",
     break_morning_end: "",
     break_lunch_start: "",
@@ -370,15 +87,6 @@ const AttendancePage = () => {
   const [editModalLog, setEditModalLog] = useState(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteModalLog, setDeleteModalLog] = useState(null);
-  const [addressMapOpen, setAddressMapOpen] = useState(false);
-  const [addressMapPayload, setAddressMapPayload] = useState(null);
-  const [historyModalLog, setHistoryModalLog] = useState(null);
-  const [editHistoryRefresh, setEditHistoryRefresh] = useState(0);
-
-  const openAddressMap = (payload) => {
-    setAddressMapPayload(payload);
-    setAddressMapOpen(true);
-  };
 
   const logDateKeyForReg = (log) =>
     log?.date ? new Date(log.date).toLocaleDateString("en-CA") : "";
@@ -408,7 +116,6 @@ const AttendancePage = () => {
       }
 
       toast.success("Attendance log updated successfully!");
-      setEditHistoryRefresh((n) => n + 1);
       setEditModalOpen(false);
       setEditModalLog(null);
       fetchAttendance();
@@ -552,9 +259,8 @@ const AttendancePage = () => {
 
   const handleShowAll = () => {
     setFilterStatus("all");
-    const { from, to } = currentMonthRange();
-    setFromDate(from);
-    setToDate(to);
+    setFromDate("");
+    setToDate("");
   };
 
   const handleSearch = () => {
@@ -566,31 +272,20 @@ const AttendancePage = () => {
     }, 120);
   };
 
-  const openAttendanceHistoryModal = (log) => {
-    setHistoryModalLog(log);
-  };
-
   const openBreakEditModal = (log) => {
     setBreakEditLog(log);
-    const form = {
-      checkin_time: timeInputFromDbValue(log.checkin_time),
-      checkout_time: timeInputFromDbValue(log.checkout_time),
+    setBreakEditForm({
       break_morning_start: timeInputFromDbValue(log.break_morning_start),
       break_morning_end: timeInputFromDbValue(log.break_morning_end),
       break_lunch_start: timeInputFromDbValue(log.break_lunch_start),
       break_lunch_end: timeInputFromDbValue(log.break_lunch_end),
       break_evening_start: timeInputFromDbValue(log.break_evening_start),
       break_evening_end: timeInputFromDbValue(log.break_evening_end),
-    };
-    setBreakEditForm(form);
-    setBreakEditInitialForm(form);
-    setBreakEditRemark("");
+    });
   };
 
   const closeBreakEditModal = () => {
     setBreakEditLog(null);
-    setBreakEditInitialForm(null);
-    setBreakEditRemark("");
     setBreakEditSaving(false);
   };
 
@@ -601,33 +296,11 @@ const AttendancePage = () => {
       toast.error("Invalid row.");
       return;
     }
-    const initial = breakEditInitialForm || breakEditForm;
-    const hasChanges = Object.keys(breakEditForm).some(
-      (key) => breakEditForm[key] !== initial[key]
-    );
-    if (!hasChanges) {
-      toast.error("No time changes to save.");
-      return;
-    }
-    const remarkTrimmed = breakEditRemark.trim();
-    if (!remarkTrimmed) {
-      toast.error("Remark is required when changing attendance times.");
-      return;
-    }
     setBreakEditSaving(true);
     try {
       const payload = {
-        edit_remark: remarkTrimmed,
         username: breakEditLog.username,
         date: dateYmd,
-        checkin_time: combineDateAndTimeForDb(
-          dateYmd,
-          breakEditForm.checkin_time
-        ),
-        checkout_time: combineDateAndTimeForDb(
-          dateYmd,
-          breakEditForm.checkout_time
-        ),
         break_morning_start: combineDateAndTimeForDb(
           dateYmd,
           breakEditForm.break_morning_start
@@ -653,7 +326,6 @@ const AttendancePage = () => {
           breakEditForm.break_evening_end
         ),
       };
-
       const res = await fetch("/api/empcrm/attendance/admin-edit-breaks", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -663,10 +335,9 @@ const AttendancePage = () => {
       if (!res.ok) {
         throw new Error(data.message || "Failed to save");
       }
-      toast.success("Attendance times updated.");
-      setEditHistoryRefresh((n) => n + 1);
-      await fetchAttendance();
+      toast.success("Break times updated.");
       closeBreakEditModal();
+      await fetchAttendance();
     } catch (e) {
       toast.error(e.message);
     } finally {
@@ -676,23 +347,6 @@ const AttendancePage = () => {
 
   const generateAttendanceTimeline = (userLogs, user) => {
     const allDates = [];
-
-    // Helper: derive half_day_type from start_time / end_time using standard lunch break (13:00).
-    const deriveHalfDayType = (startTime, endTime) => {
-      const toMin = (t) => {
-        if (!t) return null;
-        const s = String(t).trim();
-        const m = s.match(/^(\d{1,2}):(\d{2})/);
-        if (!m) return null;
-        return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
-      };
-      const LUNCH_MIN = 13 * 60; // 13:00 = standard lunch reference
-      const startMin = toMin(startTime);
-      const endMin = toMin(endTime);
-      if (startMin !== null) return startMin >= LUNCH_MIN ? "2nd_half" : "1st_half";
-      if (endMin !== null) return endMin <= LUNCH_MIN ? "1st_half" : "2nd_half";
-      return null;
-    };
 
     // Determine end date: use toDate if specified, otherwise use today
     const endDate = toDate ? new Date(toDate) : new Date();
@@ -732,91 +386,23 @@ const AttendancePage = () => {
       }
     });
 
-    // Create a separate map of APPROVED half-day leaves (attendance-page only display)
-    // Key: "yyyy-mm-dd" | Value: { is_half_day, half_day_type, leave_type, reason }
-    const halfDayLeaveMap = new Map();
-    leaves
-      .filter(leave => leave.username === user && (leave.is_half_day == 1 || leave.leave_type === 'half-day'))
-      .forEach((leave) => {
-        const fromDate = new Date(leave.from_date);
-        const toDate = new Date(leave.to_date);
-        const derived = deriveHalfDayType(leave.start_time, leave.end_time);
-        for (let d = new Date(fromDate); d <= toDate; d.setDate(d.getDate() + 1)) {
-          halfDayLeaveMap.set(d.toLocaleDateString("en-CA"), {
-            is_half_day: leave.is_half_day,
-            half_day_type: leave.half_day_type || derived,
-            leave_type: leave.leave_type,
-            reason: leave.reason,
-          });
-        }
-      });
-
-    // Create a map of paid leaves (both full-day and half-day) — used to override timing display
-    const paidLeaveMap = new Map();
-    leaves
-      .filter(leave => leave.username === user && leave.leave_type === 'paid')
-      .forEach((leave) => {
-        const fromD = new Date(leave.from_date);
-        const toD = new Date(leave.to_date);
-        for (let d = new Date(fromD); d <= toD; d.setDate(d.getDate() + 1)) {
-          paidLeaveMap.set(d.toLocaleDateString("en-CA"), leave);
-        }
-      });
-
     for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
       const dateString = d.toLocaleDateString("en-CA");
       const existingLog = dateMap.get(dateString);
       const isWeekend = d.getDay() === 0;
       const isHoliday = holidayMap.has(dateString);
       const isOnLeave = leaveMap.has(dateString);
-      const approvedHalfDay = halfDayLeaveMap.get(dateString) || null;
-      const approvedPaidLeave = paidLeaveMap.get(dateString) || null;
 
       const hasRealPunch =
         existingLog && rowHasMeaningfulCheckinOrCheckout(existingLog);
 
-      // If paid leave exists for this date — display logic:
-      //   If attendance punch logs exist → Half-Day Leave (worked half-day + leave half).
-      //   No punches → Full leave as usual.
-      if (approvedPaidLeave) {
-        const leaveIsHalfDay = approvedPaidLeave.is_half_day == 1 || approvedPaidLeave.leave_type === 'half-day';
-        const treatAsHalfDay = hasRealPunch || leaveIsHalfDay;
-        const derivedType = deriveHalfDayType(approvedPaidLeave.start_time, approvedPaidLeave.end_time);
-        const finalHalfType = approvedPaidLeave.half_day_type || derivedType || (hasRealPunch ? "1st_half" : "1st_half");
-        allDates.push({
-          ...(existingLog ? { ...existingLog } : {}),
-          username: existingLog?.username || user,
-          date: d.toISOString(),
-          type: "paidleave",
-          leaveType: "Paid",
-          leaveReason: approvedPaidLeave.reason || null,
-          is_half_day: treatAsHalfDay ? 1 : 0,
-          half_day_type: treatAsHalfDay ? finalHalfType : null,
-          has_punch_on_leave: hasRealPunch ? 1 : 0,
-        });
-      } else if (hasRealPunch) {
-        allDates.push({ ...existingLog, type: "present", workedSunday: isWeekend, approvedHalfDay });
+      if (hasRealPunch) {
+        allDates.push({ ...existingLog, type: "present" });
       } else {
         const base = existingLog
           ? { ...existingLog, username: existingLog.username || user }
           : { username: user };
-        if (isOnLeave) {
-          const leaveInfo = leaveMap.get(dateString);
-          const isUnpaid = leaveInfo?.leave_type === "unpaid";
-          const leaveIsHalfDay = leaveInfo?.is_half_day == 1 || leaveInfo?.leave_type === 'half-day';
-          const derivedType = deriveHalfDayType(leaveInfo?.start_time, leaveInfo?.end_time);
-          const finalHalfType = leaveInfo?.half_day_type || derivedType;
-          allDates.push({
-            ...base,
-            date: d.toISOString(),
-            type: isUnpaid ? "unpaidleave" : "leave",
-            leaveType: leaveInfo?.leave_type || "Leave",
-            leaveReason: leaveInfo?.reason || null,
-            is_half_day: leaveIsHalfDay ? 1 : 0,
-            half_day_type: leaveIsHalfDay ? finalHalfType : null,
-            has_punch_on_leave: 0,
-          });
-        } else if (isHoliday) {
+        if (isHoliday) {
           const holidayInfo = holidayMap.get(dateString);
           allDates.push({
             ...base,
@@ -845,6 +431,16 @@ const AttendancePage = () => {
               type: "absent",
             });
           }
+        } else if (isOnLeave) {
+          const leaveInfo = leaveMap.get(dateString);
+          const isUnpaid = leaveInfo?.leave_type === "unpaid";
+          allDates.push({
+            ...base,
+            date: d.toISOString(),
+            type: isUnpaid ? "absent" : "leave",
+            leaveType: leaveInfo?.leave_type || "Leave",
+            leaveReason: leaveInfo?.reason || null,
+          });
         } else {
           allDates.push({
             ...base,
@@ -876,111 +472,67 @@ const AttendancePage = () => {
     fullTimeline = generateAttendanceTimeline(userLogs, appliedUserSelection).reverse();
   }
 
-  const timelineLogKey = (log) =>
-    `${log.username}|${toYmd(new Date(log.date))}`;
+  // Apply filters to the complete timeline
+  const filteredLogs = fullTimeline.filter((log) => {
+    // Date range filter is already applied in date generation
+    let matchesFilter = true;
 
-  const inSelectedDateRange = (log) => {
-    const logYmd = toYmd(new Date(log.date));
-    if (fromDate && logYmd < fromDate) return false;
-    if (toDate && logYmd > toDate) return false;
-    return true;
-  };
+    if (filterStatus === "late") {
+      // Show only RED late status (09:46-09:59 or 18:14), NOT grace period or half day
+      const checkinStatus = getCheckinStatus(log.checkin_time, log.username);
+      const checkoutStatus = getCheckoutStatus(log.checkout_time, log.username);
+      matchesFilter =
+        log.type === "present" &&
+        (checkinStatus === 'late' || checkoutStatus === 'late');
+    } else if (filterStatus === "onTime") {
+      // Show green on time AND orange grace period (NOT red late or yellow half day)
+      const checkinStatus = getCheckinStatus(log.checkin_time, log.username);
+      const checkoutStatus = getCheckoutStatus(log.checkout_time, log.username);
+      matchesFilter =
+        log.type === "present" &&
+        checkinStatus !== 'late' &&
+        checkinStatus !== 'halfDay' &&
+        checkoutStatus !== 'late' &&
+        checkoutStatus !== 'halfDay';
+    } else if (filterStatus === "halfDay") {
+      // Show half-days considering grace period logic (first 3 grace days not counted)
+      matchesFilter = log.type === "present" && isHalfDay(log);
+    } else if (filterStatus === "all") {
+      matchesFilter = true;
+    }
 
-  const dateRangedTimeline = fullTimeline.filter(inSelectedDateRange);
+    return matchesFilter;
+  });
 
-  const { summary, halfDayKeys } = (() => {
-    const sorted = [...dateRangedTimeline].sort(
-      (a, b) => new Date(a.date) - new Date(b.date),
-    );
-    const halfDayKeys = new Set();
-    const acc = {
-      present: 0,
-      absents: 0,
-      leaves: 0,
-      holidays: 0,
-      sundays: 0,
-      halfDays: 0,
-      lateDays: 0,
-    };
-    const graceCounters = {};
+  // Sort filteredLogs chronologically for grace counter to work correctly
+  const chronologicallySortedLogs = [...filteredLogs].sort(
+    (a, b) => new Date(a.date) - new Date(b.date)
+  );
 
-    for (const log of sorted) {
+  const summary = chronologicallySortedLogs.reduce(
+    (acc, log) => {
       if (log.type === "absent") acc.absents++;
-      if (
-        log.type === "leave" ||
-        log.type === "paidleave" ||
-        log.type === "unpaidleave"
-      ) {
-        if (log.is_half_day == 1) {
-          if (isPaidLeaveRow(log)) {
-            acc.leaves += 0.5;
-            acc.present += 0.5;
-            if (
-              logShowsAttendancePunchDetails(log) &&
-              isLateDaySummary(log, rulesFor(log.username))
-            ) {
-              acc.lateDays++;
-            }
-          } else {
-            acc.halfDays++;
-            halfDayKeys.add(timelineLogKey(log));
-          }
-        } else {
-          acc.leaves += 1;
-        }
-      }
+      if (log.type === "leave") acc.leaves++;
       if (log.type === "holiday") acc.holidays++;
       if (log.type === "sunday") acc.sundays++;
       if (log.type === "present") {
         acc.present++;
+        // Use grace period logic: first 3 grace period days (15 min late) are NOT half-days
         const username = log.username;
-        if (!graceCounters[username]) {
-          graceCounters[username] = 0;
+        if (!acc.graceCounters[username]) {
+          acc.graceCounters[username] = 0;
         }
-        const { isHalfDay: halfDayFlag, graceUsed } = isHalfDayWithGrace(
-          log,
-          rulesFor(username),
-          graceCounters[username],
-        );
-        graceCounters[username] = graceUsed;
-        if (halfDayFlag) {
-          acc.halfDays++;
-          halfDayKeys.add(timelineLogKey(log));
-        }
+        const { isHalfDay, graceUsed } = isHalfDayWithGrace(log, rulesFor(username), acc.graceCounters[username]);
+        acc.graceCounters[username] = graceUsed;
+        if (isHalfDay) acc.halfDays++;
         if (isLateDaySummary(log, rulesFor(log.username))) {
           acc.lateDays++;
         }
       }
-    }
-
-    return { summary: acc, halfDayKeys };
-  })();
-
-  const filteredLogs = dateRangedTimeline.filter((log) => {
-    if (filterStatus === "late") {
-      const checkinStatus = getCheckinStatus(log.checkin_time, log.username);
-      const checkoutStatus = getCheckoutStatus(log.checkout_time, log.username);
-      return (
-        logShowsAttendancePunchDetails(log) &&
-        (checkinStatus === "late" || checkoutStatus === "late")
-      );
-    }
-    if (filterStatus === "onTime") {
-      const checkinStatus = getCheckinStatus(log.checkin_time, log.username);
-      const checkoutStatus = getCheckoutStatus(log.checkout_time, log.username);
-      return (
-        logShowsAttendancePunchDetails(log) &&
-        checkinStatus !== "late" &&
-        checkinStatus !== "halfDay" &&
-        checkoutStatus !== "late" &&
-        checkoutStatus !== "halfDay"
-      );
-    }
-    if (filterStatus === "halfDay") {
-      return halfDayKeys.has(timelineLogKey(log));
-    }
-    return true;
-  });
+      return acc;
+    },
+    { present: 0, absents: 0, leaves: 0, holidays: 0, sundays: 0, halfDays: 0, lateDays: 0, graceCounters: {} }
+  );
 
   const handleDownload = async () => {
     if (appliedUserSelection == null) {
@@ -995,8 +547,6 @@ const AttendancePage = () => {
       worksheet.columns = [
         { header: "Date", key: "Date", width: 15 },
         { header: "User", key: "User", width: 20 },
-        { header: "Emp ID", key: "EmpId", width: 12 },
-        { header: "Machine code", key: "MachineCode", width: 14 },
         { header: "Type", key: "Type", width: 12 },
         { header: "Checkin", key: "Checkin", width: 12 },
         { header: "Checkin Photo", key: "CheckinPhoto", width: 30 },
@@ -1006,7 +556,6 @@ const AttendancePage = () => {
         { header: "Evening Break", key: "EveningBreak", width: 20 },
         { header: "Checkin Address", key: "CheckinAddress", width: 30 },
         { header: "Checkout Address", key: "CheckoutAddress", width: 30 },
-        { header: "Admin Remark", key: "AdminRemark", width: 36 },
       ];
 
       // Map and add rows
@@ -1014,8 +563,6 @@ const AttendancePage = () => {
         worksheet.addRow({
           Date: new Date(log.date).toLocaleDateString(),
           User: log.username,
-          EmpId: log.employee_id ?? "",
-          MachineCode: log.machine_code || "",
           Type: log.type === "present" ? "Present" : log.type === "absent" ? "Absent" : log.type === "leave" ? "Leave" : "Holiday",
           Checkin: log.checkin_time ? formatTime(log.checkin_time) : "",
           CheckinPhoto: log.checkin_photo || "",
@@ -1031,7 +578,6 @@ const AttendancePage = () => {
             : "",
           CheckinAddress: log.checkin_address || "",
           CheckoutAddress: log.checkout_address || "",
-          AdminRemark: log.admin_time_edit_remark || "",
         });
       });
 
@@ -1065,8 +611,8 @@ const AttendancePage = () => {
 
   return (
     <>
-      <div className="w-full py-2 sm:py-4">
-        <div className="bg-white shadow-md rounded-lg p-4 sm:p-5 mb-4 sm:mb-6">
+      <div className="container mx-auto p-4 md:p-8 max-w-7xl">
+        <div className="bg-white shadow-md rounded-lg p-6 mb-6">
           <h1 className="text-3xl font-bold text-gray-900 mb-4 text-center">
             Attendance details
           </h1>
@@ -1125,25 +671,17 @@ const AttendancePage = () => {
           <div className="grid grid-cols-2 md:grid-cols-7 gap-4 mb-8 text-center">
             <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
               <p className="text-2xl font-bold text-green-600">
-                {formatLeaveSummaryDays(summary.present)}
+                {summary.present}
               </p>
               <p className="text-sm text-gray-500">Present</p>
-              <p className="text-[11px] text-gray-400 mt-0.5">
-                Full day punch = 1; paid half-day work = 0.5
-              </p>
             </div>
             <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
               <p className="text-2xl font-bold text-orange-600">{summary.absents}</p>
               <p className="text-sm text-gray-500">Absent</p>
             </div>
             <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
-              <p className="text-2xl font-bold text-blue-600">
-                {formatLeaveSummaryDays(summary.leaves)}
-              </p>
+              <p className="text-2xl font-bold text-blue-600">{summary.leaves}</p>
               <p className="text-sm text-gray-500">Leaves</p>
-              <p className="text-[11px] text-gray-400 mt-0.5">
-                Full day = 1, paid half-day = 0.5
-              </p>
             </div>
             <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
               <p className="text-2xl font-bold text-purple-600">
@@ -1203,35 +741,30 @@ const AttendancePage = () => {
               </div>
             </div>
 
-            <div className="flex flex-col items-stretch gap-2 w-full md:w-auto md:items-end">
-              <div className="flex flex-wrap items-center justify-end gap-2">
+            <div className="flex flex-wrap gap-2">
               <button
                 onClick={handleShowAll}
-                className={`px-4 py-2 rounded-md font-medium text-sm transition-colors duration-200 ${filterStatus === "all"
+                className={`px-4 py-2 rounded-md font-medium text-sm transition-colors duration-200 ${filterStatus === "all" && !fromDate && !toDate
                   ? "bg-blue-600 text-white shadow-md"
                   : "bg-gray-200 text-gray-700 hover:bg-gray-300"
                   }`}
               >
                 Show All
               </button>
-              <div className="flex flex-row items-center gap-2 shrink-0">
-              <TypeableDateFilterInput
+              <input
+                type="date"
                 value={fromDate}
-                onChange={setFromDate}
+                onChange={(e) => setFromDate(e.target.value)}
                 placeholder="From Date"
-                wrapperClassName="relative flex w-[10.5rem] sm:w-36 shrink-0 items-stretch"
-                className="px-3 py-2 w-full border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="px-4 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-              <TypeableDateFilterInput
+              <input
+                type="date"
                 value={toDate}
-                onChange={setToDate}
+                onChange={(e) => setToDate(e.target.value)}
                 placeholder="To Date"
-                wrapperClassName="relative flex w-[10.5rem] sm:w-36 shrink-0 items-stretch"
-                className="px-3 py-2 w-full border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="px-4 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-              </div>
-              </div>
-              <div className="flex flex-wrap items-center justify-end gap-2">
               <button
                 onClick={() => setFilterStatus("late")}
                 className={`px-4 py-2 rounded-md font-medium text-sm transition-colors duration-200 ${filterStatus === "late"
@@ -1265,7 +798,6 @@ const AttendancePage = () => {
               >
                 Download
               </button>
-              </div>
             </div>
           </div>
             </>
@@ -1282,64 +814,30 @@ const AttendancePage = () => {
                   key={index}
                   className={`rounded-lg shadow-md p-4 space-y-2 ${log.type === "absent"
                     ? "bg-orange-50"
-                    : log.type === "leave" || log.type === "paidleave" || log.type === "unpaidleave"
+                    : log.type === "leave"
                       ? "bg-blue-50"
                       : log.type === "sunday"
                         ? "bg-purple-50"
                         : log.type === "holiday"
                           ? "bg-indigo-50"
-                          : log.workedSunday
-                            ? "bg-pink-200"
-                            : "bg-white"
+                          : "bg-white"
                     }`}
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-semibold text-gray-900">
                       Date:
                     </span>
-                    <span className="text-sm text-gray-700 flex flex-col items-end gap-1.5">
-                      <span className="flex items-center gap-1.5">
-                        {new Date(log.date).toLocaleDateString()}
-                        {log.workedSunday && (
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-purple-100 text-purple-700 border border-purple-200">
-                            Working Sunday
-                          </span>
-                        )}
-                      </span>
-                      {log.approvedHalfDay && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-orange-100 text-orange-700 border border-orange-200">
-                          <Sun className="w-3 h-3" />
-                          Half-Day · {log.approvedHalfDay.half_day_type === "1st_half" ? "1st Half" : "2nd Half"}
-                        </span>
-                      )}
+                    <span className="text-sm text-gray-700">
+                      {new Date(log.date).toLocaleDateString()}
                     </span>
                   </div>
-                  {(log.type === "leave" ||
-                    log.type === "paidleave" ||
-                    log.type === "unpaidleave") && (
-                    <div className="rounded-md bg-blue-50/80 px-3 py-2">
-                      <LeaveDayStatusBlock log={log} className="text-left" />
-                    </div>
-                  )}
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-semibold text-gray-900">
                       User:
                     </span>
-                    <span className="text-sm text-gray-700 text-right">
-                      {log.username}
-                      {log.employee_id != null ? (
-                        <span className="block text-xs text-gray-500">
-                          Emp ID: {log.employee_id}
-                        </span>
-                      ) : null}
-                      {log.machine_code ? (
-                        <span className="block text-xs text-gray-500">
-                          Machine: {log.machine_code}
-                        </span>
-                      ) : null}
-                    </span>
+                    <span className="text-sm text-gray-700">{log.username}</span>
                   </div>
-                  {logShowsAttendancePunchDetails(log) ? (
+                  {log.type === "present" ? (
                     <>
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-semibold text-gray-900">
@@ -1356,30 +854,16 @@ const AttendancePage = () => {
                           })()
                             }`}
                         >
-                          <span className="inline-flex items-center gap-0.5">
-                            {formatTime(log.checkin_time)}
-                            <AttendanceSourceInfo log={log} />
-                          </span>
+                          {formatTime(log.checkin_time)}
                         </span>
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-semibold text-gray-900">
                           Check-in Address:
                         </span>
-                        {isMachineAttendanceAddress(log.checkin_address) ? (
-                          <span className="text-sm font-medium text-indigo-700">
-                            {MACHINE_ATTENDANCE_ADDRESS}
-                          </span>
-                        ) : (
-                          <ViewAddressLink
-                            title={`Check-in — ${log.username}`}
-                            address={log.checkin_address}
-                            latitude={log.checkin_latitude}
-                            longitude={log.checkin_longitude}
-                            onOpen={openAddressMap}
-                            className="text-sm"
-                          />
-                        )}
+                        <span className="text-sm text-gray-700">
+                          {log.checkin_address}
+                        </span>
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-semibold text-gray-900">
@@ -1439,9 +923,6 @@ const AttendancePage = () => {
                         </span>
                         <span
                           className={`text-sm ${(() => {
-                            if (isAutomaticCheckoutAddress(log.checkout_address)) {
-                              return "text-red-600 font-bold";
-                            }
                             const status = getCheckoutStatus(log.checkout_time, log.username);
                             // Early checkout or missing checkout always shows as half-day for display
                             const isHalfDayStatus = isHalfDay(log);
@@ -1452,7 +933,7 @@ const AttendancePage = () => {
                           })()
                             }`}
                         >
-                          <CheckoutTimeDisplay log={log} />
+                          {formatTime(log.checkout_time)}
                         </span>
                       </div>
                       <div className="flex items-center justify-between gap-2">
@@ -1460,12 +941,9 @@ const AttendancePage = () => {
                           Check-out Address:
                         </span>
                         <span className="text-sm text-gray-700 flex items-center gap-1.5 justify-end text-right min-w-0">
-                          <CheckoutAddressCell
-                            log={log}
-                            title={`Check-out — ${log.username}`}
-                            onOpen={openAddressMap}
-                            className="text-sm"
-                          />
+                          <span className="truncate">
+                            {log.checkout_address || "—"}
+                          </span>
                           {log.regularization ? (
                             <span className="relative inline-flex shrink-0 group/regm">
                               <Info
@@ -1498,14 +976,6 @@ const AttendancePage = () => {
                           ) : null}
                         </span>
                       </div>
-                      {log.admin_time_edit_remark ? (
-                        <div className="rounded-md bg-red-50 border border-red-100 px-3 py-2">
-                          <p className="text-xs font-semibold text-red-800 mb-1">
-                            Admin remark
-                          </p>
-                          <AdminTimeEditRemark remark={log.admin_time_edit_remark} />
-                        </div>
-                      ) : null}
                       <div className="pt-2 border-t border-gray-100 space-y-2">
                             {/* <button
                               type="button"
@@ -1515,25 +985,14 @@ const AttendancePage = () => {
                               <Pencil className="h-4 w-4" aria-hidden />
                               Edit Log
                             </button> */}
-                            <div className="flex gap-2">
-                              <button
-                                type="button"
-                                onClick={() => openBreakEditModal(log)}
-                                className="inline-flex flex-1 items-center justify-center gap-2 rounded-md border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100"
-                              >
-                                <Pencil className="h-4 w-4" aria-hidden />
-                                Edit times
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => openAttendanceHistoryModal(log)}
-                                className="inline-flex items-center justify-center rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-700 hover:bg-slate-50"
-                                title="View edit history"
-                                aria-label="View edit history"
-                              >
-                                <History className="h-4 w-4" aria-hidden />
-                              </button>
-                            </div>
+                            <button
+                              type="button"
+                              onClick={() => openBreakEditModal(log)}
+                              className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100"
+                            >
+                              <Pencil className="h-4 w-4" aria-hidden />
+                              Edit Break Times
+                            </button>
                             {/* <button
                               type="button"
                               onClick={() => openDeleteDialog(log)}
@@ -1548,32 +1007,14 @@ const AttendancePage = () => {
                     </>
                   ) : (
                     <div className="text-center py-4">
-                      {(log.type === "leave" || log.type === "paidleave" || log.type === "unpaidleave") ? (
-                        <>
-                          <p className={`text-lg font-bold ${log.is_half_day == 1 ? "text-orange-600" : ""}`}>
-                            {log.is_half_day == 1
-                              ? "Half Day"
-                              : log.type === "unpaidleave"
-                                ? "Unpaid Leave"
-                                : "Leave"}
-                          </p>
-                          {log.is_half_day == 1 && (
-                            <span className="inline-flex items-center gap-1 mt-2 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-orange-100 text-orange-700 border border-orange-200">
-                              <Sun className="w-3 h-3" />
-                              {log.half_day_type === "2nd_half" ? "2nd Half" : "1st Half"}
-                            </span>
-                          )}
-                          {log.leaveType && (
-                            <p className="text-sm text-gray-600 mt-2 capitalize">{log.leaveType} Leave</p>
-                          )}
-                        </>
-                      ) : (
-                        <p className="text-lg font-bold">
-                          {log.type === "absent" ? "Absent" : log.type === "sunday" ? "Sunday" : "Holiday"}
-                        </p>
-                      )}
-                      {!(log.type === "leave" || log.type === "paidleave" || log.type === "unpaidleave") && log.leaveType && (
+                      <p className="text-lg font-bold">
+                        {log.type === "absent" ? "Absent" : log.type === "leave" ? "Leave" : log.type === "sunday" ? "Sunday" : "Holiday"}
+                      </p>
+                      {log.leaveType && (
                         <p className="text-sm text-gray-600 mt-1 capitalize">{log.leaveType} Leave</p>
+                      )}
+                      {log.leaveReason && (
+                        <p className="text-xs text-gray-500 mt-1">{log.leaveReason}</p>
                       )}
                       {log.holidayTitle && log.holidayTitle !== "Weekend" && log.holidayTitle !== "Sunday" && (
                         <p className="text-sm text-gray-600 mt-1">{log.holidayTitle}</p>
@@ -1611,17 +1052,8 @@ const AttendancePage = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Date
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[200px]">
-                    Leave / Status
-                  </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     User
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Emp ID
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Machine code
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Check-in
@@ -1647,9 +1079,6 @@ const AttendancePage = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Check-out Address
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[140px]">
-                    Remark
-                  </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Actions
                   </th>
@@ -1660,48 +1089,18 @@ const AttendancePage = () => {
                   filteredLogs.map((log, index) => (
                     <tr
                       key={index}
-                      className={`transition-colors duration-150 ${log.workedSunday ? "bg-pink-200 hover:bg-pink-300" : "hover:bg-gray-50"}`}
+                      className="hover:bg-gray-50 transition-colors duration-150"
                     >
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                         {new Date(log.date).toLocaleDateString()}
-                        {log.workedSunday && (
-                          <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-purple-100 text-purple-700 border border-purple-200">
-                            Working Sunday
-                          </span>
-                        )}
-                        {log.approvedHalfDay && (
-                          <span className="ml-2 mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-orange-100 text-orange-700 border border-orange-200">
-                            <Sun className="w-3 h-3" />
-                            Half-Day · {log.approvedHalfDay.half_day_type === "1st_half" ? "1st Half" : "2nd Half"}
-                          </span>
-                        )}
-                      </td>
-                      <td
-                        className={`px-4 py-4 text-sm align-top max-w-xs ${
-                          log.type === "leave" ||
-                          log.type === "paidleave" ||
-                          log.type === "unpaidleave"
-                            ? "bg-blue-50/80"
-                            : ""
-                        }`}
-                      >
-                        <LeaveDayStatusBlock log={log} className="text-left" />
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {log.username}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {log.employee_id != null && log.employee_id !== ""
-                          ? log.employee_id
-                          : "—"}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {log.machine_code || "—"}
-                      </td>
-                      {logShowsAttendancePunchDetails(log) ? (
+                      {log.type === "present" ? (
                         <>
                           <td
-                            className={`relative overflow-visible px-6 py-4 whitespace-nowrap text-sm text-gray-500 ${(() => {
+                            className={`px-6 py-4 whitespace-nowrap text-sm text-gray-500 ${(() => {
                               const status = getCheckinStatus(log.checkin_time, log.username);
                               if (status === 'halfDay') return 'bg-yellow-100';
                               if (status === 'late') return 'bg-red-100';
@@ -1711,10 +1110,7 @@ const AttendancePage = () => {
                             })()
                               }`}
                           >
-                            <span className="inline-flex items-center gap-0.5">
-                              {formatTime(log.checkin_time)}
-                              <AttendanceSourceInfo log={log} />
-                            </span>
+                            {formatTime(log.checkin_time)}
                           </td>
                           <td className="px-6 py-4 text-sm text-gray-500">
                             {log.checkin_photo ? (
@@ -1735,20 +1131,13 @@ const AttendancePage = () => {
                               <span className="text-gray-400 italic">No photo</span>
                             )}
                           </td>
-                          <td className="px-6 py-4 text-sm text-gray-500">
-                            {isMachineAttendanceAddress(log.checkin_address) ? (
-                              <span className="font-medium text-indigo-700">
-                                {MACHINE_ATTENDANCE_ADDRESS}
-                              </span>
-                            ) : (
-                              <ViewAddressLink
-                                title={`Check-in — ${log.username} (${attendanceDateYmd(log.date)})`}
-                                address={log.checkin_address}
-                                latitude={log.checkin_latitude}
-                                longitude={log.checkin_longitude}
-                                onOpen={openAddressMap}
-                              />
-                            )}
+                          <td className="px-6 py-4 text-sm text-gray-500 relative group">
+                            <span className="underline cursor-help">
+                              View Address
+                            </span>
+                            <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-3 py-1 bg-gray-800 text-white text-xs rounded-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
+                              {log.checkin_address}
+                            </span>
                           </td>
                           <td
                             className={`px-6 py-4 whitespace-nowrap text-sm text-gray-500 ${(() => {
@@ -1785,9 +1174,6 @@ const AttendancePage = () => {
                           </td>
                           <td
                             className={`px-6 py-4 whitespace-nowrap text-sm text-gray-500 ${(() => {
-                              if (isAutomaticCheckoutAddress(log.checkout_address)) {
-                                return "bg-red-100 text-red-700 font-bold";
-                              }
                               const status = getCheckoutStatus(log.checkout_time, log.username);
                               if (status === 'halfDay') return 'bg-yellow-100';
                               if (status === 'late') return 'bg-red-100';
@@ -1797,15 +1183,18 @@ const AttendancePage = () => {
                             })()
                               }`}
                           >
-                            <CheckoutTimeDisplay log={log} />
+                            {formatTime(log.checkout_time)}
                           </td>
                           <td className="px-6 py-4 text-sm text-gray-500">
                             <div className="flex flex-wrap items-center gap-1.5">
-                              <CheckoutAddressCell
-                                log={log}
-                                title={`Check-out — ${log.username} (${attendanceDateYmd(log.date)})`}
-                                onOpen={openAddressMap}
-                              />
+                              <span className="relative group/coaddr inline-block">
+                                <span className="underline cursor-help">
+                                  View Address
+                                </span>
+                                <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-3 py-1 bg-gray-800 text-white text-xs rounded-md max-w-sm whitespace-normal opacity-0 group-hover/coaddr:opacity-100 transition-opacity duration-200 pointer-events-none z-10">
+                                  {log.checkout_address || "—"}
+                                </span>
+                              </span>
                               {log.regularization ? (
                                 <span className="relative inline-flex group/coreg">
                                   <Info
@@ -1838,9 +1227,6 @@ const AttendancePage = () => {
                               ) : null}
                             </div>
                           </td>
-                          <td className="px-6 py-4 text-sm max-w-[220px] align-top">
-                            <AdminTimeEditRemark remark={log.admin_time_edit_remark} />
-                          </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm">
                             <div className="flex flex-wrap gap-2">
                               {/* <button
@@ -1856,19 +1242,10 @@ const AttendancePage = () => {
                                 type="button"
                                 onClick={() => openBreakEditModal(log)}
                                 className="inline-flex items-center gap-1 rounded-md border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-100"
-                                title="Edit check-in, check-out, and break times"
+                                title="Edit morning, lunch, evening break times"
                               >
                                 <Pencil className="h-3.5 w-3.5" aria-hidden />
-                                Edit
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => openAttendanceHistoryModal(log)}
-                                className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                                title="View edit history"
-                                aria-label="View edit history"
-                              >
-                                <History className="h-3.5 w-3.5" aria-hidden />
+                                Edit Breaks
                               </button>
                               {/* <button
                                 type="button"
@@ -1886,30 +1263,24 @@ const AttendancePage = () => {
                         </>
                       ) : (
                         <td
-                          colSpan="8"
+                          colSpan="9"
                           className={`px-6 py-4 text-center ${log.type === "absent"
                             ? "bg-orange-50 text-orange-700"
                             : log.type === "leave"
                               ? "bg-blue-50 text-blue-700"
-                              : log.type === "paidleave" || log.type === "unpaidleave"
-                                ? "bg-blue-50 text-blue-700"
                               : log.type === "sunday"
                                 ? "bg-purple-50 text-purple-700"
                                 : "bg-indigo-50 text-indigo-700"
                             }`}
                         >
-                          {(log.type === "leave" ||
-                            log.type === "paidleave" ||
-                            log.type === "unpaidleave") ? (
-                            <span className="text-sm text-gray-400">—</span>
-                          ) : (
                           <p className="font-bold text-lg">
-                            {log.type === "absent"
-                              ? "Absent"
-                              : log.type === "sunday"
-                                  ? "Sunday"
-                                  : "Holiday"}
+                            {log.type === "absent" ? "Absent" : log.type === "leave" ? "Leave" : log.type === "sunday" ? "Sunday" : "Holiday"}
                           </p>
+                          {log.leaveType && (
+                            <p className="text-sm mt-1 capitalize">{log.leaveType} Leave</p>
+                          )}
+                          {log.leaveReason && (
+                            <p className="text-xs text-gray-500 mt-1">{log.leaveReason}</p>
                           )}
                           {log.holidayTitle && log.holidayTitle !== "Weekend" && log.holidayTitle !== "Sunday" && (
                             <p className="text-sm mt-1">{log.holidayTitle}</p>
@@ -1930,20 +1301,12 @@ const AttendancePage = () => {
                           )}
                         </td>
                       )}
-                      {!logShowsAttendancePunchDetails(log) ? (
-                        <>
-                          <td className="px-6 py-4 text-sm max-w-[220px] align-top">
-                            <AdminTimeEditRemark remark={log.admin_time_edit_remark} />
-                          </td>
-                          <td className="px-6 py-4 text-sm text-gray-400">—</td>
-                        </>
-                      ) : null}
                     </tr>
                   ))
                 ) : (
                   <tr>
                     <td
-                      colSpan="15"
+                      colSpan="11"
                       className="px-6 py-4 text-center text-gray-500"
                     >
                       No attendance logs found for the selected filter.
@@ -1959,13 +1322,13 @@ const AttendancePage = () => {
       {breakEditLog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div
-            className="bg-white rounded-lg shadow-lg w-full max-w-lg max-h-[90vh] overflow-y-auto p-4"
+            className="bg-white rounded-lg shadow-lg w-full max-w-md max-h-[90vh] overflow-y-auto p-4"
             role="dialog"
             aria-labelledby="break-edit-title"
           >
             <div className="flex items-center justify-between mb-3">
               <h3 id="break-edit-title" className="text-lg font-semibold">
-                Edit attendance times
+                Edit break times
               </h3>
               <button
                 type="button"
@@ -1982,92 +1345,37 @@ const AttendancePage = () => {
             </p>
             <p className="text-xs text-gray-500 mb-3">
               Leave a field empty to clear that time. Times use the attendance
-              date (IST). If you change check-in or check-out, the address is
-              saved as Admin (no GPS).
+              date (IST).
             </p>
-            <div className="space-y-4">
+            <div className="space-y-3">
               {[
-                {
-                  section: null,
-                  fields: [
-                    ["Check-in", "checkin_time"],
-                    ["Check-out", "checkout_time"],
-                  ],
-                },
-                {
-                  section: "Morning break",
-                  fields: [
-                    ["Start", "break_morning_start"],
-                    ["End", "break_morning_end"],
-                  ],
-                },
-                {
-                  section: "Lunch break",
-                  fields: [
-                    ["Start", "break_lunch_start"],
-                    ["End", "break_lunch_end"],
-                  ],
-                },
-                {
-                  section: "Evening break",
-                  fields: [
-                    ["Start", "break_evening_start"],
-                    ["End", "break_evening_end"],
-                  ],
-                },
-              ].map(({ section, fields }) => (
-                <div key={section ?? "punch"}>
-                  {section ? (
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-                      {section}
-                    </p>
-                  ) : null}
-                  <div className="grid grid-cols-2 gap-3">
-                    {fields.map(([label, key]) => (
-                      <label
-                        key={key}
-                        className="flex flex-col gap-1 text-sm font-medium text-gray-700 min-w-0"
-                      >
-                        {label}
-                        <input
-                          type="time"
-                          step={60}
-                          value={breakEditForm[key]}
-                          onChange={(e) =>
-                            setBreakEditForm((f) => ({
-                              ...f,
-                              [key]: e.target.value,
-                            }))
-                          }
-                          className="w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                        />
-                      </label>
-                    ))}
-                  </div>
-                </div>
+                ["Morning break — start", "break_morning_start"],
+                ["Morning break — end", "break_morning_end"],
+                ["Lunch break — start", "break_lunch_start"],
+                ["Lunch break — end", "break_lunch_end"],
+                ["Evening break — start", "break_evening_start"],
+                ["Evening break — end", "break_evening_end"],
+              ].map(([label, key]) => (
+                <label
+                  key={key}
+                  className="flex flex-col gap-1 text-sm font-medium text-gray-700"
+                >
+                  {label}
+                  <input
+                    type="time"
+                    step={60}
+                    value={breakEditForm[key]}
+                    onChange={(e) =>
+                      setBreakEditForm((f) => ({
+                        ...f,
+                        [key]: e.target.value,
+                      }))
+                    }
+                    className="rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </label>
               ))}
             </div>
-            <label className="mt-4 flex flex-col gap-1.5 text-sm font-medium text-gray-700">
-              Remark
-              <span className="text-xs font-normal text-gray-500">
-                Required whenever you change any attendance time.
-              </span>
-              <textarea
-                value={breakEditRemark}
-                onChange={(e) => setBreakEditRemark(e.target.value)}
-                rows={3}
-                maxLength={512}
-                required
-                placeholder="Reason for this change…"
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm font-normal shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-            </label>
-            <AttendanceEditHistoryPanel
-              className="mt-5 pt-4 border-t border-gray-200"
-              username={breakEditLog.username}
-              logDate={attendanceDateYmd(breakEditLog.date)}
-              refreshToken={editHistoryRefresh}
-            />
             <div className="mt-5 flex flex-wrap justify-end gap-2">
               <button
                 type="button"
@@ -2092,55 +1400,6 @@ const AttendancePage = () => {
           </div>
         </div>
       )}
-      {historyModalLog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div
-            className="bg-white rounded-lg shadow-lg w-full max-w-lg max-h-[90vh] overflow-y-auto p-4"
-            role="dialog"
-            aria-labelledby="attendance-history-title"
-          >
-            <div className="flex items-center justify-between mb-3">
-              <h3 id="attendance-history-title" className="text-lg font-semibold">
-                Edit history
-              </h3>
-              <button
-                type="button"
-                onClick={() => setHistoryModalLog(null)}
-                className="text-gray-500 hover:text-gray-800 text-xl leading-none"
-                aria-label="Close"
-              >
-                ✕
-              </button>
-            </div>
-            <p className="text-sm text-gray-600 mb-4">
-              {historyModalLog.username} ·{" "}
-              {new Date(historyModalLog.date).toLocaleDateString()}
-            </p>
-            <AttendanceEditHistoryPanel
-              username={historyModalLog.username}
-              logDate={attendanceDateYmd(historyModalLog.date)}
-              refreshToken={editHistoryRefresh}
-            />
-            <div className="mt-4 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setHistoryModalLog(null)}
-                className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      <AttendanceAddressMapModal
-        open={addressMapOpen}
-        payload={addressMapPayload}
-        onClose={() => {
-          setAddressMapOpen(false);
-          setAddressMapPayload(null);
-        }}
-      />
       <AttendanceRegularizeModal
         open={regModalOpen}
         log={regModalLog}

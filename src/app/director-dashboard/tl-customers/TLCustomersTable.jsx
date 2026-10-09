@@ -1,6 +1,5 @@
 "use client";
 
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useTransition, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -65,7 +64,9 @@ export default function TLCustomersTable({
 
   console.log("customer data ", customers);
 
-  const basePath = "/director-dashboard/tl-customers";
+  const basePath = isAdmin
+    ? "/admin-dashboard/tl-customers"
+    : "/user-dashboard/tl-customers";
 
   // Use allCustomersForKPI for counts, or fallback to customers if not provided
   const customersForKPI =
@@ -645,14 +646,26 @@ export default function TLCustomersTable({
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Next Followup from
                   </label>
-                  <TypeableDateFilterInput value={nextFromDate} onChange={setNextFromDate} placeholder="dd/mm/yyyy" className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                  <input
+                    type="date"
+                    placeholder="dd/mm/yyyy"
+                    value={nextFromDate}
+                    onChange={(e) => setNextFromDate(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Next Followup to
                   </label>
-                  <TypeableDateFilterInput value={nextToDate} onChange={setNextToDate} placeholder="dd/mm/yyyy" className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                  <input
+                    type="date"
+                    placeholder="dd/mm/yyyy"
+                    value={nextToDate}
+                    onChange={(e) => setNextToDate(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
                 </div>
               </div>
 
@@ -1157,7 +1170,7 @@ export default function TLCustomersTable({
                           {latestquote?.quote_number && (
                             <div className="flex justify-end gap-2 mt-5">
                               <a
-                                href={`/director-dashboard/quotations/${latestquote.quote_number}`}
+                                href={`/admin-dashboard/quotations/${latestquote.quote_number}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"

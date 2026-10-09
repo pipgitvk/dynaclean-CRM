@@ -1,6 +1,5 @@
 "use client";
 
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Search, CreditCard } from "lucide-react";
 import toast from "react-hot-toast";
@@ -169,7 +168,12 @@ function PaymentModal({ open, row, onClose, onDone }) {
           {/* Payment date */}
           <div>
             <label className="mb-1.5 block text-xs font-medium text-slate-700">Payment date</label>
-            <TypeableDateFilterInput value={paymentDate} onChange={setPaymentDate} className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm text-slate-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"/>
+            <input
+              type="date"
+              value={paymentDate}
+              onChange={(e) => setPaymentDate(e.target.value)}
+              className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm text-slate-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+            />
           </div>
 
           {/* Payment mode */}

@@ -1,6 +1,5 @@
 "use client";
 
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Search, Users, FileText, IndianRupee, X } from "lucide-react";
@@ -47,21 +46,9 @@ export default function BuyerCards() {
   const [loadingInvoices, setLoadingInvoices] = useState(false);
   const [invoicePage, setInvoicePage] = useState(1);
   const [invoiceTotal, setInvoiceTotal] = useState(0);
-  const invoicePageSize = 10000;
-
-  // Default dates: current month start to end (timezone-safe local date)
-  const formatDateForInput = (date) => {
-    const y = date.getFullYear();
-    const m = String(date.getMonth() + 1).padStart(2, "0");
-    const d = String(date.getDate()).padStart(2, "0");
-    return `${y}-${m}-${d}`;
-  };
-  const now = new Date();
-  const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-
-  const [fromDate, setFromDate] = useState(formatDateForInput(firstDayOfMonth));
-  const [toDate, setToDate] = useState(formatDateForInput(lastDayOfMonth));
+  const invoicePageSize = 50;
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
   const [invoiceSearch, setInvoiceSearch] = useState("");
 
   useEffect(() => {
@@ -308,11 +295,21 @@ export default function BuyerCards() {
               <div className="flex gap-4 flex-wrap items-end">
                 <div>
                   <label className="block text-xs font-semibold text-gray-600 mb-1">From Date</label>
-                  <TypeableDateFilterInput value={fromDate} onChange={setFromDate} className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"/>
+                  <input
+                    type="date"
+                    value={fromDate}
+                    onChange={(e) => setFromDate(e.target.value)}
+                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-gray-600 mb-1">To Date</label>
-                  <TypeableDateFilterInput value={toDate} onChange={setToDate} className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"/>
+                  <input
+                    type="date"
+                    value={toDate}
+                    onChange={(e) => setToDate(e.target.value)}
+                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  />
                 </div>
                 <button
                   onClick={handleFilterChange}
@@ -357,7 +354,7 @@ export default function BuyerCards() {
                           <th className="border p-2 text-left">Buyer Name</th>
                           <th className="border p-2 text-left">GSTIN</th>
                           <th className="border p-2 text-left">Employee</th>
-                          <th className="border p-2 text-left">Invoice Date</th>
+                          <th className="border p-2 text-left">Date</th>
                           <th className="border p-2 text-left">Tax Amount</th>
                           <th className="border p-2 text-left">Taxable Amt</th>
                           <th className="border p-2 text-left">Grand Total</th>
@@ -381,7 +378,7 @@ export default function BuyerCards() {
                                     <td className="border p-2" rowSpan={inv.items.length}>{inv.buyer_name || "-"}</td>
                                     <td className="border p-2" rowSpan={inv.items.length}>{inv.gst_number || "-"}</td>
                                     <td className="border p-2" rowSpan={inv.items.length}>{inv.employee_name || "-"}</td>
-                                    <td className="border p-2" rowSpan={inv.items.length}>{inv.invoice_date ? new Date(inv.invoice_date).toLocaleDateString("en-IN") : inv.created_at ? new Date(inv.created_at).toLocaleDateString("en-IN") : "-"}</td>
+                                    <td className="border p-2" rowSpan={inv.items.length}>{inv.created_at ? new Date(inv.created_at).toLocaleDateString("en-IN") : "-"}</td>
                                     <td className="border p-2 text-right font-semibold" rowSpan={inv.items.length}>₹{Number(inv.tax_amount || 0).toLocaleString('en-IN')}</td>
                                     <td className="border p-2 text-right" rowSpan={inv.items.length}>₹{Number(item.taxable_value || 0).toLocaleString('en-IN')}</td>
                                     <td className="border p-2 text-right font-semibold text-green-600" rowSpan={inv.items.length}>₹{Number(inv.grand_total || 0).toLocaleString('en-IN')}</td>
@@ -402,11 +399,11 @@ export default function BuyerCards() {
                               <td className="border p-2">{inv.buyer_name || "-"}</td>
                               <td className="border p-2">{inv.gst_number || "-"}</td>
                               <td className="border p-2">{inv.employee_name || "-"}</td>
-                              <td className="border p-2">{inv.invoice_date ? new Date(inv.invoice_date).toLocaleDateString("en-IN") : inv.created_at ? new Date(inv.created_at).toLocaleDateString("en-IN") : "-"}</td>
+                              <td className="border p-2">{inv.created_at ? new Date(inv.created_at).toLocaleDateString("en-IN") : "-"}</td>
                               <td className="border p-2 text-right font-semibold">₹{Number(inv.tax_amount || 0).toLocaleString('en-IN')}</td>
                               <td className="border p-2 text-right">₹{Number(0).toLocaleString('en-IN')}</td>
                               <td className="border p-2 text-right font-semibold text-green-600">₹{Number(inv.grand_total || 0).toLocaleString('en-IN')}</td>
-                              <td className="border p-2 text-center text-gray-500" colSpan="6">No items</td>
+                              <td className="border p-2" colSpan="6" className="text-center text-gray-500">No items</td>
                             </tr>
                           )
                         ))}

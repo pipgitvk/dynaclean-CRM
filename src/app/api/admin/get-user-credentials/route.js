@@ -5,7 +5,6 @@ import { getDbConnection } from "@/lib/db";
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret";
 
 export async function POST(request) {
-  console.log("--- API Route Execution Start ---");
   try {
     const { username, password } = await request.json();
     console.log("🟡 Login request received:", username);

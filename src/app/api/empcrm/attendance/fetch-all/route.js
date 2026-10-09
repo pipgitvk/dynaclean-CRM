@@ -7,13 +7,7 @@ import {
   rowToAttendanceRulesShape,
   mergeGlobalRulesWithEmployeeSchedule,
 } from "@/lib/attendanceRulesDb";
-import { ensureAttendanceEditHistoryTable } from "@/lib/ensureAttendanceEditHistoryTable";
-import {
-  loadMachineCodeMaps,
-  loadMachineDailyByUsername,
-  mergeAttendanceListWithMachine,
-} from "@/lib/attendanceMachineMerge";
-import { ensureAttendanceLogsEmployeeColumns } from "@/lib/ensureAttendanceLogsEmployeeColumns";
+
 export const dynamic = 'force-dynamic';
 
 function normalizeUserKey(value) {
@@ -45,8 +39,6 @@ export async function GET(request) {
     console.log(`Fetching all attendance logs for admin view.`);
 
     const db = await getDbConnection();
-    await ensureAttendanceEditHistoryTable(db);
-    await ensureAttendanceLogsEmployeeColumns(db);
     console.log("Database connection established.");
 
     // Query to fetch all attendance logs
@@ -54,9 +46,6 @@ export async function GET(request) {
       `SELECT
       a.date,
       a.username,
-      COALESCE(a.employee_id, r.empId) AS employee_id,
-      COALESCE(NULLIF(TRIM(a.machine_code), ''), NULLIF(TRIM(r.machine_code), '')) AS machine_code,
-      a.admin_time_edit_remark,
       a.checkin_time,
       a.checkout_time,
       a.break_morning_start,
@@ -66,11 +55,7 @@ export async function GET(request) {
       a.break_evening_start,
       a.break_evening_end,
       a.checkin_address,
-      a.checkin_latitude,
-      a.checkin_longitude,
       a.checkout_address,
-      a.checkout_latitude,
-      a.checkout_longitude,
       a.checkin_photo
    FROM attendance_logs a
    INNER JOIN rep_list r
@@ -89,7 +74,7 @@ export async function GET(request) {
 
     // Fetch all approved leaves
     const [leaves] = await db.query(
-      `SELECT username, from_date, to_date, leave_type, reason, is_half_day, half_day_type, start_time, end_time
+      `SELECT username, from_date, to_date, leave_type, reason
        FROM employee_leaves
        WHERE status = 'approved'
        ORDER BY from_date DESC`
@@ -109,8 +94,9 @@ export async function GET(request) {
     const scheduleByUser = new Map(
       (schedules || []).map((s) => [normalizeUserKey(s.username), s])
     );
+    const uniqueUsernames = [...new Set(rows.map((r) => r.username))];
     const rulesByUsername = {};
-    for (const u of [...new Set(rows.map((r) => r.username))]) {
+    for (const u of uniqueUsernames) {
       const schedule =
         scheduleByUser.get(normalizeUserKey(u)) || null;
       rulesByUsername[u] = mergeGlobalRulesWithEmployeeSchedule(
@@ -148,56 +134,13 @@ export async function GET(request) {
       console.warn("attendance regularization metadata skipped:", e.message);
     }
 
-    const { machineCodeToUsername } = await loadMachineCodeMaps(db);
-    const machineByUserDate = await loadMachineDailyByUsername(
-      db,
-      machineCodeToUsername
-    );
-    const mergedRows = mergeAttendanceListWithMachine(rows, machineByUserDate);
-
-    const [idRows] = await db.query(
-      `SELECT username, empId, TRIM(machine_code) AS machine_code
-       FROM rep_list WHERE status = 1`
-    );
-    const idsByUser = new Map(
-      (idRows || []).map((r) => [
-        r.username,
-        {
-          employee_id: r.empId ?? null,
-          machine_code: String(r.machine_code || "").trim() || null,
-        },
-      ])
-    );
-
-    for (const row of mergedRows) {
+    for (const row of rows) {
       const dk = attendanceDateKey(row.date);
       const meta = regMap.get(`${row.username}|${dk}`);
       row.regularization = meta || null;
-      const ids = idsByUser.get(row.username);
-      if (ids) {
-        if (row.employee_id == null) row.employee_id = ids.employee_id;
-        if (!row.machine_code) row.machine_code = ids.machine_code;
-      }
     }
 
-    const uniqueUsernames = [
-      ...new Set(mergedRows.map((r) => r.username)),
-    ];
-    for (const u of uniqueUsernames) {
-      if (rulesByUsername[u]) continue;
-      const schedule = scheduleByUser.get(normalizeUserKey(u)) || null;
-      rulesByUsername[u] = mergeGlobalRulesWithEmployeeSchedule(
-        globalRules,
-        schedule
-      );
-    }
-
-    return NextResponse.json({
-      attendance: mergedRows,
-      holidays,
-      leaves,
-      rulesByUsername,
-    });
+    return NextResponse.json({ attendance: rows, holidays, leaves, rulesByUsername });
   } catch (error) {
     console.error("Error fetching attendance logs:", error);
     return NextResponse.json(

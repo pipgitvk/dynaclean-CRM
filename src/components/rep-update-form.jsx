@@ -1,12 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import {
-  notifyEmployeesListReload,
-  reloadEmployeesAdminPage,
-} from "@/lib/employeesPageReload";
+import { useRouter } from "next/navigation";
 
 export default function RepUpdateForm({ initialPassword, username }) {
+  const router = useRouter();
   const [newPassword, setNewPassword] = useState(initialPassword);
   const [isUpdating, setIsUpdating] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
@@ -27,9 +25,8 @@ export default function RepUpdateForm({ initialPassword, username }) {
 
       if (response.ok) {
         setStatusMessage("✅ Password updated successfully!");
-        if (!notifyEmployeesListReload()) {
-          reloadEmployeesAdminPage();
-        }
+        // Redirect to the admin dashboard on success
+        router.push("/admin-dashboard/employees");
       } else {
         setStatusMessage(`❌ Error: ${result.error || "Update failed."}`);
       }

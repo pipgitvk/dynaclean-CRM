@@ -1,6 +1,5 @@
 "use client";
 
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect, useMemo } from "react";
 import {
     Pencil,
@@ -685,17 +684,17 @@ export default function DDManagementPage() {
                                             </div>
                                             <div>
                                                 <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Assign Date</label>
-                                                <TypeableDateFilterInput value={formData.assign_date} onChange={(v) => handleInputChange({ target: { name: "assign_date", value: v } })} disabled={selectedDD?.assign_date} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"/>
+                                                <input disabled={selectedDD?.assign_date} type="date" name="assign_date" value={formData.assign_date} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" />
                                             </div>
                                         </div>
                                         <div className="grid grid-cols-2 gap-4">
                                             <div>
                                                 <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Expiry Date</label>
-                                                <TypeableDateFilterInput value={formData.expiry_date} onChange={(v) => handleInputChange({ target: { name: "expiry_date", value: v } })} disabled={selectedDD?.expiry_date} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"/>
+                                                <input disabled={selectedDD?.expiry_date} type="date" name="expiry_date" value={formData.expiry_date} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" />
                                             </div>
                                             <div>
                                                 <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Claim Expiry Date</label>
-                                                <TypeableDateFilterInput value={formData.claim_expiry_date} onChange={(v) => handleInputChange({ target: { name: "claim_expiry_date", value: v } })} disabled={selectedDD?.claim_expiry_date} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"/>
+                                                <input disabled={selectedDD?.claim_expiry_date} type="date" name="claim_expiry_date" value={formData.claim_expiry_date} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" />
                                             </div>
                                         </div>
                                         <div>
@@ -729,7 +728,7 @@ export default function DDManagementPage() {
                                             </div>
                                             <div>
                                                 <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Assign Date</label>
-                                                <TypeableDateFilterInput value={formData.assign_date} onChange={(v) => handleInputChange({ target: { name: "assign_date", value: v } })} disabled={selectedDD?.assign_date} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"/>
+                                                <input disabled={selectedDD?.assign_date} type="date" name="assign_date" value={formData.assign_date} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" />
                                             </div>
                                         </div>
                                     </>
@@ -857,7 +856,7 @@ export default function DDManagementPage() {
                                             </div>
                                             <div>
                                                 <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Filled Date</label>
-                                                <TypeableDateFilterInput value={formData.filled_date} onChange={(v) => handleInputChange({ target: { name: "filled_date", value: v } })} className="w-full p-2.5 border rounded-lg outline-none"/>
+                                                <input type="date" name="filled_date" value={formData.filled_date} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg outline-none" />
                                             </div>
                                         </div>
                                         <div className="pt-4 border-t">
@@ -934,7 +933,7 @@ export default function DDManagementPage() {
                                             </div>
                                             <div>
                                                 <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Filled Date</label>
-                                                <TypeableDateFilterInput value={formData.filled_date} onChange={(v) => handleInputChange({ target: { name: "filled_date", value: v } })} disabled={selectedDD?.filled_date} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"/>
+                                                <input disabled={selectedDD?.filled_date} type="date" name="filled_date" value={formData.filled_date} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" />
                                             </div>
                                         </div>
                                     </>

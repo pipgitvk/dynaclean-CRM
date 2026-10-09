@@ -1,6 +1,5 @@
 "use client";
 
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useEffect, useState } from "react";
 import React from "react";
 import { Search } from "lucide-react";
@@ -646,8 +645,18 @@ export default function ProductsNewPage() {
                   <option value="Invoice">Invoice</option>
                   <option value="Quotation">Quotation</option>
                 </select>
-                <TypeableDateFilterInput value={fromDate} onChange={setFromDate} className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"/>
-                <TypeableDateFilterInput value={toDate} onChange={setToDate} className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                <input
+                  type="date"
+                  value={fromDate}
+                  onChange={(e) => setFromDate(e.target.value)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <input
+                  type="date"
+                  value={toDate}
+                  onChange={(e) => setToDate(e.target.value)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
               </div>
 
               <div className="overflow-x-auto">

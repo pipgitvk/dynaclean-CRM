@@ -1,26 +1,7 @@
 "use client";
 
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect } from "react";
 import { toast } from "react-hot-toast";
-
-const CategoryBadge = ({ category }) => {
-  if (category === "Product") {
-    return (
-      <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">
-        Product
-      </span>
-    );
-  }
-  if (category === "Spare") {
-    return (
-      <span className="px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-700">
-        Spare
-      </span>
-    );
-  }
-  return <span className="text-gray-400 text-xs">Other</span>;
-};
 
 export default function WarehouseInForm() {
   const [pendingRequests, setPendingRequests] = useState([]);
@@ -56,57 +37,18 @@ export default function WarehouseInForm() {
 
   const loadPendingRequests = async () => {
     try {
-      const [productRes, spareRes] = await Promise.all([
-        fetch("/api/warehouse-in"),
-        fetch("/api/spare/warehouse-in"),
-      ]);
-
-      let productRequests = [];
-      let spareRequests = [];
-
-      if (productRes.ok) {
-        const data = await productRes.json();
-        productRequests = (Array.isArray(data) ? data : []).map((r) => ({
-          ...r,
-          __source: "product",
-          category: r.category || "Product",
-          product_code: r.product_code,
-          product_name: r.product_name,
-          product_image: r.product_image,
-        }));
+      const res = await fetch("/api/warehouse/in");
+      if (res.ok) {
+        const data = await res.json();
+        setPendingRequests(data);
       }
-      if (spareRes.ok) {
-        const data = await spareRes.json();
-        spareRequests = (Array.isArray(data) ? data : []).map((r) => ({
-          ...r,
-          __source: "spare",
-          category: "Spare",
-          product_code: r.spare_id ?? r.product_code ?? `SP${r.id}`,
-          product_name: r.spare_name ?? r.product_name ?? `Spare #${r.id}`,
-          product_image: r.spare_image ?? r.product_image ?? null,
-        }));
-      }
-
-      const combined = [...productRequests, ...spareRequests].sort(
-        (a, b) => new Date(b.created_at) - new Date(a.created_at)
-      );
-
-      setPendingRequests(combined);
     } catch (error) {
       console.error("Error loading requests:", error);
     }
   };
 
-  const handleRequestSelect = (requestIdOrObj) => {
-    let request = null;
-    if (typeof requestIdOrObj === "object" && requestIdOrObj?.id !== undefined) {
-      request = pendingRequests.find(
-        (r) => r.id === requestIdOrObj.id && r.__source === requestIdOrObj.__source
-      );
-    } else {
-      const id = parseInt(requestIdOrObj);
-      request = pendingRequests.find((r) => r.id === id);
-    }
+  const handleRequestSelect = (requestId) => {
+    const request = pendingRequests.find((r) => r.id === parseInt(requestId));
     setSelectedRequest(request);
     setShowForm(true);
 
@@ -165,11 +107,7 @@ export default function WarehouseInForm() {
     setIsSubmitting(true);
 
     try {
-      // Route to correct API endpoint based on item category
-      const isSpare = selectedRequest.__source === "spare";
-      const endpoint = isSpare ? "/api/spare/warehouse-in" : "/api/warehouse-in";
-
-      const res = await fetch(endpoint, {
+      const res = await fetch("/api/warehouse-in", {
         method: "POST",
         body: submitData,
       });
@@ -224,9 +162,6 @@ export default function WarehouseInForm() {
       <h3 className="text-lg font-semibold mb-4">
         Warehouse In - Receive Stock
       </h3>
-      <p className="text-sm text-gray-600 mb-4">
-        Pending product and spare requests from product stock request — stock updates by category on receive.
-      </p>
 
       {/* Select Pending Request */}
       {!showForm && (
@@ -243,8 +178,8 @@ export default function WarehouseInForm() {
 
             {pendingRequests.map((req) => (
               <div
-                key={`${req.__source}-${req.id}`}
-                onClick={() => handleRequestSelect(req)}
+                key={req.id}
+                onClick={() => handleRequestSelect(req.id)}
                 className="bg-white border rounded-xl shadow-md p-4 flex items-center space-x-4 cursor-pointer transition-all hover:shadow-lg active:scale-[0.98]"
               >
                 {/* Image */}
@@ -258,19 +193,12 @@ export default function WarehouseInForm() {
 
                 {/* Text Content */}
                 <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <p className="font-semibold text-gray-800 text-base">
-                      Req #{req.id}
-                    </p>
-                    <CategoryBadge category={req.category} />
-                  </div>
+                  <p className="font-semibold text-gray-800 text-base">
+                    Req #{req.id}
+                  </p>
 
                   <p className="text-sm text-gray-700 font-medium">
                     {req.product_name}
-                  </p>
-
-                  <p className="text-xs text-gray-600">
-                    {req.category === "Spare" ? "Spare ID" : "Code"}: {req.product_code}
                   </p>
 
                   <p className="text-sm text-gray-600">
@@ -301,10 +229,8 @@ export default function WarehouseInForm() {
                 <thead className="bg-gray-100 text-left text-xs">
                   <tr>
                     <th className="p-2 border-b">Request ID</th>
-                    <th className="p-2 border-b">Category</th>
-                    <th className="p-2 border-b">Image</th>
-                    <th className="p-2 border-b">Name</th>
-                    <th className="p-2 border-b">Code / Spare ID</th>
+                    <th className="p-2 border-b">Product Image</th>
+                    <th className="p-2 border-b">Product Name</th>
                     <th className="p-2 border-b">Quantity</th>
                     <th className="p-2 border-b">From Company</th>
                     <th className="p-2 border-b">Created At</th>
@@ -322,7 +248,6 @@ export default function WarehouseInForm() {
                         onClick={() => handleRequestSelect(req.id)}
                       >
                         <td className="p-2 font-semibold">Req #{req.id}</td>
-                        <td className="p-2"><CategoryBadge category={req.category} /></td>
                         <td className="p-2">
                           {req.product_image ? (
                             <img
@@ -335,7 +260,6 @@ export default function WarehouseInForm() {
                           )}
                         </td>
                         <td className="p-2">{req.product_name}</td>
-                        <td className="p-2 font-medium">{req.product_code}</td>
                         <td className="p-2">{req.quantity} units</td>
                         <td className="p-2">{req.from_company || "N/A"}</td>
                         <td className="p-2 whitespace-nowrap">
@@ -369,14 +293,11 @@ export default function WarehouseInForm() {
         <>
           {/* Product Details (Read-only) */}
           <div className="bg-gray-50 p-4 rounded border">
-            <div className="flex items-center gap-2 mb-2">
-              <h4 className="font-semibold">Request Details</h4>
-              <CategoryBadge category={selectedRequest.category} />
-            </div>
+            <h4 className="font-semibold mb-2">Request Details</h4>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium mb-1">
-                  {selectedRequest.category === "Spare" ? "Spare ID" : "Product Code"}
+                  Product Code
                 </label>
                 <input
                   value={selectedRequest.product_code}
@@ -386,7 +307,7 @@ export default function WarehouseInForm() {
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">
-                  {selectedRequest.category === "Spare" ? "Spare Name" : "Product Name"}
+                  Product Name
                 </label>
                 <input
                   value={selectedRequest.product_name}
@@ -483,9 +404,15 @@ export default function WarehouseInForm() {
             </div>
             <div>
               <label className="block mb-1 font-medium">Received Date *</label>
-              <TypeableDateFilterInput value={formData.received_date} onChange={(v) => handleChange({ target: { name: "received_date", value: v } })} max={new Date().toISOString().split("T")[0]}
+              <input
+                type="date"
+                name="received_date"
+                value={formData.received_date}
+                onChange={handleChange}
+                max={new Date().toISOString().split("T")[0]}
                 className="w-full border p-2 rounded"
-                required/>
+                required
+              />
             </div>
             <div>
               <label className="block mb-1 font-medium">

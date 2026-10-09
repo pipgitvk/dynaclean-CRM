@@ -3,22 +3,6 @@
 import { getDbConnection } from "@/lib/db";
 import { getISTDateString, getISTDateTimeString } from "@/lib/istDateTime";
 import { NextResponse } from "next/server";
-import { getSessionPayload } from "@/lib/auth";
-import {
-  ADMIN_EDIT_ATTENDANCE_ADDRESS,
-  ATTENDANCE_EDIT_TRACKED_FIELDS,
-  diffAttendanceEditFields,
-  recordAttendanceEditHistory,
-} from "@/lib/attendanceEditHistory";
-import { ensureAttendanceCheckoutGpsTriggersAllowAdmin } from "@/lib/ensureAttendanceCheckoutGpsTriggers";
-import { ensureAttendanceEditHistoryTable } from "@/lib/ensureAttendanceEditHistoryTable";
-import { lookupAttendanceEmployeeIds } from "@/lib/ensureAttendanceLogsEmployeeColumns";
-
-const HR_ATTENDANCE_ROLES = ["SUPERADMIN", "HR HEAD", "HR", "HR Executive"];
-
-function isHrRole(role) {
-  return role != null && HR_ATTENDANCE_ROLES.includes(String(role));
-}
 
 
 
@@ -90,25 +74,12 @@ export async function POST(req) {
 
   try {
     switch (action) {
-      case 'checkin': {
-        const checkinLocationless =
-          latitude == null ||
-          latitude === "" ||
-          longitude == null ||
-          longitude === "";
-        if (checkinLocationless) {
-          return NextResponse.json(
-            { error: "Check-in requires GPS location." },
-            { status: 400 }
-          );
-        }
-        const ids = await lookupAttendanceEmployeeIds(conn, username);
+      case 'checkin':
         await conn.execute(
-          "INSERT INTO attendance_logs (username, employee_id, machine_code, date, checkin_time, checkin_latitude, checkin_longitude, checkin_address) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-          [username, ids.employee_id, ids.machine_code, today, now, latitude, longitude, locationAddress]
+          "INSERT INTO attendance_logs (username, date, checkin_time, checkin_latitude, checkin_longitude, checkin_address) VALUES (?, ?, ?, ?, ?, ?)",
+          [username, today, now, latitude, longitude, locationAddress]
         );
         break;
-      }
 
       case 'break_morning':
         await conn.execute(
@@ -188,14 +159,6 @@ export async function POST(req) {
 
 export async function PUT(req) {
   try {
-    const payload = await getSessionPayload();
-    if (!payload) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    if (!isHrRole(payload.role)) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-
     const body = await req.json();
     const { username, date, ...updates } = body;
 
@@ -203,93 +166,21 @@ export async function PUT(req) {
       return NextResponse.json({ error: "Username and date are required" }, { status: 400 });
     }
 
-    const allowed = new Set(ATTENDANCE_EDIT_TRACKED_FIELDS);
-    const afterValues = {};
-    for (const [key, value] of Object.entries(updates)) {
-      if (allowed.has(key)) afterValues[key] = value;
-    }
-
-    if (Object.keys(afterValues).length === 0) {
-      return NextResponse.json({ error: "No allowed fields to update" }, { status: 400 });
-    }
-
     const conn = await getDbConnection();
-    await ensureAttendanceEditHistoryTable(conn);
-    await ensureAttendanceCheckoutGpsTriggersAllowAdmin(conn);
-    const cols = ATTENDANCE_EDIT_TRACKED_FIELDS.join(", ");
-    const [beforeRows] = await conn.execute(
-      `SELECT ${cols} FROM attendance_logs WHERE username = ? AND date = ? LIMIT 1`,
-      [username, date]
-    );
-    if (!beforeRows.length) {
-      return NextResponse.json({ error: "Attendance record not found" }, { status: 404 });
-    }
 
-    const changes = diffAttendanceEditFields(beforeRows[0], afterValues);
-    if (!changes.length) {
-      return NextResponse.json({ error: "No attendance time changes to save." }, { status: 400 });
-    }
-
-    const editRemark = String(body.edit_remark ?? "").trim();
-    if (!editRemark) {
-      return NextResponse.json(
-        { error: "Remark is required when changing attendance times." },
-        { status: 400 }
-      );
-    }
-    if (editRemark.length > 512) {
-      return NextResponse.json(
-        { error: "Remark must be 512 characters or less." },
-        { status: 400 }
-      );
-    }
-
-    const checkinTimeEdited = changes.some((c) => c.field === "checkin_time");
-    const checkoutTimeEdited = changes.some((c) => c.field === "checkout_time");
-
+    // Build the update query dynamically
     const fields = [];
     const values = [];
-    for (const [key, value] of Object.entries(afterValues)) {
+
+    for (const [key, value] of Object.entries(updates)) {
       fields.push(`${key} = ?`);
-      values.push(value === "" ? null : value);
+      values.push(value);
     }
 
-    if (checkinTimeEdited) {
-      if (afterValues.checkin_time == null || afterValues.checkin_time === "") {
-        fields.push(
-          "checkin_latitude = NULL",
-          "checkin_longitude = NULL",
-          "checkin_address = NULL"
-        );
-      } else {
-        fields.push(
-          "checkin_latitude = NULL",
-          "checkin_longitude = NULL",
-          "checkin_address = ?"
-        );
-        values.push(ADMIN_EDIT_ATTENDANCE_ADDRESS);
-      }
+    if (fields.length === 0) {
+      return NextResponse.json({ error: "No fields to update" }, { status: 400 });
     }
 
-    if (checkoutTimeEdited) {
-      if (afterValues.checkout_time == null || afterValues.checkout_time === "") {
-        fields.push(
-          "checkout_latitude = NULL",
-          "checkout_longitude = NULL",
-          "checkout_address = NULL"
-        );
-      } else {
-        fields.push(
-          "checkout_latitude = NULL",
-          "checkout_longitude = NULL",
-          "checkout_address = ?"
-        );
-        values.push(ADMIN_EDIT_ATTENDANCE_ADDRESS);
-      }
-    }
-
-    fields.push("admin_time_edit_remark = ?");
-    values.push(editRemark);
     values.push(username);
     values.push(date);
 
@@ -297,17 +188,6 @@ export async function PUT(req) {
       `UPDATE attendance_logs SET ${fields.join(", ")} WHERE username = ? AND date = ?`,
       values
     );
-
-    const editedBy =
-      payload.username || payload.name || payload.email || String(payload.sub || "unknown");
-    await recordAttendanceEditHistory(conn, {
-      username,
-      logDate: date,
-      editedBy,
-      source: "admin_full_edit",
-      changes,
-      editRemark,
-    });
 
     return NextResponse.json({ success: true });
   } catch (error) {

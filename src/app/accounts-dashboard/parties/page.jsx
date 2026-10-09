@@ -9,9 +9,7 @@ import {
   Phone,
   Bell,
   Loader2,
-  Database,
 } from "lucide-react";
-import toast from "react-hot-toast";
 import LedgerTableClient from "@/app/accounts-dashboard/ledger/[companyName]/LedgerTableClient";
 
 function formatAmount(n) {
@@ -42,20 +40,6 @@ function rowKey(p) {
   return `name:${(p.name || "").toLowerCase()}`;
 }
 
-function displayCustomerId(p) {
-  if (p?.customer_id == null) return "";
-  const id = String(p.customer_id).trim();
-  return id && id !== "0" ? id : "";
-}
-
-function formatSidebarCustomerMeta(p) {
-  const id = displayCustomerId(p);
-  const clientName = String(p?.client_name || "").trim();
-  if (!id) return clientName;
-  if (clientName) return `${clientName} (${id})`;
-  return `(${id})`;
-}
-
 export default function PartiesPage() {
   const [search, setSearch] = useState("");
   const [parties, setParties] = useState([]);
@@ -66,7 +50,6 @@ export default function PartiesPage() {
   const [ledgerEntries, setLedgerEntries] = useState([]);
   const [ledgerLoading, setLedgerLoading] = useState(false);
   const [ledgerError, setLedgerError] = useState(null);
-  const [ledgerSyncLoading, setLedgerSyncLoading] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -185,62 +168,12 @@ export default function PartiesPage() {
     });
   }, [parties, search]);
 
-  const handleSyncAllLedgers = useCallback(async () => {
-    if (
-      !window.confirm(
-        "Save all party ledgers to the database? This may take several minutes.",
-      )
-    ) {
-      return;
-    }
-    setLedgerSyncLoading(true);
-    try {
-      const res = await fetch("/api/parties/ledger/sync", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ syncAll: true }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(
-          data.error || data.message || "Failed to save ledgers to database",
-        );
-      }
-      const failed = Number(data.parties_failed || 0);
-      const synced = Number(data.parties_synced || 0);
-      if (synced === 0 && failed > 0) {
-        const hint =
-          Array.isArray(data.error_messages) && data.error_messages[0]
-            ? data.error_messages[0]
-            : "See console for details";
-        toast.error(`Ledger sync failed: ${hint}`);
-        console.warn("[ledger sync errors]", data.errors, data.error_messages);
-        return;
-      }
-      const skippedParties = Number(data.parties_skipped || 0);
-      const inserted = Number(data.lines_inserted || 0);
-      toast.success(
-        skippedParties > 0
-          ? `Added ${inserted} new lines; ${skippedParties} parties already in DB (skipped)`
-          : `Saved ${data.total_lines ?? 0} lines for ${synced} parties` +
-            (failed > 0 ? ` (${failed} failed)` : ""),
-      );
-      if (failed > 0 && Array.isArray(data.errors) && data.errors.length > 0) {
-        console.warn("[ledger sync errors]", data.errors);
-      }
-    } catch (err) {
-      toast.error(err?.message || "Ledger sync failed");
-    } finally {
-      setLedgerSyncLoading(false);
-    }
-  }, []);
-
   return (
     <div className="h-[calc(100vh-2rem)] w-full bg-gray-50 flex flex-col">
       <div className="flex-1 flex gap-3 p-3 overflow-hidden">
         {/* Left Panel – Party List */}
         <aside className="w-[320px] flex flex-col bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-          <div className="p-3 border-b border-gray-100 space-y-2">
+          <div className="p-3 border-b border-gray-100">
             <div className="relative">
               <Search
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
@@ -253,20 +186,6 @@ export default function PartiesPage() {
                 className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
-            <button
-              type="button"
-              onClick={handleSyncAllLedgers}
-              disabled={ledgerSyncLoading}
-              title="Save all party ledgers to party_ledger_lines table"
-              className="w-full inline-flex items-center justify-center gap-2 rounded-md border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-800 hover:bg-indigo-100 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
-            >
-              {ledgerSyncLoading ? (
-                <Loader2 size={14} className="animate-spin shrink-0" />
-              ) : (
-                <Database size={14} className="shrink-0" />
-              )}
-              {ledgerSyncLoading ? "Saving ledgers…" : "Save all ledgers to DB"}
-            </button>
           </div>
 
           <div className="grid grid-cols-[1fr_auto] text-xs font-medium text-gray-600 bg-gray-50 border-b border-gray-100">
@@ -297,7 +216,6 @@ export default function PartiesPage() {
             ) : (
               filteredParties.map((p) => {
                 const isSelected = rowKey(p) === selectedKey;
-                const customerMeta = formatSidebarCustomerMeta(p);
                 return (
                   <button
                     key={rowKey(p)}
@@ -316,16 +234,15 @@ export default function PartiesPage() {
                       >
                         {p.name}
                       </span>
-                      {customerMeta ? (
+                      {p.customer_id != null && String(p.customer_id).trim() !== "" && (
                         <span
-                          className={`text-xs mt-0.5 block truncate ${
+                          className={`text-xs mt-0.5 block ${
                             isSelected ? "text-gray-500" : "text-gray-400"
                           }`}
-                          title={customerMeta}
                         >
-                          {customerMeta}
+                          ID: {p.customer_id}
                         </span>
-                      ) : null}
+                      )}
                     </div>
                     <span
                       className={`font-semibold tabular-nums whitespace-nowrap self-start text-right ${

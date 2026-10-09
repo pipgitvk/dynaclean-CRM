@@ -1,7 +1,6 @@
 // app/admin-dashboard/quick-edit/[username]/page.jsx
 "use client";
 
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
@@ -13,11 +12,6 @@ import {
   applySuperadminOnlyModuleRestrictions,
   applyRoleDenyModuleRestrictions,
 } from "@/lib/moduleAccess";
-import { getRoleDefaultModuleKeys } from "@/lib/roleDefaultModuleAccess";
-import {
-  notifyEmployeesListReload,
-  reloadEmployeesAdminPage,
-} from "@/lib/employeesPageReload";
 
 function uniqueStrings(arr) {
   return [...new Set((arr || []).map((v) => String(v || "").trim()).filter(Boolean))];
@@ -161,7 +155,6 @@ const QuickEditPage = () => {
     address: "",
     state: "",
     userRole: "",
-    machine_code: "",
     profile_pic: "",
     status: 0,
   });
@@ -599,7 +592,26 @@ const QuickEditPage = () => {
 
   const setServiceHeadDefaults = () => {
     userEditedModulesRef.current = true;
-    const defaults = getRoleDefaultModuleKeys("SERVICE HEAD")
+    const defaults = [
+      "dashboard-home",
+      "task-manager",
+      "add-customer",
+      "view-customers",
+      "employee-crm",
+      "quotations",
+      "orders-process",
+      "orders-delay",
+      "warranty-console",
+      "registered-products",
+      "service-followups",
+      "warranty-map",
+      "service-records",
+      "upcoming-installations",
+      "service-map",
+      "product-stock",
+      "spare-parts",
+      "installation-videos",
+    ]
       .filter((k) => ALL_MODULE_KEYS.includes(k))
       .filter((k) => k !== "dm-fresh-leads");
 
@@ -609,7 +621,26 @@ const QuickEditPage = () => {
 
   const setServiceSupportDefaults = () => {
     userEditedModulesRef.current = true;
-    const defaults = getRoleDefaultModuleKeys("SERVICE SUPPORT")
+    const defaults = [
+      "dashboard-home",
+      "task-manager",
+      "add-customer",
+      "view-customers",
+      "employee-crm",
+      "quotations",
+      "orders-process",
+      "orders-delay",
+      "warranty-console",
+      "registered-products",
+      "service-followups",
+      "warranty-map",
+      "service-records",
+      "upcoming-installations",
+      "service-map",
+      "product-stock",
+      "spare-parts",
+      "installation-videos",
+    ]
       .filter((k) => ALL_MODULE_KEYS.includes(k))
       .filter((k) => k !== "dm-fresh-leads");
 
@@ -644,7 +675,6 @@ const QuickEditPage = () => {
     formData.append("address", employee.address);
     formData.append("state", employee.state);
     formData.append("userRole", employee.userRole);
-    formData.append("machine_code", employee.machine_code ?? "");
     if (canEditEmployeeStatus)
       formData.append("status", String(employee.status === 1 ? 1 : 0));
     if (canEditModuleAccess) {
@@ -682,9 +712,7 @@ const QuickEditPage = () => {
       if (!response.ok)
         throw new Error(payload.message || "Failed to update employee data.");
       toast.success("Employee data updated successfully!");
-      if (!notifyEmployeesListReload()) {
-        reloadEmployeesAdminPage();
-      }
+      router.push("/admin-dashboard/employees");
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -774,8 +802,14 @@ const QuickEditPage = () => {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700">Date of Birth</label>
-            <TypeableDateFilterInput value={employee.dob || ""} onChange={(v) => handleInputChange({ target: { name: "dob", value: v } })} max={today}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"/>
+            <input
+              type="date"
+              name="dob"
+              value={employee.dob || ""}
+              onChange={handleInputChange}
+              max={today}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+            />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700">Number</label>
@@ -811,52 +845,11 @@ const QuickEditPage = () => {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700">User Role</label>
-            <select
-              name="userRole"
-              value={(employee.userRole || "").trim()}
-              onChange={handleInputChange}
-              className="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-            >
-              <option value="">-- Select Role --</option>
-              <option value="DIRECTOR">DIRECTOR</option>
-              <option value="ACCOUNTANT">ACCOUNTANT</option>
-              <option value="TEAM LEADER">TEAM LEADER</option>
-              <option value="SALES">SALES</option>
-              <option value="SALES CUM BACKOFFICE">SALES CUM BACKOFFICE</option>
-              <option value="SALES HEAD">SALES HEAD</option>
-              <option value="DIGITAL MARKETER">DIGITAL MARKETER</option>
-              <option value="ADMIN">ADMIN</option>
-              <option value="HR">HR</option>
-              <option value="HR HEAD">HR HEAD</option>
-              <option value="JUNIOR HR EXECUTIVE">JUNIOR HR EXECUTIVE</option>
-              <option value="HR EXECUTIVE">HR EXECUTIVE</option>
-              <option value="HR RECRUITER">HR RECRUITER</option>
-              <option value="GEM">GEM</option>
-              <option value="GRAPHIC DESIGNER">GRAPHIC DESIGNER</option>
-              <option value="DESIGN ENGINEER">DESIGN ENGINEER</option>
-              <option value="DEVELOPER">DEVELOPER</option>
-              <option value="SERVICE ENGINEER">SERVICE ENGINEER</option>
-              <option value="SERVICE TECHNICIAN">SERVICE TECHNICIAN</option>
-              <option value="SERVICE HEAD">SERVICE HEAD</option>
-              <option value="SERVICE SUPPORT">SERVICE SUPPORT</option>
-              <option value="WELDER">WELDER</option>
-              <option value="WELDER HELPER">WELDER HELPER</option>
-              <option value="WAREHOUSE INCHARGE">WAREHOUSE INCHARGE</option>
-              <option value="EA">EA</option>
-              <option value="MACHINE OPERATOR">MACHINE OPERATOR</option>
-              <option value="PRODUCTION ENGINEER">PRODUCTION ENGINEER</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700">
-              Machine Employee ID
-            </label>
             <input
               type="text"
-              name="machine_code"
-              value={employee.machine_code || ""}
+              name="userRole"
+              value={employee.userRole || ""}
               onChange={handleInputChange}
-              placeholder="e.g. 102"
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
             />
           </div>

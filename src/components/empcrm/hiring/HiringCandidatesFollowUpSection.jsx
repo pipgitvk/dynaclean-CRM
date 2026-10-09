@@ -2,8 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { getDirectorHrHiringBase } from "@/lib/directorHrPaths";
+import { useRouter } from "next/navigation";
 import { ArrowRight } from "lucide-react";
 import HiringEntryCard from "./HiringEntryCard";
 import { TL_FOLLOWUP_LEGEND } from "@/utils/hiringFollowUpUrgency";
@@ -11,6 +10,8 @@ import { TL_FOLLOWUP_LEGEND } from "@/utils/hiringFollowUpUrgency";
 function isCandidatesFollowUpRow(row) {
   return true;
 }
+
+const HIRING_ROUTE = "/empcrm/admin-dashboard/hiring";
 
 function scheduleSortKey(row) {
   if (row.next_followup_at) {
@@ -38,8 +39,6 @@ export default function HiringCandidatesFollowUpSection({
   showOpenHiringLink = false,
 }) {
   const router = useRouter();
-  const pathname = usePathname();
-  const hiringRoute = getDirectorHrHiringBase(pathname);
   const year = yearProp ?? new Date().getFullYear();
   const controlled = entriesProp !== undefined;
 
@@ -110,7 +109,7 @@ export default function HiringCandidatesFollowUpSection({
           ) : null}
           {showOpenHiringLink ? (
             <Link
-              href={hiringRoute}
+              href={HIRING_ROUTE}
               className="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-600 hover:text-indigo-800 sm:text-sm"
             >
               Open hiring
@@ -154,7 +153,7 @@ export default function HiringCandidatesFollowUpSection({
                 row={row}
                 showEditButton={false}
                 showViewButton={true}
-                onView={() => router.push(`${hiringRoute}/${row.id}/view`)}
+                onView={() => router.push(`${HIRING_ROUTE}/${row.id}/view`)}
                 colorScheme="tl-followup"
               />
             ))}
