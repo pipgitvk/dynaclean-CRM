@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { LogOut } from "lucide-react";
+import HeaderLogoutButton from "@/components/HeaderLogoutButton";
 
 export default function ThirdPartyEngineerPortalShell({ children, title }) {
   const router = useRouter();
@@ -23,14 +23,7 @@ export default function ThirdPartyEngineerPortalShell({ children, title }) {
             </p>
             <h1 className="text-lg font-bold text-slate-900">{title || "Third Party Engineer"}</h1>
           </div>
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50"
-          >
-            <LogOut size={16} />
-            Logout
-          </button>
+          <HeaderLogoutButton onClick={handleLogout} variant="sales" />
         </div>
       </header>
       <main className="max-w-6xl mx-auto px-4 py-8">{children}</main>

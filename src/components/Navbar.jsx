@@ -2,7 +2,8 @@
 
 import { useRouter, usePathname } from "next/navigation";
 import { createPortal } from "react-dom";
-import { Menu, LogOut, User, Plus, UserPlus, Search, Bell, X, DollarSign } from "lucide-react";
+import { Menu, User, Plus, UserPlus, Search, Bell, X, DollarSign } from "lucide-react";
+import HeaderLogoutButton from "@/components/HeaderLogoutButton";
 import { useTheme } from "@/context/ThemeContext";
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
@@ -598,22 +599,10 @@ export default function Navbar({ onToggleSidebar, showSalesMeta = false }) {
           </div>
           )}
 
-          <button
-            type="button"
+          <HeaderLogoutButton
             onClick={handleLogout}
-            className={
-              showSalesMeta
-                ? "grid h-10 w-10 min-h-[44px] min-w-[44px] place-items-center rounded-xl bg-red-500 text-white transition hover:bg-red-600 min-[1100px]:min-h-0 min-[1100px]:min-w-0"
-                : "flex min-h-[44px] items-center gap-2 rounded-lg bg-red-500 px-3 py-2 text-white shadow-md transition hover:bg-red-600 min-[1100px]:min-h-0 min-[1100px]:px-4"
-            }
-            aria-label="Logout"
-            title="Logout"
-          >
-            <LogOut size={18} />
-            {!showSalesMeta && (
-              <span className="hidden font-medium sm:inline">Logout</span>
-            )}
-          </button>
+            variant={showSalesMeta ? "sales" : "gradient"}
+          />
         </div>
       </div>
     </nav>
