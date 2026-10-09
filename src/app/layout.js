@@ -33,8 +33,8 @@ export const metadata = {
   title: "CRM | Dynaclean",
   description: "Manage your customers and leads efficiently",
   icons: {
-    icon: [{ url: '/dynaclean_logo.png', type: 'image/png' }],
-    apple: [{ url: '/dynaclean_logo.png', sizes: '180x180', type: 'image/png' }],
+    icon: [{ url: "/logo.png", type: "image/png" }],
+    apple: [{ url: "/logo.png", sizes: "180x180", type: "image/png" }],
   },
 };
 

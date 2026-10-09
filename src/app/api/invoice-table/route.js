@@ -6,6 +6,7 @@ import {
   canSeeAllPerformaInvoices,
   isAccountantRole,
 } from "@/lib/performaInvoiceAccess";
+import { ensureInvoiceItemsInsertReady } from "@/lib/ensureInvoiceItemsAutoIncrement";
 
 /** Parse linked_trans_ids JSON or plain string → array of strings */
 function parseTransIds(raw) {
@@ -1140,6 +1141,8 @@ export async function POST(req) {
     if (!finalInvoiceNumber || !invoiceId) {
       throw new Error("Failed to generate unique invoice number");
     }
+
+    await ensureInvoiceItemsInsertReady(conn);
 
     // Insert invoice_items for each item
     for (let item of items) {

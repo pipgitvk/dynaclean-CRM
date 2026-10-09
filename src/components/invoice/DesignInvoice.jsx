@@ -1732,8 +1732,10 @@ import InvoicePDFPreview from "../Preview";
 import { numberToWords } from "@/utils/NumbertoWord";
 import { INVOICE_LETTERHEAD } from "@/lib/invoiceLetterhead";
 
-/** Static file in `public/s.png` (not bundled — avoids missing asset build errors). */
-const INVOICE_SIGNATURE_SRC = "/s.png";
+const INVOICE_SIGNATURE_CANDIDATES = [
+  "/s.png",
+  "https://app.dynacleanindustries.com/s.png",
+];
 
 const NewInvoice = ({ invoice }) => {
   // Determine invoice type label
@@ -2021,6 +2023,10 @@ const NewInvoice = ({ invoice }) => {
 
   const [logoSrc, setLogoSrc] = React.useState(dynacleanLogo.src);
   const [logoErrorStep, setLogoErrorStep] = React.useState(0);
+  const [signatureSrc, setSignatureSrc] = React.useState(
+    INVOICE_SIGNATURE_CANDIDATES[0],
+  );
+  const [signatureErrorStep, setSignatureErrorStep] = React.useState(0);
 
   const handleLogoError = () => {
     if (logoErrorStep === 0) {
@@ -2044,6 +2050,16 @@ const NewInvoice = ({ invoice }) => {
       return;
     }
     setLogoSrc("");
+  };
+
+  const handleSignatureError = () => {
+    const next = signatureErrorStep + 1;
+    if (next < INVOICE_SIGNATURE_CANDIDATES.length) {
+      setSignatureErrorStep(next);
+      setSignatureSrc(INVOICE_SIGNATURE_CANDIDATES[next]);
+      return;
+    }
+    setSignatureSrc("");
   };
 
   const containerRef = React.useRef(null);
@@ -2098,6 +2114,7 @@ const NewInvoice = ({ invoice }) => {
               mode: "cors",
               cache: "force-cache",
             });
+            if (!res.ok) return;
             const blob = await res.blob();
             const base64 = await new Promise((resolve, reject) => {
               const reader = new FileReader();
@@ -2130,6 +2147,22 @@ const NewInvoice = ({ invoice }) => {
         }
       });
 
+      const taxSummaryTable = clonedEl.querySelector("[data-invoice-tax-summary]");
+      if (taxSummaryTable) {
+        taxSummaryTable.style.borderCollapse = "separate";
+        taxSummaryTable.style.borderSpacing = "0";
+        taxSummaryTable.querySelectorAll("th, td").forEach((cell) => {
+          cell.style.border = "1px solid rgb(0, 0, 0)";
+          cell.style.paddingTop = "7px";
+          cell.style.paddingBottom = "7px";
+          cell.style.paddingLeft = "5px";
+          cell.style.paddingRight = "5px";
+          cell.style.lineHeight = "1.55";
+          cell.style.verticalAlign = "middle";
+          cell.style.boxSizing = "border-box";
+        });
+      }
+
       // Improve footer text metrics before capture.
       clonedEl.querySelectorAll("[data-pdf-footer-block]").forEach((block) => {
         block.style.lineHeight = "1.55";
@@ -2137,8 +2170,52 @@ const NewInvoice = ({ invoice }) => {
         block.style.paddingBottom = "1px";
       });
 
-      // Force layout recalculation
-      await new Promise((r) => setTimeout(r, 100));
+      const notesBlock = clonedEl.querySelector('[data-pdf-invoice-block="notes"]');
+      const notesTable = notesBlock?.closest("table");
+      if (notesTable) {
+        notesTable.style.tableLayout = "fixed";
+        notesTable.style.width = "100%";
+      }
+      if (notesBlock) {
+        notesBlock.style.overflow = "visible";
+        notesBlock.style.whiteSpace = "pre-wrap";
+        notesBlock.style.wordBreak = "break-word";
+        notesBlock.style.overflowWrap = "break-word";
+        notesBlock.style.display = "table-cell";
+        notesBlock.style.width = "100%";
+        notesBlock.setAttribute("colspan", "2");
+        const notesLabel = notesBlock.querySelector("[data-pdf-notes-label]");
+        if (notesLabel) {
+          notesLabel.style.display = "block";
+          notesLabel.style.fontWeight = "bold";
+          notesLabel.style.color = "rgb(0, 0, 0)";
+          notesLabel.style.webkitTextFillColor = "rgb(0, 0, 0)";
+        }
+        const notesBody = notesBlock.querySelector("[data-pdf-notes-body]");
+        if (notesBody) {
+          notesBody.style.whiteSpace = "pre-wrap";
+          notesBody.style.wordBreak = "break-word";
+          notesBody.style.overflowWrap = "break-word";
+          notesBody.style.overflow = "visible";
+          notesBody.style.display = "block";
+          notesBody.style.color = "rgb(0, 0, 0)";
+          notesBody.style.webkitTextFillColor = "rgb(0, 0, 0)";
+        }
+        const notesTotalHeight =
+          (notesLabel?.offsetHeight || 0) +
+          (notesBody?.scrollHeight || 0) +
+          16;
+        notesBlock.style.minHeight = `${notesTotalHeight}px`;
+        notesBlock.style.height = "auto";
+        const notesRow = notesBlock.closest("tr");
+        if (notesRow) {
+          notesRow.style.height = "auto";
+          notesRow.style.minHeight = `${notesTotalHeight}px`;
+        }
+      }
+
+      // Force layout recalculation so line items sit below expanded notes
+      await new Promise((r) => setTimeout(r, 150));
       const finalHeight = Math.max(
         clonedEl.scrollHeight,
         clonedEl.offsetHeight,
@@ -2151,7 +2228,9 @@ const NewInvoice = ({ invoice }) => {
       const footerBlockBoxes = {};
       if (rootRect.width > 0 && rootRect.height > 0) {
         for (const key of footerBlockKeys) {
-          const blockEl = clonedEl.querySelector(`[data-pdf-footer-block="${key}"]`);
+          const blockEl = clonedEl.querySelector(
+            `[data-pdf-footer-block="${key}"]`,
+          );
           if (!blockEl) continue;
           const r = blockEl.getBoundingClientRect();
           footerBlockBoxes[key] = {
@@ -2160,7 +2239,7 @@ const NewInvoice = ({ invoice }) => {
             relW: r.width / rootRect.width,
             relH: r.height / rootRect.height,
           };
-          blockEl.style.minHeight = `${r.height}px`;
+          blockEl.style.minHeight = `${Math.max(r.height, blockEl.scrollHeight)}px`;
         }
       }
 
@@ -2228,16 +2307,18 @@ const NewInvoice = ({ invoice }) => {
         width: drawW * box.relW,
         height: drawH * box.relH,
       });
-      const wipeBlock = (rect, maxRight = null) => {
-        const pad = 0.4;
+      const wipeBlock = (rect, maxRight = null, extraPad = {}) => {
+        const sidePad = 0.4;
+        const topPad = extraPad.top ?? sidePad;
+        const bottomPad = extraPad.bottom ?? sidePad;
         let right = rect.left + rect.width;
         if (maxRight != null) right = Math.min(right, maxRight);
         pdf.setFillColor(255, 255, 255);
         pdf.rect(
-          Math.max(0, rect.left - pad),
-          Math.max(0, rect.top - pad),
-          Math.max(0, right - rect.left + pad * 2),
-          rect.height + pad * 2,
+          Math.max(0, rect.left - sidePad),
+          Math.max(0, rect.top - topPad),
+          Math.max(0, right - rect.left + sidePad * 2),
+          rect.height + topPad + bottomPad,
           "F",
         );
       };
@@ -2247,26 +2328,36 @@ const NewInvoice = ({ invoice }) => {
         startFontSize = 7,
         title,
         maxRight = null,
+        wipeTopPad = 0.4,
+        titleTopInset = 0.9,
       }) => {
-        wipeBlock(rect, maxRight);
-        pdf.setTextColor(0, 0, 0);
-
-        let cursorY = rect.top + startFontSize * ptToMm * 0.9;
         const textWidth = Math.max(rect.width - 1, 20);
-
+        const paragraphList = paragraphs;
+        const lineHeight = startFontSize * ptToMm * 1.45;
+        let estimatedHeight = startFontSize * ptToMm * titleTopInset;
+        if (title) estimatedHeight += 7.5 * ptToMm * 1.55;
+        for (const paragraph of paragraphList) {
+          const wrapped = pdf.splitTextToSize(paragraph, textWidth);
+          estimatedHeight +=
+            wrapped.length * lineHeight + startFontSize * ptToMm * 0.35;
+        }
+        wipeBlock(
+          { ...rect, height: Math.max(rect.height, estimatedHeight + 1.5) },
+          maxRight,
+          { top: wipeTopPad, bottom: 0.8 },
+        );
+        pdf.setTextColor(0, 0, 0);
+        let cursorY = rect.top + startFontSize * ptToMm * titleTopInset;
         if (title) {
           pdf.setFont("helvetica", "bold");
           pdf.setFontSize(7.5);
           pdf.text(title, rect.left, cursorY);
-          cursorY += 7.5 * ptToMm * 1.35;
+          cursorY += 7.5 * ptToMm * 1.5;
         }
-
-        const paragraphList = paragraphs;
         for (const paragraph of paragraphList) {
           pdf.setFont("helvetica", "normal");
           pdf.setFontSize(startFontSize);
           const wrapped = pdf.splitTextToSize(paragraph, textWidth);
-          const lineHeight = startFontSize * ptToMm * 1.45;
           for (const line of wrapped) {
             pdf.text(line, rect.left, cursorY);
             cursorY += lineHeight;
@@ -2279,16 +2370,23 @@ const NewInvoice = ({ invoice }) => {
 
       if (footerBlockBoxes["tax-words"]) {
         const rect = toBlockRect(footerBlockBoxes["tax-words"]);
-        wipeBlock(rect);
-        pdf.setTextColor(0, 0, 0);
+        const taxText = `Tax Amount (in words) : INR- ${numberToWords(data.taxAmount)}`;
         pdf.setFont("helvetica", "bold");
         pdf.setFontSize(7.5);
-        pdf.text(
-          `Tax Amount (in words) : INR- ${numberToWords(data.taxAmount)}`,
-          rect.left,
-          rect.top + 7.5 * ptToMm * 0.9,
-          { maxWidth: rect.width },
+        const taxLines = pdf.splitTextToSize(taxText, Math.max(rect.width - 1, 20));
+        const taxLineHeight = 7.5 * ptToMm * 1.4;
+        const taxBlockHeight = taxLines.length * taxLineHeight + 1.2;
+        wipeBlock(
+          { ...rect, height: Math.max(rect.height, taxBlockHeight) },
+          null,
+          { top: 0.6, bottom: 0.8 },
         );
+        pdf.setTextColor(0, 0, 0);
+        let taxY = rect.top + 7.5 * ptToMm * 0.95;
+        for (const line of taxLines) {
+          pdf.text(line, rect.left, taxY);
+          taxY += taxLineHeight;
+        }
       }
 
       if (footerBlockBoxes.terms) {
@@ -2300,6 +2398,8 @@ const NewInvoice = ({ invoice }) => {
           rect: toBlockRect(footerBlockBoxes.terms),
           paragraphs: termsParagraphs,
           title: "Terms & Condition",
+          wipeTopPad: 2.2,
+          titleTopInset: 1.15,
         });
       }
 
@@ -2388,6 +2488,23 @@ const NewInvoice = ({ invoice }) => {
   const formatInvoiceTaxRate = (raw) => {
     const n = parseFloat(String(raw ?? "").replace(/,/g, ""));
     return Number.isFinite(n) ? n.toFixed(2) : "0.00";
+  };
+
+  const taxSummaryThStyle = {
+    border: "1px solid #000",
+    padding: "6px 5px",
+    textAlign: "center",
+    lineHeight: "1.45",
+    verticalAlign: "middle",
+    fontWeight: "bold",
+    backgroundColor: "#f0f0f0",
+  };
+  const taxSummaryTdStyle = {
+    border: "1px solid #000",
+    padding: "6px 5px",
+    textAlign: "center",
+    lineHeight: "1.45",
+    verticalAlign: "middle",
   };
 
   // Function to render tax rows based on available tax data
@@ -2880,33 +2997,31 @@ const NewInvoice = ({ invoice }) => {
           </tbody>
         </table>
 
-        {/* Buyer Consignee Table */}
-
-<table
-  style={{
+        {/* Buyer, state/amount, notes — single grid (full-width notes row) */}
+        <table
+          style={{
             width: "100%",
             borderCollapse: "collapse",
             fontSize: "10px",
+            tableLayout: "fixed",
           }}
->
-  <tbody>
-    <tr>
-      {/* BUYER COLUMN */}
- <td
-  style={{
-    border: "1px solid #000",
-    padding: "4px",
-    width: "50%",
-    borderBottom: "0px",
-    verticalAlign: "top",
-    wordBreak: "break-word",
-    overflowWrap: "break-word",
-    borderRight: "0px",
-    whiteSpace: "normal",
-    lineHeight: "1.5",
-    overflow: "hidden"
-  }}
->
+        >
+          <tbody>
+            <tr>
+              {/* BUYER COLUMN */}
+              <td
+                style={{
+                  border: "1px solid #000",
+                  padding: "4px",
+                  width: "50%",
+                  verticalAlign: "top",
+                  wordBreak: "break-word",
+                  overflowWrap: "break-word",
+                  borderRight: "0px",
+                  whiteSpace: "normal",
+                  lineHeight: "1.5",
+                }}
+              >
   <div style={{ marginBottom: "4px" }}><b>Buyer (Bill To) : {data.buyer.name}</b></div>
 
   <div style={{ marginBottom: "3px" }}><b>Address: </b>{data.buyer.address}</div>
@@ -2928,21 +3043,19 @@ const NewInvoice = ({ invoice }) => {
 
 
 
-      {/* CONSIGNEE COLUMN */}
-  <td
-  style={{
-    border: "1px solid #000",
-    padding: "4px",               // increased from 3px
-    width: "50%",
-    borderBottom: "0px",
-    lineHeight: "1.5",
-    verticalAlign: "top",
-    wordBreak: "break-word",
-    overflowWrap: "break-word",
-    whiteSpace: "normal",
-    overflow: "hidden"
-  }}
->
+              {/* CONSIGNEE COLUMN */}
+              <td
+                style={{
+                  border: "1px solid #000",
+                  padding: "4px",
+                  width: "50%",
+                  lineHeight: "1.5",
+                  verticalAlign: "top",
+                  wordBreak: "break-word",
+                  overflowWrap: "break-word",
+                  whiteSpace: "normal",
+                }}
+              >
   <div style={{ marginBottom: "4px" }}><b>Consignee (Ship To) : {data.consignee.name}</b></div>
 
   <div style={{ marginBottom: "3px" }}><b>Address: </b>{data.consignee.address}</div>
@@ -2952,28 +3065,8 @@ const NewInvoice = ({ invoice }) => {
   <div style={{ marginBottom: "3px" }}><b>State: </b>{data.consignee.state}</div>
 
   <div style={{ marginBottom: "3px" }}><b>Contact: </b>{data.consignee.contactPerson} ({data.consignee.phone})</div>
-</td>
-
-
-
-
-
- 
-    </tr>
-  </tbody>
-</table>
-
-
-
-        {/* Additional Info Row */}
-        <table
-          style={{
-            width: "100%",
-            borderCollapse: "collapse",
-            fontSize: "10px",
-          }}
-        >
-          <tbody>
+              </td>
+            </tr>
             <tr>
               <td
                 style={{
@@ -2981,11 +3074,13 @@ const NewInvoice = ({ invoice }) => {
                   padding: "4px",
                   width: "50%",
                   fontWeight: "bold",
-                  borderBottom: "0px",
                   borderRight: "0px",
                 }}
               >
-                State Code : <span style={{ fontWeight: "normal" }}> {data.invoice.stateCode || ""}</span>
+                State Code :{" "}
+                <span style={{ fontWeight: "normal" }}>
+                  {data.invoice.stateCode || ""}
+                </span>
               </td>
               <td
                 style={{
@@ -2993,27 +3088,60 @@ const NewInvoice = ({ invoice }) => {
                   padding: "4px",
                   width: "50%",
                   fontWeight: "bold",
-                  borderBottom: "0px",
                 }}
               >
-                Amount Paid : <span style={{ fontWeight: "normal" }}> ₹{data.paymentInfo.amountPaid || "0.00"}</span>
+                Amount Paid :{" "}
+                <span style={{ fontWeight: "normal" }}>
+                  ₹{data.paymentInfo.amountPaid || "0.00"}
+                </span>
               </td>
             </tr>
-            
             <tr>
               <td
-                colSpan="2"
+                colSpan={2}
+                data-pdf-invoice-block="notes"
                 style={{
                   border: "1px solid #000",
-                  padding: "4px",
-                  fontWeight: "bold",
-                  borderBottom: "0px",
+                  padding: "6px 4px",
+                  verticalAlign: "top",
+                  lineHeight: 1.55,
+                  fontSize: "9px",
+                  boxSizing: "border-box",
                 }}
               >
-                Notes : <span style={{ fontWeight: "normal" }}>{data.notes || ""}</span>
+                <div
+                  style={{
+                    width: "100%",
+                    maxWidth: "100%",
+                  }}
+                >
+                  <div
+                    data-pdf-notes-label
+                    style={{
+                      fontWeight: "bold",
+                      marginBottom: "3px",
+                      fontSize: "9px",
+                      lineHeight: 1.55,
+                    }}
+                  >
+                    Notes :
+                  </div>
+                  <div
+                    data-pdf-notes-body
+                    style={{
+                      fontWeight: "normal",
+                      whiteSpace: "pre-wrap",
+                      wordBreak: "break-word",
+                      overflowWrap: "break-word",
+                      lineHeight: 1.55,
+                      fontSize: "9px",
+                    }}
+                  >
+                    {data.notes || ""}
+                  </div>
+                </div>
               </td>
             </tr>
-            
           </tbody>
         </table>
 
@@ -3024,6 +3152,7 @@ const NewInvoice = ({ invoice }) => {
             borderCollapse: "collapse",
             marginBottom: "10px",
             fontSize: "10px",
+            marginTop: "0px",
           }}
         >
           <thead>
@@ -3035,6 +3164,7 @@ const NewInvoice = ({ invoice }) => {
                   textAlign: "left",
                   borderBottom: "0px",
                   borderRight: "0px",
+                  borderTop: "0px",
                 }}
               >
                 Sl No.
@@ -3269,291 +3399,74 @@ const NewInvoice = ({ invoice }) => {
 
         {/* Tax Summary Table */}
         <table
+          data-invoice-tax-summary
           style={{
             width: "100%",
-            borderCollapse: "collapse",
+            borderCollapse: "separate",
+            borderSpacing: 0,
             marginBottom: "10px",
             fontSize: "9px",
           }}
         >
           <thead>
-            <tr style={{ backgroundColor: "#f0f0f0" }}>
-              <th
-                style={{
-                  border: "1px solid #000",
-                  padding: "4px",
-                  textAlign: "center",
-                  borderBottom: "0px",
-                  borderRight: "0px",
-                }}
-              >
-                HSN/SAC
-              </th>
-              <th
-                style={{
-                  border: "1px solid #000",
-                  padding: "4px",
-                  textAlign: "center",
-                  borderBottom: "0px",
-                  borderRight: "0px",
-                }}
-              >
-                Taxable Value
-              </th>
+            <tr>
+              <th style={taxSummaryThStyle}>HSN/SAC</th>
+              <th style={taxSummaryThStyle}>Taxable Value</th>
               {parseFloat(itemTotals.totalIGST) > 0 ? (
                 <>
-                  <th
-                    style={{
-                      border: "1px solid #000",
-                      padding: "4px",
-                      textAlign: "center",
-                      borderBottom: "0px",
-                      borderRight: "0px",
-                    }}
-                  >
-                    IGST
-                  </th>
-                  <th
-                    style={{
-                      border: "1px solid #000",
-                      padding: "4px",
-                      textAlign: "center",
-                      borderBottom: "0px",
-                      borderRight: "0px",
-                    }}
-                  >
-                    Rate
-                  </th>
-                  <th
-                    style={{
-                      border: "1px solid #000",
-                      padding: "4px",
-                      textAlign: "center",
-                      borderBottom: "0px",
-                      borderRight: "0px",
-                    }}
-                  >
-                    Amount
-                  </th>
+                  <th style={taxSummaryThStyle}>IGST</th>
+                  <th style={taxSummaryThStyle}>Rate</th>
+                  <th style={taxSummaryThStyle}>Amount</th>
                 </>
               ) : (
                 <>
-                  <th
-                    style={{
-                      border: "1px solid #000",
-                      padding: "4px",
-                      textAlign: "center",
-                      borderBottom: "0px",
-                      borderRight: "0px",
-                    }}
-                  >
-                    CGST
-                  </th>
-                  <th
-                    style={{
-                      border: "1px solid #000",
-                      padding: "4px",
-                      textAlign: "center",
-                      borderBottom: "0px",
-                      borderRight: "0px",
-                    }}
-                  >
-                    Rate
-                  </th>
-                  <th
-                    style={{
-                      border: "1px solid #000",
-                      padding: "4px",
-                      textAlign: "center",
-                      borderBottom: "0px",
-                      borderRight: "0px",
-                    }}
-                  >
-                    Amount
-                  </th>
-                  <th
-                    style={{
-                      border: "1px solid #000",
-                      padding: "4px",
-                      textAlign: "center",
-                      borderBottom: "0px",
-                      borderRight: "0px",
-                    }}
-                  >
-                    SGST/UTGST
-                  </th>
-                  <th
-                    style={{
-                      border: "1px solid #000",
-                      padding: "4px",
-                      textAlign: "center",
-                      borderBottom: "0px",
-                      borderRight: "0px",
-                    }}
-                  >
-                    Rate
-                  </th>
-                  <th
-                    style={{
-                      border: "1px solid #000",
-                      padding: "4px",
-                      textAlign: "center",
-                      borderBottom: "0px",
-                      borderRight: "0px",
-                    }}
-                  >
-                    Amount
-                  </th>
+                  <th style={taxSummaryThStyle}>CGST</th>
+                  <th style={taxSummaryThStyle}>Rate</th>
+                  <th style={taxSummaryThStyle}>Amount</th>
+                  <th style={taxSummaryThStyle}>SGST/UTGST</th>
+                  <th style={taxSummaryThStyle}>Rate</th>
+                  <th style={taxSummaryThStyle}>Amount</th>
                 </>
               )}
-              <th
-                style={{
-                  border: "1px solid #000",
-                  padding: "4px",
-                  textAlign: "center",
-                  borderBottom: "0px",
-                }}
-              >
-                Total Tax Amount
-              </th>
+              <th style={taxSummaryThStyle}>Total Tax Amount</th>
             </tr>
           </thead>
           <tbody>
             {hsnSummary.map((row, idx) => (
               <tr key={idx}>
-                <td
-                  style={{
-                    border: "1px solid #000",
-                    padding: "4px",
-                    borderBottom: "0px",
-                    textAlign: "center",
-                    borderRight: "0px",
-                  }}
-                >
-                  {row.hsn}
-                </td>
-
-                <td
-                  style={{
-                    border: "1px solid #000",
-                    padding: "4px",
-                    textAlign: "center",
-                    borderBottom: "0px",
-                    borderRight: "0px",
-                  }}
-                >
+                <td style={taxSummaryTdStyle}>{row.hsn}</td>
+                <td style={taxSummaryTdStyle}>
                   {formatCurrency(row.taxableValue)}
                 </td>
-
                 {parseFloat(itemTotals.totalIGST) > 0 ? (
                   <>
-                    <td
-                      style={{
-                        border: "1px solid #000",
-                        padding: "4px",
-                        textAlign: "center",
-                      }}
-                    >
-                      IGST
-                    </td>
-                    <td
-                      style={{
-                        border: "1px solid #000",
-                        padding: "4px",
-                        textAlign: "center",
-                      }}
-                    >
+                    <td style={taxSummaryTdStyle}>IGST</td>
+                    <td style={taxSummaryTdStyle}>
                       {formatInvoiceTaxRate(row.igstPercent)}%
                     </td>
-                    <td
-                      style={{
-                        border: "1px solid #000",
-                        padding: "4px",
-                        textAlign: "center",
-                      }}
-                    >
+                    <td style={taxSummaryTdStyle}>
                       {formatCurrency(row.igst)}
                     </td>
                   </>
                 ) : (
                   <>
-                    <td
-                      style={{
-                        border: "1px solid #000",
-                        padding: "4px",
-                        textAlign: "center",
-                        borderBottom: "0px",
-                        borderRight: "0px",
-                      }}
-                    >
-                      CGST
-                    </td>
-                    <td
-                      style={{
-                        border: "1px solid #000",
-                        padding: "4px",
-                        textAlign: "center",
-                        borderBottom: "0px",
-                        borderRight: "0px",
-                      }}
-                    >
+                    <td style={taxSummaryTdStyle}>CGST</td>
+                    <td style={taxSummaryTdStyle}>
                       {formatInvoiceTaxRate(row.cgstPercent)}%
                     </td>
-                    <td
-                      style={{
-                        border: "1px solid #000",
-                        padding: "4px",
-                        textAlign: "center",
-                        borderBottom: "0px",
-                        borderRight: "0px",
-                      }}
-                    >
+                    <td style={taxSummaryTdStyle}>
                       {formatCurrency(row.cgst)}
                     </td>
-                    <td
-                      style={{
-                        border: "1px solid #000",
-                        padding: "4px",
-                        textAlign: "center",
-                        borderBottom: "0px",
-                        borderRight: "0px",
-                      }}
-                    >
-                      SGST/UTGST
-                    </td>
-                    <td
-                      style={{
-                        border: "1px solid #000",
-                        padding: "4px",
-                        textAlign: "center",
-                        borderBottom: "0px",
-                        borderRight: "0px",
-                      }}
-                    >
+                    <td style={taxSummaryTdStyle}>SGST/UTGST</td>
+                    <td style={taxSummaryTdStyle}>
                       {formatInvoiceTaxRate(row.sgstPercent)}%
                     </td>
-                    <td
-                      style={{
-                        border: "1px solid #000",
-                        padding: "4px",
-                        textAlign: "center",
-                        borderBottom: "0px",
-                        borderRight: "0px",
-                      }}
-                    >
+                    <td style={taxSummaryTdStyle}>
                       {formatCurrency(row.sgst)}
                     </td>
                   </>
                 )}
-
-                <td
-                  style={{
-                    border: "1px solid #000",
-                    padding: "4px",
-                    textAlign: "center",
-                    borderBottom: "0px",
-                  }}
-                >
+                <td style={taxSummaryTdStyle}>
                   {parseFloat(itemTotals.totalIGST) > 0
                     ? formatCurrency(row.igst)
                     : formatCurrency(row.cgst + row.sgst)}
@@ -3561,109 +3474,39 @@ const NewInvoice = ({ invoice }) => {
               </tr>
             ))}
 
-            {/* TOTAL ROW */}
             <tr style={{ fontWeight: "bold" }}>
-              <td
-                style={{
-                  border: "1px solid #000",
-                  padding: "4px",
-                  borderRight: "0px",
-                  textAlign: "center",
-                  marginBottom:"2px"
-                }}
-              >
-                Total
-              </td>
-              <td
-                style={{
-                  border: "1px solid #000",
-                  padding: "4px",
-                  textAlign: "center",
-                  borderRight: "0px",
-                }}
-              >
-                {data.subtotal}
-              </td>
+              <td style={taxSummaryTdStyle}>Total</td>
+              <td style={taxSummaryTdStyle}>{data.subtotal}</td>
               {parseFloat(itemTotals.totalIGST) > 0 ? (
                 <>
-                  <td
-                    colSpan="2"
-                    style={{
-                      border: "1px solid #000",
-                      padding: "4px",
-                      textAlign: "center",
-                      borderRight: "0px",
-                    }}
-                  ></td>
-                  <td
-                    style={{
-                      border: "1px solid #000",
-                      padding: "4px",
-                      textAlign: "center",
-                      borderRight: "0px",
-                    }}
-                  >
-                    {data.igst}
-                  </td>
+                  <td colSpan={2} style={taxSummaryTdStyle} />
+                  <td style={taxSummaryTdStyle}>{data.igst}</td>
                 </>
               ) : (
                 <>
-                  <td
-                    colSpan="2"
-                    style={{
-                      border: "1px solid #000",
-                      padding: "4px",
-                      textAlign: "center",
-                      borderRight: "0px",
-                    }}
-                  ></td>
-                  <td
-                    style={{
-                      border: "1px solid #000",
-                      padding: "4px",
-                      textAlign: "center",
-                      borderRight: "0px",
-                    }}
-                  >
-                    {data.cgst}
-                  </td>
-                  <td
-                    colSpan="2"
-                    style={{
-                      border: "1px solid #000",
-                      padding: "4px",
-                      textAlign: "center",
-                      borderRight: "0px",
-                    }}
-                  ></td>
-                  <td
-                    style={{
-                      border: "1px solid #000",
-                      padding: "4px",
-                      textAlign: "center",
-                      borderRight: "0px",
-                    }}
-                  >
-                    {data.sgst}
-                  </td>
+                  <td colSpan={2} style={taxSummaryTdStyle} />
+                  <td style={taxSummaryTdStyle}>{data.cgst}</td>
+                  <td colSpan={2} style={taxSummaryTdStyle} />
+                  <td style={taxSummaryTdStyle}>{data.sgst}</td>
                 </>
               )}
-              <td
-                style={{
-                  border: "1px solid #000",
-                  padding: "4px",
-                  textAlign: "center",
-                }}
-              >
-                {data.taxAmount}
-              </td>
+              <td style={taxSummaryTdStyle}>{data.taxAmount}</td>
             </tr>
           </tbody>
         </table>
 
         {/* Tax Amount in Words */}
-        <div style={{ marginBottom: "10px", fontSize: "9px", display: "flex", justifyContent: "space-between" }}>
-          <strong data-pdf-footer-block="tax-words" style={{ display: "block", lineHeight: 1.55 }}>
+        <div
+          data-pdf-footer-block="tax-words"
+          style={{
+            marginBottom: "12px",
+            fontSize: "9px",
+            display: "flex",
+            justifyContent: "space-between",
+            lineHeight: 1.55,
+          }}
+        >
+          <strong style={{ display: "block", lineHeight: 1.55 }}>
             Tax Amount (in words) : INR- {numberToWords(data.taxAmount)}
           </strong>
           {data.roundOff !== 0 && (
@@ -3690,11 +3533,12 @@ const NewInvoice = ({ invoice }) => {
                   width: "58%",
                   verticalAlign: "top",
                   paddingRight: "16px",
+                  paddingTop: "6px",
                   fontSize: "9px",
                   lineHeight: 1.55,
                 }}
               >
-                <div style={{ fontWeight: "bold", marginBottom: "5px" }}>
+                <div style={{ fontWeight: "bold", marginBottom: "6px", marginTop: "2px" }}>
                   Terms & Condition
                 </div>
                 {data.terms.length > 0 ? (
@@ -3755,15 +3599,18 @@ const NewInvoice = ({ invoice }) => {
       justifyContent: "flex-end",
     }}
   >
-    <img
-      src={INVOICE_SIGNATURE_SRC}
-      alt="Signature"
-      style={{
-        height: "60px",
-        width: "120px",
-        objectFit: "contain",
-      }}
-    />
+    {signatureSrc ? (
+      <img
+        src={signatureSrc}
+        alt="Signature"
+        onError={handleSignatureError}
+        style={{
+          height: "60px",
+          width: "120px",
+          objectFit: "contain",
+        }}
+      />
+    ) : null}
   </div>
 
   {/* Signatory Text */}

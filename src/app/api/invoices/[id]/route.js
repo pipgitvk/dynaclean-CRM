@@ -7,6 +7,7 @@ import {
   loadInvoiceWithItemsForPdf,
   sendInvoicePaymentNoticeEmail,
 } from "@/lib/invoiceCustomerEmailNotice";
+import { ensureInvoiceItemsInsertReady } from "@/lib/ensureInvoiceItemsAutoIncrement";
 
 export async function GET(_req, context) {
   try {
@@ -422,6 +423,8 @@ export async function PATCH(req, context) {
     await conn.execute(`DELETE FROM invoice_items WHERE invoice_id = ?`, [
       invoiceId,
     ]);
+
+    await ensureInvoiceItemsInsertReady(conn);
 
     for (const item of items) {
       const item_name = item.item_name || null;

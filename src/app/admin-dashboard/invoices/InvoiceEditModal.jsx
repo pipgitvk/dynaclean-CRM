@@ -8,6 +8,10 @@ import TaxAndSummary from "./new/Tax-invoice";
 import PaymentLinkModal from "@/app/user-dashboard/invoices/new/PaymentLinkModal";
 import { useUser } from "@/context/UserContext";
 import { canEditInvoiceHsn } from "@/lib/performaInvoiceAccess";
+import {
+  isPerformaInvoiceType,
+  resolvePerformaInvoiceTerms,
+} from "@/lib/performaInvoiceTerms";
 
 const emptyItem = () => ({
   item_name: "",
@@ -211,7 +215,11 @@ export default function InvoiceEditModal({
         });
         setShowPaymentLinkModal(false);
         setNotes(inv.notes || "");
-        setEditableTerms(inv.terms_conditions || "");
+        setEditableTerms(
+          isPerformaInvoiceType(inv.type)
+            ? resolvePerformaInvoiceTerms(inv.terms_conditions)
+            : inv.terms_conditions || "",
+        );
         setRoundOff(Number(inv.round_off) || 0);
         // setIsAutoRoundOff(false); // Keep it true by default as requested
 
@@ -800,7 +808,7 @@ export default function InvoiceEditModal({
                     Terms &amp; conditions
                   </label>
                   <textarea
-                    rows={5}
+                    rows={invoiceType === "performa" ? 10 : 5}
                     className="w-full border rounded px-2 py-1.5 resize-y"
                     value={editableTerms}
                     onChange={(e) => setEditableTerms(e.target.value)}

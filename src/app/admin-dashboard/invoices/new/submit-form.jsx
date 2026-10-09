@@ -11,6 +11,10 @@ import dynacleanLogo from "@/components/logo1.jpg";
 import { LetterheadCompanyInfo, LetterheadBankLine, LetterheadSignatoryLine } from "@/components/invoice/InvoiceLetterheadSection";
 import { useUser } from "@/context/UserContext";
 import { canEditInvoiceHsn } from "@/lib/performaInvoiceAccess";
+import {
+  DEFAULT_TAX_INVOICE_TERMS,
+  getDefaultPerformaInvoiceTerms,
+} from "@/lib/performaInvoiceTerms";
 
 
 export default function InvoiceForm({ invoiceNumber, invoiceDate, invoiceType = "tax", onBack, onSuccessRedirect, initialQuotationNumber = "" }) {
@@ -236,12 +240,9 @@ export default function InvoiceForm({ invoiceNumber, invoiceDate, invoiceType = 
   }, [form.gst_number, form.state, form.state_code, isFromQuotation]);
 
   const [editableTerms, setEditableTerms] = useState(
-    `1. Payment due within specified due date.
-2. Late payment charges: Interest charges at the rate of 1.5% per month or as per MSME act 2006, whichever is higher will be charged on overdue amounts from the invoice due date.
-3. All disputes subject to Delhi jurisdiction.
-4. Goods once sold will not be taken back.
-
-Thanks for doing business with us!`,
+    invoiceType === "performa"
+      ? getDefaultPerformaInvoiceTerms()
+      : DEFAULT_TAX_INVOICE_TERMS,
   );
 
   const [notes, setNotes] = useState("");
