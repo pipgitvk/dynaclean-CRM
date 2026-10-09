@@ -25,28 +25,61 @@ const AMC_STAT_ORDER_WHERE = `
   AND COALESCE(no.is_cancelled, 0) = 0
 `;
 
+function parsePatDateInput(value) {
+  const s = String(value ?? "").trim();
+  if (!s) return null;
+  const d = dayjs(s, "YYYY-MM-DD", true);
+  return d.isValid() ? d : null;
+}
+
 export function getPatPeriodFromQuery(searchParams) {
   const today = dayjs();
-  const range = String(searchParams?.get("range") ?? "thisMonth").trim();
+  const rawFrom = String(
+    searchParams?.get("dateFrom") ?? searchParams?.get("date_from") ?? "",
+  ).trim();
+  const rawTo = String(
+    searchParams?.get("dateTo") ?? searchParams?.get("date_to") ?? "",
+  ).trim();
+  const range = String(searchParams?.get("range") ?? "").trim();
+
   let from;
   let to;
   let label;
 
-  if (range === "thisYear") {
+  const parsedFrom = parsePatDateInput(rawFrom);
+  const parsedTo = parsePatDateInput(rawTo);
+
+  if (parsedFrom && parsedTo) {
+    from = parsedFrom.startOf("day");
+    to = parsedTo.startOf("day");
+    if (from.isAfter(to)) {
+      const swap = from;
+      from = to;
+      to = swap;
+    }
+    label = `${from.format("D MMM YYYY")} – ${to.format("D MMM YYYY")}`;
+  } else if (range === "thisYear") {
     from = today.startOf("year");
     to = today.endOf("day");
     label = `Calendar year ${today.year()}`;
   } else {
     from = today.startOf("month");
     to = today.endOf("day");
-    label = from.format("MMMM YYYY");
+    label = `${from.format("D MMM YYYY")} – ${to.format("D MMM YYYY")}`;
   }
+
+  const salaryMonthFrom = from.format("YYYY-MM");
+  const salaryMonthTo = to.format("YYYY-MM");
 
   return {
     dateFrom: from.format("YYYY-MM-DD"),
     dateTo: to.format("YYYY-MM-DD"),
     label,
-    salaryMonth: from.format("YYYY-MM"),
+    periodLabel: label,
+    salaryMonthFrom,
+    salaryMonthTo,
+    /** @deprecated use salaryMonthFrom/salaryMonthTo */
+    salaryMonth: salaryMonthFrom,
   };
 }
 
@@ -71,6 +104,19 @@ export async function fetchClientExpensesTotal(conn, dateFrom, dateTo) {
   );
 }
 
+async function fetchExpenseCategoryNames(conn) {
+  try {
+    const [rows] = await conn.execute(
+      `SELECT name FROM expense_categories ORDER BY id ASC`,
+    );
+    return (rows || [])
+      .map((r) => String(r.name || "").trim())
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
 /** PAT Expenses (F) children: one row per expense head; sub-heads as nested children with +. */
 export async function fetchPatExpenseHeadLines(
   conn,
@@ -79,9 +125,20 @@ export async function fetchPatExpenseHeadLines(
   salaryBenefits = 0,
 ) {
   const lines = [];
-  if (Number(salaryBenefits) > 0) {
+  let expenseLineSeq = 0;
+
+  const pushExpenseLine = (row) => {
+    expenseLineSeq += 1;
+    const n = String(expenseLineSeq);
     lines.push({
-      id: "F-salary",
+      ...row,
+      id: n,
+      toggleKey: `F-${expenseLineSeq}`,
+    });
+  };
+
+  if (Number(salaryBenefits) > 0) {
+    pushExpenseLine({
       label: "Employee Salary & Benefits",
       amount: Number(salaryBenefits) || 0,
     });
@@ -134,33 +191,51 @@ export async function fetchPatExpenseHeadLines(
     }
   }
 
-  let headIdx = 0;
+  const categoryNames = await fetchExpenseCategoryNames(conn);
+  const catalogSet = new Set(categoryNames);
+  const orderedHeadEntries = [];
+
+  for (const name of categoryNames) {
+    const bucket = headMap.get(name);
+    if (bucket && bucket.expenseTotal > 0) {
+      orderedHeadEntries.push([name, bucket]);
+    }
+  }
+
   for (const [headLabel, bucket] of [...headMap.entries()].sort((a, b) =>
     a[0].localeCompare(b[0]),
   )) {
+    if (!catalogSet.has(headLabel) && bucket.expenseTotal > 0) {
+      orderedHeadEntries.push([headLabel, bucket]);
+    }
+  }
+
+  for (const [headLabel, bucket] of orderedHeadEntries) {
+    const headToggleKey = `F-${expenseLineSeq + 1}`;
     const subChildren = [...bucket.subMap.entries()]
       .sort((a, b) => a[0].localeCompare(b[0]))
+      .filter(([, amount]) => Number(amount) > 0)
       .map(([sh, amount], subIdx) => ({
-        id: `F-h-${headIdx}-s-${subIdx}`,
+        id: "",
+        toggleKey: `${headToggleKey}-s-${subIdx}`,
         label: sh,
         amount,
       }));
 
     if (bucket.noSubTotal > 0 && subChildren.length > 0) {
       subChildren.push({
-        id: `F-h-${headIdx}-s-other`,
+        id: "",
+        toggleKey: `${headToggleKey}-s-other`,
         label: "Other (no sub-head)",
         amount: bucket.noSubTotal,
       });
     }
 
-    lines.push({
-      id: `F-h-${headIdx}`,
+    pushExpenseLine({
       label: headLabel,
       amount: bucket.expenseTotal,
       ...(subChildren.length > 0 ? { children: subChildren } : {}),
     });
-    headIdx += 1;
   }
 
   return lines;
@@ -345,7 +420,10 @@ export async function fetchAmcServiceChargesFromOrders(conn, dateFrom, dateTo) {
   }
 }
 
-export async function buildAdminPatSummary(conn, { dateFrom, dateTo, periodLabel, salaryMonth }) {
+export async function buildAdminPatSummary(
+  conn,
+  { dateFrom, dateTo, periodLabel, salaryMonthFrom, salaryMonthTo, salaryMonth },
+) {
   const revenueSales = await fetchApprovedOrderTaxableRevenue(conn, dateFrom, dateTo);
 
   const amcService = await fetchAmcServiceChargesFromOrders(conn, dateFrom, dateTo);
@@ -405,13 +483,16 @@ export async function buildAdminPatSummary(conn, { dateFrom, dateTo, periodLabel
 
   const grossProfit = totalRevenue - purchaseCogs;
 
+  const smFrom = salaryMonthFrom || salaryMonth;
+  const smTo = salaryMonthTo || salaryMonth || smFrom;
   const salaryBenefits = await safeSum(
     conn,
     `SELECT COALESCE(SUM(net_salary), 0) AS total
      FROM monthly_salary_records
-     WHERE salary_month = ?
+     WHERE salary_month >= ?
+       AND salary_month <= ?
        AND LOWER(COALESCE(status, '')) IN ('approved', 'paid')`,
-    [salaryMonth],
+    [smFrom, smTo],
   );
 
   const expenseLines = await fetchPatExpenseHeadLines(
@@ -630,6 +711,24 @@ export async function fetchPatDrillRows(conn, section, dateFrom, dateTo) {
 
 /** Client expenses for PAT drill-down, grouped by calendar month (newest month first). */
 export async function fetchPatExpenseDrillByMonth(conn, dateFrom, dateTo) {
+  const smFrom = dayjs(dateFrom).format("YYYY-MM");
+  const smTo = dayjs(dateTo).format("YYYY-MM");
+  const salaryBenefits = await safeSum(
+    conn,
+    `SELECT COALESCE(SUM(net_salary), 0) AS total
+     FROM monthly_salary_records
+     WHERE salary_month >= ?
+       AND salary_month <= ?
+       AND LOWER(COALESCE(status, '')) IN ('approved', 'paid')`,
+    [smFrom, smTo],
+  );
+  const byHead = await fetchPatExpenseHeadLines(
+    conn,
+    dateFrom,
+    dateTo,
+    salaryBenefits,
+  );
+
   const [rows] = await conn.execute(
     `
       SELECT id, expense_name, client_name, head, amount, created_at
@@ -670,5 +769,5 @@ export async function fetchPatExpenseDrillByMonth(conn, dateFrom, dateTo) {
   const grandTotal = months.reduce((s, m) => s + m.total, 0);
   const lineCount = months.reduce((s, m) => s + m.rows.length, 0);
 
-  return { byMonth: true, months, grandTotal, lineCount };
+  return { byMonth: true, months, grandTotal, lineCount, byHead };
 }
