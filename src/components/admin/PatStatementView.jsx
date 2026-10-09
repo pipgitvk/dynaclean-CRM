@@ -16,6 +16,7 @@ import {
   CalendarDays,
   Package,
   Landmark,
+  X,
 } from "lucide-react";
 
 export function formatPatInr(value, isPercent = false) {
@@ -28,6 +29,15 @@ export function formatPatInr(value, isPercent = false) {
     maximumFractionDigits: 2,
   }).format(n);
 }
+
+const PAT_ORDER_ITEM_DRILL_SECTIONS = new Set([
+  "revenue_sales",
+  "amc_service",
+  "machine_repair",
+  "spare_parts_sales",
+  "installation_charges",
+  "freight_recovered",
+]);
 
 const ROW_VARIANT_CLASS = {
   totalBlue: "bg-blue-50/90 font-semibold text-slate-900",
@@ -60,6 +70,19 @@ function rowVariantForId(id) {
   if (id === "E" || id === "I") return "totalGreen";
   if (id === "J") return "margin";
   return null;
+}
+
+/** Unique expand/drill keys so e.g. B child "1" and F child "1" do not share state. */
+function resolvePatRowToggleKey(row, parentToggleKey = "") {
+  const rowKey = row.toggleKey ?? row.id;
+  const leaf =
+    rowKey !== "" && rowKey != null
+      ? String(rowKey)
+      : `_${String(row.label || "row")
+          .trim()
+          .slice(0, 48)
+          .replace(/\s+/g, "-")}`;
+  return parentToggleKey ? `${parentToggleKey}/${leaf}` : leaf;
 }
 
 function KpiCard({ tone, icon: Icon, label, value }) {
@@ -96,6 +119,92 @@ function KpiCard({ tone, icon: Icon, label, value }) {
   );
 }
 
+function PatOrderItemsModal({ state, onClose, formatInr }) {
+  if (!state?.open) return null;
+  const { orderId, quoteNumber, loading, items, error } = state;
+
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/50 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="pat-order-items-title"
+      onClick={onClose}
+    >
+      <div
+        className="max-h-[85vh] w-full max-w-lg overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3 border-b border-slate-200 px-4 py-3">
+          <div>
+            <h2 id="pat-order-items-title" className="text-base font-semibold text-slate-900">
+              Order {orderId}
+            </h2>
+            {quoteNumber ? (
+              <p className="mt-0.5 text-xs text-slate-500">Quotation: {quoteNumber}</p>
+            ) : null}
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+            aria-label="Close"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="max-h-[calc(85vh-4rem)] overflow-y-auto p-4">
+          {loading ? (
+            <p className="flex items-center gap-2 text-sm text-slate-500">
+              <Loader2 className="h-4 w-4 animate-spin" /> Loading products…
+            </p>
+          ) : error ? (
+            <p className="text-sm text-red-600">{error}</p>
+          ) : items.length === 0 ? (
+            <p className="text-sm text-slate-500">No line items for this order.</p>
+          ) : (
+            <table className="w-full text-left text-sm">
+              <thead className="border-b border-slate-200 text-xs font-semibold uppercase text-slate-600">
+                <tr>
+                  <th className="pb-2 pr-2">Product name</th>
+                  <th className="pb-2 pr-2 text-right w-16">Qty</th>
+                  <th className="pb-2 text-right w-28">Price (₹)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((item) => {
+                  const qty = Number(item.quantity) || 0;
+                  const unitPrice =
+                    Number(item.price_per_unit) ||
+                    (qty > 0 && Number(item.taxable_price)
+                      ? Number(item.taxable_price) / qty
+                      : Number(item.taxable_price) || 0);
+                  const name =
+                    String(item.item_name || "").trim() ||
+                    String(item.item_code || "").trim() ||
+                    "—";
+                  return (
+                    <tr key={item.id} className="border-t border-slate-100">
+                      <td className="py-2 pr-2 text-slate-800">{name}</td>
+                      <td className="py-2 pr-2 text-right tabular-nums text-slate-700">
+                        {qty}
+                        {item.unit ? ` ${item.unit}` : ""}
+                      </td>
+                      <td className="py-2 text-right tabular-nums text-slate-900">
+                        {formatInr(unitPrice)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function PatRow({
   row,
   bold = false,
@@ -103,20 +212,33 @@ function PatRow({
   expandedMap,
   onToggle,
   onLoadDrill,
-  drill,
+  onOpenOrderItems,
+  drillByKey,
   indent = 0,
+  parentToggleKey = "",
 }) {
-  const toggleKey = row.toggleKey || row.id;
-  const expanded = Boolean(expandedMap[toggleKey]);
-  const drillActive =
-    drill.section === row.drillSection && drill.parentKey === toggleKey;
-  const drillLoading = drill.loading && drillActive;
-  const drillRows = drillActive ? drill.rows : [];
-  const drillExpenseByMonth = drillActive ? drill.expenseByMonth : null;
+  const toggleKey = resolvePatRowToggleKey(row, parentToggleKey);
+  const rowDrill = drillByKey[toggleKey];
   const canExpandChildren =
     Array.isArray(row.children) && row.children.length > 0;
+  const canExpandLineDetail =
+    Array.isArray(row.lineDetailRows) && row.lineDetailRows.length > 0;
   const canDrill = Boolean(row.drillSection);
-  const canExpand = canExpandChildren || canDrill;
+  const isDrillOnlyRow =
+    canDrill && !canExpandChildren && !canExpandLineDetail;
+  const drillOpen = Boolean(
+    row.drillSection &&
+      rowDrill?.section === row.drillSection &&
+      (rowDrill.loading || rowDrill.loaded),
+  );
+  const expanded = isDrillOnlyRow
+    ? drillOpen
+    : Boolean(expandedMap[toggleKey]);
+  const drillActive = drillOpen;
+  const drillLoading = Boolean(drillActive && rowDrill?.loading);
+  const drillRows = drillActive ? rowDrill?.rows ?? [] : [];
+  const drillExpenseByMonth = drillActive ? rowDrill?.expenseByMonth : null;
+  const canExpand = canExpandChildren || canDrill || canExpandLineDetail;
 
   const rowClass =
     variant && ROW_VARIANT_CLASS[variant]
@@ -140,10 +262,10 @@ function PatRow({
               <button
                 type="button"
                 onClick={() => {
-                  if (canExpandChildren) {
+                  if (canExpandChildren || canExpandLineDetail) {
                     onToggle(toggleKey);
                   } else if (canDrill) {
-                    onLoadDrill(toggleKey, row.drillSection, !expanded);
+                    onLoadDrill(toggleKey, row.drillSection, !drillOpen);
                   }
                 }}
                 className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white shadow-sm hover:bg-blue-700"
@@ -157,14 +279,6 @@ function PatRow({
               </span>
             )}
             <span className="text-sm sm:text-[15px]">{row.label}</span>
-            {row.expandHref ? (
-              <Link
-                href={row.expandHref}
-                className="rounded-full bg-blue-100 px-2.5 py-0.5 text-[11px] font-semibold text-blue-700 hover:bg-blue-200"
-              >
-                Open
-              </Link>
-            ) : null}
             {canExpandChildren && canDrill ? (
               <button
                 type="button"
@@ -180,20 +294,49 @@ function PatRow({
           {formatPatInr(row.amount, row.isPercent)}
         </td>
       </tr>
-      {expanded && Array.isArray(row.children)
+      {!isDrillOnlyRow && expandedMap[toggleKey] && Array.isArray(row.children)
         ? row.children.map((child) => (
             <PatRow
-              key={child.toggleKey || child.id}
+              key={resolvePatRowToggleKey(child, toggleKey)}
               row={child}
               indent={indent + 1}
+              parentToggleKey={toggleKey}
               expandedMap={expandedMap}
               onToggle={onToggle}
               onLoadDrill={onLoadDrill}
-              drill={drill}
+              onOpenOrderItems={onOpenOrderItems}
+              drillByKey={drillByKey}
             />
           ))
         : null}
-      {expanded && row.drillSection && drillActive ? (
+      {!canExpandChildren &&
+      expandedMap[toggleKey] &&
+      canExpandLineDetail ? (
+        <tr className="border-b border-slate-100 bg-slate-50/70">
+          <td />
+          <td
+            colSpan={2}
+            className="px-3 py-2 sm:px-4"
+            style={{ paddingLeft: `${8 + (indent + 1) * 18}px` }}
+          >
+            <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white text-xs shadow-sm">
+              <table className="w-full min-w-[280px]">
+                <tbody>
+                  {row.lineDetailRows.map((d) => (
+                    <tr key={`${d.label}-${d.value}`} className="border-t border-slate-100 first:border-t-0">
+                      <td className="px-2 py-1.5 font-medium text-slate-600 w-28">
+                        {d.label}
+                      </td>
+                      <td className="px-2 py-1.5 text-slate-800">{d.value}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </td>
+        </tr>
+      ) : null}
+      {drillActive ? (
         <tr>
           <td colSpan={3} className="bg-slate-50/90 px-4 py-4 border-b border-slate-100">
             {drillLoading ? (
@@ -290,30 +433,51 @@ function PatRow({
                   </div>
                 </details>
               </div>
-            ) : drillRows?.length ? (
+            ) : row.drillSection !== "expenses" ? (
               <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
                 <table className="w-full min-w-[480px] text-left text-xs">
                   <thead className="bg-slate-100 text-slate-600">
                     <tr>
-                      {row.drillSection === "amc_service" ? (
+                      {row.drillSection === "revenue_sales" ? (
                         <>
-                          <th className="px-2 py-1.5">Order</th>
+                          <th className="px-2 py-1.5">Order ID</th>
+                          <th className="px-2 py-1.5">Quotation</th>
+                          <th className="px-2 py-1.5">Created by</th>
+                          <th className="px-2 py-1.5 text-right">Taxable (ex-GST)</th>
+                        </>
+                      ) : row.drillSection === "amc_service" ? (
+                        <>
+                          <th className="px-2 py-1.5">Order ID</th>
                           <th className="px-2 py-1.5">Quotation</th>
                           <th className="px-2 py-1.5">AMC/CAMC · By</th>
                           <th className="px-2 py-1.5 text-right">Taxable (ex-GST)</th>
                         </>
                       ) : row.drillSection === "machine_repair" ? (
                         <>
-                          <th className="px-2 py-1.5">Order</th>
+                          <th className="px-2 py-1.5">Order ID</th>
                           <th className="px-2 py-1.5">Quotation</th>
                           <th className="px-2 py-1.5">Spare / service line · By</th>
                           <th className="px-2 py-1.5 text-right">Taxable (ex-GST)</th>
                         </>
                       ) : row.drillSection === "spare_parts_sales" ? (
                         <>
-                          <th className="px-2 py-1.5">Order</th>
+                          <th className="px-2 py-1.5">Order ID</th>
                           <th className="px-2 py-1.5">Quotation</th>
                           <th className="px-2 py-1.5">Spare part · By</th>
+                          <th className="px-2 py-1.5 text-right">Taxable (ex-GST)</th>
+                        </>
+                      ) : row.drillSection === "installation_charges" ? (
+                        <>
+                          <th className="px-2 py-1.5">Order ID</th>
+                          <th className="px-2 py-1.5">Quotation</th>
+                          <th className="px-2 py-1.5">Installation line · By</th>
+                          <th className="px-2 py-1.5 text-right">Taxable (ex-GST)</th>
+                        </>
+                      ) : row.drillSection === "freight_recovered" ? (
+                        <>
+                          <th className="px-2 py-1.5">Order ID</th>
+                          <th className="px-2 py-1.5">Quotation</th>
+                          <th className="px-2 py-1.5">Freight line · By</th>
                           <th className="px-2 py-1.5 text-right">Taxable (ex-GST)</th>
                         </>
                       ) : (
@@ -327,16 +491,45 @@ function PatRow({
                     </tr>
                   </thead>
                   <tbody>
-                    {drillRows.map((d) => (
-                      <tr key={d.id} className="border-t border-slate-100">
-                        <td className="px-2 py-1.5">{d.col1}</td>
-                        <td className="px-2 py-1.5">{d.col2}</td>
-                        <td className="px-2 py-1.5">{d.col3}</td>
-                        <td className="px-2 py-1.5 text-right tabular-nums">
-                          {formatPatInr(d.amount)}
+                    {drillRows.length > 0 ? (
+                      drillRows.map((d) => (
+                        <tr key={d.id} className="border-t border-slate-100">
+                          <td className="px-2 py-1.5">
+                            {PAT_ORDER_ITEM_DRILL_SECTIONS.has(row.drillSection) &&
+                            onOpenOrderItems ? (
+                              <button
+                                type="button"
+                                className="font-medium text-blue-700 hover:text-blue-900 hover:underline"
+                                onClick={() =>
+                                  onOpenOrderItems(
+                                    d.orderId ?? d.col1,
+                                    d.quoteNumber ?? d.col2,
+                                  )
+                                }
+                              >
+                                {d.col1}
+                              </button>
+                            ) : (
+                              d.col1
+                            )}
+                          </td>
+                          <td className="px-2 py-1.5">{d.col2}</td>
+                          <td className="px-2 py-1.5">{d.col3}</td>
+                          <td className="px-2 py-1.5 text-right tabular-nums">
+                            {formatPatInr(d.amount)}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr className="border-t border-slate-100">
+                        <td
+                          colSpan={4}
+                          className="px-2 py-3 text-center text-slate-500"
+                        >
+                          No orders in this period for this line.
                         </td>
                       </tr>
-                    ))}
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -373,24 +566,79 @@ export default function PatStatementView() {
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState(null);
   const [expanded, setExpanded] = useState({});
-  const [drill, setDrill] = useState({
-    section: null,
-    parentKey: null,
-    rows: [],
-    expenseByMonth: null,
+  const [drillByKey, setDrillByKey] = useState({});
+  const [orderItemsModal, setOrderItemsModal] = useState({
+    open: false,
+    orderId: "",
+    quoteNumber: "",
     loading: false,
+    items: [],
+    error: null,
   });
+
+  const openOrderItems = useCallback(async (orderId, quoteNumberRaw) => {
+    const quoteNumber = String(quoteNumberRaw ?? "").trim();
+    if (!quoteNumber || quoteNumber === "—") {
+      setOrderItemsModal({
+        open: true,
+        orderId: String(orderId ?? ""),
+        quoteNumber: "",
+        loading: false,
+        items: [],
+        error: "Quotation not linked to this order.",
+      });
+      return;
+    }
+    setOrderItemsModal({
+      open: true,
+      orderId: String(orderId ?? ""),
+      quoteNumber,
+      loading: true,
+      items: [],
+      error: null,
+    });
+    try {
+      const res = await fetch(
+        `/api/orders/items?quote_number=${encodeURIComponent(quoteNumber)}`,
+      );
+      const data = await res.json();
+      if (!data.success) {
+        setOrderItemsModal((prev) => ({
+          ...prev,
+          loading: false,
+          error: data.error || "Could not load products.",
+        }));
+        return;
+      }
+      setOrderItemsModal((prev) => ({
+        ...prev,
+        loading: false,
+        items: Array.isArray(data.items) ? data.items : [],
+      }));
+    } catch {
+      setOrderItemsModal((prev) => ({
+        ...prev,
+        loading: false,
+        error: "Could not load products.",
+      }));
+    }
+  }, []);
+
+  const closeOrderItemsModal = useCallback(() => {
+    setOrderItemsModal({
+      open: false,
+      orderId: "",
+      quoteNumber: "",
+      loading: false,
+      items: [],
+      error: null,
+    });
+  }, []);
 
   const loadSummary = useCallback(async () => {
     setLoading(true);
     setExpanded({});
-    setDrill({
-      section: null,
-      parentKey: null,
-      rows: [],
-      expenseByMonth: null,
-      loading: false,
-    });
+    setDrillByKey({});
     try {
       const q = patPeriodQueryParams(dateFrom, dateTo);
       const res = await fetch(`/api/admin-dashboard/pat-summary?${q}`);
@@ -440,64 +688,110 @@ export default function PatStatementView() {
 
   const toggleRow = (key) => {
     const next = !expanded[key];
-    setExpanded((prev) => ({ ...prev, [key]: next }));
-    if (!next && drill.parentKey === key) {
-      setDrill({
-        section: null,
-        parentKey: null,
-        rows: [],
-        expenseByMonth: null,
-        loading: false,
+    setExpanded((prev) => {
+      const nextState = { ...prev, [key]: next };
+      if (!next) {
+        for (const k of Object.keys(nextState)) {
+          if (k.startsWith(`${key}/`)) {
+            delete nextState[k];
+          }
+        }
+      }
+      return nextState;
+    });
+    if (!next) {
+      setDrillByKey((prev) => {
+        const rest = {};
+        for (const [k, v] of Object.entries(prev)) {
+          if (k !== key && !k.startsWith(`${key}/`)) {
+            rest[k] = v;
+          }
+        }
+        return rest;
       });
     }
   };
 
   const loadDrill = async (parentKey, drillSection, open = true) => {
-    if (open) {
-      setExpanded((prev) => ({ ...prev, [parentKey]: true }));
+    if (!open) {
+      setExpanded((prev) => ({ ...prev, [parentKey]: false }));
+      setDrillByKey((prev) => {
+        if (!prev[parentKey]) return prev;
+        const { [parentKey]: _removed, ...rest } = prev;
+        return rest;
+      });
+      return;
     }
-    setDrill({
-      section: drillSection,
-      parentKey,
-      rows: [],
-      expenseByMonth: null,
-      loading: true,
+
+    let shouldFetch = true;
+    setDrillByKey((prev) => {
+      const cur = prev[parentKey];
+      if (cur?.section === drillSection && cur.loaded && !cur.loading) {
+        shouldFetch = false;
+        return prev;
+      }
+      return {
+        ...prev,
+        [parentKey]: {
+          section: drillSection,
+          loading: true,
+          loaded: false,
+          rows: [],
+          expenseByMonth: null,
+        },
+      };
     });
+    if (!shouldFetch) return;
+
     try {
       const q = patPeriodQueryParams(dateFrom, dateTo);
       q.set("section", drillSection);
       const res = await fetch(`/api/admin-dashboard/pat-summary?${q}`);
       const data = await res.json();
       if (data.success && data.expenseByMonth) {
-        setDrill({
-          section: drillSection,
-          parentKey,
-          rows: [],
-          expenseByMonth: data.expenseByMonth,
-          loading: false,
-        });
+        setDrillByKey((prev) => ({
+          ...prev,
+          [parentKey]: {
+            section: drillSection,
+            loading: false,
+            loaded: true,
+            rows: [],
+            expenseByMonth: data.expenseByMonth,
+          },
+        }));
       } else {
-        setDrill({
-          section: drillSection,
-          parentKey,
-          rows: data.success && Array.isArray(data.rows) ? data.rows : [],
-          expenseByMonth: null,
-          loading: false,
-        });
+        setDrillByKey((prev) => ({
+          ...prev,
+          [parentKey]: {
+            section: drillSection,
+            loading: false,
+            loaded: true,
+            rows: data.success && Array.isArray(data.rows) ? data.rows : [],
+            expenseByMonth: null,
+          },
+        }));
       }
     } catch {
-      setDrill({
-        section: drillSection,
-        parentKey,
-        rows: [],
-        expenseByMonth: null,
-        loading: false,
-      });
+      setDrillByKey((prev) => ({
+        ...prev,
+        [parentKey]: {
+          section: drillSection,
+          loading: false,
+          loaded: true,
+          rows: [],
+          expenseByMonth: null,
+        },
+      }));
     }
   };
 
   return (
     <div className="space-y-6">
+      <PatOrderItemsModal
+        state={orderItemsModal}
+        onClose={closeOrderItemsModal}
+        formatInr={(v) => formatPatInr(v)}
+      />
       <Link
         href="/admin-dashboard"
         className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-700 hover:text-blue-900 hover:underline"
@@ -615,7 +909,8 @@ export default function PatStatementView() {
                     expandedMap={expanded}
                     onToggle={toggleRow}
                     onLoadDrill={loadDrill}
-                    drill={drill}
+                    onOpenOrderItems={openOrderItems}
+                    drillByKey={drillByKey}
                   />
                 ))}
               </tbody>
