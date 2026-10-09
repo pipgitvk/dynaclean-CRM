@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getDbConnection } from "@/lib/db";
+import { getDbConnection, withDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { getISTDateTimeString } from "@/lib/istDateTime";
 import { AUTO_CHECKOUT_ATTENDANCE_ADDRESS } from "@/lib/attendanceAutoCheckoutConstants";
@@ -146,80 +146,78 @@ export async function POST(request) {
       );
     }
 
-    const conn = await getDbConnection();
-    await ensureAttendanceAutoCheckoutApprovalsTable(conn);
-    await ensureAttendanceCheckoutGpsTriggersAllowAdmin(conn);
-
     const reviewedAt = getISTDateTimeString();
     const reviewedBy =
       payload.username || payload.name || payload.email || "admin";
 
-    const [logs] = await conn.query(
-      `SELECT checkout_address FROM attendance_logs
-       WHERE username = ? AND date = ? LIMIT 1`,
-      [username, logDate]
-    );
-    if (!logs.length) {
-      return NextResponse.json(
-        { message: "Attendance log not found." },
-        { status: 404 }
+    await withDbConnection(async (conn) => {
+      await ensureAttendanceAutoCheckoutApprovalsTable(conn);
+      await ensureAttendanceCheckoutGpsTriggersAllowAdmin(conn);
+
+      const [logs] = await conn.query(
+        `SELECT checkout_address FROM attendance_logs
+         WHERE username = ? AND date = ? LIMIT 1`,
+        [username, logDate]
       );
-    }
-    const addr = String(logs[0].checkout_address ?? "").trim();
-    if (addr.toLowerCase() !== AUTO_CHECKOUT_ATTENDANCE_ADDRESS.toLowerCase()) {
-      return NextResponse.json(
-        { message: "This record is not an automatic check-out." },
-        { status: 400 }
-      );
-    }
-
-    await conn.beginTransaction();
-
-    try {
-      if (action === "approve") {
-        await conn.query(
-          `UPDATE attendance_logs
-           SET checkout_address = ?
-           WHERE username = ? AND date = ?
-             AND TRIM(COALESCE(checkout_address, '')) = ?`,
-          [
-            ADMIN_EDIT_ATTENDANCE_ADDRESS,
-            username,
-            logDate,
-            AUTO_CHECKOUT_ATTENDANCE_ADDRESS,
-          ]
-        );
-
-        await conn.query(
-          `INSERT INTO attendance_auto_checkout_approvals
-             (username, log_date, status, reviewed_by, reviewed_at, note)
-           VALUES (?, ?, 'approved', ?, ?, ?)
-           ON DUPLICATE KEY UPDATE
-             status = 'approved',
-             reviewed_by = VALUES(reviewed_by),
-             reviewed_at = VALUES(reviewed_at),
-             note = VALUES(note)`,
-          [username, logDate, reviewedBy, reviewedAt, note]
-        );
-      } else {
-        await conn.query(
-          `INSERT INTO attendance_auto_checkout_approvals
-             (username, log_date, status, reviewed_by, reviewed_at, note)
-           VALUES (?, ?, 'rejected', ?, ?, ?)
-           ON DUPLICATE KEY UPDATE
-             status = 'rejected',
-             reviewed_by = VALUES(reviewed_by),
-             reviewed_at = VALUES(reviewed_at),
-             note = VALUES(note)`,
-          [username, logDate, reviewedBy, reviewedAt, note]
-        );
+      if (!logs.length) {
+        const err = new Error("Attendance log not found.");
+        err.status = 404;
+        throw err;
+      }
+      const addr = String(logs[0].checkout_address ?? "").trim();
+      if (addr.toLowerCase() !== AUTO_CHECKOUT_ATTENDANCE_ADDRESS.toLowerCase()) {
+        const err = new Error("This record is not an automatic check-out.");
+        err.status = 400;
+        throw err;
       }
 
-      await conn.commit();
-    } catch (e) {
-      await conn.rollback();
-      throw e;
-    }
+      await conn.beginTransaction();
+      try {
+        if (action === "approve") {
+          await conn.query(
+            `UPDATE attendance_logs
+             SET checkout_address = ?
+             WHERE username = ? AND date = ?
+               AND TRIM(COALESCE(checkout_address, '')) = ?`,
+            [
+              ADMIN_EDIT_ATTENDANCE_ADDRESS,
+              username,
+              logDate,
+              AUTO_CHECKOUT_ATTENDANCE_ADDRESS,
+            ]
+          );
+
+          await conn.query(
+            `INSERT INTO attendance_auto_checkout_approvals
+               (username, log_date, status, reviewed_by, reviewed_at, note)
+             VALUES (?, ?, 'approved', ?, ?, ?)
+             ON DUPLICATE KEY UPDATE
+               status = 'approved',
+               reviewed_by = VALUES(reviewed_by),
+               reviewed_at = VALUES(reviewed_at),
+               note = VALUES(note)`,
+            [username, logDate, reviewedBy, reviewedAt, note]
+          );
+        } else {
+          await conn.query(
+            `INSERT INTO attendance_auto_checkout_approvals
+               (username, log_date, status, reviewed_by, reviewed_at, note)
+             VALUES (?, ?, 'rejected', ?, ?, ?)
+             ON DUPLICATE KEY UPDATE
+               status = 'rejected',
+               reviewed_by = VALUES(reviewed_by),
+               reviewed_at = VALUES(reviewed_at),
+               note = VALUES(note)`,
+            [username, logDate, reviewedBy, reviewedAt, note]
+          );
+        }
+
+        await conn.commit();
+      } catch (e) {
+        await conn.rollback();
+        throw e;
+      }
+    });
 
     return NextResponse.json({
       success: true,
@@ -229,9 +227,10 @@ export async function POST(request) {
     });
   } catch (err) {
     console.error("auto-checkout-approvals POST:", err);
+    const status = Number(err?.status) || 500;
     return NextResponse.json(
       { message: err.message || "Server error" },
-      { status: 500 }
+      { status }
     );
   }
 }
