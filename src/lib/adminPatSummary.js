@@ -1,9 +1,27 @@
 import dayjs from "dayjs";
 
+const ORDER_APPROVED_SQL = `
+  (
+    LOWER(TRIM(COALESCE(no.approval_status, ''))) = 'approved'
+    OR (
+      COALESCE(no.sales_status, 0) = 1
+      AND LOWER(TRIM(COALESCE(no.approval_status, ''))) NOT IN ('rejected', 'pending')
+    )
+  )
+`;
+
 const STAT_ORDER_WHERE = `
   DATE(no.created_at) >= ?
   AND DATE(no.created_at) <= ?
-  AND no.approval_status = 'approved'
+  AND ${ORDER_APPROVED_SQL}
+  AND COALESCE(no.is_cancelled, 0) = 0
+`;
+
+/** AMC income: use invoice date when set (order may be created earlier). */
+const AMC_STAT_ORDER_WHERE = `
+  DATE(COALESCE(no.invoice_date, no.created_at)) >= ?
+  AND DATE(COALESCE(no.invoice_date, no.created_at)) <= ?
+  AND ${ORDER_APPROVED_SQL}
   AND COALESCE(no.is_cancelled, 0) = 0
 `;
 
@@ -53,6 +71,101 @@ export async function fetchClientExpensesTotal(conn, dateFrom, dateTo) {
   );
 }
 
+/** PAT Expenses (F) children: one row per expense head; sub-heads as nested children with +. */
+export async function fetchPatExpenseHeadLines(
+  conn,
+  dateFrom,
+  dateTo,
+  salaryBenefits = 0,
+) {
+  const lines = [];
+  if (Number(salaryBenefits) > 0) {
+    lines.push({
+      id: "F-salary",
+      label: "Employee Salary & Benefits",
+      amount: Number(salaryBenefits) || 0,
+    });
+  }
+
+  let rows = [];
+  try {
+    [rows] = await conn.execute(
+      `
+        SELECT ce.id, ce.head, ce.amount,
+               GROUP_CONCAT(DISTINCT cesh.sub_head ORDER BY cesh.sub_head SEPARATOR ', ') AS sub_heads
+        FROM client_expenses ce
+        LEFT JOIN client_expense_sub_heads cesh ON ce.id = cesh.client_expense_id
+        WHERE DATE(ce.created_at) >= ?
+          AND DATE(ce.created_at) <= ?
+        GROUP BY ce.id, ce.head, ce.amount
+      `,
+      [dateFrom, dateTo],
+    );
+  } catch (e) {
+    console.error("fetchPatExpenseHeadLines:", e);
+    return lines;
+  }
+
+  const headMap = new Map();
+
+  for (const r of rows || []) {
+    const headLabel = String(r.head || "").trim() || "Unclassified";
+    if (!headMap.has(headLabel)) {
+      headMap.set(headLabel, {
+        expenseTotal: 0,
+        subMap: new Map(),
+        noSubTotal: 0,
+      });
+    }
+    const bucket = headMap.get(headLabel);
+    const amt = Number(r.amount) || 0;
+    bucket.expenseTotal += amt;
+
+    const shList = String(r.sub_heads || "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (shList.length === 0) {
+      bucket.noSubTotal += amt;
+    } else {
+      for (const sh of shList) {
+        bucket.subMap.set(sh, (bucket.subMap.get(sh) || 0) + amt);
+      }
+    }
+  }
+
+  let headIdx = 0;
+  for (const [headLabel, bucket] of [...headMap.entries()].sort((a, b) =>
+    a[0].localeCompare(b[0]),
+  )) {
+    const subChildren = [...bucket.subMap.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([sh, amount], subIdx) => ({
+        id: `F-h-${headIdx}-s-${subIdx}`,
+        label: sh,
+        amount,
+      }));
+
+    if (bucket.noSubTotal > 0 && subChildren.length > 0) {
+      subChildren.push({
+        id: `F-h-${headIdx}-s-other`,
+        label: "Other (no sub-head)",
+        amount: bucket.noSubTotal,
+      });
+    }
+
+    lines.push({
+      id: `F-h-${headIdx}`,
+      label: headLabel,
+      amount: bucket.expenseTotal,
+      ...(subChildren.length > 0 ? { children: subChildren } : {}),
+    });
+    headIdx += 1;
+  }
+
+  return lines;
+}
+
 export async function fetchApprovedOrderTaxableRevenue(conn, dateFrom, dateTo) {
   const [result] = await conn.execute(
     `
@@ -79,61 +192,199 @@ export async function fetchApprovedOrderTaxableRevenue(conn, dateFrom, dateTo) {
   return Number(result[0]?.taxable_amount) || 0;
 }
 
+/**
+ * AMC/CAMC lines: quotation item_code may be SKU (AMC/CAMC) or products_list.item_code
+ * (e.g. 1002500173) with item_name AMC/CAMC.
+ */
+const AMC_ITEM_MATCH_SQL = `
+  (
+    UPPER(TRIM(qi.item_code)) IN ('AMC', 'CAMC', 'CMC')
+    OR UPPER(TRIM(qi.item_name)) IN ('AMC', 'CAMC')
+    OR UPPER(qi.item_name) LIKE '%CAMC%'
+    OR UPPER(qi.item_name) LIKE '%COMPREHENSIVE MAINTENANCE%'
+    OR UPPER(qi.item_name) LIKE '%ANNUAL MAINTENANCE CONTRACT%'
+    OR EXISTS (
+      SELECT 1
+      FROM products_list pl
+      WHERE (
+          TRIM(pl.item_code) = TRIM(qi.item_code)
+          OR CAST(pl.product_number AS CHAR) = TRIM(qi.item_code)
+        )
+        AND (
+          UPPER(TRIM(pl.item_name)) IN ('AMC', 'CAMC')
+          OR UPPER(TRIM(pl.item_code)) IN ('AMC', 'CAMC', 'CMC')
+        )
+    )
+  )
+`;
+
+const ORDER_QUOTATION_HEADER_JOIN = `
+  INNER JOIN quotations_records qr ON (
+    (no.quotation_id IS NOT NULL AND no.quotation_id > 0 AND qr.\`S.No.\` = no.quotation_id)
+    OR (
+      TRIM(COALESCE(no.quote_number, '')) <> ''
+      AND TRIM(qr.quote_number) = TRIM(no.quote_number)
+    )
+  )
+  INNER JOIN quotation_items qi
+    ON TRIM(qi.quote_number) = TRIM(qr.quote_number)
+`;
+
+const AMC_QUOTATION_ITEMS_JOIN = `
+  ${ORDER_QUOTATION_HEADER_JOIN}
+   AND ${AMC_ITEM_MATCH_SQL}
+`;
+
+/** Service / repair income spares (e.g. spare_number 1110 Service Maintenance Charges). */
+const MACHINE_REPAIR_SPARE_MATCH_SQL = `
+  (
+    NOT (${AMC_ITEM_MATCH_SQL})
+    AND (
+      EXISTS (
+        SELECT 1
+        FROM spare_list sl
+        WHERE (
+            CAST(sl.spare_number AS CHAR) = TRIM(qi.item_code)
+            OR CAST(sl.id AS CHAR) = TRIM(qi.item_code)
+          )
+          AND (
+            UPPER(sl.item_name) LIKE '%SERVICE%MAINTEN%'
+            OR UPPER(sl.item_name) LIKE '%MAINTENECE%CHARGE%'
+            OR UPPER(sl.item_name) LIKE '%REPARING CHARGE%'
+            OR UPPER(sl.item_name) LIKE '%REPAIRING CHARGE%'
+            OR UPPER(sl.item_name) LIKE '%REPAIR CHARGE%'
+          )
+      )
+      OR UPPER(qi.item_name) LIKE '%SERVICE%MAINTEN%'
+      OR UPPER(qi.item_name) LIKE '%MAINTENECE%CHARGE%'
+      OR UPPER(qi.item_name) LIKE '%REPARING CHARGE%'
+    )
+  )
+`;
+
+const MACHINE_REPAIR_QUOTATION_ITEMS_JOIN = `
+  ${ORDER_QUOTATION_HEADER_JOIN}
+   AND ${MACHINE_REPAIR_SPARE_MATCH_SQL}
+`;
+
+/** Spare-parts sales: any spare_list line on the order quotation (excludes AMC & service-charge spares). */
+const SPARE_PARTS_SALES_MATCH_SQL = `
+  (
+    EXISTS (
+      SELECT 1
+      FROM spare_list sl
+      WHERE (
+          CAST(sl.spare_number AS CHAR) = TRIM(qi.item_code)
+          OR CAST(sl.id AS CHAR) = TRIM(qi.item_code)
+        )
+    )
+    AND NOT (${AMC_ITEM_MATCH_SQL})
+    AND NOT (${MACHINE_REPAIR_SPARE_MATCH_SQL})
+  )
+`;
+
+const SPARE_PARTS_QUOTATION_ITEMS_JOIN = `
+  ${ORDER_QUOTATION_HEADER_JOIN}
+   AND ${SPARE_PARTS_SALES_MATCH_SQL}
+`;
+
+const AMC_LINE_TAXABLE_SQL = `
+  COALESCE(
+    NULLIF(qi.total_taxable_amt, 0),
+    qi.taxable_price * COALESCE(qi.quantity, 1),
+    qi.taxable_price,
+    0
+  )
+`;
+
+export async function fetchMachineRepairIncomeFromOrders(conn, dateFrom, dateTo) {
+  try {
+    const [rows] = await conn.execute(
+      `SELECT COALESCE(SUM(${AMC_LINE_TAXABLE_SQL}), 0) AS total
+       FROM neworder no
+       ${MACHINE_REPAIR_QUOTATION_ITEMS_JOIN}
+       WHERE ${AMC_STAT_ORDER_WHERE}`,
+      [dateFrom, dateTo],
+    );
+    return Number(rows[0]?.total) || 0;
+  } catch (e) {
+    console.error("fetchMachineRepairIncomeFromOrders:", e);
+    return 0;
+  }
+}
+
+export async function fetchSparePartsSalesFromOrders(conn, dateFrom, dateTo) {
+  try {
+    const [rows] = await conn.execute(
+      `SELECT COALESCE(SUM(${AMC_LINE_TAXABLE_SQL}), 0) AS total
+       FROM neworder no
+       ${SPARE_PARTS_QUOTATION_ITEMS_JOIN}
+       WHERE ${AMC_STAT_ORDER_WHERE}`,
+      [dateFrom, dateTo],
+    );
+    return Number(rows[0]?.total) || 0;
+  } catch (e) {
+    console.error("fetchSparePartsSalesFromOrders:", e);
+    return 0;
+  }
+}
+
+export async function fetchAmcServiceChargesFromOrders(conn, dateFrom, dateTo) {
+  try {
+    const [rows] = await conn.execute(
+      `SELECT COALESCE(SUM(${AMC_LINE_TAXABLE_SQL}), 0) AS total
+       FROM neworder no
+       ${AMC_QUOTATION_ITEMS_JOIN}
+       WHERE ${AMC_STAT_ORDER_WHERE}`,
+      [dateFrom, dateTo],
+    );
+    return Number(rows[0]?.total) || 0;
+  } catch (e) {
+    console.error("fetchAmcServiceChargesFromOrders:", e);
+    return 0;
+  }
+}
+
 export async function buildAdminPatSummary(conn, { dateFrom, dateTo, periodLabel, salaryMonth }) {
   const revenueSales = await fetchApprovedOrderTaxableRevenue(conn, dateFrom, dateTo);
 
-  const amcService = await safeSum(
-    conn,
-    `SELECT COALESCE(SUM(COALESCE(contract_amount, amc_amount, 0)), 0) AS total
-     FROM amc_cmc
-     WHERE status IN ('approved','Approved','paid','Paid')
-       AND DATE(COALESCE(approved_time, created_time, amc_start_datetime)) >= ?
-       AND DATE(COALESCE(approved_time, created_time, amc_start_datetime)) <= ?`,
-    [dateFrom, dateTo],
-  );
-
-  const manualReceived = await safeSum(
-    conn,
-    `SELECT COALESCE(SUM(mpr.amount), 0) AS total
-     FROM manual_payment_received mpr
-     INNER JOIN manual_payment_pending mpp ON mpp.id = mpr.payment_id
-     WHERE DATE(mpr.received_date) >= ? AND DATE(mpr.received_date) <= ?`,
-    [dateFrom, dateTo],
-  );
+  const amcService = await fetchAmcServiceChargesFromOrders(conn, dateFrom, dateTo);
+  const machineRepair = await fetchMachineRepairIncomeFromOrders(conn, dateFrom, dateTo);
+  const sparePartsSales = await fetchSparePartsSalesFromOrders(conn, dateFrom, dateTo);
 
   const otherIncomeLines = [
     {
-      id: "B1",
+      id: "1",
       label: "AMC / service charges",
       amount: amcService,
-      expandHref: "/admin-dashboard/amc-cmc",
+      drillSection: "amc_service",
     },
     {
-      id: "B2",
+      id: "2",
       label: "Machine repair / service income",
-      amount: manualReceived,
-      expandHref: "/admin-dashboard/manual-payments",
+      amount: machineRepair,
+      drillSection: "machine_repair",
     },
     {
-      id: "B3",
+      id: "3",
       label: "Spare-parts sales",
-      amount: 0,
-      expandHref: "/admin-dashboard/spare/purchase/purchases",
+      amount: sparePartsSales,
+      drillSection: "spare_parts_sales",
     },
     {
-      id: "B4",
+      id: "4",
       label: "Installation / commissioning charges",
       amount: 0,
       expandHref: "/admin-dashboard/view_service_reports/upcoming-installation",
     },
     {
-      id: "B5",
+      id: "5",
       label: "Freight recovered from customer",
       amount: 0,
       expandHref: "/admin-dashboard/order",
     },
     {
-      id: "B6",
+      id: "6",
       label: "Scrap generated from manufacturing",
       amount: 0,
       expandHref: "/admin-dashboard/productions/status",
@@ -163,60 +414,17 @@ export async function buildAdminPatSummary(conn, { dateFrom, dateTo, periodLabel
     [salaryMonth],
   );
 
-  const clientExpensesTotal = await fetchClientExpensesTotal(conn, dateFrom, dateTo);
+  const expenseLines = await fetchPatExpenseHeadLines(
+    conn,
+    dateFrom,
+    dateTo,
+    salaryBenefits,
+  );
 
-  const expenseLines = [
-    {
-      id: "F7",
-      label: "Employee Salary & Benefits",
-      amount: salaryBenefits,
-      expandHref: "/accounts-dashboard/salary/generate",
-    },
-    {
-      id: "F8",
-      label: "Sales & Marketing Expenses",
-      amount: 0,
-      expandHref: "/admin-dashboard/all-expenses",
-    },
-    {
-      id: "F9",
-      label: "Service & Warranty Expenses",
-      amount: 0,
-      expandHref: "/admin-dashboard/view_service_reports",
-    },
-    {
-      id: "F10",
-      label: "Client & company expenses (client_expenses)",
-      amount: clientExpensesTotal,
-      expandHref: "/admin-dashboard/client-expenses/cards",
-    },
-    {
-      id: "F11",
-      label: "Transportation / Freight",
-      amount: 0,
-      expandHref: "/admin-dashboard/all-expenses",
-    },
-    {
-      id: "F12",
-      label: "Administrative Expenses",
-      amount: 0,
-      expandHref: "/admin-dashboard/all-expenses",
-    },
-    {
-      id: "F13",
-      label: "Depreciation",
-      amount: 0,
-      expandHref: "/admin-dashboard/ledger",
-    },
-    {
-      id: "F14",
-      label: "Other expense categories",
-      amount: 0,
-      expandHref: "/admin-dashboard/client-expenses/cards",
-    },
-  ];
-
-  const totalExpenses = salaryBenefits + clientExpensesTotal;
+  const totalExpenses = expenseLines.reduce(
+    (sum, line) => sum + (Number(line.amount) || 0),
+    0,
+  );
   const ebit = grossProfit - totalExpenses;
   const interest = 0;
   const pbt = ebit - interest;
@@ -255,6 +463,7 @@ export async function buildAdminPatSummary(conn, { dateFrom, dateTo, periodLabel
         id: "F",
         label: "Expenses",
         amount: totalExpenses,
+        drillSection: "expenses",
         children: expenseLines,
       },
       ebit: {
@@ -316,6 +525,104 @@ export async function fetchPatDrillRows(conn, section, dateFrom, dateTo) {
 
   if (section === "expenses") {
     return fetchPatExpenseDrillByMonth(conn, dateFrom, dateTo);
+  }
+
+  if (section === "spare_parts_sales") {
+    const [rows] = await conn.execute(
+      `
+        SELECT no.order_id,
+               TRIM(qr.quote_number) AS quote_number,
+               no.created_by,
+               GROUP_CONCAT(
+                 DISTINCT CONCAT(
+                   TRIM(qi.item_code),
+                   IF(TRIM(qi.item_name) <> '', CONCAT(' — ', qi.item_name), '')
+                 )
+                 ORDER BY qi.item_code SEPARATOR '; '
+               ) AS spare_lines,
+               SUM(${AMC_LINE_TAXABLE_SQL}) AS taxable_amount
+        FROM neworder no
+        ${SPARE_PARTS_QUOTATION_ITEMS_JOIN}
+        WHERE ${AMC_STAT_ORDER_WHERE}
+        GROUP BY no.order_id, qr.quote_number, no.created_by, no.created_at
+        ORDER BY no.created_at DESC
+        LIMIT 100
+      `,
+      [dateFrom, dateTo],
+    );
+    return rows.map((r) => ({
+      id: r.order_id,
+      col1: r.order_id,
+      col2: r.quote_number || "—",
+      col3: [r.spare_lines, r.created_by].filter(Boolean).join(" · ") || "—",
+      amount: Number(r.taxable_amount) || 0,
+    }));
+  }
+
+  if (section === "machine_repair") {
+    const [rows] = await conn.execute(
+      `
+        SELECT no.order_id,
+               TRIM(qr.quote_number) AS quote_number,
+               no.created_by,
+               GROUP_CONCAT(
+                 DISTINCT CONCAT(
+                   TRIM(qi.item_code),
+                   IF(TRIM(qi.item_name) <> '', CONCAT(' — ', qi.item_name), '')
+                 )
+                 ORDER BY qi.item_code SEPARATOR '; '
+               ) AS spare_lines,
+               SUM(${AMC_LINE_TAXABLE_SQL}) AS taxable_amount
+        FROM neworder no
+        ${MACHINE_REPAIR_QUOTATION_ITEMS_JOIN}
+        WHERE ${AMC_STAT_ORDER_WHERE}
+        GROUP BY no.order_id, qr.quote_number, no.created_by, no.created_at
+        ORDER BY no.created_at DESC
+        LIMIT 100
+      `,
+      [dateFrom, dateTo],
+    );
+    return rows.map((r) => ({
+      id: r.order_id,
+      col1: r.order_id,
+      col2: r.quote_number || "—",
+      col3: [r.spare_lines, r.created_by].filter(Boolean).join(" · ") || "—",
+      amount: Number(r.taxable_amount) || 0,
+    }));
+  }
+
+  if (section === "amc_service") {
+    const [rows] = await conn.execute(
+      `
+        SELECT no.order_id,
+               TRIM(qr.quote_number) AS quote_number,
+               no.created_by,
+               no.quotation_id,
+               GROUP_CONCAT(
+                 DISTINCT CONCAT(
+                   UPPER(TRIM(qi.item_code)),
+                   IF(TRIM(qi.item_name) <> '', CONCAT(' (', qi.item_name, ')'), '')
+                 )
+                 ORDER BY qi.item_code SEPARATOR '; '
+               ) AS amc_item_codes,
+               SUM(${AMC_LINE_TAXABLE_SQL}) AS taxable_amount
+        FROM neworder no
+        ${AMC_QUOTATION_ITEMS_JOIN}
+        WHERE ${AMC_STAT_ORDER_WHERE}
+        GROUP BY no.order_id, qr.quote_number, no.created_by,
+                 no.quotation_id, no.created_at
+        ORDER BY no.created_at DESC
+        LIMIT 100
+      `,
+      [dateFrom, dateTo],
+    );
+    return rows.map((r) => ({
+      id: r.order_id,
+      col1: r.order_id,
+      col2: r.quote_number || "—",
+      col3: [r.amc_item_codes, r.created_by].filter(Boolean).join(" · ") || "—",
+      amount: Number(r.taxable_amount) || 0,
+    }));
   }
 
   return [];

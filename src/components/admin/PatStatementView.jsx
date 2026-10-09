@@ -18,14 +18,17 @@ export function formatPatInr(value, isPercent = false) {
 function PatRow({
   row,
   bold = false,
-  expanded,
+  expandedMap,
   onToggle,
-  drillLoading,
-  drillRows,
-  drillExpenseByMonth,
+  drill,
   indent = 0,
 }) {
   const toggleKey = row.toggleKey || row.id;
+  const expanded = Boolean(expandedMap[toggleKey]);
+  const drillLoading = drill.loading && drill.section === row.drillSection;
+  const drillRows = drill.section === row.drillSection ? drill.rows : [];
+  const drillExpenseByMonth =
+    drill.section === row.drillSection ? drill.expenseByMonth : null;
   const canExpandChildren =
     Array.isArray(row.children) && row.children.length > 0;
   const canDrill = Boolean(row.drillSection);
@@ -75,7 +78,9 @@ function PatRow({
               key={child.id}
               row={child}
               indent={indent + 1}
+              expandedMap={expandedMap}
               onToggle={onToggle}
+              drill={drill}
             />
           ))
         : null}
@@ -145,10 +150,35 @@ function PatRow({
                 <table className="w-full min-w-[480px] text-left text-xs">
                   <thead className="bg-slate-100 text-slate-600">
                     <tr>
-                      <th className="px-2 py-1.5">Ref</th>
-                      <th className="px-2 py-1.5">Detail</th>
-                      <th className="px-2 py-1.5">Status / By</th>
-                      <th className="px-2 py-1.5 text-right">Amount</th>
+                      {row.drillSection === "amc_service" ? (
+                        <>
+                          <th className="px-2 py-1.5">Order</th>
+                          <th className="px-2 py-1.5">Quotation</th>
+                          <th className="px-2 py-1.5">AMC/CAMC · By</th>
+                          <th className="px-2 py-1.5 text-right">Taxable (ex-GST)</th>
+                        </>
+                      ) : row.drillSection === "machine_repair" ? (
+                        <>
+                          <th className="px-2 py-1.5">Order</th>
+                          <th className="px-2 py-1.5">Quotation</th>
+                          <th className="px-2 py-1.5">Spare / service line · By</th>
+                          <th className="px-2 py-1.5 text-right">Taxable (ex-GST)</th>
+                        </>
+                      ) : row.drillSection === "spare_parts_sales" ? (
+                        <>
+                          <th className="px-2 py-1.5">Order</th>
+                          <th className="px-2 py-1.5">Quotation</th>
+                          <th className="px-2 py-1.5">Spare part · By</th>
+                          <th className="px-2 py-1.5 text-right">Taxable (ex-GST)</th>
+                        </>
+                      ) : (
+                        <>
+                          <th className="px-2 py-1.5">Ref</th>
+                          <th className="px-2 py-1.5">Detail</th>
+                          <th className="px-2 py-1.5">Status / By</th>
+                          <th className="px-2 py-1.5 text-right">Amount</th>
+                        </>
+                      )}
                     </tr>
                   </thead>
                   <tbody>
@@ -317,19 +347,9 @@ export default function PatStatementView({ initialRange = "thisMonth" }) {
                     key={row.id}
                     row={row}
                     bold={row.bold}
-                    expanded={Boolean(expanded[row.toggleKey || row.id])}
+                    expandedMap={expanded}
                     onToggle={toggleRow}
-                    drillLoading={
-                      drill.loading && drill.section === row.drillSection
-                    }
-                    drillRows={
-                      drill.section === row.drillSection ? drill.rows : []
-                    }
-                    drillExpenseByMonth={
-                      drill.section === row.drillSection
-                        ? drill.expenseByMonth
-                        : null
-                    }
+                    drill={drill}
                   />
                 ))}
               </tbody>

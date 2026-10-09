@@ -55,6 +55,7 @@ export async function GET(req, { params }) {
       customerPhone,
       customerFirstName,
       quote_number: header.quote_number,
+      quotation_id: header["S.No."],
       company_name: header.company_name,
       company_address: header.company_address,
       state: header.state,

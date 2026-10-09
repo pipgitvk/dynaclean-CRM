@@ -59,6 +59,19 @@ function generateOrderId(todayCount) {
   return date + String(todayCount + 1).padStart(3, "0");
 }
 
+/** Works on MySQL/MariaDB versions that do not support ADD COLUMN IF NOT EXISTS. */
+async function ensureNeworderQuotationIdColumn(conn) {
+  const [cols] = await conn.execute(
+    `SELECT 1 AS ok FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'neworder'
+       AND COLUMN_NAME = 'quotation_id'
+     LIMIT 1`,
+  );
+  if (cols?.length) return;
+  await conn.execute(`ALTER TABLE neworder ADD COLUMN quotation_id INT NULL`);
+}
+
 // GET endpoint to fetch orders
 export async function GET(req) {
   try {
@@ -76,6 +89,8 @@ export async function GET(req) {
     const conn = await getDbConnection();
 
     // Ensure new columns exist (safe, runs only if missing)
+    await ensureNeworderQuotationIdColumn(conn);
+
     const safeAlters = [
       "ALTER TABLE neworder ADD COLUMN IF NOT EXISTS return_booking_done TINYINT(1) DEFAULT 0",
       "ALTER TABLE neworder ADD COLUMN IF NOT EXISTS return_booking_date DATE NULL",
@@ -268,38 +283,34 @@ export async function POST(req) {
     const orderId = generateOrderId(count);
     // console.log("Generated Order ID:", orderId);
 
+    await ensureNeworderQuotationIdColumn(conn);
+
+    const [quotationRows] = await conn.execute(
+      `SELECT customer_id, payment_term_days, \`S.No.\` AS quotation_id
+       FROM quotations_records WHERE quote_number = ? LIMIT 1`,
+      [quote_number],
+    );
+    const quotationRecord = quotationRows?.[0] || {};
+    const customerIdFromQuotation = quotationRecord.customer_id ?? null;
+    const quotationIdFromBody = fields.quotation_id
+      ? Number(fields.quotation_id)
+      : null;
+    const quotationId =
+      Number.isFinite(quotationIdFromBody) && quotationIdFromBody > 0
+        ? quotationIdFromBody
+        : quotationRecord.quotation_id != null
+          ? Number(quotationRecord.quotation_id)
+          : null;
+
     // Compute duedate = (client may send) OR today + payment_term_days from quotation
     let duedateISO = fields.duedate;
     if (!duedateISO) {
-      let days = 0;
-      if (quotation && quotation.payment_term_days) {
-        days = Number(quotation.payment_term_days) || 0;
-      } else {
-        // attempt to fetch from quotations_records
-        const [qRows] = await conn.execute(
-          `SELECT payment_term_days FROM quotations_records WHERE quote_number = ? LIMIT 1`,
-          [quote_number],
-        );
-        days =
-          (Array.isArray(qRows) &&
-            qRows.length &&
-            Number(qRows[0]?.payment_term_days)) ||
-          0;
-      }
+      const days = Number(quotationRecord.payment_term_days) || 0;
       const today = new Date();
       const due = new Date(today);
       due.setDate(due.getDate() + days);
       duedateISO = due.toISOString().slice(0, 10);
     }
-
-    // Get customer_id from quotation
-    const [quotationRecordForCustomer] = await conn.execute(
-      `SELECT customer_id FROM quotations_records WHERE quote_number = ? LIMIT 1`,
-      [quote_number]
-    );
-    const customerIdFromQuotation = quotationRecordForCustomer.length > 0 
-      ? quotationRecordForCustomer[0].customer_id 
-      : null;
 
     // console here
     console.log("INSERT PARAMS", {
@@ -316,15 +327,16 @@ export async function POST(req) {
 
     const [result] = await conn.execute(
       `INSERT INTO neworder
-         (order_id, quote_number, po_file, payment_proof, client_name,
+         (order_id, quote_number, quotation_id, po_file, payment_proof, client_name,
           contact, email, delivery_location, company_name, company_address,
           state, sales_status, sales_remark, ship_to, created_by, duedate, client_delivery_date, approval_status,
           po_number, payment_date, transaction_id, payment_amount, item_name, item_code, specification,
           quantity, unit, price_per_unit, taxable_price, gst, total_price, img_url, customer_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         orderId,
         quote_number,
+        quotationId,
         poFileUrl,
         paymentProofUrl,
         client_name,
