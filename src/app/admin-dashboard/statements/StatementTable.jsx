@@ -244,82 +244,158 @@ export default function StatementTable({ rows }) {
     return () => { cancelled = true; };
   }, []);
 
-  const filteredRows = useMemo(() => {    return rows.filter((row) => {
-      const qRaw = searchQuery.trim();
-      const q = qRaw.toLowerCase();
-      const isNumericSearch = /^\d+$/.test(qRaw);
+  const rowPassesStatementFilters = (row, { forOpening = false } = {}) => {
+    const qRaw = searchQuery.trim();
+    const q = qRaw.toLowerCase();
+    const isNumericSearch = /^\d+$/.test(qRaw);
 
-      // Special case: If searching for a numeric Purchase ID, show ALL matches bypassing date/status filters
+    if (!forOpening) {
+      // Special case: numeric Purchase ID — show matches bypassing date/status filters
       if (isNumericSearch) {
         const refs = getLinkedPurchaseRefs(row);
         const isPurchaseMatch = refs.some((ref) => String(ref.id) === qRaw);
         if (isPurchaseMatch) return true;
       }
+    }
 
-      if (statusFilter) {
-        const settled = isSettledRow(row);
-        if (statusFilter === "Settled" && !settled) return false;
-        if (statusFilter === "Unsettled" && settled) return false;
-      }
+    if (statusFilter) {
+      const settled = isSettledRow(row);
+      if (statusFilter === "Settled" && !settled) return false;
+      if (statusFilter === "Unsettled" && settled) return false;
+    }
 
-      if (qRaw) {
-        const matchesExpenseLinked =
-          isNumericSearch &&
-          row.client_expense_id != null &&
-          String(row.client_expense_id) === qRaw;
-        const rowTransNorm = String(row.trans_id || "").trim().toLowerCase();
-        const expenseTxnNorm = expenseTxnForIdSearch ? expenseTxnForIdSearch.toLowerCase() : "";
-        const matchesExpenseByTransId =
-          isNumericSearch &&
-          expenseIdResolved === qRaw &&
-          expenseTxnNorm !== "" &&
-          rowTransNorm === expenseTxnNorm;
+    if (qRaw) {
+      const matchesExpenseLinked =
+        isNumericSearch &&
+        row.client_expense_id != null &&
+        String(row.client_expense_id) === qRaw;
+      const rowTransNorm = String(row.trans_id || "").trim().toLowerCase();
+      const expenseTxnNorm = expenseTxnForIdSearch
+        ? expenseTxnForIdSearch.toLowerCase()
+        : "";
+      const matchesExpenseByTransId =
+        isNumericSearch &&
+        expenseIdResolved === qRaw &&
+        expenseTxnNorm !== "" &&
+        rowTransNorm === expenseTxnNorm;
 
-        // Digits-only = expense ID: only linked row OR statement.trans_id === that expense's transaction_id.
-        if (isNumericSearch) {
-          if (!matchesExpenseLinked && !matchesExpenseByTransId) return false;
-        } else {
-          const transId = (row.trans_id || "").toLowerCase();
-          const desc = (row.description || "").toLowerCase();
-          const cheqNo = (row.cheq_no || "").toLowerCase();
-          const amount = String(row.amount || "");
-          const invoiceNo = (row.invoice_number || "").toLowerCase();
-          const linked = (row.linked_purchase_ids || "").toLowerCase();
-          if (
-            !transId.includes(q) &&
-            !desc.includes(q) &&
-            !cheqNo.includes(q) &&
-            !amount.includes(q) &&
-            !invoiceNo.includes(q) &&
-            !linked.includes(q)
-          ) {
-            return false;
-          }
+      if (isNumericSearch) {
+        if (!matchesExpenseLinked && !matchesExpenseByTransId) return false;
+      } else {
+        const transId = (row.trans_id || "").toLowerCase();
+        const desc = (row.description || "").toLowerCase();
+        const cheqNo = (row.cheq_no || "").toLowerCase();
+        const amount = String(row.amount || "");
+        const invoiceNo = (row.invoice_number || "").toLowerCase();
+        const linked = (row.linked_purchase_ids || "").toLowerCase();
+        if (
+          !transId.includes(q) &&
+          !desc.includes(q) &&
+          !cheqNo.includes(q) &&
+          !amount.includes(q) &&
+          !invoiceNo.includes(q) &&
+          !linked.includes(q)
+        ) {
+          return false;
         }
       }
-      if (dateFrom || dateTo) {
-        const rowDate = row.date ? dayjs(row.date).valueOf() : 0;
-        if (dateFrom && rowDate < dayjs(dateFrom).startOf("day").valueOf()) return false;
-        if (dateTo && rowDate > dayjs(dateTo).endOf("day").valueOf()) return false;
-      }
+    }
 
-      // Linked type filter
-      if (linkedTypeFilter) {
-        const hasInvoice = !!String(row.invoice_number || "").trim();
-        const hasPurchases = getLinkedPurchaseRefs(row).filter(x => x.prefix !== "IP").length > 0;
-        const hasDD = row.dd_id != null && String(row.dd_id).trim() !== "";
-        const hasExpense = row.client_expense_id != null && String(row.client_expense_id).trim() !== "";
-        const hasAssets = row.linked_module_type === 'Assets' && row.linked_module_id != null;
-        if (linkedTypeFilter === "Invoice" && !hasInvoice) return false;
-        if (linkedTypeFilter === "Purchases" && !hasPurchases) return false;
-        if (linkedTypeFilter === "DD" && !hasDD) return false;
-        if (linkedTypeFilter === "Expense" && !hasExpense) return false;
-        if (linkedTypeFilter === "Assets" && !hasAssets) return false;
-      }
+    if (forOpening) {
+      if (!dateFrom) return false;
+      const rowDate = row.date ? dayjs(row.date).valueOf() : 0;
+      return rowDate < dayjs(dateFrom).startOf("day").valueOf();
+    }
 
-      return true;
-    });
-  }, [rows, statusFilter, searchQuery, dateFrom, dateTo, linkedTypeFilter, expenseTxnForIdSearch, expenseIdResolved]);
+    if (dateFrom || dateTo) {
+      const rowDate = row.date ? dayjs(row.date).valueOf() : 0;
+      if (dateFrom && rowDate < dayjs(dateFrom).startOf("day").valueOf()) return false;
+      if (dateTo && rowDate > dayjs(dateTo).endOf("day").valueOf()) return false;
+    }
+
+    if (linkedTypeFilter) {
+      const hasInvoice = !!String(row.invoice_number || "").trim();
+      const hasPurchases =
+        getLinkedPurchaseRefs(row).filter((x) => x.prefix !== "IP").length > 0;
+      const hasDD = row.dd_id != null && String(row.dd_id).trim() !== "";
+      const hasExpense =
+        row.client_expense_id != null &&
+        String(row.client_expense_id).trim() !== "";
+      const hasAssets =
+        row.linked_module_type === "Assets" && row.linked_module_id != null;
+      if (linkedTypeFilter === "Invoice" && !hasInvoice) return false;
+      if (linkedTypeFilter === "Purchases" && !hasPurchases) return false;
+      if (linkedTypeFilter === "DD" && !hasDD) return false;
+      if (linkedTypeFilter === "Expense" && !hasExpense) return false;
+      if (linkedTypeFilter === "Assets" && !hasAssets) return false;
+    }
+
+    return true;
+  };
+
+  const statementRowDelta = (row) => {
+    const amt = Number(row.amount || 0);
+    return row.type === "Credit" ? amt : -amt;
+  };
+
+  const filteredRows = useMemo(() => {
+    return rows.filter((row) => rowPassesStatementFilters(row, { forOpening: false }));
+  }, [
+    rows,
+    statusFilter,
+    searchQuery,
+    dateFrom,
+    dateTo,
+    linkedTypeFilter,
+    expenseTxnForIdSearch,
+    expenseIdResolved,
+    purchaseTypeByLegacyId,
+  ]);
+
+  const filteredSummary = useMemo(() => {
+    let totalDebit = 0;
+    let totalCredit = 0;
+    for (const row of filteredRows) {
+      const amt = Number(row.amount || 0);
+      if (row.type === "Debit") totalDebit += amt;
+      else if (row.type === "Credit") totalCredit += amt;
+    }
+
+    let openingBalance = 0;
+    if (dateFrom) {
+      const priorRows = rows
+        .filter((row) => rowPassesStatementFilters(row, { forOpening: true }))
+        .sort((a, b) => {
+          const da = a.date ? dayjs(a.date).valueOf() : 0;
+          const db = b.date ? dayjs(b.date).valueOf() : 0;
+          if (da !== db) return da - db;
+          return (a.id || 0) - (b.id || 0);
+        });
+      for (const row of priorRows) {
+        openingBalance += statementRowDelta(row);
+      }
+    }
+
+    const availableBalance = openingBalance + totalCredit - totalDebit;
+
+    return {
+      openingBalance,
+      totalDebit,
+      totalCredit,
+      availableBalance,
+    };
+  }, [
+    filteredRows,
+    rows,
+    dateFrom,
+    statusFilter,
+    searchQuery,
+    dateTo,
+    linkedTypeFilter,
+    expenseTxnForIdSearch,
+    expenseIdResolved,
+    purchaseTypeByLegacyId,
+  ]);
 
   // Compute running balance (chronological order: date ASC, id ASC)
   const balanceMap = {};
@@ -886,10 +962,22 @@ export default function StatementTable({ rows }) {
             className="pl-9 pr-4 py-2 border border-gray-200 rounded-lg w-full text-sm focus:ring-2 focus:ring-blue-500/25 focus:border-blue-500 outline-none"
           />
         </div>
-        <TypeableDateFilterInput value={dateFrom} onChange={setDateFrom} className="px-4 py-2 border rounded-lg w-full sm:w-36 text-sm"
-          title="From date"/>
-        <TypeableDateFilterInput value={dateTo} onChange={setDateTo} className="px-4 py-2 border rounded-lg w-full sm:w-36 text-sm"
-          title="To date"/>
+        <div className="flex flex-row gap-2 items-center shrink-0 w-full sm:w-auto">
+          <TypeableDateFilterInput
+            value={dateFrom}
+            onChange={setDateFrom}
+            wrapperClassName="relative flex w-[9.5rem] min-w-0 shrink-0 items-stretch"
+            className="px-3 py-2 border rounded-lg text-sm w-full"
+            title="From date"
+          />
+          <TypeableDateFilterInput
+            value={dateTo}
+            onChange={setDateTo}
+            wrapperClassName="relative flex w-[9.5rem] min-w-0 shrink-0 items-stretch"
+            className="px-3 py-2 border rounded-lg text-sm w-full"
+            title="To date"
+          />
+        </div>
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
@@ -973,6 +1061,50 @@ export default function StatementTable({ rows }) {
             {fixingStatus ? "Fixing..." : "Fix Settled Status"}
           </button> */}
         </div>
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {[
+          {
+            label: "Opening Balance",
+            value: filteredSummary.openingBalance,
+            color: "text-slate-800",
+          },
+          {
+            label: "Total Debit",
+            value: filteredSummary.totalDebit,
+            color: "text-red-600",
+          },
+          {
+            label: "Total Credit",
+            value: filteredSummary.totalCredit,
+            color: "text-green-600",
+          },
+          {
+            label: "Available Balance",
+            value: filteredSummary.availableBalance,
+            color:
+              filteredSummary.availableBalance >= 0
+                ? "text-green-700"
+                : "text-red-600",
+          },
+        ].map(({ label, value, color }) => (
+          <div
+            key={label}
+            className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm"
+          >
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+              {label}
+            </p>
+            <p className={`mt-1 text-lg sm:text-xl font-bold ${color}`}>
+              ₹{formatPdfAmount(value)}
+            </p>
+            <p className="text-[11px] text-gray-400 mt-1">
+              Based on {filteredRows.length} filtered row
+              {filteredRows.length !== 1 ? "s" : ""}
+            </p>
+          </div>
+        ))}
       </div>
 
       <div className="hidden md:block overflow-auto bg-white shadow rounded-lg">
