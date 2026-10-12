@@ -340,7 +340,7 @@ export default function AdminSpecialPricingTable({
                   </div>
                   <div>
                     <p className="text-gray-500">Price term</p>
-                    <p className="capitalize">
+                    <p className="capitalize font-bold text-red-600">
                       {resolveSpecialPriceTerm(row.price_term)}
                     </p>
                   </div>
@@ -548,7 +548,7 @@ export default function AdminSpecialPricingTable({
                     <td className="p-3 text-sm capitalize font-bold text-red-600">
                       {resolveSpecialPriceType(row.price_type)}
                     </td>
-                    <td className="p-3 text-sm capitalize">
+                    <td className="p-3 text-sm capitalize font-bold text-red-600">
                       {resolveSpecialPriceTerm(row.price_term)}
                     </td>
                     <td className="p-3 text-center">
