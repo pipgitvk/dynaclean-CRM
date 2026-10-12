@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Eye, Search, ArrowRightLeft, History, X, PackageX, AlertTriangle, Plus, Edit } from "lucide-react";
+import { Eye, Search, ArrowRightLeft, History, X, PackageX, AlertTriangle, Plus, Edit, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
 import Link from "next/link";
 import IncomingShipmentsTable from "./IncomingShipmentsTable";
 import AddIncomingShipment from "./AddIncomingShipment";
@@ -45,6 +45,13 @@ function ProductStockList() {
   const [showEditShipmentModal, setShowEditShipmentModal] = useState(false);
   const [selectedShipmentForEdit, setSelectedShipmentForEdit] = useState(null);
   const [isShipmentViewOnly, setIsShipmentViewOnly] = useState(false);
+
+  const [lowStockSearch, setLowStockSearch] = useState("");
+  const [lowStockModelFilter, setLowStockModelFilter] = useState("");
+  const [lowStockExpectedFrom, setLowStockExpectedFrom] = useState("");
+  const [lowStockExpectedTo, setLowStockExpectedTo] = useState("");
+  const [lowStockSortKey, setLowStockSortKey] = useState("total_quantity");
+  const [lowStockSortDir, setLowStockSortDir] = useState("asc");
 
   const handleViewSpares = (product) => {
     // Filter spares based on product/machine compatibility
@@ -490,10 +497,251 @@ function ProductStockList() {
     [...lowStockProducts, ...zeroStockProducts].forEach((p) => {
       if (p.product_code) map.set(p.product_code, p);
     });
-    return Array.from(map.values()).sort(
-      (a, b) => (a.total_quantity ?? 0) - (b.total_quantity ?? 0)
-    );
+    return Array.from(map.values());
   }, [lowStockProducts, zeroStockProducts]);
+
+  const lowStockEnrichedItems = useMemo(() => {
+    return allLowStockItems.map((p) => {
+      const totalQty = p.total_quantity ?? 0;
+      const isZero = totalQty <= 0;
+      const relatedShipment = findRelatedIncomingShipment(incomingShipments, p);
+      const incomingQty =
+        p.latest_shipment_qty ?? relatedShipment?.qty ?? null;
+      const incomingDate =
+        p.latest_shipment_expected_date ??
+        relatedShipment?.expected_arrival_date ??
+        null;
+      const incomingStatus =
+        p.latest_shipment_status ?? relatedShipment?.status ?? null;
+      const preBooked = getPreBookedQuantity(p.item_name);
+      const displayStatus =
+        incomingStatus || (isZero ? "Zero Stock" : "Low Stock");
+      const incomingDateLabel = incomingDate
+        ? new Date(incomingDate).toLocaleDateString("en-IN", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+          })
+        : "";
+
+      return {
+        ...p,
+        _totalQty: totalQty,
+        _isZero: isZero,
+        _relatedShipment: relatedShipment,
+        _incomingQty: incomingQty,
+        _incomingDate: incomingDate,
+        _incomingStatus: incomingStatus,
+        _preBooked: preBooked,
+        _netQty: totalQty - preBooked,
+        _displayStatus: displayStatus,
+        _incomingDateLabel: incomingDateLabel,
+      };
+    });
+  }, [allLowStockItems, incomingShipments, preBookingData]);
+
+  const lowStockModelOptions = useMemo(() => {
+    const codes = new Set();
+    lowStockEnrichedItems.forEach((p) => {
+      if (p.product_code) codes.add(p.product_code);
+    });
+    return Array.from(codes).sort((a, b) => a.localeCompare(b));
+  }, [lowStockEnrichedItems]);
+
+  const compareLowStockValues = (a, b, key) => {
+    const dateKeys = new Set(["expected_date"]);
+    const numberKeys = new Set([
+      "total_quantity",
+      "min_qty",
+      "delhi",
+      "south",
+      "pre_booked",
+      "net_qty",
+      "incoming_qty",
+      "product_number",
+    ]);
+
+    let va;
+    let vb;
+    switch (key) {
+      case "product_code":
+        va = a.product_code;
+        vb = b.product_code;
+        break;
+      case "item_name":
+        va = a.item_name;
+        vb = b.item_name;
+        break;
+      case "product_number":
+        va = a.product_number;
+        vb = b.product_number;
+        break;
+      case "total_quantity":
+        va = a._totalQty;
+        vb = b._totalQty;
+        break;
+      case "min_qty":
+        va = a.min_qty;
+        vb = b.min_qty;
+        break;
+      case "delhi":
+        va = a.delhi;
+        vb = b.delhi;
+        break;
+      case "south":
+        va = a.south;
+        vb = b.south;
+        break;
+      case "pre_booked":
+        va = a._preBooked;
+        vb = b._preBooked;
+        break;
+      case "net_qty":
+        va = a._netQty;
+        vb = b._netQty;
+        break;
+      case "status":
+        va = a._displayStatus;
+        vb = b._displayStatus;
+        break;
+      case "incoming_qty":
+        va = a._incomingQty;
+        vb = b._incomingQty;
+        break;
+      case "expected_date":
+        va = a._incomingDate;
+        vb = b._incomingDate;
+        break;
+      default:
+        va = "";
+        vb = "";
+    }
+
+    if (dateKeys.has(key)) {
+      const ta = va ? new Date(va).getTime() : null;
+      const tb = vb ? new Date(vb).getTime() : null;
+      if (ta == null && tb == null) return 0;
+      if (ta == null) return 1;
+      if (tb == null) return -1;
+      return ta - tb;
+    }
+
+    if (numberKeys.has(key)) {
+      const na = Number(va);
+      const nb = Number(vb);
+      const aNaN = Number.isNaN(na);
+      const bNaN = Number.isNaN(nb);
+      if (aNaN && bNaN) return 0;
+      if (aNaN) return 1;
+      if (bNaN) return -1;
+      return na - nb;
+    }
+
+    return String(va ?? "").localeCompare(String(vb ?? ""), undefined, {
+      numeric: true,
+      sensitivity: "base",
+    });
+  };
+
+  const filteredLowStockItems = useMemo(() => {
+    let items = [...lowStockEnrichedItems];
+    const search = lowStockSearch.trim().toLowerCase();
+
+    if (search) {
+      items = items.filter((row) => {
+        const blob = [
+          row.product_code,
+          row.item_name,
+          row.product_number,
+          row._totalQty,
+          row.min_qty,
+          row.delhi,
+          row.south,
+          row._preBooked,
+          row._netQty,
+          row._displayStatus,
+          row._incomingQty,
+          row._incomingDateLabel,
+        ]
+          .map((v) => String(v ?? "").toLowerCase())
+          .join(" ");
+        return blob.includes(search);
+      });
+    }
+
+    if (lowStockModelFilter) {
+      items = items.filter((row) => row.product_code === lowStockModelFilter);
+    }
+
+    if (lowStockExpectedFrom) {
+      const from = new Date(lowStockExpectedFrom);
+      from.setHours(0, 0, 0, 0);
+      items = items.filter((row) => {
+        if (!row._incomingDate) return false;
+        return new Date(row._incomingDate) >= from;
+      });
+    }
+
+    if (lowStockExpectedTo) {
+      const to = new Date(lowStockExpectedTo);
+      to.setHours(23, 59, 59, 999);
+      items = items.filter((row) => {
+        if (!row._incomingDate) return false;
+        return new Date(row._incomingDate) <= to;
+      });
+    }
+
+    const dir = lowStockSortDir === "asc" ? 1 : -1;
+    items.sort(
+      (a, b) => compareLowStockValues(a, b, lowStockSortKey) * dir,
+    );
+
+    return items;
+  }, [
+    lowStockEnrichedItems,
+    lowStockSearch,
+    lowStockModelFilter,
+    lowStockExpectedFrom,
+    lowStockExpectedTo,
+    lowStockSortKey,
+    lowStockSortDir,
+  ]);
+
+  const handleLowStockSort = (key) => {
+    if (lowStockSortKey === key) {
+      setLowStockSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setLowStockSortKey(key);
+      setLowStockSortDir("asc");
+    }
+  };
+
+  const renderLowStockSortTh = (label, key) => {
+    const active = lowStockSortKey === key;
+    return (
+      <th
+        key={key}
+        className="px-5 py-2 text-left font-semibold whitespace-nowrap"
+      >
+        <button
+          type="button"
+          onClick={() => handleLowStockSort(key)}
+          className="inline-flex items-center gap-1 hover:text-amber-900 uppercase tracking-wider"
+        >
+          {label}
+          {active ? (
+            lowStockSortDir === "asc" ? (
+              <ChevronUp size={14} className="shrink-0" />
+            ) : (
+              <ChevronDown size={14} className="shrink-0" />
+            )
+          ) : (
+            <ChevronsUpDown size={14} className="shrink-0 opacity-50" />
+          )}
+        </button>
+      </th>
+    );
+  };
 
   return (
     <div className="p-6">
@@ -660,22 +908,90 @@ function ProductStockList() {
             </div>
           </div>
 
+          <div className="mb-4 space-y-3">
+            <div className="relative">
+              <Search
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                size={18}
+              />
+              <input
+                type="text"
+                placeholder="Search all columns (code, name, qty, status, dates…)"
+                value={lowStockSearch}
+                onChange={(e) => setLowStockSearch(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+              />
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <select
+                value={lowStockModelFilter}
+                onChange={(e) => setLowStockModelFilter(e.target.value)}
+                className="px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 min-w-[10rem]"
+              >
+                <option value="">All models (product code)</option>
+                {lowStockModelOptions.map((code) => (
+                  <option key={code} value={code}>
+                    {code}
+                  </option>
+                ))}
+              </select>
+              <label className="text-xs text-gray-600 flex items-center gap-1.5">
+                Expected from
+                <input
+                  type="date"
+                  value={lowStockExpectedFrom}
+                  onChange={(e) => setLowStockExpectedFrom(e.target.value)}
+                  className="px-2 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
+              </label>
+              <label className="text-xs text-gray-600 flex items-center gap-1.5">
+                Expected to
+                <input
+                  type="date"
+                  value={lowStockExpectedTo}
+                  onChange={(e) => setLowStockExpectedTo(e.target.value)}
+                  className="px-2 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
+              </label>
+              {(lowStockSearch ||
+                lowStockModelFilter ||
+                lowStockExpectedFrom ||
+                lowStockExpectedTo) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLowStockSearch("");
+                    setLowStockModelFilter("");
+                    setLowStockExpectedFrom("");
+                    setLowStockExpectedTo("");
+                  }}
+                  className="text-sm text-amber-800 hover:underline"
+                >
+                  Clear filters
+                </button>
+              )}
+              <span className="text-sm text-gray-500 ml-auto">
+                Showing {filteredLowStockItems.length} of {allLowStockItems.length}
+              </span>
+            </div>
+          </div>
+
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
               <thead>
                 <tr className="bg-amber-100/60 text-amber-700 uppercase text-[11px] tracking-wider">
-                  <th className="px-5 py-2 text-left font-semibold">Product Code</th>
-                  <th className="px-5 py-2 text-left font-semibold">Item Name</th>
-                  <th className="px-5 py-2 text-left font-semibold">Product No.</th>
-                  <th className="px-5 py-2 text-left font-semibold">Total Qty</th>
-                  <th className="px-5 py-2 text-left font-semibold">Min Qty</th>
-                  <th className="px-5 py-2 text-left font-semibold">Delhi</th>
-                  <th className="px-5 py-2 text-left font-semibold">South</th>
-                  <th className="px-5 py-2 text-left font-semibold">Pre-booked</th>
-                  <th className="px-5 py-2 text-left font-semibold">Net Qty</th>
-                  <th className="px-5 py-2 text-left font-semibold">Status</th>
-                  <th className="px-5 py-2 text-left font-semibold">Incoming Qty</th>
-                  <th className="px-5 py-2 text-left font-semibold">Expected Date</th>
+                  {renderLowStockSortTh("Product Code", "product_code")}
+                  {renderLowStockSortTh("Item Name", "item_name")}
+                  {renderLowStockSortTh("Product No.", "product_number")}
+                  {renderLowStockSortTh("Total Qty", "total_quantity")}
+                  {renderLowStockSortTh("Min Qty", "min_qty")}
+                  {renderLowStockSortTh("Delhi", "delhi")}
+                  {renderLowStockSortTh("South", "south")}
+                  {renderLowStockSortTh("Pre-booked", "pre_booked")}
+                  {renderLowStockSortTh("Net Qty", "net_qty")}
+                  {renderLowStockSortTh("Status", "status")}
+                  {renderLowStockSortTh("Incoming Qty", "incoming_qty")}
+                  {renderLowStockSortTh("Expected Date", "expected_date")}
                   <th className="px-5 py-2 text-left font-semibold">Actions</th>
                 </tr>
               </thead>
@@ -686,22 +1002,20 @@ function ProductStockList() {
                       No low stock products found
                     </td>
                   </tr>
+                ) : filteredLowStockItems.length === 0 ? (
+                  <tr>
+                    <td colSpan="13" className="px-5 py-8 text-center text-gray-500">
+                      No products match your search or filters
+                    </td>
+                  </tr>
                 ) : (
-                  allLowStockItems.map((p, idx) => {
-                    const totalQty = p.total_quantity ?? 0;
-                    const isZero = totalQty <= 0;
-                    const relatedShipment = findRelatedIncomingShipment(
-                      incomingShipments,
-                      p
-                    );
-                    const incomingQty =
-                      p.latest_shipment_qty ?? relatedShipment?.qty ?? null;
-                    const incomingDate =
-                      p.latest_shipment_expected_date ??
-                      relatedShipment?.expected_arrival_date ??
-                      null;
-                    const incomingStatus =
-                      p.latest_shipment_status ?? relatedShipment?.status ?? null;
+                  filteredLowStockItems.map((p, idx) => {
+                    const totalQty = p._totalQty;
+                    const isZero = p._isZero;
+                    const relatedShipment = p._relatedShipment;
+                    const incomingQty = p._incomingQty;
+                    const incomingDate = p._incomingDate;
+                    const incomingStatus = p._incomingStatus;
                     return (
                       <tr
                         key={p.product_code || idx}
@@ -719,8 +1033,8 @@ function ProductStockList() {
                         <td className="px-5 py-3 text-gray-600">{p.min_qty ?? "—"}</td>
                         <td className="px-5 py-3 text-gray-700">{p.delhi ?? 0}</td>
                         <td className="px-5 py-3 text-gray-700">{p.south ?? 0}</td>
-                        <td className="px-5 py-3 font-semibold text-orange-600">{getPreBookedQuantity(p.item_name)}</td>
-                        <td className="px-5 py-3 font-semibold text-green-600">{totalQty - getPreBookedQuantity(p.item_name)}</td>
+                        <td className="px-5 py-3 font-semibold text-orange-600">{p._preBooked}</td>
+                        <td className="px-5 py-3 font-semibold text-green-600">{p._netQty}</td>
                         <td className="px-5 py-3">
                           {incomingStatus ? (
                             <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
@@ -749,13 +1063,7 @@ function ProductStockList() {
                         </td>
                         <td className="px-5 py-3 text-gray-600">
                           {incomingDate ? (
-                            <span className="text-xs">
-                              {new Date(incomingDate).toLocaleDateString('en-IN', {
-                                day: '2-digit',
-                                month: 'short',
-                                year: 'numeric'
-                              })}
-                            </span>
+                            <span className="text-xs">{p._incomingDateLabel}</span>
                           ) : (
                             <span className="text-gray-400">—</span>
                           )}
