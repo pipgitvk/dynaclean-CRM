@@ -30,15 +30,45 @@ import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
 import {
   canEditDeliveryProof,
 } from "@/lib/orderDocumentEditRules";
+import DeleteButton from "@/components/accounts/DeleteButton";
+import toast from "react-hot-toast";
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
-import DeleteButton from "@/components/accounts/DeleteButton";
+const LEAD_CAMPAIGN_OPTIONS = [
+  { value: "india_mart", label: "India Mart", color: "rgba(16, 185, 129, 0.85)" },
+  { value: "social_media", label: "Social Media", color: "rgba(236, 72, 153, 0.85)" },
+  { value: "google_ads", label: "Google Ads", color: "rgba(168, 85, 247, 0.85)" },
+  { value: "visit", label: "Visit", color: "rgba(249, 115, 22, 0.85)" },
+  { value: "website_visit", label: "Website Visit", color: "rgba(34, 211, 238, 0.85)" },
+  { value: "reference", label: "Reference", color: "rgba(59, 130, 246, 0.85)" },
+];
+
+function normalizeLeadCampaignKey(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function formatLeadCampaignLabel(value) {
+  const key = normalizeLeadCampaignKey(value);
+  if (!key) return "—";
+  const found = LEAD_CAMPAIGN_OPTIONS.find((o) => o.value === key);
+  if (found) return found.label;
+  return key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function leadCampaignColor(value) {
+  const key = normalizeLeadCampaignKey(value);
+  if (!key) return "rgba(148, 163, 184, 0.85)";
+  return (
+    LEAD_CAMPAIGN_OPTIONS.find((o) => o.value === key)?.color ||
+    "rgba(100, 116, 139, 0.85)"
+  );
+}
+
 // import {
 //   DispatchPhotosMenuButton,
 //   DispatchPhotosModal,
 // } from "@/components/orders/DispatchPhotosModal";
-import toast from "react-hot-toast";
 
 function parseOrderLineItems(order) {
   if (Array.isArray(order?.line_items)) return order.line_items;
@@ -103,6 +133,7 @@ function readOrderTableFilterState() {
       dateFrom: monthStart,
       dateTo: monthEnd,
       createdByFilter: "",
+      leadCampaignFilter: "",
       modelNameFilters: [],
       approvalStatusFilter: "",
       paymentStatusFilter: "",
@@ -125,6 +156,7 @@ function readOrderTableFilterState() {
     dateFrom: localStorage.getItem("orderTable_dateFrom") || monthStart,
     dateTo: localStorage.getItem("orderTable_dateTo") || monthEnd,
     createdByFilter: localStorage.getItem("orderTable_createdByFilter") || "",
+    leadCampaignFilter: localStorage.getItem("orderTable_leadCampaignFilter") || "",
     modelNameFilters: parseModelFiltersFromStorage(savedModel),
     approvalStatusFilter: localStorage.getItem("orderTable_approvalStatusFilter") || "",
     paymentStatusFilter: localStorage.getItem("orderTable_paymentStatusFilter") || "",
@@ -139,6 +171,7 @@ function persistOrderTableFilterState(state) {
   localStorage.setItem("orderTable_dateFrom", state.dateFrom);
   localStorage.setItem("orderTable_dateTo", state.dateTo);
   localStorage.setItem("orderTable_createdByFilter", state.createdByFilter);
+  localStorage.setItem("orderTable_leadCampaignFilter", state.leadCampaignFilter);
   localStorage.setItem("orderTable_modelNameFilters", JSON.stringify(state.modelNameFilters));
   localStorage.setItem("orderTable_approvalStatusFilter", state.approvalStatusFilter);
   localStorage.setItem("orderTable_paymentStatusFilter", state.paymentStatusFilter);
@@ -542,6 +575,12 @@ export default function OrderTable({ orders, userRole }) {
   const [appliedCreatedByFilter, setAppliedCreatedByFilter] = useState(
     () => readOrderTableFilterState().createdByFilter,
   );
+  const [leadCampaignFilter, setLeadCampaignFilter] = useState(
+    () => readOrderTableFilterState().leadCampaignFilter,
+  );
+  const [appliedLeadCampaignFilter, setAppliedLeadCampaignFilter] = useState(
+    () => readOrderTableFilterState().leadCampaignFilter,
+  );
   const [modelNameFilters, setModelNameFilters] = useState(
     () => readOrderTableFilterState().modelNameFilters,
   );
@@ -631,6 +670,7 @@ export default function OrderTable({ orders, userRole }) {
     setAppliedDateFrom(dateFrom);
     setAppliedDateTo(dateTo);
     setAppliedCreatedByFilter(createdByFilter);
+    setAppliedLeadCampaignFilter(leadCampaignFilter);
     setAppliedModelNameFilters(modelNameFilters);
     setAppliedApprovalStatusFilter(approvalStatusFilter);
     setAppliedPaymentStatusFilter(paymentStatusFilter);
@@ -641,6 +681,7 @@ export default function OrderTable({ orders, userRole }) {
       dateFrom,
       dateTo,
       createdByFilter,
+      leadCampaignFilter,
       modelNameFilters,
       approvalStatusFilter,
       paymentStatusFilter,
@@ -652,6 +693,7 @@ export default function OrderTable({ orders, userRole }) {
     dateFrom,
     dateTo,
     createdByFilter,
+    leadCampaignFilter,
     modelNameFilters,
     approvalStatusFilter,
     paymentStatusFilter,
@@ -687,6 +729,8 @@ export default function OrderTable({ orders, userRole }) {
         return order.client_name?.toString().toLowerCase() || "";
       case "company_name":
         return order.company_name?.toString().toLowerCase() || "";
+      case "lead_campaign":
+        return normalizeLeadCampaignKey(order.lead_campaign);
       case "state":
         return order.state?.toString().toLowerCase() || "";
       case "item_name":
@@ -799,6 +843,7 @@ export default function OrderTable({ orders, userRole }) {
         { header: "Item Name", key: "item_name", width: 30 },
         { header: "Item Code", key: "item_code", width: 20 },
         { header: "Created By", key: "created_by", width: 15 },
+        { header: "Lead Campaign", key: "lead_campaign", width: 18 },
         { header: "Created At", key: "created_at", width: 20 },
         { header: "Due Date", key: "duedate", width: 15 },
         { header: "Payment Status", key: "payment_status", width: 15 },
@@ -834,6 +879,7 @@ export default function OrderTable({ orders, userRole }) {
           item_name: order.item_name || "",
           item_code: order.item_code || "",
           created_by: order.created_by || "",
+          lead_campaign: formatLeadCampaignLabel(order.lead_campaign),
           created_at: order.created_at ? dayjs(order.created_at).format("DD/MM/YYYY HH:mm:ss") : "",
           duedate: order.duedate ? dayjs(order.duedate).format("DD/MM/YYYY") : "",
           payment_status: order.payment_status || "",
@@ -894,6 +940,15 @@ export default function OrderTable({ orders, userRole }) {
         return false;
       }
 
+      if (appliedLeadCampaignFilter) {
+        const campaignKey = normalizeLeadCampaignKey(order.lead_campaign);
+        if (appliedLeadCampaignFilter === "__none__") {
+          if (campaignKey) return false;
+        } else if (campaignKey !== appliedLeadCampaignFilter) {
+          return false;
+        }
+      }
+
       if (
         appliedApprovalStatusFilter &&
         order.approval_status !== appliedApprovalStatusFilter
@@ -920,7 +975,11 @@ export default function OrderTable({ orders, userRole }) {
         order.client_name?.toLowerCase().includes(lowercasedQuery) ||
         order.company_name?.toLowerCase().includes(lowercasedQuery) ||
         order.contact?.toLowerCase().includes(lowercasedQuery) ||
-        order.state?.toLowerCase().includes(lowercasedQuery)
+        order.state?.toLowerCase().includes(lowercasedQuery) ||
+        formatLeadCampaignLabel(order.lead_campaign)
+          .toLowerCase()
+          .includes(lowercasedQuery) ||
+        normalizeLeadCampaignKey(order.lead_campaign).includes(lowercasedQuery)
       );
     });
 
@@ -943,6 +1002,7 @@ export default function OrderTable({ orders, userRole }) {
     appliedDateFrom,
     appliedDateTo,
     appliedCreatedByFilter,
+    appliedLeadCampaignFilter,
     appliedApprovalStatusFilter,
     appliedPaymentStatusFilter,
     sortColumn,
@@ -1023,6 +1083,17 @@ export default function OrderTable({ orders, userRole }) {
     () => filteredOrders.filter((order) => !isOrderExcludedFromStatCards(order)),
     [filteredOrders],
   );
+
+  const leadCampaignFilterOptions = useMemo(() => {
+    const keys = new Set(LEAD_CAMPAIGN_OPTIONS.map((o) => o.value));
+    orders?.forEach((o) => {
+      const k = normalizeLeadCampaignKey(o.lead_campaign);
+      if (k) keys.add(k);
+    });
+    return [...keys].sort((a, b) =>
+      formatLeadCampaignLabel(a).localeCompare(formatLeadCampaignLabel(b)),
+    );
+  }, [orders]);
 
   const orderStats = useMemo(() => {
     return ordersForStatCards.reduce(
@@ -1222,6 +1293,106 @@ export default function OrderTable({ orders, userRole }) {
       },
     }),
     [handleStatCardClick, orderStats.total],
+  );
+
+  const leadCampaignPieChartData = useMemo(() => {
+    const counts = {};
+    ordersForStatCards.forEach((order) => {
+      const key = normalizeLeadCampaignKey(order.lead_campaign) || "__none__";
+      counts[key] = (counts[key] || 0) + 1;
+    });
+    const entries = Object.entries(counts)
+      .map(([key, value]) => ({
+        key,
+        label: key === "__none__" ? "No campaign" : formatLeadCampaignLabel(key),
+        value,
+        color:
+          key === "__none__"
+            ? "rgba(148, 163, 184, 0.85)"
+            : leadCampaignColor(key),
+      }))
+      .filter((entry) => entry.value > 0)
+      .sort((a, b) => b.value - a.value);
+
+    return {
+      labels: entries.map((entry) => entry.label),
+      keys: entries.map((entry) => entry.key),
+      datasets: [
+        {
+          data: entries.map((entry) => entry.value),
+          backgroundColor: entries.map((entry) => entry.color),
+          borderWidth: 2,
+          borderColor: "#ffffff",
+          hoverOffset: 8,
+        },
+      ],
+    };
+  }, [ordersForStatCards]);
+
+  const leadCampaignPieTotal = useMemo(() => {
+    const data = leadCampaignPieChartData.datasets[0]?.data || [];
+    return data.reduce((sum, n) => sum + Number(n || 0), 0);
+  }, [leadCampaignPieChartData]);
+
+  const leadCampaignPieChartOptions = useMemo(
+    () => ({
+      responsive: true,
+      maintainAspectRatio: false,
+      onClick: (_event, elements, chart) => {
+        if (!elements?.length) return;
+        const key = chart.data.keys?.[elements[0].index];
+        if (!key) return;
+        const filterVal = key === "__none__" ? "__none__" : key;
+        setLeadCampaignFilter(filterVal);
+        setAppliedLeadCampaignFilter(filterVal);
+        persistOrderTableFilterState({
+          searchQuery: appliedSearchQuery,
+          statusFilter: appliedStatusFilter,
+          dateFrom: appliedDateFrom,
+          dateTo: appliedDateTo,
+          createdByFilter: appliedCreatedByFilter,
+          leadCampaignFilter: filterVal,
+          modelNameFilters: appliedModelNameFilters,
+          approvalStatusFilter: appliedApprovalStatusFilter,
+          paymentStatusFilter: appliedPaymentStatusFilter,
+          showRejected: appliedShowRejected,
+        });
+      },
+      plugins: {
+        legend: {
+          position: "bottom",
+          labels: { boxWidth: 12, padding: 10, font: { size: 10 } },
+        },
+        title: {
+          display: true,
+          text: "Orders by Lead Campaign",
+          font: { size: 14, weight: "bold" },
+          padding: { bottom: 8 },
+        },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => {
+              const val = ctx.parsed || 0;
+              const total = leadCampaignPieTotal || 1;
+              const pct = ((val / total) * 100).toFixed(1);
+              return ` ${ctx.label}: ${val.toLocaleString("en-IN")} (${pct}%)`;
+            },
+          },
+        },
+      },
+    }),
+    [
+      leadCampaignPieTotal,
+      appliedSearchQuery,
+      appliedStatusFilter,
+      appliedDateFrom,
+      appliedDateTo,
+      appliedCreatedByFilter,
+      appliedModelNameFilters,
+      appliedApprovalStatusFilter,
+      appliedPaymentStatusFilter,
+      appliedShowRejected,
+    ],
   );
 
   const dispatchDoneTotals = useMemo(() => {
@@ -1474,6 +1645,26 @@ export default function OrderTable({ orders, userRole }) {
     </div>
   );
 
+  const renderLeadCampaignPieChart = () => (
+    <div className="rounded-xl border border-slate-200 bg-white shadow-sm p-4 h-full flex flex-col">
+      <div className="flex-1 min-h-[220px] lg:min-h-0">
+        {leadCampaignPieTotal > 0 && leadCampaignPieChartData.labels.length > 0 ? (
+          <Pie
+            data={leadCampaignPieChartData}
+            options={leadCampaignPieChartOptions}
+          />
+        ) : (
+          <div className="flex h-full min-h-[220px] items-center justify-center rounded-lg border border-dashed border-gray-200 bg-gray-50 text-sm text-gray-500 text-center px-3">
+            No lead campaign data for current filters
+          </div>
+        )}
+      </div>
+      <p className="text-[10px] text-gray-500 mt-2 text-center">
+        Click a slice to filter by campaign
+      </p>
+    </div>
+  );
+
   return (
     <div className="space-y-6">
       {/* Mobile / tablet: all cards in grid */}
@@ -1487,11 +1678,17 @@ export default function OrderTable({ orders, userRole }) {
           {statCards.map((card) => renderStatCard(card))}
         </div>
 
-        {renderPieChart()}
+        <div className="flex flex-col gap-3 min-h-0">
+          {renderPieChart()}
+          {renderLeadCampaignPieChart()}
+        </div>
       </div>
 
-      {/* Mobile / tablet: pie chart below cards */}
-      <div className="lg:hidden">{renderPieChart()}</div>
+      {/* Mobile / tablet: pie charts below cards */}
+      <div className="lg:hidden space-y-3">
+        {renderPieChart()}
+        {renderLeadCampaignPieChart()}
+      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
         {/* Combined Amount Summary Card */}
@@ -1855,6 +2052,23 @@ export default function OrderTable({ orders, userRole }) {
         </div>
 
         <div>
+          <label className="block text-xs text-gray-600 mb-1">Lead Campaign</label>
+          <select
+            value={leadCampaignFilter}
+            onChange={(e) => setLeadCampaignFilter(e.target.value)}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+          >
+            <option value="">All Campaigns</option>
+            <option value="__none__">No campaign</option>
+            {leadCampaignFilterOptions.map((key) => (
+              <option key={key} value={key}>
+                {formatLeadCampaignLabel(key)}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
           <label className="block text-xs text-gray-600 mb-1">
             Approval Status
           </label>
@@ -1932,6 +2146,17 @@ export default function OrderTable({ orders, userRole }) {
                 <div className="flex items-center gap-1">
                   Order Date
                   {sortColumn === "created_at" && (
+                    sortDirection === "asc" ? <ArrowUp size={14} /> : <ArrowDown size={14} />
+                  )}
+                </div>
+              </th>
+              <th
+                className="px-3 py-3 font-semibold text-left cursor-pointer hover:bg-gray-700 transition-colors"
+                onClick={() => handleSort("lead_campaign")}
+              >
+                <div className="flex items-center gap-1">
+                  Lead Campaign
+                  {sortColumn === "lead_campaign" && (
                     sortDirection === "asc" ? <ArrowUp size={14} /> : <ArrowDown size={14} />
                   )}
                 </div>
@@ -2051,6 +2276,9 @@ export default function OrderTable({ orders, userRole }) {
                     <td className="px-3 py-3 text-left">
                       {dayjs(r.created_at).format("DD/MM/YYYY")}
                     </td>
+                    <td className="px-3 py-3 text-left text-xs font-medium text-indigo-800">
+                      {formatLeadCampaignLabel(r.lead_campaign)}
+                    </td>
                     <td className="px-3 py-3 text-left">
                       <div className="space-y-1 text-xs">
                         <div>
@@ -2165,7 +2393,7 @@ export default function OrderTable({ orders, userRole }) {
               })
             ) : (
               <tr>
-                <td colSpan={13} className="px-6 py-4 text-center text-gray-500">
+                <td colSpan={14} className="px-6 py-4 text-center text-gray-500">
                   No orders found.
                 </td>
               </tr>
@@ -2241,6 +2469,10 @@ export default function OrderTable({ orders, userRole }) {
                 </div>
                 <div>
                   <strong>Created By:</strong> {r.created_by || "-"}
+                </div>
+                <div>
+                  <strong>Lead Campaign:</strong>{" "}
+                  {formatLeadCampaignLabel(r.lead_campaign)}
                 </div>
 
                 <div>

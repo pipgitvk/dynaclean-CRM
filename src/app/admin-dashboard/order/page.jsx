@@ -115,6 +115,7 @@ export default async function OrdersPage({ searchParams }) {
                 no.warehouse_in_image,
                 no.warehouse_in_by,
                 qr.company_name, qr.emp_name, qr.state, qr.grand_total as quotation_grand_total, qr.subtotal as quotation_subtotal, qr.gst as quotation_gst,
+                MAX(c.lead_campaign) AS lead_campaign,
                 MAX(cn.id) as credit_note_id,
                 MAX(cn.credit_note_number) as credit_note_number,
                 GROUP_CONCAT(DISTINCT qi.item_name SEPARATOR ', ') as item_name,
@@ -134,6 +135,8 @@ export default async function OrdersPage({ searchParams }) {
                 neworder no
             LEFT JOIN 
                 quotations_records qr ON no.quote_number = qr.quote_number
+            LEFT JOIN
+                customers c ON qr.customer_id = c.customer_id
             LEFT JOIN 
                 quotation_items qi ON no.quote_number = qi.quote_number
             LEFT JOIN
