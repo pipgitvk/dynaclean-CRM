@@ -1628,16 +1628,34 @@ export default function OrderTable({ orders, userRole }) {
     );
   };
 
-  const renderPieChart = () => (
-    <div className="rounded-xl border border-slate-200 bg-white shadow-sm p-4 h-full flex flex-col">
-      <div className="mb-3">
-        <p className="text-sm font-semibold text-gray-800">Order Distribution</p>
+  const renderPieChart = (compact = false) => (
+    <div
+      className={`rounded-xl border border-slate-200 bg-white shadow-sm h-full flex flex-col min-w-0 ${
+        compact ? "p-2" : "p-4"
+      }`}
+    >
+      <div className={compact ? "mb-1" : "mb-3"}>
+        <p
+          className={`font-semibold text-gray-800 ${
+            compact ? "text-xs" : "text-sm"
+          }`}
+        >
+          Order Distribution
+        </p>
       </div>
-      <div className="flex-1 min-h-[220px] lg:min-h-0">
+      <div
+        className={`flex-1 lg:min-h-0 ${
+          compact ? "min-h-[160px]" : "min-h-[220px]"
+        }`}
+      >
         {orderStats.total > 0 && orderPieChartData.labels.length > 0 ? (
           <Pie data={orderPieChartData} options={orderPieChartOptions} />
         ) : (
-          <div className="flex h-full min-h-[220px] items-center justify-center rounded-lg border border-dashed border-gray-200 bg-gray-50 text-sm text-gray-500">
+          <div
+            className={`flex h-full items-center justify-center rounded-lg border border-dashed border-gray-200 bg-gray-50 text-gray-500 ${
+              compact ? "min-h-[160px] text-xs px-1" : "min-h-[220px] text-sm"
+            }`}
+          >
             No order data for the selected date range
           </div>
         )}
@@ -1678,8 +1696,8 @@ export default function OrderTable({ orders, userRole }) {
           {statCards.map((card) => renderStatCard(card))}
         </div>
 
-        <div className="flex flex-col gap-3 min-h-0">
-          {renderPieChart()}
+        <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-2 min-h-0 items-stretch">
+          {renderPieChart(true)}
           {renderLeadCampaignPieChart()}
         </div>
       </div>
