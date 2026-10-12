@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
+import {
+  buildLatestShipmentMap,
+  findShipmentFromMap,
+} from "@/lib/incomingShipmentProductMatch";
 
 export async function GET() {
   try {
@@ -42,10 +46,6 @@ export async function GET() {
       ORDER BY pl.item_name ASC
     `);
 
-    // Fetch latest shipments for each product with future expected dates only
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
     const [shipments] = await db.execute(`
       SELECT 
         id,
@@ -56,34 +56,21 @@ export async function GET() {
         status,
         created_at
       FROM incoming_shipments
-      WHERE status IN ('Order Preparing', 'In Transit', 'Out for Delivery')
-        AND DATE(expected_arrival_date) >= CURDATE()
+      WHERE COALESCE(status, '') <> 'Delivered'
       ORDER BY created_at DESC
     `);
 
-    // Create a map of latest shipment per product
-    const latestShipmentMap = {};
-    for (const shipment of shipments) {
-      const key = shipment.product_code || shipment.item_name?.toLowerCase();
-      if (key && !latestShipmentMap[key]) {
-        latestShipmentMap[key] = {
-          expected_arrival_date: shipment.expected_arrival_date,
-          qty: shipment.qty,
-          status: shipment.status
-        };
-      }
-    }
+    const latestShipmentMap = buildLatestShipmentMap(shipments);
 
-    // Merge shipment data into stock rows
     const addShipmentData = (rows) => {
-      return rows.map(row => {
-        const key = row.product_code || row.item_name?.toLowerCase();
-        const shipment = latestShipmentMap[key];
+      return rows.map((row) => {
+        const shipment = findShipmentFromMap(row, latestShipmentMap);
         return {
           ...row,
-          latest_shipment_qty: shipment?.qty || null,
+          latest_shipment_qty:
+            shipment?.qty != null && shipment.qty !== "" ? shipment.qty : null,
           latest_shipment_expected_date: shipment?.expected_arrival_date || null,
-          latest_shipment_status: shipment?.status || null
+          latest_shipment_status: shipment?.status || null,
         };
       });
     };

@@ -6,6 +6,7 @@ import Link from "next/link";
 import IncomingShipmentsTable from "./IncomingShipmentsTable";
 import AddIncomingShipment from "./AddIncomingShipment";
 import EditIncomingShipment from "./EditIncomingShipment";
+import { findRelatedIncomingShipment } from "@/lib/incomingShipmentProductMatch";
 
 function ProductStockList() {
   const [rows, setRows] = useState([]);
@@ -689,6 +690,18 @@ function ProductStockList() {
                   allLowStockItems.map((p, idx) => {
                     const totalQty = p.total_quantity ?? 0;
                     const isZero = totalQty <= 0;
+                    const relatedShipment = findRelatedIncomingShipment(
+                      incomingShipments,
+                      p
+                    );
+                    const incomingQty =
+                      p.latest_shipment_qty ?? relatedShipment?.qty ?? null;
+                    const incomingDate =
+                      p.latest_shipment_expected_date ??
+                      relatedShipment?.expected_arrival_date ??
+                      null;
+                    const incomingStatus =
+                      p.latest_shipment_status ?? relatedShipment?.status ?? null;
                     return (
                       <tr
                         key={p.product_code || idx}
@@ -709,15 +722,15 @@ function ProductStockList() {
                         <td className="px-5 py-3 font-semibold text-orange-600">{getPreBookedQuantity(p.item_name)}</td>
                         <td className="px-5 py-3 font-semibold text-green-600">{totalQty - getPreBookedQuantity(p.item_name)}</td>
                         <td className="px-5 py-3">
-                          {p.latest_shipment_status ? (
+                          {incomingStatus ? (
                             <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                              p.latest_shipment_status === 'In Transit' 
+                              incomingStatus === 'In Transit' 
                                 ? 'bg-blue-100 text-blue-700'
-                                : p.latest_shipment_status === 'Out for Delivery'
+                                : incomingStatus === 'Out for Delivery'
                                 ? 'bg-green-100 text-green-700'
                                 : 'bg-gray-100 text-gray-700'
                             }`}>
-                              {p.latest_shipment_status}
+                              {incomingStatus}
                             </span>
                           ) : (
                             <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${isZero ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}`}>
@@ -726,18 +739,18 @@ function ProductStockList() {
                           )}
                         </td>
                         <td className="px-5 py-3">
-                          {p.latest_shipment_qty ? (
+                          {incomingQty != null && incomingQty !== "" ? (
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold text-white bg-blue-500">
-                              {p.latest_shipment_qty}
+                              {incomingQty}
                             </span>
                           ) : (
                             <span className="text-gray-400">—</span>
                           )}
                         </td>
                         <td className="px-5 py-3 text-gray-600">
-                          {p.latest_shipment_expected_date ? (
+                          {incomingDate ? (
                             <span className="text-xs">
-                              {new Date(p.latest_shipment_expected_date).toLocaleDateString('en-IN', {
+                              {new Date(incomingDate).toLocaleDateString('en-IN', {
                                 day: '2-digit',
                                 month: 'short',
                                 year: 'numeric'
@@ -750,11 +763,6 @@ function ProductStockList() {
                         <td className="px-5 py-3 whitespace-nowrap">
                           <div className="flex items-center gap-2">
                             {(() => {
-                              const relatedShipment = incomingShipments.find(ship => 
-                                (ship.product_code && ship.product_code === p.product_code) ||
-                                (ship.item_name && ship.item_name.toLowerCase() === (p.item_name || '').toLowerCase())
-                              );
-                              
                               if (!relatedShipment) {
                                 return <span className="text-gray-400 text-xs">—</span>;
                               }
