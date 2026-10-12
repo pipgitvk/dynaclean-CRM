@@ -334,7 +334,7 @@ export default function AdminSpecialPricingTable({
                   </div>
                   <div>
                     <p className="text-gray-500">Price type</p>
-                    <p className="capitalize">
+                    <p className="capitalize font-bold text-red-600">
                       {resolveSpecialPriceType(row.price_type)}
                     </p>
                   </div>
@@ -545,7 +545,7 @@ export default function AdminSpecialPricingTable({
                         </span>
                       )}
                     </td>
-                    <td className="p-3 text-sm capitalize">
+                    <td className="p-3 text-sm capitalize font-bold text-red-600">
                       {resolveSpecialPriceType(row.price_type)}
                     </td>
                     <td className="p-3 text-sm capitalize">
