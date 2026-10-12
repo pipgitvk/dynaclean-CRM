@@ -351,12 +351,12 @@ export default function AdminSpecialPricingTable({
                 </div>
 
                 {row.item_type === "product" && (
-                  <div className="text-xs text-green-800 bg-green-50 rounded p-2 space-y-1">
-                    <p>
-                      <span className="font-medium">DP (warranty):</span>{" "}
+                  <div className="text-xs bg-gray-50 rounded p-2 space-y-1">
+                    <p className="font-bold text-red-600">
+                      <span className="font-bold">DP (warranty):</span>{" "}
                       {formatStockDpLine(row.stock_dp)}
                     </p>
-                    <p>
+                    <p className="text-green-800">
                       <span className="font-medium">DP (no warranty):</span>{" "}
                       {formatStockDpLine(row.stock_dp_no_warranty)}
                     </p>
@@ -514,14 +514,16 @@ export default function AdminSpecialPricingTable({
                     </td>
                     <td className="p-3 text-right align-top">
                       {row.item_type === "product" ? (
-                        <div className="text-green-700 space-y-0.5 leading-snug font-normal">
-                          <div>
-                            <span className="text-[10px] font-medium text-green-800/70 uppercase tracking-wide">
+                        <div className="space-y-0.5 leading-snug font-normal">
+                          <div className="text-red-600">
+                            <span className="text-[10px] font-bold uppercase tracking-wide">
                               With warranty
                             </span>
-                            <div className="font-normal">{formatStockDpLine(row.stock_dp)}</div>
+                            <div className="font-bold">
+                              {formatStockDpLine(row.stock_dp)}
+                            </div>
                           </div>
-                          <div>
+                          <div className="text-green-700">
                             <span className="text-[10px] font-medium text-green-800/70 uppercase tracking-wide">
                               No warranty
                             </span>
