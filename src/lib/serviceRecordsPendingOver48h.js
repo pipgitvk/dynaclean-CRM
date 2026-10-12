@@ -2,6 +2,30 @@
 export const ADMIN_SERVICE_HISTORY_PENDING_OVER_48H_HREF =
   "/admin-dashboard/view_service_reports?status=PENDING&pending_over_48h=1";
 
+/** Admin dashboard card → all service records where status is not COMPLETED. */
+export const ADMIN_SERVICE_HISTORY_NOT_COMPLETED_HREF =
+  "/admin-dashboard/view_service_reports?not_completed=1";
+
+export const SERVICE_RECORDS_NOT_COMPLETED_WHERE = `
+  UPPER(TRIM(COALESCE(status, ''))) <> 'COMPLETED'
+`;
+
+export async function getServiceRecordsNotCompletedCount(connection) {
+  const [rows] = await connection.execute(
+    `SELECT COUNT(*) AS c FROM service_records WHERE ${SERVICE_RECORDS_NOT_COMPLETED_WHERE}`,
+  );
+  return Number(rows[0]?.c ?? 0);
+}
+
+export function parseServiceNotCompletedFromSearchParam(value) {
+  const v = String(value ?? "").trim().toLowerCase();
+  return v === "1" || v === "true";
+}
+
+export function isServiceRecordNotCompleted(record) {
+  return String(record?.status ?? "").trim().toUpperCase() !== "COMPLETED";
+}
+
 /** SQL predicate (no leading WHERE). */
 export const SERVICE_RECORDS_PENDING_OVER_48H_WHERE = `
   UPPER(TRIM(status)) = 'PENDING'

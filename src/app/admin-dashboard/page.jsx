@@ -206,8 +206,8 @@ import PatDashboardCard from "@/components/admin/PatDashboardCard";
 import { SPECIAL_PRICE_PENDING_CONDITION } from "@/lib/specialPriceDefaults";
 import { getPendingProspectSubmissionsCount } from "@/lib/prospectSubmissionCounts";
 import {
-  ADMIN_SERVICE_HISTORY_PENDING_OVER_48H_HREF,
-  getPendingServiceRecordsOver48hCount,
+  ADMIN_SERVICE_HISTORY_NOT_COMPLETED_HREF,
+  getServiceRecordsNotCompletedCount,
 } from "@/lib/serviceRecordsPendingOver48h";
 import { countPendingAutoCheckoutApprovals } from "@/lib/countPendingAutoCheckoutApprovals";
 
@@ -427,11 +427,11 @@ export default async function UserDashboardPage() {
       console.warn("pending prospect submissions count:", e.message);
     }
 
-    let pendingServiceOver48hCount = 0;
+    let serviceNotCompletedCount = 0;
     try {
-      pendingServiceOver48hCount = await getPendingServiceRecordsOver48hCount(connection);
+      serviceNotCompletedCount = await getServiceRecordsNotCompletedCount(connection);
     } catch (e) {
-      console.warn("pending service records over 48h count:", e.message);
+      console.warn("service records not completed count:", e.message);
     }
 
     if (!user) {
@@ -625,9 +625,9 @@ export default async function UserDashboardPage() {
             </div>
           </a>
 
-          {/* Pending service records &gt; 48 hours */}
+          {/* Service records not completed */}
           <a
-            href={ADMIN_SERVICE_HISTORY_PENDING_OVER_48H_HREF}
+            href={ADMIN_SERVICE_HISTORY_NOT_COMPLETED_HREF}
             className="bg-white rounded-lg shadow-md p-4 text-black hover:shadow-lg transition-shadow h-full cursor-pointer block border-l-4 border-red-600 min-h-[140px]"
           >
             <div className="flex flex-col h-full justify-between">
@@ -635,17 +635,17 @@ export default async function UserDashboardPage() {
                 <div className="flex items-center gap-2 mb-2">
                   <Wrench className="w-5 h-5 text-red-600 shrink-0" />
                   <h2 className="text-sm font-bold text-black leading-tight">
-                    Service Pending &gt; 48h
+                    Service Not Completed
                   </h2>
                 </div>
                 <p
                   className={`text-2xl font-bold mt-1 ${
-                    pendingServiceOver48hCount === 0
+                    serviceNotCompletedCount === 0
                       ? "text-green-600"
                       : "text-red-600"
                   }`}
                 >
-                  {pendingServiceOver48hCount}
+                  {serviceNotCompletedCount}
                 </p>
               </div>
             </div>

@@ -23,7 +23,9 @@ import {
 import { useWarrantyProductFollowup } from "@/components/warranty/WarrantyProductFollowupControls";
 import ServiceRecordFollowupActions from "@/components/services/ServiceRecordFollowupActions";
 import {
+  isServiceRecordNotCompleted,
   isServiceRecordPendingOver48Hours,
+  parseServiceNotCompletedFromSearchParam,
   parseServicePendingOver48hFromSearchParam,
 } from "@/lib/serviceRecordsPendingOver48h";
 
@@ -57,6 +59,9 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
   const [appliedAssignedToFilter, setAppliedAssignedToFilter] = useState("");
   const [pendingOver48hOnly, setPendingOver48hOnly] = useState(false);
   const [appliedPendingOver48hOnly, setAppliedPendingOver48hOnly] =
+    useState(false);
+  const [notCompletedOnly, setNotCompletedOnly] = useState(false);
+  const [appliedNotCompletedOnly, setAppliedNotCompletedOnly] =
     useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedService, setSelectedService] = useState(null);
@@ -104,7 +109,15 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
     const over48 = parseServicePendingOver48hFromSearchParam(
       searchParams.get("pending_over_48h"),
     );
-    if (statusParam != null && String(statusParam).trim() !== "") {
+    const notCompleted = parseServiceNotCompletedFromSearchParam(
+      searchParams.get("not_completed"),
+    );
+    if (notCompleted) {
+      setStatusFilter("");
+      setAppliedStatusFilter("");
+      setNotCompletedOnly(true);
+      setAppliedNotCompletedOnly(true);
+    } else if (statusParam != null && String(statusParam).trim() !== "") {
       const s = String(statusParam).trim();
       setStatusFilter(s);
       setAppliedStatusFilter(s);
@@ -127,6 +140,7 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
     setAppliedAssignedFilter(assignedFilter);
     setAppliedAssignedToFilter(assignedToFilter);
     setAppliedPendingOver48hOnly(pendingOver48hOnly);
+    setAppliedNotCompletedOnly(notCompletedOnly);
     setCurrentPage(1);
   }, [
     searchTerm,
@@ -137,6 +151,7 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
     assignedFilter,
     assignedToFilter,
     pendingOver48hOnly,
+    notCompletedOnly,
   ]);
   const dashboardPath =
     dashboardPathOverride ||
@@ -473,6 +488,14 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
     }
 
     if (
+      appliedNotCompletedOnly &&
+      !isServiceRecordNotCompleted(record)
+    ) {
+      return false;
+    }
+
+    if (
+      !appliedNotCompletedOnly &&
       appliedStatusFilter &&
       record.status?.toUpperCase() !== appliedStatusFilter.toUpperCase()
     ) {
@@ -554,6 +577,8 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
     setAppliedAssignedToFilter("");
     setPendingOver48hOnly(false);
     setAppliedPendingOver48hOnly(false);
+    setNotCompletedOnly(false);
+    setAppliedNotCompletedOnly(false);
     setCurrentPage(1);
   };
 
