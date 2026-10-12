@@ -76,23 +76,45 @@ export async function GET(req) {
       [...params, limit, offset]
     );
 
-    // Check AMC status for each product
+    // Check AMC status and get AMC details for each product
     const productsWithAMC = await Promise.all(
       rows.map(async (product) => {
         try {
           const [amcRecords] = await pool.execute(
-            `SELECT id FROM amc_cmc WHERE serial_number = ? LIMIT 1`,
+            `SELECT amc_start_datetime, amc_end_datetime, contact, model, company_name 
+             FROM amc_cmc 
+             WHERE serial_number = ? 
+             ORDER BY amc_end_datetime DESC 
+             LIMIT 1`,
             [product.serial_number]
           );
+          
+          if (amcRecords && amcRecords.length > 0) {
+            const amc = amcRecords[0];
+            return {
+              ...product,
+              has_amc: true,
+              amc_details: {
+                start_date: amc.amc_start_datetime,
+                end_date: amc.amc_end_datetime,
+                contact: amc.contact,
+                model: amc.model,
+                company_name: amc.company_name
+              }
+            };
+          }
+          
           return {
             ...product,
-            has_amc: amcRecords && amcRecords.length > 0 ? true : false,
+            has_amc: false,
+            amc_details: null
           };
         } catch (error) {
           console.error(`Error checking AMC for ${product.serial_number}:`, error);
           return {
             ...product,
             has_amc: false,
+            amc_details: null
           };
         }
       })

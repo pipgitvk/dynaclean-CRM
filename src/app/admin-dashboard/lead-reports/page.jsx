@@ -1,5 +1,6 @@
 // app/reports/page.jsx
 "use client";
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import CustomerTable from "@/components/CustomerTable";
@@ -171,30 +172,18 @@ export default function ReportsPage() {
       </h1>
 
       {/* 📊 Filters and Fetch Button */}
-      <div className="bg-gray-50 rounded-xl p-6 shadow-md border border-gray-100 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-6 items-end">
+      <div className="bg-gray-50 rounded-xl p-6 shadow-md border border-gray-100 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-6 items-end">
         <div>
           <label className="text-sm font-medium text-gray-700 block mb-1">
             Date From
           </label>
-          <input
-            type="date"
-            name="startDate"
-            value={filters.startDate}
-            onChange={handleFilterChange}
-            className="w-full px-4 py-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500"
-          />
+          <TypeableDateFilterInput value={filters.startDate} onChange={(v) => handleFilterChange({ target: { name: "startDate", value: v } })} className="w-full px-4 py-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500"/>
         </div>
         <div>
           <label className="text-sm font-medium text-gray-700 block mb-1">
             Date To
           </label>
-          <input
-            type="date"
-            name="endDate"
-            value={filters.endDate}
-            onChange={handleFilterChange}
-            className="w-full px-4 py-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500"
-          />
+          <TypeableDateFilterInput value={filters.endDate} onChange={(v) => handleFilterChange({ target: { name: "endDate", value: v } })} className="w-full px-4 py-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500"/>
         </div>
         <div>
           <label className="text-sm font-medium text-gray-700 block mb-1">
@@ -210,6 +199,24 @@ export default function ReportsPage() {
             {campaignList.map((c) => (
               <option key={c.value} value={c.value}>
                 {c.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="text-sm font-medium text-gray-700 block mb-1">
+            Status
+          </label>
+          <select
+            name="status"
+            value={filters.status}
+            onChange={handleFilterChange}
+            className="w-full px-4 py-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500"
+          >
+            <option value="all">All</option>
+            {statusList.map((s) => (
+              <option key={s} value={s}>
+                {s}
               </option>
             ))}
           </select>
@@ -238,24 +245,6 @@ export default function ReportsPage() {
             <option value="Won (Order Received)">Won (Order Received)</option>
             <option value="Lost">Lost</option>
             <option value="Disqualified / Invalid Lead">Disqualified / Invalid Lead</option>
-          </select>
-        </div>
-        <div>
-          <label className="text-sm font-medium text-gray-700 block mb-1">
-            Status
-          </label>
-          <select
-            name="status"
-            value={filters.status}
-            onChange={handleFilterChange}
-            className="w-full px-4 py-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500"
-          >
-            <option value="all">All</option>
-            {statusList.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
           </select>
         </div>
         <div>
@@ -304,7 +293,7 @@ export default function ReportsPage() {
             <option value="morethan5hour">More than 5 hours</option>
           </select>
         </div>
-        <div className="md:col-span-2 lg:col-span-1 flex gap-2">
+        <div className="md:col-span-2 lg:col-span-4 xl:col-span-1 flex gap-2">
           <button
             onClick={handleFetchData}
             disabled={isLoading}

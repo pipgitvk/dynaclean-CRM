@@ -38,27 +38,21 @@ export default function ProfileApprovalsCard() {
 
   return (
     <Link href="/empcrm/admin-dashboard/profile/approvals-admin">
-      <div className="bg-gradient-to-br from-teal-400 via-cyan-400 to-sky-500 rounded-lg sm:rounded-xl shadow-lg p-3 sm:p-4 md:p-6 text-white cursor-pointer hover:shadow-xl transition-all">
-        <div className="flex flex-col h-full justify-between min-h-[160px]">
+      <div className="bg-white rounded-lg shadow-md p-4 text-black cursor-pointer hover:shadow-lg transition-shadow h-full border-l-4 border-teal-500 min-h-[140px]">
+        <div className="flex flex-col h-full justify-between">
           <div>
-            <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
-              <Shield className="w-8 h-8 sm:w-10 sm:h-10 text-white" />
-              <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-white leading-tight tracking-tight">
-                <span className="block">Profile</span>
-                <span className="block">Approvals</span>
+            <div className="flex items-center gap-2 mb-2">
+              <Shield className="w-5 h-5 text-teal-500 shrink-0" />
+              <h2 className="text-sm font-bold text-black leading-tight">
+                Profile Approvals
               </h2>
             </div>
-            <p className="text-2xl sm:text-3xl md:text-4xl font-bold">
+            <p className={`text-2xl font-bold mt-1 ${pendingCount === 0 ? 'text-green-600' : 'text-red-600'}`}>
               {loading ? "..." : pendingCount}
             </p>
-            <p className="mt-1 text-sm sm:text-base font-semibold text-white/90">
+            <p className="text-xs text-gray-600 mt-0.5">
               Pending approvals
             </p>
-          </div>
-          <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-white/20">
-            <button className="px-4 py-2 bg-white text-teal-600 rounded-lg font-bold text-sm sm:text-base hover:bg-gray-100 transition-colors shadow-lg hover:scale-105 transform duration-200">
-              Review Profiles →
-            </button>
           </div>
         </div>
       </div>

@@ -1,7 +1,7 @@
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
-import { getDbConnection, isDbConnectionError } from "@/lib/db";
+import { getDbConnection } from "@/lib/db";
 import NotificationService from "@/lib/services/NotificationService";
 import { convertISTtoUTC } from "@/lib/timezone";
 
@@ -45,6 +45,25 @@ class RecurrenceService {
 
   nowMysql() {
     return dayjs();
+  }
+
+  /** MySQL JSON / form strings / already-parsed arrays — safe for cron & API. */
+  parseWeeklyDays(value) {
+    if (value == null || value === "") return null;
+    if (Array.isArray(value)) {
+      return value.length > 0 ? value : null;
+    }
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (!trimmed) return null;
+      try {
+        const parsed = JSON.parse(trimmed);
+        return Array.isArray(parsed) && parsed.length > 0 ? parsed : null;
+      } catch {
+        return null;
+      }
+    }
+    return null;
   }
 
   /** After the manual first task: when is cron allowed to create the next one? */
@@ -172,9 +191,7 @@ class RecurrenceService {
         console.log(`✅ Marked ${flagResult.affectedRows} task(s) as automatic (A)`);
       }
     } catch (error) {
-      if (!isDbConnectionError(error)) {
-        console.error("❌ Error backfilling automatic task fields:", error);
-      }
+      console.error("❌ Error backfilling automatic task fields:", error);
     }
   }
 
@@ -216,7 +233,7 @@ class RecurrenceService {
     } catch (error) {
       if (error.code === "ER_DUP_KEYNAME" || error.code === "ER_DUP_FIELDNAME") {
         console.log("ℹ️ Unique constraint already exists");
-      } else if (!isDbConnectionError(error)) {
+      } else {
         console.error("❌ Error adding unique constraint:", error);
       }
     }
@@ -344,7 +361,7 @@ class RecurrenceService {
     const nextRunAt = this.calculateNextDate({
       recurrence_type: recurringTask.recurrence_type,
       repeat_interval: recurringTask.repeat_interval,
-      weekly_days: recurringTask.weekly_days ? JSON.parse(recurringTask.weekly_days) : null,
+      weekly_days: this.parseWeeklyDays(recurringTask.weekly_days),
       monthly_date: recurringTask.monthly_date,
       yearly_month: recurringTask.yearly_month,
       yearly_date: recurringTask.yearly_date,
@@ -462,9 +479,7 @@ class RecurrenceService {
         ]
       );
     } catch (insertError) {
-      if (!isDbConnectionError(insertError)) {
-        console.error("❌ Error inserting task:", insertError);
-      }
+      console.error("❌ Error inserting task:", insertError);
       if (insertError.code === "ER_DUP_ENTRY") {
         // Duplicate task already exists
         console.log(`ℹ️ Task already exists for recurring task ${recurringTask.id}`);

@@ -1,5 +1,6 @@
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
+import { ensureCustomersFollowupNotesText } from "@/lib/ensureCustomersFollowupNotesText";
 import FollowupForm from "./FollowupForm";
 import dayjs from "dayjs";
 export const dynamic = "force-dynamic";
@@ -11,6 +12,7 @@ export default async function FollowUpPage({ params }) {
   const userRole = payload?.role || "";
 
   const conn = await getDbConnection();
+  await ensureCustomersFollowupNotesText(conn);
 
   let [rows] = await conn.execute(
     `SELECT 

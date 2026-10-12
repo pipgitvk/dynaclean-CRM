@@ -1,5 +1,6 @@
 'use client';
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect } from 'react';
 import { AlertCircle, Eye } from 'lucide-react';
 
@@ -219,21 +220,11 @@ export default function EmployeeExpensesPage() {
             <div className="flex gap-4 items-center">
               <div>
                 <label className="text-sm font-medium text-gray-700 block mb-1">From Date:</label>
-                <input
-                  type="date"
-                  value={fromDate}
-                  onChange={(e) => setFromDate(e.target.value)}
-                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+                <TypeableDateFilterInput value={fromDate} onChange={setFromDate} className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-700 block mb-1">To Date:</label>
-                <input
-                  type="date"
-                  value={toDate}
-                  onChange={(e) => setToDate(e.target.value)}
-                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+                <TypeableDateFilterInput value={toDate} onChange={setToDate} className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-700 block mb-1">Employee:</label>

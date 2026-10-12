@@ -2,6 +2,7 @@
 import { getDbConnection } from "@/lib/db";
 import { NextResponse } from "next/server";
 import { jwtVerify } from "jose";
+import { syncPreBookingsForOrder } from "@/lib/syncPreBookingsForOrder";
 
 export async function POST(req) {
     try {
@@ -42,6 +43,30 @@ export async function POST(req) {
                 "UPDATE neworder SET approval_status = 'approved', sales_status = 1, approval_remark = ?, approval_date = NOW() WHERE order_id = ?",
                 [remarkVal, orderId]
             );
+
+            const [orderRows] = await conn.execute(
+                `SELECT quote_number, customer_id, client_delivery_date, duedate
+                 FROM neworder WHERE order_id = ? LIMIT 1`,
+                [orderId],
+            );
+            const order = orderRows[0];
+            if (order?.quote_number) {
+                const deliveryDate =
+                    order.client_delivery_date ||
+                    (order.duedate
+                        ? new Date(order.duedate).toISOString().slice(0, 10)
+                        : new Date().toISOString().slice(0, 10));
+                try {
+                    await syncPreBookingsForOrder(conn, {
+                        orderId,
+                        quoteNumber: order.quote_number,
+                        customerId: order.customer_id,
+                        deliveryDate,
+                    });
+                } catch (syncErr) {
+                    console.error("⚠️ Pre-booking sync on approve failed:", syncErr);
+                }
+            }
         } else if (action === 'reject') {
             await conn.execute(
                 "UPDATE neworder SET approval_status = 'rejected', is_cancelled = 1, approval_remark = ?, approval_date = NOW() WHERE order_id = ?",

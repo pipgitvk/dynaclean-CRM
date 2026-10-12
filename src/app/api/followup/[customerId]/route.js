@@ -2,6 +2,11 @@ import { getDbConnection } from "@/lib/db";
 import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 import { convertISTtoUTC } from "@/lib/timezone";
+import { ensureCustomersServiceColumns } from "@/lib/ensureCustomersServiceColumns";
+import { ensureCustomersGemColumns } from "@/lib/ensureCustomersGemColumns";
+import { ensureCustomersFollowupNotesText } from "@/lib/ensureCustomersFollowupNotesText";
+import { isGemRole } from "@/lib/isGemRole";
+import { updateCustomerNotesLanguage } from "@/lib/customerFollowupNotesLanguage";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret";
 
@@ -33,12 +38,16 @@ export async function GET(req, { params }) {
   }
 
   const conn = await getDbConnection();
+  await ensureCustomersFollowupNotesText(conn);
 
   let sql = `SELECT 
       followed_date,
       next_followup_date,
+      service_next_followup,
+      gem_next_followup,
       comm_mode,
       notes,
+      notes_language,
       followed_by,
       time_stamp
      FROM customers_followup
@@ -76,12 +85,14 @@ export async function POST(req, { params }) {
   }
 
   let followedBy = null;
+  let userRole = null;
   try {
     const { payload } = await jwtVerify(
       token,
       new TextEncoder().encode(JWT_SECRET),
     );
     followedBy = payload.username || null;
+    userRole = payload.role || null;
   } catch (e) {
     return new Response(JSON.stringify({ error: "Invalid token" }), {
       status: 401,
@@ -89,6 +100,9 @@ export async function POST(req, { params }) {
   }
 
   const conn = await getDbConnection();
+  await ensureCustomersServiceColumns(conn);
+  await ensureCustomersGemColumns(conn);
+  await ensureCustomersFollowupNotesText(conn);
 
   // First try to get from customers_followup (existing records), fallback to customers table
   let [rows] = await conn.execute(
@@ -157,16 +171,16 @@ export async function POST(req, { params }) {
   let insertServiceNext = null;
   let insertGemNext = null;
 
-  if (data.service_next_followup) {
+  if (userRole === "SERVICE SUPPORT") {
     // SERVICE SUPPORT role - update service_next_followup, preserve others
     insertServiceNext = serviceNextFollowupUTC;
-    insertNextDate = latestDates.next_followup_date || null;   // preserve Sales date
-    insertGemNext = latestDates.gem_next_followup || null;     // preserve GEM date
-  } else if (data.gem_next_followup) {
-    // GEM role - update gem_next_followup, preserve others
+    insertNextDate = latestDates.next_followup_date || null;
+    insertGemNext = latestDates.gem_next_followup || null;
+  } else if (isGemRole(userRole)) {
+    // GEM / GEM PORTAL - update gem_next_followup, preserve others
     insertGemNext = gemNextFollowupUTC;
-    insertNextDate = latestDates.next_followup_date || null;   // preserve Sales date
-    insertServiceNext = latestDates.service_next_followup || null; // preserve Service date
+    insertNextDate = latestDates.next_followup_date || null;
+    insertServiceNext = latestDates.service_next_followup || null;
   } else {
     // Sales / normal role - update next_followup_date, preserve others
     insertNextDate = data.status === "Denied" ? null : nextFollowupDateUTC;
@@ -174,10 +188,39 @@ export async function POST(req, { params }) {
     insertGemNext = latestDates.gem_next_followup || null;         // preserve GEM date
   }
 
+  const notesLanguage = String(data.notes_language || "").trim().slice(0, 10);
+  if (!notesLanguage) {
+    return new Response(JSON.stringify({ error: "Language is required." }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+  const purpose = data.purpose ? data.purpose.slice(0, 100) : null;
+  const isServiceSupport = userRole === "SERVICE SUPPORT";
+  const serviceStatus = isServiceSupport
+    ? String(data.service_status || "").trim().slice(0, 50) || null
+    : null;
+  const serviceStage = isServiceSupport
+    ? String(data.service_stage || "").trim().slice(0, 100) || null
+    : null;
+  const serviceTags = isServiceSupport
+    ? String(data.service_tags || "").trim().slice(0, 255) || null
+    : null;
+  const isGEM = isGemRole(userRole);
+  const gemStatus = isGEM
+    ? String(data.gem_status || "").trim().slice(0, 50) || null
+    : null;
+  const gemStage = isGEM
+    ? String(data.gem_stage || "").trim().slice(0, 100) || null
+    : null;
+  const gemTags = isGEM
+    ? String(data.gem_tags || "").trim().slice(0, 255) || null
+    : null;
+
   await conn.execute(
     `INSERT INTO customers_followup 
-    (customer_id, name, contact, email, next_followup_date, service_next_followup, gem_next_followup, followed_date, comm_mode, notes, followed_by, multi_tag)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    (customer_id, name, contact, email, next_followup_date, service_next_followup, gem_next_followup, followed_date, comm_mode, notes, notes_language, followed_by, multi_tag, purpose)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       customerId,
       name,
@@ -189,10 +232,28 @@ export async function POST(req, { params }) {
       followedDateUTC,
       data.communication_mode,
       data.notes,
+      notesLanguage,
       followedBy,
-      data.multi_tag || null,
+      isServiceSupport ? null : data.multi_tag || null,
+      purpose,
     ],
   );
+
+  await updateCustomerNotesLanguage(conn, customerId, notesLanguage);
+
+  if (isServiceSupport) {
+    await conn.execute(
+      `UPDATE customers SET service_status = ?, service_stage = ?, service_tags = ? WHERE customer_id = ?`,
+      [serviceStatus, serviceStage || "New", serviceTags, customerId],
+    );
+  }
+
+  if (isGEM) {
+    await conn.execute(
+      `UPDATE customers SET gem_status = ?, gem_stage = ?, gem_tags = ? WHERE customer_id = ?`,
+      [gemStatus, gemStage || "New", gemTags, customerId],
+    );
+  }
 
   // If status is Denied, insert second follow-up row with employee name + notes + client name + contact
   if (data.status === "Denied") {
@@ -200,27 +261,29 @@ export async function POST(req, { params }) {
     const secondRowNotes = `(${followedBy}) marked (${name}-${contact}) as Denied dated (${currentDateTime}), ${data.notes}`;
     await conn.execute(
       `INSERT INTO customers_followup 
-      (customer_id, name, contact, email, next_followup_date, service_next_followup, gem_next_followup, followed_date, comm_mode, notes, followed_by, multi_tag)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      (customer_id, name, contact, email, next_followup_date, service_next_followup, gem_next_followup, followed_date, comm_mode, notes, notes_language, followed_by, multi_tag, purpose)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         customerId,
         name,
         contact,
         email,
-        nextFollowupDateUTC, // 4 days later date
-        null, // no service_next_followup for Denied status
-        null, // no gem_next_followup for Denied status
+        nextFollowupDateUTC,
+        null,
+        null,
         followedDateUTC,
         data.communication_mode,
         secondRowNotes,
+        notesLanguage,
         followedBy,
         data.multi_tag || null,
+        purpose,
       ],
     );
   }
 
-  // Only update status and stage if they are provided (not SERVICE SUPPORT or GEM)
-  if (data.status || data.stage) {
+  // Only update sales status/stage on customers table (not SERVICE SUPPORT or GEM roles)
+  if ((data.status || data.stage) && userRole !== "SERVICE SUPPORT" && !isGemRole(userRole)) {
     await conn.execute(
       `UPDATE customers SET status=?, stage=? WHERE customer_id=?`,
       [data.status, data.stage || "New", customerId],

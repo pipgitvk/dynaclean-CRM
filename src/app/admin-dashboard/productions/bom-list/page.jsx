@@ -46,7 +46,8 @@ export default function BomListPage() {
   const [viewCode, setViewCode] = useState(null);
 
   function openEdit(row) {
-    router.push(`/admin-dashboard/productions/bom-list/${encodeURIComponent(row.product_code)}/edit`);
+    const code = encodeURIComponent(row.product_code);
+    router.push(`/admin-dashboard/productions/bom-list/${code}/edit?product_code=${code}`);
   }
 
   return (

@@ -36,6 +36,9 @@ const SkeletonRows = () => (
           <div className="h-4 bg-gray-200 rounded w-full"></div>
         </td>
         <td className="px-3 py-4">
+          <div className="h-4 bg-gray-200 rounded w-full"></div>
+        </td>
+        <td className="px-3 py-4">
           <div className="h-4 bg-gray-200 rounded w-1/2"></div>
         </td>
         <td className="px-3 py-4">
@@ -156,6 +159,7 @@ export default function CustomerTable({ customers, isLoading }) {
         c.lead_campaign,
         c.first_name,
         c.company,
+        c.address ? `${c.address}${c.state ? `, ${c.state}` : ''}` : '-',
         c.status,
         c.stage || "-",
         c.lead_source,
@@ -164,7 +168,7 @@ export default function CustomerTable({ customers, isLoading }) {
       ];
     });
     autoTable(doc, {
-      head: [["#", "Date", "Campaign", "Name", "Company", "Status", "Stage", "Source", "Next Followup", "Contacted"]],
+      head: [["#", "Date", "Campaign", "Name", "Company", "Address", "Status", "Stage", "Source", "Next Followup", "Contacted"]],
       body: tableData,
       styles: { fontSize: 8 },
       headStyles: { fillColor: "#e5e7eb", textColor: 0, fontStyle: "bold" },
@@ -185,6 +189,7 @@ export default function CustomerTable({ customers, isLoading }) {
                 <th className="px-3 py-3 font-semibold text-left">Campaign</th>
                 <th className="px-3 py-3 font-semibold text-left">Name</th>
                 <th className="px-3 py-3 font-semibold text-left">Company</th>
+                <th className="px-3 py-3 font-semibold text-left">Address</th>
                 <th className="px-3 py-3 font-semibold text-left">Status</th>
                 <th className="px-3 py-3 font-semibold text-left">Stage</th>
                 <th className="px-3 py-3 font-semibold text-left">Source</th>
@@ -245,6 +250,7 @@ export default function CustomerTable({ customers, isLoading }) {
               <th className="px-3 py-3 font-semibold text-left">Campaign</th>
               <th className="px-3 py-3 font-semibold text-left">Name</th>
               <th className="px-3 py-3 font-semibold text-left">Company</th>
+              <th className="px-3 py-3 font-semibold text-left">Address</th>
               <th className="px-3 py-3 font-semibold text-left">Status</th>
               <th className="px-3 py-3 font-semibold text-left">Stage</th>
               <th className="px-3 py-3 font-semibold text-left">Source</th>
@@ -269,6 +275,9 @@ export default function CustomerTable({ customers, isLoading }) {
                   <td className="px-3 py-3 text-left">{c.first_name}</td>
                   <td className="px-3 py-3 text-left whitespace-normal break-words max-w-[200px]">
                     {c.company}
+                  </td>
+                  <td className="px-3 py-3 text-left whitespace-normal break-words max-w-[200px]">
+                    {c.address ? `${c.address}${c.state ? `, ${c.state}` : ''}` : '-'}
                   </td>
                   <td className="px-3 py-3 text-left">{c.status}</td>
                   <td className="px-3 py-3 text-left">
@@ -323,7 +332,7 @@ export default function CustomerTable({ customers, isLoading }) {
               ))
             ) : (
               <tr>
-                <td colSpan="10" className="px-6 py-4 text-center text-gray-500">
+                <td colSpan="12" className="px-6 py-4 text-center text-gray-500">
                   No customers found.
                 </td>
               </tr>
@@ -351,6 +360,9 @@ export default function CustomerTable({ customers, isLoading }) {
                 </div>
                 <div className="break-words whitespace-normal">
                   <strong>Company:</strong> {c.company}
+                </div>
+                <div className="break-words whitespace-normal">
+                  <strong>Address:</strong> {c.address ? `${c.address}${c.state ? `, ${c.state}` : ''}` : '-'}
                 </div>
                 <div>
                   <strong>Campaign:</strong> {c.lead_campaign}

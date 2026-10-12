@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 
 export default function ProductAccessoriesPage() {
@@ -17,11 +17,23 @@ export default function ProductAccessoriesPage() {
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(20);
 
+    // Spare search state for Add New Accessory form
+    const [spareQuery, setSpareQuery] = useState("");
+    const [spareSuggestions, setSpareSuggestions] = useState([]);
+    const [spareLoading, setSpareLoading] = useState(false);
+    const [showSpareSuggestions, setShowSpareSuggestions] = useState(false);
+    const [spareSelected, setSpareSelected] = useState(false); // true only when picked from dropdown
+    const spareSearchRef = useRef(null);
+    const spareDebounceRef = useRef(null);
+
     // Form state for new accessory
     const [newAccessory, setNewAccessory] = useState({
         accessory_name: "",
         description: "",
         is_mandatory: false,
+        qty: 1,
+        spare_id: null,
+        package_status: "available",
     });
 
     // Edit state
@@ -30,6 +42,9 @@ export default function ProductAccessoriesPage() {
         accessory_name: "",
         description: "",
         is_mandatory: false,
+        qty: 1,
+        spare_id: null,
+        package_status: "available",
     });
 
     useEffect(() => {
@@ -73,6 +88,56 @@ export default function ProductAccessoriesPage() {
         }
     };
 
+    // Search spare parts by name or code
+    const searchSpares = useCallback(async (query) => {
+        if (!query || query.length < 2) {
+            setSpareSuggestions([]);
+            setShowSpareSuggestions(false);
+            return;
+        }
+        setSpareLoading(true);
+        try {
+            const res = await fetch(`/api/spare/search?q=${encodeURIComponent(query)}`);
+            if (res.ok) {
+                const data = await res.json();
+                setSpareSuggestions(data || []);
+                setShowSpareSuggestions(true);
+            }
+        } catch (err) {
+            console.error("Spare search error:", err);
+        } finally {
+            setSpareLoading(false);
+        }
+    }, []);
+
+    const handleSpareQueryChange = (e) => {
+        const val = e.target.value;
+        setSpareQuery(val);
+        setSpareSelected(false);
+        setNewAccessory((prev) => ({ ...prev, accessory_name: val, spare_id: null }));
+        // debounce 300ms
+        if (spareDebounceRef.current) clearTimeout(spareDebounceRef.current);
+        spareDebounceRef.current = setTimeout(() => searchSpares(val), 300);
+    };
+
+    const handleSelectSpare = (spare) => {
+        const label = `${spare.item_name} (${spare.spare_number})`;
+        setSpareQuery(label);
+        setSpareSelected(true);
+        setNewAccessory((prev) => ({
+            ...prev,
+            accessory_name: label,
+            spare_id: spare.id,
+        }));
+        setSpareSuggestions([]);
+        setShowSpareSuggestions(false);
+    };
+
+    const handleSpareBlur = () => {
+        // slight delay so click on suggestion registers first
+        setTimeout(() => setShowSpareSuggestions(false), 150);
+    };
+
     const handleAddAccessory = async (e) => {
         e.preventDefault();
         if (!selectedProduct) {
@@ -81,6 +146,10 @@ export default function ProductAccessoriesPage() {
         }
         if (!newAccessory.accessory_name.trim()) {
             alert("Accessory name is required");
+            return;
+        }
+        if (!spareSelected || !newAccessory.spare_id) {
+            alert("Please select a spare part from the search results. Manual entry is not allowed.");
             return;
         }
 
@@ -98,7 +167,17 @@ export default function ProductAccessoriesPage() {
             const json = await res.json();
             if (json.success) {
                 alert("Accessory added successfully");
-                setNewAccessory({ accessory_name: "", description: "", is_mandatory: false });
+                setNewAccessory({
+                    accessory_name: "",
+                    description: "",
+                    is_mandatory: false,
+                    qty: 1,
+                    spare_id: null,
+                    package_status: "available",
+                });
+                setSpareQuery("");
+                setSpareSelected(false);
+                setSpareSuggestions([]);
                 loadAccessories(selectedProduct.item_code);
             } else {
                 alert(json.error || "Failed to add accessory");
@@ -165,12 +244,22 @@ export default function ProductAccessoriesPage() {
             accessory_name: accessory.accessory_name,
             description: accessory.description || "",
             is_mandatory: accessory.is_mandatory === 1,
+            qty: accessory.qty || 1,
+            spare_id: accessory.spare_id || null,
+            package_status: accessory.package_status || "available",
         });
     };
 
     const cancelEdit = () => {
         setEditingId(null);
-        setEditForm({ accessory_name: "", description: "", is_mandatory: false });
+        setEditForm({
+            accessory_name: "",
+            description: "",
+            is_mandatory: false,
+            qty: 1,
+            spare_id: null,
+            package_status: "available",
+        });
     };
 
     const filteredProducts = products.filter((p) =>
@@ -249,16 +338,48 @@ export default function ProductAccessoriesPage() {
                             <form onSubmit={handleAddAccessory} className="mb-6 p-3 md:p-4 bg-gray-50 rounded">
                                 <h3 className="text-sm md:text-base font-medium mb-3">Add New Accessory</h3>
                                 <div className="space-y-3">
-                                    <input
-                                        type="text"
-                                        placeholder="Accessory Name *"
-                                        className="w-full px-3 py-2 text-sm border rounded"
-                                        value={newAccessory.accessory_name}
-                                        onChange={(e) =>
-                                            setNewAccessory({ ...newAccessory, accessory_name: e.target.value })
-                                        }
-                                        required
-                                    />
+                                    {/* Searchable spare input */}
+                                    <div className="relative" ref={spareSearchRef}>
+                                        <input
+                                            type="text"
+                                            placeholder="Search Spare Name or Code *"
+                                            className={`w-full px-3 py-2 text-sm border rounded ${spareSelected ? "border-green-500 bg-green-50" : ""}`}
+                                            value={spareQuery}
+                                            onChange={handleSpareQueryChange}
+                                            onBlur={handleSpareBlur}
+                                            onFocus={() => spareSuggestions.length > 0 && setShowSpareSuggestions(true)}
+                                            required
+                                            autoComplete="off"
+                                        />
+                                        {spareLoading && (
+                                            <span className="absolute right-3 top-2 text-xs text-gray-400">Searching...</span>
+                                        )}
+                                        {spareSelected && !spareLoading && (
+                                            <span className="absolute right-3 top-2 text-xs text-green-600 font-medium">✓ Selected</span>
+                                        )}
+                                        {!spareSelected && spareQuery.length > 0 && !spareLoading && (
+                                            <span className="absolute right-3 top-2 text-xs text-orange-500">Select from list</span>
+                                        )}
+                                        {showSpareSuggestions && spareSuggestions.length > 0 && (
+                                            <ul className="absolute z-50 left-0 right-0 bg-white border border-gray-200 rounded shadow-lg max-h-52 overflow-y-auto mt-1">
+                                                {spareSuggestions.map((spare) => (
+                                                    <li
+                                                        key={spare.id}
+                                                        onMouseDown={() => handleSelectSpare(spare)}
+                                                        className="px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 flex flex-col"
+                                                    >
+                                                        <span className="font-medium">{spare.item_name}</span>
+                                                        <span className="text-xs text-gray-500">{spare.spare_number}</span>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        )}
+                                        {showSpareSuggestions && !spareLoading && spareSuggestions.length === 0 && spareQuery.length >= 2 && (
+                                            <div className="absolute z-50 left-0 right-0 bg-white border border-gray-200 rounded shadow mt-1 px-3 py-2 text-sm text-gray-500">
+                                                No spare parts found
+                                            </div>
+                                        )}
+                                    </div>
                                     <textarea
                                         placeholder="Description (optional)"
                                         className="w-full px-3 py-2 text-sm border rounded"
@@ -278,6 +399,31 @@ export default function ProductAccessoriesPage() {
                                         />
                                         <span className="text-sm">Mark as mandatory</span>
                                     </label>
+                                    <div>
+                                        <label className="block text-sm font-medium mb-1">Quantity</label>
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            className="w-full px-3 py-2 text-sm border rounded"
+                                            value={newAccessory.qty}
+                                            onChange={(e) =>
+                                                setNewAccessory({ ...newAccessory, qty: parseInt(e.target.value) || 1 })
+                                            }
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium mb-1">Package Status</label>
+                                        <select
+                                            className="w-full px-3 py-2 text-sm border rounded"
+                                            value={newAccessory.package_status}
+                                            onChange={(e) =>
+                                                setNewAccessory({ ...newAccessory, package_status: e.target.value })
+                                            }
+                                        >
+                                            <option value="available">Available (in package - checklist only)</option>
+                                            <option value="added">Added (separate dispatch - auto added to dispatch)</option>
+                                        </select>
+                                    </div>
                                     <button
                                         type="submit"
                                         disabled={saving}
@@ -342,8 +488,11 @@ export default function ProductAccessoriesPage() {
                                                 <thead>
                                                     <tr className="bg-gray-100">
                                                         <th className="p-2 border text-left">Name</th>
+                                                        <th className="p-2 border text-left">Spare ID</th>
                                                         <th className="p-2 border text-left">Description</th>
-                                                        <th className="p-2 border text-left">Type</th>
+                                                        <th className="p-2 border text-center">Qty</th>
+                                                        <th className="p-2 border text-left">Mandatory</th>
+                                                        <th className="p-2 border text-left">Package</th>
                                                         <th className="p-2 border text-center">Actions</th>
                                                     </tr>
                                                 </thead>
@@ -362,6 +511,9 @@ export default function ProductAccessoriesPage() {
                                                                             }
                                                                         />
                                                                     </td>
+                                                                    <td className="p-2 border text-gray-600">
+                                                                        {editForm.spare_id || "-"}
+                                                                    </td>
                                                                     <td className="p-2 border">
                                                                         <textarea
                                                                             className="w-full px-2 py-1 text-sm border rounded"
@@ -369,6 +521,17 @@ export default function ProductAccessoriesPage() {
                                                                             value={editForm.description}
                                                                             onChange={(e) =>
                                                                                 setEditForm({ ...editForm, description: e.target.value })
+                                                                            }
+                                                                        />
+                                                                    </td>
+                                                                    <td className="p-2 border">
+                                                                        <input
+                                                                            type="number"
+                                                                            min="1"
+                                                                            className="w-full px-2 py-1 text-sm border rounded"
+                                                                            value={editForm.qty}
+                                                                            onChange={(e) =>
+                                                                                setEditForm({ ...editForm, qty: parseInt(e.target.value) || 1 })
                                                                             }
                                                                         />
                                                                     </td>
@@ -383,6 +546,18 @@ export default function ProductAccessoriesPage() {
                                                                             />
                                                                             <span className="text-xs">Mandatory</span>
                                                                         </label>
+                                                                    </td>
+                                                                    <td className="p-2 border">
+                                                                        <select
+                                                                            className="w-full px-2 py-1 text-sm border rounded"
+                                                                            value={editForm.package_status}
+                                                                            onChange={(e) =>
+                                                                                setEditForm({ ...editForm, package_status: e.target.value })
+                                                                            }
+                                                                        >
+                                                                            <option value="available">Available</option>
+                                                                            <option value="added">Added</option>
+                                                                        </select>
                                                                     </td>
                                                                     <td className="p-2 border text-center">
                                                                         <div className="flex gap-2 justify-center">
@@ -405,9 +580,11 @@ export default function ProductAccessoriesPage() {
                                                             ) : (
                                                                 <>
                                                                     <td className="p-2 border font-medium">{acc.accessory_name}</td>
+                                                                    <td className="p-2 border text-gray-600">{acc.spare_id || "-"}</td>
                                                                     <td className="p-2 border text-gray-600 max-w-xs truncate">
                                                                         {acc.description || "-"}
                                                                     </td>
+                                                                    <td className="p-2 border text-center font-medium">{acc.qty || 1}</td>
                                                                     <td className="p-2 border">
                                                                         {acc.is_mandatory === 1 ? (
                                                                             <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded">
@@ -416,6 +593,17 @@ export default function ProductAccessoriesPage() {
                                                                         ) : (
                                                                             <span className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded">
                                                                                 Optional
+                                                                            </span>
+                                                                        )}
+                                                                    </td>
+                                                                    <td className="p-2 border">
+                                                                        {acc.package_status === "added" ? (
+                                                                            <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded">
+                                                                                Added
+                                                                            </span>
+                                                                        ) : (
+                                                                            <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">
+                                                                                Available
                                                                             </span>
                                                                         )}
                                                                     </td>
@@ -467,6 +655,16 @@ export default function ProductAccessoriesPage() {
                                                                 }
                                                                 placeholder="Description"
                                                             />
+                                                            <input
+                                                                type="number"
+                                                                min="1"
+                                                                className="w-full px-2 py-1 text-sm border rounded"
+                                                                value={editForm.qty}
+                                                                onChange={(e) =>
+                                                                    setEditForm({ ...editForm, qty: parseInt(e.target.value) || 1 })
+                                                                }
+                                                                placeholder="Quantity"
+                                                            />
                                                             <label className="flex items-center gap-2 text-sm">
                                                                 <input
                                                                     type="checkbox"
@@ -477,6 +675,16 @@ export default function ProductAccessoriesPage() {
                                                                 />
                                                                 <span>Mandatory</span>
                                                             </label>
+                                                            <select
+                                                                className="w-full px-2 py-1 text-sm border rounded"
+                                                                value={editForm.package_status}
+                                                                onChange={(e) =>
+                                                                    setEditForm({ ...editForm, package_status: e.target.value })
+                                                                }
+                                                            >
+                                                                <option value="available">Available</option>
+                                                                <option value="added">Added</option>
+                                                            </select>
                                                             <div className="flex gap-2">
                                                                 <button
                                                                     onClick={() => handleUpdateAccessory(acc.id)}
@@ -510,6 +718,16 @@ export default function ProductAccessoriesPage() {
                                                             {acc.description && (
                                                                 <p className="text-xs text-gray-600 mb-2">{acc.description}</p>
                                                             )}
+                                                            <div className="text-xs text-gray-600 mb-2">
+                                                                <span className="font-medium">Spare ID:</span> {acc.spare_id || "-"}
+                                                            </div>
+                                                            <div className="text-xs text-gray-600 mb-2">
+                                                                <span className="font-medium">Qty:</span> {acc.qty || 1}
+                                                            </div>
+                                                            <div className="text-xs text-gray-600 mb-2">
+                                                                <span className="font-medium">Package:</span>{" "}
+                                                                {acc.package_status === "added" ? "Added" : "Available"}
+                                                            </div>
                                                             <div className="flex gap-2 pt-2 border-t">
                                                                 <button
                                                                     onClick={() => startEdit(acc)}

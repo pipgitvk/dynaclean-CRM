@@ -7,7 +7,7 @@ import FastCardsWidget from "@/components/FastCardsWidget";
 import TodayReportButton from "@/components/TodayReportButton";
 import LeaveApprovalButton from "@/components/LeaveApprovalButton";
 
-export default function WarehouseInchargeDashboard({ user, counts }) {
+export default function WarehouseInchargeDashboard({ user, reportingManager, counts }) {
   return (
     <div className="space-y-4 md:space-y-6">
 

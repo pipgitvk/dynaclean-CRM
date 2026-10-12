@@ -272,6 +272,14 @@ export default function UpcomingInstallationsPage() {
                 <p className={`${dateColor(r.installation_status)}`}>
                   <b>Days:</b> {formatDays(r.days_until_installation)}
                 </p>
+                <p className="mt-1">
+                  <b>Warranty:</b>{" "}
+                  {Number(r.warranty_registered) === 1 ? (
+                    <span className="text-green-600 font-semibold">✔ Registered</span>
+                  ) : (
+                    <span className="text-gray-400">Not Registered</span>
+                  )}
+                </p>
               </div>
 
               {/* Actions */}
@@ -322,6 +330,7 @@ export default function UpcomingInstallationsPage() {
                 <th className="p-3">Emp</th>
                 <th className="p-3">Delivery</th>
                 <th className="p-3">Days</th>
+                <th className="p-3">Warranty</th>
                 <th className="p-3">Actions</th>
               </tr>
             </thead>
@@ -340,6 +349,18 @@ export default function UpcomingInstallationsPage() {
                   </td>
                   <td className={`p-3 ${dateColor(r.installation_status)}`}>
                     {formatDays(r.days_until_installation)}
+                  </td>
+                  <td className="p-3 text-center">
+                    {Number(r.warranty_registered) === 1 ? (
+                      <span title="Registered in Warranty" className="inline-flex items-center gap-1 text-green-600 font-semibold text-xs">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        Registered
+                      </span>
+                    ) : (
+                      <span className="text-gray-400 text-xs">—</span>
+                    )}
                   </td>
                   <td className="p-3">
                     <div className="flex flex-col gap-2 items-stretch">

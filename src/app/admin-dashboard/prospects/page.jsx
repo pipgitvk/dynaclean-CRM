@@ -13,11 +13,9 @@ import {
   parseQuoteNumbersParam,
   parseProspectsAdminFiltersFromSearchParams,
   mergeProspectAdminCalendarDefaults,
+  parseProspectTlFollowupOnlyFromSearchParams,
 } from "@/lib/prospectFilterUtils";
-import {
-  buildProspectsListWhereClause,
-  buildCommitmentCalendarFiltersForProspects,
-} from "@/lib/prospectListQuery";
+import { buildProspectsListWhereClause } from "@/lib/prospectListQuery";
 import {
   enrichProspectRowsWithPaymentStatus,
   commitmentValueToYmd,
@@ -49,57 +47,19 @@ export default async function ProspectsPage({ searchParams }) {
   const adminFiltersParsed = viewerIsAdmin
     ? parseProspectsAdminFiltersFromSearchParams(resolved)
     : null;
-  const adminFilters = viewerIsAdmin
+  let adminFilters = viewerIsAdmin
     ? mergeProspectAdminCalendarDefaults(resolved, adminFiltersParsed)
     : null;
+  if (viewerIsAdmin && parseProspectTlFollowupOnlyFromSearchParams(resolved)) {
+    adminFilters = { ...(adminFilters ?? {}), tlFollowupOnly: true };
+  }
 
   let rows = [];
   let loadError = null;
-  let prospectCreatorSummaries = [];
 
   try {
     await ensureProspectsTable();
     const conn = await getDbConnection();
-
-    if (viewerIsAdmin) {
-      try {
-        const {
-          parts: calParts,
-          params: calParams,
-        } = buildCommitmentCalendarFiltersForProspects(adminFilters);
-        const calSql = calParts.length
-          ? ` AND ${calParts.join(" AND ")}`
-          : "";
-        const [cr] = await conn.execute(
-          `SELECT TRIM(p.created_by) AS u, COUNT(*) AS cnt,
-                  COALESCE(SUM(p.amount), 0) AS total_amount,
-                  GROUP_CONCAT(DISTINCT TRIM(CAST(p.customer_id AS CHAR)) ORDER BY TRIM(CAST(p.customer_id AS CHAR)) SEPARATOR ', ') AS customer_ids
-           FROM prospects p
-           WHERE p.created_by IS NOT NULL AND TRIM(p.created_by) <> ''
-           ${calSql}
-           GROUP BY TRIM(p.created_by)
-           ORDER BY u ASC`,
-          calParams,
-        );
-        prospectCreatorSummaries = (cr || [])
-          .map((r) => {
-            const raw = r.customer_ids != null ? String(r.customer_ids) : "";
-            const customerIds = raw
-              .split(",")
-              .map((s) => s.trim())
-              .filter(Boolean);
-            return {
-              name: String(r.u ?? "").trim(),
-              count: Number(r.cnt) || 0,
-              totalAmount: Number(r.total_amount) || 0,
-              customerIds,
-            };
-          })
-          .filter((x) => x.name);
-      } catch {
-        prospectCreatorSummaries = [];
-      }
-    }
 
     const { whereSql, params } = buildProspectsListWhereClause({
       customerIds,
@@ -200,7 +160,6 @@ export default async function ProspectsPage({ searchParams }) {
           initialCustomerIds={customerIds}
           initialQuoteNumbers={quoteNumbers}
           initialAdminFilters={adminFilters}
-          prospectCreatorSummaries={prospectCreatorSummaries}
           loadError={loadError}
           viewerUsername={viewerUsername}
           viewerIsAdmin={viewerIsAdmin}

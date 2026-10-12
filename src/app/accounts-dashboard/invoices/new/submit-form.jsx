@@ -8,8 +8,9 @@ import Image from "next/image";
 import toast from "react-hot-toast";
 import AddSpecialPriceModal from "@/components/specialPrice/AddSpecialPriceModal";
 import dynacleanLogo from "@/components/logo1.jpg";
+import { LetterheadCompanyInfo, LetterheadBankLine, LetterheadSignatoryLine } from "@/components/invoice/InvoiceLetterheadSection";
 
-export default function InvoiceForm({ invoiceNumber, invoiceDate, invoiceType = "tax", onBack }) {
+export default function InvoiceForm({ invoiceNumber, invoiceDate, invoiceType = "tax", onBack, onSuccessRedirect }) {
   const router = useRouter();
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -139,29 +140,50 @@ export default function InvoiceForm({ invoiceNumber, invoiceDate, invoiceType = 
     }
   }, [taxSummary.finalRoundOff, isAutoRoundOff]);
 
-  // Auto-set state + state_code from GSTIN
-  useEffect(() => {
-    const st = getStateFromGSTIN(form.gst_number?.trim());
-    if (!st) return;
-    setForm((prev) => ({ ...prev, state: st.display, state_code: st.code }));
-    setStateSearch(st.display);
-    setShowStateSuggestions(false);
-  }, [form.gst_number]);
-
-  // State-based rate setting — skip if from quotation
+  // Auto-set state from GSTIN + apply CGST/SGST vs IGST — skip if loaded from quotation
   useEffect(() => {
     if (isFromQuotation) return;
-    const code = form.state_code || parseCodeFromDisplay(form.state);
-    if (!code) return;
 
-    if (code === SUPPLIER_STATE_CODE) {
-      setCgstRate(9); setSgstRate(9); setIgstRate(0);
-      setItems((prev) => prev.map((item) => ({ ...item, cgst_percent: 9, sgst_percent: 9, igst_percent: 0 })));
+    const gstinValue = form.gst_number?.trim();
+
+    if (gstinValue) {
+      // GSTIN provided → use its first 2 digits to determine tax type
+      const st = getStateFromGSTIN(gstinValue);
+      if (!st) return;
+
+      // Auto-fill state field
+      setForm((prev) => ({ ...prev, state: st.display, state_code: st.code }));
+      setStateSearch(st.display);
+      setShowStateSuggestions(false);
+
+      // Same state as supplier (07 Delhi) → CGST + SGST; else → IGST
+      if (st.code === SUPPLIER_STATE_CODE) {
+        setCgstRate(9); setSgstRate(9); setIgstRate(0);
+        setItems((prev) => prev.map((item) => ({ ...item, cgst_percent: 9, sgst_percent: 9, igst_percent: 0 })));
+      } else {
+        setCgstRate(0); setSgstRate(0); setIgstRate(18);
+        setItems((prev) => prev.map((item) => ({ ...item, cgst_percent: 0, sgst_percent: 0, igst_percent: 18 })));
+      }
     } else {
-      setCgstRate(0); setSgstRate(0); setIgstRate(18);
-      setItems((prev) => prev.map((item) => ({ ...item, cgst_percent: 0, sgst_percent: 0, igst_percent: 18 })));
+      // No GSTIN → use manually selected state to decide
+      // Try: state_code field → parse code from "Name (XX)" format → match by state name
+      const code = form.state_code?.trim()
+        || parseCodeFromDisplay(form.state)
+        || Object.entries(stateCodeToName).find(
+            ([, name]) => name.toLowerCase() === form.state?.trim().toLowerCase()
+          )?.[0];
+
+      if (!code || code === SUPPLIER_STATE_CODE) {
+        // No state or same state (Delhi 07) → CGST + SGST
+        setCgstRate(9); setSgstRate(9); setIgstRate(0);
+        setItems((prev) => prev.map((item) => ({ ...item, cgst_percent: 9, sgst_percent: 9, igst_percent: 0 })));
+      } else {
+        // Different state, no GSTIN → IGST (interstate supply)
+        setCgstRate(0); setSgstRate(0); setIgstRate(18);
+        setItems((prev) => prev.map((item) => ({ ...item, cgst_percent: 0, sgst_percent: 0, igst_percent: 18 })));
+      }
     }
-  }, [form.state, form.state_code, isFromQuotation, SUPPLIER_STATE_CODE]);
+  }, [form.gst_number, form.state, form.state_code, isFromQuotation]);
 
   const [editableTerms, setEditableTerms] = useState(
     `1. Payment due within specified due date.
@@ -242,7 +264,13 @@ Thanks for doing business with us!`,
       const data = await res.json();
       if (data.success) {
         toast.success("Invoice created successfully");
-        router.push("/accounts-dashboard/invoices");
+        if (onSuccessRedirect) {
+          router.push(onSuccessRedirect);
+        } else if (invoiceType === "performa") {
+          router.push("/accounts-dashboard/performa-invoices");
+        } else {
+          router.push("/accounts-dashboard/invoices");
+        }
       } else {
         alert("Error: " + data.error);
       }
@@ -340,16 +368,8 @@ Thanks for doing business with us!`,
           ) : (
             <div className="w-[120px] h-[80px] border border-gray-200 flex items-center justify-center text-xs font-semibold text-red-600">DYNACLEAN</div>
           )}
-          <div className="flex-1 text-sm text-gray-700">
-            <h2 className="text-xl font-bold text-red-600 mb-1">Dynaclean Industries Pvt Ltd</h2>
-            <p className="leading-relaxed">
-              <span className="block">1st Floor, 13-B, Kattabomman Street, Gandhi Nagar Main Road,</span>
-              <span className="block">Gandhi Nagar, Ganapathy, Coimbatore, Tamil Nadu, 641006</span>
-              <span className="block mt-1"><strong>Phone:</strong> 011-45143666, +91-7982456944</span>
-              <span className="block"><strong>Email:</strong> sales@dynacleanindustries.com</span>
-              <span className="block mt-1"><strong>GSTIN:</strong> 07AAKCD6495M1ZV | <strong>State:</strong> Delhi (07)</span>
-            </p>
-          </div>
+          <LetterheadCompanyInfo />
+        
         </div>
 
         {/* Invoice Info */}
@@ -498,14 +518,14 @@ Thanks for doing business with us!`,
           <div className="lg:col-span-1 space-y-4">
             <div className="border p-4 rounded bg-gray-50 text-sm">
               <h4 className="font-semibold mb-2">Bank Details</h4>
-              <p>A/C Holder: Dynaclean Industries Private Limited</p>
+              <LetterheadBankLine />
               <p>ICICI Bank</p>
               <p>Account: 343405500379</p>
               <p>IFSC: ICIC0003434</p>
             </div>
             <div className="border p-4 rounded bg-gray-50 text-sm text-center flex flex-col justify-between">
               <div>
-                <p>For Dynaclean Industries Pvt Ltd</p>
+                <LetterheadSignatoryLine />
                 <Image src="/images/sign.png" alt="Sign" width={100} height={80} className="mx-auto mt-2" unoptimized />
               </div>
               <p className="mt-2 font-semibold">Authorized Signatory</p>

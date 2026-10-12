@@ -2,6 +2,43 @@ import dayjs from "dayjs";
 import { getDbConnection, withPool, dbExecute } from "@/lib/db";
 import { resolveGemCrmEmployeeId } from "@/lib/gemCrmAuth";
 
+// Table को सिर्फ एक बार बनाएं — Promise cache करके race condition भी नहीं होगी
+let tableEnsurePromise = null;
+
+function ensureTableOnce() {
+  if (tableEnsurePromise) {
+    return tableEnsurePromise;
+  }
+
+  tableEnsurePromise = withPool(async (conn) => {
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS notifications (
+        id INT NOT NULL AUTO_INCREMENT,
+        user_id INT NOT NULL,
+        message TEXT NOT NULL,
+        type VARCHAR(50) NOT NULL DEFAULT 'general',
+        related_id INT NULL,
+        is_read BOOLEAN NOT NULL DEFAULT false,
+        created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        KEY idx_notifications_user_id (user_id),
+        KEY idx_notifications_is_read (is_read)
+      )
+    `);
+    console.log("✅ [NotificationService] notifications table ready");
+  }).catch((error) => {
+    console.error(
+      "❌ [NotificationService] Error ensuring notifications table:",
+      error
+    );
+    // Allow a controlled retry later
+    tableEnsurePromise = null;
+    throw error;
+  });
+
+  return tableEnsurePromise;
+}
+
 class NotificationService {
   async resolveAutomaticTaskRecipients(recurringTask, taskMeta = {}) {
     const ids = new Set();
@@ -27,7 +64,6 @@ class NotificationService {
   async sendAutomaticTaskNotification(recurringTask, task, taskMeta = {}) {
     try {
       await withPool(async (conn) => {
-        await this.ensureNotificationTable(conn);
 
         const recipientIds = await this.resolveAutomaticTaskRecipients(
           recurringTask,
@@ -91,7 +127,6 @@ class NotificationService {
   async getUnreadNotifications(userId) {
     try {
       return await withPool(async (conn) => {
-        await this.ensureNotificationTable(conn);
         const [notifications] = await conn.execute(
           `SELECT * FROM notifications
            WHERE user_id = ? AND is_read = false
@@ -110,7 +145,6 @@ class NotificationService {
   async markAsRead(notificationId, userId) {
     try {
       return await withPool(async (conn) => {
-        await this.ensureNotificationTable(conn);
         await conn.execute(
           `UPDATE notifications
            SET is_read = true
@@ -135,7 +169,6 @@ class NotificationService {
   ) {
     try {
       await withPool(async (conn) => {
-        await this.ensureNotificationTable(conn);
 
         const recipientIds = new Set();
         const newAssigneeId = await resolveGemCrmEmployeeId({
@@ -172,3 +205,4 @@ class NotificationService {
 }
 
 export default new NotificationService();
+export { ensureTableOnce };

@@ -1,14 +1,21 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import {
+  filterPaymentPendingOrders,
+  sortPaymentPendingOrders,
+} from "@/lib/filterPaymentPendingOrders";
+import ManualFilterSearchButton, {
+  MANUAL_FILTER_HINT,
+} from "@/components/ui/ManualFilterSearchButton";
 import dayjs from "dayjs";
 import { Download, Search, Calendar, DollarSign, ArrowUp, ArrowDown } from "lucide-react";
 
 export default function PaymentPendingReport() {
   const [orders, setOrders] = useState([]);
-  const [filteredOrders, setFilteredOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [appliedSearchQuery, setAppliedSearchQuery] = useState("");
   const [userRole, setUserRole] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
 
@@ -24,7 +31,6 @@ export default function PaymentPendingReport() {
       
       if (data.success) {
         setOrders(data.orders || []);
-        setFilteredOrders(data.orders || []);
         setUserRole(data.userRole || "");
       } else {
         alert(data.error || "Failed to fetch report");
@@ -37,51 +43,19 @@ export default function PaymentPendingReport() {
     }
   };
 
-  useEffect(() => {
-    let filtered = orders;
-    
-    // Apply search filter
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(order => 
-        order.order_id?.toLowerCase().includes(query) ||
-        order.client_name?.toLowerCase().includes(query) ||
-        order.company_name?.toLowerCase().includes(query) ||
-        order.contact?.toLowerCase().includes(query) ||
-        order.created_by?.toLowerCase().includes(query)
-      );
-    }
+  const handleApplySearch = useCallback(() => {
+    setAppliedSearchQuery(searchQuery);
+  }, [searchQuery]);
 
-    // Apply sorting
-    if (sortConfig.key) {
-      filtered = [...filtered].sort((a, b) => {
-        let aVal = a[sortConfig.key];
-        let bVal = b[sortConfig.key];
-
-        // Handle date sorting
-        if (sortConfig.key === 'due_date') {
-          aVal = dayjs(aVal).unix();
-          bVal = dayjs(bVal).unix();
-        }
-        // Handle numeric sorting
-        else if (['total_amount', 'paid_amount', 'remaining_amount'].includes(sortConfig.key)) {
-          aVal = parseFloat(aVal) || 0;
-          bVal = parseFloat(bVal) || 0;
-        }
-        // Handle string sorting
-        else {
-          aVal = (aVal || '').toString().toLowerCase();
-          bVal = (bVal || '').toString().toLowerCase();
-        }
-
-        if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
-        if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
-        return 0;
-      });
-    }
-
-    setFilteredOrders(filtered);
-  }, [searchQuery, orders, sortConfig]);
+  const filteredOrders = useMemo(() => {
+    const filtered = filterPaymentPendingOrders(orders, {
+      searchQuery: appliedSearchQuery,
+      dueDateFrom: "",
+      dueDateTo: "",
+      statusFilter: "all",
+    });
+    return sortPaymentPendingOrders(filtered, sortConfig);
+  }, [orders, appliedSearchQuery, sortConfig]);
 
   const handleSort = (key) => {
     setSortConfig(prev => ({
@@ -198,9 +172,16 @@ export default function PaymentPendingReport() {
               placeholder="Search by order ID, customer, company, contact, or employee..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleApplySearch();
+                }
+              }}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
+          <ManualFilterSearchButton onClick={handleApplySearch} />
           <button
             onClick={exportToCSV}
             className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors duration-200"
@@ -209,6 +190,7 @@ export default function PaymentPendingReport() {
             Export CSV
           </button>
         </div>
+        <p className="text-xs text-gray-500 mt-2">{MANUAL_FILTER_HINT}</p>
       </div>
 
       {/* Table */}

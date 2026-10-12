@@ -66,6 +66,17 @@ export default function UpdateBomForProductionPage() {
 
   const hasChanges = diffItems.some(row => selected[row.spare_id]);
 
+  const emptyMessage = useMemo(() => {
+    if (!data || diffItems.length > 0) return null;
+    if (!data.meta?.bom_found && data.bom_items.length === 0) {
+      return `No BOM found for product "${data.header?.product_code}". Create or update the BOM for this product first.`;
+    }
+    if (data.current_items.length === 0 && data.bom_items.length === 0) {
+      return "Production snapshot and BOM are both empty for this product.";
+    }
+    return "No differences between production snapshot and current BOM.";
+  }, [data, diffItems]);
+
   const applyUpdate = async () => {
     try {
       setSaving(true);
@@ -159,10 +170,10 @@ export default function UpdateBomForProductionPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {!hasChanges && (
+                  {!hasChanges && emptyMessage && (
                     <tr>
                       <td className="p-2 text-gray-500 text-sm" colSpan={7}>
-                        No differences between production snapshot and current BOM.
+                        {emptyMessage}
                       </td>
                     </tr>
                   )}
@@ -239,9 +250,9 @@ export default function UpdateBomForProductionPage() {
                 <span>Select all</span>
               </div>
 
-              {!hasChanges && (
+              {!hasChanges && emptyMessage && (
                 <div className="text-sm text-gray-500">
-                  No differences between production snapshot and current BOM.
+                  {emptyMessage}
                 </div>
               )}
 

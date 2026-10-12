@@ -1,9 +1,17 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
+import { ensureServiceRecordsPlannedDateColumn } from "@/lib/ensureServiceRecordsPlannedDateColumn";
+
+function normalizePlannedDate(value) {
+  if (value == null || String(value).trim() === "") return null;
+  const s = String(value).trim().slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+  return s;
+}
 
 export async function POST(req) {
   try {
-    const { service_id, status, description } = await req.json();
+    const { service_id, status, description, planned_date } = await req.json();
 
     if (!service_id || !status) {
       return NextResponse.json(
@@ -31,10 +39,25 @@ export async function POST(req) {
       );
     }
 
+    const isPlanned = normalizedStatus.toUpperCase() === "PLANNED";
+    const plannedDate = isPlanned ? normalizePlannedDate(planned_date) : null;
+    if (isPlanned && !plannedDate) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Planned date is required when status is PLANNED",
+        },
+        { status: 400 }
+      );
+    }
+
+    await ensureServiceRecordsPlannedDateColumn();
     const conn = await getDbConnection();
     await conn.execute(
-      "UPDATE service_records SET status = ?, status_description = ? WHERE service_id = ?",
-      [normalizedStatus, desc, service_id]
+      `UPDATE service_records
+       SET status = ?, status_description = ?, planned_date = ?
+       WHERE service_id = ?`,
+      [normalizedStatus, desc, plannedDate, service_id]
     );
     // await conn.end();
 

@@ -1,5 +1,6 @@
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useMemo, useEffect } from "react";
 import {
   Plus,
@@ -588,23 +589,13 @@ left("Closing Balance", col.particulars, y, 9, true);
             <label className="block text-xs font-medium text-gray-700 mb-2">
               From Date
             </label>
-            <input
-              type="date"
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
-            />
+            <TypeableDateFilterInput value={dateFrom} onChange={setDateFrom} className="px-3 py-2 border border-gray-300 rounded-lg outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"/>
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-2">
               To Date
             </label>
-            <input
-              type="date"
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
-            />
+            <TypeableDateFilterInput value={dateTo} onChange={setDateTo} className="px-3 py-2 border border-gray-300 rounded-lg outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"/>
           </div>
           <button
             onClick={() => {
@@ -667,11 +658,11 @@ left("Closing Balance", col.particulars, y, 9, true);
                     {dayjs(row.entry_date).format("DD MMM YYYY")}
                   </td>
 
-                  <td className="px-4 py-3 text-gray-800 max-w-xs">
+                  <td className="px-4 py-3 text-gray-800 max-w-xs break-all">
                     {row.particulars}
                   </td>
 
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3 whitespace-nowrap">
                     <VchBadge type={row.vch_type} />
                   </td>
 
@@ -949,6 +940,8 @@ left("Closing Balance", col.particulars, y, 9, true);
 function VchBadge({ type }) {
   const colorMap = {
     Payment: "bg-orange-100 text-orange-700",
+    Spare: "bg-cyan-100 text-cyan-700",
+    "Spare Purchase": "bg-cyan-100 text-cyan-800",
     Receipt: "bg-green-100 text-green-700",
     Journal: "bg-blue-100 text-blue-700",
     Sales: "bg-purple-100 text-purple-700",
@@ -957,6 +950,8 @@ function VchBadge({ type }) {
     "Credit Note": "bg-teal-100 text-teal-700",
     "Debit Note": "bg-pink-100 text-pink-700",
     Opening: "bg-gray-100 text-gray-700",
+    Return: "bg-rose-100 text-rose-700",
+    "Return Completed": "bg-orange-100 text-orange-800",
     Other: "bg-slate-100 text-slate-700",
   };
 

@@ -1,5 +1,6 @@
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useEffect, useState } from "react";
 import dayjs from "dayjs";
 import toast from "react-hot-toast";
@@ -153,18 +154,8 @@ export default function ScheduleVisitsClient({ dashboardPrefix = "user-dashboard
           <option value="visited">Visited</option>
           <option value="completed">Completed</option>
         </select>
-        <input
-          type="date"
-          value={filters.date_from}
-          onChange={(e) => setFilters({ ...filters, date_from: e.target.value })}
-          className="border border-gray-300 rounded-md px-3 py-2 text-sm"
-        />
-        <input
-          type="date"
-          value={filters.date_to}
-          onChange={(e) => setFilters({ ...filters, date_to: e.target.value })}
-          className="border border-gray-300 rounded-md px-3 py-2 text-sm"
-        />
+        <TypeableDateFilterInput value={filters.date_from} onChange={(v) => setFilters({ ...filters, date_from: v })} className="border border-gray-300 rounded-md px-3 py-2 text-sm"/>
+        <TypeableDateFilterInput value={filters.date_to} onChange={(v) => setFilters({ ...filters, date_to: v })} className="border border-gray-300 rounded-md px-3 py-2 text-sm"/>
         <button
           onClick={fetchData}
           className="px-4 py-2 bg-gray-600 text-white rounded-md text-sm hover:bg-gray-700"

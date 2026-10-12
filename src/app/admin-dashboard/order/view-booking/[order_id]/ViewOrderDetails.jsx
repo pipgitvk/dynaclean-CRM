@@ -1,8 +1,14 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
+import { resolveStoredFileUrl } from "@/lib/resolveStoredFileUrl";
 
-export default function ViewOrderDetails({ data }) {
+export default function ViewOrderDetails({
+  data,
+  orderBasePath = "/admin-dashboard/order",
+  canEditBooking: canEditBookingByRole = false,
+}) {
   const {
     orderDetails,
     items,
@@ -32,11 +38,30 @@ export default function ViewOrderDetails({ data }) {
     return val || "-";
   };
 
+  const hasBooking =
+    orderDetails.booking_id &&
+    String(orderDetails.booking_id).trim() !== "" &&
+    String(orderDetails.booking_id) !== "0";
+  const canEditBooking =
+    canEditBookingByRole &&
+    hasBooking &&
+    Number(orderDetails.dispatch_status) === 0;
+
   return (
     <div className="max-w-7xl mx-auto p-6">
-      <h1 className="text-2xl font-bold mb-4 text-center">
-        View Order by Quotation
-      </h1>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+        <h1 className="text-2xl font-bold text-center sm:text-left">
+          View Order by Quotation
+        </h1>
+        {canEditBooking && (
+          <Link
+            href={`${orderBasePath}/upload-booking/${orderDetails.order_id}`}
+            className="inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          >
+            Edit Booking
+          </Link>
+        )}
+      </div>
 
       {/* Progress Bar */}
       <div className="mb-6">
@@ -196,19 +221,7 @@ export default function ViewOrderDetails({ data }) {
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
         {files.map(({ label, key }) => {
           const fileUrl = orderDetails[key];
-          let displayUrl = fileUrl;
-          
-          // Convert direct upload paths to API routes for proper file serving
-          if (fileUrl && fileUrl.startsWith('/uploads/')) {
-            const parts = fileUrl.split('/');
-            if (parts.length >= 3) {
-              // Extract folder and filename from /uploads/folder/filename
-              const folder = parts[2];
-              const filename = parts.slice(3).join('/');
-              displayUrl = `/api/files/${folder}/${encodeURIComponent(filename)}`;
-            }
-          }
-          
+          const displayUrl = resolveStoredFileUrl(fileUrl);
           return (
             <div key={key} className="p-4 border rounded-lg">
               <h4 className="text-sm font-semibold mb-2">{label}</h4>

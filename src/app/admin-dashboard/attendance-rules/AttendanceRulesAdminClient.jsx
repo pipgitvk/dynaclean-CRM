@@ -13,12 +13,33 @@ const inputClass =
 const numClass =
   "h-9 w-full max-w-[5rem] rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-200/80";
 
-function timeForInput(hhmmss) {
-  if (!hhmmss) return "";
-  const s = String(hhmmss).trim();
+function normalizeScheduleTime(v) {
+  if (v == null || v === "") return "";
+  if (v instanceof Date && !Number.isNaN(v.getTime())) {
+    return `${String(v.getHours()).padStart(2, "0")}:${String(v.getMinutes()).padStart(2, "0")}:${String(v.getSeconds()).padStart(2, "0")}`;
+  }
+  const s = String(v).trim();
+  const iso = s.match(/T(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if (iso) {
+    const h = String(parseInt(iso[1], 10)).padStart(2, "0");
+    const m = iso[2];
+    const sec = iso[3] != null ? iso[3] : "00";
+    return `${h}:${m}:${sec}`;
+  }
+  if (s.length === 5 && s[2] === ":") return `${s}:00`;
+  if (s.length >= 8) return s.slice(0, 8);
   const parts = s.split(":");
-  if (parts.length < 2) return "";
-  return `${parts[0].padStart(2, "0")}:${parts[1].padStart(2, "0")}`;
+  if (parts.length >= 2) {
+    return `${parts[0].padStart(2, "0")}:${parts[1].padStart(2, "0")}:${(parts[2] || "00").padStart(2, "0")}`;
+  }
+  return "";
+}
+
+function timeForInput(hhmmss) {
+  const norm = normalizeScheduleTime(hhmmss);
+  if (!norm) return "";
+  const parts = norm.split(":");
+  return `${parts[0]}:${parts[1]}`;
 }
 
 /** Minutes between start (HH:mm:ss) and end (HH:mm from input); null if invalid. */
@@ -47,11 +68,8 @@ function scheduleRowToForm(row) {
   if (!row?.username) return null;
   const base = emptyForm();
   const t = (v, fallback) => {
-    if (v == null || v === "") return fallback;
-    const s = String(v).trim();
-    if (s.length === 5 && s[2] === ":") return `${s}:00`;
-    if (s.length >= 8) return s.slice(0, 8);
-    return `${s}:00`.slice(0, 8);
+    const norm = normalizeScheduleTime(v);
+    return norm || fallback;
   };
   return {
     checkin: t(row.checkin_time, base.checkin),
@@ -93,7 +111,14 @@ export default function AttendanceRulesAdminClient({
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.message || "Failed to load");
       const r = data.rules;
-      if (r) {
+
+      if (editEmployeeRow?.username) {
+        const mapped = scheduleRowToForm(editEmployeeRow);
+        if (mapped) {
+          setForm(mapped);
+          setSelectedUsernames(new Set([editEmployeeRow.username]));
+        }
+      } else if (r) {
         setForm({
           checkin: r.checkin,
           checkout: r.checkout,
@@ -112,20 +137,11 @@ export default function AttendanceRulesAdminClient({
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [editEmployeeRow]);
 
   useEffect(() => {
     load();
   }, [load]);
-
-  /** When editing from table: pre-fill form + select that employee after company rules load */
-  useEffect(() => {
-    if (loading) return;
-    if (!editEmployeeRow?.username) return;
-    const mapped = scheduleRowToForm(editEmployeeRow);
-    if (mapped) setForm(mapped);
-    setSelectedUsernames(new Set([editEmployeeRow.username]));
-  }, [loading, editEmployeeRow]);
 
   useEffect(() => {
     let cancelled = false;

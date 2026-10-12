@@ -16,20 +16,16 @@ const TaskCard = ({
       style={{ backgroundColor: bgColor }}
     >
       <div>
-        {/* Task Name */}
         <h3 className="text-xl font-semibold mb-1 line-clamp-1">{title}</h3>
 
-        {/* Assigned By */}
         <div className="flex items-center gap-2 text-xs text-gray-700 mb-3">
           <User size={14} className="text-white" />
           <span className="font-medium">Assigned by:</span>
           <span className="truncate">{assignedBy}</span>
         </div>
 
-        {/* Notes/Description */}
         <p className="text-sm text-gray-600 mb-4 line-clamp-3">{description}</p>
 
-        {/* Meta Info Section */}
         <div className="space-y-2 text-xs text-gray-600 font-medium">
           <div className="flex items-center gap-2">
             <ClipboardList size={14} className="text-white" />
@@ -48,7 +44,6 @@ const TaskCard = ({
         </div>
       </div>
 
-      {/* Buttons pinned to bottom */}
       <div className="flex justify-between items-center gap-2 mt-6">
         <a
           href={`/user-dashboard/view-task/${taskId}`}

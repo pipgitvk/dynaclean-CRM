@@ -1,8 +1,10 @@
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useMemo, useTransition } from "react";
 import { useEffect } from "react";
 import dayjs from "dayjs";
+import { formatCrmDatetimeForISTDisplay } from "@/lib/timezone";
 import { useRouter } from "next/navigation";
 import { Eye, Pencil, ArrowRightCircle, Loader2 } from "lucide-react";
 
@@ -41,9 +43,15 @@ export default function CustomerTable({
     stage: searchParams.stage ?? "",
     lead_campaign: searchParams.lead_campaign ?? "",
     next_follow_date: searchParams.next_follow_date ?? "",
+    followed_date: searchParams.followed_date ?? "",
     employee: searchParams.employee ?? "",
   });
-  const [isInputVisible, setIsInputVisible] = useState(false);
+  const [isNextFollowInputVisible, setIsNextFollowInputVisible] = useState(
+    !!(searchParams.next_follow_date ?? "")
+  );
+  const [isFollowedDateInputVisible, setIsFollowedDateInputVisible] = useState(
+    !!(searchParams.followed_date ?? "")
+  );
 
   useEffect(() => {
     console.log("ROWS:", rows);
@@ -61,8 +69,11 @@ export default function CustomerTable({
       stage: searchParams.stage ?? "",
       lead_campaign: searchParams.lead_campaign ?? "",
       next_follow_date: searchParams.next_follow_date ?? "",
+      followed_date: searchParams.followed_date ?? "",
       employee: searchParams.employee ?? "",
     }));
+    setIsNextFollowInputVisible(!!(searchParams.next_follow_date ?? ""));
+    setIsFollowedDateInputVisible(!!(searchParams.followed_date ?? ""));
   }, [searchParams]);
 
   const resetFilters = () => {
@@ -75,6 +86,7 @@ export default function CustomerTable({
       stage: "",
       lead_campaign: "",
       next_follow_date: "",
+      followed_date: "",
       employee: "",
     };
     setFilters(cleared);
@@ -115,14 +127,23 @@ export default function CustomerTable({
     return rows;
   }, [rows]);
 
-  const handleLabelClick = () => {
-    setIsInputVisible((prev) => !prev); // Toggle visibility
+  const handleNextFollowLabelClick = () => {
+    setIsNextFollowInputVisible((prev) => !prev);
   };
 
-  const handleBlur = (e) => {
-    // Hide the input if it's blurred and no date is selected
+  const handleFollowedDateLabelClick = () => {
+    setIsFollowedDateInputVisible((prev) => !prev);
+  };
+
+  const handleNextFollowBlur = (e) => {
     if (!e.target.value) {
-      setIsInputVisible(false);
+      setIsNextFollowInputVisible(false);
+    }
+  };
+
+  const handleFollowedDateBlur = (e) => {
+    if (!e.target.value) {
+      setIsFollowedDateInputVisible(false);
     }
   };
 
@@ -137,18 +158,8 @@ export default function CustomerTable({
           onChange={(e) => update("search", e.target.value)}
           className="p-2 border rounded w-full"
         />
-        <input
-          type="date"
-          value={filters.date_from}
-          onChange={(e) => update("date_from", e.target.value)}
-          className="p-2 border rounded w-full"
-        />
-        <input
-          type="date"
-          value={filters.date_to}
-          onChange={(e) => update("date_to", e.target.value)}
-          className="p-2 border rounded w-full"
-        />
+        <TypeableDateFilterInput value={filters.date_from} onChange={(v) => update("date_from", v)} className="p-2 border rounded w-full"/>
+        <TypeableDateFilterInput value={filters.date_to} onChange={(v) => update("date_to", v)} className="p-2 border rounded w-full"/>
         <select
           value={filters.sort}
           onChange={(e) => update("sort", e.target.value)}
@@ -205,26 +216,31 @@ export default function CustomerTable({
           <option value="reference">Reference</option>
         </select>
         <div className="relative">
-          {/* Label */}
           <label
             htmlFor="next_follow_date"
             className="cursor-pointer text-gray-600 text-sm border-b pb-1"
-            onClick={handleLabelClick}
+            onClick={handleNextFollowLabelClick}
           >
             Select Next Follow-up
           </label>
-
-          {/* Input (conditionally rendered) */}
-          {isInputVisible && (
-            <input
-              id="next_follow_date"
-              type="date"
-              value={filters.next_follow_date}
-              onChange={(e) => update("next_follow_date", e.target.value)}
-              onBlur={handleBlur}
+          {isNextFollowInputVisible && (
+            <TypeableDateFilterInput value={filters.next_follow_date} onChange={(v) => update("next_follow_date", v)} id="next_follow_date" onBlur={handleNextFollowBlur}
               className="p-2 border rounded w-full text-gray-700 mt-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200"
-              placeholder="Next Follow-up"
-            />
+              placeholder="Next Follow-up"/>
+          )}
+        </div>
+        <div className="relative">
+          <label
+            htmlFor="followed_date"
+            className="cursor-pointer text-gray-600 text-sm border-b pb-1"
+            onClick={handleFollowedDateLabelClick}
+          >
+            Select Followed Date
+          </label>
+          {isFollowedDateInputVisible && (
+            <TypeableDateFilterInput value={filters.followed_date} onChange={(v) => update("followed_date", v)} id="followed_date" onBlur={handleFollowedDateBlur}
+              className="p-2 border rounded w-full text-gray-700 mt-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200"
+              placeholder="Followed Date"/>
           )}
         </div>
 
@@ -267,6 +283,7 @@ export default function CustomerTable({
                   "ID",
                   "Customer",
                   "Status",
+                  "Followed Date",
                   "Stage",
                   "Notes",
                   "Created",
@@ -293,6 +310,11 @@ export default function CustomerTable({
                     <div className="text-xs text-gray-500">{r.phone}</div>
                   </td>
                   <td className="px-4 py-2">{r.status}</td>
+                  <td className="px-4 py-2 whitespace-nowrap">
+                    {r.followed_date
+                      ? formatCrmDatetimeForISTDisplay(r.followed_date, "DD MMM YYYY HH:mm")
+                      : "-"}
+                  </td>
                   <td className="px-4 py-2">{r.stage}</td>
                   <td className="px-4 py-2">{r.notes}</td>
                   <td className="px-4 py-2">
@@ -345,7 +367,7 @@ export default function CustomerTable({
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={10} className="text-center p-4">
+                  <td colSpan={11} className="text-center p-4">
                     No customers found.
                   </td>
                 </tr>
@@ -377,6 +399,12 @@ export default function CustomerTable({
               </div>
               <div>
                 <span className="font-semibold">Status:</span> {r.status}
+              </div>
+              <div>
+                <span className="font-semibold">Followed Date:</span>{" "}
+                {r.followed_date
+                  ? formatCrmDatetimeForISTDisplay(r.followed_date, "DD MMM YYYY HH:mm")
+                  : "-"}
               </div>
               <div>
                 <span className="font-semibold">Stage:</span> {r.stage}

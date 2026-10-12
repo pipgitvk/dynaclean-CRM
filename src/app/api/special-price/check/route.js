@@ -1,20 +1,29 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
+import {
+  getApprovedSpecialPrice,
+  getQuotationItemBasePricing,
+  resolveQuotationItemByCode,
+} from "@/lib/getApprovedSpecialPrice";
+
+function normCode(value) {
+  return String(value ?? "").trim();
+}
 
 export async function POST(req) {
   try {
-    // ✅ 1. Authenticate
     const payload = await getSessionPayload();
     if (!payload) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // ✅ 2. Parse body
     const body = await req.json();
-    const { customer_id, product_code } = body;
+    const customerId = String(body.customer_id ?? "").trim();
+    const productCodeInput = normCode(body.product_code || body.item_code);
+    const itemTypeInput = normCode(body.item_type).toLowerCase() || null;
 
-    if (!customer_id || !product_code) {
+    if (!customerId || !productCodeInput) {
       return NextResponse.json(
         { error: "customer_id and product_code are required" },
         { status: 400 }
@@ -22,53 +31,44 @@ export async function POST(req) {
     }
 
     const conn = await getDbConnection();
+    const item = await resolveQuotationItemByCode(conn, productCodeInput);
 
-    // ✅ 3. Get product_id from product_code
-    const [productRows] = await conn.execute(
-      `SELECT id, price_per_unit, gst_rate 
-       FROM products_list 
-       WHERE item_code = ? 
-       LIMIT 1`,
-      [product_code]
+    const { originalPrice, gstRate } = await getQuotationItemBasePricing(
+      conn,
+      item
     );
 
-    if (productRows.length === 0) {
-      return NextResponse.json(
-        { error: "Product not found" },
-        { status: 404 }
-      );
-    }
+    const resolvedCode = item?.itemCode ?? productCodeInput;
+    const resolvedType = item?.itemType ?? itemTypeInput;
 
-    const product = productRows[0];
-
-    // ✅ 4. Check special price
-    const [specialRows] = await conn.execute(
-      `SELECT special_price, status
-       FROM special_price
-       WHERE customer_id = ? 
-       AND product_id = ?
-       AND status = 'approved'
-       LIMIT 1`,
-      [customer_id, product.id]
+    const specialPrice = await getApprovedSpecialPrice(
+      conn,
+      customerId,
+      item?.itemId ?? null,
+      resolvedCode,
+      resolvedType
     );
 
-    let finalPrice = product.price_per_unit;
-    let specialPrice = null;
-
-    if (specialRows.length > 0) {
-      specialPrice = specialRows[0].special_price;
-      finalPrice = specialPrice;
+    if (item == null && specialPrice == null) {
+      return NextResponse.json({ error: "Item not found" }, { status: 404 });
     }
+
+    const finalPrice =
+      specialPrice != null && Number.isFinite(specialPrice)
+        ? specialPrice
+        : originalPrice;
 
     return NextResponse.json({
       success: true,
-      product_id: product.id,
-      original_price: product.price_per_unit,
+      item_type: resolvedType,
+      product_id: item?.itemId ?? null,
+      product_code: resolvedCode,
+      original_price: originalPrice,
       special_price: specialPrice,
       final_price: finalPrice,
-      gst_rate: product.gst_rate,
+      gst_rate: gstRate,
+      has_special_price: specialPrice != null && Number.isFinite(specialPrice),
     });
-
   } catch (err) {
     console.error("❌ Special price check failed:", err);
 

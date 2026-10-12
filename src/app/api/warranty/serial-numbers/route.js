@@ -46,13 +46,7 @@ export async function GET(request) {
       { error: "Failed to fetch serial numbers", details: error.message },
       { status: 500 }
     );
-  } finally {
-    if (conn) {
-      try {
-        await conn.end();
-      } catch (e) {
-        console.error("Error closing connection:", e);
-      }
-    }
   }
+  // Note: Do NOT call conn.end() here - the pool is global and shared across requests
+  // Calling end() would close all connections and break subsequent requests
 }

@@ -1,7 +1,8 @@
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useMemo, useRef } from "react";
-import { Plus, Trash2, Search, Download, ArrowUp, ArrowDown, X } from "lucide-react";
+import { Plus, Search, Download, ArrowUp, ArrowDown, X } from "lucide-react";
 import dayjs from "dayjs";
 import toast from "react-hot-toast";
 
@@ -38,7 +39,6 @@ export default function LedgerTable({ rows: initialRows }) {
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
-  const [deletingId, setDeletingId] = useState(null);
 
   // ─── Sorting ───────────────────────────────────────────────────
   const handleSort = (col) => {
@@ -145,26 +145,6 @@ export default function LedgerTable({ rows: initialRows }) {
     }
   };
 
-  // ─── Delete entry ──────────────────────────────────────────────
-  const handleDelete = async (id) => {
-    if (!confirm("Delete this ledger entry?")) return;
-    setDeletingId(id);
-    try {
-      const res = await fetch(`/api/ledger/${id}`, {
-        method: "DELETE",
-        credentials: "include",
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Delete failed");
-      setRows((prev) => prev.filter((r) => r.id !== id));
-      toast.success("Entry deleted");
-    } catch (err) {
-      toast.error(err.message);
-    } finally {
-      setDeletingId(null);
-    }
-  };
-
   // ─── CSV Export ────────────────────────────────────────────────
   const handleExport = () => {
     const header = ["Date", "Particulars", "Vch Type", "Vch No", "Debit", "Credit"];
@@ -253,19 +233,9 @@ export default function LedgerTable({ rows: initialRows }) {
             className="pl-8 pr-3 py-2 text-sm rounded-lg border border-gray-300 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 text-black w-56"
           />
         </div>
-        <input
-          type="date"
-          value={dateFrom}
-          onChange={(e) => setDateFrom(e.target.value)}
-          className="text-sm rounded-lg border border-gray-300 bg-white px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 text-black"
-        />
+        <TypeableDateFilterInput value={dateFrom} onChange={setDateFrom} className="text-sm rounded-lg border border-gray-300 bg-white px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 text-black"/>
         <span className="text-gray-400 text-sm">to</span>
-        <input
-          type="date"
-          value={dateTo}
-          onChange={(e) => setDateTo(e.target.value)}
-          className="text-sm rounded-lg border border-gray-300 bg-white px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 text-black"
-        />
+        <TypeableDateFilterInput value={dateTo} onChange={setDateTo} className="text-sm rounded-lg border border-gray-300 bg-white px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 text-black"/>
         <select
           value={vchTypeFilter}
           onChange={(e) => setVchTypeFilter(e.target.value)}
@@ -308,15 +278,12 @@ export default function LedgerTable({ rows: initialRows }) {
                   <SortIcon col={col} />
                 </th>
               ))}
-              <th className="px-4 py-3 text-left font-semibold text-gray-600">
-                Action
-              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 bg-white text-black">
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-10 text-center text-gray-400">
+                <td colSpan={6} className="px-4 py-10 text-center text-gray-400">
                   No ledger entries found.
                 </td>
               </tr>
@@ -344,16 +311,6 @@ export default function LedgerTable({ rows: initialRows }) {
                   <td className="px-4 py-3 text-right font-mono text-green-600 whitespace-nowrap">
                     {Number(row.credit) > 0 ? `₹${fmt(row.credit)}` : "—"}
                   </td>
-                  <td className="px-4 py-3">
-                    <button
-                      onClick={() => handleDelete(row.id)}
-                      disabled={deletingId === row.id}
-                      className="p-1.5 rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 disabled:opacity-50 transition"
-                      title="Delete entry"
-                    >
-                      <Trash2 size={15} />
-                    </button>
-                  </td>
                 </tr>
               ))
             )}
@@ -370,7 +327,6 @@ export default function LedgerTable({ rows: initialRows }) {
                 <td className="px-4 py-3 text-right font-mono text-green-600">
                   ₹{fmt(totals.credit)}
                 </td>
-                <td />
               </tr>
             </tfoot>
           )}
@@ -387,22 +343,13 @@ export default function LedgerTable({ rows: initialRows }) {
               key={row.id}
               className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm"
             >
-              <div className="flex items-start justify-between gap-2 mb-2">
-                <div>
-                  <p className="font-semibold text-gray-800">
-                    {row.particulars}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    {dayjs(row.entry_date).format("DD MMM YYYY")}
-                  </p>
-                </div>
-                <button
-                  onClick={() => handleDelete(row.id)}
-                  disabled={deletingId === row.id}
-                  className="p-1.5 rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 disabled:opacity-50 transition shrink-0"
-                >
-                  <Trash2 size={15} />
-                </button>
+              <div className="mb-2">
+                <p className="font-semibold text-gray-800">
+                  {row.particulars}
+                </p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {dayjs(row.entry_date).format("DD MMM YYYY")}
+                </p>
               </div>
               <div className="flex flex-wrap gap-2 text-xs">
                 <VchBadge type={row.vch_type} />

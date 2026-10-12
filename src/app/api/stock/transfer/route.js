@@ -75,6 +75,30 @@ export async function POST(req) {
       ]
     );
 
+    // Log edit history to product_stock_edit_history table
+    try {
+      const oldDelhi = from_godown === "Delhi" ? stock.Delhi : stock.Delhi;
+      const oldSouth = from_godown === "South" ? stock.South : stock.South;
+      
+      await conn.execute(
+        `INSERT INTO product_stock_edit_history 
+          (product_code, edited_by, old_delhi, new_delhi, old_south, new_south, change_description, edited_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
+        [
+          product_code,
+          payload.username || "Unknown",
+          oldDelhi,
+          newDelhi,
+          oldSouth,
+          newSouth,
+          `Transfer: ${quantity} units from ${from_godown} to ${to_godown}`
+        ]
+      );
+    } catch (historyError) {
+      console.warn("Failed to log edit history:", historyError.message);
+      // Continue anyway - don't fail the transfer if history logging fails
+    }
+
     return NextResponse.json({ 
       success: true, 
       message: `Successfully transferred ${quantity} units from ${from_godown} to ${to_godown}`,

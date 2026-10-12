@@ -1,9 +1,11 @@
 "use client";
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useTransition } from "react";
 import { format } from "date-fns";
 import { useRouter } from "next/navigation";
 import { Eye, Pencil, Search, RefreshCw, Loader2 } from "lucide-react";
 import Link from "next/link";
+import { NOTES_LANGUAGE_OPTIONS } from "@/constants/notesLanguageOptions";
 
 export default function CustomerTable({ 
   data, 
@@ -26,6 +28,7 @@ export default function CustomerTable({
     from: searchParams?.from || "",
     to: searchParams?.to || "",
     tags: searchParams?.tags || "",
+    notes_language: searchParams?.notes_language || "",
   });
 
   const handleSearch = (e) => {
@@ -40,6 +43,7 @@ export default function CustomerTable({
       if (filters.from) params.set("from", filters.from);
       if (filters.to) params.set("to", filters.to);
       if (filters.tags) params.set("tags", filters.tags);
+      if (filters.notes_language) params.set("notes_language", filters.notes_language);
       router.push(`/admin-dashboard/customers?${params.toString()}`);
     });
   };
@@ -55,6 +59,7 @@ export default function CustomerTable({
         from: "",
         to: "",
         tags: "",
+        notes_language: "",
       });
       router.push("/admin-dashboard/customers");
     });
@@ -71,6 +76,7 @@ export default function CustomerTable({
       if (filters.from) params.set("from", filters.from);
       if (filters.to) params.set("to", filters.to);
       if (filters.tags) params.set("tags", filters.tags);
+      if (filters.notes_language) params.set("notes_language", filters.notes_language);
       params.set("page", newPage.toString());
       router.push(`/admin-dashboard/customers?${params.toString()}`);
     });
@@ -180,20 +186,27 @@ export default function CustomerTable({
             <option value="Repeat Order">Repeat Order</option>
             <option value="Running Order">Running Order</option>
             <option value="Strong Follow-Up">Strong Follow-Up</option>
+            <option value="Reseller">Reseller</option>
+            <option value="Contractor">Contractor</option>
             <option value="N/A">N/A</option>
           </select>
-          <input
-            type="date"
-            value={filters.from}
-            onChange={(e) => setFilters({ ...filters, from: e.target.value })}
-            className="border border-gray-300 rounded-lg px-3 py-2 text-sm min-w-[120px] sm:min-w-0"
-          />
-          <input
-            type="date"
-            value={filters.to}
-            onChange={(e) => setFilters({ ...filters, to: e.target.value })}
-            className="border border-gray-300 rounded-lg px-3 py-2 text-sm min-w-[120px] sm:min-w-0"
-          />
+
+          <select
+            value={filters.notes_language}
+            onChange={(e) =>
+              setFilters({ ...filters, notes_language: e.target.value })
+            }
+            className="border border-gray-300 rounded-lg px-3 py-2 text-sm min-w-[140px] sm:min-w-0"
+          >
+            <option value="">All Notes Languages</option>
+            {NOTES_LANGUAGE_OPTIONS.map((lang) => (
+              <option key={lang.code} value={lang.code}>
+                {lang.name}
+              </option>
+            ))}
+          </select>
+          <TypeableDateFilterInput value={filters.from} onChange={(v) => setFilters({ ...filters, from: v })} className="border border-gray-300 rounded-lg px-3 py-2 text-sm min-w-[120px] sm:min-w-0"/>
+          <TypeableDateFilterInput value={filters.to} onChange={(v) => setFilters({ ...filters, to: v })} className="border border-gray-300 rounded-lg px-3 py-2 text-sm min-w-[120px] sm:min-w-0"/>
           
           <button
             type="submit"

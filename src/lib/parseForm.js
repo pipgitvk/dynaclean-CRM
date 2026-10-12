@@ -40,13 +40,19 @@ function toNodeRequest(request) {
   });
 }
 
-export async function parseFormData(request) {
+export async function parseFormData(request, options = {}) {
   const nodeReq = toNodeRequest(request);
+  const allowedExt = new Set(options.allowedExt || ALLOWED_EXT);
+  const allowedMime = new Set(options.allowedMime || ALLOWED_MIME);
+  const multiples = options.multiples === true;
+  const maxFileSize = options.maxFileSize || MAX_FILE_SIZE;
 
   return new Promise((resolve, reject) => {
     const form = new IncomingForm({
-      multiples: false,
-      maxFileSize: MAX_FILE_SIZE,
+      multiples,
+      maxFileSize,
+      maxTotalFileSize:
+        options.maxTotalFileSize || (multiples ? maxFileSize * 5 : maxFileSize),
       uploadDir: UPLOAD_ROOT,
       keepExtensions: false,
 
@@ -58,7 +64,7 @@ export async function parseFormData(request) {
           .extname(part.originalFilename || "")
           .toLowerCase();
 
-        if (!ALLOWED_EXT.has(cleanExt)) {
+        if (!allowedExt.has(cleanExt)) {
           throw new Error("Invalid file extension");
         }
 
@@ -71,10 +77,11 @@ export async function parseFormData(request) {
       filter: ({ mimetype, originalFilename }) => {
         const ext = path.extname(originalFilename || "").toLowerCase();
 
-        if (!ALLOWED_MIME.has(mimetype)) return false;
-        if (!ALLOWED_EXT.has(ext)) return false;
+        if (!allowedExt.has(ext)) return false;
+        if (!mimetype) return true;
+        if (allowedMime.has(mimetype) || mimetype === "application/octet-stream") return true;
 
-        return true;
+        return false;
       },
     });
 

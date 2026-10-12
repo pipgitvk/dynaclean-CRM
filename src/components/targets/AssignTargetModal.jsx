@@ -1,5 +1,6 @@
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect } from "react";
 import { X } from "lucide-react";
 
@@ -145,28 +146,16 @@ export default function AssignTargetModal({ isOpen, onClose, onSuccess }) {
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-800">Start Date</label>
-            <input
-              type="date"
-              name="target_start_date"
-              value={formData.target_start_date}
-              onChange={handleChange}
-              required
+            <TypeableDateFilterInput value={formData.target_start_date} onChange={(v) => handleChange({ target: { name: "target_start_date", value: v } })} required
               disabled={submitting}
-              className="w-full rounded-lg border border-gray-600 px-4 py-3 disabled:opacity-60"
-            />
+              className="w-full rounded-lg border border-gray-600 px-4 py-3 disabled:opacity-60"/>
           </div>
 
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-800">End Date</label>
-            <input
-              type="date"
-              name="target_end_date"
-              value={formData.target_end_date}
-              onChange={handleChange}
-              required
+            <TypeableDateFilterInput value={formData.target_end_date} onChange={(v) => handleChange({ target: { name: "target_end_date", value: v } })} required
               disabled={submitting}
-              className="w-full rounded-lg border border-gray-600 px-4 py-3 disabled:opacity-60"
-            />
+              className="w-full rounded-lg border border-gray-600 px-4 py-3 disabled:opacity-60"/>
           </div>
 
           <div>

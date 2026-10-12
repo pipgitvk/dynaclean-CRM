@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import dayjs from "dayjs";
+import { resolveStoredFileUrl } from "@/lib/resolveStoredFileUrl";
 
 const stages = [
   "Sales",
@@ -299,7 +300,7 @@ export default function OrderDetailsClient({
       {/* Back Link */}
       <div className="text-center mt-6">
         <a
-          href="/user-dashboard/order"
+          href="/sales-dashboard/order"
           className="inline-block bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded"
         >
           ← Back to Order List
@@ -360,28 +361,86 @@ function FileSection({ label, file }) {
 }
 
 function DocCell({ label, file, optional, required }) {
-  return (
-    <div>
-      <p className="font-medium">{label}</p>
-      {file ? (
-        <div className="space-x-3">
-          <a
-            href={file}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-blue-600 underline"
-          >
-            View
-          </a>
-          <a href={file} download className="text-blue-600 underline">
-            Download
-          </a>
-        </div>
-      ) : (
+  if (!file) {
+    return (
+      <div>
+        <p className="font-medium">{label}</p>
         <p className={`italic ${required ? "text-red-600" : "text-gray-500"}`}>
           {required ? "Required but not uploaded" : "Not uploaded"}
         </p>
-      )}
+      </div>
+    );
+  }
+
+  // Handle multiple files (comma-separated)
+  const fileUrls = file
+    .split(",")
+    .map((url) => url.trim())
+    .filter((url) => url.length > 0);
+
+  // If there's only one file, show simple view
+  if (fileUrls.length === 1) {
+    const displayUrl = resolveStoredFileUrl(fileUrls[0]);
+    return (
+      <div>
+        <p className="font-medium">{label}</p>
+        <div className="space-x-3">
+          <a
+            href={displayUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-600 underline hover:text-blue-800"
+          >
+            View
+          </a>
+          <a href={displayUrl} download className="text-blue-600 underline hover:text-blue-800">
+            Download
+          </a>
+        </div>
+      </div>
+    );
+  }
+
+  // Multiple files - show dropdown/expandable list
+  return (
+    <div>
+      <p className="font-medium">{label}</p>
+      <details className="cursor-pointer">
+        <summary className="text-blue-600 underline hover:text-blue-800">
+          📁 {fileUrls.length} Files
+        </summary>
+        <div className="mt-2 space-y-2 bg-gray-50 p-2 rounded border border-gray-200">
+          {fileUrls.map((fileUrl, idx) => {
+            const displayUrl = resolveStoredFileUrl(fileUrl);
+
+            // Extract filename from URL
+            const filename = fileUrl.split('/').pop() || `File ${idx + 1}`;
+            
+            return (
+              <div key={idx} className="flex items-center justify-between text-sm p-2 bg-white rounded">
+                <span className="truncate flex-1">{idx + 1}. {filename}</span>
+                <div className="space-x-2 flex-shrink-0">
+                  <a
+                    href={displayUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 underline hover:text-blue-800 text-xs"
+                  >
+                    View
+                  </a>
+                  <a
+                    href={displayUrl}
+                    download
+                    className="text-blue-600 underline hover:text-blue-800 text-xs"
+                  >
+                    Download
+                  </a>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </details>
     </div>
   );
 }

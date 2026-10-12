@@ -42,9 +42,55 @@ export async function GET() {
       ORDER BY pl.item_name ASC
     `);
 
+    // Fetch latest shipments for each product with future expected dates only
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const [shipments] = await db.execute(`
+      SELECT 
+        id,
+        product_code,
+        item_name,
+        qty,
+        expected_arrival_date,
+        status,
+        created_at
+      FROM incoming_shipments
+      WHERE status IN ('Order Preparing', 'In Transit', 'Out for Delivery')
+        AND DATE(expected_arrival_date) >= CURDATE()
+      ORDER BY created_at DESC
+    `);
+
+    // Create a map of latest shipment per product
+    const latestShipmentMap = {};
+    for (const shipment of shipments) {
+      const key = shipment.product_code || shipment.item_name?.toLowerCase();
+      if (key && !latestShipmentMap[key]) {
+        latestShipmentMap[key] = {
+          expected_arrival_date: shipment.expected_arrival_date,
+          qty: shipment.qty,
+          status: shipment.status
+        };
+      }
+    }
+
+    // Merge shipment data into stock rows
+    const addShipmentData = (rows) => {
+      return rows.map(row => {
+        const key = row.product_code || row.item_name?.toLowerCase();
+        const shipment = latestShipmentMap[key];
+        return {
+          ...row,
+          latest_shipment_qty: shipment?.qty || null,
+          latest_shipment_expected_date: shipment?.expected_arrival_date || null,
+          latest_shipment_status: shipment?.status || null
+        };
+      });
+    };
+
     return NextResponse.json({
-      lowStock: lowStockRows,
-      zeroStock: zeroStockRows,
+      lowStock: addShipmentData(lowStockRows),
+      zeroStock: addShipmentData(zeroStockRows),
       lowStockCount: lowStockRows.length,
       zeroStockCount: zeroStockRows.length,
     });

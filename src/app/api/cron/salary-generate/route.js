@@ -66,6 +66,7 @@ async function generateForEmployee({ db, emp, salaryMonth, workingDays, defaultS
     salaryContext.globalRules,
     salaryContext.scheduleByUser.get(normalizeUserKey(emp.username)) || null
   );
+  const uk = normalizeUserKey(emp.username);
   const stats = computeSalaryPayDaysForUser({
     monthStr: salaryMonth,
     logs,
@@ -73,7 +74,9 @@ async function generateForEmployee({ db, emp, salaryMonth, workingDays, defaultS
     leavesAll: salaryContext.leaves,
     username: emp.username,
     rules,
-    dateOfJoining: salaryContext.dojByUser?.get(normalizeUserKey(emp.username)) ?? null,
+    dateOfJoining: salaryContext.dojByUser?.get(uk) ?? null,
+    userRole: salaryContext.roleByUser?.get(uk) ?? emp.userRole ?? null,
+    workLocation: salaryContext.workLocationByUser?.get(uk) ?? null,
   });
   const presentDays = stats.pay_days;
 
@@ -302,7 +305,7 @@ export async function GET(request) {
 
     // Fetch all active employees
     const [employees] = await db.query(
-      "SELECT username FROM rep_list WHERE status = 1 ORDER BY username"
+      "SELECT username, userRole FROM rep_list WHERE status = 1 ORDER BY username"
     );
 
     const logRange = getPayrollAttendanceLogDateRange(salaryMonth);
@@ -312,6 +315,7 @@ export async function GET(request) {
 
     const [attendanceRows] = await db.query(
       `SELECT username, date, checkin_time, checkout_time,
+        checkin_latitude, checkin_longitude, checkin_address,
         break_morning_start, break_morning_end,
         break_lunch_start, break_lunch_end,
         break_evening_start, break_evening_end
@@ -341,9 +345,17 @@ export async function GET(request) {
       (schedules || []).map((s) => [normalizeUserKey(s.username), s])
     );
 
-    const [profileRows] = await db.query(`SELECT username, date_of_joining FROM employee_profiles`);
+    const [profileRows] = await db.query(
+      `SELECT username, date_of_joining, work_location FROM employee_profiles`
+    );
     const dojByUser = new Map(
       (profileRows || []).map((p) => [normalizeUserKey(p.username), p.date_of_joining])
+    );
+    const workLocationByUser = new Map(
+      (profileRows || []).map((p) => [normalizeUserKey(p.username), p.work_location])
+    );
+    const roleByUser = new Map(
+      (employees || []).map((e) => [normalizeUserKey(e.username), e.userRole])
     );
 
     const salaryContext = {
@@ -353,6 +365,8 @@ export async function GET(request) {
       globalRules,
       scheduleByUser,
       dojByUser,
+      roleByUser,
+      workLocationByUser,
     };
 
     let generated = 0, skipped = 0, failed = 0;

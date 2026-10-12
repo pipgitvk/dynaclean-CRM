@@ -4,6 +4,14 @@ import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
 
+const MAX_FILES_PER_FIELD = 5;
+const FILE_FIELD_NAMES = new Set([
+  "ewaybill_file",
+  "einvoice_file",
+  "report_file",
+  "deliverchallan",
+]);
+
 export default function UploadForm({ orderDetails }) {
   const [form, setForm] = useState({
     invoice_number: "",
@@ -12,10 +20,10 @@ export default function UploadForm({ orderDetails }) {
     taxamt: "",
     totalamt: "",
     remark: "",
-    ewaybill_file: null,
-    einvoice_file: null,
-    report_file: null,
-    deliverchallan: null,
+    ewaybill_file: [],
+    einvoice_file: [],
+    report_file: [],
+    deliverchallan: [],
     payment_id: "",
     payment_date: "",
     payment_amount: "",
@@ -101,9 +109,33 @@ export default function UploadForm({ orderDetails }) {
     setComputedPaymentStatus(status);
   }, [form.payment_amount, form.duedate, paymentTermDays, form.totalamt]);
 
+  const fileKey = (file) => `${file.name}-${file.size}-${file.lastModified}`;
+
+  const handleRemoveFile = (fieldName, index) => {
+    setForm((prev) => ({
+      ...prev,
+      [fieldName]: prev[fieldName].filter((_, i) => i !== index),
+    }));
+  };
+
   const handleChange = (e) => {
     const { name, value, files } = e.target;
-    if (files) {
+    if (files && FILE_FIELD_NAMES.has(name)) {
+      const selected = Array.from(files);
+      setForm((prev) => {
+        const existing = prev[name] || [];
+        const seen = new Set(existing.map(fileKey));
+        const newFiles = selected.filter((f) => !seen.has(fileKey(f)));
+        const combined = [...existing, ...newFiles];
+
+        if (combined.length > MAX_FILES_PER_FIELD) {
+          toast.error(`Maximum ${MAX_FILES_PER_FIELD} files allowed per field`);
+          return { ...prev, [name]: combined.slice(0, MAX_FILES_PER_FIELD) };
+        }
+        return { ...prev, [name]: combined };
+      });
+      e.target.value = "";
+    } else if (files) {
       setForm((prev) => ({ ...prev, [name]: files[0] }));
     } else {
       setForm((prev) => ({ ...prev, [name]: value }));
@@ -139,12 +171,21 @@ export default function UploadForm({ orderDetails }) {
       setLoading(false);
       return;
     }
+    if (!form.report_file?.length) {
+      setMessage("❌ Please upload at least one Invoice PDF.");
+      setLoading(false);
+      return;
+    }
 
     const formData = new FormData();
     formData.append("order_id", orderDetails.order_id);
     for (const key in form) {
-      if (form[key]) {
-        formData.append(key, form[key]);
+      const value = form[key];
+      if (!value) continue;
+      if (Array.isArray(value)) {
+        value.forEach((file) => formData.append(key, file));
+      } else {
+        formData.append(key, value);
       }
     }
 
@@ -273,23 +314,31 @@ export default function UploadForm({ orderDetails }) {
         <FileInput
           name="ewaybill_file"
           label="E-way Bill (Optional)"
+          files={form.ewaybill_file}
           onChange={handleChange}
+          onRemove={handleRemoveFile}
         />
         <FileInput
           name="einvoice_file"
           label="E-invoice (Optional)"
+          files={form.einvoice_file}
           onChange={handleChange}
+          onRemove={handleRemoveFile}
         />
         <FileInput
           name="report_file"
           label="Invoice PDF (Required)"
+          files={form.report_file}
           required
           onChange={handleChange}
+          onRemove={handleRemoveFile}
         />
         <FileInput
           name="deliverchallan"
           label="Delivery Challan (Optional)"
+          files={form.deliverchallan}
           onChange={handleChange}
+          onRemove={handleRemoveFile}
         />
       </div>
 
@@ -332,7 +381,16 @@ function TextInput({ label, name, value, onChange, type = "text", required }) {
   );
 }
 
-function FileInput({ label, name, onChange, required = false }) {
+function FileInput({
+  label,
+  name,
+  onChange,
+  onRemove,
+  required = false,
+  files = [],
+}) {
+  const atMax = files.length >= MAX_FILES_PER_FIELD;
+
   return (
     <div>
       <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -341,11 +399,35 @@ function FileInput({ label, name, onChange, required = false }) {
       <input
         type="file"
         name={name}
-        accept=".pdf"
+        accept=".pdf,.jpg,.jpeg,.png"
+        multiple
         onChange={onChange}
-        required={required}
-        className="w-full border border-gray-300 rounded file:mr-4 file:py-1 file:px-3 file:border-0 file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200"
+        disabled={atMax}
+        required={required && files.length === 0}
+        className="w-full border border-gray-300 rounded file:mr-4 file:py-1 file:px-3 file:border-0 file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
       />
+      {files.length > 0 && (
+        <ul className="mt-1 space-y-1 text-xs text-gray-600">
+          {files.map((file, index) => (
+            <li
+              key={`${file.name}-${file.size}-${index}`}
+              className="flex items-center justify-between gap-2 rounded bg-gray-50 px-2 py-1"
+            >
+              <span className="truncate">
+                {index + 1}. {file.name}
+              </span>
+              <button
+                type="button"
+                onClick={() => onRemove(name, index)}
+                className="shrink-0 text-red-600 hover:text-red-800"
+                title="Remove file"
+              >
+                ✕
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

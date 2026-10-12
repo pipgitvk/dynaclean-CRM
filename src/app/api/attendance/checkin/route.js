@@ -1,5 +1,6 @@
 // /api/attendance/checkin/route.js
 import { getDbConnection } from "@/lib/db";
+import { lookupAttendanceEmployeeIds } from "@/lib/ensureAttendanceLogsEmployeeColumns";
 import { getISTDateString, getISTDateTimeString } from "@/lib/istDateTime";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
@@ -84,11 +85,12 @@ export async function POST() {
       );
     }
 
+    const ids = await lookupAttendanceEmployeeIds(conn, username);
     const [insertResult] = await conn.execute(
       `INSERT INTO attendance_logs 
-       (username, date, checkin_time)
-       VALUES (?, ?, ?)`,
-      [username, today, checkinTime]
+       (username, employee_id, machine_code, date, checkin_time)
+       VALUES (?, ?, ?, ?, ?)`,
+      [username, ids.employee_id, ids.machine_code, today, checkinTime]
     );
 
     console.log("🔥 CHECKIN INSERT RESULT:", insertResult);

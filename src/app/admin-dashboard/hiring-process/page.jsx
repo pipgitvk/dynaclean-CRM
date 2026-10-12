@@ -1,5 +1,6 @@
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Eye, Filter, Loader2, Pencil, Trash2 } from "lucide-react";
@@ -292,22 +293,11 @@ export default function AdminHiringProcessPage() {
               Next follow-up date (from – to)
             </label>
             <div className="flex items-center gap-2">
-              <input
-                type="date"
-                value={filterNextFollowupFrom}
-                onChange={(e) => setFilterNextFollowupFrom(e.target.value)}
-                className={`${fieldClass} flex-1 min-w-0`}
-                title="Next follow-up from"
-              />
+              <TypeableDateFilterInput value={filterNextFollowupFrom} onChange={setFilterNextFollowupFrom} className={`${fieldClass} flex-1 min-w-0`}
+                title="Next follow-up from"/>
               <span className="text-xs text-slate-400">–</span>
-              <input
-                type="date"
-                value={filterNextFollowupTo}
-                min={filterNextFollowupFrom || undefined}
-                onChange={(e) => setFilterNextFollowupTo(e.target.value)}
-                className={`${fieldClass} flex-1 min-w-0`}
-                title="Next follow-up to"
-              />
+              <TypeableDateFilterInput value={filterNextFollowupTo} onChange={setFilterNextFollowupTo} min={filterNextFollowupFrom || undefined} className={`${fieldClass} flex-1 min-w-0`}
+                title="Next follow-up to"/>
             </div>
           </div>
         </div>

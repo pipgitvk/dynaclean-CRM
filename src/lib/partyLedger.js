@@ -290,17 +290,30 @@ export async function buildLedgerForParty(decodedCompany, customerIdFilter = nul
       ? String(customerIdFilter).trim()
       : null;
 
-  const nameAliases = cidFilter
-    ? []
-    : await getPartyNameAliases(conn, decodedCompany, null);
+  const nameAliases = await getPartyNameAliases(
+    conn,
+    decodedCompany,
+    cidFilter,
+  );
 
-  // A selected party is loaded only by customer_id. Name and address
-  // must not pull in another customer's invoices.
+  // Match production company ledger: invoices by customer_name. Parties UI also
+  // passes customer_id — include those rows AND any invoice whose buyer name
+  // matches this party (many invoices have null/mismatched customer_id).
   const invoiceWhereParts = [];
   const invoiceParams = [];
   if (cidFilter) {
-    invoiceWhereParts.push("CAST(customer_id AS CHAR) = ?");
+    const cidParts = ["CAST(customer_id AS CHAR) = ?"];
     invoiceParams.push(cidFilter);
+    if (nameAliases.length > 0) {
+      const nameClause = nameAliases
+        .map(() => "(TRIM(customer_name) = ? OR customer_name = ?)")
+        .join(" OR ");
+      cidParts.push(`(${nameClause})`);
+      for (const alias of nameAliases) {
+        invoiceParams.push(alias, alias);
+      }
+    }
+    invoiceWhereParts.push(`(${cidParts.join(" OR ")})`);
   } else if (nameAliases.length > 0) {
     const nameClause = nameAliases
       .map(() => "(TRIM(customer_name) = ? OR customer_name = ?)")
@@ -729,8 +742,9 @@ export async function buildLedgerForParty(decodedCompany, customerIdFilter = nul
   } catch (_) {}
 
   let manualRows = [];
-  if (!cidFilter) {
-    const manualAliases = nameAliases.length > 0 ? nameAliases : [decodedCompany];
+  const manualAliases =
+    nameAliases.length > 0 ? nameAliases : [decodedCompany];
+  if (manualAliases.length > 0) {
     const manualPlaceholders = manualAliases.map(() => "?").join(",");
     const [rows] = await conn.execute(
       `SELECT id, entry_date, particulars, vch_type, vch_no, debit, credit, created_at
@@ -764,13 +778,13 @@ export async function buildLedgerForParty(decodedCompany, customerIdFilter = nul
   });
 
   await appendReturnCompletedEntries(conn, {
-    partyName: cidFilter ? "" : decodedCompany,
+    partyName: decodedCompany,
     customerId: customerIdForCompany,
-    invoiceNumbers: cidFilter ? [] : buyerInvoiceNumbers,
-    gstins: cidFilter ? [] : invoices.map((i) => i.gst_number).filter(Boolean),
+    invoiceNumbers: buyerInvoiceNumbers,
+    gstins: invoices.map((i) => i.gst_number).filter(Boolean),
     existingRows: filteredManualRows,
     derivedLedger,
-    onlyCustomerId: Boolean(cidFilter),
+    onlyCustomerId: false,
   });
 
   const combined = [

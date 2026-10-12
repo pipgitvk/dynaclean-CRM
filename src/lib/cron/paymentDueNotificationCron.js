@@ -2,8 +2,9 @@ import cron from "node-cron";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
-import { getDbConnection, withPool, isDbConnectionError } from "@/lib/db";
+import { getDbConnection, withPool } from "@/lib/db";
 import NotificationService from "@/lib/services/NotificationService";
+import { PAYMENT_PENDING_ORDER_SQL_WHERE } from "@/lib/paymentPendingFilters";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -67,9 +68,7 @@ async function sendPaymentDueNotifications() {
       FROM neworder AS o
       LEFT JOIN emplist AS e ON CAST(o.created_by AS CHAR) = CAST(e.username AS CHAR)
       LEFT JOIN rep_list AS r ON CAST(o.created_by AS CHAR) = CAST(r.username AS CHAR)
-      WHERE (o.payment_status IS NULL OR o.payment_status != 'paid')
-        AND (o.is_returned = 0 OR o.is_returned = 2 OR o.is_returned IS NULL)
-        AND (o.is_cancelled = 0 OR o.is_cancelled IS NULL)
+      WHERE ${PAYMENT_PENDING_ORDER_SQL_WHERE}
         AND o.duedate IS NOT NULL
         AND DATE(o.duedate) >= DATE(?)
         AND DATE(o.duedate) <= DATE(?)
@@ -139,25 +138,19 @@ async function sendPaymentDueNotifications() {
           console.log(`✅ Admin notification sent to SUPERADMIN for order ${order.order_id}`);
         }
       } catch (error) {
-        if (!isDbConnectionError(error)) {
-          console.error(`❌ Error creating notification for order ${order.order_id}:`, error);
-        }
+        console.error(`❌ Error creating notification for order ${order.order_id}:`, error);
       }
     }
 
     console.log(`📊 Cron job completed: ${notificationCount} notifications sent`);
   } catch (error) {
-    if (!isDbConnectionError(error)) {
-      console.error("❌ Error in payment due notification cron job:", error);
-    }
+    console.error("❌ Error in payment due notification cron job:", error);
   } finally {
     if (conn) {
       try {
         conn.release();
       } catch (releaseError) {
-        if (!isDbConnectionError(releaseError)) {
-          console.error("❌ Error releasing database connection:", releaseError);
-        }
+        console.error("❌ Error releasing database connection:", releaseError);
       }
     }
   }
