@@ -332,6 +332,7 @@ export default function MachineAttendancePage() {
                 <th className="px-4 py-3 text-left">#</th>
                 <th className="px-4 py-3 text-left">Emp code</th>
                 <th className="px-4 py-3 text-left">Name</th>
+                <th className="px-4 py-3 text-left">Role</th>
                 {viewMode === "daily" ? (
                   <>
                     <th className="px-4 py-3 text-left">Date</th>
@@ -352,7 +353,7 @@ export default function MachineAttendancePage() {
               {!loading && rows.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={viewMode === "daily" ? 7 : 6}
+                    colSpan={viewMode === "daily" ? 8 : 7}
                     className="px-4 py-8 text-center text-gray-500"
                   >
                     No punches found. Sync from machine or clear filters (Show
@@ -373,6 +374,14 @@ export default function MachineAttendancePage() {
                     </td>
                     <td className="px-4 py-2 text-gray-800">
                       {row.employee_name}
+                    </td>
+                    <td className="px-4 py-2 text-gray-700">
+                      <span className="block">{row.userRole || "—"}</span>
+                      {row.userDepartment ? (
+                        <span className="block text-xs text-gray-500">
+                          {row.userDepartment}
+                        </span>
+                      ) : null}
                     </td>
                     <td className="px-4 py-2 text-gray-700 whitespace-nowrap">
                       {formatDateOnly(row.punch_date)}
@@ -399,6 +408,14 @@ export default function MachineAttendancePage() {
                     </td>
                     <td className="px-4 py-2 text-gray-800">
                       {row.employee_name}
+                    </td>
+                    <td className="px-4 py-2 text-gray-700">
+                      <span className="block">{row.userRole || "—"}</span>
+                      {row.userDepartment ? (
+                        <span className="block text-xs text-gray-500">
+                          {row.userDepartment}
+                        </span>
+                      ) : null}
                     </td>
                     <td className="px-4 py-2 text-gray-700 whitespace-nowrap">
                       {formatPunchDisplay(row.punch_datetime)}

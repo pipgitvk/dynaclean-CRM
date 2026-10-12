@@ -134,6 +134,37 @@ export async function loadMachineCodeMaps(conn) {
   return { usernameToMachineCode, machineCodeToUsername };
 }
 
+/** emp_code (machine) → rep_list userRole / userDepartment via machine_code or empId. */
+export async function loadRepListInfoByMachineEmpCode(conn) {
+  await ensureRepListMachineCodeColumn(conn);
+  const [rows] = await conn.query(
+    `SELECT
+       TRIM(machine_code) AS machine_code,
+       TRIM(CAST(empId AS CHAR)) AS emp_id,
+       userRole,
+       userDepartment
+     FROM rep_list
+     WHERE status = 1`
+  );
+  const byCode = new Map();
+  for (const row of rows || []) {
+    const userRole = String(row.userRole ?? "").trim() || null;
+    const userDepartment = String(row.userDepartment ?? "").trim() || null;
+    const info = { userRole, userDepartment };
+    const machineCode = String(row.machine_code || "").trim();
+    const empId = String(row.emp_id ?? "").trim();
+    if (machineCode && !byCode.has(machineCode)) byCode.set(machineCode, info);
+    if (empId && !byCode.has(empId)) byCode.set(empId, info);
+  }
+  return byCode;
+}
+
+export function repListInfoForEmpCode(byCode, empCode) {
+  const code = String(empCode ?? "").trim();
+  if (!code || !byCode) return { userRole: null, userDepartment: null };
+  return byCode.get(code) || { userRole: null, userDepartment: null };
+}
+
 export async function loadMachineDailyByUsername(conn, machineCodeToUsername) {
   await ensureMachineAttendancePunchesTable(conn);
   const [rows] = await conn.query(

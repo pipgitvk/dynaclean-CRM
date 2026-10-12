@@ -6,6 +6,10 @@ import {
   getLastMachineAttendanceSync,
   syncMachineAttendanceFromEtimeOffice,
 } from "@/lib/syncMachineAttendance";
+import {
+  loadRepListInfoByMachineEmpCode,
+  repListInfoForEmpCode,
+} from "@/lib/attendanceMachineMerge";
 
 export const dynamic = "force-dynamic";
 
@@ -70,6 +74,15 @@ export async function GET(request) {
 
     const lastSync = await getLastMachineAttendanceSync(conn);
     const { whereSql, params } = buildMachinePunchFilters(from, to, employeeSearch);
+    const repByEmpCode = await loadRepListInfoByMachineEmpCode(conn);
+
+    const attachRepListFields = (row) => {
+      const { userRole, userDepartment } = repListInfoForEmpCode(
+        repByEmpCode,
+        row.emp_code
+      );
+      return { ...row, userRole, userDepartment };
+    };
 
     if (view === "raw") {
       const [countRows] = await conn.execute(
@@ -89,7 +102,7 @@ export async function GET(request) {
 
       return NextResponse.json({
         view: "raw",
-        rows: rows || [],
+        rows: (rows || []).map(attachRepListFields),
         lastSync,
         pagination: { page, limit, total, pages: Math.ceil(total / limit) || 1 },
       });
@@ -136,14 +149,16 @@ export async function GET(request) {
       params
     );
 
-    const normalized = (rows || []).map((row) => ({
-      emp_code: row.emp_code,
-      employee_name: row.employee_name,
-      punch_date: row.punch_date,
-      check_in: row.check_in_times ? String(row.check_in_times).trim() : "",
-      check_out: row.check_out_times ? String(row.check_out_times).trim() : "",
-      punch_count: Number(row.punch_count ?? 0),
-    }));
+    const normalized = (rows || []).map((row) =>
+      attachRepListFields({
+        emp_code: row.emp_code,
+        employee_name: row.employee_name,
+        punch_date: row.punch_date,
+        check_in: row.check_in_times ? String(row.check_in_times).trim() : "",
+        check_out: row.check_out_times ? String(row.check_out_times).trim() : "",
+        punch_count: Number(row.punch_count ?? 0),
+      })
+    );
 
     return NextResponse.json({
       view: "daily",
