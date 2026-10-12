@@ -12,26 +12,35 @@ function formatInr(value) {
   return `₹ ${n.toLocaleString("en-IN")}`;
 }
 
+function rowToPdfItem(r) {
+  return {
+    imageUrl: r.image_path || r.product_image || null,
+    model: r.product_number || r.item_code || "—",
+    name: r.item_name || "—",
+    price: r.special_price,
+  };
+}
+
 export default function ApprovedPriceListPdfButton({
   customerId,
   customerName,
   rows = [],
+  /** When set, PDF uses only these rows (e.g. user selection). */
+  selectedRows = null,
+  buttonLabel,
+  disabled: disabledProp = false,
 }) {
   const containerRef = useRef(null);
   const [isDownloading, setIsDownloading] = useState(false);
 
-  const approvedItems = useMemo(
-    () =>
-      rows
-        .filter((r) => (r.status || "").toLowerCase() === "approved")
-        .map((r) => ({
-          imageUrl: r.image_path || r.product_image || null,
-          model: r.product_number || r.item_code || "—",
-          name: r.item_name || "—",
-          price: r.special_price,
-        })),
-    [rows],
-  );
+  const approvedItems = useMemo(() => {
+    if (selectedRows != null) {
+      return selectedRows.map(rowToPdfItem);
+    }
+    return rows
+      .filter((r) => (r.status || "").toLowerCase() === "approved")
+      .map(rowToPdfItem);
+  }, [rows, selectedRows]);
 
   const downloadPDF = async () => {
     const el = containerRef.current;
@@ -138,15 +147,22 @@ export default function ApprovedPriceListPdfButton({
       <button
         type="button"
         onClick={downloadPDF}
-        disabled={isDownloading || approvedItems.length === 0}
+        disabled={
+          disabledProp || isDownloading || approvedItems.length === 0
+        }
         className="px-4 py-2 rounded bg-slate-800 text-white text-sm font-medium hover:bg-slate-900 disabled:opacity-50"
         title={
           approvedItems.length === 0
-            ? "No approved prices to export"
-            : "Download approved prices as PDF"
+            ? selectedRows != null
+              ? "Select at least one row"
+              : "No approved prices to export"
+            : "Download as PDF"
         }
       >
-        {isDownloading ? "Generating PDF…" : "Download PDF"}
+        {isDownloading
+          ? "Generating PDF…"
+          : buttonLabel ||
+            (selectedRows != null ? "Download selected PDF" : "Download PDF")}
       </button>
 
       <div
