@@ -49,6 +49,7 @@ export default async function CustomerSpecialPrice({ params }) {
     SELECT 
       sp.product_id,
       sp.special_price,
+      sp.price_term,
       sp.status,
       sp.set_by,
       sp.approved_by,

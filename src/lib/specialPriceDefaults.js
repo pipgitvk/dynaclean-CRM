@@ -22,6 +22,33 @@ export function resolveSpecialPriceTerm(value) {
   return trimmed || SPECIAL_PRICE_TERM_DEFAULT;
 }
 
+function normalizePriceTerm(priceTerm) {
+  return String(priceTerm || SPECIAL_PRICE_TERM_DEFAULT).trim().toLowerCase();
+}
+
+/** PDF / export: warranty column from price_term. */
+export function specialPriceWarrantyPdfLabel(priceTerm) {
+  const term = normalizePriceTerm(priceTerm);
+  if (term === DEALER_PRICE_TERM_OPTIONS[1].toLowerCase()) {
+    return "No warranty";
+  }
+  return "1 year";
+}
+
+/** PDF / export: delivery column from price_term. */
+export function specialPriceDeliveryPdfLabel(priceTerm) {
+  const term = normalizePriceTerm(priceTerm);
+  if (term === DEALER_PRICE_TERM_OPTIONS[1].toLowerCase()) {
+    return "Extra";
+  }
+  return "Included";
+}
+
+export const SPECIAL_PRICE_PDF_FOOTER_TERMS = [
+  "GST extra as applicable,",
+  "Payment terms: 100% Advance.",
+];
+
 /** Rows the special-pricing table shows as pending (not approved/rejected). */
 export const SPECIAL_PRICE_PENDING_CONDITION =
   "LOWER(TRIM(IFNULL(sp.status, ''))) NOT IN ('approved', 'rejected')";

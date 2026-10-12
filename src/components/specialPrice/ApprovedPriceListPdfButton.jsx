@@ -5,6 +5,11 @@ import Image from "next/image";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import { LetterheadCompanyInfo } from "@/components/invoice/InvoiceLetterheadSection";
+import {
+  SPECIAL_PRICE_PDF_FOOTER_TERMS,
+  specialPriceDeliveryPdfLabel,
+  specialPriceWarrantyPdfLabel,
+} from "@/lib/specialPriceDefaults";
 
 function formatInr(value) {
   const n = Number(value);
@@ -18,6 +23,8 @@ function rowToPdfItem(r) {
     model: r.product_number || r.item_code || "—",
     name: r.item_name || "—",
     price: r.special_price,
+    warranty: specialPriceWarrantyPdfLabel(r.price_term),
+    delivery: specialPriceDeliveryPdfLabel(r.price_term),
   };
 }
 
@@ -205,7 +212,9 @@ export default function ApprovedPriceListPdfButton({
                 <th className="border border-gray-300 p-2 w-24">Image</th>
                 <th className="border border-gray-300 p-2">Model</th>
                 <th className="border border-gray-300 p-2">Name</th>
-                <th className="border border-gray-300 p-2 text-right w-36">
+                <th className="border border-gray-300 p-2 w-28">Warranty</th>
+                <th className="border border-gray-300 p-2 w-24">Delivery</th>
+                <th className="border border-gray-300 p-2 text-right w-32">
                   Approved Price
                 </th>
               </tr>
@@ -234,6 +243,12 @@ export default function ApprovedPriceListPdfButton({
                   <td className="border border-gray-300 p-2 align-middle">
                     {item.name}
                   </td>
+                  <td className="border border-gray-300 p-2 align-middle text-center text-xs">
+                    {item.warranty}
+                  </td>
+                  <td className="border border-gray-300 p-2 align-middle text-center text-xs">
+                    {item.delivery}
+                  </td>
                   <td className="border border-gray-300 p-2 align-middle text-right font-semibold">
                     {formatInr(item.price)}
                   </td>
@@ -241,6 +256,15 @@ export default function ApprovedPriceListPdfButton({
               ))}
             </tbody>
           </table>
+
+          <div className="text-sm text-gray-900 pt-2">
+            <p className="font-semibold mb-1">Terms:</p>
+            <ul className="list-none space-y-0.5 pl-0">
+              {SPECIAL_PRICE_PDF_FOOTER_TERMS.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+          </div>
         </div>
       </div>
     </>
