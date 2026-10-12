@@ -390,3 +390,102 @@ export async function bulkApproveSpecialPrices(prevState, formData) {
 
   redirect("/admin-dashboard/special-pricing");
 }
+
+/* =========================
+   BULK REJECT (same page selection)
+========================= */
+export async function bulkRejectSpecialPrices(prevState, formData) {
+  const fd = getFormDataFromActionArgs(prevState, formData);
+  if (!fd) {
+    return { error: "Invalid request." };
+  }
+
+  const note = String(fd.get("note") || "").trim();
+  let ids = [];
+  try {
+    const raw = fd.get("ids");
+    ids = JSON.parse(String(raw || "[]"));
+  } catch {
+    return { error: "Invalid selection." };
+  }
+
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return { error: "Select at least one row to reject." };
+  }
+  if (!note) {
+    return { error: "Note is required before submitting." };
+  }
+
+  const payload = await getSessionPayload();
+  if (
+    !payload ||
+    !["SUPERADMIN", "DIRECTOR"].includes(String(payload.role).toUpperCase())
+  ) {
+    return { error: "Unauthorized." };
+  }
+
+  const actor =
+    (typeof payload.username === "string" && payload.username.trim()) ||
+    (typeof payload.name === "string" && payload.name.trim()) ||
+    "admin";
+
+  const conn = await getDbConnection();
+  const numericIds = ids
+    .map((id) => Number(id))
+    .filter((id) => Number.isFinite(id) && id > 0);
+
+  if (numericIds.length === 0) {
+    return { error: "Invalid selection." };
+  }
+
+  const placeholders = numericIds.map(() => "?").join(", ");
+  const [rows] = await conn.execute(
+    `SELECT id, status FROM special_price WHERE id IN (${placeholders})`,
+    numericIds,
+  );
+
+  const rejectable = rows.filter((row) => {
+    const status = String(row.status || "").toLowerCase();
+    return status !== "approved" && status !== "rejected";
+  });
+
+  if (rejectable.length === 0) {
+    return {
+      error:
+        "None of the selected rows can be rejected (already approved or rejected).",
+    };
+  }
+
+  for (const row of rejectable) {
+    const id = Number(row.id);
+    try {
+      await conn.execute(
+        `
+        UPDATE special_price
+        SET
+          status = 'rejected',
+          approved_by = ?,
+          approved_date = NOW(),
+          approval_note = ?
+        WHERE id = ?
+        `,
+        [actor, note, id],
+      );
+    } catch (e) {
+      if (!isUnknownApprovalNoteColumnError(e)) throw e;
+      await conn.execute(
+        `
+        UPDATE special_price
+        SET
+          status = 'rejected',
+          approved_by = ?,
+          approved_date = NOW()
+        WHERE id = ?
+        `,
+        [actor, id],
+      );
+    }
+  }
+
+  redirect("/admin-dashboard/special-pricing");
+}

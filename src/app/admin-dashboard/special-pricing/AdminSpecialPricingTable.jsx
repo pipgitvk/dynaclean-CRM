@@ -13,7 +13,7 @@ import {
   resolveSpecialPriceTerm,
   resolveSpecialPriceType,
 } from "@/lib/specialPriceDefaults";
-import { bulkApproveSpecialPrices } from "./_actions";
+import { bulkApproveSpecialPrices, bulkRejectSpecialPrices } from "./_actions";
 
 function rowKey(row) {
   return `${row.item_type}-${row.id}`;
@@ -46,8 +46,7 @@ function getSpecialPriceRowMeta(row) {
   const autoApprovalNote = dealerPending
     ? dealerApprovalNoteForTerm(row.price_term)
     : "";
-  const canSelect =
-    pending && (!dealerPending || canAutoApproveDealerPrice(row));
+  const canSelect = pending;
   const badgeClass = isApproved
     ? "bg-green-100 text-green-700"
     : isRejected
@@ -146,8 +145,13 @@ export default function AdminSpecialPricingTable({
 }) {
   const [selected, setSelected] = useState(() => new Set());
   const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkRejectOpen, setBulkRejectOpen] = useState(false);
   const [bulkState, bulkAction, bulkPending] = useActionState(
     bulkApproveSpecialPrices,
+    null,
+  );
+  const [bulkRejectState, bulkRejectAction, bulkRejectPending] = useActionState(
+    bulkRejectSpecialPrices,
     null,
   );
 
@@ -156,7 +160,7 @@ export default function AdminSpecialPricingTable({
     [rows],
   );
 
-  const selectablePending = useMemo(
+  const approvablePending = useMemo(
     () =>
       pendingOnPage.filter(
         (r) => !isDealerPricePending(r) || canAutoApproveDealerPrice(r),
@@ -165,8 +169,8 @@ export default function AdminSpecialPricingTable({
   );
 
   const allSelectableSelected =
-    selectablePending.length > 0 &&
-    selectablePending.every((r) => selected.has(rowKey(r)));
+    pendingOnPage.length > 0 &&
+    pendingOnPage.every((r) => selected.has(rowKey(r)));
 
   const toggleRow = (row) => {
     const key = rowKey(row);
@@ -183,7 +187,7 @@ export default function AdminSpecialPricingTable({
       setSelected(new Set());
       return;
     }
-    setSelected(new Set(selectablePending.map((r) => rowKey(r))));
+    setSelected(new Set(pendingOnPage.map((r) => rowKey(r))));
   };
 
   const selectedIds = useMemo(() => {
@@ -213,16 +217,16 @@ export default function AdminSpecialPricingTable({
               className="rounded border-gray-300"
               checked={allSelectableSelected}
               onChange={toggleSelectAllOnPage}
-              disabled={selectablePending.length === 0}
+              disabled={pendingOnPage.length === 0}
             />
             <span>Select all on this page</span>
           </label>
           <span className="text-gray-500 text-xs sm:text-sm">
             {selectedIds.length} selected
-            {selectablePending.length < pendingOnPage.length && (
+            {approvablePending.length < pendingOnPage.length && (
               <span className="block sm:inline sm:ml-1 mt-1 sm:mt-0">
                 (set DP / DP No-Warranty on product stock to bulk-approve dealer
-                requests)
+                requests; you can still bulk-reject them)
               </span>
             )}
           </span>
@@ -233,6 +237,14 @@ export default function AdminSpecialPricingTable({
             className="w-full sm:w-auto px-3 py-2 rounded-md bg-green-600 text-white text-sm font-medium hover:bg-green-700 disabled:opacity-40"
           >
             Approve selected
+          </button>
+          <button
+            type="button"
+            disabled={selectedIds.length === 0}
+            onClick={() => setBulkRejectOpen(true)}
+            className="w-full sm:w-auto px-3 py-2 rounded-md bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-40"
+          >
+            Reject selected
           </button>
         </div>
       )}
@@ -401,7 +413,7 @@ export default function AdminSpecialPricingTable({
                   className="rounded border-gray-300"
                   checked={allSelectableSelected}
                   onChange={toggleSelectAllOnPage}
-                  disabled={selectablePending.length === 0}
+                  disabled={pendingOnPage.length === 0}
                   aria-label="Select all on this page"
                   title="Select all on this page"
                 />
@@ -658,6 +670,61 @@ export default function AdminSpecialPricingTable({
                   className="px-4 py-2 rounded-md bg-green-600 text-white text-sm font-medium disabled:opacity-50"
                 >
                   {bulkPending ? "Approving…" : "Approve all selected"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {bulkRejectOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-4 space-y-3">
+            <h2 className="text-sm font-semibold">
+              Reject {selectedIds.length} special price
+              {selectedIds.length === 1 ? "" : "s"}
+            </h2>
+            <form action={bulkRejectAction} className="space-y-3">
+              <input
+                type="hidden"
+                name="ids"
+                value={JSON.stringify(selectedIds)}
+              />
+              <div>
+                <label
+                  htmlFor="bulk-reject-note"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
+                  Note <span className="text-red-600">*</span>
+                </label>
+                <textarea
+                  id="bulk-reject-note"
+                  name="note"
+                  required
+                  rows={4}
+                  disabled={bulkRejectPending}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                  placeholder="Enter a note for all selected rejections…"
+                />
+              </div>
+              {bulkRejectState?.error && (
+                <p className="text-sm text-red-600">{bulkRejectState.error}</p>
+              )}
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setBulkRejectOpen(false)}
+                  disabled={bulkRejectPending}
+                  className="px-4 py-2 border rounded-md text-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={bulkRejectPending}
+                  className="px-4 py-2 rounded-md bg-red-600 text-white text-sm font-medium disabled:opacity-50"
+                >
+                  {bulkRejectPending ? "Rejecting…" : "Reject all selected"}
                 </button>
               </div>
             </form>
