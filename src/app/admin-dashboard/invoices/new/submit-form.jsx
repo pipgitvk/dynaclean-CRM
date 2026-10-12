@@ -6,6 +6,7 @@ import TaxAndSummary from "./Tax-invoice";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import toast from "react-hot-toast";
+import { Pencil } from "lucide-react";
 import AddSpecialPriceModal from "@/components/specialPrice/AddSpecialPriceModal";
 import dynacleanLogo from "@/components/logo1.jpg";
 import { LetterheadCompanyInfo, LetterheadBankLine, LetterheadSignatoryLine } from "@/components/invoice/InvoiceLetterheadSection";
@@ -22,6 +23,7 @@ export default function InvoiceForm({ invoiceNumber, invoiceDate, invoiceType = 
   const { user } = useUser();
   const canEditHsn = canEditInvoiceHsn(user?.userRole);
   const autoFilledQuoteRef = useRef(false);
+  const termsTextareaRef = useRef(null);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   
@@ -244,6 +246,7 @@ export default function InvoiceForm({ invoiceNumber, invoiceDate, invoiceType = 
       ? getDefaultPerformaInvoiceTerms()
       : DEFAULT_TAX_INVOICE_TERMS,
   );
+  const [termsEditing, setTermsEditing] = useState(invoiceType !== "performa");
 
   const [notes, setNotes] = useState("");
   const [formLogoSrc, setFormLogoSrc] = useState(dynacleanLogo.src);
@@ -886,14 +889,36 @@ const fetchQuotationAndFill = async (quoteNoArg) => {
 
         {/* Terms & Conditions */}
         <div className="lg:col-span-2 border p-4 rounded bg-gray-50">
-          <h4 className="font-semibold text-base mb-2 text-gray-800">
-            Terms & Conditions
-          </h4>
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <h4 className="font-semibold text-base text-gray-800">
+              Terms & Conditions
+            </h4>
+            {invoiceType === "performa" && !termsEditing && (
+              <button
+                type="button"
+                onClick={() => {
+                  setTermsEditing(true);
+                  requestAnimationFrame(() => termsTextareaRef.current?.focus());
+                }}
+                className="inline-flex items-center gap-1 rounded p-1.5 text-gray-600 hover:bg-gray-200 hover:text-gray-900"
+                title="Edit terms & conditions"
+                aria-label="Edit terms & conditions"
+              >
+                <Pencil className="h-4 w-4" />
+              </button>
+            )}
+          </div>
           <textarea
+            ref={termsTextareaRef}
             rows={8}
             value={editableTerms}
             onChange={(e) => setEditableTerms(e.target.value)}
-            className="w-full text-sm p-2 border rounded resize-y"
+            readOnly={invoiceType === "performa" && !termsEditing}
+            className={`w-full text-sm p-2 border rounded resize-y ${
+              invoiceType === "performa" && !termsEditing
+                ? "cursor-default bg-white"
+                : ""
+            }`}
           />
         </div>
 

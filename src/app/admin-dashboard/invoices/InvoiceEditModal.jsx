@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import Link from "next/link";
 import toast from "react-hot-toast";
+import { Pencil } from "lucide-react";
 import InvoiceItemsTable from "./new/invoice-table";
 import TaxAndSummary from "./new/Tax-invoice";
 import PaymentLinkModal from "@/app/user-dashboard/invoices/new/PaymentLinkModal";
@@ -121,6 +122,8 @@ export default function InvoiceEditModal({
   });
   const [notes, setNotes] = useState("");
   const [editableTerms, setEditableTerms] = useState("");
+  const [termsEditing, setTermsEditing] = useState(false);
+  const termsTextareaRef = useRef(null);
   const [cgstRate, setCgstRate] = useState(9);
   const [sgstRate, setSgstRate] = useState(9);
   const [igstRate, setIgstRate] = useState(0);
@@ -220,6 +223,7 @@ export default function InvoiceEditModal({
             ? resolvePerformaInvoiceTerms(inv.terms_conditions)
             : inv.terms_conditions || "",
         );
+        setTermsEditing(!isPerformaInvoiceType(inv.type));
         setRoundOff(Number(inv.round_off) || 0);
         // setIsAutoRoundOff(false); // Keep it true by default as requested
 
@@ -804,14 +808,38 @@ export default function InvoiceEditModal({
                   />
                 </div>
                 <div>
-                  <label className="block text-gray-600 mb-1 font-medium">
-                    Terms &amp; conditions
-                  </label>
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <label className="block text-gray-600 font-medium">
+                      Terms &amp; conditions
+                    </label>
+                    {invoiceType === "performa" && !termsEditing && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTermsEditing(true);
+                          requestAnimationFrame(() =>
+                            termsTextareaRef.current?.focus(),
+                          );
+                        }}
+                        className="inline-flex items-center rounded p-1 text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                        title="Edit terms & conditions"
+                        aria-label="Edit terms & conditions"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
                   <textarea
+                    ref={termsTextareaRef}
                     rows={invoiceType === "performa" ? 10 : 5}
-                    className="w-full border rounded px-2 py-1.5 resize-y"
+                    className={`w-full border rounded px-2 py-1.5 resize-y ${
+                      invoiceType === "performa" && !termsEditing
+                        ? "cursor-default bg-gray-50"
+                        : ""
+                    }`}
                     value={editableTerms}
                     onChange={(e) => setEditableTerms(e.target.value)}
+                    readOnly={invoiceType === "performa" && !termsEditing}
                   />
                 </div>
               </div>
