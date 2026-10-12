@@ -26,10 +26,20 @@ export function resolveSpecialPriceTerm(value) {
 export const SPECIAL_PRICE_PENDING_CONDITION =
   "LOWER(TRIM(IFNULL(sp.status, ''))) NOT IN ('approved', 'rejected')";
 
+export function normalizeSpecialPriceStatus(status) {
+  return String(status ?? "").trim().toLowerCase();
+}
+
+/** Client-side pending check — keep in sync with SPECIAL_PRICE_PENDING_CONDITION. */
+export function isSpecialPricePendingRow(row) {
+  const status = normalizeSpecialPriceStatus(row?.status);
+  return status !== "approved" && status !== "rejected";
+}
+
 export function isDealerPricePending(row) {
   return (
     isDealerPriceType(row?.price_type) &&
-    String(row?.status || "").toLowerCase() === "pending" &&
+    isSpecialPricePendingRow(row) &&
     Number(row?.special_price || 0) === 0
   );
 }

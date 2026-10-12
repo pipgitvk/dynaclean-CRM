@@ -9,6 +9,7 @@ import {
   canAutoApproveDealerPrice,
   dealerApprovalNoteForTerm,
   isDealerPricePending,
+  isSpecialPricePendingRow,
   resolveDealerPriceFromProductStock,
   resolveSpecialPriceTerm,
   resolveSpecialPriceType,
@@ -19,10 +20,8 @@ function rowKey(row) {
   return `${row.item_type}-${row.id}`;
 }
 
-function isPendingRow(row) {
-  const status = (row.status || "").toLowerCase();
-  return status !== "approved" && status !== "rejected";
-}
+const bulkSelectCheckboxClass =
+  "h-4 w-4 shrink-0 rounded border-gray-400 text-blue-600 focus:ring-2 focus:ring-blue-500 cursor-pointer accent-blue-600";
 
 function formatStockDpLine(value) {
   if (value == null || value === "") return "—";
@@ -32,10 +31,10 @@ function formatStockDpLine(value) {
 }
 
 function getSpecialPriceRowMeta(row) {
-  const status = (row.status || "").toLowerCase();
+  const status = String(row?.status ?? "").trim().toLowerCase();
   const isApproved = status === "approved";
   const isRejected = status === "rejected";
-  const pending = isPendingRow(row);
+  const pending = isSpecialPricePendingRow(row);
   const dealerPending = isDealerPricePending(row);
   const autoDealerPrice = dealerPending
     ? resolveDealerPriceFromProductStock(row.price_term, {
@@ -156,7 +155,7 @@ export default function AdminSpecialPricingTable({
   );
 
   const pendingOnPage = useMemo(
-    () => rows.filter((r) => isPendingRow(r)),
+    () => rows.filter((r) => isSpecialPricePendingRow(r)),
     [rows],
   );
 
@@ -214,7 +213,7 @@ export default function AdminSpecialPricingTable({
           <label className="inline-flex items-center gap-2 cursor-pointer">
             <input
               type="checkbox"
-              className="rounded border-gray-300"
+              className={bulkSelectCheckboxClass}
               checked={allSelectableSelected}
               onChange={toggleSelectAllOnPage}
               disabled={pendingOnPage.length === 0}
@@ -270,7 +269,7 @@ export default function AdminSpecialPricingTable({
                     {meta.canSelect ? (
                       <input
                         type="checkbox"
-                        className="rounded border-gray-300 mt-1 shrink-0"
+                        className={`${bulkSelectCheckboxClass} mt-0.5`}
                         checked={selected.has(meta.key)}
                         onChange={() => toggleRow(row)}
                         aria-label={`Select row ${row.id}`}
@@ -410,7 +409,7 @@ export default function AdminSpecialPricingTable({
               <th className="p-3 w-10 text-center">
                 <input
                   type="checkbox"
-                  className="rounded border-gray-300"
+                  className={bulkSelectCheckboxClass}
                   checked={allSelectableSelected}
                   onChange={toggleSelectAllOnPage}
                   disabled={pendingOnPage.length === 0}
@@ -458,13 +457,18 @@ export default function AdminSpecialPricingTable({
                       {meta.canSelect ? (
                         <input
                           type="checkbox"
-                          className="rounded border-gray-300"
+                          className={bulkSelectCheckboxClass}
                           checked={selected.has(meta.key)}
                           onChange={() => toggleRow(row)}
                           aria-label={`Select row ${row.id}`}
                         />
                       ) : (
-                        <span className="text-gray-300">—</span>
+                        <span
+                          className="text-gray-300 text-xs"
+                          title="Only pending rows can be selected for bulk actions"
+                        >
+                          —
+                        </span>
                       )}
                     </td>
                     <td className="p-3">
