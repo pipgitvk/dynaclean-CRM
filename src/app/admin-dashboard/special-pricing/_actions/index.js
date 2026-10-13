@@ -2,6 +2,7 @@
 
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { isUnknownApprovalNoteColumnError } from "@/lib/specialPriceApprovalNoteColumn";
 import {
@@ -32,12 +33,28 @@ function getFormDataFromActionArgs(first, second) {
   return null;
 }
 
-export async function updateSpecialPrice(formData) {
-  const id = formData.get("id");
-  const specialPrice = formData.get("special_price");
+export async function updateSpecialPrice(prevState, formData) {
+  const fd = getFormDataFromActionArgs(prevState, formData);
+  if (!fd) {
+    return { error: "Invalid request." };
+  }
+
+  const id = fd.get("id");
+  const specialPrice = fd.get("special_price");
 
   const payload = await getSessionPayload();
-  if (!payload || payload.role !== "SUPERADMIN") return;
+  if (!payload || payload.role !== "SUPERADMIN") {
+    return { error: "Unauthorized." };
+  }
+
+  const numericId = Number(id);
+  const price = Number(specialPrice);
+  if (!Number.isFinite(numericId) || numericId <= 0) {
+    return { error: "Invalid record." };
+  }
+  if (!Number.isFinite(price)) {
+    return { error: "Invalid price." };
+  }
 
   const conn = await getDbConnection();
 
@@ -47,29 +64,54 @@ export async function updateSpecialPrice(formData) {
     SET special_price = ?, status = 'pending'
     WHERE id = ?
     `,
-    [Number(specialPrice), Number(id)]
+    [price, numericId]
   );
 
-  redirect("/admin-dashboard/special-pricing");
+  revalidatePath("/admin-dashboard/special-pricing");
+  if (fd.get("stay_on_page") !== "1") {
+    redirect("/admin-dashboard/special-pricing");
+  }
+  return {
+    success: true,
+    id: numericId,
+    special_price: price,
+    status: "pending",
+    approved_by: null,
+    approved_date: null,
+    approval_note: null,
+  };
 }
 
 /* =========================
    DELETE SPECIAL PRICE
 ========================= */
-export async function deleteSpecialPrice(formData) {
-  const id = formData.get("id");
+export async function deleteSpecialPrice(prevState, formData) {
+  const fd = getFormDataFromActionArgs(prevState, formData);
+  if (!fd) {
+    return { error: "Invalid request." };
+  }
+
+  const id = fd.get("id");
 
   const payload = await getSessionPayload();
-  if (!payload || payload.role !== "SUPERADMIN") return;
+  if (!payload || payload.role !== "SUPERADMIN") {
+    return { error: "Unauthorized." };
+  }
+
+  const numericId = Number(id);
+  if (!Number.isFinite(numericId) || numericId <= 0) {
+    return { error: "Invalid record." };
+  }
 
   const conn = await getDbConnection();
 
-  await conn.execute(
-    `DELETE FROM special_price WHERE id = ?`,
-    [Number(id)]
-  );
+  await conn.execute(`DELETE FROM special_price WHERE id = ?`, [numericId]);
 
-  redirect("/admin-dashboard/special-pricing");
+  revalidatePath("/admin-dashboard/special-pricing");
+  if (fd.get("stay_on_page") !== "1") {
+    redirect("/admin-dashboard/special-pricing");
+  }
+  return { success: true, id: numericId, deleted: true };
 }
 
 /* =========================
@@ -114,6 +156,9 @@ export async function decideSpecialPrice(prevState, formData) {
   const numericId = Number(id);
   // Both products and spares are now in the same special_price table
 
+  let approvedPriceApplied = null;
+  let approvalNoteFinal = note;
+
   if (decision === "approve") {
     const [existingRows] = await conn.execute(
       `SELECT special_price, price_type, price_term, item_type, product_id
@@ -148,6 +193,9 @@ export async function decideSpecialPrice(prevState, formData) {
         approvedPrice = dealerPrice;
       }
     }
+
+    approvedPriceApplied = approvedPrice;
+    approvalNoteFinal = approvalNote;
 
     try {
       if (approvedPrice !== null) {
@@ -237,7 +285,17 @@ export async function decideSpecialPrice(prevState, formData) {
     }
   }
 
-  redirect("/admin-dashboard/special-pricing");
+  revalidatePath("/admin-dashboard/special-pricing");
+  const status = decision === "approve" ? "approved" : "rejected";
+  return {
+    success: true,
+    id: numericId,
+    status,
+    approved_by: actor,
+    approved_date: new Date().toISOString(),
+    approval_note: decision === "approve" ? approvalNoteFinal : note,
+    special_price: approvedPriceApplied,
+  };
 }
 
 /* =========================
@@ -388,7 +446,19 @@ export async function bulkApproveSpecialPrices(prevState, formData) {
     }
   }
 
-  redirect("/admin-dashboard/special-pricing");
+  revalidatePath("/admin-dashboard/special-pricing");
+  const approvedAt = new Date().toISOString();
+  return {
+    success: true,
+    updates: approvable.map((item) => ({
+      id: item.id,
+      status: "approved",
+      approved_by: actor,
+      approved_date: approvedAt,
+      approval_note: item.approvalNote,
+      special_price: item.price,
+    })),
+  };
 }
 
 /* =========================
@@ -487,5 +557,16 @@ export async function bulkRejectSpecialPrices(prevState, formData) {
     }
   }
 
-  redirect("/admin-dashboard/special-pricing");
+  revalidatePath("/admin-dashboard/special-pricing");
+  const rejectedAt = new Date().toISOString();
+  return {
+    success: true,
+    updates: rejectable.map((row) => ({
+      id: Number(row.id),
+      status: "rejected",
+      approved_by: actor,
+      approved_date: rejectedAt,
+      approval_note: note,
+    })),
+  };
 }

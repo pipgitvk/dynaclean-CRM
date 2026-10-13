@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useActionState } from "react";
 import SpecialPriceDetailsModal from "@/components/specialPrice/SpecialPriceDetailsModal";
 import SpecialPriceApproveRejectButtons from "@/components/specialPrice/SpecialPriceApproveRejectButtons";
@@ -86,16 +86,28 @@ function getSpecialPriceRowMeta(row) {
   };
 }
 
+function patchFromActionState(state) {
+  if (!state?.success) return null;
+  const patch = { ...state };
+  delete patch.success;
+  delete patch.deleted;
+  if (patch.special_price == null) delete patch.special_price;
+  return patch;
+}
+
 function SpecialPriceRowActions({
   row,
   meta,
   updateSpecialPrice,
   deleteSpecialPrice,
+  onRowPatch,
+  onRowRemove,
 }) {
   return (
     <>
       <div className="flex flex-wrap gap-2">
         <SpecialPriceDetailsModal
+          triggerLabel="Activity"
           details={{
             id: row.id,
             itemType: row.item_type,
@@ -116,6 +128,11 @@ function SpecialPriceRowActions({
           }}
           onUpdate={updateSpecialPrice}
           onDelete={deleteSpecialPrice}
+          onRowChange={(state) => {
+            const patch = patchFromActionState(state);
+            if (patch) onRowPatch(row.id, patch);
+          }}
+          onRowDeleted={() => onRowRemove(row.id, row.item_type)}
         />
       </div>
       {meta.pending && (
@@ -125,6 +142,7 @@ function SpecialPriceRowActions({
           needsDealerPrice={meta.dealerPending}
           autoDealerPrice={meta.autoDealerPrice}
           autoApprovalNote={meta.autoApprovalNote}
+          onDecided={(patch) => onRowPatch(row.id, patch)}
         />
       )}
     </>
@@ -153,10 +171,63 @@ export default function AdminSpecialPricingTable({
     bulkRejectSpecialPrices,
     null,
   );
+  const [localRows, setLocalRows] = useState(rows);
+
+  useEffect(() => {
+    setLocalRows(rows);
+  }, [rows]);
+
+  const applyRowPatch = (id, patch) => {
+    setLocalRows((prev) =>
+      prev.map((r) => (r.id === id ? { ...r, ...patch } : r)),
+    );
+  };
+
+  const removeRow = (id, itemType) => {
+    const key =
+      itemType != null ? `${itemType}-${id}` : null;
+    setLocalRows((prev) => prev.filter((r) => r.id !== id));
+    if (key) {
+      setSelected((prev) => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
+    }
+  };
+
+  const applyBulkUpdates = (updates) => {
+    if (!updates?.length) return;
+    const byId = new Map(updates.map((u) => [u.id, u]));
+    setLocalRows((prev) =>
+      prev.map((r) => {
+        const u = byId.get(r.id);
+        if (!u) return r;
+        const patch = { ...u };
+        if (patch.special_price == null) delete patch.special_price;
+        return { ...r, ...patch };
+      }),
+    );
+    setSelected(new Set());
+  };
+
+  useEffect(() => {
+    if (bulkState?.success && bulkState.updates) {
+      applyBulkUpdates(bulkState.updates);
+      setBulkOpen(false);
+    }
+  }, [bulkState]);
+
+  useEffect(() => {
+    if (bulkRejectState?.success && bulkRejectState.updates) {
+      applyBulkUpdates(bulkRejectState.updates);
+      setBulkRejectOpen(false);
+    }
+  }, [bulkRejectState]);
 
   const pendingOnPage = useMemo(
-    () => rows.filter((r) => isSpecialPricePendingRow(r)),
-    [rows],
+    () => localRows.filter((r) => isSpecialPricePendingRow(r)),
+    [localRows],
   );
 
   const approvablePending = useMemo(
@@ -191,11 +262,11 @@ export default function AdminSpecialPricingTable({
 
   const selectedIds = useMemo(() => {
     const ids = [];
-    for (const row of rows) {
+    for (const row of localRows) {
       if (selected.has(rowKey(row))) ids.push(row.id);
     }
     return ids;
-  }, [rows, selected]);
+  }, [localRows, selected]);
 
   const paginationQuery = (page) =>
     new URLSearchParams({
@@ -250,14 +321,14 @@ export default function AdminSpecialPricingTable({
 
       {/* Mobile cards */}
       <div className="lg:hidden p-3 space-y-3">
-        {rows.length === 0 ? (
+        {localRows.length === 0 ? (
           <p className="text-center text-gray-500 text-sm py-6">
             {searchQuery || statusFilter || typeFilter || priceTypeFilter
               ? "No data found"
               : "No special prices found."}
           </p>
         ) : (
-          rows.map((row) => {
+          localRows.map((row) => {
             const meta = getSpecialPriceRowMeta(row);
             return (
               <div
@@ -391,6 +462,8 @@ export default function AdminSpecialPricingTable({
                     meta={meta}
                     updateSpecialPrice={updateSpecialPrice}
                     deleteSpecialPrice={deleteSpecialPrice}
+                    onRowPatch={applyRowPatch}
+                    onRowRemove={removeRow}
                   />
                 </div>
               </div>
@@ -436,7 +509,7 @@ export default function AdminSpecialPricingTable({
             </tr>
           </thead>
           <tbody>
-            {rows.length === 0 ? (
+            {localRows.length === 0 ? (
               <tr>
                 <td
                   colSpan={15}
@@ -448,7 +521,7 @@ export default function AdminSpecialPricingTable({
                 </td>
               </tr>
             ) : (
-              rows.map((row) => {
+              localRows.map((row) => {
                 const meta = getSpecialPriceRowMeta(row);
 
                 return (
@@ -594,6 +667,8 @@ export default function AdminSpecialPricingTable({
                         meta={meta}
                         updateSpecialPrice={updateSpecialPrice}
                         deleteSpecialPrice={deleteSpecialPrice}
+                        onRowPatch={applyRowPatch}
+                        onRowRemove={removeRow}
                       />
                     </td>
                   </tr>

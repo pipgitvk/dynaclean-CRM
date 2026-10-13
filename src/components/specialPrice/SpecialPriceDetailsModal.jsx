@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import {
   resolveSpecialPriceTerm,
   resolveSpecialPriceType,
@@ -11,8 +11,29 @@ export default function SpecialPriceDetailsModal({
   triggerLabel = "Details",
   onUpdate,
   onDelete,
+  onRowChange,
+  onRowDeleted,
 }) {
   const [open, setOpen] = useState(false);
+  const [updateState, updateAction, updatePending] = useActionState(
+    onUpdate ?? (async () => ({ error: "Not available." })),
+    null,
+  );
+  const [deleteState, deleteAction, deletePending] = useActionState(
+    onDelete ?? (async () => ({ error: "Not available." })),
+    null,
+  );
+
+  useEffect(() => {
+    if (!updateState?.success) return;
+    onRowChange?.(updateState);
+  }, [updateState, onRowChange]);
+
+  useEffect(() => {
+    if (!deleteState?.success) return;
+    onRowDeleted?.(deleteState.id);
+    setOpen(false);
+  }, [deleteState, onRowDeleted]);
 
   if (!details) return null;
 
@@ -185,9 +206,10 @@ export default function SpecialPriceDetailsModal({
                 <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
                   {onUpdate && (
                     <form
-                      action={onUpdate}
+                      action={updateAction}
                       className="flex flex-col sm:flex-row sm:items-center gap-2 text-xs"
                     >
+                      <input type="hidden" name="stay_on_page" value="1" />
                       <input type="hidden" name="id" value={id} />
                       <label className="text-gray-600 font-medium">
                         Update Price
@@ -203,17 +225,21 @@ export default function SpecialPriceDetailsModal({
                         />
                         <button
                           type="submit"
-                          className="px-3 py-1.5 sm:py-1 rounded bg-blue-600 text-white hover:bg-blue-700 whitespace-nowrap"
+                          disabled={updatePending}
+                          className="px-3 py-1.5 sm:py-1 rounded bg-blue-600 text-white hover:bg-blue-700 whitespace-nowrap disabled:opacity-50"
                         >
-                          Save
+                          {updatePending ? "Saving…" : "Save"}
                         </button>
                       </div>
+                      {updateState?.error && (
+                        <p className="text-red-600 text-xs">{updateState.error}</p>
+                      )}
                     </form>
                   )}
 
                   {onDelete && (
                     <form
-                      action={onDelete}
+                      action={deleteAction}
                       className="text-xs"
                       onSubmit={(e) => {
                         if (
@@ -225,13 +251,18 @@ export default function SpecialPriceDetailsModal({
                         }
                       }}
                     >
+                      <input type="hidden" name="stay_on_page" value="1" />
                       <input type="hidden" name="id" value={id} />
                       <button
                         type="submit"
-                        className="w-full sm:w-auto px-3 py-1.5 rounded bg-red-600 text-white hover:bg-red-700"
+                        disabled={deletePending}
+                        className="w-full sm:w-auto px-3 py-1.5 rounded bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
                       >
-                        Delete
+                        {deletePending ? "Deleting…" : "Delete"}
                       </button>
+                      {deleteState?.error && (
+                        <p className="text-red-600 text-xs mt-1">{deleteState.error}</p>
+                      )}
                     </form>
                   )}
                 </div>

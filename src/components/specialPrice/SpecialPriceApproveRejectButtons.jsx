@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useRef, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { decideSpecialPrice } from "@/app/admin-dashboard/special-pricing/_actions";
 
 export default function SpecialPriceApproveRejectButtons({
@@ -10,10 +10,20 @@ export default function SpecialPriceApproveRejectButtons({
   needsDealerPrice = false,
   autoDealerPrice = null,
   autoApprovalNote = "",
+  onDecided,
 }) {
   const [modal, setModal] = useState(null);
   const [state, formAction, pending] = useActionState(decideSpecialPrice, null);
   const quickApproveFormRef = useRef(null);
+
+  useEffect(() => {
+    if (!state?.success || !onDecided) return;
+    const patch = { ...state };
+    delete patch.success;
+    if (patch.special_price == null) delete patch.special_price;
+    onDecided(patch);
+    setModal(null);
+  }, [state, onDecided]);
 
   const autoPrice = Number(autoDealerPrice);
   const canQuickApproveDealer =
