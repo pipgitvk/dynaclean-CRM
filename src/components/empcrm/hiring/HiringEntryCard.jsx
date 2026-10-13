@@ -18,6 +18,9 @@ export const STATUS_CHIP_STYLES = {
   Backup: "bg-slate-400/20 text-slate-50 border-slate-200/30 ring-1 ring-slate-300/20",
   Hired: "bg-emerald-400/25 text-emerald-50 border-emerald-200/30 ring-1 ring-emerald-300/20",
   Joined: "bg-teal-400/25 text-teal-50 border-teal-200/30 ring-1 ring-teal-300/20",
+  Backout: "bg-rose-400/20 text-rose-50 border-rose-200/30 ring-1 ring-rose-300/15",
+  "After joining backout":
+    "bg-fuchsia-400/20 text-fuchsia-50 border-fuchsia-200/30 ring-1 ring-fuchsia-300/15",
   Rejected: "bg-red-400/20 text-red-50 border-red-200/30 ring-1 ring-red-300/15",
 };
 
@@ -36,6 +39,9 @@ export const STATUS_CHIP_STYLES_LIGHT = {
   Backup: "bg-slate-100 text-slate-700 border-slate-300 ring-1 ring-slate-400/20",
   Hired: "bg-emerald-50 text-emerald-900 border-emerald-200 ring-1 ring-emerald-500/20",
   Joined: "bg-teal-50 text-teal-900 border-teal-200 ring-1 ring-teal-500/20",
+  Backout: "bg-rose-50 text-rose-900 border-rose-200 ring-1 ring-rose-500/15",
+  "After joining backout":
+    "bg-fuchsia-50 text-fuchsia-900 border-fuchsia-200 ring-1 ring-fuchsia-500/15",
   Rejected: "bg-red-50 text-red-900 border-red-200 ring-1 ring-red-500/15",
 };
 

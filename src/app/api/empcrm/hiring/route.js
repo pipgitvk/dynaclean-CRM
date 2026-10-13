@@ -6,6 +6,10 @@ import { normalizeRoleKey } from "@/lib/roleKeyUtils";
 import { logHiringCreated, logHiringNoteUpdate, logHiringStatusChange } from "@/lib/hiringStatusHistory";
 import { parseHiringPayload, toMysqlDatetime } from "@/lib/hiringPayload";
 import { omitBlockedDesignations } from "@/lib/designationDedupe";
+import {
+  ensureHiringCandidatesInsertReady,
+  isHiringDuplicatePrimaryZeroError,
+} from "@/lib/ensureHiringCandidatesInsertReady";
 
 function assertHrRole(payload) {
   if (!payload?.username) {
@@ -272,8 +276,8 @@ export async function POST(request) {
 
     const pool = await getDbConnection();
     const conn = await pool.getConnection();
-    try {
-      await conn.beginTransaction();
+
+    const insertCandidate = async () => {
       const [result] = await conn.execute(
         `INSERT INTO candidates (
         created_by, candidate_name, emp_contact, designation, marital_status,
@@ -311,10 +315,25 @@ export async function POST(request) {
       if (insertId) {
         await logHiringCreated(conn, insertId, d.status, payload.username, d.note);
       }
-      await conn.commit();
-    } catch (e) {
-      await conn.rollback();
-      throw e;
+    };
+
+    try {
+      await ensureHiringCandidatesInsertReady(conn);
+      try {
+        await conn.beginTransaction();
+        await insertCandidate();
+        await conn.commit();
+      } catch (e) {
+        await conn.rollback();
+        if (isHiringDuplicatePrimaryZeroError(e)) {
+          await ensureHiringCandidatesInsertReady(conn);
+          await conn.beginTransaction();
+          await insertCandidate();
+          await conn.commit();
+        } else {
+          throw e;
+        }
+      }
     } finally {
       conn.release();
     }
@@ -323,6 +342,16 @@ export async function POST(request) {
   } catch (error) {
     console.error("[empcrm/hiring POST]", error);
     const msg = `${error?.message || ""} ${error?.sqlMessage || ""}`;
+    if (isHiringDuplicatePrimaryZeroError(error)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Could not save (database ID issue). Please try again once; if it repeats, ask admin to repair hiring tables.",
+        },
+        { status: 500 }
+      );
+    }
     if (msg.includes("candidates") && msg.includes("doesn't exist")) {
       return NextResponse.json(
         {
@@ -386,6 +415,7 @@ export async function PATCH(request) {
     const conn = await pool.getConnection();
     let result;
     try {
+      await ensureHiringCandidatesInsertReady(conn);
       await conn.beginTransaction();
       const [rows] = await conn.execute(
         `SELECT status, note FROM candidates WHERE id = ?${isSuperadmin ? "" : " AND LOWER(TRIM(created_by)) = LOWER(TRIM(?))"}`,
@@ -458,6 +488,16 @@ export async function PATCH(request) {
   } catch (error) {
     console.error("[empcrm/hiring PATCH]", error);
     const msg = `${error?.message || ""} ${error?.sqlMessage || ""}`;
+    if (isHiringDuplicatePrimaryZeroError(error)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Could not update (database ID issue). Please try again once; if it repeats, ask admin to repair hiring tables.",
+        },
+        { status: 500 }
+      );
+    }
     if (isMysqlUnknownColumnError(error)) {
       if (msg.includes("note") && msg.includes("candidates_followups")) {
         return NextResponse.json(

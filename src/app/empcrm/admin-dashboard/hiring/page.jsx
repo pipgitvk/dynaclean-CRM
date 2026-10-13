@@ -5,7 +5,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Eye, Filter, Loader2, Pencil, UserPlus, X } from "lucide-react";
-import { HR_SCORE_RATING_OPTIONS, HIRING_TAG_OPTIONS as TAG_OPTIONS, HAVE_NOT_TALKED_REASONS } from "@/lib/hiringPayload";
+import {
+  HR_SCORE_RATING_OPTIONS,
+  HIRING_TAG_OPTIONS as TAG_OPTIONS,
+  HAVE_NOT_TALKED_REASONS,
+  hiringStatusSkipsNextFollowup,
+} from "@/lib/hiringPayload";
 import { HR_TARGET_ALLOWED_DESIGNATIONS, mergeDesignationOptions, normalizeDesignationKey, resolveCanonicalDesignation } from "@/lib/designationDedupe";
 import { getDirectorHrHiringBase } from "@/lib/directorHrPaths";
 
@@ -29,6 +34,8 @@ const STATUS_OPTIONS = [
   "Backup",
   "Hired",
   "Joined",
+  "Backout",
+  "After joining backout",
   "Rejected",
 ];
 
@@ -115,6 +122,9 @@ const STATUS_CHIP_STYLES = {
   Backup:        "bg-slate-100 text-slate-700 border-slate-300 ring-1 ring-slate-400/20",
   Hired:         "bg-emerald-50 text-emerald-900 border-emerald-200 ring-1 ring-emerald-500/20",
   Joined:        "bg-teal-50 text-teal-900 border-teal-200 ring-1 ring-teal-500/20",
+  Backout:       "bg-rose-50 text-rose-900 border-rose-200 ring-1 ring-rose-500/15",
+  "After joining backout":
+    "bg-fuchsia-50 text-fuchsia-900 border-fuchsia-200 ring-1 ring-fuchsia-500/15",
   Rejected:      "bg-red-50 text-red-900 border-red-200 ring-1 ring-red-500/15",
   // Legacy — old rows still render with correct colours
   "Shortlisted for interview": "bg-sky-50 text-sky-900 border-sky-200 ring-1 ring-sky-500/15",
@@ -471,7 +481,7 @@ export default function HiringPage() {
           experience_type: experience_type || null,
           interview_at: interview_at || null,
           rescheduled_at: rescheduled ? rescheduled_at || null : null,
-          next_followup_at: (status !== "Rejected" && status !== "Reject" && status !== "Joined" && status !== "Attended Interview")
+          next_followup_at: !hiringStatusSkipsNextFollowup(status)
             ? next_followup_at || null
             : null,
           interview_mode: interview_mode || null,
@@ -934,7 +944,7 @@ export default function HiringPage() {
                     )}
                   </div>
 
-                  {!["Talked", "Have not talked", "Didn't receive the call", "Cut the call", "Not reachable", "next-follow-up", "follow-up", "Joined", "Attended Interview"].includes(status) && (
+                  {!["Talked", "Have not talked", "Didn't receive the call", "Cut the call", "Not reachable", "next-follow-up", "follow-up", "Joined", "Attended Interview", "Backout", "After joining backout"].includes(status) && (
                     <>
                       <div>
                         <label className="mb-1 block text-sm font-medium text-slate-700">HR Interview Score (1–10)</label>
@@ -1080,7 +1090,7 @@ export default function HiringPage() {
                           setProbationMonths("");
                         }
                         if (v !== "Rescheduled") setRescheduledAt("");
-                        if (v === "Rejected" || v === "Reject") setNextFollowupAt("");
+                        if (hiringStatusSkipsNextFollowup(v)) setNextFollowupAt("");
                       }}
                       className={`w-full max-w-full sm:max-w-md ${fieldClass} min-h-[44px]`}
                     >
@@ -1107,14 +1117,14 @@ export default function HiringPage() {
                     </div>
                   )}
 
-                  {status !== "Rejected" && status !== "Reject" && status !== "Joined" && status !== "Attended Interview" && (
+                  {!hiringStatusSkipsNextFollowup(status) && (
                     <div className="sm:col-span-2">
                       <label className="mb-1 block text-sm font-medium text-slate-700">
                         Next follow-up date &amp; time *
                       </label>
                       <input
                         type="datetime-local"
-                        required={status !== "Rejected" && status !== "Reject" && status !== "Joined" && status !== "Attended Interview"}
+                        required={!hiringStatusSkipsNextFollowup(status)}
                         value={next_followup_at}
                         onChange={(e) => setNextFollowupAt(e.target.value)}
                         className={formFieldClass}
@@ -1220,7 +1230,7 @@ export default function HiringPage() {
                     </div>
                   )}
 
-                  {!["Talked", "Have not talked", "Didn't receive the call", "Cut the call", "Not reachable", "next-follow-up", "follow-up", "Joined", "Attended Interview"].includes(status) && (
+                  {!["Talked", "Have not talked", "Didn't receive the call", "Cut the call", "Not reachable", "next-follow-up", "follow-up", "Joined", "Attended Interview", "Backout", "After joining backout"].includes(status) && (
                     <div className="space-y-4 rounded-xl border border-indigo-200 bg-indigo-50/40 p-4 sm:col-span-2">
                       <p className="text-sm font-semibold text-indigo-900">Selected — resume &amp; score</p>
                       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

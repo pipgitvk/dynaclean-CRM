@@ -4,7 +4,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import { ArrowLeft, Loader2 } from "lucide-react";
-import { HIRING_TAG_OPTIONS as TAG_OPTIONS, HR_SCORE_RATING_OPTIONS, HAVE_NOT_TALKED_REASONS } from "@/lib/hiringPayload";
+import {
+  HIRING_TAG_OPTIONS as TAG_OPTIONS,
+  HR_SCORE_RATING_OPTIONS,
+  HAVE_NOT_TALKED_REASONS,
+  hiringStatusSkipsNextFollowup,
+} from "@/lib/hiringPayload";
 import { HR_TARGET_ALLOWED_DESIGNATIONS, mergeDesignationOptions, resolveCanonicalDesignation } from "@/lib/designationDedupe";
 import { canonicalHiringCityInList, mergeHiringCityOptions } from "@/lib/hiringCities";
 import { getDirectorHrHiringBase } from "@/lib/directorHrPaths";
@@ -202,7 +207,7 @@ export default function EmpcrmHiringEditPage() {
           experience_type: editing.experience_type || null,
           interview_at: editing.interview_at || null,
           rescheduled_at: rescheduled ? editing.rescheduled_at || null : null,
-          next_followup_at: (editing.status !== "Rejected" && editing.status !== "Reject")
+          next_followup_at: !hiringStatusSkipsNextFollowup(editing.status)
             ? editing.next_followup_at || null
             : null,
           interview_mode: editing.interview_mode || null,
@@ -369,7 +374,7 @@ export default function EmpcrmHiringEditPage() {
                   </p>
                 )}
             </div>
-            {!["Talked", "Have not talked", "Didn't receive the call", "Cut the call", "Not reachable", "next-follow-up", "follow-up", "Joined", "Attended Interview"].includes(editing.status) && (
+            {!["Talked", "Have not talked", "Didn't receive the call", "Cut the call", "Not reachable", "next-follow-up", "follow-up", "Joined", "Attended Interview", "Backout", "After joining backout"].includes(editing.status) && (
               <>
                 <div>
                   <label className="mb-1 block text-sm font-medium text-slate-700">HR Interview Score (1–10)</label>
@@ -508,7 +513,7 @@ export default function EmpcrmHiringEditPage() {
                       next.probationMonths = "";
                     }
                     if (v !== "Rescheduled") next.rescheduled_at = "";
-                    if (v === "Rejected" || v === "Reject") next.next_followup_at = "";
+                    if (hiringStatusSkipsNextFollowup(v)) next.next_followup_at = "";
                     return next;
                   });
                 }}
@@ -535,12 +540,12 @@ export default function EmpcrmHiringEditPage() {
               </div>
             )}
 
-            {editing.status !== "Rejected" && editing.status !== "Reject" && editing.status !== "Joined" && editing.status !== "Attended Interview" && (
+            {!hiringStatusSkipsNextFollowup(editing.status) && (
               <div className="sm:col-span-2">
                 <label className="mb-1 block text-sm font-medium text-slate-700">Next follow-up date &amp; time *</label>
                 <input
                   type="datetime-local"
-                  required={editing.status !== "Rejected" && editing.status !== "Reject" && editing.status !== "Joined" && editing.status !== "Attended Interview"}
+                  required={!hiringStatusSkipsNextFollowup(editing.status)}
                   value={editing.next_followup_at ?? ""}
                   onChange={(e) => updateEdit("next_followup_at", e.target.value)}
                   className={formFieldClass}
@@ -664,7 +669,7 @@ export default function EmpcrmHiringEditPage() {
               </div>
             )}
 
-            {!["Talked", "Have not talked", "Didn't receive the call", "Cut the call", "Not reachable", "next-follow-up", "follow-up", "Joined", "Attended Interview"].includes(editing.status) && (
+            {!["Talked", "Have not talked", "Didn't receive the call", "Cut the call", "Not reachable", "next-follow-up", "follow-up", "Joined", "Attended Interview", "Backout", "After joining backout"].includes(editing.status) && (
               <div className="space-y-4 rounded-xl border border-indigo-200 bg-indigo-50/40 p-4 sm:col-span-2">
                 <p className="text-sm font-semibold text-indigo-900">Selected — resume &amp; score</p>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
