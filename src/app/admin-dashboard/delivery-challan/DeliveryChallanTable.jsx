@@ -117,8 +117,8 @@ export default function DeliveryChallanTable({ rows }) {
           : 0}
       </td>
       <td className="p-3 text-gray-600">{row.challan_no || "-"}</td>
-      <td className="p-3 text-gray-600">{row.challan_date ? dayjs(row.challan_date).format("DD MMM YYYY") : "-"}</td>
-      <td className="p-3 text-gray-600">{row.created_at ? dayjs(row.created_at).format("DD MMM YYYY") : "-"}</td>
+      <td className="p-3 text-gray-600">{row.challan_date ? dayjs(row.challan_date).format("DD-MM-YYYY") : "-"}</td>
+      <td className="p-3 text-gray-600">{row.created_at ? dayjs(row.created_at).format("DD-MM-YYYY") : "-"}</td>
       <td className="p-3">
         <div className="flex gap-1.5 items-center">
           <Link href={`/admin-dashboard/delivery-challan/${row.id}/edit`} className="p-2 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 hover:text-green-700 transition-colors" title="Edit">
@@ -245,8 +245,8 @@ export default function DeliveryChallanTable({ rows }) {
           ? row.products.reduce((sum, p) => sum + (parseInt(p.qty) || 0), 0)
           : 0}</div>
               <div><span className="text-gray-500">Challan No:</span> {row.challan_no || "-"}</div>
-              <div><span className="text-gray-500">Challan Date:</span> {row.challan_date ? dayjs(row.challan_date).format("DD MMM YYYY") : "-"}</div>
-              <div className="col-span-2"><span className="text-gray-500">Created:</span> {row.created_at ? dayjs(row.created_at).format("DD MMM YYYY") : "-"}</div>
+              <div><span className="text-gray-500">Challan Date:</span> {row.challan_date ? dayjs(row.challan_date).format("DD-MM-YYYY") : "-"}</div>
+              <div className="col-span-2"><span className="text-gray-500">Created:</span> {row.created_at ? dayjs(row.created_at).format("DD-MM-YYYY") : "-"}</div>
             </div>
             <div className="pt-3 border-t border-gray-100 flex justify-end items-center">
               <div className="flex gap-1.5">

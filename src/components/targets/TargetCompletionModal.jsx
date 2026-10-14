@@ -1,4 +1,6 @@
 "use client";
+
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect } from "react";
 import {
@@ -236,10 +238,8 @@ const TargetCompletionModal = ({ isOpen, onClose, targetData }) => {
                 <div className="flex justify-between">
                   <span className="text-gray-600">Original Target Period:</span>
                   <span className="font-semibold text-gray-800">
-                    {new Date(
-                      targetData.target_start_date
-                    ).toLocaleDateString()}{" "}
-                    - {new Date(targetData.target_end_date).toLocaleDateString()}
+                    {formatCrmDateOnly(targetData.target_start_date)}{" "}
+                    - {formatCrmDateOnly(targetData.target_end_date)}
                   </span>
                 </div>
               </div>

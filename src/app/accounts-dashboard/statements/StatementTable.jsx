@@ -448,9 +448,9 @@ export default function StatementTable({ rows }) {
       body: sortedRows.map((row) => [
         String(row.id),
         (row.trans_id || "-").toString().slice(0, 14),
-        row.date ? dayjs(row.date).format("DD MMM YYYY") : "-",
-        row.txn_dated_deb && row.txn_dated_deb !== "0000-00-00" ? dayjs(row.txn_dated_deb).format("DD MMM YYYY") : "-",
-        row.txn_posted_date && row.txn_posted_date !== "0000-00-00" ? dayjs(row.txn_posted_date).format("DD MMM YYYY") : "-",
+        row.date ? dayjs(row.date).format("DD-MM-YYYY") : "-",
+        row.txn_dated_deb && row.txn_dated_deb !== "0000-00-00" ? dayjs(row.txn_dated_deb).format("DD-MM-YYYY") : "-",
+        row.txn_posted_date && row.txn_posted_date !== "0000-00-00" ? dayjs(row.txn_posted_date).format("DD-MM-YYYY") : "-",
         (row.cheq_no || "-").toString().slice(0, 12),
         (row.description || "-").toString().slice(0, 22),
         row.type === "Debit" ? formatPdfAmount(row.amount) : "-",
@@ -535,9 +535,9 @@ export default function StatementTable({ rows }) {
         worksheet.addRow({
           id: row.id,
           trans_id: row.trans_id || "-",
-          date: row.date ? dayjs(row.date).format("DD MMM YYYY") : "-",
-          txn_dated_deb: row.txn_dated_deb && row.txn_dated_deb !== "0000-00-00" ? dayjs(row.txn_dated_deb).format("DD MMM YYYY") : "-",
-          txn_posted_date: row.txn_posted_date && row.txn_posted_date !== "0000-00-00" ? dayjs(row.txn_posted_date).format("DD MMM YYYY") : "-",
+          date: row.date ? dayjs(row.date).format("DD-MM-YYYY") : "-",
+          txn_dated_deb: row.txn_dated_deb && row.txn_dated_deb !== "0000-00-00" ? dayjs(row.txn_dated_deb).format("DD-MM-YYYY") : "-",
+          txn_posted_date: row.txn_posted_date && row.txn_posted_date !== "0000-00-00" ? dayjs(row.txn_posted_date).format("DD-MM-YYYY") : "-",
           cheq_no: row.cheq_no || "-",
           description: row.description || "-",
           debit: row.type === "Debit" ? formatPdfAmount(row.amount) : "-",
@@ -1013,16 +1013,16 @@ export default function StatementTable({ rows }) {
                   <td className="p-3">{row.id}</td>
                   <td className="p-3">{row.trans_id}</td>
                   <td className="p-3">
-                    {row.date ? dayjs(row.date).format("DD MMM YYYY") : "-"}
+                    {row.date ? dayjs(row.date).format("DD-MM-YYYY") : "-"}
                   </td>
                   <td className="p-3">
                     {row.txn_dated_deb && row.txn_dated_deb !== "0000-00-00"
-                      ? dayjs(row.txn_dated_deb).format("DD MMM YYYY")
+                      ? dayjs(row.txn_dated_deb).format("DD-MM-YYYY")
                       : "-"}
                   </td>
                   <td className="p-3">
                     {row.txn_posted_date && row.txn_posted_date !== "0000-00-00"
-                      ? dayjs(row.txn_posted_date).format("DD MMM YYYY")
+                      ? dayjs(row.txn_posted_date).format("DD-MM-YYYY")
                       : "-"}
                   </td>
                   <td className="p-3">{row.cheq_no || "-"}</td>
@@ -1209,9 +1209,9 @@ export default function StatementTable({ rows }) {
           >
             <div><strong>ID:</strong> {row.id}</div>
             <div><strong>Trans ID:</strong> {row.trans_id}</div>
-            <div><strong>Date:</strong> {row.date ? dayjs(row.date).format("DD MMM YYYY") : "-"}</div>
-            <div><strong>Txn Dated Deb:</strong> {row.txn_dated_deb && row.txn_dated_deb !== "0000-00-00" ? dayjs(row.txn_dated_deb).format("DD MMM YYYY") : "-"}</div>
-            <div><strong>Txn Posted Date:</strong> {row.txn_posted_date && row.txn_posted_date !== "0000-00-00" ? dayjs(row.txn_posted_date).format("DD MMM YYYY") : "-"}</div>
+            <div><strong>Date:</strong> {row.date ? dayjs(row.date).format("DD-MM-YYYY") : "-"}</div>
+            <div><strong>Txn Dated Deb:</strong> {row.txn_dated_deb && row.txn_dated_deb !== "0000-00-00" ? dayjs(row.txn_dated_deb).format("DD-MM-YYYY") : "-"}</div>
+            <div><strong>Txn Posted Date:</strong> {row.txn_posted_date && row.txn_posted_date !== "0000-00-00" ? dayjs(row.txn_posted_date).format("DD-MM-YYYY") : "-"}</div>
             <div><strong>Cheq No:</strong> {row.cheq_no || "-"}</div>
             <div><strong>Description:</strong> {row.description || "-"}</div>
             <div><strong>Debit:</strong> <span className="text-red-600">{row.type === "Debit" ? `₹${Number(row.amount || 0).toFixed(2)}` : "-"}</span></div>
@@ -1680,7 +1680,7 @@ export default function StatementTable({ rows }) {
                           {expense.expense.hsn && <p><span className="font-medium">HSN:</span> {expense.expense.hsn}</p>}
                           <p><span className="font-medium">Tax applicable:</span> {expense.expense.tax_applicable ? "Yes" : "No"}</p>
                           {expense.expense.transaction_id && <p><span className="font-medium">Txn ID:</span> <span className="font-mono text-xs">{expense.expense.transaction_id}</span></p>}
-                          {expense.expense.created_at && <p><span className="font-medium">Created:</span> {dayjs(expense.expense.created_at).format("DD MMM YYYY")}</p>}
+                          {expense.expense.created_at && <p><span className="font-medium">Created:</span> {dayjs(expense.expense.created_at).format("DD-MM-YYYY")}</p>}
                         </div>
                       ) : (
                         <p className="text-gray-400 text-xs">Expense details not available</p>
@@ -1698,7 +1698,7 @@ export default function StatementTable({ rows }) {
                           <>
                             <p><span className="font-medium">Customer:</span> {expense.invoice.buyer_name || expense.invoice.customer_name || "-"}</p>
                             <p><span className="font-medium">Amount:</span> {expense.invoice.grand_total != null ? `₹${Number(expense.invoice.grand_total).toLocaleString("en-IN", {minimumFractionDigits:2})}` : "-"}</p>
-                            <p><span className="font-medium">Date:</span> {expense.invoice.invoice_date ? dayjs(expense.invoice.invoice_date).format("DD MMM YYYY") : "-"}</p>
+                            <p><span className="font-medium">Date:</span> {expense.invoice.invoice_date ? dayjs(expense.invoice.invoice_date).format("DD-MM-YYYY") : "-"}</p>
                             {expense.invoice.employee_name && <p><span className="font-medium">Employee:</span> {expense.invoice.employee_name}</p>}
                             {expense.invoice.gst_number && <p><span className="font-medium">GST:</span> {expense.invoice.gst_number}</p>}
                             {expense.invoice.cgst != null && Number(expense.invoice.cgst) > 0 && <p><span className="font-medium">CGST:</span> ₹{Number(expense.invoice.cgst).toLocaleString("en-IN", {minimumFractionDigits:2})}</p>}
@@ -1762,7 +1762,7 @@ export default function StatementTable({ rows }) {
                                     {pur.unit_price != null && <p><span className="font-medium">Unit Price:</span> ₹{Number(pur.unit_price).toLocaleString("en-IN", {minimumFractionDigits:2})}</p>}
                                     {pur.total_amount != null && <p><span className="font-medium">Total:</span> ₹{Number(pur.total_amount).toLocaleString("en-IN", {minimumFractionDigits:2})}</p>}
                                     {pur.status && <p><span className="font-medium">Status:</span> {pur.status}</p>}
-                                    {pur.created_at && <p><span className="font-medium">Date:</span> {dayjs(pur.created_at).format("DD MMM YYYY")}</p>}
+                                    {pur.created_at && <p><span className="font-medium">Date:</span> {dayjs(pur.created_at).format("DD-MM-YYYY")}</p>}
                                   </div>
                                 ) : (
                                   <p className="text-gray-400 text-xs">Purchase details not available</p>
@@ -1791,10 +1791,10 @@ export default function StatementTable({ rows }) {
                             {expense.dd.bank_name && <p><span className="font-medium">Bank:</span> {expense.dd.bank_name}</p>}
                             {expense.dd.type && <p><span className="font-medium">Type:</span> {expense.dd.type}</p>}
                             {expense.dd.status && <p><span className="font-medium">Status:</span> {expense.dd.status}</p>}
-                            {expense.dd.dd_date && <p><span className="font-medium">DD Date:</span> {dayjs(expense.dd.dd_date).format("DD MMM YYYY")}</p>}
-                            {expense.dd.expiry_date && <p><span className="font-medium">Expiry:</span> {dayjs(expense.dd.expiry_date).format("DD MMM YYYY")}</p>}
+                            {expense.dd.dd_date && <p><span className="font-medium">DD Date:</span> {dayjs(expense.dd.dd_date).format("DD-MM-YYYY")}</p>}
+                            {expense.dd.expiry_date && <p><span className="font-medium">Expiry:</span> {dayjs(expense.dd.expiry_date).format("DD-MM-YYYY")}</p>}
                             {expense.dd.dd_location && <p><span className="font-medium">Location:</span> {expense.dd.dd_location}</p>}
-                            {expense.dd.claim_date && <p><span className="font-medium">Claim Date:</span> {dayjs(expense.dd.claim_date).format("DD MMM YYYY")}</p>}
+                            {expense.dd.claim_date && <p><span className="font-medium">Claim Date:</span> {dayjs(expense.dd.claim_date).format("DD-MM-YYYY")}</p>}
                           </>
                         ) : (
                           <p className="text-gray-400 text-xs col-span-2">DD details not available</p>
@@ -1814,7 +1814,7 @@ export default function StatementTable({ rows }) {
                             {expense.asset.asset_name && <p><span className="font-medium">Name:</span> {expense.asset.asset_name}</p>}
                             {expense.asset.cost != null && <p><span className="font-medium">Cost:</span> ₹{Number(expense.asset.cost).toLocaleString("en-IN", {minimumFractionDigits:2})}</p>}
                             {expense.asset.category && <p><span className="font-medium">Category:</span> {expense.asset.category}</p>}
-                            {expense.asset.purchase_date && <p><span className="font-medium">Purchase Date:</span> {dayjs(expense.asset.purchase_date).format("DD MMM YYYY")}</p>}
+                            {expense.asset.purchase_date && <p><span className="font-medium">Purchase Date:</span> {dayjs(expense.asset.purchase_date).format("DD-MM-YYYY")}</p>}
                             {expense.asset.status && <p><span className="font-medium">Status:</span> {expense.asset.status}</p>}
                           </>
                         ) : (

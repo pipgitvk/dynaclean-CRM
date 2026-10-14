@@ -1,5 +1,7 @@
 "use client";
 
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
+
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect, useMemo } from "react";
 import { Search, Edit, Plus, Mail } from "lucide-react";
@@ -165,11 +167,7 @@ const BacklinksTableReadOnly = () => {
   const formatDate = (dateString) => {
     if (!dateString) return "-";
     const date = new Date(dateString);
-    return date.toLocaleDateString("en-GB", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
+    return formatCrmDateOnly(date);
   };
 
   const getStatusBadgeColor = (status) => {

@@ -2,6 +2,7 @@
 "use client";
 
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import { Loader2, Search, Info, Pencil, Sun, History, AlertTriangle } from "lucide-react";
@@ -1012,7 +1013,7 @@ const AttendancePage = () => {
       // Map and add rows
       filteredLogs.forEach((log) => {
         worksheet.addRow({
-          Date: new Date(log.date).toLocaleDateString(),
+          Date: formatCrmDateOnly(log.date),
           User: log.username,
           EmpId: log.employee_id ?? "",
           MachineCode: log.machine_code || "",
@@ -1299,7 +1300,7 @@ const AttendancePage = () => {
                     </span>
                     <span className="text-sm text-gray-700 flex flex-col items-end gap-1.5">
                       <span className="flex items-center gap-1.5">
-                        {new Date(log.date).toLocaleDateString()}
+                        {formatCrmDateOnly(log.date)}
                         {log.workedSunday && (
                           <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-purple-100 text-purple-700 border border-purple-200">
                             Working Sunday
@@ -1663,7 +1664,7 @@ const AttendancePage = () => {
                       className={`transition-colors duration-150 ${log.workedSunday ? "bg-pink-200 hover:bg-pink-300" : "hover:bg-gray-50"}`}
                     >
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {new Date(log.date).toLocaleDateString()}
+                        {formatCrmDateOnly(log.date)}
                         {log.workedSunday && (
                           <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-purple-100 text-purple-700 border border-purple-200">
                             Working Sunday
@@ -1978,7 +1979,7 @@ const AttendancePage = () => {
             </div>
             <p className="text-sm text-gray-600 mb-4">
               {breakEditLog.username} ·{" "}
-              {new Date(breakEditLog.date).toLocaleDateString()}
+              {formatCrmDateOnly(breakEditLog.date)}
             </p>
             <p className="text-xs text-gray-500 mb-3">
               Leave a field empty to clear that time. Times use the attendance
@@ -2114,7 +2115,7 @@ const AttendancePage = () => {
             </div>
             <p className="text-sm text-gray-600 mb-4">
               {historyModalLog.username} ·{" "}
-              {new Date(historyModalLog.date).toLocaleDateString()}
+              {formatCrmDateOnly(historyModalLog.date)}
             </p>
             <AttendanceEditHistoryPanel
               username={historyModalLog.username}
@@ -2175,7 +2176,7 @@ const AttendancePage = () => {
                 {holidays.map((h) => (
                   <li key={h.id} className="py-2">
                     <p className="font-medium">{h.title}</p>
-                    <p className="text-sm text-gray-600">{new Date(h.holiday_date).toLocaleDateString()} {h.is_optional ? "(Optional)" : ""}</p>
+                    <p className="text-sm text-gray-600">{formatCrmDateOnly(h.holiday_date)} {h.is_optional ? "(Optional)" : ""}</p>
                     {h.description ? (
                       <p className="text-sm text-gray-500">{h.description}</p>
                     ) : null}
@@ -2361,7 +2362,7 @@ const AttendancePage = () => {
           <div className="bg-white rounded-lg shadow-lg w-full max-w-sm p-6">
             <h3 className="text-lg font-semibold mb-4">Delete Attendance Log</h3>
             <p className="text-gray-600 mb-6">
-              Are you sure you want to delete the attendance log for {deleteModalLog.username} on {new Date(deleteModalLog.date).toLocaleDateString()}? This action cannot be undone.
+              Are you sure you want to delete the attendance log for {deleteModalLog.username} on {formatCrmDateOnly(deleteModalLog.date)}? This action cannot be undone.
             </p>
             <div className="flex gap-3">
               <button

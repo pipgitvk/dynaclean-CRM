@@ -1,6 +1,7 @@
 // components/Modal.jsx
 "use client";
 import React, { useEffect, useState } from "react";
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
 import ServiceAttachmentLink from "./ServiceAttachmentLink";
 
 
@@ -145,7 +146,7 @@ export default function Modal({
             </p>
             <p>
               <strong>Invoice Date:</strong>{" "}
-              {new Date(selectedService.invoice_date).toLocaleDateString()}
+              {formatCrmDateOnly(selectedService.invoice_date)}
             </p>
 
             <p>

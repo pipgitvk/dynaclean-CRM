@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
 import {
   Calendar,
   CheckCircle,
@@ -198,14 +199,7 @@ export default function LeaveApprovalsPage() {
     return colors[type] || "bg-gray-100 text-gray-800";
   };
 
-  const formatDate = (d) =>
-    d
-      ? new Date(d).toLocaleDateString("en-IN", {
-          day: "2-digit",
-          month: "short",
-          year: "numeric",
-        })
-      : "-";
+  const formatDate = (d) => formatCrmDateOnly(d, "-");
 
   const pendingCount = leaves.filter((l) => l.status === "pending").length;
 

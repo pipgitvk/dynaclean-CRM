@@ -1,5 +1,7 @@
 "use client";
 
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
+
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useEffect, useState } from "react";
 import React from "react";
@@ -734,7 +736,7 @@ export default function ProductsNewPage() {
                             <td className="p-3">{item.display.quantity !== undefined ? item.display.quantity : '-'}</td>
                             <td className="p-3">
                               {item.display.date
-                                ? new Date(item.display.date).toLocaleDateString()
+                                ? formatCrmDateOnly(item.display.date)
                                 : "-"}
                             </td>
                             <td className="p-3">

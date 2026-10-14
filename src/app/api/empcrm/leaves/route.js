@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { getReportees } from "@/lib/reportingManager";
@@ -730,7 +731,7 @@ export async function POST(request) {
                 <tr>
                   <td style="padding: 12px; border: 1px solid #e5e7eb; font-weight: bold;">Duration</td>
                   <td style="padding: 12px; border: 1px solid #e5e7eb;">
-                    ${new Date(from_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}${!isHalfDay ? ` To ${new Date(to_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}` : ""}
+                    ${new formatCrmDateOnly(Date(from_date))}${!isHalfDay ? ` To ${new formatCrmDateOnly(Date(to_date))}` : ""}
                     ${finalStartTime && finalEndTime ? `<br><span style="color:#111827; font-weight:600;">Time:</span> ${finalStartTime} — ${finalEndTime}` : ""}
                     <br>
                     <span style="color: #666; font-size: 0.9em;">(${isHalfDay ? "0.5 days" : `${totalDays} days`})</span>
@@ -1296,9 +1297,9 @@ export async function PATCH(request) {
                     <tr>
                       <td style="padding: 8px 0; font-weight: bold; color: #555;">Dates:</td>
                       <td style="padding: 8px 0;">
-                        ${new Date(leave.from_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} 
+                        ${new formatCrmDateOnly(Date(leave.from_date))} 
                         - 
-                        ${new Date(leave.to_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        ${new formatCrmDateOnly(Date(leave.to_date))}
                       </td>
                     </tr>
                     ${status === 'rejected' && rejection_reason ? `

@@ -53,7 +53,7 @@ export function getEtimeOfficeAuthHeader() {
   return `Basic ${Buffer.from(basicCredentials, "utf8").toString("base64")}`;
 }
 
-/** YYYY-MM-DD → DD/MM/YYYY_HH:mm for API query params. */
+/** YYYY-MM-DD → DD-MM-YYYY_HH:mm for API query params. */
 export function formatEtimeOfficeApiDate(ymd, timeHHmm = "09:30") {
   const m = String(ymd || "").trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!m) return null;

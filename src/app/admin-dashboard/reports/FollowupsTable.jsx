@@ -151,10 +151,10 @@ export default function FollowupsClient({ leadSource }) {
                       )}
                     </td>
                     <td className="px-4 py-3 text-gray-700">
-                      {dayjs(r.followed_date).format("DD-MMM-YYYY")}
+                      {dayjs(r.followed_date).format("DD-MM-YYYY")}
                     </td>
                     <td className="px-4 py-3 text-gray-700">
-                      {dayjs(r.next_followup_date).format("DD-MMM-YYYY")}
+                      {dayjs(r.next_followup_date).format("DD-MM-YYYY")}
                     </td>
                     <td className="px-4 py-3 text-gray-700">{r.comm_mode}</td>
                     <td className="px-4 py-3">
@@ -198,11 +198,11 @@ export default function FollowupsClient({ leadSource }) {
                 </div>
                 <div className="text-sm text-gray-600">
                   <strong>Followed:</strong>{" "}
-                  {dayjs(r.followed_date).format("DD-MMM-YYYY")}
+                  {dayjs(r.followed_date).format("DD-MM-YYYY")}
                 </div>
                 <div className="text-sm text-gray-600">
                   <strong>Next:</strong>{" "}
-                  {dayjs(r.next_followup_date).format("DD-MMM-YYYY")}
+                  {dayjs(r.next_followup_date).format("DD-MM-YYYY")}
                 </div>
                 <div className="text-sm text-gray-600">
                   <strong>Mode:</strong> {r.comm_mode}

@@ -1,5 +1,7 @@
 "use client";
 
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
+
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Search } from "lucide-react";
@@ -526,7 +528,7 @@ export default function SparesNewPage() {
                           </td>
                           <td className="p-3">
                             {item.date
-                              ? new Date(item.date).toLocaleDateString()
+                              ? formatCrmDateOnly(item.date)
                               : "—"}
                           </td>
                           <td className="p-3">

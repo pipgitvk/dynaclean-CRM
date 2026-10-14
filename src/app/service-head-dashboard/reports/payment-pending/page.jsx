@@ -82,7 +82,7 @@ export default function PaymentPendingReport() {
       order.total_amount.toFixed(2),
       order.paid_amount.toFixed(2),
       order.remaining_amount.toFixed(2),
-      dayjs(order.due_date).format("DD/MM/YYYY")
+      dayjs(order.due_date).format("DD-MM-YYYY")
     ]);
 
     const csvContent = [
@@ -281,7 +281,7 @@ export default function PaymentPendingReport() {
                         <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
                           isOverdue ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
                         }`}>
-                          {dayjs(order.due_date).format("DD/MM/YYYY")}
+                          {dayjs(order.due_date).format("DD-MM-YYYY")}
                           {isOverdue && " ⚠️"}
                         </span>
                       </td>

@@ -13,6 +13,7 @@ import {
 } from "@/lib/hiringPayload";
 import { HR_TARGET_ALLOWED_DESIGNATIONS, mergeDesignationOptions, normalizeDesignationKey, resolveCanonicalDesignation } from "@/lib/designationDedupe";
 import { getDirectorHrHiringBase } from "@/lib/directorHrPaths";
+import { formatInterviewAt } from "@/components/empcrm/hiring/HiringEntryCard";
 
 /** Shared field styles */
 const fieldClass =
@@ -88,24 +89,6 @@ const readStoredFilters = () => {
     return null;
   }
 };
-
-function formatInterviewAt(v) {
-  if (!v) return "—";
-  try {
-    const s = String(v).replace("Z", "");
-    const d = new Date(s);
-    if (Number.isNaN(d.getTime())) return s.slice(0, 16);
-    return d.toLocaleString("en-IN", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return "—";
-  }
-}
 
 const STATUS_CHIP_STYLES = {
   Talked:        "bg-amber-50 text-amber-900 border-amber-200 ring-1 ring-amber-500/15",

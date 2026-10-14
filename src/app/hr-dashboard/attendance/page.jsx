@@ -2,6 +2,7 @@
 "use client";
 
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
 import toast from "react-hot-toast";
@@ -549,7 +550,7 @@ const AttendancePage = () => {
                     Date:
                   </span>
                   <span className="text-sm text-gray-700">
-                    {new Date(log.date).toLocaleDateString()}
+                    {formatCrmDateOnly(log.date)}
                   </span>
                 </div>
                 {log.type === "present" ? (
@@ -724,7 +725,7 @@ const AttendancePage = () => {
                     className="hover:bg-gray-50 transition-colors duration-150"
                   >
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {new Date(log.date).toLocaleDateString()}
+                      {formatCrmDateOnly(log.date)}
                     </td>
                     {log.type === "present" ? (
                       <>
@@ -922,7 +923,7 @@ const AttendancePage = () => {
                 {holidays.map((h) => (
                   <li key={h.id} className="py-2">
                     <p className="font-medium">{h.title}</p>
-                    <p className="text-sm text-gray-600">{new Date(h.holiday_date).toLocaleDateString()} {h.is_optional ? "(Optional)" : ""}</p>
+                    <p className="text-sm text-gray-600">{formatCrmDateOnly(h.holiday_date)} {h.is_optional ? "(Optional)" : ""}</p>
                     {h.description ? (
                       <p className="text-sm text-gray-500">{h.description}</p>
                     ) : null}
@@ -1096,7 +1097,7 @@ const AttendancePage = () => {
           <div className="bg-white rounded-lg shadow-lg w-full max-w-sm p-6">
             <h3 className="text-lg font-semibold mb-4">Delete Attendance Log</h3>
             <p className="text-gray-600 mb-6">
-              Are you sure you want to delete the attendance log for {new Date(deleteModalLog.date).toLocaleDateString()}? This action cannot be undone.
+              Are you sure you want to delete the attendance log for {formatCrmDateOnly(deleteModalLog.date)}? This action cannot be undone.
             </p>
             <div className="flex gap-3">
               <button

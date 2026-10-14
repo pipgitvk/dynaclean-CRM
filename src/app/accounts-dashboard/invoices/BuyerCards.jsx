@@ -508,7 +508,7 @@ function BuyerCard({ buyer, onClick }) {
   const initials = getInitials(buyer.buyer_name);
   const bgColor = avatarColor(buyer.buyer_name);
   const lastDate = buyer.last_invoice_date
-    ? dayjs(buyer.last_invoice_date).format("DD MMM YYYY")
+    ? dayjs(buyer.last_invoice_date).format("DD-MM-YYYY")
     : "—";
 
   return (

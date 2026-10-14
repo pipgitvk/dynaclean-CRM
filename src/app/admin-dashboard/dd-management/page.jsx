@@ -1,5 +1,7 @@
 "use client";
 
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
+
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect, useMemo } from "react";
 import {
@@ -824,7 +826,7 @@ export default function DDManagementPage() {
                                                 {dd.other_deduction_amount && Number(dd.other_deduction_amount) > 0 && (
                                                     <div className="text-orange-600 text-[11px] font-semibold">(₹{parseFloat(dd.amount).toLocaleString()} - ₹{parseFloat(dd.other_deduction_amount).toLocaleString()})</div>
                                                 )}
-                                                <div className="text-gray-500 font-medium">{dayjs(dd.assign_date).format("DD MMM YYYY")}</div>
+                                                <div className="text-gray-500 font-medium">{dayjs(dd.assign_date).format("DD-MM-YYYY")}</div>
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
@@ -860,9 +862,9 @@ export default function DDManagementPage() {
                                                 </div>
                                                 <div className="text-gray-500">
                                                     {dd.type === 'BG' ? (
-                                                        dd.expiry_date ? `Exp: ${dayjs(dd.expiry_date).format("DD MMM YYYY")}` : "No Expiry"
+                                                        dd.expiry_date ? `Exp: ${dayjs(dd.expiry_date).format("DD-MM-YYYY")}` : "No Expiry"
                                                     ) : (
-                                                        dayjs(dd.updated_at).format("DD MMM YYYY")
+                                                        dayjs(dd.updated_at).format("DD-MM-YYYY")
                                                     )}
                                                 </div>
                                             </div>
@@ -871,7 +873,7 @@ export default function DDManagementPage() {
                                             {dd.overdue_date ? (
                                                 <div className="text-xs">
                                                     <div className={`font-bold ${(!dd.claim_from_bank && dayjs(dd.overdue_date).isBefore(dayjs(), 'day')) ? 'text-red-600' : 'text-gray-800'}`}>
-                                                        {dayjs(dd.overdue_date).format("DD MMM YYYY")}
+                                                        {dayjs(dd.overdue_date).format("DD-MM-YYYY")}
                                                     </div>
                                                     {!dd.claim_from_bank && dayjs(dd.overdue_date).isBefore(dayjs(), 'day') && (
                                                         <div className="text-red-500 font-bold mt-0.5">⚠ Overdue</div>
@@ -912,7 +914,7 @@ export default function DDManagementPage() {
                                             <div className="flex justify-center items-center">
                                                 {dd.claim_date ? (
                                                     <span className="text-xs text-gray-700 font-medium">
-                                                        {dayjs(dd.claim_date).format("DD MMM YYYY")}
+                                                        {dayjs(dd.claim_date).format("DD-MM-YYYY")}
                                                     </span>
                                                 ) : (
                                                     <span className="text-xs text-gray-400">—</span>
@@ -2003,7 +2005,7 @@ export default function DDManagementPage() {
                                                     String(s.id) === paymentSearch ||
                                                     (s.trans_id && s.trans_id.toLowerCase().includes(paymentSearch.toLowerCase())) ||
                                                     String(s.amount || 0).includes(paymentSearch) ||
-                                                    (s.date && new Date(s.date).toLocaleDateString().toLowerCase().includes(paymentSearch.toLowerCase())) ||
+                                                    (s.date && formatCrmDateOnly(s.date).toLowerCase().includes(paymentSearch.toLowerCase())) ||
                                                     (s.type && s.type.toLowerCase().includes(paymentSearch.toLowerCase())) ||
                                                     (s.invoice_status && s.invoice_status.toLowerCase().includes(paymentSearch.toLowerCase()));
                                                 const matchesDateFrom = !paymentDateFrom || (s.date && new Date(s.date) >= new Date(paymentDateFrom));
@@ -2023,7 +2025,7 @@ export default function DDManagementPage() {
                                                         String(s.id) === paymentSearch ||
                                                         (s.trans_id && s.trans_id.toLowerCase().includes(paymentSearch.toLowerCase())) ||
                                                         String(s.amount || 0).includes(paymentSearch) ||
-                                                        (s.date && new Date(s.date).toLocaleDateString().toLowerCase().includes(paymentSearch.toLowerCase())) ||
+                                                        (s.date && formatCrmDateOnly(s.date).toLowerCase().includes(paymentSearch.toLowerCase())) ||
                                                         (s.type && s.type.toLowerCase().includes(paymentSearch.toLowerCase())) ||
                                                         (s.invoice_status && s.invoice_status.toLowerCase().includes(paymentSearch.toLowerCase()));
                                                     const matchesDateFrom = !paymentDateFrom || (s.date && new Date(s.date) >= new Date(paymentDateFrom));
@@ -2033,7 +2035,7 @@ export default function DDManagementPage() {
                                                     <tr key={s.id} className="hover:bg-gray-50">
                                                         <td className="p-3 font-medium text-gray-600">#{s.id}</td>
                                                         <td className="p-3 font-mono text-xs text-gray-500">{s.trans_id || "—"}</td>
-                                                        <td className="p-3 text-gray-600">{s.date ? new Date(s.date).toLocaleDateString() : "—"}</td>
+                                                        <td className="p-3 text-gray-600">{s.date ? formatCrmDateOnly(s.date) : "—"}</td>
                                                         <td className="p-3 max-w-[400px] truncate text-gray-600" title={s.description || ""}>{s.description || "—"}</td>
                                                         <td className="p-3 font-bold text-red-600">₹{Number(s.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                                                         <td className="p-3">
@@ -2177,7 +2179,7 @@ export default function DDManagementPage() {
                                                     String(s.id) === creditSearch ||
                                                     (s.trans_id && s.trans_id.toLowerCase().includes(creditSearch.toLowerCase())) ||
                                                     String(s.amount || 0).includes(creditSearch) ||
-                                                    (s.date && new Date(s.date).toLocaleDateString().toLowerCase().includes(creditSearch.toLowerCase())) ||
+                                                    (s.date && formatCrmDateOnly(s.date).toLowerCase().includes(creditSearch.toLowerCase())) ||
                                                     (s.type && s.type.toLowerCase().includes(creditSearch.toLowerCase())) ||
                                                     (s.invoice_status && s.invoice_status.toLowerCase().includes(creditSearch.toLowerCase()));
                                                 const statementDate = s.date ? dayjs(s.date).startOf("day") : null;
@@ -2198,7 +2200,7 @@ export default function DDManagementPage() {
                                                         String(s.id) === creditSearch ||
                                                         (s.trans_id && s.trans_id.toLowerCase().includes(creditSearch.toLowerCase())) ||
                                                         String(s.amount || 0).includes(creditSearch) ||
-                                                        (s.date && new Date(s.date).toLocaleDateString().toLowerCase().includes(creditSearch.toLowerCase())) ||
+                                                        (s.date && formatCrmDateOnly(s.date).toLowerCase().includes(creditSearch.toLowerCase())) ||
                                                         (s.type && s.type.toLowerCase().includes(creditSearch.toLowerCase())) ||
                                                         (s.invoice_status && s.invoice_status.toLowerCase().includes(creditSearch.toLowerCase()));
                                                     const statementDate = s.date ? dayjs(s.date).startOf("day") : null;
@@ -2209,7 +2211,7 @@ export default function DDManagementPage() {
                                                     <tr key={s.id} className="hover:bg-gray-50">
                                                         <td className="p-3 font-medium text-gray-600">#{s.id}</td>
                                                         <td className="p-3 font-mono text-xs text-gray-500">{s.trans_id || "—"}</td>
-                                                        <td className="p-3 text-gray-600">{s.date ? new Date(s.date).toLocaleDateString() : "—"}</td>
+                                                        <td className="p-3 text-gray-600">{s.date ? formatCrmDateOnly(s.date) : "—"}</td>
                                                         <td className="p-3 max-w-[400px] truncate text-gray-600" title={s.description || ""}>{s.description || "—"}</td>
                                                         <td className="p-3 font-bold text-green-600">₹{Number(s.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                                                         <td className="p-3">
@@ -2291,9 +2293,9 @@ export default function DDManagementPage() {
                                             {viewLinkedDD?.amount != null && <p><span className="font-medium">Amount:</span> ₹{Number(viewLinkedDD.amount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</p>}
                                             {viewLinkedDD?.bank_name && <p><span className="font-medium">Bank:</span> {viewLinkedDD.bank_name}</p>}
                                             {viewLinkedDD?.status && <p><span className="font-medium">Status:</span> <StatusBadge status={viewLinkedDD.status} /></p>}
-                                            {viewLinkedDD?.dd_date && <p><span className="font-medium">DD Date:</span> {dayjs(viewLinkedDD.dd_date).format("DD MMM YYYY")}</p>}
-                                            {viewLinkedDD?.expiry_date && <p><span className="font-medium">Expiry:</span> {dayjs(viewLinkedDD.expiry_date).format("DD MMM YYYY")}</p>}
-                                            {viewLinkedDD?.claim_date && <p><span className="font-medium">Claim Date:</span> {dayjs(viewLinkedDD.claim_date).format("DD MMM YYYY")}</p>}
+                                            {viewLinkedDD?.dd_date && <p><span className="font-medium">DD Date:</span> {dayjs(viewLinkedDD.dd_date).format("DD-MM-YYYY")}</p>}
+                                            {viewLinkedDD?.expiry_date && <p><span className="font-medium">Expiry:</span> {dayjs(viewLinkedDD.expiry_date).format("DD-MM-YYYY")}</p>}
+                                            {viewLinkedDD?.claim_date && <p><span className="font-medium">Claim Date:</span> {dayjs(viewLinkedDD.claim_date).format("DD-MM-YYYY")}</p>}
                                             {viewLinkedDD?.assigned_by && <p><span className="font-medium">Assigned By:</span> {viewLinkedDD.assigned_by}</p>}
                                         </div>
                                     </div>
@@ -2307,7 +2309,7 @@ export default function DDManagementPage() {
                                                     <div key={idx} className={`text-sm ${idx > 0 ? "pt-3 border-t border-blue-200" : ""}`}>
                                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-gray-700">
                                                             {stmt.trans_id && <p><span className="font-medium">Trans ID:</span> <span className="font-mono text-xs">{stmt.trans_id}</span></p>}
-                                                            {stmt.date && <p><span className="font-medium">Date:</span> {dayjs(stmt.date).format("DD MMM YYYY")}</p>}
+                                                            {stmt.date && <p><span className="font-medium">Date:</span> {dayjs(stmt.date).format("DD-MM-YYYY")}</p>}
                                                             {stmt.type && <p><span className="font-medium">Type:</span> <span className={stmt.type === "Credit" ? "text-green-700 font-semibold" : "text-red-700 font-semibold"}>{stmt.type}</span></p>}
                                                             {stmt.amount != null && <p><span className="font-medium">Amount:</span> ₹{Number(stmt.amount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</p>}
                                                             {stmt.description && <p className="sm:col-span-2"><span className="font-medium">Description:</span> {stmt.description}</p>}

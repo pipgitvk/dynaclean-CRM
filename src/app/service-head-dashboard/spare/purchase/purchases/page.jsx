@@ -1,5 +1,7 @@
 "use client";
 
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
+
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
@@ -450,7 +452,7 @@ function LinkPaymentModal({ open, onClose, purchase, onLinked, currentStatementI
                     <tr key={s.id} className={`hover:bg-gray-50 transition-colors ${alreadyLinkedToThis ? 'bg-emerald-50/30' : ''}`}>
                       <td className="p-3 font-medium text-gray-600">#{s.id}</td>
                       <td className="p-3 font-mono text-xs text-gray-500">{s.trans_id || "—"}</td>
-                      <td className="p-3 text-gray-600">{s.date ? new Date(s.date).toLocaleDateString() : "—"}</td>
+                      <td className="p-3 text-gray-600">{s.date ? formatCrmDateOnly(s.date) : "—"}</td>
                       <td className="p-3 max-w-[400px] truncate text-gray-600" title={s.description || ""}>{s.description || "—"}</td>
                       <td className="p-3 font-bold text-red-600">₹{Number(s.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                       <td className="p-3">
@@ -751,7 +753,7 @@ export default function SparePurchasesPage() {
     const doc = new jsPDF();
     autoTable(doc, {
       head: [["ID", "Spare", "Qty", "Amount", "From Company", "Transport", "Status", "Created"]],
-      body: filteredPurchases.map((row) => [row.id, row.spare_name, row.quantity, row.net_amount, row.from_company, row.mode_of_transport, row.status_label || row.status, new Date(row.created_at).toLocaleDateString()]),
+      body: filteredPurchases.map((row) => [row.id, row.spare_name, row.quantity, row.net_amount, row.from_company, row.mode_of_transport, row.status_label || row.status, formatCrmDateOnly(row.created_at)]),
       styles: { fontSize: 8 },
     });
     doc.save("spare_purchases.pdf");
@@ -872,7 +874,7 @@ export default function SparePurchasesPage() {
                     <td className="p-3">{purchase.mode_of_transport || "—"}</td>
                     <td className="p-3">{getStatusBadge(purchase.status)}</td>
                     <td className="p-3">{purchase.created_by}</td>
-                    <td className="p-3">{new Date(purchase.created_at).toLocaleDateString()}</td>
+                    <td className="p-3">{formatCrmDateOnly(purchase.created_at)}</td>
                     <td className="p-3 text-center">
                       {purchase.spare_image ? (
                         <button onClick={() => setPreviewImage({ url: purchase.spare_image, type: getFileType(purchase.spare_image) })} className="text-gray-600 hover:text-blue-700">

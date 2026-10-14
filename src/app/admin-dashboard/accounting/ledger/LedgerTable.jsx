@@ -294,7 +294,7 @@ export default function LedgerTable({ rows: initialRows }) {
                   className="bg-white hover:bg-blue-50 transition-colors text-black"
                 >
                   <td className="px-4 py-3 whitespace-nowrap text-gray-700">
-                    {dayjs(row.entry_date).format("DD MMM YYYY")}
+                    {dayjs(row.entry_date).format("DD-MM-YYYY")}
                   </td>
                   <td className="px-4 py-3 text-gray-800 max-w-xs">
                     {row.particulars}
@@ -348,7 +348,7 @@ export default function LedgerTable({ rows: initialRows }) {
                   {row.particulars}
                 </p>
                 <p className="text-xs text-gray-500 mt-0.5">
-                  {dayjs(row.entry_date).format("DD MMM YYYY")}
+                  {dayjs(row.entry_date).format("DD-MM-YYYY")}
                 </p>
               </div>
               <div className="flex flex-wrap gap-2 text-xs">

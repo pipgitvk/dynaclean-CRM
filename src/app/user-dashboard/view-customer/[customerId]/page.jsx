@@ -344,7 +344,7 @@ export default async function CustomerPage({ params }) {
         <dt className="text-sm font-medium text-gray-500">Created</dt>
         <dd className="mt-1 text-gray-800">
           {customer.date_created
-            ? dayjs(customer.date_created).format("DD MMM, YYYY")
+            ? dayjs(customer.date_created).format("DD-MM-YYYY")
             : "-"}
         </dd>
       </div>

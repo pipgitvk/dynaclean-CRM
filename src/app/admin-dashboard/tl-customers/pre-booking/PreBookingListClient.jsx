@@ -342,7 +342,7 @@ export default function PreBookingListClient({
                       </td>
                       <td className="px-3 py-3 text-sm text-gray-700">
                         {booking.expected_date
-                          ? dayjs(booking.expected_date).format("DD MMM YYYY")
+                          ? dayjs(booking.expected_date).format("DD-MM-YYYY")
                           : "N/A"}
                       </td>
                       <td className="px-3 py-3 text-sm">
@@ -361,7 +361,7 @@ export default function PreBookingListClient({
                       </td>
                       <td className="px-3 py-3 text-sm text-gray-700">
                         {booking.received_date
-                          ? dayjs(booking.received_date).format("DD MMM YYYY")
+                          ? dayjs(booking.received_date).format("DD-MM-YYYY")
                           : "-"}
                       </td>
                       <td className="px-3 py-3 text-sm">
@@ -386,7 +386,7 @@ export default function PreBookingListClient({
                             </p>
                             {booking.remark_type === "postponed" && booking.postponed_date && (
                               <p className="text-xs text-gray-500">
-                                New date: {dayjs(booking.postponed_date).format("DD MMM YYYY")}
+                                New date: {dayjs(booking.postponed_date).format("DD-MM-YYYY")}
                               </p>
                             )}
                             <button

@@ -5,10 +5,10 @@ import dayjs from "dayjs";
 import { X } from "lucide-react";
 
 const formatDT = (val) =>
-  val ? dayjs(val).format("DD MMM YYYY, hh:mm A") : "—";
+  val ? dayjs(val).format("DD-MM-YYYY hh:mm A") : "—";
 
 const formatDate = (val) =>
-  val ? dayjs(val).format("DD MMM YYYY") : "—";
+  val ? dayjs(val).format("DD-MM-YYYY") : "—";
 
 const formatCurrency = (val) =>
   val != null && val !== "" ? `₹${Number(val).toLocaleString("en-IN")}` : "—";

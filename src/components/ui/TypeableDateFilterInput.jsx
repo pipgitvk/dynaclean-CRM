@@ -2,10 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import dayjs from "dayjs";
+import { CRM_DATE_FORMAT } from "@/lib/crmDateFormat";
 import toast from "react-hot-toast";
 import { CalendarDays } from "lucide-react";
 
-/** Parse typed date (DD/MM/YYYY, DD-MM-YYYY, or YYYY-MM-DD) to ISO date for filters. */
+/** Parse typed date (DD-MM-YYYY, DD-MM-YYYY, or YYYY-MM-DD) to ISO date for filters. */
 export function parseFlexibleDateToIso(raw) {
   const s = String(raw || "").trim();
   if (!s) return "";
@@ -41,7 +42,7 @@ export function parseFlexibleDateToIso(raw) {
 export function formatIsoDateForDisplay(iso) {
   if (!iso) return "";
   const d = dayjs(iso);
-  return d.isValid() ? d.format("DD/MM/YYYY") : iso;
+  return d.isValid() ? d.format(CRM_DATE_FORMAT) : iso;
 }
 
 export default function TypeableDateFilterInput({
@@ -49,7 +50,7 @@ export default function TypeableDateFilterInput({
   onChange,
   className = "",
   wrapperClassName = "",
-  placeholder = "DD/MM/YYYY",
+  placeholder = "DD-MM-YYYY",
   showToastOnInvalid = true,
   id,
   disabled,
@@ -84,7 +85,7 @@ export default function TypeableDateFilterInput({
       applyIso(iso);
     } else {
       if (showToastOnInvalid) {
-        toast.error("Invalid date — use DD/MM/YYYY or YYYY-MM-DD");
+        toast.error("Invalid date — use DD-MM-YYYY or YYYY-MM-DD");
       }
       setText(formatIsoDateForDisplay(value));
     }

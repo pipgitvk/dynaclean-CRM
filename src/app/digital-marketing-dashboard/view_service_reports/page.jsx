@@ -1,6 +1,7 @@
 // app/service-reports/page.js
 
 import { getDbConnection } from "@/lib/db";
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
 import ServiceTable from "@/components/services/ServiceTable";
 import { getSessionPayload } from "@/lib/auth";
 
@@ -67,7 +68,7 @@ export default async function ViewServiceReportsPage() {
       installed_address: row.installed_address_from_wp || "N/A",
       // Ensure the date fields are converted to a readable string format
       completed_date: row.completed_date
-        ? new Date(row.completed_date).toLocaleDateString()
+        ? formatCrmDateOnly(row.completed_date)
         : "N/A",
     }));
 

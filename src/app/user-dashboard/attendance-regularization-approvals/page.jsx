@@ -1,5 +1,7 @@
 "use client";
 
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
+
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import toast from "react-hot-toast";
@@ -15,7 +17,7 @@ function formatLogDate(v) {
   if (v == null) return "";
   const s = String(v);
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-  return new Date(v).toLocaleDateString();
+  return formatCrmDateOnly(v);
 }
 
 /** Proposed column only when employee actually changed this field vs current log */

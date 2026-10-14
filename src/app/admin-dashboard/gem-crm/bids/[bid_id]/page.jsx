@@ -1,5 +1,7 @@
 "use client";
 
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
+
 import { useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { getGemCrmBasePath } from "@/lib/gemCrmBasePath";
@@ -459,7 +461,7 @@ export default function BidDetailsPage({ params }) {
                     <p className="font-medium text-gray-900">{doc.document_name}</p>
                     <p className="text-xs text-gray-500">
                       {doc.document_type} • Uploaded by {doc.uploaded_by_name} •{" "}
-                      {new Date(doc.created_at).toLocaleDateString()}
+                      {formatCrmDateOnly(doc.created_at)}
                     </p>
                   </div>
                 </div>

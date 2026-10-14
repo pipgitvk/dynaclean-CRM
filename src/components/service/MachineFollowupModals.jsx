@@ -481,14 +481,14 @@ export function HistoryModal({
                       <div>
                         <span className="text-gray-500">Followed At:</span>{" "}
                         <span className="font-medium">
-                          {rec.sortAt ? dayjs(rec.sortAt).tz(IST).format("DD/MM/YYYY HH:mm") : "—"}
+                          {rec.sortAt ? dayjs(rec.sortAt).tz(IST).format("DD-MM-YYYY HH:mm") : "—"}
                         </span>
                       </div>
                       <div>
                         <span className="text-gray-500">Next Follow-up:</span>{" "}
                         <span className="font-medium">
                           {rec.service_next_followup || rec.next_followup_date
-                            ? dayjs(rec.service_next_followup || rec.next_followup_date).tz(IST).format("DD/MM/YYYY HH:mm")
+                            ? dayjs(rec.service_next_followup || rec.next_followup_date).tz(IST).format("DD-MM-YYYY HH:mm")
                             : "—"}
                         </span>
                       </div>
@@ -545,7 +545,7 @@ export function HistoryModal({
                     </div>
                     {rec.created_at || rec.time_stamp ? (
                       <div className="mt-2 text-xs text-gray-400">
-                        Recorded: {dayjs(rec.created_at || rec.time_stamp).tz(IST).format("DD/MM/YYYY HH:mm")}
+                        Recorded: {dayjs(rec.created_at || rec.time_stamp).tz(IST).format("DD-MM-YYYY HH:mm")}
                       </div>
                     ) : null}
                   </div>

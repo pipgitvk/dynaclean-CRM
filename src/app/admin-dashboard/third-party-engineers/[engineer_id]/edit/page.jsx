@@ -1,5 +1,7 @@
 'use client';
 
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
+
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { toast } from 'react-hot-toast';
@@ -421,7 +423,7 @@ export default function EditThirdPartyEngineerPage() {
                     <div>
                       <p className="font-semibold text-slate-900">{attachment.attachment_name}</p>
                       <p className="text-xs text-slate-500 mt-1">
-                        Created: {new Date(attachment.created_at).toLocaleDateString()}
+                        Created: {formatCrmDateOnly(attachment.created_at)}
                       </p>
                     </div>
 

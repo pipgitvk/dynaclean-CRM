@@ -1,5 +1,7 @@
 "use client";
 
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
+
 import { useState, useEffect } from "react";
 import { 
   Calendar, 
@@ -123,11 +125,7 @@ export default function PaidLeaveLedger() {
   };
 
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-IN', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric'
-    });
+    return new formatCrmDateOnly(Date(dateString));
   };
 
   const downloadLedger = () => {
@@ -348,7 +346,7 @@ export default function PaidLeaveLedger() {
                       .forEach(entry => {
                         const date = new Date(entry.date);
                         const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-                        const monthName = date.toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
+                        const monthName = formatCrmDateOnly(date);
                         
                         if (!monthlyBreakdown[monthKey]) {
                           monthlyBreakdown[monthKey] = { name: monthName, days: 0 };
@@ -502,7 +500,7 @@ export default function PaidLeaveLedger() {
                     unpaidLedgerData.forEach(entry => {
                       const date = new Date(entry.date);
                       const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-                      const monthName = date.toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
+                      const monthName = formatCrmDateOnly(date);
                       
                       if (!monthlyBreakdown[monthKey]) {
                         monthlyBreakdown[monthKey] = { name: monthName, days: 0, approved: 0, pending: 0, rejected: 0 };

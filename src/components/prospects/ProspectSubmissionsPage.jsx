@@ -21,7 +21,7 @@ const formatDT = (val) => {
     ? dayjs(s)
     : dayjs.utc(s.includes("T") ? s : s.replace(" ", "T"));
   if (!parsed.isValid()) return "—";
-  return parsed.utcOffset(IST_OFFSET_MINUTES).format("DD MMM YYYY, hh:mm A");
+  return parsed.utcOffset(IST_OFFSET_MINUTES).format("DD-MM-YYYY hh:mm A");
 };
 
 function isAcknowledged(status) {

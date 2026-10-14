@@ -68,7 +68,7 @@ function parseDate(val) {
       return `${y}-${m}-${day}`;
     }
   }
-  // DD/MMM/YYYY or DD-MMM-YYYY (e.g. 15/Apr/2026)
+  // DD/MMM/YYYY or DD-MM-YYYY (e.g. 15/Apr/2026)
   const dmyText = s.match(/^(\d{1,2})[\/\-]([A-Za-z]{3,9})[\/\-](\d{4})$/i);
   if (dmyText) {
     const [, dayStr, monStr, yearStr] = dmyText;
@@ -84,18 +84,18 @@ function parseDate(val) {
       }
     }
   }
-  // DD/MM/YYYY or DD-MM-YYYY (numeric month) - Handle time part too
+  // DD-MM-YYYY or DD-MM-YYYY (numeric month) - Handle time part too
   const dmyWithTime = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})(\s+.*)?$/);
   if (dmyWithTime) {
     const [, day, month, year] = dmyWithTime;
-    console.log("[DEBUG] DD/MM/YYYY with time:", { day, month, year, original: s });
+    console.log("[DEBUG] DD-MM-YYYY with time:", { day, month, year, original: s });
     const d = new Date(Number(year), Number(month) - 1, Number(day));
     if (!isNaN(d.getTime())) {
       const y = d.getFullYear();
       const m = String(d.getMonth() + 1).padStart(2, "0");
       const dd = String(d.getDate()).padStart(2, "0");
       const result = `${y}-${m}-${dd}`;
-      console.log("[DEBUG] DD/MM/YYYY result:", result);
+      console.log("[DEBUG] DD-MM-YYYY result:", result);
       return result;
     }
   }

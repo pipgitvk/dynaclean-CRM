@@ -85,7 +85,7 @@ export default function TaskFollowupModal({ open, task, onClose }) {
             <p>
               <strong>Deadline:</strong>{" "}
               {task.next_followup_date
-                ? dayjs(task.next_followup_date).format("DD MMM YYYY, hh:mm A")
+                ? dayjs(task.next_followup_date).format("DD-MM-YYYY hh:mm A")
                 : "—"}
             </p>
             <p>
@@ -110,7 +110,7 @@ export default function TaskFollowupModal({ open, task, onClose }) {
                   <li key={i} className="border-b pb-2 last:border-none">
                     <p className="text-xs text-gray-500">
                       {f.followed_date
-                        ? dayjs(f.followed_date).format("DD MMM YYYY, hh:mm A")
+                        ? dayjs(f.followed_date).format("DD-MM-YYYY hh:mm A")
                         : "—"}
                     </p>
                     <p>{f.notes}</p>

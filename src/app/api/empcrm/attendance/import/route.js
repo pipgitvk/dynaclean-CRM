@@ -152,7 +152,7 @@ export async function POST(request) {
       if (!dateStr) {
         errors.push({
           row: rowNum,
-          message: "date is invalid (use YYYY-MM-DD or DD/MM/YYYY).",
+          message: "date is invalid (use YYYY-MM-DD or DD-MM-YYYY).",
         });
         continue;
       }

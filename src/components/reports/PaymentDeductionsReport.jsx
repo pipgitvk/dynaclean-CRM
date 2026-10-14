@@ -109,9 +109,9 @@ export default function PaymentDeductionsReport({ paymentPendingPath }) {
       d.remarks,
       d.claimable ? "Yes" : "No",
       d.claim_status,
-      d.claim_received_date ? dayjs(d.claim_received_date).format("DD/MM/YYYY") : "",
+      d.claim_received_date ? dayjs(d.claim_received_date).format("DD-MM-YYYY") : "",
       d.recorded_by,
-      d.recorded_date ? dayjs(d.recorded_date).format("DD/MM/YYYY hh:mm A") : "",
+      d.recorded_date ? dayjs(d.recorded_date).format("DD-MM-YYYY hh:mm A") : "",
     ]);
 
     const csvContent = [
@@ -364,7 +364,7 @@ export default function PaymentDeductionsReport({ paymentPendingPath }) {
                     </td>
                     <td className="px-3 py-3 text-center text-xs text-gray-700">
                       {item.claim_received_date
-                        ? dayjs(item.claim_received_date).format("DD/MM/YYYY")
+                        ? dayjs(item.claim_received_date).format("DD-MM-YYYY")
                         : "-"}
                     </td>
                   </tr>

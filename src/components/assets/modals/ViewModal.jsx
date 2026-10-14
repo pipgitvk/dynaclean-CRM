@@ -1,6 +1,8 @@
 // src/app/components/assets/modals/ViewModal.jsx
 "use client";
 
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
+
 export default function ViewModal({ asset }) {
   if (!asset) return null;
 
@@ -69,7 +71,7 @@ export default function ViewModal({ asset }) {
           <div>
             <p className="text-sm font-semibold text-gray-600">Purchase Date</p>
             <p className="text-lg font-medium text-gray-900">
-              {new Date(asset.purchase_date).toLocaleDateString()}
+              {formatCrmDateOnly(asset.purchase_date)}
             </p>
           </div>
           <div>
@@ -154,7 +156,7 @@ export default function ViewModal({ asset }) {
               </p>
               <p className="text-base text-gray-900">
                 {asset.Assigned_Date
-                  ? new Date(asset.Assigned_Date).toLocaleDateString()
+                  ? formatCrmDateOnly(asset.Assigned_Date)
                   : "N/A"}
               </p>
             </div>

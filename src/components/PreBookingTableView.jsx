@@ -118,7 +118,7 @@ export default function PreBookingTableView({ basePath }) {
                 </td>
                 <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
                   {booking.expected_date
-                    ? dayjs(booking.expected_date).format("DD MMM YYYY")
+                    ? dayjs(booking.expected_date).format("DD-MM-YYYY")
                     : "N/A"}
                 </td>
               </tr>

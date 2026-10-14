@@ -169,7 +169,7 @@ export default function OrderFollowups() {
       row.grand_total ? `₹${Number(row.grand_total).toFixed(2)}` : '₹0.00',
       row.delivery_location,
       row.created_by || '-',
-      dayjs(row.created_at).format("DD-MMM-YYYY"),
+      dayjs(row.created_at).format("DD-MM-YYYY"),
       row.booking_id,
     ]);
     autoTable(doc, {
@@ -357,7 +357,7 @@ export default function OrderFollowups() {
                   <td className="p-4">{row.delivery_location}</td>
                   <td className="p-4">{row.created_by || '-'}</td>
                   <td className="p-4">
-                    {dayjs(row.created_at).format("DD-MMM-YYYY")}
+                    {dayjs(row.created_at).format("DD-MM-YYYY")}
                   </td>
                   <td className="p-4">{row.booking_id}</td>
                   <td className="p-4 space-x-2 flex">

@@ -189,7 +189,7 @@ export default function UpcomingTeamLeaderFollowupsCards({ teamLeader }) {
                     dueDate={
                       followup.next_followup_date
                         ? dayjs(followup.next_followup_date).format(
-                          "DD MMM, YYYY hh:mm A"
+                          "DD-MM-YYYY hh:mm A"
                         )
                         : "Not set"
                     }

@@ -2,6 +2,7 @@
 "use client";
 
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import toast from "react-hot-toast";
 import { Sun, BadgeCheck, AlertTriangle } from "lucide-react";
@@ -794,7 +795,7 @@ const AttendancePage = () => {
                   </span>
                   <span className="text-sm text-gray-700 flex flex-col items-end gap-1.5">
                     <span className="flex items-center gap-1.5">
-                      {new Date(log.date).toLocaleDateString()}
+                      {formatCrmDateOnly(log.date)}
                       {log.workedSunday && (
                         <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-purple-100 text-purple-700 border border-purple-200">
                           Working Sunday
@@ -1080,7 +1081,7 @@ const AttendancePage = () => {
                     className={`transition-colors duration-150 ${log.workedSunday ? "bg-pink-200 hover:bg-pink-300" : "hover:bg-gray-50"}`}
                   >
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {new Date(log.date).toLocaleDateString()}
+                      {formatCrmDateOnly(log.date)}
                       {log.workedSunday && (
                         <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-purple-100 text-purple-700 border border-purple-200">
                           Working Sunday
@@ -1559,7 +1560,7 @@ const AttendancePage = () => {
                 {holidays.map((h) => (
                   <li key={h.id} className="py-2">
                     <p className="font-medium">{h.title}</p>
-                    <p className="text-sm text-gray-600">{new Date(h.holiday_date).toLocaleDateString()} {h.is_optional ? "(Optional)" : ""}</p>
+                    <p className="text-sm text-gray-600">{formatCrmDateOnly(h.holiday_date)} {h.is_optional ? "(Optional)" : ""}</p>
                     {h.description ? (
                       <p className="text-sm text-gray-500">{h.description}</p>
                     ) : null}
@@ -1595,7 +1596,7 @@ const AttendancePage = () => {
               <p className="text-sm text-gray-600">
                 Date:{" "}
                 <span className="font-medium text-gray-900">
-                  {new Date(editRegRequest.log_date).toLocaleDateString()}
+                  {formatCrmDateOnly(editRegRequest.log_date)}
                 </span>
                 . Update the proposed check-in / check-out times and reason. The request stays pending with your manager.
               </p>

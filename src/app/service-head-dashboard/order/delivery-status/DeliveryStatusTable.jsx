@@ -217,10 +217,10 @@ export default function DeliveryStatusTable({ orders }) {
                       {order.booking_by || "-"}
                     </td>
                     <td className="px-3 py-3 text-center">
-                      {order.delivery_date ? dayjs(order.delivery_date).format("DD/MM/YYYY") : "-"}
+                      {order.delivery_date ? dayjs(order.delivery_date).format("DD-MM-YYYY") : "-"}
                     </td>
                     <td className="px-3 py-3 text-center">
-                      {order.delivered_on ? dayjs(order.delivered_on).format("DD/MM/YYYY") : "-"}
+                      {order.delivered_on ? dayjs(order.delivered_on).format("DD-MM-YYYY") : "-"}
                     </td>
                     <td className="px-3 py-3 text-center">
                       <span
@@ -291,13 +291,13 @@ export default function DeliveryStatusTable({ orders }) {
                     <div>
                       <span className="text-xs text-gray-600">Expected:</span>
                       <p className="font-medium">
-                        {order.delivery_date ? dayjs(order.delivery_date).format("DD/MM/YYYY") : "-"}
+                        {order.delivery_date ? dayjs(order.delivery_date).format("DD-MM-YYYY") : "-"}
                       </p>
                     </div>
                     <div>
                       <span className="text-xs text-gray-600">Actual:</span>
                       <p className="font-medium">
-                        {order.delivered_on ? dayjs(order.delivered_on).format("DD/MM/YYYY") : "-"}
+                        {order.delivered_on ? dayjs(order.delivered_on).format("DD-MM-YYYY") : "-"}
                       </p>
                     </div>
                   </div>

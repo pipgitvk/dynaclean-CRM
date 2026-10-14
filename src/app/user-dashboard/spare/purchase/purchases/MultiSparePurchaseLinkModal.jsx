@@ -1,5 +1,7 @@
 "use client";
 
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
+
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import React, { useEffect, useState, useMemo } from "react";
 import { Search, X, Link2 } from "lucide-react";
@@ -513,7 +515,7 @@ export default function MultiSparePurchaseLinkModal({
                       </td>
                       <td className="p-3 font-medium text-gray-600">#{s.id}</td>
                       <td className="p-3 font-mono text-xs text-gray-500">{s.trans_id || "—"}</td>
-                      <td className="p-3 text-gray-600">{s.date ? new Date(s.date).toLocaleDateString() : "—"}</td>
+                      <td className="p-3 text-gray-600">{s.date ? formatCrmDateOnly(s.date) : "—"}</td>
                       <td className="p-3 max-w-[300px] truncate text-gray-600" title={s.description || ""}>{s.description || "—"}</td>
                       <td className="p-3 font-bold text-red-600">₹{Number(s.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                       <td className="p-3 font-medium text-green-700">

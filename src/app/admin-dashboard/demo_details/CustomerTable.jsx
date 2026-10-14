@@ -188,14 +188,14 @@ export default function CustomerTable({ rows, searchParams }) {
                   <td className="p-3">{item.company}</td>
                   <td className="p-3">{item.demo_address}</td>
                   <td className="p-3">
-                    {dayjs(item.demo_date_time).format("DD MMM YYYY hh:mm A")}
+                    {dayjs(item.demo_date_time).format("DD-MM-YYYY hh:mm A")}
                   </td>
                   <td className="p-3">{item.machine1}</td>
                   <td className="p-3">{item.demo_status || "Pending"}</td>
                   <td className="p-3">{item.username}</td>
                   <td className="p-3">
                     {item.demo_completion_date
-                      ? dayjs(item.demo_completion_date).format("DD MMM YYYY")
+                      ? dayjs(item.demo_completion_date).format("DD-MM-YYYY")
                       : "-"}
                   </td>
                   <td className="p-3">
@@ -244,7 +244,7 @@ export default function CustomerTable({ rows, searchParams }) {
                   {item.customer_name}
                 </h3>
                 <span className="text-sm text-gray-50">
-                  {dayjs(item.demo_date_time).format("DD MMM YYYY")}
+                  {dayjs(item.demo_date_time).format("DD-MM-YYYY")}
                 </span>
               </div>
               <p className="text-gray-700">
@@ -259,7 +259,7 @@ export default function CustomerTable({ rows, searchParams }) {
               </p>
               <p className="text-gray-700">
                 <strong className="font-medium">Demo Date & Time:</strong>{" "}
-                {dayjs(item.demo_date_time).format("DD MMM YYYY hh:mm A")}
+                {dayjs(item.demo_date_time).format("DD-MM-YYYY hh:mm A")}
               </p>
               <p className="text-gray-700">
                 <strong className="font-medium">Machine:</strong>{" "}
@@ -276,7 +276,7 @@ export default function CustomerTable({ rows, searchParams }) {
               <p className="text-gray-700 mb-4">
                 <strong className="font-medium">Completed On:</strong>{" "}
                 {item.demo_completion_date
-                  ? dayjs(item.demo_completion_date).format("DD MMM YYYY")
+                  ? dayjs(item.demo_completion_date).format("DD-MM-YYYY")
                   : "-"}
               </p>
 

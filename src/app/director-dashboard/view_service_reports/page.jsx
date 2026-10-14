@@ -3,6 +3,7 @@
 import { getDbConnection } from "@/lib/db"; // DB connection utility
 import ServiceTable from "@/components/services/ServiceTable"; // Import the new Table Component
 import { getSessionPayload } from "@/lib/auth";
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
 import { ensureServiceReportStepsTable } from "@/lib/ensureServiceReportStepsTable";
 
 // ✅ Disable caching to always fetch fresh data from database
@@ -64,7 +65,7 @@ export default async function DirectorViewServiceReportsPage() {
       customer_name: row.customer_name_from_wp || row.contact_person_from_wp || "N/A",
       installed_address: row.installed_address_from_wp || "N/A",
       completed_date: row.completed_date
-        ? new Date(row.completed_date).toLocaleDateString()
+        ? formatCrmDateOnly(row.completed_date)
         : "N/A",
     }));
 

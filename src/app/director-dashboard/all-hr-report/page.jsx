@@ -110,7 +110,7 @@ export default function AllHrReportPage() {
       "Contact": item.emp_contact,
       "Designation": item.designation,
       "Status": item.status,
-      "Interview Date": item.interview_at ? dayjs(item.interview_at).format("DD-MMM-YYYY HH:mm") : "—",
+      "Interview Date": item.interview_at ? dayjs(item.interview_at).format("DD-MM-YYYY HH:mm") : "—",
     }));
     setModalData(formattedRecords);
     setIsModalOpen(true);
@@ -131,9 +131,9 @@ export default function AllHrReportPage() {
       "Contact": item.emp_contact,
       "Designation": item.designation,
       "Status": item.status,
-      "Interview Date": item.interview_at ? dayjs(item.interview_at).format("DD-MMM-YYYY HH:mm") : "—",
+      "Interview Date": item.interview_at ? dayjs(item.interview_at).format("DD-MM-YYYY HH:mm") : "—",
       "Created By": item.creator_name || item.created_by,
-      "Created At": dayjs(item.created_at).format("DD-MMM-YYYY HH:mm"),
+      "Created At": dayjs(item.created_at).format("DD-MM-YYYY HH:mm"),
     }));
 
   return (

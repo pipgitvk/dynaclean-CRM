@@ -1,5 +1,7 @@
 "use client";
 
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
+
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Search, CreditCard } from "lucide-react";
@@ -19,7 +21,7 @@ function formatDateOnly(value) {
   if (!value) return "—";
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+  return formatCrmDateOnly(d);
 }
 function numMoney(v) {
   if (v == null || v === "") return "—";

@@ -437,7 +437,7 @@ export default function OrderTable({ orders, userRole }) {
         order.order_id,
         order.quote_number,
         order.created_by,
-        dayjs(order.created_at).format("DD/MM/YYYY"),
+        dayjs(order.created_at).format("DD-MM-YYYY"),
         order.client_name,
         order.company_name,
         order.contact,
@@ -446,7 +446,7 @@ export default function OrderTable({ orders, userRole }) {
         order.item_code,
         getStatusText(order).text,
         order.payment_status,
-        dayjs(order.duedate).format("DD/MM/YYYY"),
+        dayjs(order.duedate).format("DD-MM-YYYY"),
         order.totalamt || 0,
         totalPaid,
       ];
@@ -632,7 +632,7 @@ export default function OrderTable({ orders, userRole }) {
                       {r.created_by}
                     </td>
                     <td className="px-3 py-3 text-left">
-                      {dayjs(r.created_at).format("DD/MM/YYYY")}
+                      {dayjs(r.created_at).format("DD-MM-YYYY")}
                     </td>
                     <td className="px-3 py-3 text-left">
                       <div className="space-y-1 text-xs">
@@ -699,7 +699,7 @@ export default function OrderTable({ orders, userRole }) {
                       )}
                     </td>
                     <td className="px-3 py-3 text-center">
-                      {dayjs(r.duedate).format("DD/MM/YYYY")}
+                      {dayjs(r.duedate).format("DD-MM-YYYY")}
                     </td>
                     {/* {canShowInstall && (
                       <td className="px-3 py-3">
@@ -744,7 +744,7 @@ export default function OrderTable({ orders, userRole }) {
                   <span className="text-xs">#{i + 1}</span>
                   <div className="flex items-center">
                     <span className="font-medium text-gray-800 mr-2">
-                      {dayjs(r.created_at).format("DD/MM/YYYY")}
+                      {dayjs(r.created_at).format("DD-MM-YYYY")}
                     </span>
                     <span
                       className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${status.bg} ${status.textCol}`}
@@ -1093,7 +1093,7 @@ function EditPaymentButton({ order }) {
   const formatPrevDate = (d) => {
     if (!d) return "-";
     const v = dayjs(d);
-    return v.isValid() ? v.format("DD/MM/YYYY") : d;
+    return v.isValid() ? v.format("DD-MM-YYYY") : d;
   };
 
   const totalPaid = prevAmounts

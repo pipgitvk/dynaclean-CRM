@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
 import { Modal } from "./Modal";
 import ViewModal from "./modals/ViewModal";
 import EditModal from "./modals/EditModal";
@@ -399,13 +400,13 @@ export default function AssetsTable() {
                     Rs. {asset.purchase_price}
                   </td>
                   <td className="py-3 px-6 whitespace-nowrap">
-                    {new Date(asset.purchase_date).toLocaleDateString()}
+                    {formatCrmDateOnly(asset.purchase_date)}
                   </td>
                   <td className="py-3 px-6 whitespace-nowrap">
                     {asset.current_status === 'Assigned' ? (asset.Assigned_to || 'Assigned') : 'Available'}
                   </td>
                   <td className="py-3 px-6 whitespace-nowrap">
-                    {asset.Assigned_Date ? new Date(asset.Assigned_Date).toLocaleDateString() : "N/A"}
+                    {asset.Assigned_Date ? formatCrmDateOnly(asset.Assigned_Date) : "N/A"}
                   </td>
                   <td className="py-3 px-6 whitespace-nowrap">
                     {asset.linked_trans_id ? (
@@ -540,7 +541,7 @@ export default function AssetsTable() {
               </p>
               <p className="text-sm text-gray-600">
                 <strong>Purchase Date:</strong>{" "}
-                {new Date(asset.purchase_date).toLocaleDateString()}
+                {formatCrmDateOnly(asset.purchase_date)}
               </p>
               <p className="text-sm text-gray-600">
                 <strong>Assigned to:</strong>{" "}
@@ -553,7 +554,7 @@ export default function AssetsTable() {
                 {asset.is_submit
                   ? "N/A"
                   : asset.Assigned_Date
-                  ? new Date(asset.Assigned_Date).toLocaleDateString()
+                  ? formatCrmDateOnly(asset.Assigned_Date)
                   : "N/A"}
               </p>
               <p className="text-sm text-gray-600">

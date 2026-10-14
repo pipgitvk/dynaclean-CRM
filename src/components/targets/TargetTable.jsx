@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
 import { useRouter } from "next/navigation"; // Import useRouter
 import { Search, Eye, Edit, Plus } from "lucide-react";
 import TargetCompletionModal from "./TargetCompletionModal";
@@ -57,11 +58,7 @@ const TargetTable = () => {
   const formatDate = (dateString) => {
     if (!dateString) return "-";
     const date = new Date(dateString);
-    return date.toLocaleDateString("en-GB", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
+    return formatCrmDateOnly(date);
   };
 
   useEffect(() => {

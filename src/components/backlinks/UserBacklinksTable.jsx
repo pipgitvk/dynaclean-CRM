@@ -1,5 +1,7 @@
 "use client";
 
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
+
 import { useState, useEffect } from "react";
 import { Search, Mail, ExternalLink } from "lucide-react";
 import toast from "react-hot-toast";
@@ -66,11 +68,7 @@ const UserBacklinksTable = () => {
   const formatDate = (dateString) => {
     if (!dateString) return "-";
     const date = new Date(dateString);
-    return date.toLocaleDateString("en-GB", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
+    return formatCrmDateOnly(date);
   };
 
   const getStatusBadgeColor = (status) => {

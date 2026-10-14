@@ -3,6 +3,7 @@
 import { getDbConnection } from "@/lib/db"; // DB connection utility
 import ServiceTable from "@/components/services/ServiceTable"; // Import the new Table Component
 import { getSessionPayload } from "@/lib/auth";
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
 import { ensureServiceReportStepsTable } from "@/lib/ensureServiceReportStepsTable";
 import { ensureServiceRecordsFollowupColumns } from "@/lib/ensureServiceRecordsFollowupColumns";
 import { ensureServiceRecordsPlannedDateColumn } from "@/lib/ensureServiceRecordsPlannedDateColumn";
@@ -72,7 +73,7 @@ export default async function UserViewServiceReportsPage() {
       installed_address: row.installed_address_from_wp || "N/A",
       // Ensure the date fields are converted to a readable string format
       completed_date: row.completed_date
-        ? new Date(row.completed_date).toLocaleDateString()
+        ? formatCrmDateOnly(row.completed_date)
         : "N/A",
     }));
 

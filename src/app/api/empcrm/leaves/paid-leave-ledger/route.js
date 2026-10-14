@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 
@@ -135,7 +136,7 @@ export async function GET(request) {
         type: "credit",
         date: accrual.date.toISOString().split('T')[0],
         days: Math.round(accrual.days * 100) / 100, // Round to 2 decimals
-        description: `Monthly accrual (${accrual.date.toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })})`,
+        description: `Monthly accrual (${formatCrmDateOnly(accrual.date)})`,
         entryType: "accrual"
       });
     });

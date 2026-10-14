@@ -50,7 +50,7 @@ export default function ExpenseTable({ rows, role }) {
 
   // Filter rows based on the search query, employee, date range, and status
   const filteredRows = rows.filter((row) => {
-    const formattedDate = dayjs(row.TravelDate).format("DD MMM YYYY");
+    const formattedDate = dayjs(row.TravelDate).format("DD-MM-YYYY");
 
     // Check if any field matches the search query
     const matchesSearch =
@@ -254,7 +254,7 @@ export default function ExpenseTable({ rows, role }) {
     const doc = new jsPDF();
     const tableData = filteredRows.map((row) => [
       row.ID,
-      dayjs(row.TravelDate).format("DD MMM YYYY"),
+      dayjs(row.TravelDate).format("DD-MM-YYYY"),
       row.username,
       row.FromLocation,
       row.Tolocation,
@@ -268,7 +268,7 @@ export default function ExpenseTable({ rows, role }) {
         ? "-"
         : `₹${Number(row.approved_amount).toFixed(2)}`,
       row.payment_date && row.payment_date !== "0000-00-00"
-        ? dayjs(row.payment_date).format("DD MMM YYYY")
+        ? dayjs(row.payment_date).format("DD-MM-YYYY")
         : "-",
       row.approval_status,
     ]);
@@ -314,7 +314,7 @@ export default function ExpenseTable({ rows, role }) {
         Number(row.OtherExpenses || 0);
       worksheet.addRow({
         ID: row.ID,
-        TravelDate: dayjs(row.TravelDate).format("DD MMM YYYY"),
+        TravelDate: dayjs(row.TravelDate).format("DD-MM-YYYY"),
         username: row.username,
         FromLocation: row.FromLocation,
         Tolocation: row.Tolocation,
@@ -325,7 +325,7 @@ export default function ExpenseTable({ rows, role }) {
             : `₹${Number(row.approved_amount).toFixed(2)}`,
         payment_date:
           row.payment_date && row.payment_date !== "0000-00-00"
-            ? dayjs(row.payment_date).format("DD MMM YYYY")
+            ? dayjs(row.payment_date).format("DD-MM-YYYY")
             : "-",
         approval_status: row.approval_status,
       });
@@ -497,7 +497,7 @@ export default function ExpenseTable({ rows, role }) {
                       <td className="p-3">{row.ID}</td>
                       <td className="p-3">
                         {row.TravelDate
-                          ? dayjs(row.TravelDate).format("DD MMM YYYY")
+                          ? dayjs(row.TravelDate).format("DD-MM-YYYY")
                           : "-"}
                       </td>
                       <td className="p-3">{row.username}</td>
@@ -512,7 +512,7 @@ export default function ExpenseTable({ rows, role }) {
                       </td>
                       <td className="p-3">
                         {row.payment_date && row.payment_date !== "0000-00-00"
-                          ? dayjs(row.payment_date).format("DD MMM YYYY")
+                          ? dayjs(row.payment_date).format("DD-MM-YYYY")
                           : "-"}
                       </td>
                       <td className="p-3">{row.approval_status}</td>
@@ -634,13 +634,13 @@ export default function ExpenseTable({ rows, role }) {
                     <div>
                       <span className="font-semibold">Date:</span>{" "}
                       {row.TravelDate
-                        ? dayjs(row.TravelDate).format("DD MMM YYYY")
+                        ? dayjs(row.TravelDate).format("DD-MM-YYYY")
                         : "-"}
                     </div>
                     <div>
                       <span className="font-semibold">Payment Date:</span>{" "}
                       {row.payment_date && row.payment_date !== "0000-00-00"
-                        ? dayjs(row.payment_date).format("DD MMM YYYY")
+                        ? dayjs(row.payment_date).format("DD-MM-YYYY")
                         : "-"}
                     </div>
                     <div className="col-span-2">

@@ -83,7 +83,7 @@ class NotificationService {
         }
 
         const dueLabel = task.due_date
-          ? dayjs(task.due_date).format("DD MMM YYYY, hh:mm A")
+          ? dayjs(task.due_date).format("DD-MM-YYYY hh:mm A")
           : "soon";
         const message = `Automatic task (A): "${recurringTask.task_title}" — due ${dueLabel}`;
 

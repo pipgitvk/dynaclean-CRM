@@ -78,7 +78,7 @@ export default async function Page({ params }) {
           <span className="font-medium">Client Delivery Date: </span>
           <span>
             {orderDetails.client_delivery_date
-              ? dayjs(orderDetails.client_delivery_date).format("DD/MM/YYYY")
+              ? dayjs(orderDetails.client_delivery_date).format("DD-MM-YYYY")
               : "NA"}
           </span>
         </div>
@@ -86,7 +86,7 @@ export default async function Page({ params }) {
           <span className="font-medium">Expected Delivery Date: </span>
           <span>
             {orderDetails.delivery_date
-              ? dayjs(orderDetails.delivery_date).format("DD/MM/YYYY")
+              ? dayjs(orderDetails.delivery_date).format("DD-MM-YYYY")
               : "NA"}
           </span>
         </div>

@@ -1,5 +1,7 @@
 "use client";
 
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
+
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { ArrowLeft, Save, Calculator, AlertCircle, Download, CalendarDays, Lock } from "lucide-react";
@@ -773,7 +775,7 @@ const GenerateSalaryPage = () => {
     };
 
     const formatDate = (dateString) => {
-        return new Date(dateString).toLocaleDateString();
+        return formatCrmDateOnly(dateString);
     };
 
     const formatMonthHeading = (ym) => {

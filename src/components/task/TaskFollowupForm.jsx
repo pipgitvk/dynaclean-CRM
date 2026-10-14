@@ -163,7 +163,7 @@ export default function TaskFollowupForm({
         <label className="block font-medium mb-1">Follow-up Time</label>
         <input
           type="text"
-          value={dayjs().format("DD MMM YYYY, hh:mm A")}
+          value={dayjs().format("DD-MM-YYYY hh:mm A")}
           className="w-full border rounded-md p-2 bg-gray-100"
           readOnly
         />

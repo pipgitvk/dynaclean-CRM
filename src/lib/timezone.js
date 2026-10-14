@@ -3,6 +3,17 @@
 
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
+import {
+  CRM_DATETIME_FORMAT,
+  CRM_DATETIME_24_FORMAT,
+} from '@/lib/crmDateFormat';
+
+export {
+  CRM_DATE_FORMAT,
+  CRM_DATETIME_FORMAT,
+  CRM_DATETIME_24_FORMAT,
+  formatCrmDateOnly,
+} from '@/lib/crmDateFormat';
 
 dayjs.extend(utc);
 
@@ -45,14 +56,14 @@ export function parseCrmDatetimeToDayjs(value) {
  * Format follow-up / next-follow-up / external ISO datetimes for the UI in IST.
  * Use for fields saved via `convertISTtoUTC` in production.
  */
-export function formatCrmDatetimeForISTDisplay(value, format = 'DD MMM, YYYY hh:mm A') {
+export function formatCrmDatetimeForISTDisplay(value, format = CRM_DATETIME_FORMAT) {
   const d = parseCrmDatetimeToDayjs(value);
   if (!d || !d.isValid()) return '';
   return d.utcOffset(IST_OFFSET_MINUTES).format(format);
 }
 
 /** Format an instant already parsed with {@link parseCrmDatetimeToDayjs} (e.g. from TL pick helpers) for IST display. */
-export function formatCrmDayjsForISTDisplay(d, format = 'DD MMM, YYYY HH:mm') {
+export function formatCrmDayjsForISTDisplay(d, format = CRM_DATETIME_24_FORMAT) {
   if (!d || !d.isValid()) return '';
   return d.utcOffset(IST_OFFSET_MINUTES).format(format);
 }

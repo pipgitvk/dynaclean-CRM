@@ -1,6 +1,8 @@
 "use client";
 
 import { CalendarDays, Pencil, Phone, Briefcase, Sparkles, Eye } from "lucide-react";
+import dayjs from "dayjs";
+import { CRM_DATETIME_24_FORMAT } from "@/lib/crmDateFormat";
 import { getGradientColor } from "@/utils/getGradientColor";
 import { getHoursForTrafficCard, getTrafficGradientForHours, getTlFollowUpCardGradientForHours } from "@/utils/hiringFollowUpUrgency";
 
@@ -47,19 +49,12 @@ export const STATUS_CHIP_STYLES_LIGHT = {
 
 export function formatInterviewAt(v) {
   if (!v) return "—";
-  try {
-    const d = new Date(v);
-    if (Number.isNaN(d.getTime())) return String(v).slice(0, 16);
-    return d.toLocaleString("en-IN", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return "—";
+  const d = dayjs(v);
+  if (!d.isValid()) {
+    const s = String(v).trim();
+    return s ? s.slice(0, 16) : "—";
   }
+  return d.format(CRM_DATETIME_24_FORMAT);
 }
 
 /** @param {{ variant?: "light" | "onCard" }} props */

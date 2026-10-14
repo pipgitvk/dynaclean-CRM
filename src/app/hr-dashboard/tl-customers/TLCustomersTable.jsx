@@ -952,7 +952,7 @@ export default function TLCustomersTable({
                       {customer.followup_start_at
                         ? formatCrmDatetimeForISTDisplay(
                             customer.followup_start_at,
-                            "DD MMM, YYYY HH:mm",
+                            "DD-MM-YYYY HH:mm",
                           ) || "N/A"
                         : "N/A"}
                     </td>
@@ -1004,18 +1004,18 @@ export default function TLCustomersTable({
                     {tlOnly
                       ? formatCrmDatetimeForISTDisplay(
                           customer.tl_next_followup,
-                          "DD MMM, YYYY HH:mm",
+                          "DD-MM-YYYY HH:mm",
                         ) || "N/A"
                       : formatCrmDayjsForISTDisplay(
                           pickEffectiveNextFollowup(customer),
-                          "DD MMM, YYYY HH:mm",
+                          "DD-MM-YYYY HH:mm",
                         ) || "N/A"}
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
                     {customer.estimated_order_date
                       ? formatCrmDatetimeForISTDisplay(
                           customer.estimated_order_date,
-                          "DD MMM, YYYY HH:mm",
+                          "DD-MM-YYYY HH:mm",
                         ) || "N/A"
                       : "N/A"}
                   </td>
@@ -1140,7 +1140,7 @@ export default function TLCustomersTable({
                               <p>
                                 <b>Date:</b>{" "}
                                 {dayjs(latestquote.quote_date).format(
-                                  "DD MMM YYYY",
+                                  "DD-MM-YYYY",
                                 )}
                               </p>
                               <p>

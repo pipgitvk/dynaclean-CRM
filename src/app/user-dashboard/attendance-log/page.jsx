@@ -2,6 +2,7 @@
 "use client";
 
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import { Loader2, Search, Info, Pencil } from "lucide-react";
@@ -489,7 +490,7 @@ const AttendancePage = () => {
       // Map and add rows
       filteredLogs.forEach((log) => {
         worksheet.addRow({
-          Date: new Date(log.date).toLocaleDateString(),
+          Date: formatCrmDateOnly(log.date),
           User: log.username,
           Type: log.type === "present" ? "Present" : log.type === "absent" ? "Absent" : log.type === "leave" ? "Leave" : "Holiday",
           Checkin: log.checkin_time ? formatTime(log.checkin_time) : "",
@@ -745,7 +746,7 @@ const AttendancePage = () => {
                       Date:
                     </span>
                     <span className="text-sm text-gray-700">
-                      {new Date(log.date).toLocaleDateString()}
+                      {formatCrmDateOnly(log.date)}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
@@ -964,7 +965,7 @@ const AttendancePage = () => {
                       className="hover:bg-gray-50 transition-colors duration-150"
                     >
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {new Date(log.date).toLocaleDateString()}
+                        {formatCrmDateOnly(log.date)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {log.username}
@@ -1172,7 +1173,7 @@ const AttendancePage = () => {
             </div>
             <p className="text-sm text-gray-600 mb-4">
               {breakEditLog.username} ·{" "}
-              {new Date(breakEditLog.date).toLocaleDateString()}
+              {formatCrmDateOnly(breakEditLog.date)}
             </p>
             <p className="text-xs text-gray-500 mb-3">
               Leave a field empty to clear that time. Times use the attendance
@@ -1265,7 +1266,7 @@ const AttendancePage = () => {
                 {holidays.map((h) => (
                   <li key={h.id} className="py-2">
                     <p className="font-medium">{h.title}</p>
-                    <p className="text-sm text-gray-600">{new Date(h.holiday_date).toLocaleDateString()} {h.is_optional ? "(Optional)" : ""}</p>
+                    <p className="text-sm text-gray-600">{formatCrmDateOnly(h.holiday_date)} {h.is_optional ? "(Optional)" : ""}</p>
                     {h.description ? (
                       <p className="text-sm text-gray-500">{h.description}</p>
                     ) : null}

@@ -150,7 +150,7 @@ export default function BuyerLedgerTable({ rows: initialRows, buyerName, billing
     // Date range
     const dateFrom = filtered.length > 0 ? filtered[0].entry_date : dayjs().format("YYYY-MM-DD");
     const dateTo = filtered.length > 0 ? filtered[filtered.length - 1].entry_date : dayjs().format("YYYY-MM-DD");
-    csvLines.push(`"Period: ${dayjs(dateFrom).format("DD-MMM-YY")} to ${dayjs(dateTo).format("DD-MMM-YY")}"`);
+    csvLines.push(`"Period: ${dayjs(dateFrom).format("DD-MM-YYYY")} to ${dayjs(dateTo).format("DD-MM-YYYY")}"`);
     csvLines.push("");
 
     // Table headers
@@ -160,7 +160,7 @@ export default function BuyerLedgerTable({ rows: initialRows, buyerName, billing
     // Data rows
     filtered.forEach((r) => {
       csvLines.push([
-        `"${dayjs(r.entry_date).format("DD/MM/YYYY")}"`,
+        `"${dayjs(r.entry_date).format("DD-MM-YYYY")}"`,
         `"${(r.particulars || "").replace(/"/g, '""')}"`,
         `"${r.vch_type || ""}"`,
         `"${r.vch_no || ""}"`,
@@ -510,7 +510,7 @@ right(fmtAmt(finalTotal), col.creditEnd, y, 9, true);
               filtered.map((row) => (
                 <tr key={row.id} className="bg-white hover:bg-blue-50 transition-colors">
                   <td className="px-4 py-3 whitespace-nowrap text-gray-700">
-                    {dayjs(row.entry_date).format("DD MMM YYYY")}
+                    {dayjs(row.entry_date).format("DD-MM-YYYY")}
                   </td>
                   <td className="px-4 py-3 text-gray-800 max-w-xs">{row.particulars}</td>
                   <td className="px-4 py-3"><VchBadge type={row.vch_type} /></td>
@@ -587,7 +587,7 @@ right(fmtAmt(finalTotal), col.creditEnd, y, 9, true);
                 <div>
                   <p className="font-semibold text-gray-800">{row.particulars}</p>
                   <p className="text-xs text-gray-500 mt-0.5">
-                    {dayjs(row.entry_date).format("DD MMM YYYY")}
+                    {dayjs(row.entry_date).format("DD-MM-YYYY")}
                   </p>
                 </div>
                 {row.source === "manual" && (

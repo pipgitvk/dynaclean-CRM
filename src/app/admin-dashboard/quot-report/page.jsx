@@ -2,6 +2,7 @@
 "use client";
 
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
 import { useEffect, useState, useMemo } from "react";
 import { Download, Search, RefreshCcw } from "lucide-react";
 import jsPDF from "jspdf";
@@ -158,7 +159,7 @@ export default function QuotationFollowup() {
       ],
       body: filteredData.map((row) => [
         row.quote_number,
-        new Date(row.quote_date).toLocaleDateString(),
+        formatCrmDateOnly(row.quote_date),
         row.company_name,
         row.grand_total,
         row.emp_name,
@@ -381,7 +382,7 @@ export default function QuotationFollowup() {
                 >
                   <td className="p-4">{row.quote_number}</td>
                   <td className="p-4">
-                    {new Date(row.quote_date).toLocaleDateString()}
+                    {formatCrmDateOnly(row.quote_date)}
                   </td>
                   <td className="p-4">{row.company_name}</td>
                   <td className="p-4">{row.grand_total}</td>

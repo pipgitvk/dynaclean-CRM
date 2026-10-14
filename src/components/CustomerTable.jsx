@@ -155,7 +155,7 @@ export default function CustomerTable({ customers, isLoading }) {
       
       return [
         i + 1,
-        dayjs.utc(c.date_created).format("DD-MMM-YYYY HH:mm"),
+        dayjs.utc(c.date_created).format("DD-MM-YYYY HH:mm"),
         c.lead_campaign,
         c.first_name,
         c.company,
@@ -163,7 +163,7 @@ export default function CustomerTable({ customers, isLoading }) {
         c.status,
         c.stage || "-",
         c.lead_source,
-        c.next_followup_time ? dayjs.utc(c.next_followup_time).format("DD-MMM-YYYY HH:mm") : "-",
+        c.next_followup_time ? dayjs.utc(c.next_followup_time).format("DD-MM-YYYY HH:mm") : "-",
         contactedValue,
       ];
     });
@@ -269,7 +269,7 @@ export default function CustomerTable({ customers, isLoading }) {
                 >
                   <td className="px-3 py-3">{i + 1}</td>
                   <td className="px-3 py-3 text-left">
-                    {dayjs.utc(c.date_created).format("DD-MMM-YYYY HH:mm")}
+                    {dayjs.utc(c.date_created).format("DD-MM-YYYY HH:mm")}
                   </td>
                   <td className="px-3 py-3 text-left">{c.lead_campaign}</td>
                   <td className="px-3 py-3 text-left">{c.first_name}</td>
@@ -294,7 +294,7 @@ export default function CustomerTable({ customers, isLoading }) {
                   <td className="px-3 py-3 text-left">
                     {c.next_followup_time ? (
                       <span className="text-orange-600 font-medium">
-                        {dayjs.utc(c.next_followup_time).format("DD-MMM-YYYY HH:mm")}
+                        {dayjs.utc(c.next_followup_time).format("DD-MM-YYYY HH:mm")}
                       </span>
                     ) : (
                       <span className="text-gray-400">-</span>
@@ -351,7 +351,7 @@ export default function CustomerTable({ customers, isLoading }) {
               <div className="flex justify-between items-center text-gray-500">
                 <span className="text-xs font-medium">#{i + 1}</span>
                 <span className="font-medium text-gray-800">
-                  {dayjs.utc(c.date_created).format("DD-MMM-YYYY HH:mm")}
+                  {dayjs.utc(c.date_created).format("DD-MM-YYYY HH:mm")}
                 </span>
               </div>
               <div className="space-y-1">
@@ -380,7 +380,7 @@ export default function CustomerTable({ customers, isLoading }) {
                   <strong>Next Followup:</strong> 
                   {c.next_followup_time ? (
                     <span className="text-orange-600 font-medium ml-1">
-                      {dayjs.utc(c.next_followup_time).format("DD-MMM-YYYY HH:mm")}
+                      {dayjs.utc(c.next_followup_time).format("DD-MM-YYYY HH:mm")}
                     </span>
                   ) : (
                     <span className="text-gray-400 ml-1">-</span>

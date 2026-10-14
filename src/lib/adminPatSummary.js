@@ -236,7 +236,7 @@ export async function fetchPatExpenseHeadLines(
         { label: "Client", value: line.client_name || "—" },
         {
           label: "Date",
-          value: created?.isValid() ? created.format("DD MMM YYYY") : "—",
+          value: created?.isValid() ? created.format("DD-MM-YYYY") : "—",
         },
         { label: "Head", value: line.headLabel || "—" },
         { label: "Expense ID", value: String(line.expenseId) },
@@ -1026,7 +1026,7 @@ export async function fetchPatExpenseDrillByMonth(conn, dateFrom, dateTo) {
       id: r.id,
       col1: r.expense_name || "—",
       col2: r.client_name || "—",
-      col3: r.head ? String(r.head) : created?.format("DD MMM YYYY") || "—",
+      col3: r.head ? String(r.head) : created?.format("DD-MM-YYYY") || "—",
       amount,
     });
   }

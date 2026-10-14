@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { normalizeRoleKey } from "@/lib/roleKeyUtils";
@@ -36,7 +37,7 @@ function periodLabels(year, month) {
   const start = new Date(year, month - 1, 1);
   const end = new Date(year, month, 0);
   const fmt = (d) =>
-    d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+    formatCrmDateOnly(d);
   return { start_date: fmt(start), end_date: fmt(end) };
 }
 

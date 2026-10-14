@@ -1,5 +1,7 @@
 "use client";
 
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
+
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect } from "react";
 import ManualLeadModal from "@/components/models/ManualLeadModal";
@@ -159,7 +161,7 @@ export default function LeadDistributionPage() {
                   filteredCustomers.map((c, i) => (
                     <tr key={c.customer_id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-3 py-3 text-center">{i + 1}</td>
-                      <td className="px-3 py-3">{new Date(c.date_created).toLocaleDateString()}</td>
+                      <td className="px-3 py-3">{formatCrmDateOnly(c.date_created)}</td>
                       <td className="px-3 py-3">{c.lead_campaign}</td>
                       <td className="px-3 py-3">{c.first_name}</td>
                       <td className="px-3 py-3 whitespace-normal break-words max-w-[240px]">{c.company}</td>

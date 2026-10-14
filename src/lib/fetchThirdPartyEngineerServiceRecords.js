@@ -1,4 +1,5 @@
 import { ensureServiceReportStepsTable } from "@/lib/ensureServiceReportStepsTable";
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
 import { ensureServiceRecordsFollowupColumns } from "@/lib/ensureServiceRecordsFollowupColumns";
 import { ensureServiceRecordsPlannedDateColumn } from "@/lib/ensureServiceRecordsPlannedDateColumn";
 import { ensureServiceRecordsThirdPartyAssignColumns } from "@/lib/ensureServiceRecordsThirdPartyAssignColumns";
@@ -55,7 +56,7 @@ export async function fetchThirdPartyEngineerServiceRecords(conn, engineerId) {
     customer_name: row.customer_name_from_wp || row.contact_person_from_wp || "N/A",
     installed_address: row.installed_address_from_wp || "N/A",
     completed_date: row.completed_date
-      ? new Date(row.completed_date).toLocaleDateString()
+      ? formatCrmDateOnly(row.completed_date)
       : "N/A",
   }));
 }

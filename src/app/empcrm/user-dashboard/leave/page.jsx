@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
 import { useRouter, usePathname } from "next/navigation";
 import {
   Calendar,
@@ -297,13 +298,7 @@ export default function UserLeaveManagement() {
     return colors[type] || "bg-gray-100 text-gray-800";
   };
 
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-IN', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric'
-    });
-  };
+  const formatDate = (dateString) => formatCrmDateOnly(dateString, "-");
 
   const totalDays =
     formData.is_half_day && formData.from_date

@@ -122,8 +122,8 @@ export default function CustomerPaymentBehaviorReport() {
             order.total_amount.toFixed(2),
             order.paid_amount.toFixed(2),
             order.remaining_amount.toFixed(2),
-            order.due_date ? dayjs(order.due_date).format("DD/MM/YYYY") : "N/A",
-            order.payment_date ? dayjs(order.payment_date).format("DD/MM/YYYY") : "N/A",
+            order.due_date ? dayjs(order.due_date).format("DD-MM-YYYY") : "N/A",
+            order.payment_date ? dayjs(order.payment_date).format("DD-MM-YYYY") : "N/A",
             order.days_overdue,
             order.payment_behavior
         ]);
@@ -181,13 +181,13 @@ export default function CustomerPaymentBehaviorReport() {
                 <div>
                     <p className="text-gray-500 text-xs">Due Date</p>
                     <p className="font-medium text-gray-800">
-                        {order.due_date ? dayjs(order.due_date).format("DD/MM/YYYY") : "N/A"}
+                        {order.due_date ? dayjs(order.due_date).format("DD-MM-YYYY") : "N/A"}
                     </p>
                 </div>
                 <div>
                     <p className="text-gray-500 text-xs">Payment Date</p>
                     <p className="font-medium text-gray-800">
-                        {order.payment_date ? dayjs(order.payment_date).format("DD/MM/YYYY") : "N/A"}
+                        {order.payment_date ? dayjs(order.payment_date).format("DD-MM-YYYY") : "N/A"}
                     </p>
                 </div>
             </div>
@@ -433,10 +433,10 @@ export default function CustomerPaymentBehaviorReport() {
                                             ₹{order.remaining_amount.toFixed(2)}
                                         </td>
                                         <td className="px-4 py-3 text-center text-gray-700">
-                                            {order.due_date ? dayjs(order.due_date).format("DD/MM/YYYY") : "N/A"}
+                                            {order.due_date ? dayjs(order.due_date).format("DD-MM-YYYY") : "N/A"}
                                         </td>
                                         <td className="px-4 py-3 text-center text-gray-700">
-                                            {order.payment_date ? dayjs(order.payment_date).format("DD/MM/YYYY") : "N/A"}
+                                            {order.payment_date ? dayjs(order.payment_date).format("DD-MM-YYYY") : "N/A"}
                                         </td>
                                         <td className="px-4 py-3 text-center">
                                             {order.days_overdue > 0 ? (

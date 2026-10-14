@@ -1,5 +1,7 @@
 "use client";
 
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
+
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
@@ -871,7 +873,7 @@ function LinkPaymentModal({
                         {s.trans_id || "—"}
                       </td>
                       <td className="p-3 text-gray-600">
-                        {s.date ? new Date(s.date).toLocaleDateString() : "—"}
+                        {s.date ? formatCrmDateOnly(s.date) : "—"}
                       </td>
                       <td
                         className="p-3 max-w-[400px] truncate text-gray-600"
@@ -1367,7 +1369,7 @@ export default function SparePurchasesPage() {
         row.from_company,
         row.mode_of_transport,
         row.status_label || row.status,
-        new Date(row.created_at).toLocaleDateString(),
+        formatCrmDateOnly(row.created_at),
       ]),
       styles: { fontSize: 8 },
     });

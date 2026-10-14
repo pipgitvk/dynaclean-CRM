@@ -123,7 +123,7 @@ export default function DashboardPage() {
     setIsModalOpen(true);
   };
 
-  const formattedDate = dayjs().format("DD MMM, YYYY");
+  const formattedDate = dayjs().format("DD-MM-YYYY");
 
   const tableData = {
     quotations: data.quotations.map((item) => ({
@@ -145,7 +145,7 @@ export default function DashboardPage() {
       "Customer Name": item.customer_name,
       Mobile: item.mobile,
       Company: item.company,
-      "Demo Date": dayjs(item.demo_date_time).format("DD-MMM-YYYY"),
+      "Demo Date": dayjs(item.demo_date_time).format("DD-MM-YYYY"),
       "Demo Date/Time": item.demo_date_time,
       Address: item.demo_address,
       Username: item.username,

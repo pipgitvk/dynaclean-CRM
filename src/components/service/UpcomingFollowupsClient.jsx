@@ -247,8 +247,8 @@ function HistoryModal({ serialNumber, onClose, onPreviewImage }) {
                       <span className="text-xs text-gray-500">Added by <span className="font-semibold text-gray-700">{rec.added_by}</span></span>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-sm">
-                      <div><span className="text-gray-500">Followed At:</span> <span className="font-medium">{dayjs(rec.followed_at).tz(IST).format("DD/MM/YYYY HH:mm")}</span></div>
-                      <div><span className="text-gray-500">Next Follow-up:</span> <span className="font-medium">{rec.next_followup_date ? dayjs(rec.next_followup_date).tz(IST).format("DD/MM/YYYY HH:mm") : "—"}</span></div>
+                      <div><span className="text-gray-500">Followed At:</span> <span className="font-medium">{dayjs(rec.followed_at).tz(IST).format("DD-MM-YYYY HH:mm")}</span></div>
+                      <div><span className="text-gray-500">Next Follow-up:</span> <span className="font-medium">{rec.next_followup_date ? dayjs(rec.next_followup_date).tz(IST).format("DD-MM-YYYY HH:mm") : "—"}</span></div>
                       {rec.contact && <div><span className="text-gray-500">Contact:</span> <span className="font-medium">{rec.contact}</span></div>}
                       {rec.product_model && <div><span className="text-gray-500">Model:</span> <span className="font-medium">{rec.product_model}</span></div>}
                       {rec.notes && <div className="sm:col-span-2"><span className="text-gray-500">Notes:</span> <span className="font-medium">{rec.notes}</span></div>}
@@ -262,7 +262,7 @@ function HistoryModal({ serialNumber, onClose, onPreviewImage }) {
                         </div>
                       )}
                     </div>
-                    <div className="mt-2 text-xs text-gray-400">Recorded: {dayjs(rec.created_at).tz(IST).format("DD/MM/YYYY HH:mm")}</div>
+                    <div className="mt-2 text-xs text-gray-400">Recorded: {dayjs(rec.created_at).tz(IST).format("DD-MM-YYYY HH:mm")}</div>
                   </div>
                 </li>
               ))}
@@ -378,11 +378,11 @@ export default function UpcomingFollowupsClient({
                     <div className="space-y-1 text-xs text-gray-500 mb-3">
                       <div className="flex items-center gap-1.5">
                         <CalendarDays size={12} />
-                        <span>Last: {dayjs(fu.followed_at).tz(IST).format("DD MMM YYYY, hh:mm A")}</span>
+                        <span>Last: {dayjs(fu.followed_at).tz(IST).format("DD-MM-YYYY hh:mm A")}</span>
                       </div>
                       <div className={`flex items-center gap-1.5 font-semibold ${color.text}`}>
                         <CalendarDays size={12} />
-                        <span>Next: {dayjs(fu.next_followup_date).tz(IST).format("DD MMM YYYY, hh:mm A")}</span>
+                        <span>Next: {dayjs(fu.next_followup_date).tz(IST).format("DD-MM-YYYY hh:mm A")}</span>
                       </div>
                     </div>
 

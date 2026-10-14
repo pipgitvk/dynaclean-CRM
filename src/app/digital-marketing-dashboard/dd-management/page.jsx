@@ -1,5 +1,7 @@
 "use client";
 
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
+
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect, useMemo } from "react";
 import {
@@ -490,7 +492,7 @@ export default function DDManagementPage() {
                                         <td className="px-6 py-4">
                                             <div className="text-xs">
                                                 <div className="font-bold text-gray-800">₹{parseFloat(dd.amount).toLocaleString()}</div>
-                                                <div className="text-gray-500 font-medium">{dayjs(dd.assign_date).format("DD MMM YYYY")}</div>
+                                                <div className="text-gray-500 font-medium">{dayjs(dd.assign_date).format("DD-MM-YYYY")}</div>
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
@@ -526,9 +528,9 @@ export default function DDManagementPage() {
                                                 </div>
                                                 <div className="text-gray-500">
                                                     {dd.type === 'BG' ? (
-                                                        dd.expiry_date ? `Exp: ${dayjs(dd.expiry_date).format("DD MMM YYYY")}` : "No Expiry"
+                                                        dd.expiry_date ? `Exp: ${dayjs(dd.expiry_date).format("DD-MM-YYYY")}` : "No Expiry"
                                                     ) : (
-                                                        dayjs(dd.updated_at).format("DD MMM YYYY")
+                                                        dayjs(dd.updated_at).format("DD-MM-YYYY")
                                                     )}
                                                 </div>
                                             </div>
@@ -1012,7 +1014,7 @@ export default function DDManagementPage() {
                                                     <tr key={s.id} className="hover:bg-gray-50">
                                                         <td className="p-3 font-medium text-gray-600">#{s.id}</td>
                                                         <td className="p-3 font-mono text-xs text-gray-500">{s.trans_id || "—"}</td>
-                                                        <td className="p-3 text-gray-600">{s.date ? new Date(s.date).toLocaleDateString() : "—"}</td>
+                                                        <td className="p-3 text-gray-600">{s.date ? formatCrmDateOnly(s.date) : "—"}</td>
                                                         <td className="p-3 max-w-[400px] truncate text-gray-600" title={s.description || ""}>{s.description || "—"}</td>
                                                         <td className="p-3 font-bold text-red-600">₹{Number(s.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                                                         <td className="p-3">
@@ -1095,7 +1097,7 @@ export default function DDManagementPage() {
                                                     <tr key={s.id} className="hover:bg-gray-50">
                                                         <td className="p-3 font-medium text-gray-600">#{s.id}</td>
                                                         <td className="p-3 font-mono text-xs text-gray-500">{s.trans_id || "—"}</td>
-                                                        <td className="p-3 text-gray-600">{s.date ? new Date(s.date).toLocaleDateString() : "—"}</td>
+                                                        <td className="p-3 text-gray-600">{s.date ? formatCrmDateOnly(s.date) : "—"}</td>
                                                         <td className="p-3 max-w-[400px] truncate text-gray-600" title={s.description || ""}>{s.description || "—"}</td>
                                                         <td className="p-3 font-bold text-green-600">₹{Number(s.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                                                         <td className="p-3">

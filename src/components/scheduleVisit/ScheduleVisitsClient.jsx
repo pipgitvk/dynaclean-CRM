@@ -220,7 +220,7 @@ export default function ScheduleVisitsClient({ dashboardPrefix = "user-dashboard
                   </td>
                   <td className="p-3">
                     {row.scheduled_date
-                      ? dayjs(row.scheduled_date).format("DD MMM YYYY, hh:mm A")
+                      ? dayjs(row.scheduled_date).format("DD-MM-YYYY hh:mm A")
                       : "—"}
                   </td>
                   <td className="p-3"><StatusBadge status={row.visit_status} /></td>
@@ -228,7 +228,7 @@ export default function ScheduleVisitsClient({ dashboardPrefix = "user-dashboard
                   <td className="p-3">{row.visited_by || "—"}</td>
                   <td className="p-3">
                     {row.visit_date
-                      ? dayjs(row.visit_date).format("DD MMM YYYY, hh:mm A")
+                      ? dayjs(row.visit_date).format("DD-MM-YYYY hh:mm A")
                       : "—"}
                   </td>
                   <td className="p-3 max-w-[150px] truncate" title={row.discussion_summary}>

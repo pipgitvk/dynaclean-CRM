@@ -602,7 +602,7 @@ function FailedTransactionSearch({ type = "Credit", onSearch }) {
       const filtered = allStatements.filter((stmt) =>
         String(stmt.trans_id).toLowerCase().includes(lowerValue) ||
         String(stmt.amount).includes(value) ||
-        dayjs(stmt.date).format("DD/MM/YYYY").includes(value)
+        dayjs(stmt.date).format("DD-MM-YYYY").includes(value)
       );
       
       const uniqueSuggestions = [...new Set(
@@ -632,7 +632,7 @@ function FailedTransactionSearch({ type = "Credit", onSearch }) {
     const filtered = allStatements.filter((stmt) =>
       String(stmt.trans_id).toLowerCase().includes(lowerValue) ||
       String(stmt.amount).includes(suggestion) ||
-      dayjs(stmt.date).format("DD/MM/YYYY").includes(suggestion)
+      dayjs(stmt.date).format("DD-MM-YYYY").includes(suggestion)
     );
     onSearch(filtered, true);
   };
@@ -685,7 +685,7 @@ function FailedTransactionSearch({ type = "Credit", onSearch }) {
             </div>
             <div>
               <label className="block text-xs font-semibold text-gray-600 mb-1">Date</label>
-              <div className="px-4 py-2 bg-gray-50 rounded border">{dayjs(selectedStatement.date).format("DD MMM YYYY")}</div>
+              <div className="px-4 py-2 bg-gray-50 rounded border">{dayjs(selectedStatement.date).format("DD-MM-YYYY")}</div>
             </div>
             <div>
               <label className="block text-xs font-semibold text-gray-600 mb-1">Type</label>
@@ -752,7 +752,7 @@ function CancelledTransactionSearch({ type = "Credit", onSearch }) {
       const filtered = allStatements.filter((stmt) =>
         String(stmt.trans_id).toLowerCase().includes(lowerValue) ||
         String(stmt.amount).includes(value) ||
-        dayjs(stmt.date).format("DD/MM/YYYY").includes(value)
+        dayjs(stmt.date).format("DD-MM-YYYY").includes(value)
       );
       
       const uniqueSuggestions = [...new Set(
@@ -829,7 +829,7 @@ function CancelledTransactionSearch({ type = "Credit", onSearch }) {
             </div>
             <div>
               <label className="block text-xs font-semibold text-gray-600 mb-1">Date</label>
-              <div className="px-4 py-2 bg-gray-50 rounded border">{dayjs(selectedStatement.date).format("DD MMM YYYY")}</div>
+              <div className="px-4 py-2 bg-gray-50 rounded border">{dayjs(selectedStatement.date).format("DD-MM-YYYY")}</div>
             </div>
             <div>
               <label className="block text-xs font-semibold text-gray-600 mb-1">Type</label>
@@ -1088,7 +1088,7 @@ function AllStatementsTable({ type = "Credit", statementType = "failed_transacti
                   <tr key={stmt.id} className={`border-t hover:bg-gray-50 ${isSelected ? 'bg-yellow-50' : ''}`}>
                     <td className="px-4 py-2 text-sm text-gray-600">{stmt.id}</td>
                     <td className="px-4 py-2 font-medium">{stmt.trans_id}</td>
-                    <td className="px-4 py-2">{dayjs(stmt.date).format("DD MMM YYYY")}</td>
+                    <td className="px-4 py-2">{dayjs(stmt.date).format("DD-MM-YYYY")}</td>
                     <td className="px-4 py-2">₹{Number(stmt.amount).toFixed(2)}</td>
                     <td className="px-4 py-2 text-center">
                       <button

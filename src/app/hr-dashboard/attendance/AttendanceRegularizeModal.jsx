@@ -1,5 +1,7 @@
 "use client";
 
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
+
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import {
@@ -116,7 +118,7 @@ export default function AttendanceRegularizeModal({
           <p className="text-sm text-gray-600">
             Date:{" "}
             <span className="font-medium text-gray-900">
-              {new Date(log.date).toLocaleDateString()}
+              {formatCrmDateOnly(log.date)}
             </span>
             {forUsername ? (
               <>

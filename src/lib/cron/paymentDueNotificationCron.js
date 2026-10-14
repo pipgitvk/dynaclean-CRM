@@ -93,7 +93,7 @@ async function sendPaymentDueNotifications() {
         }
 
         const daysUntilDue = dayjs(order.duedate).diff(today, 'day');
-        const dueDateFormatted = dayjs(order.duedate).format("DD MMM YYYY");
+        const dueDateFormatted = dayjs(order.duedate).format("DD-MM-YYYY");
         
         const totalAmt = parseFloat(order.totalamt || 0);
         const paidAmt = (order.payment_amount || "")

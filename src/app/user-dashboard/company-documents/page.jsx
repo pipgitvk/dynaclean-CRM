@@ -1,5 +1,7 @@
 "use client";
 
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
+
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect } from "react";
 import { toast } from "react-hot-toast";
@@ -218,7 +220,7 @@ export default function CompanyDocumentsPage() {
   // Format date
   const formatDate = (dateString) => {
     if (!dateString) return "Lifetime";
-    return new Date(dateString).toLocaleDateString();
+    return formatCrmDateOnly(dateString);
   };
 
   // Filter documents based on search
@@ -518,7 +520,7 @@ export default function CompanyDocumentsPage() {
                       <div className="flex items-center">
                         <Clock className="w-4 h-4 text-gray-400 mr-2" />
                         <span className="text-sm text-gray-900">
-                          {new Date(document.created_at).toLocaleDateString()}
+                          {formatCrmDateOnly(document.created_at)}
                         </span>
                       </div>
                     </td>

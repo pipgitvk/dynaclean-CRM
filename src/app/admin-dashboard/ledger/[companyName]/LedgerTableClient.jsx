@@ -151,13 +151,13 @@ export default function LedgerTableClient({
     csvLines.push(`"${companyName}"`);
     if (customerId) csvLines.push(`"Customer ID: ${customerId}"`);
     csvLines.push("");
-    csvLines.push(`"Period: ${dayjs(dateFrom).format("DD-MMM-YY")} to ${dayjs(dateTo).format("DD-MMM-YY")}"`);
+    csvLines.push(`"Period: ${dayjs(dateFrom).format("DD-MM-YYYY")} to ${dayjs(dateTo).format("DD-MM-YYYY")}"`);
     csvLines.push("");
     csvLines.push(["Date", "Particulars", "Vch Type", "Vch No", "Debit (₹)", "Credit (₹)"].map((h) => `"${h}"`).join(","));
 
     filtered.forEach((r) => {
       csvLines.push([
-        `"${dayjs(r.entry_date).format("DD/MM/YYYY")}"`,
+        `"${dayjs(r.entry_date).format("DD-MM-YYYY")}"`,
         `"${(r.particulars || "").replace(/"/g, '""')}"`,
         `"${r.vch_type || ""}"`,
         `"${r.vch_no || ""}"`,
@@ -420,7 +420,7 @@ export default function LedgerTableClient({
               filtered.map((row) => (
                 <tr key={row.id} className="bg-white hover:bg-blue-50 transition-colors">
                   <td className="px-4 py-3 whitespace-nowrap text-gray-700">
-                    {dayjs(row.entry_date).format("DD MMM YYYY")}
+                    {dayjs(row.entry_date).format("DD-MM-YYYY")}
                   </td>
                   <td className="px-4 py-3 text-gray-800 max-w-xs break-all">{row.particulars}</td>
                   <td className="px-4 py-3 whitespace-nowrap"><VchBadge type={row.vch_type} /></td>
@@ -477,7 +477,7 @@ export default function LedgerTableClient({
                 <div>
                   <p className="font-semibold text-gray-800">{row.particulars}</p>
                   <p className="text-xs text-gray-500 mt-0.5">
-                    {dayjs(row.entry_date).format("DD MMM YYYY")}
+                    {dayjs(row.entry_date).format("DD-MM-YYYY")}
                   </p>
                 </div>
               </div>

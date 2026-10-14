@@ -1,5 +1,7 @@
 "use client";
 
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
+
 import { useEffect, useMemo, useState } from "react";
 import { Eye, Search, ArrowRightLeft, History, X, PackageX, AlertTriangle, Plus, Edit, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
 import Link from "next/link";
@@ -517,11 +519,7 @@ function ProductStockList() {
       const displayStatus =
         incomingStatus || (isZero ? "Zero Stock" : "Low Stock");
       const incomingDateLabel = incomingDate
-        ? new Date(incomingDate).toLocaleDateString("en-IN", {
-            day: "2-digit",
-            month: "short",
-            year: "numeric",
-          })
+        ? new formatCrmDateOnly(Date(incomingDate))
         : "";
 
       return {
@@ -1326,7 +1324,7 @@ function ProductStockList() {
                       {row.location || '-'}
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
-                      {row.updated_at ? new Date(row.updated_at).toLocaleDateString() : '-'}
+                      {row.updated_at ? formatCrmDateOnly(row.updated_at) : '-'}
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
                       <div className="flex gap-2">

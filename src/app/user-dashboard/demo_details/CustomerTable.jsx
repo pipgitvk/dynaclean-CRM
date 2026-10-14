@@ -225,7 +225,7 @@ export default function CustomerTable({ rows, searchParams }) {
                     {item.demo_address}
                   </td>
                   <td className="p-3">
-                    {dayjs(item.demo_date_time).format("DD MMM YYYY hh:mm A")}
+                    {dayjs(item.demo_date_time).format("DD-MM-YYYY hh:mm A")}
                   </td>
                   <td className="p-3 hidden xl:table-cell">{item.machine1}</td>
                   <td className="p-3">{item.demo_status || "Pending"}</td>
@@ -237,12 +237,12 @@ export default function CustomerTable({ rows, searchParams }) {
                   </td>
                   <td className="p-3">
                     {item.postponed_date
-                      ? dayjs(item.postponed_date).format("DD MMM YYYY")
+                      ? dayjs(item.postponed_date).format("DD-MM-YYYY")
                       : "-"}
                   </td>
                   <td className="p-3">
                     {item.demo_completion_date
-                      ? dayjs(item.demo_completion_date).format("DD MMM YYYY")
+                      ? dayjs(item.demo_completion_date).format("DD-MM-YYYY")
                       : "-"}
                   </td>
                   <td className="p-3">

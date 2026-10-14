@@ -11,7 +11,7 @@ import {
 
 function formatDt(value) {
   if (!value) return "—";
-  return dayjs(value).format("DD MMM YYYY, hh:mm A");
+  return dayjs(value).format("DD-MM-YYYY hh:mm A");
 }
 
 export default function ThirdPartyEngineerFollowupPanel({ engineerId, engineerName }) {

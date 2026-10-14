@@ -1,4 +1,5 @@
 import { getDbConnection } from "@/lib/db";
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
 import { getSessionPayload } from "@/lib/auth";
 import AddSpecialPriceModal from "@/components/specialPrice/AddSpecialPriceModal";
 import RequestDealerPriceModal from "@/components/specialPrice/RequestDealerPriceModal";
@@ -302,7 +303,7 @@ export default async function CustomerSpecialPrice({ params }) {
 
                     {/* Set Date */}
                     <td className="p-3 text-sm text-gray-500">
-                      {new Date(row.set_date).toLocaleDateString()}
+                      {formatCrmDateOnly(row.set_date)}
                     </td>
 
                     {/* Actions */}

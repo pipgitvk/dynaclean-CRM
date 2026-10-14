@@ -1,6 +1,7 @@
 "use client";
 
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
 import { Suspense, useEffect, useState, useCallback } from "react";
 import ManualFilterSearchButton, {
   MANUAL_FILTER_HINT,
@@ -413,13 +414,7 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
     (showStepVideos ? 1 : 0) +
     (showServiceFollowupColumn ? 1 : 0);
 
-  // Helper: format dates safely
-  const formatDate = (value) => {
-    if (!value) return "";
-    if (value instanceof Date) return value.toDateString();
-    if (!isNaN(Date.parse(value))) return new Date(value).toDateString();
-    return value;
-  };
+  const formatDate = (value) => formatCrmDateOnly(value, "");
 
   const plannedDateForInput = (value) => {
     if (!value) return "";

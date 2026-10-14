@@ -16,7 +16,7 @@ export default function OtherIncomeTable({ rows, role }) {
   // Filter rows based on search, status, and date range
   const filteredRows = rows.filter((row) => {
     const totalIncome = Number(row.amount || 0) + Number(row.gst_amount || 0);
-    const formattedDate = dayjs(row.income_date).format("DD MMM YYYY");
+    const formattedDate = dayjs(row.income_date).format("DD-MM-YYYY");
 
     const matchesSearch =
       Object.values(row)
@@ -155,7 +155,7 @@ export default function OtherIncomeTable({ rows, role }) {
               sortedRows.map((row, idx) => (
                 <tr key={row.id || idx} className="border-b hover:bg-gray-50">
                   <td className="px-4 py-3 text-gray-700">
-                    {dayjs(row.income_date).format("DD MMM YYYY")}
+                    {dayjs(row.income_date).format("DD-MM-YYYY")}
                   </td>
                   <td className="px-4 py-3 text-gray-700 font-medium">{row.income_name}</td>
                   <td className="px-4 py-3 text-gray-700">{row.income_source}</td>

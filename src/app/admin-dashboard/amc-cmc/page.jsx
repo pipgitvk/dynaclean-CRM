@@ -1,5 +1,7 @@
 "use client";
 
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
+
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { Search, Edit, Trash2, CheckCircle, Eye, X, ClipboardList, History } from "lucide-react";
@@ -157,8 +159,8 @@ function HistoryModal({ serialNumber, onClose }) {
                   <div className={`p-4 rounded-lg border ${idx === 0 ? "bg-purple-50 border-purple-200" : "bg-gray-50 border-gray-200"}`}>
                     <div className="text-xs text-gray-500">#{rec.id} by <span className="font-semibold">{rec.added_by}</span></div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-sm mt-2">
-                      <div><span className="text-gray-500">Followed At:</span> <span className="font-medium">{dayjs(rec.followed_at).tz(IST).format("DD/MM/YYYY HH:mm")}</span></div>
-                      <div><span className="text-gray-500">Next Follow-up:</span> <span className="font-medium">{rec.next_followup_date ? dayjs(rec.next_followup_date).tz(IST).format("DD/MM/YYYY HH:mm") : "—"}</span></div>
+                      <div><span className="text-gray-500">Followed At:</span> <span className="font-medium">{dayjs(rec.followed_at).tz(IST).format("DD-MM-YYYY HH:mm")}</span></div>
+                      <div><span className="text-gray-500">Next Follow-up:</span> <span className="font-medium">{rec.next_followup_date ? dayjs(rec.next_followup_date).tz(IST).format("DD-MM-YYYY HH:mm") : "—"}</span></div>
                       {rec.notes && <div className="sm:col-span-2"><span className="text-gray-500">Notes:</span> <span className="font-medium">{rec.notes}</span></div>}
                     </div>
                   </div>
@@ -405,8 +407,8 @@ export default function AMCCMCPage() {
                   <td className="p-3">{record.company_name}</td>
                   <td className="p-3">{record.contact || "—"}</td>
                   <td className="p-3 text-sm">
-                    {new Date(record.amc_start_datetime).toLocaleDateString()} -{" "}
-                    {new Date(record.amc_end_datetime).toLocaleDateString()}
+                    {formatCrmDateOnly(record.amc_start_datetime)} -{" "}
+                    {formatCrmDateOnly(record.amc_end_datetime)}
                   </td>
                   <td className="p-3">
                     <span
@@ -418,7 +420,7 @@ export default function AMCCMCPage() {
                     </span>
                   </td>
                   <td className="p-3 text-sm">
-                    {new Date(record.created_time).toLocaleDateString()}
+                    {formatCrmDateOnly(record.created_time)}
                   </td>
                   <td className="p-3 text-center">
                     <Link

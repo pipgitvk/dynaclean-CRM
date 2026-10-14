@@ -1,6 +1,7 @@
 "use client";
 
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
 import { useState, useEffect } from "react";
 import { 
   Calendar, 
@@ -444,13 +445,7 @@ export default function AdminLeaveManagement() {
     return `${y}-${m}-${day}`;
   };
 
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-IN', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric'
-    });
-  };
+  const formatDate = (dateString) => formatCrmDateOnly(dateString, "-");
 
   const employeeFilterOptions = (() => {
     const placeholder = { value: "", label: "All employees" };

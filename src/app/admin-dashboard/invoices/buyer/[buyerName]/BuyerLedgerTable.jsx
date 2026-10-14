@@ -269,7 +269,7 @@ export default function BuyerLedgerTable({ rows: initialRows, buyerName, billing
     filtered.forEach((r) => {
       csvLines.push(
         [
-          `"${dayjs(r.entry_date).format("DD/MM/YYYY")}"`,
+          `"${dayjs(r.entry_date).format("DD-MM-YYYY")}"`,
           `"${String(r.particulars || "").replace(/"/g, '""')}"`,
           `"${r.vch_type || ""}"`,
           `"${r.vch_no || ""}"`,
@@ -655,7 +655,7 @@ left("Closing Balance", col.particulars, y, 9, true);
                   className="bg-white hover:bg-blue-50 transition-colors"
                 >
                   <td className="px-4 py-3 whitespace-nowrap text-gray-700">
-                    {dayjs(row.entry_date).format("DD MMM YYYY")}
+                    {dayjs(row.entry_date).format("DD-MM-YYYY")}
                   </td>
 
                   <td className="px-4 py-3 text-gray-800 max-w-xs break-all">
@@ -762,7 +762,7 @@ left("Closing Balance", col.particulars, y, 9, true);
                   </p>
 
                   <p className="text-xs text-gray-500 mt-0.5">
-                    {dayjs(row.entry_date).format("DD MMM YYYY")}
+                    {dayjs(row.entry_date).format("DD-MM-YYYY")}
                   </p>
                 </div>
 

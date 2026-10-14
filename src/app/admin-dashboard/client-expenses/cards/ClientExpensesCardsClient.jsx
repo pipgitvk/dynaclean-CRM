@@ -1,5 +1,7 @@
 "use client";
 
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
+
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import Link from "next/link";
 import { useMemo, useState, useEffect } from "react";
@@ -468,11 +470,7 @@ export default function ClientExpensesCardsClient({ rows }) {
                     </td>
                     <td className="p-3 text-gray-600 whitespace-nowrap">
                       {row.created_at
-                        ? new Date(row.created_at).toLocaleDateString("en-IN", {
-                            day: "2-digit",
-                            month: "short",
-                            year: "numeric",
-                          })
+                        ? new formatCrmDateOnly(Date(row.created_at))
                         : "—"}
                     </td>
                     <td className="p-3">

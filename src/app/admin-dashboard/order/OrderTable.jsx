@@ -880,8 +880,8 @@ export default function OrderTable({ orders, userRole }) {
           item_code: order.item_code || "",
           created_by: order.created_by || "",
           lead_campaign: formatLeadCampaignLabel(order.lead_campaign),
-          created_at: order.created_at ? dayjs(order.created_at).format("DD/MM/YYYY HH:mm:ss") : "",
-          duedate: order.duedate ? dayjs(order.duedate).format("DD/MM/YYYY") : "",
+          created_at: order.created_at ? dayjs(order.created_at).format("DD-MM-YYYY HH:mm:ss") : "",
+          duedate: order.duedate ? dayjs(order.duedate).format("DD-MM-YYYY") : "",
           payment_status: order.payment_status || "",
           approval_status: order.approval_status || "",
           baseAmount: Number(order.baseAmount || 0),
@@ -2292,7 +2292,7 @@ export default function OrderTable({ orders, userRole }) {
                       {r.created_by}
                     </td>
                     <td className="px-3 py-3 text-left">
-                      {dayjs(r.created_at).format("DD/MM/YYYY")}
+                      {dayjs(r.created_at).format("DD-MM-YYYY")}
                     </td>
                     <td className="px-3 py-3 text-left text-xs font-medium text-indigo-800">
                       {formatLeadCampaignLabel(r.lead_campaign)}
@@ -2396,7 +2396,7 @@ export default function OrderTable({ orders, userRole }) {
                       </div>
                     </td>
                     <td className="px-3 py-3 text-center">
-                      {dayjs(r.duedate).format("DD/MM/YYYY")}
+                      {dayjs(r.duedate).format("DD-MM-YYYY")}
                     </td>
                     <td className="px-3 py-3 space-x-2 flex items-center justify-center relative">
                       <ActionButtons
@@ -2435,7 +2435,7 @@ export default function OrderTable({ orders, userRole }) {
                   <span className="text-xs text-gray-500">#{i + 1}</span>
                   <div className="flex items-center gap-2 flex-wrap justify-end min-w-0">
                     <span className="font-medium text-gray-800 text-xs shrink-0">
-                      {dayjs(r.created_at).format("DD/MM/YYYY")}
+                      {dayjs(r.created_at).format("DD-MM-YYYY")}
                     </span>
                     <span
                       className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium shrink-0 ${status.bg} ${status.textCol}`}
@@ -2506,7 +2506,7 @@ export default function OrderTable({ orders, userRole }) {
                   <strong>Location:</strong> {r.state}
                 </div>
                 <div>
-                  <strong>Due Date:</strong> {dayjs(r.duedate).format("DD/MM/YYYY")}
+                  <strong>Due Date:</strong> {dayjs(r.duedate).format("DD-MM-YYYY")}
                 </div>
                 <div>
                   <strong>Total Amount:</strong> ₹{getTotalAmount(r).toLocaleString("en-IN", {
@@ -3171,7 +3171,7 @@ function EditPaymentButton({ order }) {
   const formatPrevDate = (d) => {
     if (!d) return "-";
     const v = dayjs(d);
-    return v.isValid() ? v.format("DD/MM/YYYY") : d;
+    return v.isValid() ? v.format("DD-MM-YYYY") : d;
   };
 
   const totalPaid = prevAmounts

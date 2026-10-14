@@ -279,7 +279,7 @@ export default function CustomerTable({
                   <td className="px-4 py-2">{r.stage}</td>
                   <td className="px-4 py-2">{r.notes}</td>
                   <td className="px-4 py-2">
-                    {dayjs(r.date_created).format("DD MMM YYYY HH:mm")}
+                    {dayjs(r.date_created).format("DD-MM-YYYY HH:mm")}
                   </td>
                   <td className="px-4 py-2">{r.products_interest}</td>
                   <td className="px-4 py-2 flex items-center gap-2 justify-center text-gray-600">
@@ -359,7 +359,7 @@ export default function CustomerTable({
               </div>
               <div>
                 <span className="font-semibold">Created:</span>{" "}
-                {dayjs(r.date_created).format("DD MMM YYYY HH:mm")}
+                {dayjs(r.date_created).format("DD-MM-YYYY HH:mm")}
               </div>
               <div>
                 <span className="font-semibold">Products Interest:</span> {r.products_interest}

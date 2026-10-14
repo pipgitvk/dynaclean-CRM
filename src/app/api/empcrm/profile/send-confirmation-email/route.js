@@ -4,6 +4,7 @@ import nodemailer from "nodemailer";
 import path from "path";
 import { readFile } from "fs/promises";
 import { buildEmploymentConfirmationEmail } from "@/lib/emailTemplates/employmentConfirmationBuilder";
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
 
 /**
  * Send employment confirmation letter email to both personal and professional email
@@ -68,15 +69,7 @@ export async function POST(request) {
     const employee = employeeData?.[0] || {};
     
     // Format dates
-    const formatDate = (dateStr) => {
-      if (!dateStr) return 'N/A';
-      const date = new Date(dateStr);
-      return date.toLocaleDateString('en-IN', { 
-        year: 'numeric', 
-        month: '2-digit', 
-        day: '2-digit' 
-      }).split('/').reverse().join('-');
-    };
+    const formatDate = (dateStr) => formatCrmDateOnly(dateStr, "N/A");
 
     // Build confirmation email using template
     const confirmationData = {

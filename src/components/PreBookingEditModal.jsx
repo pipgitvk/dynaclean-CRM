@@ -43,7 +43,7 @@ function buildDisplayDetails(booking) {
     leadSource: booking.lead_source || "-",
     productName: booking.product_name || "-",
     expectedDate: booking.expected_date
-      ? dayjs(booking.expected_date).format("DD MMM YYYY")
+      ? dayjs(booking.expected_date).format("DD-MM-YYYY")
       : "-",
   };
 }

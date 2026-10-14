@@ -1,5 +1,7 @@
 "use client";
 
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
+
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import ApprovedPriceListPdfButton from "@/components/specialPrice/ApprovedPriceListPdfButton";
@@ -159,7 +161,7 @@ export default function CustomerSpecialPriceTable({
                   <td className="p-3">{row.set_by_name || row.set_by}</td>
                   <td className="p-3 text-sm text-gray-500">
                     {row.set_date
-                      ? new Date(row.set_date).toLocaleDateString()
+                      ? formatCrmDateOnly(row.set_date)
                       : "—"}
                   </td>
                   <td className="p-3 text-center">

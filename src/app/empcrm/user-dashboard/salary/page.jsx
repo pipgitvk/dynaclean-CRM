@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
 import { Calendar, Download, Eye, AlertCircle, CheckCircle, Clock, FileText } from "lucide-react";
 import toast from "react-hot-toast";
 import { generatePayslipPDF, downloadPayslip } from "@/utils/payslipGenerator";
@@ -298,7 +299,7 @@ const SalaryPage = () => {
                       }
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {new Date(deduction.effective_from).toLocaleDateString()}
+                      {formatCrmDateOnly(deduction.effective_from)}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-500">
                       {deduction.reason || '-'}

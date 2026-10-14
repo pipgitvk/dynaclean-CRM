@@ -226,7 +226,7 @@ export default function PaymentTable({ rows, role }) {
                                     {row.payment_method}
                                 </td>
                                 <td className="px-4 py-3 text-sm text-gray-700">
-                                    {row.payment_date ? dayjs.utc(row.payment_date).format("DD MMM YYYY") : "-"}
+                                    {row.payment_date ? dayjs.utc(row.payment_date).format("DD-MM-YYYY") : "-"}
                                 </td>
                                 <td className="px-4 py-3">
                                     <span className={`px-2 py-1 text-xs font-medium rounded-full border ${getStatusBadge(row.status)}`}>
@@ -312,7 +312,7 @@ export default function PaymentTable({ rows, role }) {
                             <div>
                                 <span className="text-gray-600">Date:</span>
                                 <p className="text-gray-900">
-                                    {row.payment_date ? dayjs.utc(row.payment_date).format("DD MMM YYYY") : "-"}
+                                    {row.payment_date ? dayjs.utc(row.payment_date).format("DD-MM-YYYY") : "-"}
                                 </p>
                             </div>
                         </div>

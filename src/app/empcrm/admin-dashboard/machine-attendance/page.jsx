@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { Loader2, RefreshCw, Search } from "lucide-react";
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
+import dayjs from "dayjs";
+import { CRM_DATETIME_24_FORMAT, formatCrmDateOnly } from "@/lib/crmDateFormat";
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 200];
 
@@ -21,29 +23,7 @@ function currentMonthRange() {
 }
 
 function formatDateOnly(value) {
-  if (!value) return "—";
-  const d = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(d.getTime())) {
-    const s = String(value).trim();
-    const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-    if (m) {
-      return new Date(
-        parseInt(m[1], 10),
-        parseInt(m[2], 10) - 1,
-        parseInt(m[3], 10)
-      ).toLocaleDateString("en-IN", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      });
-    }
-    return s;
-  }
-  return d.toLocaleDateString("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
+  return formatCrmDateOnly(value);
 }
 
 function formatTimesCell(value) {
@@ -65,14 +45,7 @@ function formatPunchDisplay(value) {
     parseInt(m[6], 10)
   );
   if (Number.isNaN(d.getTime())) return s;
-  return d.toLocaleString("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  });
+  return dayjs(d).format(`${CRM_DATETIME_24_FORMAT}:ss`);
 }
 
 export default function MachineAttendancePage() {

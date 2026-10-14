@@ -20,7 +20,7 @@ function statusBadgeClass(status) {
 
 function CompactTaskRow({ task, variant = "default", bgColor }) {
   const dueLabel = task.next_followup_date
-    ? dayjs(task.next_followup_date).format("DD MMM, YYYY hh:mm A")
+    ? dayjs(task.next_followup_date).format("DD-MM-YYYY hh:mm A")
     : "Not set";
 
   if (variant === "sales") {
@@ -232,13 +232,13 @@ export default async function UpcomingTasks({
                   dueDate={
                     task.next_followup_date
                       ? dayjs(task.next_followup_date).format(
-                          "DD MMM, YYYY hh:mm A"
+                          "DD-MM-YYYY hh:mm A"
                         )
                       : "Not set"
                   }
                   assignDate={
                     task.followed_date
-                      ? dayjs(task.followed_date).format("DD MMM, YYYY hh:mm A")
+                      ? dayjs(task.followed_date).format("DD-MM-YYYY hh:mm A")
                       : "Unknown"
                   }
                   assignedBy={task.createdby || "Unknown"}

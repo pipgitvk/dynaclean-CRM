@@ -1,5 +1,7 @@
 "use client";
 
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
+
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect } from "react";
 import { toast } from "react-hot-toast";
@@ -197,7 +199,7 @@ export default function SpareWarehouseInForm() {
                   </p>
 
                   <p className="text-xs text-gray-400 mt-1">
-                    {new Date(req.created_at).toLocaleDateString()}
+                    {formatCrmDateOnly(req.created_at)}
                   </p>
                 </div>
               </div>
@@ -236,7 +238,7 @@ export default function SpareWarehouseInForm() {
                       <td className="p-2">{req.quantity}</td>
                       <td className="p-2">{req.from_company || "N/A"}</td>
                       <td className="p-2">
-                        {new Date(req.created_at).toLocaleDateString()}
+                        {formatCrmDateOnly(req.created_at)}
                       </td>
                     </tr>
                   ))}
@@ -353,9 +355,7 @@ export default function SpareWarehouseInForm() {
                   Request Date
                 </label>
                 <input
-                  value={new Date(
-                    selectedRequest.created_at
-                  ).toLocaleDateString()}
+                  value={formatCrmDateOnly(selectedRequest.created_at)}
                   disabled
                   className="w-full border p-2 rounded bg-white"
                 />

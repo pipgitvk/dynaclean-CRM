@@ -2,6 +2,7 @@
 "use client";
 
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
 import toast from "react-hot-toast";
@@ -493,7 +494,7 @@ const AttendancePage = () => {
                     Date:
                   </span>
                   <span className="text-sm text-gray-700">
-                    {new Date(log.date).toLocaleDateString()}
+                    {formatCrmDateOnly(log.date)}
                   </span>
                 </div>
                 {log.type === "present" ? (
@@ -652,7 +653,7 @@ const AttendancePage = () => {
                     className="hover:bg-gray-50 transition-colors duration-150"
                   >
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {new Date(log.date).toLocaleDateString()}
+                      {formatCrmDateOnly(log.date)}
                     </td>
                     {log.type === "present" ? (
                       <>
@@ -834,7 +835,7 @@ const AttendancePage = () => {
                 {holidays.map((h) => (
                   <li key={h.id} className="py-2">
                     <p className="font-medium">{h.title}</p>
-                    <p className="text-sm text-gray-600">{new Date(h.holiday_date).toLocaleDateString()} {h.is_optional ? "(Optional)" : ""}</p>
+                    <p className="text-sm text-gray-600">{formatCrmDateOnly(h.holiday_date)} {h.is_optional ? "(Optional)" : ""}</p>
                     {h.description ? (
                       <p className="text-sm text-gray-500">{h.description}</p>
                     ) : null}

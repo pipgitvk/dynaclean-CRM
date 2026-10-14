@@ -9,7 +9,7 @@ import RecurringTaskForm from "@/components/recurring-tasks/RecurringTaskForm";
 function formatDateTime(value) {
   if (!value) return "-";
   const d = dayjs(value);
-  return d.isValid() ? d.format("DD MMM YYYY HH:mm") : "-";
+  return d.isValid() ? d.format("DD-MM-YYYY HH:mm") : "-";
 }
 
 function frequencyLabel(task) {

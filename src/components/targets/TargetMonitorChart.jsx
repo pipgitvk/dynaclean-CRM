@@ -1,5 +1,7 @@
 "use client";
 
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
+
 import { useState, useEffect } from "react";
 import {
   BarChart,
@@ -15,10 +17,7 @@ import {
 const formatShortDate = (dateString) => {
   if (!dateString) return "";
   const date = new Date(dateString);
-  return date.toLocaleDateString("en-GB", {
-    day: "2-digit",
-    month: "short",
-  });
+  return formatCrmDateOnly(date);
 };
 
 const formatCompact = (n) => {

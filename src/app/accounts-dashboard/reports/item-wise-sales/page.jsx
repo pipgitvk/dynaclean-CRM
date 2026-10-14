@@ -168,7 +168,7 @@ export default function ItemWiseSalesPage() {
                           {row.lead_source || "—"}
                         </td>
                         <td className="px-3 py-3 whitespace-nowrap text-gray-600">
-                          {row.order_date ? dayjs(row.order_date).format("DD MMM YYYY") : "—"}
+                          {row.order_date ? dayjs(row.order_date).format("DD-MM-YYYY") : "—"}
                         </td>
                         <td className="px-3 py-3 text-gray-900 max-w-[140px]">
                           <span className="line-clamp-2" title={row.model}>
@@ -232,7 +232,7 @@ export default function ItemWiseSalesPage() {
                     data.map((row, index) => (
                       <tr key={index}>
                         <td className="px-2 py-2 align-top whitespace-nowrap">
-                          {row.order_date ? dayjs(row.order_date).format("DD MMM YY") : "—"}
+                          {row.order_date ? dayjs(row.order_date).format("DD-MM-YYYY") : "—"}
                         </td>
                         <td className="px-2 py-2 align-top">
                           <div className="font-medium">{row.customer_name}</div>
@@ -270,7 +270,7 @@ export default function ItemWiseSalesPage() {
                 <div key={index} className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 space-y-3">
                   <div className="flex justify-between gap-2">
                     <span className="text-xs text-gray-500">
-                      {row.order_date ? dayjs(row.order_date).format("DD MMM YYYY") : "—"}
+                      {row.order_date ? dayjs(row.order_date).format("DD-MM-YYYY") : "—"}
                     </span>
                     <span className="text-xs font-medium text-gray-700 capitalize">
                       {row.payment_status || "—"}

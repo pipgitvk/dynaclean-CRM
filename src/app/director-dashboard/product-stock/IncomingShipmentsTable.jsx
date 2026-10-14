@@ -1,5 +1,7 @@
 "use client";
 
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
+
 import { useState, useMemo } from "react";
 import { Search, Edit, Trash2, Eye } from "lucide-react";
 
@@ -70,11 +72,7 @@ export default function IncomingShipmentsTable({
   const formatDate = (dateString) => {
     if (!dateString) return "—";
     const date = new Date(dateString);
-    return date.toLocaleDateString("en-IN", {
-      year: "numeric",
-      month: "short",
-      day: "numeric"
-    });
+    return formatCrmDateOnly(date);
   };
 
   const handleDeleteClick = (shipment) => {

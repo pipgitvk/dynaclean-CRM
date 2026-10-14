@@ -106,9 +106,9 @@ export default function PaymentPendingReport() {
       order.total_amount.toFixed(2),
       order.paid_amount.toFixed(2),
       order.remaining_amount.toFixed(2),
-      dayjs(order.due_date).format("DD/MM/YYYY"),
+      dayjs(order.due_date).format("DD-MM-YYYY"),
       order.latest_deduction || "",
-      order.next_followup_date ? dayjs(order.next_followup_date).format("DD/MM/YYYY hh:mm A") : ""
+      order.next_followup_date ? dayjs(order.next_followup_date).format("DD-MM-YYYY hh:mm A") : ""
     ]);
 
     const csvContent = [
@@ -433,7 +433,7 @@ export default function PaymentPendingReport() {
                         <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
                           isOverdue ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
                         }`}>
-                          {dayjs(order.due_date).format("DD/MM/YYYY")}
+                          {dayjs(order.due_date).format("DD-MM-YYYY")}
                           {isOverdue && " ⚠️"}
                         </span>
                       </td>
@@ -453,7 +453,7 @@ export default function PaymentPendingReport() {
                       </td>
                       <td className="px-4 py-3 border-b text-center text-gray-700">
                         {order.next_followup_date
-                          ? dayjs(order.next_followup_date).format("DD/MM/YYYY hh:mm A")
+                          ? dayjs(order.next_followup_date).format("DD-MM-YYYY hh:mm A")
                           : "-"}
                       </td>
                       <td className="px-4 py-3 border-b">
@@ -765,14 +765,14 @@ function HistoryModal({ open, onClose, order }) {
                       {f.created_by || "Unknown"}
                     </div>
                     <div className="text-xs text-gray-600">
-                      {f.created_at ? dayjs(f.created_at).format("DD/MM/YYYY hh:mm A") : ""}
+                      {f.created_at ? dayjs(f.created_at).format("DD-MM-YYYY hh:mm A") : ""}
                     </div>
                   </div>
                   <div className="mt-2 text-sm text-gray-800 whitespace-pre-wrap">{f.notes}</div>
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     {f.followed_date && (
                       <div className="inline-flex items-center rounded-full bg-green-50 px-3 py-1 text-xs font-semibold text-green-800">
-                        Followed: {dayjs(f.followed_date).format("DD/MM/YYYY hh:mm A")}
+                        Followed: {dayjs(f.followed_date).format("DD-MM-YYYY hh:mm A")}
                       </div>
                     )}
                     {f.communication_mode && (
@@ -782,7 +782,7 @@ function HistoryModal({ open, onClose, order }) {
                     )}
                     {f.next_followup_date && (
                       <div className="inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-800">
-                        Next: {dayjs(f.next_followup_date).format("DD/MM/YYYY hh:mm A")}
+                        Next: {dayjs(f.next_followup_date).format("DD-MM-YYYY hh:mm A")}
                       </div>
                     )}
                   </div>

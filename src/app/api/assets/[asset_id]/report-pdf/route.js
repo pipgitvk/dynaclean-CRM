@@ -1,5 +1,6 @@
 // src/app/api/assets/[asset_id]/report-pdf/route.js
 import { getDbConnection } from "@/lib/db";
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
 import { NextResponse } from "next/server";
 import { PDFDocument, rgb } from "pdf-lib";
 
@@ -81,9 +82,7 @@ export async function GET(request, { params }) {
       Asset Name: ${assignment.asset_name}
       Assigned To: ${assignment.Assigned_to}
       Assigned By: ${assignment.Assigned_by}
-      Assigned Date: ${new Date(
-        assignment.Assigned_Date
-      ).toLocaleDateString()}
+      Assigned Date: ${formatCrmDateOnly(assignment.Assigned_Date)}
       
       ---------------------------------------------------------
       

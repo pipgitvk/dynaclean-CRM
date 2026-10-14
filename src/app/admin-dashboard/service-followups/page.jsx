@@ -221,10 +221,10 @@ export default function ServiceFollowupsPage() {
                       <td className="p-3 border-b border-gray-200">{fu.product_model || "—"}</td>
                       <td className="p-3 border-b border-gray-200">{fu.contact || "—"}</td>
                       <td className="p-3 border-b border-gray-200 whitespace-nowrap">
-                        {dayjs(fu.followed_at).tz(IST).format("DD/MM/YYYY HH:mm")}
+                        {dayjs(fu.followed_at).tz(IST).format("DD-MM-YYYY HH:mm")}
                       </td>
                       <td className="p-3 border-b border-gray-200 whitespace-nowrap">
-                        {fu.next_followup_date ? dayjs(fu.next_followup_date).tz(IST).format("DD/MM/YYYY HH:mm") : "—"}
+                        {fu.next_followup_date ? dayjs(fu.next_followup_date).tz(IST).format("DD-MM-YYYY HH:mm") : "—"}
                       </td>
                       <td className="p-3 border-b border-gray-200">{fu.added_by}</td>
                       <td className="p-3 border-b border-gray-200">

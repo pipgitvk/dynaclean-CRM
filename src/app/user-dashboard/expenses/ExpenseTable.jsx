@@ -28,7 +28,7 @@ export default function ExpenseTable({ rows, role }) {
       Number(row.MealsCost || 0) +
       Number(row.OtherExpenses || 0);
 
-    const formattedDate = dayjs(row.TravelDate).format("DD MMM YYYY");
+    const formattedDate = dayjs(row.TravelDate).format("DD-MM-YYYY");
 
     // Check if any field matches the search query
     const matchesSearch =
@@ -247,7 +247,7 @@ export default function ExpenseTable({ rows, role }) {
                     <td className="p-3">{row.ID}</td>
                     <td className="p-3">
                       {row.TravelDate
-                        ? dayjs(row.TravelDate).format("DD MMM YYYY")
+                        ? dayjs(row.TravelDate).format("DD-MM-YYYY")
                         : "-"}
                     </td>
                     <td className="p-3">{row.FromLocation}</td>
@@ -261,7 +261,7 @@ export default function ExpenseTable({ rows, role }) {
                     </td>
                     <td className="p-3">
                       {row.payment_date && row.payment_date !== "0000-00-00"
-                        ? dayjs(row.payment_date).format("DD MMM YYYY")
+                        ? dayjs(row.payment_date).format("DD-MM-YYYY")
                         : "-"}
                     </td>
                     <td className="p-3">{row.approval_status}</td>
@@ -335,7 +335,7 @@ export default function ExpenseTable({ rows, role }) {
               <div>
                 <strong>Date:</strong>{" "}
                 {row.TravelDate
-                  ? dayjs(row.TravelDate).format("DD MMM YYYY")
+                  ? dayjs(row.TravelDate).format("DD-MM-YYYY")
                   : "-"}
               </div>
               <div>
@@ -357,7 +357,7 @@ export default function ExpenseTable({ rows, role }) {
               <div>
                 <strong>Payment Date:</strong>{" "}
                 {row.payment_date && row.payment_date !== "0000-00-00"
-                  ? dayjs(row.payment_date).format("DD MMM YYYY")
+                  ? dayjs(row.payment_date).format("DD-MM-YYYY")
                   : "-"}
               </div>
               <div>

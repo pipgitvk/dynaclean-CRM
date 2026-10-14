@@ -20,7 +20,7 @@ export default function OtherIncomeTable({ rows, role, isAdmin }) {
   // Filter rows based on search, status, date range, and user (for admin)
   const filteredRows = (rows || []).filter((row) => {
     const totalIncome = Number(row.amount || 0) + Number(row.gst_amount || 0);
-    const formattedDate = dayjs(row.income_date).format("DD MMM YYYY");
+    const formattedDate = dayjs(row.income_date).format("DD-MM-YYYY");
 
     const matchesSearch =
       Object.values(row)
@@ -185,7 +185,7 @@ export default function OtherIncomeTable({ rows, role, isAdmin }) {
                     <td className="px-4 py-3 text-gray-700 font-medium text-sm">{row.username}</td>
                   )}
                   <td className="px-4 py-3 text-gray-700">
-                    {dayjs(row.income_date).format("DD MMM YYYY")}
+                    {dayjs(row.income_date).format("DD-MM-YYYY")}
                   </td>
                   <td className="px-4 py-3 text-gray-700 font-medium">{row.income_name}</td>
                   <td className="px-4 py-3 text-gray-700">{row.income_source}</td>

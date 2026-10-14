@@ -1,5 +1,7 @@
 "use client";
 
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
+
 import { useState, useEffect } from "react";
 import { CalendarDays } from "lucide-react";
 import {
@@ -34,11 +36,7 @@ function formatAmount(value) {
 
 function formatDisplayDate(dateStr) {
   if (!dateStr) return "";
-  return new Date(dateStr).toLocaleDateString("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
+  return new formatCrmDateOnly(Date(dateStr));
 }
 
 function getRingColor(percent) {
@@ -411,8 +409,8 @@ const EmployeeTargetGraph = ({ variant = "default" }) => {
 
       {target_start_date && target_end_date && (
         <p className="mt-3 text-center text-xs text-gray-500">
-          Target: {new Date(target_start_date).toLocaleDateString()} –{" "}
-          {new Date(target_end_date).toLocaleDateString()}
+          Target: {formatCrmDateOnly(target_start_date)} –{" "}
+          {formatCrmDateOnly(target_end_date)}
         </p>
       )}
     </div>

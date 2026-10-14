@@ -222,7 +222,7 @@ export default function GoodFollowupsTable({ data, isLoading }) {
                     <td className="px-3 py-3">{f.status || "-"}</td>
                     <td className="px-3 py-3">{f.notes}</td>
                     <td className="px-3 py-3">
-                      {dayjs(f.followed_date).format("DD-MMM-YYYY")}
+                      {dayjs(f.followed_date).format("DD-MM-YYYY")}
                     </td>
                   </tr>
                 ))
@@ -279,7 +279,7 @@ export default function GoodFollowupsTable({ data, isLoading }) {
                 <div className="flex items-center justify-between text-sm text-gray-600">
                   <span>Date:</span>
                   <span className="text-right">
-                    {dayjs(f.followed_date).format("DD-MMM-YYYY")}
+                    {dayjs(f.followed_date).format("DD-MM-YYYY")}
                   </span>
                 </div>
               </div>
