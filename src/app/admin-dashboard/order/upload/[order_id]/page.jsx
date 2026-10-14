@@ -2,7 +2,7 @@
 import { getDbConnection } from "@/lib/db";
 import { notFound, redirect } from "next/navigation";
 import UploadForm from "../UploadForm";
-import { isBeforeDispatch } from "@/lib/orderDocumentEditRules";
+import { shouldRedirectUploadPageToView } from "@/lib/orderDocumentEditRules";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +25,7 @@ export default async function Page({ params }) {
   const orderDetails = await getOrderDetails(orderId);
   if (!orderDetails) notFound();
 
-  if (!isBeforeDispatch(orderDetails)) {
+  if (shouldRedirectUploadPageToView(orderDetails)) {
     redirect(`/admin-dashboard/order/view/${orderId}`);
   }
 

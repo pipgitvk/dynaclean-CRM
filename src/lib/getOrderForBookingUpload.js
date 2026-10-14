@@ -1,4 +1,7 @@
 import { getDbConnection } from "@/lib/db";
+import { hasOrderInvoiceReport } from "@/lib/orderDocumentEditRules";
+
+export { hasOrderInvoiceReport };
 
 export function formatDateForInput(value) {
   if (!value) return "";
@@ -14,14 +17,6 @@ export function hasOrderBooking(order) {
     String(order.booking_id).trim() !== "" &&
     String(order.booking_id) !== "0"
   );
-}
-
-/** Invoice / tax report must be uploaded before forward booking. */
-export function hasOrderInvoiceReport(order) {
-  const raw = order?.report_file;
-  if (raw == null) return false;
-  const s = String(raw).trim();
-  return s !== "" && s !== "0";
 }
 
 /** Only ADMIN and SUPERADMIN may edit an existing booking (before dispatch). */

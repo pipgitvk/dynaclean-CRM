@@ -3,7 +3,10 @@ import { parseFormData } from "@/lib/parseForm";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { uploadOrderAccountFile } from "@/lib/uploadOrderAccountFile";
-import { isBeforeDispatch } from "@/lib/orderDocumentEditRules";
+import {
+  hasOrderInvoiceReport,
+  isBeforeDispatch,
+} from "@/lib/orderDocumentEditRules";
 
 const MAX_FILES_PER_FIELD = 5;
 
@@ -97,7 +100,10 @@ export async function POST(req) {
     const existingOrder =
       Array.isArray(orderRows) && orderRows.length ? orderRows[0] : {};
 
-    if (!isBeforeDispatch(existingOrder)) {
+    if (
+      !isBeforeDispatch(existingOrder) &&
+      hasOrderInvoiceReport(existingOrder)
+    ) {
       return NextResponse.json(
         { error: "Invoice and tax documents cannot be edited after dispatch." },
         { status: 403 },

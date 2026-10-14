@@ -13,6 +13,18 @@ export function isBeforeDispatch(order) {
   return Number(order?.dispatch_status) !== 1;
 }
 
+export function hasOrderInvoiceReport(order) {
+  const raw = order?.report_file;
+  if (raw == null) return false;
+  const s = String(raw).trim();
+  return s !== "" && s !== "0";
+}
+
+/** After dispatch: view page only when invoice report exists; else upload. */
+export function shouldRedirectUploadPageToView(order) {
+  return !isBeforeDispatch(order) && hasOrderInvoiceReport(order);
+}
+
 export function isBeforeDelivered(order) {
   return Number(order?.delivery_status) !== 1;
 }
