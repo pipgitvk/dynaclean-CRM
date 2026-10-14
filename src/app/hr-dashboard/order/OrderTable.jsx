@@ -635,7 +635,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                   <FileCheck size={16} />
                   <span>View Booking</span>
                 </Link>
-              ) : (
+              ) : r.report_file ? (
                 <Link
                   href={`/user-dashboard/order/upload-booking/${r.order_id}`}
                   className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-green-700"
@@ -645,7 +645,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                   <UploadCloud size={16} />
                   <span>Create Booking</span>
                 </Link>
-              ))}
+              ) : null)}
             {isWarehouse && hasBooking && dispatchStatus === 0 && (
               <>
                 <Link

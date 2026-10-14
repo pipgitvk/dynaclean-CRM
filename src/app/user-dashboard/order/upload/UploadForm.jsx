@@ -12,7 +12,10 @@ const FILE_FIELD_NAMES = new Set([
   "deliverchallan",
 ]);
 
-export default function UploadForm({ orderDetails }) {
+export default function UploadForm({
+  orderDetails,
+  redirectPath = "/user-dashboard/order",
+}) {
   const [form, setForm] = useState({
     invoice_number: "",
     duedate: "",
@@ -198,7 +201,7 @@ export default function UploadForm({ orderDetails }) {
       const result = await res.json();
       if (res.ok) {
         setMessage("✅ Files uploaded successfully.");
-        router.push("/user-dashboard/order");
+        router.push(redirectPath);
       } else {
         setMessage("❌ " + result.error);
       }
@@ -352,7 +355,7 @@ export default function UploadForm({ orderDetails }) {
           {loading ? "Uploading..." : "Upload Files"}
         </button>
         <a
-          href="/user-dashboard/order"
+          href={redirectPath}
           className="text-sm text-gray-600 hover:text-gray-800 underline"
         >
           ← Back to Order List

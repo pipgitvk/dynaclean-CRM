@@ -936,7 +936,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                   </div>
                 </div>
               ))}
-            {canManageReturns && !hasBooking && (
+            {canManageReturns && !hasBooking && r.report_file && (
                 <Link
                   href={`/accounts-dashboard/order/upload-booking/${r.order_id}`}
                   className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-green-700"

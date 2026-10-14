@@ -2,7 +2,10 @@ import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { sendImportCrmSmtpEmail } from "@/lib/importCrmEmail";
-import { canEditOrderBooking } from "@/lib/getOrderForBookingUpload";
+import {
+  canEditOrderBooking,
+  hasOrderInvoiceReport,
+} from "@/lib/getOrderForBookingUpload";
 
 export async function POST(req) {
   try {
@@ -36,7 +39,8 @@ export async function POST(req) {
     // Fetch order details and current booking/dispatch state
     const [orderRows] = await conn.execute(
       `SELECT order_id, client_name, email, totalamt, payment_amount, quote_number, delivery_location,
-              booking_id, booking_date, booking_url, admin_remark, delivery_date, dispatch_status
+              booking_id, booking_date, booking_url, admin_remark, delivery_date, dispatch_status,
+              report_file
        FROM neworder WHERE order_id = ?`,
       [orderId]
     );
@@ -65,6 +69,16 @@ export async function POST(req) {
     if (isBookingEdit && !canEditOrderBooking(payload?.role ?? payload?.userRole)) {
       return NextResponse.json(
         { error: "Only Admin or Super Admin can edit booking details." },
+        { status: 403 },
+      );
+    }
+
+    if (!isBookingEdit && !hasOrderInvoiceReport(order)) {
+      return NextResponse.json(
+        {
+          error:
+            "Upload invoice / tax report first. Booking can be created only after report is uploaded.",
+        },
         { status: 403 },
       );
     }

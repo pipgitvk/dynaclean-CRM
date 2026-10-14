@@ -157,7 +157,7 @@ export default function UploadForm({ orderDetails }) {
       const result = await res.json();
       if (res.ok) {
         setMessage("✅ Files uploaded successfully.");
-        router.push("/user-dashboard/order");
+        router.push("/accounts-dashboard/order");
       } else {
         setMessage("❌ " + result.error);
       }
@@ -303,7 +303,7 @@ export default function UploadForm({ orderDetails }) {
           {loading ? "Uploading..." : "Upload Files"}
         </button>
         <a
-          href="/user-dashboard/order"
+          href="/accounts-dashboard/order"
           className="text-sm text-gray-600 hover:text-gray-800 underline"
         >
           ← Back to Order List

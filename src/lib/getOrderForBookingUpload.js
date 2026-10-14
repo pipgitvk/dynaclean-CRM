@@ -16,6 +16,14 @@ export function hasOrderBooking(order) {
   );
 }
 
+/** Invoice / tax report must be uploaded before forward booking. */
+export function hasOrderInvoiceReport(order) {
+  const raw = order?.report_file;
+  if (raw == null) return false;
+  const s = String(raw).trim();
+  return s !== "" && s !== "0";
+}
+
 /** Only ADMIN and SUPERADMIN may edit an existing booking (before dispatch). */
 export function canEditOrderBooking(role) {
   const normalized = String(role ?? "").trim().toUpperCase();
@@ -26,17 +34,37 @@ export function resolveBookingUploadPage(order, role) {
   const booked = hasOrderBooking(order);
   const dispatched = Number(order.dispatch_status) === 1;
 
+  if (!booked && !hasOrderInvoiceReport(order)) {
+    return {
+      redirectToView: false,
+      redirectToUploadReport: true,
+      isEditMode: false,
+      initialBooking: null,
+    };
+  }
+
   if (booked && dispatched) {
-    return { redirectToView: true, isEditMode: false, initialBooking: null };
+    return {
+      redirectToView: true,
+      redirectToUploadReport: false,
+      isEditMode: false,
+      initialBooking: null,
+    };
   }
 
   const isEditMode = booked && !dispatched;
   if (isEditMode && !canEditOrderBooking(role)) {
-    return { redirectToView: true, isEditMode: false, initialBooking: null };
+    return {
+      redirectToView: true,
+      redirectToUploadReport: false,
+      isEditMode: false,
+      initialBooking: null,
+    };
   }
 
   return {
     redirectToView: false,
+    redirectToUploadReport: false,
     isEditMode,
     initialBooking: isEditMode ? getInitialBookingValues(order) : null,
   };
@@ -47,7 +75,7 @@ export async function getOrderForBookingUpload(orderId) {
   const [rows] = await conn.execute(
     `SELECT order_id, client_name, contact, email, delivery_location, quote_number,
             client_delivery_date, booking_id, booking_date, booking_url, admin_remark,
-            delivery_date, dispatch_status
+            delivery_date, dispatch_status, report_file
      FROM neworder WHERE order_id = ?`,
     [orderId],
   );
