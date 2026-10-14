@@ -18,6 +18,11 @@ import {
 } from "lucide-react";
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import dayjs from "dayjs";
+import {
+  buildOrderPaymentRows,
+  sumOrderPaymentAmounts,
+} from "@/lib/orderPaymentHistory";
+import { deriveOrderPaymentStatus } from "@/lib/paymentOrderStatus";
 
 import DeleteButton from "@/components/accounts/DeleteButton";
 import ReturnInitiateMenuItem from "@/components/orders/ReturnInitiateMenuItem";
@@ -606,7 +611,7 @@ export default function OrderTable({ orders, userRole }) {
             {filteredOrders.length > 0 ? (
               filteredOrders.map((r, i) => {
                 const status = getStatusText(r);
-                const pay = getPaymentBadge(r.payment_status);
+                const pay = getPaymentBadge(deriveOrderPaymentStatus(r));
                 // const inst = getInstallationLabel(r.installation_status);
                 return (
                   <tr
@@ -1066,29 +1071,7 @@ function EditPaymentButton({ order }) {
   const [status, setStatus] = useState(order.payment_status || "");
   const totalamt = order.totalamt || 0;
 
-  const prevIds = (order.payment_id || "")
-    .toString()
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  const prevDates = (order.payment_date || "")
-    .toString()
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  const prevAmounts = (order.payment_amount || "")
-    .toString()
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-
-  const rows = Array.from({
-    length: Math.max(prevIds.length, prevDates.length, prevAmounts.length),
-  }).map((_, i) => ({
-    id: prevIds[i] || "",
-    date: prevDates[i] || "",
-    amount: prevAmounts[i] || "",
-  }));
+  const rows = buildOrderPaymentRows(order);
 
   const formatPrevDate = (d) => {
     if (!d) return "-";
@@ -1096,10 +1079,7 @@ function EditPaymentButton({ order }) {
     return v.isValid() ? v.format("DD-MM-YYYY") : d;
   };
 
-  const totalPaid = prevAmounts
-    .map((x) => Number(x))
-    .filter((n) => !isNaN(n))
-    .reduce((sum, n) => sum + n, 0);
+  const totalPaid = sumOrderPaymentAmounts(order);
 
   const onChange = (e) => {
     const { name, value } = e.target;

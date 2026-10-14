@@ -4,10 +4,8 @@ import { getSessionPayload } from "@/lib/auth";
 import { ensurePaymentPendingFollowupsTable } from "@/lib/ensurePaymentPendingFollowupsTable";
 import { ensurePaymentDeductionsTable } from "@/lib/ensurePaymentDeductionsTable";
 import { PAYMENT_PENDING_ORDER_SQL_WHERE } from "@/lib/paymentPendingFilters";
-import {
-  calculateAdjustedOrderTotal,
-  sumPaymentAmounts,
-} from "@/lib/paymentOrderStatus";
+import { calculateAdjustedOrderTotal } from "@/lib/paymentOrderStatus";
+import { sumOrderPaymentAmounts } from "@/lib/orderPaymentHistory";
 
 export async function GET(request) {
     try {
@@ -41,6 +39,7 @@ export async function GET(request) {
         o.created_by,
         o.totalamt,
         o.payment_amount,
+        o.transaction_id,
         o.payment_status,
         o.duedate,
         o.created_at,
@@ -106,7 +105,7 @@ export async function GET(request) {
         // Calculate remaining amount for each order
         const orders = await Promise.all(rows.map(async (order) => {
             const totalAmt = await calculateAdjustedOrderTotal(pool, order);
-            const paidAmount = sumPaymentAmounts(order.payment_amount);
+            const paidAmount = sumOrderPaymentAmounts(order);
             const deductionInfo = deductionByOrder.get(order.order_id);
             const deductionAmount = deductionInfo?.total || 0;
             const remaining = totalAmt - paidAmount - deductionAmount;

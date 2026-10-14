@@ -97,7 +97,7 @@ export default async function OrdersPage({ searchParams }) {
                 no.client_name, no.contact, no.is_cancelled, no.dispatch_status,
                 no.created_at, no.created_by , no.einvoice_file, no.booking_id, no.quote_number, no.duedate,
                 no.invoice_date , no.account_by ,no.booking_by , no.dispatch_person,
-                no.payment_id, no.payment_date, no.payment_amount, no.payment_status,no.totalamt,
+                no.payment_id, no.payment_date, no.payment_amount, no.payment_status,no.totalamt, no.transaction_id,
                 no.baseAmount, no.taxamt,
                 no.delivery_date, no.delivered_on, no.delivery_status,no.delivery_proof,
                 COALESCE(no.delivery_remark, '') as delivery_remark,

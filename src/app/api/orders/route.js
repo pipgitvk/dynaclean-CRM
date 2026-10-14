@@ -11,6 +11,7 @@ import fs from "fs/promises"; // Use fs.promises for async file operations
 import path from "path";
 import { sendTemplatedEmail } from "@/lib/template-utils";
 import { syncPreBookingsForOrder } from "@/lib/syncPreBookingsForOrder";
+import { derivePaymentStatus } from "@/lib/paymentOrderStatus";
 
 const UPLOAD_DIR = path.join(process.cwd(), "public", "uploads");
 
@@ -110,7 +111,7 @@ export async function GET(req) {
                   no.client_name, no.contact, no.is_cancelled, no.dispatch_status,
                   no.created_at, no.created_by , no.einvoice_file, no.booking_id, no.quote_number, no.duedate,
                   no.invoice_date , no.account_by ,no.booking_by , no.dispatch_person,
-                  no.payment_id, no.payment_date, no.payment_amount, no.payment_status,no.totalamt,
+                  no.payment_id, no.payment_date, no.payment_amount, no.payment_status,no.totalamt, no.transaction_id,
                   no.baseAmount, no.taxamt,
                   no.delivery_date, no.delivered_on, no.delivery_status,no.delivery_proof,
                   no.installation_status, no.is_returned, no.approval_status, no.approval_remark, no.approval_date,
@@ -286,7 +287,7 @@ export async function POST(req) {
     await ensureNeworderQuotationIdColumn(conn);
 
     const [quotationRows] = await conn.execute(
-      `SELECT customer_id, payment_term_days, \`S.No.\` AS quotation_id
+      `SELECT customer_id, payment_term_days, grand_total, \`S.No.\` AS quotation_id
        FROM quotations_records WHERE quote_number = ? LIMIT 1`,
       [quote_number],
     );
@@ -312,6 +313,18 @@ export async function POST(req) {
       duedateISO = due.toISOString().slice(0, 10);
     }
 
+    const orderTotalForPayment =
+      Number(quotationRecord.grand_total) ||
+      Number(total_price) ||
+      0;
+    const paidAtBooking = Number(paymentAmount) || 0;
+    const paymentStatusAtBooking = derivePaymentStatus({
+      total: orderTotalForPayment,
+      paidAmount: paidAtBooking,
+      deductionAmount: 0,
+      isOverdue: false,
+    });
+
     // console here
     console.log("INSERT PARAMS", {
       quote_number,
@@ -330,9 +343,9 @@ export async function POST(req) {
          (order_id, quote_number, quotation_id, po_file, payment_proof, client_name,
           contact, email, delivery_location, company_name, company_address,
           state, sales_status, sales_remark, ship_to, created_by, duedate, client_delivery_date, approval_status,
-          po_number, payment_date, transaction_id, payment_amount, item_name, item_code, specification,
+          po_number, payment_date, transaction_id, payment_id, payment_amount, payment_status, item_name, item_code, specification,
           quantity, unit, price_per_unit, taxable_price, gst, total_price, img_url, customer_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         orderId,
         quote_number,
@@ -356,7 +369,9 @@ export async function POST(req) {
         poNumber || null,
         paymentDate || null,
         transactionId || null,
+        transactionId || null,
         paymentAmount || null,
+        paymentStatusAtBooking,
         item_name || null,
         item_code || null,
         specification || null,

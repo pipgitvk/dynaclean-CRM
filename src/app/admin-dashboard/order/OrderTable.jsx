@@ -24,6 +24,11 @@ import {
 } from "lucide-react";
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import dayjs from "dayjs";
+import {
+  buildOrderPaymentRows,
+  sumOrderPaymentAmounts,
+} from "@/lib/orderPaymentHistory";
+import { deriveOrderPaymentStatus } from "@/lib/paymentOrderStatus";
 import ExcelJS from "exceljs";
 import { Pie } from "react-chartjs-2";
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
@@ -378,14 +383,7 @@ function amountWithoutGst(order) {
 
 /** Calculate total paid amount from comma-separated payment amounts */
 function getTotalPaidAmount(order) {
-  const paymentAmount = (order.payment_amount || "")
-    .toString()
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean)
-    .map((x) => Number(x))
-    .filter((n) => !isNaN(n));
-  return paymentAmount.reduce((sum, n) => sum + n, 0);
+  return sumOrderPaymentAmounts(order);
 }
 
 /** Calculate total amount - use quotation grand_total as primary source */
@@ -1169,7 +1167,7 @@ export default function OrderTable({ orders, userRole }) {
             acc.pendingDispatchAmount += taxable;
           }
 
-          const pmtStatus = (order.payment_status || "")
+          const pmtStatus = deriveOrderPaymentStatus(order)
             .toString()
             .trim()
             .toLowerCase()
@@ -2290,7 +2288,7 @@ export default function OrderTable({ orders, userRole }) {
             {filteredOrders.length > 0 ? (
               filteredOrders.map((r, i) => {
                 const status = getStatusText(r);
-                const pay = getPaymentBadge(r.payment_status);
+                const pay = getPaymentBadge(deriveOrderPaymentStatus(r));
                 return (
                   <tr
                     key={r.order_id}
@@ -2442,7 +2440,7 @@ export default function OrderTable({ orders, userRole }) {
         {filteredOrders.length > 0 ? (
           filteredOrders.map((r, i) => {
             const status = getStatusText(r);
-            const pay = getPaymentBadge(r.payment_status);
+            const pay = getPaymentBadge(deriveOrderPaymentStatus(r));
             return (
               <div
                 key={r.order_id}
@@ -3151,29 +3149,7 @@ function EditPaymentButton({ order }) {
   const [status, setStatus] = useState(order.payment_status || "");
   const totalamt = order.totalamt || 0;
 
-  const prevIds = (order.payment_id || "")
-    .toString()
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  const prevDates = (order.payment_date || "")
-    .toString()
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  const prevAmounts = (order.payment_amount || "")
-    .toString()
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-
-  const rows = Array.from({
-    length: Math.max(prevIds.length, prevDates.length, prevAmounts.length),
-  }).map((_, i) => ({
-    id: prevIds[i] || "",
-    date: prevDates[i] || "",
-    amount: prevAmounts[i] || "",
-  }));
+  const rows = buildOrderPaymentRows(order);
 
   const formatPrevDate = (d) => {
     if (!d) return "-";
@@ -3181,10 +3157,7 @@ function EditPaymentButton({ order }) {
     return v.isValid() ? v.format("DD-MM-YYYY") : d;
   };
 
-  const totalPaid = prevAmounts
-    .map((x) => Number(x))
-    .filter((n) => !isNaN(n))
-    .reduce((sum, n) => sum + n, 0);
+  const totalPaid = sumOrderPaymentAmounts(order);
 
   const onChange = (e) => {
     const { name, value } = e.target;

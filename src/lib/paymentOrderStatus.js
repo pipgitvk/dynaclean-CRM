@@ -2,6 +2,45 @@
  * Shared helpers for payment-pending reports and deduction updates.
  */
 
+import { sumOrderPaymentAmounts } from "@/lib/orderPaymentHistory";
+
+/** Matches order list UI: quotation grand total, then invoice totalamt. */
+export function getOrderTotalForPayment(order) {
+  const quotationTotal = Number(order?.quotation_grand_total) || 0;
+  if (quotationTotal > 0) return quotationTotal;
+
+  const total = Number(order?.totalamt) || 0;
+  if (total > 0) return total;
+
+  const base = Number(order?.baseAmount) || 0;
+  const tax = Number(order?.taxamt) || 0;
+  return Math.max(total, base + tax);
+}
+
+/** Status from paid vs total (booking advance before payment_status is updated). */
+export function deriveOrderPaymentStatus(order) {
+  const total = getOrderTotalForPayment(order);
+  const paidAmount = sumOrderPaymentAmounts(order);
+  const stored = (order?.payment_status || "")
+    .toString()
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "");
+
+  if (paidAmount > 0 || total > 0) {
+    return derivePaymentStatus({
+      total,
+      paidAmount,
+      deductionAmount: 0,
+      isOverdue:
+        paidAmount === 0 && (stored === "overdue" || stored === "over due"),
+    });
+  }
+
+  if (stored === "overdue") return "over due";
+  return order?.payment_status || "pending";
+}
+
 export function parsePaymentAmounts(paymentAmountRaw) {
   return (paymentAmountRaw || "")
     .toString()
@@ -74,7 +113,7 @@ export async function getOrderPaymentBreakdown(pool, orderId) {
 
   const order = orderRows[0];
   const totalAmount = await calculateAdjustedOrderTotal(pool, order);
-  const paidAmount = sumPaymentAmounts(order.payment_amount);
+  const paidAmount = sumOrderPaymentAmounts(order);
 
   const [deductionRows] = await pool.query(
     `SELECT COALESCE(SUM(amount), 0) AS total FROM payment_deductions WHERE order_id = ?`,
@@ -105,7 +144,7 @@ export async function getOrderPaymentBreakdown(pool, orderId) {
 
   const remainingAmount = totalAmount - paidAmount - deductionAmount;
   const paymentStatus = derivePaymentStatus({
-    total: totalAmount,
+    total: getOrderTotalForPayment(order) || totalAmount,
     paidAmount,
     deductionAmount,
     isOverdue,
