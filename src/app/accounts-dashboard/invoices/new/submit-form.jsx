@@ -9,6 +9,12 @@ import toast from "react-hot-toast";
 import AddSpecialPriceModal from "@/components/specialPrice/AddSpecialPriceModal";
 import dynacleanLogo from "@/components/logo1.jpg";
 import { LetterheadCompanyInfo, LetterheadBankLine, LetterheadSignatoryLine } from "@/components/invoice/InvoiceLetterheadSection";
+import {
+  applyTaxPercentsToInvoiceItems,
+  getStateCodeFromGstin,
+  headerRatesForInterstate,
+  isInterstateInvoiceSupply,
+} from "@/lib/gstSupplyType";
 
 export default function InvoiceForm({ invoiceNumber, invoiceDate, invoiceType = "tax", onBack, onSuccessRedirect }) {
   const router = useRouter();
@@ -62,8 +68,6 @@ export default function InvoiceForm({ invoiceNumber, invoiceDate, invoiceType = 
   const [sgstRate, setSgstRate] = useState(9);
   const [igstRate, setIgstRate] = useState(0);
   const [roundOff, setRoundOff] = useState(0);
-
-  const SUPPLIER_STATE_CODE = "07";
 
   const stateCodeToName = useMemo(() => ({
     "01": "Jammu & Kashmir", "02": "Himachal Pradesh", "03": "Punjab",
@@ -140,50 +144,48 @@ export default function InvoiceForm({ invoiceNumber, invoiceDate, invoiceType = 
     }
   }, [taxSummary.finalRoundOff, isAutoRoundOff]);
 
-  // Auto-set state from GSTIN + apply CGST/SGST vs IGST — skip if loaded from quotation
+  // Auto-set state from GSTIN + CGST/SGST vs IGST (quotation: buyer GSTIN/state, not stored quote tax)
   useEffect(() => {
-    if (isFromQuotation) return;
-
     const gstinValue = form.gst_number?.trim();
 
     if (gstinValue) {
-      // GSTIN provided → use its first 2 digits to determine tax type
       const st = getStateFromGSTIN(gstinValue);
-      if (!st) return;
-
-      // Auto-fill state field
-      setForm((prev) => ({ ...prev, state: st.display, state_code: st.code }));
-      setStateSearch(st.display);
-      setShowStateSuggestions(false);
-
-      // Same state as supplier (07 Delhi) → CGST + SGST; else → IGST
-      if (st.code === SUPPLIER_STATE_CODE) {
-        setCgstRate(9); setSgstRate(9); setIgstRate(0);
-        setItems((prev) => prev.map((item) => ({ ...item, cgst_percent: 9, sgst_percent: 9, igst_percent: 0 })));
-      } else {
-        setCgstRate(0); setSgstRate(0); setIgstRate(18);
-        setItems((prev) => prev.map((item) => ({ ...item, cgst_percent: 0, sgst_percent: 0, igst_percent: 18 })));
-      }
-    } else {
-      // No GSTIN → use manually selected state to decide
-      // Try: state_code field → parse code from "Name (XX)" format → match by state name
-      const code = form.state_code?.trim()
-        || parseCodeFromDisplay(form.state)
-        || Object.entries(stateCodeToName).find(
-            ([, name]) => name.toLowerCase() === form.state?.trim().toLowerCase()
-          )?.[0];
-
-      if (!code || code === SUPPLIER_STATE_CODE) {
-        // No state or same state (Delhi 07) → CGST + SGST
-        setCgstRate(9); setSgstRate(9); setIgstRate(0);
-        setItems((prev) => prev.map((item) => ({ ...item, cgst_percent: 9, sgst_percent: 9, igst_percent: 0 })));
-      } else {
-        // Different state, no GSTIN → IGST (interstate supply)
-        setCgstRate(0); setSgstRate(0); setIgstRate(18);
-        setItems((prev) => prev.map((item) => ({ ...item, cgst_percent: 0, sgst_percent: 0, igst_percent: 18 })));
+      if (st) {
+        setForm((prev) => {
+          if (prev.state === st.display && prev.state_code === st.code) return prev;
+          return { ...prev, state: st.display, state_code: st.code };
+        });
+        setStateSearch(st.display);
+        setShowStateSuggestions(false);
       }
     }
-  }, [form.gst_number, form.state, form.state_code, isFromQuotation]);
+
+    const interstate = isInterstateInvoiceSupply({
+      buyerGstin: gstinValue,
+      buyerStateCode: form.state_code,
+      stateDisplay: form.state,
+      parseCodeFromDisplay,
+    });
+
+    const { cgstRate: cR, sgstRate: sR, igstRate: iR } =
+      headerRatesForInterstate(interstate);
+    setCgstRate(cR);
+    setSgstRate(sR);
+    setIgstRate(iR);
+
+    setItems((prev) => {
+      const next = applyTaxPercentsToInvoiceItems(prev, interstate);
+      const same =
+        prev.length === next.length &&
+        prev.every(
+          (row, idx) =>
+            row.cgst_percent === next[idx].cgst_percent &&
+            row.sgst_percent === next[idx].sgst_percent &&
+            row.igst_percent === next[idx].igst_percent,
+        );
+      return same ? prev : next;
+    });
+  }, [form.gst_number, form.state, form.state_code, stateCodeToName]);
 
   const [editableTerms, setEditableTerms] = useState(
     `1. Payment due within specified due date.
@@ -293,14 +295,9 @@ Thanks for doing business with us!`,
 
       const quotation = data.quotation;
 
-      if (quotation.cgstRate !== undefined && quotation.cgstRate !== null) setCgstRate(Number(quotation.cgstRate));
-      if (quotation.sgstRate !== undefined && quotation.sgstRate !== null) setSgstRate(Number(quotation.sgstRate));
-      if (quotation.igstRate !== undefined && quotation.igstRate !== null) setIgstRate(Number(quotation.igstRate));
-
       setIsFromQuotation(true);
 
-      setForm((prev) => ({
-        ...prev,
+      const nextForm = {
         customer_name: quotation.customer_name,
         customer_email: quotation.customer_email,
         customer_phone: quotation.customer_contact,
@@ -308,14 +305,29 @@ Thanks for doing business with us!`,
         shipping_address: quotation.shipping_address,
         gst_number: quotation.gst_number,
         state: quotation.state,
-        state_code: quotation.state_code,
+        state_code:
+          quotation.state_code ||
+          getStateCodeFromGstin(quotation.gst_number) ||
+          "",
         customer_id: quotation.customer_id,
         quotation_id: quotation.quotation_id,
         due_date: quotation.due_date ? quotation.due_date.split("T")[0] : "",
-      }));
+      };
 
-      setItems(
-        quotation.items.map((it) => ({
+      setForm((prev) => ({ ...prev, ...nextForm }));
+
+      const interstate = isInterstateInvoiceSupply({
+        buyerGstin: nextForm.gst_number,
+        buyerStateCode: nextForm.state_code,
+        stateDisplay: nextForm.state,
+        parseCodeFromDisplay,
+      });
+
+      const mappedItems = quotation.items.map((it) => {
+        const cg = Number(it.cgst_percent) || 0;
+        const sg = Number(it.sgst_percent) || 0;
+        const ig = Number(it.igst_percent) || 0;
+        return {
           item_name: it.item_name || "",
           item_code: it.item_code || "",
           description: it.specification || it.description || "",
@@ -325,12 +337,19 @@ Thanks for doing business with us!`,
           rate: it.rate || it.price_per_unit || 0,
           discount_percent: it.discount_percent || 0,
           discount_amount: it.discount_amount || 0,
-          cgst_percent: it.cgst_percent || 0,
-          sgst_percent: it.sgst_percent || 0,
-          igst_percent: it.igst_percent || 0,
+          cgst_percent: cg,
+          sgst_percent: sg,
+          igst_percent: ig,
+          gst: ig || cg + sg || 18,
           imageUrl: it.img_url || "",
-        })),
-      );
+        };
+      });
+
+      setItems(applyTaxPercentsToInvoiceItems(mappedItems, interstate));
+      const rates = headerRatesForInterstate(interstate);
+      setCgstRate(rates.cgstRate);
+      setSgstRate(rates.sgstRate);
+      setIgstRate(rates.igstRate);
 
       if (quotation.round_off) setRoundOff(Number(quotation.round_off) || 0);
 
