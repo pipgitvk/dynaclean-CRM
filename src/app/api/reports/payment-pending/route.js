@@ -38,8 +38,11 @@ export async function GET(request) {
         o.contact,
         o.created_by,
         o.totalamt,
+        o.baseAmount,
+        o.taxamt,
         o.payment_amount,
         o.transaction_id,
+        qr.grand_total AS quotation_grand_total,
         o.payment_status,
         o.duedate,
         o.created_at,
@@ -49,6 +52,8 @@ export async function GET(request) {
         ppf_latest.next_followup_date AS next_followup_date,
         ppf_latest.notes AS latest_remark
       FROM neworder AS o
+      LEFT JOIN quotations_records AS qr
+        ON qr.quote_number = o.quote_number
       LEFT JOIN customers AS c 
         ON o.contact COLLATE utf8mb4_unicode_ci = c.phone COLLATE utf8mb4_unicode_ci
       LEFT JOIN (
@@ -108,7 +113,10 @@ export async function GET(request) {
             const paidAmount = sumOrderPaymentAmounts(order);
             const deductionInfo = deductionByOrder.get(order.order_id);
             const deductionAmount = deductionInfo?.total || 0;
-            const remaining = totalAmt - paidAmount - deductionAmount;
+            const remaining = Math.max(
+              0,
+              totalAmt - paidAmount - deductionAmount,
+            );
 
             return {
                 order_id: order.order_id,

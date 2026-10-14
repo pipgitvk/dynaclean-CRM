@@ -53,7 +53,7 @@ export function sumPaymentAmounts(paymentAmountRaw) {
 }
 
 export async function calculateAdjustedOrderTotal(pool, order) {
-  let totalAmt = parseFloat(order.totalamt || 0);
+  let totalAmt = getOrderTotalForPayment(order);
 
   if (Number(order.is_returned) === 2 && order.quote_number) {
     try {
@@ -104,8 +104,12 @@ export function derivePaymentStatus({ total, paidAmount, deductionAmount, isOver
 
 export async function getOrderPaymentBreakdown(pool, orderId) {
   const [orderRows] = await pool.query(
-    `SELECT order_id, quote_number, totalamt, payment_amount, duedate, is_returned
-     FROM neworder WHERE order_id = ?`,
+    `SELECT o.order_id, o.quote_number, o.totalamt, o.baseAmount, o.taxamt,
+            o.payment_amount, o.transaction_id, o.duedate, o.is_returned,
+            qr.grand_total AS quotation_grand_total
+     FROM neworder o
+     LEFT JOIN quotations_records qr ON qr.quote_number = o.quote_number
+     WHERE o.order_id = ?`,
     [orderId]
   );
 

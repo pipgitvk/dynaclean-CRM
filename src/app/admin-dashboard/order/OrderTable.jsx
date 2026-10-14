@@ -3147,7 +3147,7 @@ function EditPaymentButton({ order }) {
     payment_status: order.payment_status || "",
   });
   const [status, setStatus] = useState(order.payment_status || "");
-  const totalamt = order.totalamt || 0;
+  const totalamt = getTotalAmount(order);
 
   const rows = buildOrderPaymentRows(order);
 

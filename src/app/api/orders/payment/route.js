@@ -44,6 +44,15 @@ export async function POST(req) {
     const repaired = normalizeStoredPaymentFields(order);
     if (repaired) {
       Object.assign(order, repaired);
+      await conn.execute(
+        `UPDATE neworder SET payment_id = ?, payment_date = ?, payment_amount = ? WHERE order_id = ?`,
+        [
+          repaired.payment_id,
+          repaired.payment_date,
+          repaired.payment_amount,
+          orderId,
+        ],
+      );
     }
 
     // Fetch term days

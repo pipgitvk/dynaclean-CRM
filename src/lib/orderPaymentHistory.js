@@ -13,26 +13,28 @@ function splitCsv(value) {
 
 export function buildOrderPaymentRows(order) {
   const amounts = splitCsv(order?.payment_amount).filter(Boolean);
+  if (!amounts.length) return [];
+
   const dates = splitCsv(order?.payment_date);
   const idsFromPaymentId = splitCsv(order?.payment_id);
-
   const transactionId = (order?.transaction_id ?? "").toString().trim();
-  const ids = [...idsFromPaymentId];
 
-  // Legacy booking: amount saved without payment_id; UTR is in transaction_id
-  if (amounts.length > 0 && ids.filter(Boolean).length === 0 && transactionId) {
-    ids[0] = transactionId;
-  }
-
-  const len = Math.max(amounts.length, dates.length, ids.length, 0);
-  let rows = Array.from({ length: len }, (_, i) => ({
-    id: ids[i] || "",
-    date: dates[i] || "",
-    amount: amounts[i] || "",
-  }));
+  let rows = amounts.map((amount, i) => {
+    let id = idsFromPaymentId[i] || "";
+    if (!id && i === 0 && transactionId) id = transactionId;
+    const date =
+      dates[i] ||
+      dates[0] ||
+      (i === 0 ? (order?.payment_date ?? "") : "") ||
+      "";
+    return { id, date, amount };
+  });
 
   rows = collapseDuplicateAdvanceEntry(rows);
-  return rows;
+  return rows.filter((r) => {
+    const amt = Number(r.amount);
+    return !Number.isNaN(amt) && amt !== 0;
+  });
 }
 
 /** Same advance recorded at booking and again via Edit Payment (amount CSV doubled). */
@@ -57,9 +59,19 @@ export function sumOrderPaymentAmounts(order) {
     .reduce((sum, n) => sum + n, 0);
 }
 
+function paymentFieldsFromRows(rows) {
+  if (!rows.length) {
+    return { payment_id: null, payment_date: null, payment_amount: null };
+  }
+  return {
+    payment_id: rows.map((r) => (r.id || "").trim()).join(",") || null,
+    payment_date: rows.map((r) => (r.date || "").trim()).join(",") || null,
+    payment_amount: rows.map((r) => (r.amount || "").trim()).join(",") || null,
+  };
+}
+
 /**
  * When recording payment via API: avoid appending duplicate advance from booking.
- * Returns { nextIds, nextDates, nextAmounts, skipAppend } or null if normal append.
  */
 export function resolveNextPaymentCsv(order, { paymentId, paymentDate, paymentAmount }) {
   const prevIdsRaw = (order.payment_id || "").toString().trim();
@@ -69,22 +81,20 @@ export function resolveNextPaymentCsv(order, { paymentId, paymentDate, paymentAm
   const transactionId = (order.transaction_id ?? "").toString().trim();
   const hasMultipleAmounts = prevAmountsRaw.includes(",");
 
+  const addingAmount =
+    paymentAmount !== null && paymentAmount !== undefined && !Number.isNaN(Number(paymentAmount));
+
   const legacyAdvanceOnly =
     transactionId &&
     prevAmountsRaw &&
     !hasMultipleAmounts &&
     !prevIdsRaw;
 
-  if (
-    legacyAdvanceOnly &&
-    paymentAmount !== null &&
-    !Number.isNaN(paymentAmount)
-  ) {
+  if (legacyAdvanceOnly && addingAmount) {
     const existingAmt = Number(prevAmountsRaw);
     const sameAmount = Number(paymentAmount) === existingAmt;
     const newId = (paymentId ?? "").toString().trim();
-    const sameOrMissingId =
-      !newId || newId === transactionId;
+    const sameOrMissingId = !newId || newId === transactionId;
 
     if (sameAmount && sameOrMissingId) {
       const nextIds = newId || transactionId;
@@ -101,40 +111,50 @@ export function resolveNextPaymentCsv(order, { paymentId, paymentDate, paymentAm
     }
   }
 
+  // No new amount: only attach UTR to existing line(s) — never append extra date/amount CSV slots
+  if (!addingAmount) {
+    const rows = buildOrderPaymentRows(order);
+    const newId = (paymentId ?? "").toString().trim();
+    if (newId && rows.length === 1 && !(rows[0].id || "").trim()) {
+      rows[0].id = newId;
+      if (paymentDate) rows[0].date = paymentDate;
+      return { ...paymentFieldsFromRows(rows), skipAppend: true };
+    }
+    return {
+      nextIds: prevIdsRaw || null,
+      nextDates: prevDatesRaw || null,
+      nextAmounts: prevAmountsRaw || null,
+      skipAppend: true,
+    };
+  }
+
   let prevIds = prevIdsRaw;
   if (!prevIds && transactionId && prevAmountsRaw && !hasMultipleAmounts) {
     prevIds = transactionId;
   }
 
   const nextIds = paymentId
-    ? prevIds ? `${prevIds},${paymentId}` : paymentId
+    ? prevIds ? `${prevIds},${paymentId}` : String(paymentId)
     : prevIds || null;
   const nextDates = paymentDate
     ? prevDatesRaw ? `${prevDatesRaw},${paymentDate}` : paymentDate
     : prevDatesRaw || null;
-  const nextAmounts =
-    paymentAmount !== null && !Number.isNaN(paymentAmount)
-      ? prevAmountsRaw
-        ? `${prevAmountsRaw},${paymentAmount}`
-        : String(paymentAmount)
-      : prevAmountsRaw || null;
+  const nextAmounts = prevAmountsRaw
+    ? `${prevAmountsRaw},${paymentAmount}`
+    : String(paymentAmount);
 
   return { nextIds, nextDates, nextAmounts, skipAppend: false };
 }
 
-/** Fix DB row when duplicate advance was stored (returns null if unchanged). */
+/** Fix misaligned CSV (extra dates, duplicate advance). Returns null if unchanged. */
 export function normalizeStoredPaymentFields(order) {
-  const rawAmounts = splitCsv(order?.payment_amount).filter(Boolean);
   const rows = buildOrderPaymentRows(order);
-  if (rows.length >= rawAmounts.length) return null;
+  const next = paymentFieldsFromRows(rows);
 
-  const ids = rows.map((r) => (r.id || "").trim()).filter(Boolean);
-  const dates = rows.map((r) => (r.date || "").trim()).filter(Boolean);
-  const amounts = rows.map((r) => (r.amount || "").trim()).filter(Boolean);
+  const same =
+    (order.payment_id || "").toString().trim() === (next.payment_id || "").trim() &&
+    (order.payment_date || "").toString().trim() === (next.payment_date || "").trim() &&
+    (order.payment_amount || "").toString().trim() === (next.payment_amount || "").trim();
 
-  return {
-    payment_id: ids.length ? ids.join(",") : null,
-    payment_date: dates.length ? dates.join(",") : null,
-    payment_amount: amounts.length ? amounts.join(",") : null,
-  };
+  return same ? null : next;
 }
