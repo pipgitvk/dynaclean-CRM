@@ -597,6 +597,7 @@ export default function InvoiceTable({ onSummaryUpdate }) {
 
       {editId != null && (
         <InvoiceEditModal
+          key={editId}
           open
           invoiceId={editId}
           onClose={() => setEditId(null)}

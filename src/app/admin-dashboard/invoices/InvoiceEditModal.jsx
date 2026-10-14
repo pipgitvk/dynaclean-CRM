@@ -158,6 +158,7 @@ export default function InvoiceEditModal({
   const [showPaymentLinkModal, setShowPaymentLinkModal] = useState(false);
   const [linkedTransIds, setLinkedTransIds] = useState([]);
   const originalLinkedTransIdsRef = useRef([]);
+  const [buyerTaxReady, setBuyerTaxReady] = useState(false);
 
   const taxSummary = useMemo(() => {
     let subtotal = 0;
@@ -197,7 +198,7 @@ export default function InvoiceEditModal({
   }, [taxSummary.finalRoundOff, isAutoRoundOff]);
 
   useEffect(() => {
-    if (!open || loading) return;
+    if (!open || loading || !buyerTaxReady) return;
 
     const gstinValue = form.gst_number?.trim();
     if (gstinValue) {
@@ -232,13 +233,14 @@ export default function InvoiceEditModal({
         );
       return same ? prev : next;
     });
-  }, [open, loading, form.gst_number, form.state, form.state_code]);
+  }, [open, loading, buyerTaxReady, form.gst_number, form.state, form.state_code]);
 
   useEffect(() => {
     if (!open || !invoiceId) return;
 
     let cancelled = false;
     setLoading(true);
+    setBuyerTaxReady(false);
 
     (async () => {
       try {
@@ -309,6 +311,7 @@ export default function InvoiceEditModal({
           setSgstRate,
           setIgstRate,
         });
+        if (!cancelled) setBuyerTaxReady(true);
       } catch (e) {
         if (!cancelled) {
           toast.error(e?.message || "Failed to load invoice");
