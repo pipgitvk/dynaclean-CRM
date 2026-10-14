@@ -1,7 +1,7 @@
 "use client";
 
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
-import { useEffect, useState, useMemo } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Search, Users, FileText, IndianRupee, X } from "lucide-react";
 import dayjs from "dayjs";
@@ -42,6 +42,11 @@ export default function BuyerCards() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState("");
+  const [buyerPage, setBuyerPage] = useState(1);
+  const buyerPageSize = 20;
+  const [buyerMeta, setBuyerMeta] = useState({ page: 1, total: 0, totalPages: 1 });
+  const [summary, setSummary] = useState({ buyers: 0, invoices: 0, amount: 0 });
+  const searchDebounceRef = useRef(null);
   const [showViewModal, setShowViewModal] = useState(false);
   const [allInvoices, setAllInvoices] = useState([]);
   const [loadingInvoices, setLoadingInvoices] = useState(false);
@@ -64,34 +69,53 @@ export default function BuyerCards() {
   const [toDate, setToDate] = useState(formatDateForInput(lastDayOfMonth));
   const [invoiceSearch, setInvoiceSearch] = useState("");
 
+  const fetchBuyers = useCallback(async (page, searchQuery) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: String(buyerPageSize),
+      });
+      if (searchQuery.trim()) params.set("search", searchQuery.trim());
+
+      const res = await fetch(`/api/invoice-buyers?${params}`, { credentials: "include" });
+      const data = await res.json();
+      if (!data.success) {
+        setError(data.error || "Failed to load buyers");
+        setBuyers([]);
+        return;
+      }
+      setBuyers(data.buyers ?? []);
+      setBuyerMeta(data.meta ?? { page: 1, total: 0, totalPages: 1 });
+      setSummary(data.summary ?? { buyers: 0, invoices: 0, amount: 0 });
+      setBuyerPage(data.meta?.page ?? page);
+    } catch (e) {
+      setError(e.message);
+      setBuyers([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [buyerPageSize]);
+
   useEffect(() => {
-    fetch("/api/invoice-buyers", { credentials: "include" })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.success) setBuyers(data.buyers ?? []);
-        else setError(data.error || "Failed to load buyers");
-      })
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
-  }, []);
-
-  const filtered = useMemo(() => {
-    // First filter out buyers with null/undefined IDs
-    let result = buyers.filter(b => b.buyer_name != null && String(b.buyer_name).trim() !== "");
-    
-    if (!search.trim()) return result;
-    const q = search.trim().toLowerCase();
-    return result.filter((b) => b.buyer_name?.toLowerCase().includes(q));
-  }, [buyers, search]);
-
-  const totals = useMemo(() => {
-    const validBuyers = buyers.filter(b => b.buyer_name != null && String(b.buyer_name).trim() !== "");
-    return {
-      buyers: validBuyers.length,
-      invoices: validBuyers.reduce((s, b) => s + Number(b.invoice_count || 0), 0),
-      amount: validBuyers.reduce((s, b) => s + Number(b.total_amount || 0), 0),
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    const delay = search.trim() ? 350 : 0;
+    searchDebounceRef.current = setTimeout(() => {
+      fetchBuyers(1, search);
+    }, delay);
+    return () => {
+      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
     };
-  }, [buyers]);
+  }, [search, fetchBuyers]);
+
+  const goToBuyerPage = (page) => {
+    if (page < 1 || page > buyerMeta.totalPages || page === buyerPage) return;
+    fetchBuyers(page, search);
+  };
+
+  const totalBuyerPages = buyerMeta.totalPages || 1;
+  const buyerTotal = buyerMeta.total || 0;
 
   const handleCardClick = (buyerName) => {
     router.push(`/admin-dashboard/invoices/buyer/${encodeURIComponent(buyerName)}`);
@@ -167,7 +191,7 @@ export default function BuyerCards() {
     }
   };
 
-  if (loading) {
+  if (loading && buyers.length === 0 && !error) {
     return (
       <div className="space-y-6">
         <div className="h-8 w-48 bg-gray-200 rounded animate-pulse" />
@@ -180,7 +204,7 @@ export default function BuyerCards() {
     );
   }
 
-  if (error) {
+  if (error && buyers.length === 0) {
     return (
       <div className="text-center py-20 text-red-500">
         <p className="text-lg font-semibold">Failed to load buyers</p>
@@ -196,7 +220,7 @@ export default function BuyerCards() {
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Invoice Management</h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            {totals.buyers} buyers · {totals.invoices} invoices total
+            {summary.buyers} buyers · {summary.invoices} invoices total
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
@@ -227,9 +251,9 @@ export default function BuyerCards() {
       {/* Summary strip */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {[
-          { icon: Users,        label: "Total Buyers",   value: totals.buyers,              color: "text-blue-600",   bg: "bg-blue-50"   },
-          { icon: FileText,     label: "Total Invoices", value: totals.invoices,             color: "text-purple-600", bg: "bg-purple-50" },
-          { icon: IndianRupee,  label: "Total Amount",   value: `₹${fmt(totals.amount)}`,   color: "text-green-600",  bg: "bg-green-50"  },
+          { icon: Users,        label: "Total Buyers",   value: summary.buyers,              color: "text-blue-600",   bg: "bg-blue-50"   },
+          { icon: FileText,     label: "Total Invoices", value: summary.invoices,             color: "text-purple-600", bg: "bg-purple-50" },
+          { icon: IndianRupee,  label: "Total Amount",   value: `₹${fmt(summary.amount)}`,   color: "text-green-600",  bg: "bg-green-50"  },
         ].map(({ icon: Icon, label, value, color, bg }) => (
           <div key={label} className={`flex items-center gap-3 rounded-xl border border-gray-200 ${bg} p-4`}>
             <div className={`rounded-full p-2 ${bg}`}>
@@ -250,7 +274,10 @@ export default function BuyerCards() {
           type="text"
           placeholder="Search buyer name…"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setBuyerPage(1);
+          }}
           className="w-full rounded-xl border border-gray-300 bg-white text-gray-800 pl-9 pr-9 py-2.5 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
         />
         {search && (
@@ -264,19 +291,85 @@ export default function BuyerCards() {
       </div>
 
       {/* Buyer Cards Grid */}
-      {filtered.length === 0 ? (
+      {loading && buyers.length > 0 && (
+        <p className="text-sm text-gray-500 text-center">Loading buyers…</p>
+      )}
+
+      {buyers.length === 0 ? (
         <div className="py-20 text-center text-gray-400">
           {search ? `No buyers matching "${search}"` : "No buyers found."}
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filtered.map((buyer) => (
+        <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 ${loading ? "opacity-60 pointer-events-none" : ""}`}>
+          {buyers.map((buyer) => (
             <BuyerCard
-              key={buyer.buyer_name}
+              key={`${buyer.customer_id}-${buyer.buyer_name}`}
               buyer={buyer}
               onClick={() => handleCardClick(buyer.buyer_name)}
             />
           ))}
+        </div>
+      )}
+
+      {totalBuyerPages > 1 && (
+        <div className="flex items-center justify-between pt-2 border-t border-gray-200">
+          <p className="text-sm text-gray-500">
+            Showing {(buyerPage - 1) * buyerPageSize + 1}–{Math.min(buyerPage * buyerPageSize, buyerTotal)} of {buyerTotal} buyers
+          </p>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => goToBuyerPage(1)}
+              disabled={buyerPage === 1 || loading}
+              className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              «
+            </button>
+            <button
+              onClick={() => goToBuyerPage(buyerPage - 1)}
+              disabled={buyerPage === 1 || loading}
+              className="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Prev
+            </button>
+            {Array.from({ length: totalBuyerPages }, (_, i) => i + 1)
+              .filter((p) => p === 1 || p === totalBuyerPages || Math.abs(p - buyerPage) <= 2)
+              .reduce((acc, p, idx, arr) => {
+                if (idx > 0 && p - arr[idx - 1] > 1) acc.push("...");
+                acc.push(p);
+                return acc;
+              }, [])
+              .map((item, idx) =>
+                item === "..." ? (
+                  <span key={`ellipsis-${idx}`} className="px-2 py-1 text-xs text-gray-400">…</span>
+                ) : (
+                  <button
+                    key={item}
+                    onClick={() => goToBuyerPage(item)}
+                    className={`px-3 py-1 text-xs border rounded ${
+                      buyerPage === item
+                        ? "bg-blue-600 text-white border-blue-600 font-semibold"
+                        : "border-gray-300 hover:bg-gray-50"
+                    }`}
+                  >
+                    {item}
+                  </button>
+                )
+              )}
+            <button
+              onClick={() => goToBuyerPage(buyerPage + 1)}
+              disabled={buyerPage === totalBuyerPages || loading}
+              className="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
+            <button
+              onClick={() => goToBuyerPage(totalBuyerPages)}
+              disabled={buyerPage === totalBuyerPages || loading}
+              className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              »
+            </button>
+          </div>
         </div>
       )}
 
