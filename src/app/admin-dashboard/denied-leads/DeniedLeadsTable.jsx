@@ -71,17 +71,14 @@ export default function DeniedLeadsTable({
   return (
     <div className="space-y-4">
       <form onSubmit={handleSearch}>
-        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full mb-4">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <input
             type="text"
             value={search}
             placeholder="Search denied leads (customer ID, name, contact, followed by)..."
             onChange={(e) => setSearch(e.target.value)}
-            className="border border-gray-300 p-2.5 sm:p-2 rounded-lg flex-1 min-w-0 text-sm"
+            className="border border-gray-300 p-2.5 sm:p-2 rounded-lg min-w-[12rem] flex-1 text-sm basis-full sm:basis-auto sm:min-w-[240px] sm:max-w-md"
           />
-        </div>
-        
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <select
             value={filters.followed_by}
             onChange={(e) => setFilters({ ...filters, followed_by: e.target.value })}

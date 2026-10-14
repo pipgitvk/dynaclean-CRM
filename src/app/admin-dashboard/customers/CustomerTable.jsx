@@ -91,25 +91,14 @@ export default function CustomerTable({
   return (
     <div className="space-y-4">
       <form onSubmit={handleSearch}>
-        {/* Search + Daily Follow-Ups - stack on mobile */}
-        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full mb-4">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <input
             type="text"
             value={search}
             placeholder="Search customers (ID, phone, name, email)..."
             onChange={(e) => setSearch(e.target.value)}
-            className="border border-gray-300 p-2.5 sm:p-2 rounded-lg flex-1 min-w-0 text-sm"
+            className="border border-gray-300 p-2.5 sm:p-2 rounded-lg min-w-[12rem] flex-1 text-sm basis-full sm:basis-auto sm:min-w-[240px] sm:max-w-md"
           />
-          <Link
-            href={`/admin-dashboard/customers/followups`}
-            className="bg-blue-500 text-white px-4 py-2.5 sm:py-2 rounded-lg hover:bg-blue-600 text-center text-sm font-medium whitespace-nowrap"
-          >
-            Daily Follow-Ups
-          </Link>
-        </div>
-        
-        {/* Filters - wrap on small screens */}
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           {(userRole === "ADMIN" || userRole === "SUPERADMIN" || userRole === "TEAM LEADER" || userRole === "EA") && (
             <select
               value={filters.lead_source}
@@ -211,39 +200,43 @@ export default function CustomerTable({
               </option>
             ))}
           </select>
-          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap sm:gap-3">
-            <TypeableDateFilterInput
-              value={filters.from}
-              onChange={(v) => setFilters({ ...filters, from: v })}
-              wrapperClassName="relative flex w-[10.5rem] shrink-0 items-stretch"
-              className="border border-gray-300 rounded-lg px-3 py-2 text-sm w-full"
-              placeholder="From date"
-            />
-            <TypeableDateFilterInput
-              value={filters.to}
-              onChange={(v) => setFilters({ ...filters, to: v })}
-              wrapperClassName="relative flex w-[10.5rem] shrink-0 items-stretch"
-              className="border border-gray-300 rounded-lg px-3 py-2 text-sm w-full"
-              placeholder="To date"
-            />
-            <button
-              type="submit"
-              disabled={isPending}
-              className="shrink-0 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 disabled:opacity-50 text-sm font-medium"
-            >
-              {isPending ? <Loader2 size={18} className="animate-spin" /> : <Search size={18} />}
-              {isPending ? "Searching..." : "Search"}
-            </button>
-            <button
-              type="button"
-              onClick={resetFilters}
-              disabled={isPending}
-              className="shrink-0 px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors flex items-center gap-2 disabled:opacity-50 text-sm font-medium"
-            >
-              {isPending ? <Loader2 size={18} className="animate-spin" /> : <RefreshCw size={18} />}
-              Reset
-            </button>
-          </div>
+          <TypeableDateFilterInput
+            value={filters.from}
+            onChange={(v) => setFilters({ ...filters, from: v })}
+            wrapperClassName="relative flex w-[10.5rem] shrink-0 items-stretch"
+            className="border border-gray-300 rounded-lg px-3 py-2 text-sm w-full"
+            placeholder="From date"
+          />
+          <TypeableDateFilterInput
+            value={filters.to}
+            onChange={(v) => setFilters({ ...filters, to: v })}
+            wrapperClassName="relative flex w-[10.5rem] shrink-0 items-stretch"
+            className="border border-gray-300 rounded-lg px-3 py-2 text-sm w-full"
+            placeholder="To date"
+          />
+          <button
+            type="submit"
+            disabled={isPending}
+            className="shrink-0 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 disabled:opacity-50 text-sm font-medium"
+          >
+            {isPending ? <Loader2 size={18} className="animate-spin" /> : <Search size={18} />}
+            {isPending ? "Searching..." : "Search"}
+          </button>
+          <button
+            type="button"
+            onClick={resetFilters}
+            disabled={isPending}
+            className="shrink-0 px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors flex items-center gap-2 disabled:opacity-50 text-sm font-medium"
+          >
+            {isPending ? <Loader2 size={18} className="animate-spin" /> : <RefreshCw size={18} />}
+            Reset
+          </button>
+          <Link
+            href="/admin-dashboard/customers/followups"
+            className="shrink-0 bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 text-center text-sm font-medium whitespace-nowrap"
+          >
+            Daily Follow-Ups
+          </Link>
         </div>
       </form>
       

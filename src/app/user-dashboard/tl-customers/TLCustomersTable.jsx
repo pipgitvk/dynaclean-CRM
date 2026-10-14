@@ -527,10 +527,10 @@ export default function TLCustomersTable({
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
           {/* Left side - Search filters */}
           <div className="w-full flex-1">
-            <form onSubmit={handleSearch} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            <form onSubmit={handleSearch}>
+              <div className="flex flex-wrap items-end gap-3">
                 {/* Search */}
-                <div className="md:col-span-2">
+                <div className="min-w-[14rem] flex-1 sm:max-w-md">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Search (ID, Phone, Name, Company)
                   </label>
@@ -849,10 +849,8 @@ export default function TLCustomersTable({
                     </div>
                   )}
                 </div>
-              </div>
 
-              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                <div className="flex flex-wrap gap-2">
+                <div className="flex shrink-0 flex-wrap items-center gap-2 pb-0.5">
                   <button
                     type="submit"
                     disabled={isPending}
@@ -878,9 +876,8 @@ export default function TLCustomersTable({
                     )}
                     Reset
                   </button>
-                </div>
 
-                <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 sm:ml-4 sm:pl-4 sm:border-l border-gray-200 border-t sm:border-t-0 pt-3 sm:pt-0">
+                  <div className="flex flex-wrap items-center gap-3 sm:gap-4 sm:ml-2 sm:pl-4 sm:border-l border-gray-200">
                   <div className="flex items-center gap-2">
                     <label className="text-sm font-medium text-gray-700">
                       Show TL Entries Only:
@@ -974,6 +971,7 @@ export default function TLCustomersTable({
                       </span>
                     </div>
                   )}
+                  </div>
                 </div>
               </div>
             </form>

@@ -220,7 +220,7 @@ export default function CustomerTable({
       )}
 
       {/* Filters */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-8 gap-2">
+      <div className="flex flex-wrap items-end gap-2">
         <input
           type="text"
           placeholder="Search name, phone, email…"
@@ -232,7 +232,7 @@ export default function CustomerTable({
               runSearch();
             }
           }}
-          className="p-2 border rounded w-full sm:col-span-2"
+          className="p-2 border rounded w-full min-w-[12rem] flex-1 sm:max-w-md"
         />
         <TypeableDateFilterInput value={filters.date_from} onChange={(v) => update("date_from", v)} className="p-2 border rounded w-full"/>
         <TypeableDateFilterInput value={filters.date_to} onChange={(v) => update("date_to", v)} className="p-2 border rounded w-full"/>
@@ -391,23 +391,22 @@ export default function CustomerTable({
             ))}
           </select>
         )}
-      </div>
-      
-      {/* Reporting dates + Search / Reset */}
-      <div className="flex flex-col sm:flex-row flex-wrap items-end gap-3 mt-2">
-        <div className="flex flex-col gap-1 w-full sm:w-auto min-w-[10rem]">
+
+        <div className="flex flex-col gap-1 w-full sm:w-auto min-w-[10rem] shrink-0">
           <label className="text-xs text-gray-700 font-medium">Reporting From</label>
           <TypeableDateFilterInput
             value={filters.reporting_date_from}
             onChange={(v) => update("reporting_date_from", v)}
+            wrapperClassName="relative flex w-full min-w-[10rem] shrink-0 items-stretch"
             className="p-2 border rounded w-full"
           />
         </div>
-        <div className="flex flex-col gap-1 w-full sm:w-auto min-w-[10rem]">
+        <div className="flex flex-col gap-1 w-full sm:w-auto min-w-[10rem] shrink-0">
           <label className="text-xs text-gray-700 font-medium">Reporting To</label>
           <TypeableDateFilterInput
             value={filters.reporting_date_to}
             onChange={(v) => update("reporting_date_to", v)}
+            wrapperClassName="relative flex w-full min-w-[10rem] shrink-0 items-stretch"
             className="p-2 border rounded w-full"
           />
         </div>
@@ -415,7 +414,7 @@ export default function CustomerTable({
           type="button"
           onClick={runSearch}
           disabled={isPending}
-          className="inline-flex h-[42px] w-full sm:w-auto items-center justify-center gap-2 rounded border border-blue-600 bg-blue-600 px-6 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+          className="inline-flex h-[42px] shrink-0 items-center justify-center gap-2 rounded border border-blue-600 bg-blue-600 px-6 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
           title="Search"
         >
           {isPending ? (
@@ -428,7 +427,7 @@ export default function CustomerTable({
         <button
           type="button"
           onClick={resetFilters}
-          className="h-[42px] w-full sm:w-auto rounded border bg-red-100 px-8 py-2 text-sm font-medium hover:bg-red-200"
+          className="h-[42px] shrink-0 rounded border bg-red-100 px-8 py-2 text-sm font-medium hover:bg-red-200"
         >
           Reset
         </button>
