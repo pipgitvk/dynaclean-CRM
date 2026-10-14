@@ -23,6 +23,7 @@ import {
   sumOrderPaymentAmounts,
 } from "@/lib/orderPaymentHistory";
 import { deriveOrderPaymentStatus } from "@/lib/paymentOrderStatus";
+import { isBookingAllowedForOrder } from "@/lib/orderBookingEligibility";
 
 import DeleteButton from "@/components/accounts/DeleteButton";
 import ReturnInitiateMenuItem from "@/components/orders/ReturnInitiateMenuItem";
@@ -826,18 +827,23 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
     "back office",
     "accountant",
     "admin",
+    "superadmin",
     "sales",
     "warehouse incharge",
     "gem portal",
     "team leader",
     "service head",
   ].includes(role);
+  const isSuperAdmin = role === "superadmin";
   const isAdmin = role === "admin";
   const isAccountant = role.includes("accountant");
   const isTeamLeader = role === "team leader";
   const isWarehouse = role === "warehouse incharge";
-  const canManageReturns = isAdmin || isAccountant || isTeamLeader;
-  const canEditBooking = isAdmin || role === "superadmin";
+  const canManageInvoiceDocs =
+    isSuperAdmin || isAdmin || isAccountant || isTeamLeader;
+  const canManageReturns =
+    isSuperAdmin || isAdmin || isAccountant || isTeamLeader;
+  const canEditBooking = isSuperAdmin || isAdmin;
   const hasBooking =
     r.booking_id !== undefined &&
     r.booking_id !== null &&
@@ -896,7 +902,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                 <span>View Sales</span>
               </Link>
             )}
-            {["accountant", "admin", "team leader"].includes(role) &&
+            {canManageInvoiceDocs &&
               (r.report_file ? (
                 <>
                   <Link
@@ -932,11 +938,11 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                     <span>Upload Report</span>
                   </Link>
                   <div className="px-2">
-                    <DeleteButton orderId={r.order_id} />
+                    {isSuperAdmin && <DeleteButton orderId={r.order_id} />}
                   </div>
                 </div>
               ))}
-            {canManageReturns && !hasBooking && r.report_file && (
+            {canManageReturns && !hasBooking && isBookingAllowedForOrder(r) && (
                 <Link
                   href={`/accounts-dashboard/order/upload-booking/${r.order_id}`}
                   className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-green-700"
@@ -969,7 +975,9 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                   <span>View Booking</span>
                 </Link>
               )}
-            {isWarehouse && hasBooking && dispatchStatus === 0 && (
+            {(isWarehouse || isSuperAdmin || isAdmin) &&
+              hasBooking &&
+              dispatchStatus === 0 && (
               <>
                 <Link
                   href={`/user-dashboard/order/dispatch/${r.order_id}`}
@@ -997,7 +1005,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                   </Link>
                 </>
               )}
-            {["accountant", "admin"].includes(role) && r.report_file && (
+            {canManageInvoiceDocs && r.report_file && (
               <div className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
                 <EditPaymentButton order={r} />
               </div>
@@ -1023,7 +1031,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                 <ViewReturnBookingMenuItem order={r} />
               </div>
             )}
-            {(isAdmin || isAccountant) &&
+            {(isSuperAdmin || isAdmin || isAccountant) &&
               [3, 1, 2].includes(Number(r.is_returned)) &&
               r.credit_note_id && (
               <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>
@@ -1038,7 +1046,8 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                 </Link>
               </div>
             )}
-            {(isAdmin || isAccountant || isWarehouse) && Number(r.warehouse_in_done) === 1 && (
+            {(isSuperAdmin || isAdmin || isAccountant || isWarehouse) &&
+              Number(r.warehouse_in_done) === 1 && (
               <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>
                 <WarehouseInMenuItem order={r} />
               </div>

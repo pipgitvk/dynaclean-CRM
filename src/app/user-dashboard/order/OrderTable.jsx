@@ -740,14 +740,19 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
       "gem portal",
       "team leader",
       "service head",
+      "superadmin",
     ].includes(role) ||
     isGem;
+  const isSuperAdmin = role === "superadmin";
   const isAdmin = role === "admin";
   const isAccountant = role.includes("accountant");
   const isTeamLeader = role === "team leader";
   const isWarehouse = role === "warehouse incharge";
-  const canManageReturns = isAdmin || isAccountant || isTeamLeader;
-  const canEditBooking = isAdmin || role === "superadmin";
+  const canManageInvoiceDocs =
+    isSuperAdmin || isAdmin || isAccountant || isTeamLeader;
+  const canManageReturns =
+    isSuperAdmin || isAdmin || isAccountant || isTeamLeader;
+  const canEditBooking = isSuperAdmin || isAdmin;
   const hasBooking =
     r.booking_id !== undefined &&
     r.booking_id !== null &&
@@ -817,7 +822,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
             )}
             {!isGem && (
               <>
-                {["accountant", "admin", "team leader"].includes(role) &&
+                {canManageInvoiceDocs &&
                   (r.report_file ? (
                     <Link
                       href={`/user-dashboard/order/view/${r.order_id}`}
@@ -877,7 +882,9 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                       <span>View Booking</span>
                     </Link>
                   )}
-                {(isWarehouse || isAdmin) && hasBooking && dispatchStatus === 0 && (
+                {(isWarehouse || isAdmin || isSuperAdmin) &&
+                  hasBooking &&
+                  dispatchStatus === 0 && (
                   <Link
                     href={`/user-dashboard/order/dispatch/${r.order_id}`}
                     className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700 w-full block"
@@ -888,7 +895,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                     <span>Dispatch</span>
                   </Link>
                 )}
-                {["accountant", "admin"].includes(role) && r.report_file && (
+                {canManageInvoiceDocs && r.report_file && (
                   <div className="px-3 py-2 w-full block" onClick={(e) => e.stopPropagation()}>
                     <EditPaymentButton order={r} />
                   </div>
@@ -919,7 +926,9 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                     <ViewReturnBookingMenuItem order={r} />
                   </div>
                 )}
-                {(isAdmin || isAccountant) && [3, 1, 2].includes(Number(r.is_returned)) && r.credit_note_id && (
+                {(isSuperAdmin || isAdmin || isAccountant) &&
+                  [3, 1, 2].includes(Number(r.is_returned)) &&
+                  r.credit_note_id && (
                   <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>
                     <Link
                       href={`/user-dashboard/credit-notes/${r.credit_note_id}`}
@@ -941,7 +950,8 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                   </div>
                 )}
                 {/* After warehouse-in done, show view for admin + accountant + warehouse */}
-                {(isAdmin || isAccountant || isWarehouse) && Number(r.warehouse_in_done) === 1 && (
+                {(isSuperAdmin || isAdmin || isAccountant || isWarehouse) &&
+                  Number(r.warehouse_in_done) === 1 && (
                   <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>
                     <WarehouseInMenuItem order={r} />
                   </div>

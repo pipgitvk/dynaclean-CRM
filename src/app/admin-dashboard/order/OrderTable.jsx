@@ -35,6 +35,7 @@ import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
 import {
   canEditDeliveryProof,
 } from "@/lib/orderDocumentEditRules";
+import { isBookingAllowedForOrder } from "@/lib/orderBookingEligibility";
 import DeleteButton from "@/components/accounts/DeleteButton";
 import toast from "react-hot-toast";
 
@@ -2931,7 +2932,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                   </div>
                 </>
               ))}
-            {canManageReturns && !hasBooking && r.report_file && (
+            {canManageReturns && !hasBooking && isBookingAllowedForOrder(r) && (
                 <Link
                   href={`/admin-dashboard/order/upload-booking/${r.order_id}`}
                   className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-green-700"
