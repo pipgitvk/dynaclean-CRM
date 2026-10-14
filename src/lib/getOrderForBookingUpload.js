@@ -69,10 +69,15 @@ export function resolveBookingUploadPage(order, role) {
 export async function getOrderForBookingUpload(orderId) {
   const conn = await getDbConnection();
   const [rows] = await conn.execute(
-    `SELECT order_id, client_name, contact, email, delivery_location, quote_number,
-            client_delivery_date, booking_id, booking_date, booking_url, admin_remark,
-            delivery_date, dispatch_status, report_file
-     FROM neworder WHERE order_id = ?`,
+    `SELECT
+       no.order_id, no.client_name, no.contact, no.email, no.delivery_location, no.quote_number,
+       no.client_delivery_date, no.booking_id, no.booking_date, no.booking_url, no.admin_remark,
+       no.delivery_date, no.dispatch_status, no.report_file,
+       no.totalamt, no.baseAmount, no.taxamt,
+       qr.grand_total AS quotation_grand_total
+     FROM neworder no
+     LEFT JOIN quotations_records qr ON qr.quote_number = no.quote_number
+     WHERE no.order_id = ?`,
     [orderId],
   );
   return rows[0] || null;

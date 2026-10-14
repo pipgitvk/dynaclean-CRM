@@ -36,10 +36,15 @@ export async function POST(req) {
 
     // Fetch order details and current booking/dispatch state
     const [orderRows] = await conn.execute(
-      `SELECT order_id, client_name, email, totalamt, payment_amount, quote_number, delivery_location,
-              booking_id, booking_date, booking_url, admin_remark, delivery_date, dispatch_status,
-              report_file
-       FROM neworder WHERE order_id = ?`,
+      `SELECT
+         no.order_id, no.client_name, no.email, no.totalamt, no.baseAmount, no.taxamt,
+         no.payment_amount, no.quote_number, no.delivery_location,
+         no.booking_id, no.booking_date, no.booking_url, no.admin_remark, no.delivery_date,
+         no.dispatch_status, no.report_file,
+         qr.grand_total AS quotation_grand_total
+       FROM neworder no
+       LEFT JOIN quotations_records qr ON qr.quote_number = no.quote_number
+       WHERE no.order_id = ?`,
       [orderId]
     );
 
