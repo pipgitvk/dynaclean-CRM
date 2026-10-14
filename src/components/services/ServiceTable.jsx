@@ -1044,11 +1044,11 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
 
       {/* Search + Filters */}
       <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-3 mb-4 space-y-3">
-        <div className="flex gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
           <input
             type="text"
             placeholder="Search records (including company name)..."
-            className="p-2 w-full border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
+            className="p-2 w-full min-w-0 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             onKeyDown={(e) => {
@@ -1058,39 +1058,77 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
               }
             }}
           />
-          <ManualFilterSearchButton onClick={handleApplySearch} />
-          <button
-            type="button"
-            onClick={handleResetSearch}
-            className="px-4 py-2 bg-gray-100 border border-gray-300 rounded-lg hover:bg-gray-200 transition-colors text-sm whitespace-nowrap"
-          >
-            Clear
-          </button>
+          <div className="flex shrink-0 gap-2">
+            <ManualFilterSearchButton onClick={handleApplySearch} />
+            <button
+              type="button"
+              onClick={handleResetSearch}
+              className="px-4 py-2 bg-gray-100 border border-gray-300 rounded-lg hover:bg-gray-200 transition-colors text-sm whitespace-nowrap"
+            >
+              Clear
+            </button>
+          </div>
         </div>
         <p className="text-xs text-gray-500">{MANUAL_FILTER_HINT}</p>
 
-        {/* Filters Row */}
-        <div className="flex flex-wrap gap-3 items-end">
-          <div className="flex-1 min-w-[240px]">
-            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Date Range</label>
-            <div className="flex items-center gap-2">
-              <TypeableDateFilterInput value={complaintDateFrom} onChange={(v) => { setComplaintDateFrom(v); setCurrentPage(1); }} className="p-2 w-full border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"/>
-              <span className="text-gray-400 text-xs shrink-0">to</span>
-              <TypeableDateFilterInput value={complaintDateTo} onChange={(v) => { setComplaintDateTo(v); setCurrentPage(1); }} className="p-2 w-full border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"/>
+        {/* Filters — grid avoids flex-1 squeeze / overlap on mid-width screens */}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 items-end">
+          <div className="min-w-0 sm:col-span-2 lg:col-span-3 xl:col-span-2">
+            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+              Date Range
+            </label>
+            <div className="grid grid-cols-1 gap-2 min-[480px]:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] min-[480px]:items-center">
+              <TypeableDateFilterInput
+                value={complaintDateFrom}
+                onChange={(v) => {
+                  setComplaintDateFrom(v);
+                  setCurrentPage(1);
+                }}
+                className="p-2 w-full min-w-0 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              />
+              <span className="text-gray-400 text-xs text-center min-[480px]:px-0 px-1">to</span>
+              <TypeableDateFilterInput
+                value={complaintDateTo}
+                onChange={(v) => {
+                  setComplaintDateTo(v);
+                  setCurrentPage(1);
+                }}
+                className="p-2 w-full min-w-0 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              />
             </div>
           </div>
-          <div className="flex-1 min-w-[130px]">
-            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Service Type</label>
-            <select className="p-2 w-full border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-              value={serviceTypeFilter} onChange={(e) => { setServiceTypeFilter(e.target.value); setCurrentPage(1); }}>
+          <div className="min-w-0">
+            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+              Service Type
+            </label>
+            <select
+              className="p-2 w-full min-w-0 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              value={serviceTypeFilter}
+              onChange={(e) => {
+                setServiceTypeFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+            >
               <option value="">All Types</option>
-              {uniqueServiceTypes.map((type) => <option key={type} value={type}>{type}</option>)}
+              {uniqueServiceTypes.map((type) => (
+                <option key={type} value={type}>
+                  {type}
+                </option>
+              ))}
             </select>
           </div>
-          <div className="flex-1 min-w-[130px]">
-            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Status</label>
-            <select className="p-2 w-full border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-              value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}>
+          <div className="min-w-0">
+            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+              Status
+            </label>
+            <select
+              className="p-2 w-full min-w-0 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+            >
               <option value="">All Statuses</option>
               {statusFilterOptions.map((s) => (
                 <option key={s} value={s}>
@@ -1099,24 +1137,46 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
               ))}
             </select>
           </div>
-          <div className="flex-1 min-w-[120px]">
-            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Assigned</label>
-            <select className="p-2 w-full border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-              value={assignedFilter} onChange={(e) => { setAssignedFilter(e.target.value); setCurrentPage(1); }}>
+          <div className="min-w-0">
+            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+              Assigned
+            </label>
+            <select
+              className="p-2 w-full min-w-0 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              value={assignedFilter}
+              onChange={(e) => {
+                setAssignedFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+            >
               <option value="">All</option>
               <option value="ASSIGNED">Assigned</option>
               <option value="NOT_ASSIGNED">Not Assigned</option>
             </select>
           </div>
-          <div className="flex-1 min-w-[140px]">
-            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Engineer</label>
-            <select className="p-2 w-full border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-              value={assignedToFilter} onChange={(e) => { setAssignedToFilter(e.target.value); setCurrentPage(1); }}>
+          <div className="min-w-0">
+            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+              Engineer
+            </label>
+            <select
+              className="p-2 w-full min-w-0 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              value={assignedToFilter}
+              onChange={(e) => {
+                setAssignedToFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+            >
               <option value="">All Engineers</option>
-              {uniqueEngineers.map((eng) => <option key={eng} value={eng}>{eng}</option>)}
+              {uniqueEngineers.map((eng) => (
+                <option key={eng} value={eng}>
+                  {eng}
+                </option>
+              ))}
             </select>
           </div>
-          <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-red-200 bg-red-50/50 px-3 py-2.5 text-sm text-red-900">
+          <label
+            className="flex min-h-[42px] cursor-pointer items-center gap-2 rounded-lg border border-red-200 bg-red-50/50 px-3 py-2.5 text-sm text-red-900 min-w-0 xl:col-span-1"
+          >
             <input
               type="checkbox"
               checked={pendingOver48hOnly}
@@ -1124,9 +1184,9 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
                 setPendingOver48hOnly(e.target.checked);
                 setCurrentPage(1);
               }}
-              className="h-4 w-4 rounded border-red-300 text-red-600 focus:ring-red-500"
+              className="h-4 w-4 shrink-0 rounded border-red-300 text-red-600 focus:ring-red-500"
             />
-            Pending &gt; 48 hours
+            <span className="leading-tight">Pending &gt; 48 hours</span>
           </label>
         </div>
       </div>
