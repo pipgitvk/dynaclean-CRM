@@ -91,20 +91,6 @@ export default function TypeableDateFilterInput({
     }
   };
 
-  const openPicker = () => {
-    const el = pickerRef.current;
-    if (!el || disabled) return;
-    if (typeof el.showPicker === "function") {
-      try {
-        el.showPicker();
-        return;
-      } catch {
-        // fall through
-      }
-    }
-    el.click();
-  };
-
   const handlePickerChange = (e) => {
     const iso = e.target.value;
     applyIso(iso);
@@ -151,33 +137,29 @@ export default function TypeableDateFilterInput({
         {...textRest}
       />
 
-      <button
-        type="button"
-        tabIndex={-1}
-        disabled={disabled}
-        onMouseDown={(e) => e.preventDefault()}
-        onClick={openPicker}
-        className="absolute right-0 top-0 flex h-full w-9 shrink-0 items-center justify-center text-gray-500 hover:text-gray-700 disabled:pointer-events-none disabled:opacity-50"
-        aria-label="Open calendar"
-        title="Pick date"
-      >
-        <CalendarDays className="h-4 w-4 pointer-events-none" aria-hidden />
-      </button>
-
-      <input
-        ref={pickerRef}
-        type="date"
-        tabIndex={-1}
-        aria-hidden
-        disabled={disabled}
-        value={isoValue}
-        min={min}
-        max={max}
-        onChange={handlePickerChange}
-        className="absolute right-0 top-0 h-full w-9 cursor-pointer opacity-0"
-        onMouseDown={(e) => e.preventDefault()}
-        onClick={(e) => e.stopPropagation()}
-      />
+      {/* Native date control over the icon — browser opens picker on click (reliable vs showPicker on hidden input). */}
+      <div className="absolute right-0 top-0 z-10 h-full w-9 shrink-0">
+        <input
+          ref={pickerRef}
+          type="date"
+          disabled={disabled}
+          value={isoValue}
+          min={min}
+          max={max}
+          onChange={handlePickerChange}
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0 [color-scheme:light] [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0"
+          title="Pick date"
+          aria-label="Pick date"
+        />
+        <div
+          className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center text-gray-500"
+          aria-hidden
+        >
+          <CalendarDays className="h-4 w-4" />
+        </div>
+      </div>
     </div>
   );
 }
