@@ -108,7 +108,7 @@ export default function TypeableDateFilterInput({
 
   const wrapperClasses = wrapperClassName
     ? wrapperClassName
-    : "relative flex w-full min-w-0 items-stretch";
+    : "relative flex w-auto min-w-[9.5rem] max-w-full shrink-0 items-stretch";
 
   return (
     <div className={wrapperClasses}>

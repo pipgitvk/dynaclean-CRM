@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Eye, Pencil, Search, RefreshCw, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { NOTES_LANGUAGE_OPTIONS } from "@/constants/notesLanguageOptions";
+import { getCurrentMonthRangeIso } from "@/lib/crmDateFormat";
 
 export default function CustomerTable({ 
   data, 
@@ -19,14 +20,15 @@ export default function CustomerTable({
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const monthDefault = getCurrentMonthRangeIso();
   const [search, setSearch] = useState(searchParams?.search || "");
   const [filters, setFilters] = useState({
     lead_source: searchParams?.lead_source || "",
     lead_campaign: searchParams?.lead_campaign || "",
     status: searchParams?.status || "",
     stage: searchParams?.stage || "",
-    from: searchParams?.from || "",
-    to: searchParams?.to || "",
+    from: searchParams?.from || monthDefault.from,
+    to: searchParams?.to || monthDefault.to,
     tags: searchParams?.tags || "",
     notes_language: searchParams?.notes_language || "",
   });
@@ -49,6 +51,7 @@ export default function CustomerTable({
   };
 
   const resetFilters = () => {
+    const range = getCurrentMonthRangeIso();
     startTransition(() => {
       setSearch("");
       setFilters({
@@ -56,12 +59,15 @@ export default function CustomerTable({
         lead_campaign: "",
         status: "",
         stage: "",
-        from: "",
-        to: "",
+        from: range.from,
+        to: range.to,
         tags: "",
         notes_language: "",
       });
-      router.push("/admin-dashboard/customers");
+      const params = new URLSearchParams();
+      params.set("from", range.from);
+      params.set("to", range.to);
+      router.push(`/admin-dashboard/customers?${params.toString()}`);
     });
   };
 
@@ -205,27 +211,39 @@ export default function CustomerTable({
               </option>
             ))}
           </select>
-          <TypeableDateFilterInput value={filters.from} onChange={(v) => setFilters({ ...filters, from: v })} className="border border-gray-300 rounded-lg px-3 py-2 text-sm min-w-[120px] sm:min-w-0"/>
-          <TypeableDateFilterInput value={filters.to} onChange={(v) => setFilters({ ...filters, to: v })} className="border border-gray-300 rounded-lg px-3 py-2 text-sm min-w-[120px] sm:min-w-0"/>
-          
-          <button
-            type="submit"
-            disabled={isPending}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 disabled:opacity-50 text-sm font-medium"
-          >
-            {isPending ? <Loader2 size={18} className="animate-spin" /> : <Search size={18} />}
-            {isPending ? "Searching..." : "Search"}
-          </button>
-          
-          <button
-            type="button"
-            onClick={resetFilters}
-            disabled={isPending}
-            className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors flex items-center gap-2 disabled:opacity-50 text-sm font-medium"
-          >
-            {isPending ? <Loader2 size={18} className="animate-spin" /> : <RefreshCw size={18} />}
-            Reset
-          </button>
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap sm:gap-3">
+            <TypeableDateFilterInput
+              value={filters.from}
+              onChange={(v) => setFilters({ ...filters, from: v })}
+              wrapperClassName="relative flex w-[10.5rem] shrink-0 items-stretch"
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm w-full"
+              placeholder="From date"
+            />
+            <TypeableDateFilterInput
+              value={filters.to}
+              onChange={(v) => setFilters({ ...filters, to: v })}
+              wrapperClassName="relative flex w-[10.5rem] shrink-0 items-stretch"
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm w-full"
+              placeholder="To date"
+            />
+            <button
+              type="submit"
+              disabled={isPending}
+              className="shrink-0 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 disabled:opacity-50 text-sm font-medium"
+            >
+              {isPending ? <Loader2 size={18} className="animate-spin" /> : <Search size={18} />}
+              {isPending ? "Searching..." : "Search"}
+            </button>
+            <button
+              type="button"
+              onClick={resetFilters}
+              disabled={isPending}
+              className="shrink-0 px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors flex items-center gap-2 disabled:opacity-50 text-sm font-medium"
+            >
+              {isPending ? <Loader2 size={18} className="animate-spin" /> : <RefreshCw size={18} />}
+              Reset
+            </button>
+          </div>
         </div>
       </form>
       

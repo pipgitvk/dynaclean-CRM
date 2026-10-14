@@ -31,3 +31,13 @@ export function formatCrmDateOnly(value, empty = EMPTY) {
 
 /** @deprecated Use {@link formatCrmDateOnly}. */
 export const formatCrmDate = formatCrmDateOnly;
+
+/** First and last calendar day of the current month as YYYY-MM-DD (filters, APIs). */
+export function getCurrentMonthRangeIso() {
+  const start = dayjs().startOf("month");
+  const end = dayjs().endOf("month");
+  return {
+    from: start.format("YYYY-MM-DD"),
+    to: end.format("YYYY-MM-DD"),
+  };
+}
