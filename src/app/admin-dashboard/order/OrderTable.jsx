@@ -137,19 +137,11 @@ function readOrderTableFilterState() {
       modelNameFilters: [],
       approvalStatusFilter: "",
       paymentStatusFilter: "",
-      showRejected: false,
     };
   }
   const savedModel =
     localStorage.getItem("orderTable_modelNameFilters") ||
     localStorage.getItem("orderTable_modelNameFilter");
-  let showRejected = false;
-  try {
-    const rawRejected = localStorage.getItem("orderTable_showRejected");
-    if (rawRejected) showRejected = JSON.parse(rawRejected);
-  } catch {
-    showRejected = false;
-  }
   return {
     searchQuery: localStorage.getItem("orderTable_searchQuery") || "",
     statusFilter: localStorage.getItem("orderTable_statusFilter") || "",
@@ -160,7 +152,6 @@ function readOrderTableFilterState() {
     modelNameFilters: parseModelFiltersFromStorage(savedModel),
     approvalStatusFilter: localStorage.getItem("orderTable_approvalStatusFilter") || "",
     paymentStatusFilter: localStorage.getItem("orderTable_paymentStatusFilter") || "",
-    showRejected,
   };
 }
 
@@ -175,7 +166,6 @@ function persistOrderTableFilterState(state) {
   localStorage.setItem("orderTable_modelNameFilters", JSON.stringify(state.modelNameFilters));
   localStorage.setItem("orderTable_approvalStatusFilter", state.approvalStatusFilter);
   localStorage.setItem("orderTable_paymentStatusFilter", state.paymentStatusFilter);
-  localStorage.setItem("orderTable_showRejected", JSON.stringify(state.showRejected));
 }
 
 function formatModelOptionLabel(item) {
@@ -318,6 +308,32 @@ function isOrderPaid(order) {
       .trim()
       .toLowerCase()
       .replace(/\s+/g, "") === "paid"
+  );
+}
+
+function normalizeApprovalStatus(status) {
+  const s = (status ?? "").toString().trim().toLowerCase();
+  if (!s || s === "null" || s === "undefined") return "pending";
+  return s;
+}
+
+function getApprovalRemarkText(order) {
+  const raw = order?.approval_remark;
+  if (raw == null) return "";
+  return String(raw).trim();
+}
+
+function ApprovalRemarkHover({ remark }) {
+  const text = String(remark || "").trim();
+  if (!text) return null;
+  return (
+    <span
+      className="inline-flex items-center justify-center text-amber-600 cursor-help shrink-0"
+      title={text}
+      aria-label={`Approval remark: ${text}`}
+    >
+      <AlertCircle size={14} />
+    </span>
   );
 }
 
@@ -629,12 +645,6 @@ export default function OrderTable({ orders, userRole }) {
   const [appliedPaymentStatusFilter, setAppliedPaymentStatusFilter] = useState(
     () => readOrderTableFilterState().paymentStatusFilter,
   );
-  const [showRejected, setShowRejected] = useState(
-    () => readOrderTableFilterState().showRejected,
-  );
-  const [appliedShowRejected, setAppliedShowRejected] = useState(
-    () => readOrderTableFilterState().showRejected,
-  );
   const [showNukePanel, setShowNukePanel] = useState(false);
   const [nukeConfirmText, setNukeConfirmText] = useState("");
   const [nukeLoading, setNukeLoading] = useState(false);
@@ -674,7 +684,6 @@ export default function OrderTable({ orders, userRole }) {
     setAppliedModelNameFilters(modelNameFilters);
     setAppliedApprovalStatusFilter(approvalStatusFilter);
     setAppliedPaymentStatusFilter(paymentStatusFilter);
-    setAppliedShowRejected(showRejected);
     persistOrderTableFilterState({
       searchQuery,
       statusFilter,
@@ -685,7 +694,6 @@ export default function OrderTable({ orders, userRole }) {
       modelNameFilters,
       approvalStatusFilter,
       paymentStatusFilter,
-      showRejected,
     });
   }, [
     searchQuery,
@@ -697,7 +705,6 @@ export default function OrderTable({ orders, userRole }) {
     modelNameFilters,
     approvalStatusFilter,
     paymentStatusFilter,
-    showRejected,
   ]);
 
   const toggleMenu = (id) => {
@@ -771,54 +778,87 @@ export default function OrderTable({ orders, userRole }) {
     );
   }, []);
 
-  const handleStatCardClick = useCallback((type) => {
-    switch (type) {
-      case "total":
-        setStatusFilter("");
-        setApprovalStatusFilter("");
-        setPaymentStatusFilter("");
-        setShowRejected(false);
-        break;
-      case "approved":
-        setStatusFilter("");
-        setApprovalStatusFilter("approved");
-        setPaymentStatusFilter("");
-        break;
-      case "pending":
-        setStatusFilter("");
-        setApprovalStatusFilter("pending");
-        setPaymentStatusFilter("");
-        break;
-      case "rejected":
-        setStatusFilter("");
-        setApprovalStatusFilter("rejected");
-        setShowRejected(true);
-        setPaymentStatusFilter("");
-        break;
-      case "dispatched":
-        setStatusFilter("dispatchdone");
-        setApprovalStatusFilter("approved");
-        setPaymentStatusFilter("");
-        break;
-      case "pendingDispatch":
-        setStatusFilter("pendingdispatched");
-        setApprovalStatusFilter("approved");
-        setPaymentStatusFilter("");
-        break;
-      case "paid":
-        setStatusFilter("");
-        setApprovalStatusFilter("");
-        setPaymentStatusFilter("paid");
-        break;
-      case "unpaid":
-        setStatusFilter("");
-        setApprovalStatusFilter("");
-        setPaymentStatusFilter("unpaid");
-        break;
-      default:
-        break;
-    }
-  }, []);
+  const handleStatCardClick = useCallback(
+    (type) => {
+      let nextStatus = statusFilter;
+      let nextApproval = approvalStatusFilter;
+      let nextPayment = paymentStatusFilter;
+
+      switch (type) {
+        case "total":
+          nextStatus = "";
+          nextApproval = "";
+          nextPayment = "";
+          break;
+        case "approved":
+          nextStatus = "";
+          nextApproval = "approved";
+          nextPayment = "";
+          break;
+        case "pending":
+          nextStatus = "";
+          nextApproval = "pending";
+          nextPayment = "";
+          break;
+        case "rejected":
+          nextStatus = "";
+          nextApproval = "rejected";
+          nextPayment = "";
+          break;
+        case "dispatched":
+          nextStatus = "dispatchdone";
+          nextApproval = "approved";
+          nextPayment = "";
+          break;
+        case "pendingDispatch":
+          nextStatus = "pendingdispatched";
+          nextApproval = "approved";
+          nextPayment = "";
+          break;
+        case "paid":
+          nextStatus = "";
+          nextApproval = "";
+          nextPayment = "paid";
+          break;
+        case "unpaid":
+          nextStatus = "";
+          nextApproval = "";
+          nextPayment = "unpaid";
+          break;
+        default:
+          return;
+      }
+
+      setStatusFilter(nextStatus);
+      setApprovalStatusFilter(nextApproval);
+      setPaymentStatusFilter(nextPayment);
+      setAppliedStatusFilter(nextStatus);
+      setAppliedApprovalStatusFilter(nextApproval);
+      setAppliedPaymentStatusFilter(nextPayment);
+      persistOrderTableFilterState({
+        searchQuery,
+        statusFilter: nextStatus,
+        dateFrom,
+        dateTo,
+        createdByFilter,
+        leadCampaignFilter,
+        modelNameFilters,
+        approvalStatusFilter: nextApproval,
+        paymentStatusFilter: nextPayment,
+      });
+    },
+    [
+      statusFilter,
+      approvalStatusFilter,
+      paymentStatusFilter,
+      searchQuery,
+      dateFrom,
+      dateTo,
+      createdByFilter,
+      leadCampaignFilter,
+      modelNameFilters,
+    ],
+  );
 
   const handleExportToExcel = async () => {
     setIsExporting(true);
@@ -917,7 +957,15 @@ export default function OrderTable({ orders, userRole }) {
 
     const lowercasedQuery = appliedSearchQuery.toLowerCase();
     let result = orders.filter((order) => {
-      if (!appliedShowRejected && order.approval_status === "rejected") {
+      const approval = normalizeApprovalStatus(order.approval_status);
+      const approvalFilter = appliedApprovalStatusFilter
+        .toString()
+        .trim()
+        .toLowerCase();
+
+      if (approvalFilter) {
+        if (approval !== approvalFilter) return false;
+      } else if (approval === "rejected") {
         return false;
       }
 
@@ -947,13 +995,6 @@ export default function OrderTable({ orders, userRole }) {
         } else if (campaignKey !== appliedLeadCampaignFilter) {
           return false;
         }
-      }
-
-      if (
-        appliedApprovalStatusFilter &&
-        order.approval_status !== appliedApprovalStatusFilter
-      ) {
-        return false;
       }
 
       if (appliedPaymentStatusFilter === "paid" && !isOrderPaid(order)) {
@@ -1007,7 +1048,6 @@ export default function OrderTable({ orders, userRole }) {
     appliedPaymentStatusFilter,
     sortColumn,
     sortDirection,
-    appliedShowRejected,
     appliedModelNameFilters,
   ]);
 
@@ -1167,21 +1207,22 @@ export default function OrderTable({ orders, userRole }) {
   }, [ordersForStatCards]);
 
   const rejectedOrderStats = useMemo(() => {
-    return filteredOrders.reduce(
+    return (orders || []).reduce(
       (acc, order) => {
+        if (!orderCreatedInDateRange(order, appliedDateFrom, appliedDateTo)) {
+          return acc;
+        }
         if (order.is_cancelled) return acc;
-        const approval = (order.approval_status || "")
-          .toString()
-          .trim()
-          .toLowerCase();
-        if (approval !== "rejected") return acc;
+        if (normalizeApprovalStatus(order.approval_status) !== "rejected") {
+          return acc;
+        }
         acc.rejected += 1;
         acc.rejectedAmount += getPaymentColumnAmount(order);
         return acc;
       },
       { rejected: 0, rejectedAmount: 0 },
     );
-  }, [filteredOrders]);
+  }, [orders, appliedDateFrom, appliedDateTo]);
 
   const activeStatCard = useMemo(() => {
     if (appliedPaymentStatusFilter === "paid") return "paid";
@@ -1355,7 +1396,6 @@ export default function OrderTable({ orders, userRole }) {
           modelNameFilters: appliedModelNameFilters,
           approvalStatusFilter: appliedApprovalStatusFilter,
           paymentStatusFilter: appliedPaymentStatusFilter,
-          showRejected: appliedShowRejected,
         });
       },
       plugins: {
@@ -1391,7 +1431,6 @@ export default function OrderTable({ orders, userRole }) {
       appliedModelNameFilters,
       appliedApprovalStatusFilter,
       appliedPaymentStatusFilter,
-      appliedShowRejected,
     ],
   );
 
@@ -2113,21 +2152,9 @@ export default function OrderTable({ orders, userRole }) {
         </div>
       </div>
 
-      {/* Show Rejected Orders Toggle */}
-      <div className="mt-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={showRejected}
-            onChange={(e) => setShowRejected(e.target.checked)}
-            className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
-          />
-          <span className="text-sm font-medium text-gray-700">Show Rejected Orders</span>
-        </label>
-        <p className="text-xs text-gray-500 sm:text-right">
-          Set filters above, then click Search to update the list.
-        </p>
-      </div>
+      <p className="mt-2 text-xs text-gray-500">
+        Rejected orders are hidden by default — use Approval Status &quot;Rejected&quot;, then Search.
+      </p>
 
       {/* 👨‍💼 TABLE VIEW for large screens */}
       <div className="hidden lg:block overflow-x-auto overflow-y-auto max-h-[calc(100vh-300px)] bg-white rounded-xl shadow-lg">
@@ -2383,17 +2410,7 @@ export default function OrderTable({ orders, userRole }) {
                       </div>
                     </td>
                     <td className="px-3 py-3">
-                      <div className="flex flex-col items-center gap-1">
-                        <ApprovalActions r={r} userRole={userRole} />
-                        {r.approval_remark && (
-                          <span
-                            className="text-xs text-gray-600 max-w-[180px] line-clamp-2 block text-left"
-                            title={r.approval_remark}
-                          >
-                            {r.approval_remark}
-                          </span>
-                        )}
-                      </div>
+                      <ApprovalActions r={r} userRole={userRole} />
                     </td>
                     <td className="px-3 py-3 text-center">
                       {dayjs(r.duedate).format("DD-MM-YYYY")}
@@ -2529,17 +2546,7 @@ export default function OrderTable({ orders, userRole }) {
 
                 {/* Approval Actions - Approve/Reject/Revert - visible on mobile */}
                 <div className="pt-2 border-t border-gray-100">
-                  <div className="flex flex-col gap-2">
-                    <ApprovalActions r={r} userRole={userRole} />
-                    {r.approval_remark && (
-                      <span
-                        className="text-xs text-gray-600 block"
-                        title={r.approval_remark}
-                      >
-                        Remark: {r.approval_remark}
-                      </span>
-                    )}
-                  </div>
+                  <ApprovalActions r={r} userRole={userRole} />
                 </div>
 
               </div>
@@ -4125,6 +4132,7 @@ function ApprovalActions({ r, userRole }) {
   const isSuperAdmin =
     (userRole || "").toString().trim().toUpperCase() === "SUPERADMIN";
   const revertAllowed = canRevertOrder(r.dispatch_status);
+  const savedRemark = getApprovalRemarkText(r);
 
   const submitAction = async (action, remarkVal) => {
     setLoading(true);
@@ -4173,12 +4181,16 @@ function ApprovalActions({ r, userRole }) {
     submitAction(modalAction, remark);
   };
 
-  if (r.approval_status === "approved") {
+  if (normalizeApprovalStatus(r.approval_status) === "approved") {
     return (
       <div className="flex flex-col items-center gap-1">
-        <div className="flex items-center gap-1 text-green-600 font-semibold px-2 py-1 bg-green-50 rounded-lg border border-green-100">
+        <div
+          className="flex items-center gap-1 text-green-600 font-semibold px-2 py-1 bg-green-50 rounded-lg border border-green-100"
+          title={savedRemark || undefined}
+        >
           <CheckCircle size={14} />
           <span>Approved</span>
+          <ApprovalRemarkHover remark={savedRemark} />
         </div>
         {isSuperAdmin && (
           <button
@@ -4197,12 +4209,16 @@ function ApprovalActions({ r, userRole }) {
       </div>
     );
   }
-  if (r.approval_status === "rejected") {
+  if (normalizeApprovalStatus(r.approval_status) === "rejected") {
     return (
       <div className="flex flex-col items-center gap-1">
-        <div className="flex items-center gap-1 text-red-600 font-semibold px-2 py-1 bg-red-50 rounded-lg border border-red-100">
+        <div
+          className="flex items-center gap-1 text-red-600 font-semibold px-2 py-1 bg-red-50 rounded-lg border border-red-100"
+          title={savedRemark || undefined}
+        >
           <XCircle size={14} />
           <span>Rejected</span>
+          <ApprovalRemarkHover remark={savedRemark} />
         </div>
         {isSuperAdmin && (
           <button
