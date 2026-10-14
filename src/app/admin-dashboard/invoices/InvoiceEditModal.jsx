@@ -13,6 +13,14 @@ import {
   isPerformaInvoiceType,
   resolvePerformaInvoiceTerms,
 } from "@/lib/performaInvoiceTerms";
+import {
+  applyTaxPercentsToInvoiceItems,
+  getStateCodeFromGstin,
+  headerRatesForInterstate,
+  isInterstateInvoiceSupply,
+  parseStateCodeFromDisplay,
+  totalGstPercentFromInvoiceItem,
+} from "@/lib/gstSupplyType";
 
 const emptyItem = () => ({
   item_name: "",
@@ -67,7 +75,7 @@ function parseLinkedTransIds(raw) {
 }
 
 function mapItemFromDb(row) {
-  return {
+  const mapped = {
     ...emptyItem(),
     ...row,
     quantity: Number(row.quantity) || 0,
@@ -79,6 +87,24 @@ function mapItemFromDb(row) {
     sgst_percent: Number(row.sgst_percent) || 0,
     igst_percent: Number(row.igst_percent) || 0,
   };
+  mapped.gst = totalGstPercentFromInvoiceItem(mapped);
+  return mapped;
+}
+
+function applyBuyerGstTaxToEditState(form, items, setters) {
+  const interstate = isInterstateInvoiceSupply({
+    buyerGstin: form.gst_number,
+    buyerStateCode: form.state_code,
+    stateDisplay: form.state,
+    parseCodeFromDisplay: parseStateCodeFromDisplay,
+  });
+  const nextItems = applyTaxPercentsToInvoiceItems(items, interstate);
+  const rates = headerRatesForInterstate(interstate);
+  setters.setItems(nextItems);
+  setters.setCgstRate(rates.cgstRate);
+  setters.setSgstRate(rates.sgstRate);
+  setters.setIgstRate(rates.igstRate);
+  return { interstate, nextItems, rates };
 }
 
 export default function InvoiceEditModal({
@@ -135,16 +161,21 @@ export default function InvoiceEditModal({
 
   const taxSummary = useMemo(() => {
     let subtotal = 0;
+    let cgst = 0;
+    let sgst = 0;
+    let igst = 0;
+
     items.forEach((item) => {
       const qty = item.quantity || 0;
       const rate = item.rate || 0;
       const discountAmount = item.discount_amount || 0;
-      const itemTotal = qty * rate - discountAmount;
-      subtotal += itemTotal;
+      const itemSubtotal = qty * rate - discountAmount;
+      subtotal += itemSubtotal;
+      cgst += (itemSubtotal * (item.cgst_percent || 0)) / 100;
+      sgst += (itemSubtotal * (item.sgst_percent || 0)) / 100;
+      igst += (itemSubtotal * (item.igst_percent || 0)) / 100;
     });
-    const cgst = (subtotal * cgstRate) / 100;
-    const sgst = (subtotal * sgstRate) / 100;
-    const igst = (subtotal * igstRate) / 100;
+
     const totalTax = cgst + sgst + igst;
     
     const totalBeforeRound = subtotal + totalTax;
@@ -157,13 +188,51 @@ export default function InvoiceEditModal({
     const grandTotal = totalBeforeRound + finalRoundOff;
     
     return { subtotal, cgst, sgst, igst, totalTax, grandTotal, finalRoundOff };
-  }, [items, cgstRate, sgstRate, igstRate, roundOff, isAutoRoundOff]);
+  }, [items, roundOff, isAutoRoundOff]);
 
   useEffect(() => {
     if (isAutoRoundOff) {
       setRoundOff(parseFloat(taxSummary.finalRoundOff.toFixed(2)));
     }
   }, [taxSummary.finalRoundOff, isAutoRoundOff]);
+
+  useEffect(() => {
+    if (!open || loading) return;
+
+    const gstinValue = form.gst_number?.trim();
+    if (gstinValue) {
+      const code = getStateCodeFromGstin(gstinValue);
+      if (code) {
+        setForm((prev) => {
+          if (prev.state_code === code) return prev;
+          return { ...prev, state_code: code };
+        });
+      }
+    }
+
+    setItems((prev) => {
+      const interstate = isInterstateInvoiceSupply({
+        buyerGstin: gstinValue,
+        buyerStateCode: form.state_code,
+        stateDisplay: form.state,
+        parseCodeFromDisplay: parseStateCodeFromDisplay,
+      });
+      const next = applyTaxPercentsToInvoiceItems(prev, interstate);
+      const rates = headerRatesForInterstate(interstate);
+      setCgstRate(rates.cgstRate);
+      setSgstRate(rates.sgstRate);
+      setIgstRate(rates.igstRate);
+      const same =
+        prev.length === next.length &&
+        prev.every(
+          (row, idx) =>
+            row.cgst_percent === next[idx].cgst_percent &&
+            row.sgst_percent === next[idx].sgst_percent &&
+            row.igst_percent === next[idx].igst_percent,
+        );
+      return same ? prev : next;
+    });
+  }, [open, loading, form.gst_number, form.state, form.state_code]);
 
   useEffect(() => {
     if (!open || !invoiceId) return;
@@ -190,7 +259,18 @@ export default function InvoiceEditModal({
         const pTransIds = parseLinkedTransIds(inv.linked_trans_ids);
         setLinkedTransIds(pTransIds);
         originalLinkedTransIdsRef.current = pTransIds;
-        setForm({
+        setShowPaymentLinkModal(false);
+        setNotes(inv.notes || "");
+        setEditableTerms(
+          isPerformaInvoiceType(inv.type)
+            ? resolvePerformaInvoiceTerms(inv.terms_conditions)
+            : inv.terms_conditions || "",
+        );
+        setTermsEditing(!isPerformaInvoiceType(inv.type));
+        setRoundOff(Number(inv.round_off) || 0);
+        // setIsAutoRoundOff(false); // Keep it true by default as requested
+
+        const loadedForm = {
           customer_id: inv.customer_id != null ? String(inv.customer_id) : "",
           customer_name: inv.customer_name || "",
           customer_email: inv.customer_email || "",
@@ -215,45 +295,20 @@ export default function InvoiceEditModal({
           eway_bill_no: inv.eway_bill_no ?? "",
           delivery_challan_no: inv.delivery_challan_no ?? "",
           order_date: dateInputValue(inv.order_date) || "",
-        });
-        setShowPaymentLinkModal(false);
-        setNotes(inv.notes || "");
-        setEditableTerms(
-          isPerformaInvoiceType(inv.type)
-            ? resolvePerformaInvoiceTerms(inv.terms_conditions)
-            : inv.terms_conditions || "",
-        );
-        setTermsEditing(!isPerformaInvoiceType(inv.type));
-        setRoundOff(Number(inv.round_off) || 0);
-        // setIsAutoRoundOff(false); // Keep it true by default as requested
+        };
+        setForm(loadedForm);
 
         const loadedItems =
           Array.isArray(data.items) && data.items.length
             ? data.items.map(mapItemFromDb)
             : [emptyItem()];
-        setItems(loadedItems);
 
-        // Use stored cgst_rate/sgst_rate/igst_rate columns directly
-        // Fall back to back-calculation only if columns not yet populated (old invoices)
-        const storedCgstRate = Number(inv.cgst_rate);
-        const storedSgstRate = Number(inv.sgst_rate);
-        const storedIgstRate = Number(inv.igst_rate);
-        const st = Number(inv.subtotal) || 0;
-
-        if (storedCgstRate > 0 || storedSgstRate > 0 || storedIgstRate > 0) {
-          setCgstRate(storedCgstRate);
-          setSgstRate(storedSgstRate);
-          setIgstRate(storedIgstRate);
-        } else if (st > 0) {
-          // Legacy fallback for invoices created before this fix
-          setCgstRate(Math.round(((Number(inv.cgst) || 0) / st) * 10000) / 100);
-          setSgstRate(Math.round(((Number(inv.sgst) || 0) / st) * 10000) / 100);
-          setIgstRate(Math.round(((Number(inv.igst) || 0) / st) * 10000) / 100);
-        } else {
-          setCgstRate(9);
-          setSgstRate(9);
-          setIgstRate(0);
-        }
+        applyBuyerGstTaxToEditState(loadedForm, loadedItems, {
+          setItems,
+          setCgstRate,
+          setSgstRate,
+          setIgstRate,
+        });
       } catch (e) {
         if (!cancelled) {
           toast.error(e?.message || "Failed to load invoice");
@@ -281,16 +336,16 @@ export default function InvoiceEditModal({
         const rate = item.rate || 0;
         const discountAmount = item.discount_amount || 0;
         const taxableValue = qty * rate - discountAmount;
-        const cgstAmount = (taxableValue * (cgstRate || 0)) / 100;
-        const sgstAmount = (taxableValue * (sgstRate || 0)) / 100;
-        const igstAmount = (taxableValue * (igstRate || 0)) / 100;
+        const cgstAmount = (taxableValue * (item.cgst_percent || 0)) / 100;
+        const sgstAmount = (taxableValue * (item.sgst_percent || 0)) / 100;
+        const igstAmount = (taxableValue * (item.igst_percent || 0)) / 100;
         const totalAmount =
           taxableValue + cgstAmount + sgstAmount + igstAmount;
         return {
           ...item,
-          cgst_percent: cgstRate,
-          sgst_percent: sgstRate,
-          igst_percent: igstRate,
+          cgst_percent: item.cgst_percent || 0,
+          sgst_percent: item.sgst_percent || 0,
+          igst_percent: item.igst_percent || 0,
           taxable_value: taxableValue,
           cgst_amount: cgstAmount,
           sgst_amount: sgstAmount,

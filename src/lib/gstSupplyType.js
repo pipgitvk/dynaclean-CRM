@@ -8,6 +8,13 @@ export function normalizeGstin(value) {
   return (value ?? "").toString().trim().toUpperCase();
 }
 
+/** e.g. "Gujarat (24)" → "24" */
+export function parseStateCodeFromDisplay(display) {
+  if (!display) return null;
+  const match = String(display).match(/\((\d{2})\)$/);
+  return match ? match[1] : null;
+}
+
 export function getStateCodeFromGstin(gstin) {
   const g = normalizeGstin(gstin);
   if (g.length < 2) return null;
@@ -33,7 +40,7 @@ export function isInterstateInvoiceSupply({
     buyerStateCode?.toString().trim() ||
     (typeof parseCodeFromDisplay === "function"
       ? parseCodeFromDisplay(stateDisplay)
-      : null) ||
+      : parseStateCodeFromDisplay(stateDisplay)) ||
     getStateCodeFromGstin(buyerGst);
 
   if (!code) return false;
