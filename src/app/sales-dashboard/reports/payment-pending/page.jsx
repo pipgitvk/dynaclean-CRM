@@ -6,6 +6,7 @@ import {
   filterPaymentPendingOrders,
   sortPaymentPendingOrders,
 } from "@/lib/filterPaymentPendingOrders";
+import PaymentPendingStatsBar from "@/components/reports/PaymentPendingStatsBar";
 import ManualFilterSearchButton, {
   MANUAL_FILTER_HINT,
 } from "@/components/ui/ManualFilterSearchButton";
@@ -165,9 +166,6 @@ export default function PaymentPendingReport() {
     setTotalOrdersCardClicks((clicks) => Math.min(clicks + 1, 8));
   };
 
-  const totalPending = filteredOrders.reduce((sum, order) => sum + order.remaining_amount, 0);
-  const totalAmount = filteredOrders.reduce((sum, order) => sum + order.total_amount, 0);
-
   const SkeletonRow = () => (
     <tr className="animate-pulse">
       <td className="px-4 py-3 border-b"><div className="h-4 bg-gray-300 rounded w-20"></div></td>
@@ -198,45 +196,15 @@ export default function PaymentPendingReport() {
       {/* Cards and Filters Layout */}
       <div className="mb-4 flex flex-col lg:flex-row gap-3">
         {/* Cards - Left Side */}
-        <div className="flex-shrink-0 w-full lg:w-auto">
-          {/* Row 1: Total Orders + Pending Amount (Side by side) */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-2">
-            {/* Total Orders */}
-            <div 
-              className="bg-gradient-to-br from-teal-50 to-cyan-50 rounded-lg shadow p-3 border-l-4 border-teal-500 cursor-pointer hover:bg-white/80 transition-colors"
-              onClick={handleTotalOrdersCardClick}
-            >
-              <p className="text-xs text-teal-600 font-bold tracking-wide">Total Orders</p>
-              <p className="text-2xl font-bold text-gray-800">{filteredOrders.length}</p>
-            </div>
-
-            {/* Pending Amount */}
-            <div className="bg-gradient-to-br from-red-50 to-orange-50 rounded-lg shadow p-3 border-l-4 border-red-500">
-              <p className="text-xs text-red-600 font-bold tracking-wide">Pending Amount</p>
-              <p className="text-2xl font-bold text-red-600">₹{(totalPending / 100000).toFixed(1)}L</p>
-            </div>
-          </div>
-
-          {/* Row 2: Total Amount (Full width) */}
-          <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-lg shadow p-3 border-l-4 border-blue-500 mb-2">
-            <p className="text-xs text-blue-600 font-bold tracking-wide">Total Amount</p>
-            <p className="text-2xl font-bold text-gray-800">₹{(totalAmount / 100000).toFixed(1)}L</p>
-          </div>
-
-          {totalOrdersCardClicks >= 8 && (
-            <button
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation();
-                handleDeleteAllData();
-              }}
-              disabled={deletingAll}
-              className="w-full inline-flex items-center justify-center gap-2 rounded-md bg-red-600 px-2 py-2 text-xs font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <Trash2 size={12} />
-              {deletingAll ? "Deleting..." : "Delete All"}
-            </button>
-          )}
+        <div className="flex-shrink-0 w-full lg:max-w-md">
+          <PaymentPendingStatsBar
+            orders={filteredOrders}
+            onOrdersClick={handleTotalOrdersCardClick}
+            totalOrdersCardClicks={totalOrdersCardClicks}
+            showDeleteAll
+            deletingAll={deletingAll}
+            onDeleteAll={handleDeleteAllData}
+          />
         </div>
 
         {/* Filters - Right Side */}

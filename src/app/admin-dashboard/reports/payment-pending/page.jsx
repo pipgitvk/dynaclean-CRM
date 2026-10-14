@@ -4,15 +4,17 @@ import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import {
   filterPaymentPendingOrders,
+  formatPaymentPendingInr,
   sortPaymentPendingOrders,
 } from "@/lib/filterPaymentPendingOrders";
+import PaymentPendingStatsBar from "@/components/reports/PaymentPendingStatsBar";
 import ManualFilterSearchButton, {
   MANUAL_FILTER_HINT,
 } from "@/components/ui/ManualFilterSearchButton";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import dayjs from "dayjs";
-import { Download, Search, Calendar, DollarSign, ArrowUp, ArrowDown, Trash2, X, PhoneCall, History, Loader2, MinusCircle, List } from "lucide-react";
+import { Download, Search, Calendar, DollarSign, ArrowUp, ArrowDown, X, PhoneCall, History, Loader2, MinusCircle, List } from "lucide-react";
 
 export default function PaymentPendingReport() {
   const router = useRouter();
@@ -183,9 +185,6 @@ export default function PaymentPendingReport() {
     setTotalOrdersCardClicks((clicks) => Math.min(clicks + 1, 8));
   };
 
-  const totalPending = filteredOrders.reduce((sum, order) => sum + order.remaining_amount, 0);
-  const totalAmount = filteredOrders.reduce((sum, order) => sum + order.total_amount, 0);
-
   const SkeletonRow = () => (
     <tr className="animate-pulse">
       <td className="px-4 py-3 border-b"><div className="h-4 bg-gray-300 rounded w-20"></div></td>
@@ -207,52 +206,17 @@ export default function PaymentPendingReport() {
     <div className="w-full max-w-full p-3 overflow-hidden">
     
 
-      {/* Single Row: Stats Card + Filters */}
-      <div className="mb-4 bg-white rounded-lg shadow p-3">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-center">
-          {/* Left Side: Combined Stats Card */}
-          <div className="bg-gradient-to-r from-gray-50 to-blue-50 rounded border p-2">
-            <div className="grid grid-cols-3 divide-x divide-gray-300">
-              {/* Total Orders */}
-              <div 
-                className="text-center cursor-pointer hover:bg-white/50 transition-colors px-2"
-                onClick={handleTotalOrdersCardClick}
-              >
-                <p className="text-xs text-teal-600 font-semibold">Total Orders</p>
-                <p className="text-lg font-bold text-gray-800">{filteredOrders.length}</p>
-              </div>
-              
-              {/* Pending Amount */}
-              <div className="text-center px-2">
-                <p className="text-xs text-red-600 font-semibold">Pending Amount</p>
-                <p className="text-lg font-bold text-red-600">₹{(totalPending / 100000).toFixed(1)}L</p>
-              </div>
-              
-              {/* Total Amount */}
-              <div className="text-center px-2">
-                <p className="text-xs text-blue-600 font-semibold">Total Amount</p>
-                <p className="text-lg font-bold text-gray-800">₹{(totalAmount / 100000).toFixed(1)}L</p>
-              </div>
-            </div>
+      <div className="mb-4 bg-white rounded-lg shadow p-3 space-y-3">
+        <PaymentPendingStatsBar
+          orders={filteredOrders}
+          onOrdersClick={handleTotalOrdersCardClick}
+          totalOrdersCardClicks={totalOrdersCardClicks}
+          showDeleteAll
+          deletingAll={deletingAll}
+          onDeleteAll={handleDeleteAllData}
+        />
 
-            {totalOrdersCardClicks >= 8 && (
-              <button
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  handleDeleteAllData();
-                }}
-                disabled={deletingAll}
-                className="mt-2 w-full inline-flex items-center justify-center gap-1 rounded bg-red-600 px-2 py-1 text-xs font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <Trash2 size={10} />
-                {deletingAll ? "Deleting..." : "Delete All"}
-              </button>
-            )}
-          </div>
-
-          {/* Right Side: Search and Filters */}
-          <div className="grid grid-cols-2 md:grid-cols-6 gap-2 items-center">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 items-center">
             {/* Search Box */}
             <div className="relative md:col-span-2">
               <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400" size={12} />
@@ -348,9 +312,8 @@ export default function PaymentPendingReport() {
                 </Link>
               )}
             </div>
-          </div>
-          <p className="text-xs text-gray-500 mt-2">{MANUAL_FILTER_HINT}</p>
         </div>
+        <p className="text-xs text-gray-500">{MANUAL_FILTER_HINT}</p>
       </div>
 
       {/* Table */}
@@ -456,17 +419,17 @@ export default function PaymentPendingReport() {
                       </td>
                       <td className="px-4 py-3 border-b text-gray-700">{order.contact}</td>
                       <td className="px-4 py-3 border-b text-gray-700">{order.created_by}</td>
-                      <td className="px-4 py-3 border-b text-right font-medium text-gray-800">
-                        ₹{order.total_amount.toFixed(2)}
+                      <td className="px-4 py-3 border-b text-right font-medium text-gray-800 whitespace-nowrap">
+                        {formatPaymentPendingInr(order.total_amount)}
                       </td>
-                      <td className="px-4 py-3 border-b text-right text-green-600">
-                        ₹{order.paid_amount.toFixed(2)}
+                      <td className="px-4 py-3 border-b text-right text-green-600 whitespace-nowrap">
+                        {formatPaymentPendingInr(order.paid_amount)}
                       </td>
-                      <td className="px-4 py-3 border-b text-right font-semibold text-red-600">
-                        <div>₹{order.remaining_amount.toFixed(2)}</div>
+                      <td className="px-4 py-3 border-b text-right font-semibold text-red-600 whitespace-nowrap">
+                        <div>{formatPaymentPendingInr(order.remaining_amount)}</div>
                         {Number(order.deduction_amount || 0) > 0 && (
                           <div className="text-[11px] font-medium text-orange-600">
-                            Deducted ₹{Number(order.deduction_amount).toFixed(2)}
+                            Deducted {formatPaymentPendingInr(order.deduction_amount)}
                           </div>
                         )}
                       </td>
@@ -506,17 +469,18 @@ export default function PaymentPendingReport() {
                           <span className="text-xs text-gray-400">—</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 border-b">
-                        <div className="flex items-center justify-center gap-2">
+                      <td className="px-3 py-3 border-b min-w-[10.5rem]">
+                        <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center justify-center gap-1">
                           <button
                             type="button"
                             onClick={() => {
                               setSelectedOrder(order);
                               setFollowupModalOpen(true);
                             }}
-                            className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700"
+                            className="inline-flex items-center justify-center gap-1 rounded-md bg-blue-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-blue-700"
+                            title="Add followup"
                           >
-                            <PhoneCall size={14} />
+                            <PhoneCall size={12} />
                             Followup
                           </button>
                           <button
@@ -525,9 +489,10 @@ export default function PaymentPendingReport() {
                               setSelectedOrder(order);
                               setHistoryModalOpen(true);
                             }}
-                            className="inline-flex items-center gap-2 rounded-md bg-gray-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-gray-800"
+                            className="inline-flex items-center justify-center gap-1 rounded-md bg-gray-700 px-2 py-1 text-[11px] font-semibold text-white hover:bg-gray-800"
+                            title="Followup history"
                           >
-                            <History size={14} />
+                            <History size={12} />
                             History
                           </button>
                           {canAddDeduction && (
@@ -538,10 +503,11 @@ export default function PaymentPendingReport() {
                                   `/admin-dashboard/reports/deductions?order_id=${encodeURIComponent(order.order_id)}`
                                 );
                               }}
-                              className="inline-flex items-center gap-2 rounded-md bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-700"
+                              className="inline-flex items-center justify-center gap-1 rounded-md bg-orange-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-orange-700"
+                              title="Add deduction"
                             >
-                              <MinusCircle size={14} />
-                              Deduction
+                              <MinusCircle size={12} />
+                              Deduct
                             </button>
                           )}
                         </div>
@@ -551,7 +517,7 @@ export default function PaymentPendingReport() {
                 })
               ) : (
                 <tr>
-                  <td colSpan={11} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={12} className="px-6 py-8 text-center text-gray-500">
                     No pending payments found
                   </td>
                 </tr>

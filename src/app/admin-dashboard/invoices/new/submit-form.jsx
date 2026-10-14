@@ -16,6 +16,12 @@ import {
   DEFAULT_TAX_INVOICE_TERMS,
   getDefaultPerformaInvoiceTerms,
 } from "@/lib/performaInvoiceTerms";
+import {
+  applyTaxPercentsToInvoiceItems,
+  getStateCodeFromGstin,
+  headerRatesForInterstate,
+  isInterstateInvoiceSupply,
+} from "@/lib/gstSupplyType";
 
 
 export default function InvoiceForm({ invoiceNumber, invoiceDate, invoiceType = "tax", onBack, onSuccessRedirect, initialQuotationNumber = "" }) {
@@ -76,10 +82,6 @@ export default function InvoiceForm({ invoiceNumber, invoiceDate, invoiceType = 
   const [sgstRate, setSgstRate] = useState(9);
   const [igstRate, setIgstRate] = useState(0);
   const [roundOff, setRoundOff] = useState(0);
-
-  // Supplier state is fixed
-  const SUPPLIER_STATE_CODE = "07";
-  const SUPPLIER_STATE_NAME = "Delhi";
 
   // State code to name map (GST state codes)
     const stateCodeToName = useMemo(
@@ -196,50 +198,48 @@ export default function InvoiceForm({ invoiceNumber, invoiceDate, invoiceType = 
 
   const [isGeneratingInvoice, setIsGeneratingInvoice] = useState(true);
 
-  // Auto-set state from GSTIN + apply CGST/SGST vs IGST — skip if loaded from quotation
+  // Auto-set state from GSTIN + CGST/SGST vs IGST (quotation load uses same rules, not stored quote tax type)
   useEffect(() => {
-    if (isFromQuotation) return;
-
     const gstinValue = form.gst_number?.trim();
 
     if (gstinValue) {
-      // GSTIN provided → use its first 2 digits to determine tax type
       const st = getStateFromGSTIN(gstinValue);
-      if (!st) return;
-
-      // Auto-fill state field
-      setForm((prev) => ({ ...prev, state: st.display, state_code: st.code }));
-      setStateSearch(st.display);
-      setShowStateSuggestions(false);
-
-      // Same state as supplier (07 Delhi) → CGST + SGST; else → IGST
-      if (st.code === SUPPLIER_STATE_CODE) {
-        setCgstRate(9); setSgstRate(9); setIgstRate(0);
-        setItems((prev) => prev.map((item) => ({ ...item, cgst_percent: 9, sgst_percent: 9, igst_percent: 0 })));
-      } else {
-        setCgstRate(0); setSgstRate(0); setIgstRate(18);
-        setItems((prev) => prev.map((item) => ({ ...item, cgst_percent: 0, sgst_percent: 0, igst_percent: 18 })));
-      }
-    } else {
-      // No GSTIN → use manually selected state to decide
-      // Try: state_code field → parse code from "Name (XX)" format → match by state name
-      const code = form.state_code?.trim()
-        || parseCodeFromDisplay(form.state)
-        || Object.entries(stateCodeToName).find(
-            ([, name]) => name.toLowerCase() === form.state?.trim().toLowerCase()
-          )?.[0];
-
-      if (!code || code === SUPPLIER_STATE_CODE) {
-        // No state or same state (Delhi 07) → CGST + SGST
-        setCgstRate(9); setSgstRate(9); setIgstRate(0);
-        setItems((prev) => prev.map((item) => ({ ...item, cgst_percent: 9, sgst_percent: 9, igst_percent: 0 })));
-      } else {
-        // Different state, no GSTIN → IGST (interstate supply)
-        setCgstRate(0); setSgstRate(0); setIgstRate(18);
-        setItems((prev) => prev.map((item) => ({ ...item, cgst_percent: 0, sgst_percent: 0, igst_percent: 18 })));
+      if (st) {
+        setForm((prev) => {
+          if (prev.state === st.display && prev.state_code === st.code) return prev;
+          return { ...prev, state: st.display, state_code: st.code };
+        });
+        setStateSearch(st.display);
+        setShowStateSuggestions(false);
       }
     }
-  }, [form.gst_number, form.state, form.state_code, isFromQuotation]);
+
+    const interstate = isInterstateInvoiceSupply({
+      buyerGstin: gstinValue,
+      buyerStateCode: form.state_code,
+      stateDisplay: form.state,
+      parseCodeFromDisplay,
+    });
+
+    const { cgstRate: cR, sgstRate: sR, igstRate: iR } =
+      headerRatesForInterstate(interstate);
+    setCgstRate(cR);
+    setSgstRate(sR);
+    setIgstRate(iR);
+
+    setItems((prev) => {
+      const next = applyTaxPercentsToInvoiceItems(prev, interstate);
+      const same =
+        prev.length === next.length &&
+        prev.every(
+          (row, idx) =>
+            row.cgst_percent === next[idx].cgst_percent &&
+            row.sgst_percent === next[idx].sgst_percent &&
+            row.igst_percent === next[idx].igst_percent,
+        );
+      return same ? prev : next;
+    });
+  }, [form.gst_number, form.state, form.state_code, stateCodeToName]);
 
   const [editableTerms, setEditableTerms] = useState(
     invoiceType === "performa"
@@ -403,27 +403,6 @@ const fetchQuotationAndFill = async (quoteNoArg) => {
 
     const quotation = data.quotation;
 
-    // Set GST rates FIRST (before form updates that trigger state effect)
-    console.log("Setting rates from quotation:", {
-      cgstRate: quotation.cgstRate,
-      sgstRate: quotation.sgstRate,
-      igstRate: quotation.igstRate,
-    });
-
-    if (quotation.cgstRate !== undefined && quotation.cgstRate !== null) {
-      console.log("Setting CGST to", Number(quotation.cgstRate));
-      setCgstRate(Number(quotation.cgstRate));
-    }
-    if (quotation.sgstRate !== undefined && quotation.sgstRate !== null) {
-      console.log("Setting SGST to", Number(quotation.sgstRate));
-      setSgstRate(Number(quotation.sgstRate));
-    }
-    if (quotation.igstRate !== undefined && quotation.igstRate !== null) {
-      console.log("Setting IGST to", Number(quotation.igstRate));
-      setIgstRate(Number(quotation.igstRate));
-    }
-
-    // Set flag BEFORE form update (so state effect knows not to override)
     setIsFromQuotation(true);
 
     // Fill only available quotation fields
@@ -436,7 +415,10 @@ const fetchQuotationAndFill = async (quoteNoArg) => {
       shipping_address: quotation.shipping_address,
       gst_number: quotation.gst_number,
       state: quotation.state,
-      state_code: quotation.state_code,
+      state_code:
+        quotation.state_code ||
+        getStateCodeFromGstin(quotation.gst_number) ||
+        "",
       customer_id: quotation.customer_id,
       quotation_id: quotation.quotation_id,
       due_date: quotation.due_date
@@ -444,37 +426,47 @@ const fetchQuotationAndFill = async (quoteNoArg) => {
   : "",
     }));
 
-    // Fill items from quotation
-   setItems(
-  quotation.items.map((it) => ({
-    item_name: it.item_name || "",
-    item_code: it.item_code || "",        
-    description: it.specification || it.description || "",
-    hsn_code: it.hsn_sac || it.hsn_code || "",
-    quantity: it.quantity || 1,
-    unit: it.unit || "",                  
-    rate: it.rate || it.price_per_unit || 0,
-    discount_percent: it.discount_percent || 0,
-    discount_amount: it.discount_amount || 0,
+    const interstate = isInterstateInvoiceSupply({
+      buyerGstin: quotation.gst_number,
+      buyerStateCode:
+        quotation.state_code ||
+        getStateCodeFromGstin(quotation.gst_number),
+      stateDisplay: quotation.state,
+      parseCodeFromDisplay,
+    });
 
-    cgst_percent: it.cgst_percent || 0,
-    sgst_percent: it.sgst_percent || 0,
-    igst_percent: it.igst_percent || 0,
+    const mappedItems = quotation.items.map((it) => {
+      const cg = Number(it.cgst_percent) || 0;
+      const sg = Number(it.sgst_percent) || 0;
+      const ig = Number(it.igst_percent) || 0;
+      return {
+        item_name: it.item_name || "",
+        item_code: it.item_code || "",
+        description: it.specification || it.description || "",
+        hsn_code: it.hsn_sac || it.hsn_code || "",
+        quantity: it.quantity || 1,
+        unit: it.unit || "",
+        rate: it.rate || it.price_per_unit || 0,
+        discount_percent: it.discount_percent || 0,
+        discount_amount: it.discount_amount || 0,
+        cgst_percent: cg,
+        sgst_percent: sg,
+        igst_percent: ig,
+        gst: ig || cg + sg || 18,
+        imageUrl: it.img_url || "",
+      };
+    });
 
-    imageUrl: it.img_url || "",             
-  }))
-);
+    setItems(applyTaxPercentsToInvoiceItems(mappedItems, interstate));
+    const rates = headerRatesForInterstate(interstate);
+    setCgstRate(rates.cgstRate);
+    setSgstRate(rates.sgstRate);
+    setIgstRate(rates.igstRate);
 
     if (quotation.round_off) {
       setRoundOff(Number(quotation.round_off) || 0);
       // setIsAutoRoundOff(false); // Keep true by default
     }
-
-    console.log("Quotation loaded with rates:", {
-      cgstRate: quotation.cgstRate,
-      sgstRate: quotation.sgstRate,
-      igstRate: quotation.igstRate,
-    });
 
     toast.success("Quotation loaded successfully");
     setShowQuotationModal(false);

@@ -83,3 +83,28 @@ export function sortPaymentPendingOrders(orders, sortConfig) {
     return 0;
   });
 }
+
+/** Indian currency for payment-pending report (matches order list). */
+export function formatPaymentPendingInr(amount) {
+  const n = Number(amount) || 0;
+  return `₹${n.toLocaleString("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
+export function summarizePaymentPendingOrders(orders) {
+  const list = orders || [];
+  return {
+    count: list.length,
+    totalRemaining: list.reduce(
+      (sum, o) => sum + (Number(o.remaining_amount) || 0),
+      0,
+    ),
+    totalOrderValue: list.reduce(
+      (sum, o) => sum + (Number(o.total_amount) || 0),
+      0,
+    ),
+    totalPaid: list.reduce((sum, o) => sum + (Number(o.paid_amount) || 0), 0),
+  };
+}
