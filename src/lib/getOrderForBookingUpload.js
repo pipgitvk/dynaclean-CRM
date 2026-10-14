@@ -1,5 +1,6 @@
 import { getDbConnection } from "@/lib/db";
 import { hasOrderInvoiceReport } from "@/lib/orderDocumentEditRules";
+import { isBookingAllowedForOrder } from "@/lib/orderBookingEligibility";
 
 export { hasOrderInvoiceReport };
 
@@ -29,7 +30,7 @@ export function resolveBookingUploadPage(order, role) {
   const booked = hasOrderBooking(order);
   const dispatched = Number(order.dispatch_status) === 1;
 
-  if (!booked && !hasOrderInvoiceReport(order)) {
+  if (!booked && !isBookingAllowedForOrder(order)) {
     return {
       redirectToView: false,
       redirectToUploadReport: true,

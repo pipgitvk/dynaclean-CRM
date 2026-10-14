@@ -2,10 +2,8 @@ import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { sendImportCrmSmtpEmail } from "@/lib/importCrmEmail";
-import {
-  canEditOrderBooking,
-  hasOrderInvoiceReport,
-} from "@/lib/getOrderForBookingUpload";
+import { canEditOrderBooking } from "@/lib/getOrderForBookingUpload";
+import { isBookingAllowedForOrder } from "@/lib/orderBookingEligibility";
 
 export async function POST(req) {
   try {
@@ -73,7 +71,7 @@ export async function POST(req) {
       );
     }
 
-    if (!isBookingEdit && !hasOrderInvoiceReport(order)) {
+    if (!isBookingEdit && !isBookingAllowedForOrder(order)) {
       return NextResponse.json(
         {
           error:

@@ -27,6 +27,7 @@ import DeleteButton from "@/components/accounts/DeleteButton";
 import toast from "react-hot-toast";
 import ReturnInitiateMenuItem from "@/components/orders/ReturnInitiateMenuItem";
 import { isSalesRole } from "@/lib/isSalesRole";
+import { isBookingAllowedForOrder } from "@/lib/orderBookingEligibility";
 
 // 👻 A sleek skeleton loader for a modern feel
 const SkeletonLoader = () => (
@@ -843,7 +844,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                       </div>
                     </div>
                   ))}
-                {(canManageReturns) && !hasBooking && r.report_file && (
+                {(canManageReturns) && !hasBooking && isBookingAllowedForOrder(r) && (
                     <Link
                       href={`/user-dashboard/order/upload-booking/${r.order_id}`}
                       className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-green-700 w-full block"

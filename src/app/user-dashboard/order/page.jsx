@@ -50,7 +50,7 @@ export default async function OrdersPage() {
                 no.client_name, no.contact, no.is_cancelled, no.dispatch_status,
                 no.created_at, no.created_by , no.einvoice_file, no.booking_id, no.quote_number, no.duedate,
                 no.invoice_date , no.account_by ,no.booking_by , no.dispatch_person,
-                no.payment_id, no.payment_date, no.payment_amount, no.payment_status,no.totalamt, no.transaction_id,
+                no.payment_id, no.payment_date, no.payment_amount, no.payment_status,no.totalamt, no.baseAmount, no.taxamt, no.transaction_id,
                 no.delivery_date, no.delivered_on, no.delivery_status,no.delivery_proof,
                 COALESCE(no.delivery_remark, '') as delivery_remark,
                 no.installation_status, no.is_returned, no.approval_status, no.approval_remark, no.approval_date,
@@ -74,7 +74,7 @@ export default async function OrdersPage() {
                   WHEN qr.payment_term_days = 60 THEN '60 Days'
                   ELSE CONCAT(qr.payment_term_days, ' Days')
                 END as payment_terms,
-                qr.company_name, qr.emp_name, qr.state,
+                qr.company_name, qr.emp_name, qr.state, qr.grand_total AS quotation_grand_total,
                 MAX(cn.id) as credit_note_id,
                 MAX(cn.credit_note_number) as credit_note_number,
                 GROUP_CONCAT(DISTINCT qi.item_name SEPARATOR ', ') as item_name,
