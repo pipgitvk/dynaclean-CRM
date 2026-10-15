@@ -1,33 +1,10 @@
 /** Server helpers: leave-aware system auto check-out times. */
 
 import { AUTO_CHECKOUT_WALL_TIME } from "@/lib/attendanceAutoCheckoutConstants";
-
-function attendanceDateKey(value) {
-  if (value == null || value === "") return "";
-  if (typeof value === "string") {
-    const s = value.trim();
-    if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
-  }
-  if (value instanceof Date && !Number.isNaN(value.getTime())) {
-    return value.toLocaleDateString("en-CA");
-  }
-  const s = String(value);
-  return s.length >= 10 ? s.slice(0, 10) : s;
-}
-
-function leaveDateRangeKeys(fromDate, toDate) {
-  const from = attendanceDateKey(fromDate);
-  const to = attendanceDateKey(toDate);
-  if (!from || !to) return [];
-  const start = new Date(`${from}T12:00:00`);
-  const end = new Date(`${to}T12:00:00`);
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return [];
-  const keys = [];
-  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-    keys.push(d.toLocaleDateString("en-CA"));
-  }
-  return keys;
-}
+import {
+  attendanceDateKey,
+  leaveDateRangeKeys,
+} from "@/lib/leaveDateRange";
 
 export function isLeaveActiveForAutoCheckout(leave) {
   if (!leave) return false;

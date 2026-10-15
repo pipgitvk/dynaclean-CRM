@@ -14,29 +14,13 @@ import {
   mergeAttendanceListWithMachine,
 } from "@/lib/attendanceMachineMerge";
 import { ensureAttendanceLogsEmployeeColumns } from "@/lib/ensureAttendanceLogsEmployeeColumns";
+import { attendanceDateKey } from "@/lib/leaveDateRange";
 export const dynamic = 'force-dynamic';
 
 function normalizeUserKey(value) {
   return String(value ?? "")
     .trim()
     .toLowerCase();
-}
-
-/** Match attendance row `date` with regularization `log_date` (MySQL DATE / string / Date). */
-function attendanceDateKey(value) {
-  if (value == null || value === "") return "";
-  if (typeof value === "string") {
-    const s = value.trim();
-    if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
-  }
-  if (value instanceof Date && !Number.isNaN(value.getTime())) {
-    const y = value.getFullYear();
-    const m = String(value.getMonth() + 1).padStart(2, "0");
-    const d = String(value.getDate()).padStart(2, "0");
-    return `${y}-${m}-${d}`;
-  }
-  const s = String(value);
-  return s.length >= 10 ? s.slice(0, 10) : s;
 }
 
 export async function GET(request) {
@@ -192,10 +176,20 @@ export async function GET(request) {
       );
     }
 
+    const normalizedLeaves = (leaves || []).map((leave) => ({
+      ...leave,
+      from_date: attendanceDateKey(leave.from_date),
+      to_date: attendanceDateKey(leave.to_date),
+    }));
+    const normalizedHolidays = (holidays || []).map((h) => ({
+      ...h,
+      holiday_date: attendanceDateKey(h.holiday_date),
+    }));
+
     return NextResponse.json({
       attendance: mergedRows,
-      holidays,
-      leaves,
+      holidays: normalizedHolidays,
+      leaves: normalizedLeaves,
       rulesByUsername,
     });
   } catch (error) {

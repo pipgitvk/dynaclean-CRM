@@ -4,6 +4,7 @@
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { formatCrmDateOnly } from "@/lib/crmDateFormat";
 import { useState, useEffect, useMemo, useCallback } from "react";
+import dayjs from "dayjs";
 import toast from "react-hot-toast";
 import { Sun, BadgeCheck, AlertTriangle } from "lucide-react";
 import {
@@ -22,6 +23,10 @@ import {
   AUTO_CHECKOUT_ATTENDANCE_ADDRESS,
   isAutomaticCheckoutAddress,
 } from "@/lib/attendanceAutoCheckoutConstants";
+import {
+  attendanceDateKey as attendanceDateYmd,
+  leaveDateRangeKeys,
+} from "@/lib/leaveDateRange";
 
 const AUTO_CHECKOUT_WARNING_TITLE =
   "No manual check-out — automatic check-out at 9:00 PM only.";
@@ -368,39 +373,34 @@ const AttendancePage = () => {
   // Generate a list of all dates from the first log to the current date (or date range if specified)
   const allDates = [];
 
-  // Determine end date: use toDate if specified, otherwise use today
-  const endDate = toDate ? new Date(toDate) : new Date();
-  endDate.setHours(0, 0, 0, 0);
-
-  // Determine start date: use fromDate if specified, otherwise use earliest log or 30 days ago
-  let startDate;
+  const endDay = toDate ? dayjs(toDate, "YYYY-MM-DD", true) : dayjs();
+  let startDay;
   if (fromDate) {
-    startDate = new Date(fromDate);
+    startDay = dayjs(fromDate, "YYYY-MM-DD", true);
   } else if (logs.length > 0) {
-    startDate = new Date(logs[logs.length - 1].date);
+    startDay = dayjs(attendanceDateYmd(logs[logs.length - 1].date));
   } else {
-    startDate = new Date(); 
-    startDate.setDate(endDate.getDate() - 30);
+    startDay = endDay.subtract(30, "day");
   }
-  startDate.setHours(0, 0, 0, 0);
+  if (!startDay.isValid()) startDay = endDay.subtract(30, "day");
 
   const dateMap = new Map(
-    logs.map((log) => [new Date(log.date).toLocaleDateString("en-CA"), log])
+    logs.map((log) => [attendanceDateYmd(log.date), log])
   );
 
   // Create a map of holiday dates for quick lookup
   const holidayMap = new Map(
-    holidays.map((h) => [new Date(h.holiday_date).toLocaleDateString("en-CA"), h])
+    holidays.map((h) => [attendanceDateYmd(h.holiday_date), h])
   );
 
   // Create a map of leave dates for quick lookup
   const leaveMap = new Map();
   leaves.forEach((leave) => {
-    const fromDate = new Date(leave.from_date);
-    const toDate = new Date(leave.to_date);
-    // Add all dates in the leave range
-    for (let d = new Date(fromDate); d <= toDate; d.setDate(d.getDate() + 1)) {
-      leaveMap.set(d.toLocaleDateString("en-CA"), leave);
+    for (const dateString of leaveDateRangeKeys(
+      leave.from_date,
+      leave.to_date,
+    )) {
+      leaveMap.set(dateString, leave);
     }
   });
 
@@ -410,11 +410,12 @@ const AttendancePage = () => {
   leaves
     .filter(leave => leave.is_half_day == 1 || leave.leave_type === 'half-day')
     .forEach((leave) => {
-      const fromDate = new Date(leave.from_date);
-      const toDate = new Date(leave.to_date);
       const derived = deriveHalfDayType(leave.start_time, leave.end_time);
-      for (let d = new Date(fromDate); d <= toDate; d.setDate(d.getDate() + 1)) {
-        halfDayLeaveMap.set(d.toLocaleDateString("en-CA"), {
+      for (const dateString of leaveDateRangeKeys(
+        leave.from_date,
+        leave.to_date,
+      )) {
+        halfDayLeaveMap.set(dateString, {
           is_half_day: leave.is_half_day,
           half_day_type: leave.half_day_type || derived,
           leave_type: leave.leave_type,
@@ -428,17 +429,22 @@ const AttendancePage = () => {
   leaves
     .filter(leave => leave.leave_type === 'paid')
     .forEach((leave) => {
-      const fromD = new Date(leave.from_date);
-      const toD = new Date(leave.to_date);
-      for (let d = new Date(fromD); d <= toD; d.setDate(d.getDate() + 1)) {
-        paidLeaveMap.set(d.toLocaleDateString("en-CA"), leave);
+      for (const dateString of leaveDateRangeKeys(
+        leave.from_date,
+        leave.to_date,
+      )) {
+        paidLeaveMap.set(dateString, leave);
       }
     });
 
-  for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-    const dateString = d.toLocaleDateString("en-CA");
+  for (
+    let cur = startDay;
+    cur.isBefore(endDay) || cur.isSame(endDay, "day");
+    cur = cur.add(1, "day")
+  ) {
+    const dateString = cur.format("YYYY-MM-DD");
     const existingLog = dateMap.get(dateString);
-    const isWeekend = d.getDay() === 0; // Sunday
+    const isWeekend = cur.day() === 0; // Sunday
     const isHoliday = holidayMap.has(dateString);
     const isOnLeave = leaveMap.has(dateString);
     const approvedHalfDay = halfDayLeaveMap.get(dateString) || null;
@@ -456,7 +462,7 @@ const AttendancePage = () => {
       const derivedType = deriveHalfDayType(approvedPaidLeave.start_time, approvedPaidLeave.end_time);
       const finalHalfType = approvedPaidLeave.half_day_type || derivedType || (hasRealPunch ? "1st_half" : "1st_half");
       allDates.push({
-        date: d.toISOString(),
+        date: dateString,
         type: "paidleave",
         leaveType: "Paid",
         leaveReason: approvedPaidLeave.reason || null,
@@ -478,7 +484,7 @@ const AttendancePage = () => {
         const finalHalfType = leaveInfo?.half_day_type || derivedType;
         allDates.push({
           ...base,
-          date: d.toISOString(),
+          date: dateString,
           type: isUnpaid ? "absent" : "leave",
           leaveType: leaveInfo?.leave_type || "Leave",
           leaveReason: leaveInfo?.reason || null,
@@ -489,7 +495,7 @@ const AttendancePage = () => {
       } else if (isWeekend) {
         allDates.push({
           ...base,
-          date: d.toISOString(),
+          date: dateString,
           type: "sunday",
           holidayTitle: "Sunday",
           holidayDescription: null,
@@ -498,13 +504,13 @@ const AttendancePage = () => {
         const holidayInfo = holidayMap.get(dateString);
         allDates.push({
           ...base,
-          date: d.toISOString(),
+          date: dateString,
           type: "holiday",
           holidayTitle: holidayInfo?.title || "Holiday",
           holidayDescription: holidayInfo?.description || null,
         });
       } else {
-        allDates.push({ ...base, date: d.toISOString(), type: "absent" });
+        allDates.push({ ...base, date: dateString, type: "absent" });
       }
     }
   }
