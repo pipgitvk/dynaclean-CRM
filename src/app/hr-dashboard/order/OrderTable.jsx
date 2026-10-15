@@ -674,7 +674,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                   </Link>
                 </>
               )}
-            {["accountant", "admin"].includes(role) && r.report_file && (
+            {role.includes("accountant") && r.report_file && (
               <div className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
                 <EditPaymentButton order={r} />
               </div>

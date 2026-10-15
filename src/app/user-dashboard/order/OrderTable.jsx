@@ -820,6 +820,29 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                     <EditPaymentButton order={r} />
                   </div>
                 )}
+                {hasBooking && dispatchStatus === 1 && (
+                  <Link
+                    href={`/user-dashboard/order/dispatch/view/${r.order_id}`}
+                    className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700 w-full block"
+                    title="View Dispatch"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Search size={16} />
+                    <span>View Dispatch</span>
+                  </Link>
+                )}
+                {dispatchStatus === 1 &&
+                  ![1, 2, 3].includes(Number(r.is_returned || 0)) && (
+                    <div
+                      className="border-t border-gray-100 mt-1 pt-1"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <ReturnInitiateMenuItem
+                        order={r}
+                        orderListPath="/user-dashboard/order"
+                      />
+                    </div>
+                  )}
               </>
             ) : (
               <>
@@ -919,11 +942,6 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                     <CheckCircle size={16} />
                     <span>Dispatch</span>
                   </Link>
-                )}
-                {canManageInvoiceDocs && r.report_file && (
-                  <div className="px-3 py-2 w-full block" onClick={(e) => e.stopPropagation()}>
-                    <EditPaymentButton order={r} />
-                  </div>
                 )}
                 <UpdateDeliveryMenuItem order={r} />
                 {canManageReturns &&
