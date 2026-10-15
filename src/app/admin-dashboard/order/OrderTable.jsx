@@ -2899,6 +2899,17 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                   viewHref={`/admin-dashboard/order/view/${r.order_id}`}
                   onClick={(e) => e.stopPropagation()}
                 />
+                {hasBooking && (
+                  <Link
+                    href={`/admin-dashboard/order/view-booking/${r.order_id}`}
+                    className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
+                    title="View Booking"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <FileCheck size={16} />
+                    <span>View Booking</span>
+                  </Link>
+                )}
                 {r.report_file && (
                   <div className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
                     <EditPaymentButton order={r} />

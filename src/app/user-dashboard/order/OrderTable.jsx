@@ -812,6 +812,17 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                   viewHref={`/user-dashboard/order/view/${r.order_id}`}
                   onClick={(e) => e.stopPropagation()}
                 />
+                {hasBooking && (
+                  <Link
+                    href={`/user-dashboard/order/view-booking/${r.order_id}`}
+                    className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700 w-full block"
+                    title="View Booking"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <FileCheck size={16} />
+                    <span>View Booking</span>
+                  </Link>
+                )}
                 {r.report_file && (
                   <div
                     className="px-3 py-2 w-full block"
