@@ -5,6 +5,10 @@ import dayjs from "dayjs";
 import Image from "next/image";
 import OrderApprovalActions from "../OrderApprovalActions";
 import OrderDocumentFileCard from "@/components/orders/OrderDocumentFileCard";
+import {
+  ORDER_PIPELINE_STAGES,
+  deriveOrderPipelineProgress,
+} from "@/lib/orderPipelineStage";
 
 const DOCUMENT_FIELDS = [
   { label: "E-way Bill", key: "ewaybill_file" },
@@ -16,15 +20,7 @@ const DOCUMENT_FIELDS = [
   { label: "Delivery Proof", key: "delivery_proof" },
 ];
 
-const stages = [
-  "Sales",
-  "Account",
-  "Admin",
-  "Dispatch",
-  "Delivered",
-  "Installation Report",
-  "Complete",
-];
+const stages = ORDER_PIPELINE_STAGES;
 
 export default function OrderDetailsClient({
   orderDetails,
@@ -58,31 +54,10 @@ export default function OrderDetailsClient({
     return { totalQty, totalTaxable, totalGst, totalAmount };
   }, [items]);
 
-  const currentStage = useMemo(() => {
-    const statusList = [
-      statuses?.sales_status,
-      statuses?.account_status,
-      statuses?.admin_status,
-      statuses?.dispatch_status,
-      statuses?.delivery_status,
-      statuses?.installation_status,
-    ];
-
-    // If all statuses are complete (no 0s), show Complete
-    if (!statusList.includes(0)) return "Complete";
-
-    // Find the first incomplete status (0)
-    const firstIncompleteIndex = statusList.findIndex((s) => s === 0);
-
-    // Show the stage BEFORE the first incomplete one (the last completed stage)
-    // If first incomplete is 0, we're still at Sales
-    if (firstIncompleteIndex === 0) return "Sales";
-
-    return stages[firstIncompleteIndex - 1] || "Sales";
-  }, [statuses]);
-
-  const currentIndex = stages.indexOf(currentStage);
-  const progressPercent = (currentIndex / (stages.length - 1)) * 100;
+  const { progressPercent, stepCompleted } = useMemo(
+    () => deriveOrderPipelineProgress(orderDetails, statuses),
+    [orderDetails, statuses],
+  );
 
   const [fileValues, setFileValues] = useState(() => {
     const initial = {};
@@ -123,7 +98,7 @@ export default function OrderDetailsClient({
           {stages.map((stage, i) => (
             <div key={i} className="text-center flex-1">
               <div
-                className={`w-6 h-6 mx-auto mb-1 rounded-full text-white text-xs flex items-center justify-center ${i <= currentIndex ? "bg-blue-600" : "bg-gray-400"
+                className={`w-6 h-6 mx-auto mb-1 rounded-full text-white text-xs flex items-center justify-center ${stepCompleted[i] ? "bg-blue-600" : "bg-gray-400"
                   }`}
               >
                 {i + 1}

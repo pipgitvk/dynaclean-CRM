@@ -22,7 +22,7 @@ export default function OrderDetails({ data }) {
     items,
     stages,
     progressPercent,
-    currentIndex,
+    stepCompleted,
   } = data;
 
   const currency = (n) =>
@@ -66,7 +66,7 @@ export default function OrderDetails({ data }) {
           <div key={`stage-${idx}`} className="text-center flex-1">
             <div
               className={`w-6 h-6 mx-auto rounded-full text-white flex items-center justify-center text-xs font-bold ${
-                idx <= currentIndex ? "bg-green-500" : "bg-gray-300"
+                stepCompleted?.[idx] ? "bg-green-500" : "bg-gray-300"
               }`}
             >
               {idx + 1}
