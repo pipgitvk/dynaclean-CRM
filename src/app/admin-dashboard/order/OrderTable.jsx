@@ -40,6 +40,7 @@ import {
 } from "@/lib/orderDocumentEditRules";
 import { isBookingAllowedForOrder } from "@/lib/orderBookingEligibility";
 import AccountantReportActionLinks from "@/components/orders/AccountantReportActionLinks";
+import ViewCreditNoteMenuLink from "@/components/orders/ViewCreditNoteMenuLink";
 import { isAccountantOnlyMenuRole } from "@/lib/roleKeyUtils";
 import DeleteButton from "@/components/accounts/DeleteButton";
 import toast from "react-hot-toast";
@@ -2935,6 +2936,12 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                       <ReturnInitiateMenuItem order={r} />
                     </div>
                   )}
+                <ViewCreditNoteMenuLink
+                  order={r}
+                  userRole={userRole}
+                  hrefBase="/admin-dashboard"
+                  onClick={(e) => e.stopPropagation()}
+                />
               </>
             ) : (
               <>
@@ -3070,19 +3077,12 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                 <ReturnInitiateMenuItem order={r} />
               </div>
             )}
-            {[3, 1, 2].includes(Number(r.is_returned)) && r.credit_note_id && (
-              <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>
-                <Link
-                  href={`/admin-dashboard/credit-notes/${r.credit_note_id}`}
-                  className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-teal-700"
-                  title="View Credit Note"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <FileText size={16} />
-                  <span>View Credit Note</span>
-                </Link>
-              </div>
-            )}
+            <ViewCreditNoteMenuLink
+              order={r}
+              userRole={userRole}
+              hrefBase="/admin-dashboard"
+              onClick={(e) => e.stopPropagation()}
+            />
             {canManageReturns &&
               (Number(r.is_returned) === 3 || Number(r.return_booking_done) === 1) && (
               <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>

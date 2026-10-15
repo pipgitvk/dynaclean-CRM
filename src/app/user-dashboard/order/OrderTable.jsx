@@ -30,6 +30,7 @@ import { isSalesRole } from "@/lib/isSalesRole";
 import { isBookingAllowedForOrder } from "@/lib/orderBookingEligibility";
 import AccountantReportActionLinks from "@/components/orders/AccountantReportActionLinks";
 import { isAccountantOnlyMenuRole } from "@/lib/roleKeyUtils";
+import ViewCreditNoteMenuLink from "@/components/orders/ViewCreditNoteMenuLink";
 
 // 👻 A sleek skeleton loader for a modern feel
 const SkeletonLoader = () => (
@@ -854,6 +855,13 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                       />
                     </div>
                   )}
+                <ViewCreditNoteMenuLink
+                  order={r}
+                  userRole={userRole}
+                  hrefBase="/user-dashboard"
+                  linkClassName="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-teal-700 w-full"
+                  onClick={(e) => e.stopPropagation()}
+                />
               </>
             ) : (
               <>
@@ -980,21 +988,13 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                     <ViewReturnBookingMenuItem order={r} />
                   </div>
                 )}
-                {(isSuperAdmin || isAdmin) &&
-                  [3, 1, 2].includes(Number(r.is_returned)) &&
-                  r.credit_note_id && (
-                  <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>
-                    <Link
-                      href={`/user-dashboard/credit-notes/${r.credit_note_id}`}
-                      className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-teal-700 w-full"
-                      title="View Credit Note"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <FileText size={16} />
-                      <span>View Credit Note</span>
-                    </Link>
-                  </div>
-                )}
+                <ViewCreditNoteMenuLink
+                  order={r}
+                  userRole={userRole}
+                  hrefBase="/user-dashboard"
+                  linkClassName="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-teal-700 w-full"
+                  onClick={(e) => e.stopPropagation()}
+                />
                 {isWarehouse &&
                   Number(r.is_returned) === 3 &&
                   Number(r.return_booking_done) === 1 &&

@@ -22,6 +22,7 @@ import {
 import { deriveOrderListPaymentStatus } from "@/lib/paymentOrderStatus";
 import AccountantReportActionLinks from "@/components/orders/AccountantReportActionLinks";
 import ReturnInitiateMenuItem from "@/components/orders/ReturnInitiateMenuItem";
+import ViewCreditNoteMenuLink from "@/components/orders/ViewCreditNoteMenuLink";
 import { isAccountantOnlyMenuRole } from "@/lib/roleKeyUtils";
 import { isSalesRole } from "@/lib/isSalesRole";
 
@@ -691,6 +692,12 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                       />
                     </div>
                   )}
+                <ViewCreditNoteMenuLink
+                  order={r}
+                  userRole={userRole}
+                  hrefBase="/admin-dashboard"
+                  onClick={(e) => e.stopPropagation()}
+                />
               </>
             ) : (
               <>

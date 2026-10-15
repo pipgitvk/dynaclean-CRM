@@ -37,6 +37,7 @@ import {
   ReturnBookingMenuItem,
   WarehouseInMenuItem,
 } from "@/components/orders/ReturnBookingWarehouseMenuItems";
+import ViewCreditNoteMenuLink from "@/components/orders/ViewCreditNoteMenuLink";
 
 // 👻 A sleek skeleton loader for a modern feel
 const SkeletonLoader = () => (
@@ -922,6 +923,12 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                       />
                     </div>
                   )}
+                <ViewCreditNoteMenuLink
+                  order={r}
+                  userRole={userRole}
+                  hrefBase="/admin-dashboard"
+                  onClick={(e) => e.stopPropagation()}
+                />
               </>
             ) : (
               <>
@@ -1062,21 +1069,12 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                 <ViewReturnBookingMenuItem order={r} />
               </div>
             )}
-            {(isSuperAdmin || isAdmin) &&
-              [3, 1, 2].includes(Number(r.is_returned)) &&
-              r.credit_note_id && (
-              <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>
-                <Link
-                  href={`/admin-dashboard/credit-notes/${r.credit_note_id}`}
-                  className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-teal-700"
-                  title="View Credit Note"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <FileText size={16} />
-                  <span>View Credit Note</span>
-                </Link>
-              </div>
-            )}
+            <ViewCreditNoteMenuLink
+              order={r}
+              userRole={userRole}
+              hrefBase="/admin-dashboard"
+              onClick={(e) => e.stopPropagation()}
+            />
             {(isSuperAdmin || isAdmin || isWarehouse) &&
               Number(r.warehouse_in_done) === 1 && (
               <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>
