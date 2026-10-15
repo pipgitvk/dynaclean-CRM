@@ -3,6 +3,7 @@ import OrderTable from "./OrderTable";
 import SalesOrderMonthlyTarget from "./SalesOrderMonthlyTarget";
 import { getSessionPayload } from "@/lib/auth";
 import { canViewAllOrders } from "@/lib/dataScope";
+import { appendSqlWhereClause, orderListApprovalWhereSql } from "@/lib/orderApprovalVisibility";
 
 // Secret for verifying JWT
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -67,6 +68,8 @@ export default async function OrdersPage() {
     sql += " WHERE no.created_by = ?";
     params.push(username);
   }
+
+  sql = appendSqlWhereClause(sql, orderListApprovalWhereSql(userRole));
 
   sql += " GROUP BY no.order_id ORDER BY no.created_at DESC";
 

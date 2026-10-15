@@ -1,7 +1,8 @@
 import { getDbConnection } from "@/lib/db";
 import { deriveOrderPipelineProgress } from "@/lib/orderPipelineStage";
+import { isOrderVisibleToViewer } from "@/lib/orderApprovalVisibility";
 
-export default async function getOrderData(orderId) {
+export default async function getOrderData(orderId, viewerRole = "") {
   const conn = await getDbConnection();
 
   const [orderRows] = await conn.execute(
@@ -11,6 +12,7 @@ export default async function getOrderData(orderId) {
   if (!orderRows.length) return {};
 
   const orderDetails = orderRows[0];
+  if (!isOrderVisibleToViewer(orderDetails.approval_status, viewerRole)) return {};
 
   const [itemRows] = await conn.execute(
     "SELECT * FROM quotation_items WHERE quote_number = ?",

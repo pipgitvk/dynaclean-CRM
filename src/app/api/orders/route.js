@@ -12,6 +12,10 @@ import path from "path";
 import { sendTemplatedEmail } from "@/lib/template-utils";
 import { syncPreBookingsForOrder } from "@/lib/syncPreBookingsForOrder";
 import { derivePaymentStatus } from "@/lib/paymentOrderStatus";
+import {
+  appendSqlWhereClause,
+  orderListApprovalWhereSql,
+} from "@/lib/orderApprovalVisibility";
 
 const UPLOAD_DIR = path.join(process.cwd(), "public", "uploads");
 
@@ -137,6 +141,8 @@ export async function GET(req) {
       sql += " WHERE no.created_by = ?";
       params.push(username);
     }
+
+    sql = appendSqlWhereClause(sql, orderListApprovalWhereSql(userRole));
 
     sql += " ORDER BY no.created_at DESC";
 

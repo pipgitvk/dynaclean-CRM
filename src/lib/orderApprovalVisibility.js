@@ -1,0 +1,43 @@
+/** Order list / detail visibility until SUPERADMIN/DIRECTOR approves on admin order flow. */
+
+export function normalizeOrderApprovalStatus(status) {
+  return String(status ?? "").trim().toLowerCase();
+}
+
+/** Listed in normal order tables (approved or legacy empty status). */
+export function isOrderApprovedForListing(approvalStatus) {
+  const s = normalizeOrderApprovalStatus(approvalStatus);
+  if (s === "approved") return true;
+  if (s === "") return true;
+  return false;
+}
+
+export function canViewUnapprovedOrder(userRole) {
+  const r = String(userRole ?? "").trim().toUpperCase();
+  return r === "SUPERADMIN" || r === "DIRECTOR";
+}
+
+export function isOrderVisibleToViewer(approvalStatus, userRole) {
+  if (isOrderApprovedForListing(approvalStatus)) return true;
+  return canViewUnapprovedOrder(userRole);
+}
+
+export function sqlApprovedOrdersOnlyClause(tableAlias = "no") {
+  const col = `${tableAlias}.approval_status`;
+  return `(LOWER(TRIM(COALESCE(${col}, ''))) = 'approved' OR TRIM(COALESCE(${col}, '')) = '')`;
+}
+
+/**
+ * SQL fragment for order list queries. On admin order page, approvers see pending/rejected too.
+ * @returns {string|null}
+ */
+export function orderListApprovalWhereSql(userRole, { adminOrderPage = false } = {}) {
+  if (adminOrderPage && canViewUnapprovedOrder(userRole)) return null;
+  return sqlApprovedOrdersOnlyClause("no");
+}
+
+export function appendSqlWhereClause(sql, condition) {
+  if (!condition) return sql;
+  if (/\bWHERE\b/i.test(sql)) return `${sql} AND ${condition}`;
+  return `${sql} WHERE ${condition}`;
+}

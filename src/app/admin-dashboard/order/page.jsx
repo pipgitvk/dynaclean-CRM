@@ -2,6 +2,7 @@ import { getDbConnection } from "@/lib/db";
 import OrderTable from "./OrderTable";
 import { getSessionPayload } from "@/lib/auth";
 import { canViewAllOrders } from "@/lib/dataScope";
+import { orderListApprovalWhereSql } from "@/lib/orderApprovalVisibility";
 
 // Secret for verifying JWT
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -158,6 +159,9 @@ export default async function OrdersPage({ searchParams }) {
       )`,
     );
   }
+
+  const approvalWhere = orderListApprovalWhereSql(userRole, { adminOrderPage: true });
+  if (approvalWhere) where.push(approvalWhere);
 
   if (where.length) {
     sql += " WHERE " + where.join(" AND ");

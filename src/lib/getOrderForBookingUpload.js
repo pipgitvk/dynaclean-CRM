@@ -1,6 +1,7 @@
 import { getDbConnection } from "@/lib/db";
 import { hasOrderInvoiceReport } from "@/lib/orderDocumentEditRules";
 import { isBookingAllowedForOrder } from "@/lib/orderBookingEligibility";
+import { isOrderVisibleToViewer } from "@/lib/orderApprovalVisibility";
 
 export { hasOrderInvoiceReport };
 
@@ -66,13 +67,13 @@ export function resolveBookingUploadPage(order, role) {
   };
 }
 
-export async function getOrderForBookingUpload(orderId) {
+export async function getOrderForBookingUpload(orderId, viewerRole = "") {
   const conn = await getDbConnection();
   const [rows] = await conn.execute(
     `SELECT
        no.order_id, no.client_name, no.contact, no.email, no.delivery_location, no.quote_number,
        no.client_delivery_date, no.booking_id, no.booking_date, no.booking_url, no.admin_remark,
-       no.delivery_date, no.dispatch_status, no.report_file,
+       no.delivery_date, no.dispatch_status, no.report_file, no.approval_status,
        no.totalamt, no.baseAmount, no.taxamt,
        qr.grand_total AS quotation_grand_total
      FROM neworder no
@@ -80,7 +81,11 @@ export async function getOrderForBookingUpload(orderId) {
      WHERE no.order_id = ?`,
     [orderId],
   );
-  return rows[0] || null;
+  const order = rows[0] || null;
+  if (order && !isOrderVisibleToViewer(order.approval_status, viewerRole)) {
+    return null;
+  }
+  return order;
 }
 
 export function getInitialBookingValues(order) {

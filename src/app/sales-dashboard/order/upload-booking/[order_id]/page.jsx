@@ -10,13 +10,13 @@ const ORDER_BASE = "/sales-dashboard/order";
 
 export default async function UploadBookingPage({ params }) {
   const { order_id: orderId } = await params;
-  const order = await getOrderForBookingUpload(orderId);
+  const payload = await getSessionPayload();
+  const viewerRole = payload?.role ?? payload?.userRole ?? "";
+  const order = await getOrderForBookingUpload(orderId, viewerRole);
 
   if (!order) {
     return <div className="text-red-500 p-4">Order not found</div>;
   }
-
-  const payload = await getSessionPayload();
   const ctx = resolveBookingUploadPage(
     order,
     payload?.role ?? payload?.userRole,

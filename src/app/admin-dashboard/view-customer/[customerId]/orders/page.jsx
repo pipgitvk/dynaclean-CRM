@@ -2,6 +2,7 @@ import { getDbConnection } from "@/lib/db";
 import OrderTable from "@/app/admin-dashboard/order/OrderTable";
 import { getSessionPayload } from "@/lib/auth";
 import Link from "next/link";
+import { sqlApprovedOrdersOnlyClause } from "@/lib/orderApprovalVisibility";
 
 export default async function CustomerOrdersPage({ params }) {
   const { customerId } = await params;
@@ -87,6 +88,8 @@ export default async function CustomerOrdersPage({ params }) {
     sql += " AND no.created_by = ?";
     ordersParams.push(username);
   }
+
+  sql += ` AND ${sqlApprovedOrdersOnlyClause("no")}`;
 
   sql += " GROUP BY no.order_id ORDER BY no.created_at DESC";
 

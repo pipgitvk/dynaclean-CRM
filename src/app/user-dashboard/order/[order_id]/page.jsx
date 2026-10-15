@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import OrderDetailsClient from "./OrderDetailsClient";
 import dayjs from "dayjs";
 import { getSessionPayload } from "@/lib/auth";
+import { isOrderVisibleToViewer } from "@/lib/orderApprovalVisibility";
 
 export const dynamic = "force-dynamic";
 
@@ -67,29 +68,29 @@ export default async function Page({ params }) {
   const orderId = parseInt(order_id);
   if (isNaN(orderId)) notFound();
 
-  const { orderDetails, items, statuses, gstin, quoteCustomerId } =
-    await fetchOrderData(orderId);
-
+  const payload = await getSessionPayload();
   let orderListPath = "/user-dashboard/order";
   let canUploadDocuments = false;
-  const payload = await getSessionPayload();
+  let userRole = payload?.role || payload?.userRole || "";
   if (payload?.username) {
     const connAuth = await getDbConnection();
     const [roleRows] = await connAuth.execute(
       "SELECT userRole FROM rep_list WHERE username = ?",
       [payload.username],
     );
-    const userRole = roleRows[0]?.userRole || payload.role || "";
+    userRole = roleRows[0]?.userRole || userRole;
     orderListPath = getOrderListPath(userRole);
     canUploadDocuments = String(userRole).toUpperCase().includes("ACCOUNTANT");
   }
 
-  if (!orderDetails) {
-    return (
-      <div className="p-8 text-center text-red-600 text-xl">
-        ❌ Order not found or invalid ID.
-      </div>
-    );
+  const { orderDetails, items, statuses, gstin, quoteCustomerId } =
+    await fetchOrderData(orderId);
+
+  if (
+    !orderDetails ||
+    !isOrderVisibleToViewer(orderDetails.approval_status, userRole)
+  ) {
+    notFound();
   }
 
   return (

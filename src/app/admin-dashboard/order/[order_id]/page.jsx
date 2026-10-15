@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import OrderDetailsClient from "./OrderDetailsClient";
 import dayjs from "dayjs";
 import { getSessionPayload } from "@/lib/auth";
+import { isOrderVisibleToViewer } from "@/lib/orderApprovalVisibility";
 
 export const dynamic = "force-dynamic";
 
@@ -73,12 +74,14 @@ export default async function Page({ params }) {
   const { orderDetails, items, statuses, gstin } =
     await fetchOrderData(orderId);
 
-  if (!orderDetails) {
-    return (
-      <div className="p-8 text-center text-red-600 text-xl">
-        ❌ Order not found or invalid ID.
-      </div>
-    );
+  if (
+    !orderDetails ||
+    !isOrderVisibleToViewer(
+      orderDetails.approval_status,
+      userRole || payload?.role || payload?.userRole || "",
+    )
+  ) {
+    notFound();
   }
 
   return (
