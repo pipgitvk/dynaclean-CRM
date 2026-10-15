@@ -3,6 +3,7 @@
  */
 
 import { sumOrderPaymentAmounts } from "@/lib/orderPaymentHistory";
+import { hasOrderInvoiceReport } from "@/lib/orderDocumentEditRules";
 
 /** Matches order list UI: quotation grand total, then invoice totalamt. */
 export function getOrderTotalForPayment(order) {
@@ -15,6 +16,17 @@ export function getOrderTotalForPayment(order) {
   const base = Number(order?.baseAmount) || 0;
   const tax = Number(order?.taxamt) || 0;
   return Math.max(total, base + tax);
+}
+
+/**
+ * Order list Payment column: until accountant uploads invoice report,
+ * do not treat booking advance / quotation total as "Paid".
+ */
+export function deriveOrderListPaymentStatus(order) {
+  if (!hasOrderInvoiceReport(order)) {
+    return "pending";
+  }
+  return deriveOrderPaymentStatus(order);
 }
 
 /** Status from paid vs total (booking advance before payment_status is updated). */

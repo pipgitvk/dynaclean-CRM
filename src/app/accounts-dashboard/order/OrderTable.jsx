@@ -22,7 +22,7 @@ import {
   buildOrderPaymentRows,
   sumOrderPaymentAmounts,
 } from "@/lib/orderPaymentHistory";
-import { deriveOrderPaymentStatus } from "@/lib/paymentOrderStatus";
+import { deriveOrderListPaymentStatus } from "@/lib/paymentOrderStatus";
 import { isBookingAllowedForOrder } from "@/lib/orderBookingEligibility";
 
 import DeleteButton from "@/components/accounts/DeleteButton";
@@ -612,7 +612,7 @@ export default function OrderTable({ orders, userRole }) {
             {filteredOrders.length > 0 ? (
               filteredOrders.map((r, i) => {
                 const status = getStatusText(r);
-                const pay = getPaymentBadge(deriveOrderPaymentStatus(r));
+                const pay = getPaymentBadge(deriveOrderListPaymentStatus(r));
                 // const inst = getInstallationLabel(r.installation_status);
                 return (
                   <tr

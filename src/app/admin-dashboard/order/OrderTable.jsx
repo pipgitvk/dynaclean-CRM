@@ -28,7 +28,10 @@ import {
   buildOrderPaymentRows,
   sumOrderPaymentAmounts,
 } from "@/lib/orderPaymentHistory";
-import { deriveOrderPaymentStatus } from "@/lib/paymentOrderStatus";
+import {
+  deriveOrderPaymentStatus,
+  deriveOrderListPaymentStatus,
+} from "@/lib/paymentOrderStatus";
 import ExcelJS from "exceljs";
 import { Pie } from "react-chartjs-2";
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
@@ -2289,7 +2292,7 @@ export default function OrderTable({ orders, userRole }) {
             {filteredOrders.length > 0 ? (
               filteredOrders.map((r, i) => {
                 const status = getStatusText(r);
-                const pay = getPaymentBadge(deriveOrderPaymentStatus(r));
+                const pay = getPaymentBadge(deriveOrderListPaymentStatus(r));
                 return (
                   <tr
                     key={r.order_id}
@@ -2441,7 +2444,7 @@ export default function OrderTable({ orders, userRole }) {
         {filteredOrders.length > 0 ? (
           filteredOrders.map((r, i) => {
             const status = getStatusText(r);
-            const pay = getPaymentBadge(deriveOrderPaymentStatus(r));
+            const pay = getPaymentBadge(deriveOrderListPaymentStatus(r));
             return (
               <div
                 key={r.order_id}
