@@ -31,6 +31,7 @@ import { isBookingAllowedForOrder } from "@/lib/orderBookingEligibility";
 import AccountantReportActionLinks from "@/components/orders/AccountantReportActionLinks";
 import { isAccountantOnlyMenuRole } from "@/lib/roleKeyUtils";
 import ViewCreditNoteMenuLink from "@/components/orders/ViewCreditNoteMenuLink";
+import AccountantReturnViewMenuItems from "@/components/orders/AccountantReturnViewMenuItems";
 
 // 👻 A sleek skeleton loader for a modern feel
 const SkeletonLoader = () => (
@@ -862,6 +863,10 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                   linkClassName="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-teal-700 w-full"
                   onClick={(e) => e.stopPropagation()}
                 />
+                <AccountantReturnViewMenuItems
+                  order={r}
+                  onClick={(e) => e.stopPropagation()}
+                />
               </>
             ) : (
               <>
@@ -983,7 +988,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                     <MarkReturnBookingDoneMenuItem order={r} />
                   </div>
                 )}
-                {(canManageReturns || isAdmin || isWarehouse) &&
+                {(canManageReturns || isAdmin || isAccountant || isWarehouse) &&
                   Number(r.return_booking_done) === 1 && (
                   <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>
                     <ViewReturnBookingMenuItem order={r} />
@@ -1005,7 +1010,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                   </div>
                 )}
                 {/* After warehouse-in done, show view for admin + accountant + warehouse */}
-                {(isSuperAdmin || isAdmin || isWarehouse) &&
+                {(isSuperAdmin || isAdmin || isAccountant || isWarehouse) &&
                   Number(r.warehouse_in_done) === 1 && (
                   <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>
                     <WarehouseInMenuItem order={r} />

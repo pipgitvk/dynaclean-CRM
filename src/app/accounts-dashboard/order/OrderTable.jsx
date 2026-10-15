@@ -38,6 +38,7 @@ import {
   WarehouseInMenuItem,
 } from "@/components/orders/ReturnBookingWarehouseMenuItems";
 import ViewCreditNoteMenuLink from "@/components/orders/ViewCreditNoteMenuLink";
+import AccountantReturnViewMenuItems from "@/components/orders/AccountantReturnViewMenuItems";
 
 // 👻 A sleek skeleton loader for a modern feel
 const SkeletonLoader = () => (
@@ -929,6 +930,10 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                   hrefBase="/admin-dashboard"
                   onClick={(e) => e.stopPropagation()}
                 />
+                <AccountantReturnViewMenuItems
+                  order={r}
+                  onClick={(e) => e.stopPropagation()}
+                />
               </>
             ) : (
               <>
@@ -1064,7 +1069,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                 <ReturnBookingMenuItem order={r} />
               </div>
             )}
-            {(canManageReturns || isAdmin || isWarehouse) &&
+            {(canManageReturns || isAdmin || isAccountant || isWarehouse) &&
               Number(r.return_booking_done) === 1 && (
               <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>
                 <ViewReturnBookingMenuItem order={r} />
@@ -1076,7 +1081,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
               hrefBase="/admin-dashboard"
               onClick={(e) => e.stopPropagation()}
             />
-            {(isSuperAdmin || isAdmin || isWarehouse) &&
+            {(isSuperAdmin || isAdmin || isAccountant || isWarehouse) &&
               Number(r.warehouse_in_done) === 1 && (
               <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>
                 <WarehouseInMenuItem order={r} />
