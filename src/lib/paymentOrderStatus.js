@@ -29,6 +29,28 @@ export function deriveOrderListPaymentStatus(order) {
   return deriveOrderPaymentStatus(order);
 }
 
+/**
+ * Order list "Payment Pending" amount (same paid vs total logic as Payment column).
+ * Returns null when no invoice report or fully settled.
+ */
+export function getOrderListRemainingPayment(order) {
+  if (!hasOrderInvoiceReport(order)) {
+    return null;
+  }
+  const total = getOrderTotalForPayment(order);
+  const paidAmount = sumOrderPaymentAmounts(order);
+  const remaining = Math.max(0, total - paidAmount);
+  const statusKey = (deriveOrderListPaymentStatus(order) || "")
+    .toString()
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "");
+  if (statusKey === "paid" && remaining < 0.01) {
+    return null;
+  }
+  return remaining;
+}
+
 /** Status from paid vs total (booking advance before payment_status is updated). */
 export function deriveOrderPaymentStatus(order) {
   const total = getOrderTotalForPayment(order);

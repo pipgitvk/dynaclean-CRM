@@ -22,7 +22,10 @@ import {
   buildOrderPaymentRows,
   sumOrderPaymentAmounts,
 } from "@/lib/orderPaymentHistory";
-import { deriveOrderListPaymentStatus } from "@/lib/paymentOrderStatus";
+import {
+  deriveOrderListPaymentStatus,
+  getOrderListRemainingPayment,
+} from "@/lib/paymentOrderStatus";
 import { isBookingAllowedForOrder } from "@/lib/orderBookingEligibility";
 import AccountantReportActionLinks from "@/components/orders/AccountantReportActionLinks";
 import { isAccountantOnlyMenuRole } from "@/lib/roleKeyUtils";
@@ -167,8 +170,6 @@ export default function OrderTable({ orders, userRole }) {
     dateTo,
     createdByFilter,
   ]);
-  const [paymentPendingData, setPaymentPendingData] = useState({}); // Maps order_id to remaining amount
-  const [loadingPendingData, setLoadingPendingData] = useState(true);
   useEffect(() => {
     const statusFromCard = searchParams.get("status");
     const fromCard = searchParams.get("fromCard");
@@ -195,32 +196,6 @@ export default function OrderTable({ orders, userRole }) {
   const toggleMenu = (id) => {
     setOpenMenuId(openMenuId === id ? null : id);
   };
-
-  // Fetch payment pending data on component mount
-  useEffect(() => {
-    const fetchPaymentPendingData = async () => {
-      try {
-        setLoadingPendingData(true);
-        const res = await fetch("/api/reports/payment-pending");
-        const data = await res.json();
-        
-        if (data.success && data.orders) {
-          // Create a map of order_id to remaining amount
-          const pendingMap = {};
-          data.orders.forEach(order => {
-            pendingMap[order.order_id] = order.remaining_amount;
-          });
-          setPaymentPendingData(pendingMap);
-        }
-      } catch (error) {
-        console.error("Error fetching payment pending data:", error);
-      } finally {
-        setLoadingPendingData(false);
-      }
-    };
-
-    fetchPaymentPendingData();
-  }, []);
 
   const getStatusText = (order) => {
     // Check for return status first (highest priority)
@@ -615,6 +590,7 @@ export default function OrderTable({ orders, userRole }) {
               filteredOrders.map((r, i) => {
                 const status = getStatusText(r);
                 const pay = getPaymentBadge(deriveOrderListPaymentStatus(r));
+                const paymentPending = getOrderListRemainingPayment(r);
                 // const inst = getInstallationLabel(r.installation_status);
                 return (
                   <tr
@@ -696,14 +672,15 @@ export default function OrderTable({ orders, userRole }) {
                       </span>
                     </td>
                     <td className="px-3 py-3 text-center">
-                      {loadingPendingData ? (
-                        <span className="text-gray-400 text-xs">Loading...</span>
-                      ) : paymentPendingData[r.order_id] ? (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                          ₹{paymentPendingData[r.order_id].toFixed(2)}
-                        </span>
-                      ) : (
+                      {paymentPending == null ? (
                         <span className="text-gray-400 text-xs">—</span>
+                      ) : (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                          ₹{paymentPending.toLocaleString("en-IN", {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
+                        </span>
                       )}
                     </td>
                     <td className="px-3 py-3 text-center">
@@ -743,6 +720,7 @@ export default function OrderTable({ orders, userRole }) {
         {filteredOrders.length > 0 ? (
           filteredOrders.map((r, i) => {
             const status = getStatusText(r);
+            const paymentPending = getOrderListRemainingPayment(r);
             return (
               <div
                 key={r.order_id}
@@ -796,14 +774,16 @@ export default function OrderTable({ orders, userRole }) {
                 </div>
                 <div>
                   <strong>Payment Pending:</strong>{" "}
-                  {loadingPendingData ? (
-                    <span className="text-gray-400 text-xs">Loading...</span>
-                  ) : paymentPendingData[r.order_id] ? (
-                    <span className="font-semibold text-red-600">
-                      ₹{paymentPendingData[r.order_id].toFixed(2)}
-                    </span>
-                  ) : (
+                  {paymentPending == null ? (
                     <span className="text-gray-400">—</span>
+                  ) : (
+                    <span className="font-semibold text-red-600">
+                      ₹
+                      {paymentPending.toLocaleString("en-IN", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </span>
                   )}
                 </div>
               </div>

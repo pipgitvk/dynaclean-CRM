@@ -3,6 +3,11 @@
 import { useMemo, useState } from "react";
 import Image from "next/image";
 import OrderDocumentFileCard from "@/components/orders/OrderDocumentFileCard";
+import { sumOrderPaymentAmounts } from "@/lib/orderPaymentHistory";
+import {
+  deriveOrderPaymentStatus,
+  getOrderTotalForPayment,
+} from "@/lib/paymentOrderStatus";
 
 const FILE_FIELDS = [
   { label: "Payment Proof", key: "payment_proof" },
@@ -35,16 +40,30 @@ export default function OrderDetails({ data }) {
     return isNaN(date) ? d : date.toLocaleDateString("en-IN");
   };
 
-  const totalPaid = () => {
-    if (!orderDetails.payment_amount) return 0;
-    const amounts = String(orderDetails.payment_amount)
-      .split(",")
-      .map(s => s.trim())
-      .filter(Boolean)
-      .map(x => Number(x))
-      .filter(n => !isNaN(n));
-    return amounts.reduce((sum, n) => sum + n, 0);
-  };
+  const displayTotal = useMemo(
+    () => getOrderTotalForPayment(orderDetails),
+    [orderDetails],
+  );
+
+  const displayTax = useMemo(() => {
+    const tax = Number(orderDetails.taxamt);
+    if (tax > 0) return tax;
+    const base = Number(orderDetails.baseAmount) || 0;
+    const total = displayTotal || 0;
+    if (total > 0 && base > 0 && total >= base) return total - base;
+    const gst = Number(orderDetails.quotation_gst);
+    return gst > 0 ? gst : 0;
+  }, [orderDetails, displayTotal]);
+
+  const totalPaid = useMemo(
+    () => sumOrderPaymentAmounts(orderDetails),
+    [orderDetails],
+  );
+
+  const paymentStatus = useMemo(
+    () => deriveOrderPaymentStatus(orderDetails),
+    [orderDetails],
+  );
 
   const files = FILE_FIELDS;
 
@@ -114,9 +133,10 @@ export default function OrderDetails({ data }) {
           ["Delivery Location", orderDetails.delivery_location],
           ["Client Delivery Date", formatDate(orderDetails.client_delivery_date)],
           ["Invoice Number", orderDetails.invoice_number],
-          ["Total Tax", currency(orderDetails.taxamt)],
-          ["Total Amount", currency(orderDetails.totalamt)],
-          ["Total Paid Amount", currency(totalPaid())],
+          ["Total Tax", currency(displayTax)],
+          ["Total Amount", currency(displayTotal)],
+          ["Total Paid Amount", currency(totalPaid)],
+          ["Payment Status", paymentStatus],
           ["Due Date", formatDate(orderDetails.duedate)],
           ["Booking ID", orderDetails.booking_id],
           ["Dispatch Person", orderDetails.dispatch_person],
