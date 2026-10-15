@@ -24,6 +24,57 @@ import {
   filterEmployeesForAttendanceSheet,
 } from "@/lib/payrollActiveEmployees";
 import { dateToYmdKey } from "@/lib/salaryPayDaysFromAttendance";
+import {
+  loadMachineCodeMaps,
+  loadMachineDailyByUsername,
+  mergeAttendanceListWithMachine,
+  mergeCrmAndMachineDay,
+} from "@/lib/attendanceMachineMerge";
+
+function machineMapForUsersAndMonth(machineByUserDate, relatedUsernames, from, to) {
+  const users = new Set(relatedUsernames.map((u) => normalizeUserKey(u)));
+  const filtered = new Map();
+  for (const [key, val] of machineByUserDate.entries()) {
+    const pipe = key.indexOf("|");
+    if (pipe < 0) continue;
+    const u = key.slice(0, pipe);
+    const dateYmd = key.slice(pipe + 1);
+    if (!users.has(normalizeUserKey(u))) continue;
+    if (dateYmd < from || dateYmd > to) continue;
+    filtered.set(key, val);
+  }
+  return filtered;
+}
+
+/** One log per calendar day when multiple related usernames / merged rows exist. */
+function collapseMergedAttendanceByDate(mergedList) {
+  const byDate = new Map();
+  for (const row of mergedList) {
+    const dk = dateToYmdKey(row.date);
+    if (!dk) continue;
+    const prev = byDate.get(dk);
+    if (!prev) {
+      byDate.set(dk, { ...row, date: dk });
+      continue;
+    }
+    byDate.set(
+      dk,
+      mergeCrmAndMachineDay(
+        {
+          ...prev,
+          checkin_time: prev.checkin_time,
+          checkout_time: prev.checkout_time,
+        },
+        {
+          machine_checkin: row.checkin_time,
+          machine_checkout: row.checkout_time,
+          emp_code: row.machine_day?.emp_code ?? prev.machine_day?.emp_code,
+        }
+      )
+    );
+  }
+  return Array.from(byDate.values());
+}
 
 const HR_ROLES = [
   "SUPERADMIN",
@@ -115,6 +166,9 @@ export async function GET(request) {
       logsByUser[uk].push(row);
     }
 
+    const { machineCodeToUsername } = await loadMachineCodeMaps(db);
+    const machineByUserDate = await loadMachineDailyByUsername(db, machineCodeToUsername);
+
     const rows = employees.map((emp, index) => {
       const uk = normalizeUserKey(emp.username);
       const profile =
@@ -124,16 +178,25 @@ export async function GET(request) {
         globalRules,
         scheduleByUser.get(uk) || null
       );
-      const logs = [];
+      const crmLogs = [];
       const logDates = new Set();
       for (const uname of related) {
         for (const log of logsByUser[normalizeUserKey(uname)] || []) {
           const dk = dateToYmdKey(log.date);
           if (dk && logDates.has(dk)) continue;
           if (dk) logDates.add(dk);
-          logs.push(log);
+          crmLogs.push(log);
         }
       }
+      const machineSlice = machineMapForUsersAndMonth(
+        machineByUserDate,
+        related,
+        meta.from,
+        meta.to
+      );
+      const logs = collapseMergedAttendanceByDate(
+        mergeAttendanceListWithMachine(crmLogs, machineSlice)
+      );
       const row = buildEmployeeAttendanceSheetRow({
         meta,
         username: emp.username,
