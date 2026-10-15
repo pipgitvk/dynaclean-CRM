@@ -1143,12 +1143,10 @@ export default function OrderTable({ orders, userRole }) {
   }, [orders]);
 
   const orderStats = useMemo(() => {
-    return ordersForStatCards.reduce(
+    const stats = ordersForStatCards.reduce(
       (acc, order) => {
         const taxable = getPaymentColumnAmount(order);
-        const totalOrder = getTotalAmount(order);
         const paidOrder = getTotalPaidAmount(order);
-        const balanceOrder = Math.max(0, totalOrder - paidOrder);
         const approval = (order.approval_status || "")
           .toString()
           .trim()
@@ -1189,7 +1187,6 @@ export default function OrderTable({ orders, userRole }) {
           }
 
           acc.paidAmount += paidOrder;
-          acc.unpaidAmount += balanceOrder;
         }
 
         return acc;
@@ -1211,6 +1208,11 @@ export default function OrderTable({ orders, userRole }) {
         unpaidAmount: 0,
       },
     );
+
+    return {
+      ...stats,
+      unpaidAmount: Math.max(0, stats.totalAmount - stats.paidAmount),
+    };
   }, [ordersForStatCards]);
 
   const rejectedOrderStats = useMemo(() => {
