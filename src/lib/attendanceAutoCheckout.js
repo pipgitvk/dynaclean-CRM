@@ -8,8 +8,8 @@ import {
   isAutomaticCheckoutAddress,
 } from "@/lib/attendanceAutoCheckoutConstants";
 import {
-  autoCheckoutSkipKey,
-  buildAutoCheckoutSkipKeySet,
+  findLeaveForUserOnDate,
+  resolveAutoCheckoutForAttendanceDay,
 } from "@/lib/attendanceAutoCheckoutLeave";
 import {
   insertAutoMachineCheckoutPunch,
@@ -63,10 +63,11 @@ function attendanceDateKey(value) {
   return s.length >= 10 ? s.slice(0, 10) : s;
 }
 
-/** Only auto check-out time: attendance date + 9:00 PM IST (same for everyone). */
-function autoCheckoutDateTimeForDate(dateYmd) {
+function autoCheckoutDateTimeForDate(dateYmd, wallTime = AUTO_CHECKOUT_WALL_TIME) {
   if (!dateYmd) return null;
-  return `${dateYmd} ${AUTO_CHECKOUT_WALL_TIME}`;
+  const t = String(wallTime || AUTO_CHECKOUT_WALL_TIME).trim();
+  const normalized = t.length === 5 ? `${t}:00` : t;
+  return `${dateYmd} ${normalized}`;
 }
 
 /**
@@ -100,33 +101,23 @@ async function applyAutomaticCheckoutsOnConn(conn, options = {}) {
     const autoAddrLit = conn.escape(AUTO_CHECKOUT_ATTENDANCE_ADDRESS);
 
     const [leaves] = await conn.query(
-      `SELECT username, from_date, to_date, leave_type, is_half_day, status
+      `SELECT username, from_date, to_date, leave_type, is_half_day, half_day_type,
+              start_time, end_time, status
        FROM employee_leaves
-       WHERE status = 'approved'`
+       WHERE status IN ('pending', 'approved')`
     );
-    const skipAutoCheckout = buildAutoCheckoutSkipKeySet(leaves);
 
-    let normalizeSql = `
-    UPDATE attendance_logs a
-    INNER JOIN rep_list r
-      ON a.username COLLATE utf8mb4_unicode_ci = r.username COLLATE utf8mb4_unicode_ci
-    SET a.checkout_time = TIMESTAMP(a.date, ?),
-        a.checkout_latitude = NULL,
-        a.checkout_longitude = NULL
-    WHERE r.status = 1
-      AND TRIM(COALESCE(a.checkout_address, '')) = ${autoAddrLit}
-      AND (
-        a.checkout_time IS NULL
-        OR TIME(a.checkout_time) <> TIME(?)
-      )
-  `;
-    const normalizeParams = [AUTO_CHECKOUT_WALL_TIME, AUTO_CHECKOUT_WALL_TIME];
-    if (filterUsername) {
-      normalizeSql += ` AND a.username = ?`;
-      normalizeParams.push(filterUsername);
+    const scheduleByUser = new Map();
+    const [scheduleRows] = await conn.query(
+      `SELECT username, checkin_time, checkout_time, break_lunch,
+              lunch_duration_minutes, half_day_checkin_time
+       FROM employee_attendance_schedule`
+    );
+    for (const row of scheduleRows || []) {
+      if (row?.username) scheduleByUser.set(row.username, row);
     }
-    const [normalizeResult] = await conn.query(normalizeSql, normalizeParams);
-    let updated = normalizeResult?.affectedRows ?? 0;
+
+    let updated = 0;
 
     const { usernameToMachineCode, machineCodeToUsername } =
       await loadMachineCodeMaps(conn);
@@ -197,17 +188,22 @@ async function applyAutomaticCheckoutsOnConn(conn, options = {}) {
 
       if (!isMeaningfulAttendancePunch(merged.checkin_time)) continue;
 
-      const skipKey = autoCheckoutSkipKey(username, dateYmd);
-      const isHalfDayLeaveDay = skipAutoCheckout.has(skipKey);
+      const leave = findLeaveForUserOnDate(leaves, username, dateYmd);
+      const scheduleRow = scheduleByUser.get(username) || null;
+      const { wallTime, skipAuto } = resolveAutoCheckoutForAttendanceDay({
+        leave,
+        dateYmd,
+        scheduleRow,
+        checkinTime: merged.checkin_time,
+      });
+
       const crmCheckout = crm?.checkout_time ?? null;
       const machineCheckout = machineDay?.machine_checkout ?? null;
 
-      if (
-        isHalfDayLeaveDay &&
-        isAutomaticCheckoutAddress(crm?.checkout_address)
-      ) {
-        const [revertResult] = await conn.query(
-          `UPDATE attendance_logs
+      if (skipAuto) {
+        if (isAutomaticCheckoutAddress(crm?.checkout_address)) {
+          const [revertResult] = await conn.query(
+            `UPDATE attendance_logs
          SET checkout_time = NULL,
              checkout_latitude = NULL,
              checkout_longitude = NULL,
@@ -215,23 +211,41 @@ async function applyAutomaticCheckoutsOnConn(conn, options = {}) {
          WHERE username = ?
            AND date = ?
            AND TRIM(COALESCE(checkout_address, '')) = ?`,
-          [username, dateYmd, AUTO_CHECKOUT_ATTENDANCE_ADDRESS]
-        );
-        if (revertResult?.affectedRows > 0) updated += revertResult.affectedRows;
+            [username, dateYmd, AUTO_CHECKOUT_ATTENDANCE_ADDRESS]
+          );
+          if (revertResult?.affectedRows > 0) updated += revertResult.affectedRows;
+        }
         continue;
       }
 
-      if (isHalfDayLeaveDay) continue;
-
-      const autoAt = autoCheckoutDateTimeForDate(dateYmd);
+      const autoAt = autoCheckoutDateTimeForDate(dateYmd, wallTime);
       if (!autoAt || autoAt > nowIst) continue;
 
-      if (mergedHasCheckout(crmCheckout, machineCheckout)) continue;
-
-      if (
-        isAutomaticCheckoutAddress(crm?.checkout_address) &&
-        isMeaningfulAttendancePunch(crmCheckout)
-      ) {
+      if (mergedHasCheckout(crmCheckout, machineCheckout)) {
+        if (
+          isAutomaticCheckoutAddress(crm?.checkout_address) &&
+          isMeaningfulAttendancePunch(crmCheckout)
+        ) {
+          const [fixResult] = await conn.query(
+            `UPDATE attendance_logs
+             SET checkout_time = TIMESTAMP(?, ?),
+                 checkout_latitude = NULL,
+                 checkout_longitude = NULL
+             WHERE username = ?
+               AND date = ?
+               AND TRIM(COALESCE(checkout_address, '')) = ?
+               AND TIME(checkout_time) <> TIME(?)`,
+            [
+              dateYmd,
+              wallTime,
+              username,
+              dateYmd,
+              AUTO_CHECKOUT_ATTENDANCE_ADDRESS,
+              wallTime,
+            ]
+          );
+          if (fixResult?.affectedRows > 0) updated += fixResult.affectedRows;
+        }
         continue;
       }
 
@@ -250,7 +264,7 @@ async function applyAutomaticCheckoutsOnConn(conn, options = {}) {
         [
           checkinForRow,
           dateYmd,
-          AUTO_CHECKOUT_WALL_TIME,
+          wallTime,
           AUTO_CHECKOUT_ATTENDANCE_ADDRESS,
           username,
           dateYmd,
@@ -278,7 +292,7 @@ async function applyAutomaticCheckoutsOnConn(conn, options = {}) {
             dateYmd,
             checkinForRow,
             dateYmd,
-            AUTO_CHECKOUT_WALL_TIME,
+            wallTime,
             AUTO_CHECKOUT_ATTENDANCE_ADDRESS,
           ]
         );
@@ -293,6 +307,7 @@ async function applyAutomaticCheckoutsOnConn(conn, options = {}) {
           empCode,
           employeeName: displayNameByUser.get(username) || username,
           dateYmd,
+          wallTime,
         });
         if (punched) updated += 1;
       }

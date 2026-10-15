@@ -16,6 +16,14 @@ function attendanceDateYmd(value) {
   return d.toLocaleDateString("en-CA");
 }
 
+function wallTimeToInput(value) {
+  if (!value) return "";
+  const s = String(value).trim();
+  const m = s.match(/^(\d{1,2}):(\d{2})/);
+  if (!m) return "";
+  return `${String(m[1]).padStart(2, "0")}:${m[2]}`;
+}
+
 export default function AttendanceAutoCheckoutApprovalsCard({
   fromDate,
   toDate,
@@ -25,6 +33,9 @@ export default function AttendanceAutoCheckoutApprovalsCard({
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("pending");
   const [actingKey, setActingKey] = useState(null);
+  const [approveModal, setApproveModal] = useState(null);
+  const [approveCheckoutTime, setApproveCheckoutTime] = useState("");
+  const [approveRemark, setApproveRemark] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -50,7 +61,25 @@ export default function AttendanceAutoCheckoutApprovalsCard({
     load();
   }, [load]);
 
-  const runAction = async (item, action) => {
+  const openApproveModal = (item) => {
+    const dateKey = attendanceDateYmd(item.date);
+    const defaultTime =
+      wallTimeToInput(item.current_checkout_time) ||
+      wallTimeToInput(item.suggested_checkout_time) ||
+      "21:00";
+    setApproveModal({ item, dateKey });
+    setApproveCheckoutTime(defaultTime);
+    setApproveRemark("");
+  };
+
+  const closeApproveModal = () => {
+    if (actingKey) return;
+    setApproveModal(null);
+    setApproveCheckoutTime("");
+    setApproveRemark("");
+  };
+
+  const runAction = async (item, action, extra = {}) => {
     const dateKey = attendanceDateYmd(item.date);
     const key = `${item.username}-${dateKey}`;
     setActingKey(key);
@@ -62,6 +91,8 @@ export default function AttendanceAutoCheckoutApprovalsCard({
           username: item.username,
           date: dateKey,
           action,
+          checkoutTime: extra.checkoutTime,
+          note: extra.note,
         }),
       });
       const data = await res.json();
@@ -73,12 +104,25 @@ export default function AttendanceAutoCheckoutApprovalsCard({
       } else {
         toast.success(`Marked as rejected (still automatic in records)`);
       }
+      closeApproveModal();
       await load();
     } catch (e) {
       toast.error(e.message || "Could not update approval");
     } finally {
       setActingKey(null);
     }
+  };
+
+  const submitApprove = () => {
+    if (!approveModal?.item) return;
+    if (!approveCheckoutTime.trim()) {
+      toast.error("Check-out time is required.");
+      return;
+    }
+    runAction(approveModal.item, "approve", {
+      checkoutTime: approveCheckoutTime.trim(),
+      note: approveRemark.trim() || undefined,
+    });
   };
 
   const pendingCount =
@@ -99,10 +143,11 @@ export default function AttendanceAutoCheckoutApprovalsCard({
               Automatic check-out approval
             </h2>
             <p className="mt-0.5 text-sm text-red-800/90">
-              Approve to confirm the 9:00 PM system check-out in attendance
-              records. Until approved, entries stay{" "}
-              <span className="font-semibold">Automatic</span> in the table
-              below.
+              System check-out is usually 9:00 PM IST. Employees with{" "}
+              <strong>pending or approved</strong> leave on that day are{" "}
+              <strong>not</strong> auto checked out. After leave is{" "}
+              <strong>rejected</strong>, normal auto check-out applies. Approve
+              remaining rows with the time and remark below.
             </p>
           </div>
         </div>
@@ -152,8 +197,12 @@ export default function AttendanceAutoCheckoutApprovalsCard({
                 <th className="px-3 py-2.5 font-semibold">Employee</th>
                 <th className="px-3 py-2.5 font-semibold">Emp ID</th>
                 <th className="px-3 py-2.5 font-semibold">Check-in</th>
-                <th className="px-3 py-2.5 font-semibold">Check-out</th>
+                <th className="px-3 py-2.5 font-semibold">Auto check-out</th>
+                <th className="px-3 py-2.5 font-semibold">Leave</th>
                 <th className="px-3 py-2.5 font-semibold">Status</th>
+                {statusFilter === "rejected" ? (
+                  <th className="px-3 py-2.5 font-semibold">Remark</th>
+                ) : null}
                 {statusFilter === "pending" ? (
                   <th className="px-3 py-2.5 font-semibold text-right">Action</th>
                 ) : null}
@@ -174,6 +223,23 @@ export default function AttendanceAutoCheckoutApprovalsCard({
                     </td>
                     <td className="px-3 py-2.5 text-red-700 font-medium">
                       {formatTime(item.checkout_time) || "—"}
+                      {item.suggested_checkout_time &&
+                      wallTimeToInput(item.suggested_checkout_time) !==
+                        wallTimeToInput(item.current_checkout_time) ? (
+                        <div className="text-[10px] font-normal text-amber-700 mt-0.5">
+                          Suggested: {formatTime(item.suggested_checkout_time)}
+                        </div>
+                      ) : null}
+                    </td>
+                    <td className="px-3 py-2.5 text-xs">
+                      {item.has_active_leave ? (
+                        <span className="inline-flex rounded-full bg-orange-100 px-2 py-0.5 font-medium text-orange-800 capitalize">
+                          {item.leave_status || "leave"}
+                          {item.leave_type ? ` · ${item.leave_type}` : ""}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400">—</span>
+                      )}
                     </td>
                     <td className="px-3 py-2.5">
                       <span
@@ -188,13 +254,21 @@ export default function AttendanceAutoCheckoutApprovalsCard({
                           : "Pending"}
                       </span>
                     </td>
+                    {statusFilter === "rejected" ? (
+                      <td
+                        className="px-3 py-2.5 text-xs text-gray-600 max-w-[200px] truncate"
+                        title={item.note || ""}
+                      >
+                        {item.note || "—"}
+                      </td>
+                    ) : null}
                     {statusFilter === "pending" ? (
                       <td className="px-3 py-2.5">
                         <div className="flex justify-end gap-2">
                           <button
                             type="button"
                             disabled={busy}
-                            onClick={() => runAction(item, "approve")}
+                            onClick={() => openApproveModal(item)}
                             className="inline-flex items-center gap-1 rounded-md bg-green-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-green-700 disabled:opacity-60"
                           >
                             {busy ? (
@@ -223,6 +297,68 @@ export default function AttendanceAutoCheckoutApprovalsCard({
           </table>
         </div>
       )}
+
+      {approveModal ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={(e) => e.target === e.currentTarget && closeApproveModal()}
+        >
+          <div
+            className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-semibold text-gray-900">
+              Approve automatic check-out
+            </h3>
+            <p className="mt-1 text-sm text-gray-600">
+              <strong>{approveModal.item.username}</strong> · {approveModal.dateKey}
+            </p>
+            <label className="mt-4 block text-sm font-medium text-gray-700">
+              Check-out time (IST)
+              <input
+                type="time"
+                value={approveCheckoutTime}
+                onChange={(e) => setApproveCheckoutTime(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                required
+              />
+            </label>
+            <label className="mt-3 block text-sm font-medium text-gray-700">
+              Remark
+              <textarea
+                value={approveRemark}
+                onChange={(e) => setApproveRemark(e.target.value)}
+                rows={3}
+                placeholder="Optional approval remark…"
+                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              />
+            </label>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={closeApproveModal}
+                disabled={Boolean(actingKey)}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={submitApprove}
+                disabled={Boolean(actingKey)}
+                className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-60"
+              >
+                {actingKey ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Check className="h-4 w-4" />
+                )}
+                Save &amp; approve
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

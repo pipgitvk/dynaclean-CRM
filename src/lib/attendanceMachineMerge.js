@@ -237,17 +237,24 @@ export function mergeAttendanceListWithMachine(crmRows, machineByUserDate) {
   return merged;
 }
 
-export function formatAutoMachinePunchDateTime(dateYmd) {
-  return `${dateYmd} 21:00:00`;
+export function formatAutoMachinePunchDateTime(dateYmd, wallTime = "21:00:00") {
+  const t = String(wallTime || "21:00:00").trim();
+  const normalized = /^\d{1,2}:\d{2}(:\d{2})?$/.test(t)
+    ? t.length === 5
+      ? `${t}:00`
+      : t
+    : "21:00:00";
+  return `${dateYmd} ${normalized}`;
 }
 
 export async function insertAutoMachineCheckoutPunch(conn, {
   empCode,
   employeeName,
   dateYmd,
+  wallTime,
 }) {
   if (!empCode || !dateYmd) return false;
-  const punchAt = formatAutoMachinePunchDateTime(dateYmd);
+  const punchAt = formatAutoMachinePunchDateTime(dateYmd, wallTime);
   const sourceUid = `auto-9pm-${empCode}-${dateYmd}`;
   const [result] = await conn.execute(
     `INSERT INTO machine_attendance_punches

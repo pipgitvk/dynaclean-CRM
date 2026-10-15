@@ -40,8 +40,8 @@ export default function AutoCheckoutApprovalsPage() {
               Automatic check-out approval
             </h1>
             <p className="mt-1 text-sm text-gray-600">
-              Approve 9:00 PM system check-outs. Until approved, attendance
-              records stay marked as{" "}
+              Approve system check-outs (default 9:00 PM; earlier when pending or
+              approved leave applies). Until approved, records stay{" "}
               <span className="font-semibold text-red-600">Automatic</span>.
             </p>
           </div>
