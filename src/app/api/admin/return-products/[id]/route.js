@@ -1,9 +1,7 @@
 import { getDbConnection } from '@/lib/db';
-import { verify } from 'jsonwebtoken';
+import { getReturnProductActorUsername } from '@/lib/returnProductsActor';
 import fs from 'fs/promises';
 import path from 'path';
-
-const SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
 // GET - एक return product fetch करें
 export async function GET(request, { params }) {
@@ -90,18 +88,12 @@ export async function PUT(request, { params }) {
   try {
     const { id } = await params;
 
-    // Get user ID from token first
-    const token = request.headers.get('authorization')?.split(' ')[1];
-    let userId = 1;
-    let username = 'system';
-    if (token) {
-      try {
-        const decoded = verify(token, SECRET);
-        userId = decoded.username || decoded.empId || decoded.id || decoded.userId || decoded.client_index || 1;
-        username = decoded.username || 'system';
-      } catch (err) {
-        console.error('Token verification failed:', err);
-      }
+    const actorUsername = await getReturnProductActorUsername();
+    if (!actorUsername) {
+      return Response.json(
+        { success: false, message: 'Unauthorized' },
+        { status: 401 },
+      );
     }
 
     let body = {};
@@ -196,7 +188,7 @@ export async function PUT(request, { params }) {
     updateFields.push('updated_at = NOW()');
     if (hasRpUpdatedBy) {
       updateFields.push('updated_by = ?');
-      updateValues.push(userId);
+      updateValues.push(actorUsername);
     }
     
     const updateQuery = `UPDATE return_products SET ${updateFields.join(', ')} WHERE id = ?`;
@@ -219,7 +211,7 @@ export async function PUT(request, { params }) {
       }
       if (hasRiUpdatedBy) {
         riUpdateFields.push('updated_by = ?');
-        riUpdateValues.push(userId);
+        riUpdateValues.push(actorUsername);
       }
       
       if (riUpdateFields.length > 0) {
@@ -283,7 +275,7 @@ export async function PUT(request, { params }) {
              VALUES (?, ?, NULL, NULL, ?, ?, 'IN', NULL, NULL, ?, ?, ?, NULL, ?, ?, ?, ?, ?)`,
             [itemCode, qty, `Return Warehouse In (Return #${id})`, targetGodown,
              returnRecord.model_no || null, returnRecord.model_no || null,
-             returnRecord.quotation_no || null, username, targetGodown, totalD, delhiD, southD]
+             returnRecord.quotation_no || null, actorUsername, targetGodown, totalD, delhiD, southD]
           );
 
           const [summary] = await pool.query(
@@ -326,7 +318,7 @@ export async function PUT(request, { params }) {
              VALUES (?, ?, NULL, NULL, ?, ?, 'IN', ?, ?, ?, NULL, ?, ?, ?, ?, ?)`,
             [spareId, qty, `Return Warehouse In (Return #${id})`, targetGodown,
              returnRecord.model_no || null, returnRecord.model_no || null,
-             returnRecord.quotation_no || null, username, targetGodown, totalD, delhiD, southD]
+             returnRecord.quotation_no || null, actorUsername, targetGodown, totalD, delhiD, southD]
           );
 
           const [summary] = await pool.query(
