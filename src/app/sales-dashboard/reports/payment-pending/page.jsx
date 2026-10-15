@@ -184,7 +184,7 @@ export default function PaymentPendingReport() {
   );
 
   return (
-    <div className="w-full max-w-full p-3 overflow-hidden">
+    <div className="w-full max-w-[1600px] mx-auto p-4 md:p-6">
       <div className="mb-1">
         <h1 className="text-2xl font-bold text-gray-800 mb-0.5">Payment Pending Report</h1>
         <p className="text-xs text-gray-600">
@@ -194,9 +194,9 @@ export default function PaymentPendingReport() {
       </div>
 
       {/* Cards and Filters Layout */}
-      <div className="mb-4 flex flex-col lg:flex-row gap-3">
+      <div className="mb-4 flex flex-col gap-4 xl:flex-row xl:items-start">
         {/* Cards - Left Side */}
-        <div className="flex-shrink-0 w-full lg:max-w-md">
+        <div className="w-full shrink-0 xl:w-[min(100%,42rem)] xl:min-w-[22rem]">
           <PaymentPendingStatsBar
             orders={filteredOrders}
             onOrdersClick={handleTotalOrdersCardClick}
@@ -208,10 +208,10 @@ export default function PaymentPendingReport() {
         </div>
 
         {/* Filters - Right Side */}
-        <div className="flex-1 bg-white rounded-lg shadow p-3 max-w-2xl">
-          <div className="space-y-2">
+        <div className="min-w-0 flex-1 rounded-lg border border-gray-100 bg-white p-4 shadow-sm">
+          <div className="space-y-3">
             {/* Row 1: Search Box */}
-            <div className="relative max-w-md">
+            <div className="relative w-full max-w-lg">
               <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400" size={14} />
               <input
                 type="text"
@@ -230,63 +230,75 @@ export default function PaymentPendingReport() {
             <p className="text-xs text-gray-500">{MANUAL_FILTER_HINT}</p>
 
             {/* Row 2: Date Filters + Status + Buttons */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-2 items-end">
-              {/* Due Date From */}
-              <div>
-                <TypeableDateFilterInput value={dueDateFrom} onChange={setDueDateFrom} className="w-full px-3 py-2.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  title="From Date"/>
+            <div className="flex flex-wrap items-end gap-2">
+              <div className="w-full min-w-[9.5rem] flex-1 sm:max-w-[11rem]">
+                <label className="mb-1 block text-[11px] font-medium text-gray-500">From</label>
+                <TypeableDateFilterInput
+                  value={dueDateFrom}
+                  onChange={setDueDateFrom}
+                  className="w-full min-w-0 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  title="From Date"
+                />
               </div>
 
-              {/* Due Date To */}
-              <div>
-                <TypeableDateFilterInput value={dueDateTo} onChange={setDueDateTo} className="w-full px-3 py-2.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  title="To Date"/>
+              <div className="w-full min-w-[9.5rem] flex-1 sm:max-w-[11rem]">
+                <label className="mb-1 block text-[11px] font-medium text-gray-500">To</label>
+                <TypeableDateFilterInput
+                  value={dueDateTo}
+                  onChange={setDueDateTo}
+                  className="w-full min-w-0 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  title="To Date"
+                />
               </div>
 
-              {/* Status Filter */}
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full px-3 py-2.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="all">All</option>
-                <option value="due">Overdue</option>
-                <option value="no-due">Not Due</option>
-              </select>
+              <div className="w-full min-w-[8rem] flex-1 sm:max-w-[9rem]">
+                <label className="mb-1 block text-[11px] font-medium text-gray-500">Status</label>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="all">All</option>
+                  <option value="due">Overdue</option>
+                  <option value="no-due">Not Due</option>
+                </select>
+              </div>
 
-              <ManualFilterSearchButton
-                onClick={handleApplySearch}
-                className="w-full px-3 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded"
-              />
+              <div className="flex flex-wrap gap-2 pb-0.5">
+                <ManualFilterSearchButton
+                  onClick={handleApplySearch}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-md"
+                />
 
-              {(dueDateFrom || dueDateTo || statusFilter !== "all" || searchQuery) && (
+                {(dueDateFrom || dueDateTo || statusFilter !== "all" || searchQuery) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDueDateFrom("");
+                      setDueDateTo("");
+                      setStatusFilter("all");
+                      setSearchQuery("");
+                      setAppliedDueDateFrom("");
+                      setAppliedDueDateTo("");
+                      setAppliedStatusFilter("all");
+                      setAppliedSearchQuery("");
+                    }}
+                    className="inline-flex items-center justify-center gap-1 bg-gray-500 hover:bg-gray-600 text-white px-3 py-2 rounded-md text-sm font-semibold transition-colors"
+                  >
+                    <X size={14} />
+                    Clear
+                  </button>
+                )}
+
                 <button
                   type="button"
-                  onClick={() => {
-                    setDueDateFrom("");
-                    setDueDateTo("");
-                    setStatusFilter("all");
-                    setSearchQuery("");
-                    setAppliedDueDateFrom("");
-                    setAppliedDueDateTo("");
-                    setAppliedStatusFilter("all");
-                    setAppliedSearchQuery("");
-                  }}
-                  className="flex items-center justify-center gap-1 bg-gray-500 hover:bg-gray-600 text-white px-3 py-2.5 rounded text-xs font-semibold transition-colors"
+                  onClick={exportToCSV}
+                  className="inline-flex items-center justify-center gap-1 bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-md text-sm font-semibold transition-colors"
                 >
-                  <X size={12} />
-                  Clear
+                  <Download size={14} />
+                  CSV
                 </button>
-              )}
-
-              {/* Export Button */}
-              <button
-                onClick={exportToCSV}
-                className="flex items-center justify-center gap-1 bg-green-600 hover:bg-green-700 text-white px-3 py-2.5 rounded text-xs font-semibold transition-colors"
-              >
-                <Download size={12} />
-                CSV
-              </button>
+              </div>
             </div>
           </div>
         </div>
@@ -295,7 +307,7 @@ export default function PaymentPendingReport() {
       {/* Table */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-200px)]">
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[1100px] text-sm">
             <thead className="bg-gray-800 text-white sticky top-0 z-10">
               <tr>
                 <th 
@@ -323,19 +335,19 @@ export default function PaymentPendingReport() {
                   Employee <SortIcon columnKey="created_by" />
                 </th>
                 <th 
-                  className="px-4 py-3 text-right font-semibold cursor-pointer hover:bg-gray-700 transition-colors"
+                  className="px-4 py-3 text-right font-semibold whitespace-nowrap cursor-pointer hover:bg-gray-700 transition-colors"
                   onClick={() => handleSort('total_amount')}
                 >
                   Total Amount <SortIcon columnKey="total_amount" />
                 </th>
                 <th 
-                  className="px-4 py-3 text-right font-semibold cursor-pointer hover:bg-gray-700 transition-colors"
+                  className="px-4 py-3 text-right font-semibold whitespace-nowrap cursor-pointer hover:bg-gray-700 transition-colors"
                   onClick={() => handleSort('paid_amount')}
                 >
                   Paid <SortIcon columnKey="paid_amount" />
                 </th>
                 <th 
-                  className="px-4 py-3 text-right font-semibold cursor-pointer hover:bg-gray-700 transition-colors"
+                  className="px-4 py-3 text-right font-semibold whitespace-nowrap cursor-pointer hover:bg-gray-700 transition-colors"
                   onClick={() => handleSort('remaining_amount')}
                 >
                   Remaining <SortIcon columnKey="remaining_amount" />
@@ -395,21 +407,21 @@ export default function PaymentPendingReport() {
                       </td>
                       <td className="px-4 py-3 border-b text-gray-700">{order.contact}</td>
                       <td className="px-4 py-3 border-b text-gray-700">{order.created_by}</td>
-                      <td className="px-4 py-3 border-b text-right font-medium text-gray-800">
-                        ₹{order.total_amount.toFixed(2)}
+                      <td className="px-4 py-3 border-b text-right font-medium tabular-nums whitespace-nowrap text-gray-800">
+                        ₹{order.total_amount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
-                      <td className="px-4 py-3 border-b text-right text-green-600">
-                        ₹{order.paid_amount.toFixed(2)}
+                      <td className="px-4 py-3 border-b text-right tabular-nums whitespace-nowrap text-green-600">
+                        ₹{order.paid_amount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
-                      <td className="px-4 py-3 border-b text-right font-semibold text-red-600">
-                        ₹{order.remaining_amount.toFixed(2)}
+                      <td className="px-4 py-3 border-b text-right font-semibold tabular-nums whitespace-nowrap text-red-600">
+                        ₹{order.remaining_amount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
-                      <td className="px-4 py-3 border-b text-center">
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                      <td className="px-4 py-3 border-b text-center whitespace-nowrap">
+                        <span className={`inline-flex items-center justify-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${
                           isOverdue ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
                         }`}>
                           {dayjs(order.due_date).format("DD-MM-YYYY")}
-                          {isOverdue && " ⚠️"}
+                          {isOverdue && <span aria-hidden>⚠️</span>}
                         </span>
                       </td>
                       <td className="px-4 py-3 border-b text-center">
@@ -471,7 +483,7 @@ export default function PaymentPendingReport() {
                 })
               ) : (
                 <tr>
-                  <td colSpan={11} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={12} className="px-6 py-8 text-center text-gray-500">
                     No pending payments found
                   </td>
                 </tr>

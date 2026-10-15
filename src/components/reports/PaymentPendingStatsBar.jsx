@@ -46,14 +46,14 @@ export default function PaymentPendingStatsBar({
   ];
 
   return (
-    <div className="rounded border bg-gradient-to-r from-gray-50 to-blue-50 p-2">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-0 lg:divide-x lg:divide-gray-300">
+    <div className="rounded-lg border border-gray-200 bg-gradient-to-r from-gray-50 to-blue-50 p-3 shadow-sm">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-2">
         {cells.map((cell) => (
           <div
             key={cell.label}
-            className={`text-center px-2 py-1 ${
+            className={`min-w-0 rounded-md bg-white/70 px-2 py-2 sm:bg-transparent sm:px-3 ${
               cell.clickable
-                ? "cursor-pointer rounded hover:bg-white/60 transition-colors"
+                ? "cursor-pointer hover:bg-white/90 sm:hover:bg-white/60 transition-colors"
                 : ""
             }`}
             onClick={cell.clickable ? cell.onClick : undefined}
@@ -67,10 +67,12 @@ export default function PaymentPendingStatsBar({
             role={cell.clickable ? "button" : undefined}
             tabIndex={cell.clickable ? 0 : undefined}
           >
-            <p className={`text-[11px] font-semibold leading-tight ${cell.labelClass}`}>
+            <p className={`text-[11px] font-semibold leading-tight sm:text-xs ${cell.labelClass}`}>
               {cell.label}
             </p>
-            <p className={`font-bold leading-snug mt-0.5 break-all ${cell.valueClass}`}>
+            <p
+              className={`mt-1 text-base font-bold tabular-nums leading-none whitespace-nowrap sm:text-lg ${cell.valueClass}`}
+            >
               {cell.value}
             </p>
           </div>
