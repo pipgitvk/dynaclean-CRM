@@ -469,6 +469,7 @@ const AttendancePage = () => {
         is_half_day: treatAsHalfDay ? 1 : 0,
         half_day_type: treatAsHalfDay ? finalHalfType : null,
         has_punch_on_leave: hasRealPunch ? 1 : 0,
+        isSunday: isWeekend,
       });
     } else if (hasRealPunch) {
       allDates.push({ ...existingLog, type: "present", workedSunday: isWeekend, approvedHalfDay });
@@ -491,6 +492,7 @@ const AttendancePage = () => {
           is_half_day: leaveIsHalfDay ? 1 : 0,
           half_day_type: leaveIsHalfDay ? finalHalfType : null,
           has_punch_on_leave: 0,
+          isSunday: isWeekend,
         });
       } else if (isWeekend) {
         allDates.push({
@@ -539,7 +541,7 @@ const AttendancePage = () => {
         }
       }
       if (log.type === "holiday") acc.holidays++;
-      if (log.type === "sunday") acc.sundays++;
+      if (log.type === "sunday" || log.isSunday) acc.sundays++;
       if (log.type === "present") {
         acc.present++;
         const cls = classifyAttendanceDay(log, rules, graceHalfDaysUsed);
@@ -907,6 +909,11 @@ const AttendancePage = () => {
                         )}
                         {log.leaveType && (
                           <p className="text-sm text-gray-600 mt-2 capitalize">{log.leaveType} Leave</p>
+                        )}
+                        {log.isSunday && (
+                          <span className="inline-flex items-center gap-1 mt-2 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-purple-100 text-purple-800 border border-purple-200">
+                            Sunday
+                          </span>
                         )}
                       </>
                     ) : (
@@ -1304,6 +1311,11 @@ const AttendancePage = () => {
                           <p className={`text-sm mt-2 capitalize ${log.is_half_day == 1 ? "text-gray-600" : "mt-1"}`}>
                             {log.leaveType} Leave
                           </p>
+                        )}
+                        {log.isSunday && (
+                          <span className="inline-flex items-center gap-1 mt-2 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-purple-100 text-purple-800 border border-purple-200">
+                            Sunday
+                          </span>
                         )}
                         {log.leaveReason && (
                           <p className="text-xs text-gray-500 mt-1">{log.leaveReason}</p>

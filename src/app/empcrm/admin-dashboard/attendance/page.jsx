@@ -321,6 +321,11 @@ function LeaveDayStatusBlock({ log, className = "" }) {
           {log.leaveType} Leave
         </p>
       )}
+      {log.isSunday && (
+        <span className="inline-flex items-center gap-1 mt-2 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-purple-100 text-purple-800 border border-purple-200">
+          Sunday
+        </span>
+      )}
     </div>
   );
 }
@@ -714,6 +719,19 @@ const AttendancePage = () => {
       holidays.map((h) => [attendanceDateYmd(h.holiday_date), h])
     );
 
+    const withSundayOnLeave = (row, dateString, isWeekend) => {
+      if (!isWeekend) return row;
+      return {
+        ...row,
+        isSunday: true,
+        sundayPaidWeeklyOff: weeklyOffSundayCountsAsPaid(dateString, {
+          holidayMap,
+          dateMap,
+        }),
+        holidayTitle: row.holidayTitle || "Sunday",
+      };
+    };
+
     // Create a map of leave dates for the specific user
     const leaveMap = new Map();
     leaves.filter(leave => leave.username === user).forEach((leave) => {
@@ -782,17 +800,23 @@ const AttendancePage = () => {
         const treatAsHalfDay = hasRealPunch || leaveIsHalfDay;
         const derivedType = deriveHalfDayType(approvedPaidLeave.start_time, approvedPaidLeave.end_time);
         const finalHalfType = approvedPaidLeave.half_day_type || derivedType || (hasRealPunch ? "1st_half" : "1st_half");
-        allDates.push({
-          ...(existingLog ? { ...existingLog } : {}),
-          username: existingLog?.username || user,
-          date: dateString,
-          type: "paidleave",
-          leaveType: "Paid",
-          leaveReason: approvedPaidLeave.reason || null,
-          is_half_day: treatAsHalfDay ? 1 : 0,
-          half_day_type: treatAsHalfDay ? finalHalfType : null,
-          has_punch_on_leave: hasRealPunch ? 1 : 0,
-        });
+        allDates.push(
+          withSundayOnLeave(
+            {
+              ...(existingLog ? { ...existingLog } : {}),
+              username: existingLog?.username || user,
+              date: dateString,
+              type: "paidleave",
+              leaveType: "Paid",
+              leaveReason: approvedPaidLeave.reason || null,
+              is_half_day: treatAsHalfDay ? 1 : 0,
+              half_day_type: treatAsHalfDay ? finalHalfType : null,
+              has_punch_on_leave: hasRealPunch ? 1 : 0,
+            },
+            dateString,
+            isWeekend,
+          ),
+        );
       } else if (hasRealPunch) {
         allDates.push({ ...existingLog, type: "present", workedSunday: isWeekend, approvedHalfDay });
       } else {
@@ -805,16 +829,22 @@ const AttendancePage = () => {
           const leaveIsHalfDay = leaveInfo?.is_half_day == 1 || leaveInfo?.leave_type === 'half-day';
           const derivedType = deriveHalfDayType(leaveInfo?.start_time, leaveInfo?.end_time);
           const finalHalfType = leaveInfo?.half_day_type || derivedType;
-          allDates.push({
-            ...base,
-            date: dateString,
-            type: isUnpaid ? "unpaidleave" : "leave",
-            leaveType: leaveInfo?.leave_type || "Leave",
-            leaveReason: leaveInfo?.reason || null,
-            is_half_day: leaveIsHalfDay ? 1 : 0,
-            half_day_type: leaveIsHalfDay ? finalHalfType : null,
-            has_punch_on_leave: 0,
-          });
+          allDates.push(
+            withSundayOnLeave(
+              {
+                ...base,
+                date: dateString,
+                type: isUnpaid ? "unpaidleave" : "leave",
+                leaveType: leaveInfo?.leave_type || "Leave",
+                leaveReason: leaveInfo?.reason || null,
+                is_half_day: leaveIsHalfDay ? 1 : 0,
+                half_day_type: leaveIsHalfDay ? finalHalfType : null,
+                has_punch_on_leave: 0,
+              },
+              dateString,
+              isWeekend,
+            ),
+          );
         } else if (isHoliday) {
           const holidayInfo = holidayMap.get(dateString);
           allDates.push({
@@ -929,7 +959,7 @@ const AttendancePage = () => {
         }
       }
       if (log.type === "holiday") acc.holidays++;
-      if (log.type === "sunday") acc.sundays++;
+      if (log.type === "sunday" || log.isSunday) acc.sundays++;
       if (log.type === "present") {
         acc.present++;
         const username = log.username;
@@ -1564,6 +1594,11 @@ const AttendancePage = () => {
                           )}
                           {log.leaveType && (
                             <p className="text-sm text-gray-600 mt-2 capitalize">{log.leaveType} Leave</p>
+                          )}
+                          {log.isSunday && (
+                            <span className="inline-flex items-center gap-1 mt-2 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-purple-100 text-purple-800 border border-purple-200">
+                              Sunday
+                            </span>
                           )}
                         </>
                       ) : (
