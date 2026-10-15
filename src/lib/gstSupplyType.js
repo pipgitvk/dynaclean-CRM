@@ -22,8 +22,8 @@ export function getStateCodeFromGstin(gstin) {
 }
 
 /**
- * IGST when buyer GSTIN ≠ company GSTIN, or buyer state code ≠ 07 (Delhi).
- * Same rules as quotation create form.
+ * IGST when buyer place-of-supply state ≠ supplier (Delhi 07).
+ * Different GSTIN in the same state still uses CGST+SGST (same as quotation form).
  */
 export function isInterstateInvoiceSupply({
   buyerGstin,
@@ -32,9 +32,6 @@ export function isInterstateInvoiceSupply({
   parseCodeFromDisplay,
 }) {
   const buyerGst = normalizeGstin(buyerGstin);
-  if (buyerGst && buyerGst !== normalizeGstin(SUPPLIER_GSTIN)) {
-    return true;
-  }
 
   const code =
     buyerStateCode?.toString().trim() ||
