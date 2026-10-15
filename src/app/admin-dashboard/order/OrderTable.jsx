@@ -2801,6 +2801,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
   const canViewSales = [
     "back office",
     "accountant",
+    "admin",
     "superadmin",
     "sales",
     "sales head",
@@ -2813,6 +2814,8 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
   const isAccountant = role.includes("accountant");
   const canManageReturns = isSuperAdmin || isAccountant;
   const canEditBooking = isSuperAdmin || isAdmin;
+  const reportUploaded = isBookingAllowedForOrder(r);
+  const canAdminAfterReport = (isAdmin || isSuperAdmin) && reportUploaded;
   const canManageInvoiceDocs = isSuperAdmin || isAccountant;
   const isWarehouse = role === "warehouse incharge";
   const hasBooking =
@@ -2932,7 +2935,9 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                   </div>
                 </>
               ))}
-            {canManageReturns && !hasBooking && isBookingAllowedForOrder(r) && (
+            {(canManageReturns || canAdminAfterReport) &&
+              !hasBooking &&
+              isBookingAllowedForOrder(r) && (
                 <Link
                   href={`/admin-dashboard/order/upload-booking/${r.order_id}`}
                   className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-green-700"
@@ -2954,7 +2959,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                 <span>Edit Booking</span>
               </Link>
             )}
-            {canManageReturns && hasBooking && (
+            {(canManageReturns || canAdminAfterReport) && hasBooking && (
                 <Link
                   href={`/admin-dashboard/order/view-booking/${r.order_id}`}
                   className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
@@ -2965,7 +2970,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                   <span>View Booking</span>
                 </Link>
               )}
-            {(isWarehouse || canManageReturns) &&
+            {(isWarehouse || canManageReturns || canAdminAfterReport) &&
               hasBooking &&
               dispatchStatus === 0 && (
                 <>

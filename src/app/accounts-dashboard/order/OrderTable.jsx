@@ -842,8 +842,9 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
   const canManageInvoiceDocs =
     isSuperAdmin || isAdmin || isAccountant || isTeamLeader;
   const canManageReturns =
-    isSuperAdmin || isAdmin || isAccountant || isTeamLeader;
+    isSuperAdmin || isAccountant || isTeamLeader;
   const canEditBooking = isSuperAdmin || isAdmin;
+  const canAdminAfterReport = isAdmin && isBookingAllowedForOrder(r);
   const hasBooking =
     r.booking_id !== undefined &&
     r.booking_id !== null &&
@@ -942,7 +943,9 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                   </div>
                 </div>
               ))}
-            {canManageReturns && !hasBooking && isBookingAllowedForOrder(r) && (
+            {(canManageReturns || canAdminAfterReport) &&
+              !hasBooking &&
+              isBookingAllowedForOrder(r) && (
                 <Link
                   href={`/accounts-dashboard/order/upload-booking/${r.order_id}`}
                   className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-green-700"
@@ -964,7 +967,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                 <span>Edit Booking</span>
               </Link>
             )}
-            {canManageReturns && hasBooking && (
+            {(canManageReturns || canAdminAfterReport) && hasBooking && (
                 <Link
                   href={`/accounts-dashboard/order/view-booking/${r.order_id}`}
                   className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
@@ -975,7 +978,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                   <span>View Booking</span>
                 </Link>
               )}
-            {(isWarehouse || isSuperAdmin || isAdmin) &&
+            {(isWarehouse || isSuperAdmin || canAdminAfterReport) &&
               hasBooking &&
               dispatchStatus === 0 && (
               <>

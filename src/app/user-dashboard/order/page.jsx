@@ -3,6 +3,8 @@ import OrderTable from "./OrderTable";
 import { getSessionPayload } from "@/lib/auth";
 import { sqlColumnInActiveServiceSupportUsers } from "@/lib/serviceSupportTeamScope";
 import { appendSqlWhereClause, orderListApprovalWhereSql } from "@/lib/orderApprovalVisibility";
+import { orderListReportWhereSql } from "@/lib/orderReportVisibility";
+import { canViewAllOrders } from "@/lib/dataScope";
 
 // Secret for verifying JWT
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -111,6 +113,10 @@ export default async function OrdersPage() {
   }
 
   sql = appendSqlWhereClause(sql, orderListApprovalWhereSql(userRole));
+  sql = appendSqlWhereClause(
+    sql,
+    orderListReportWhereSql(userRole, { seesAllOrders: canViewAllOrders(userRole) }),
+  );
 
   sql += " GROUP BY no.order_id ORDER BY no.created_at DESC";
 

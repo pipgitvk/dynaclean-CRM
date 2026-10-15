@@ -12,7 +12,11 @@ export default async function UploadBookingPage({ params }) {
   const { order_id: orderId } = await params;
   const payload = await getSessionPayload();
   const viewerRole = payload?.role ?? payload?.userRole ?? "";
-  const order = await getOrderForBookingUpload(orderId, viewerRole);
+  const order = await getOrderForBookingUpload(
+    orderId,
+    viewerRole,
+    payload?.username ?? "",
+  );
 
   if (!order) {
     return <div className="text-red-500 p-4">Order not found</div>;

@@ -67,7 +67,11 @@ export function resolveBookingUploadPage(order, role) {
   };
 }
 
-export async function getOrderForBookingUpload(orderId, viewerRole = "") {
+export async function getOrderForBookingUpload(
+  orderId,
+  viewerRole = "",
+  username = "",
+) {
   const conn = await getDbConnection();
   const [rows] = await conn.execute(
     `SELECT
@@ -82,7 +86,13 @@ export async function getOrderForBookingUpload(orderId, viewerRole = "") {
     [orderId],
   );
   const order = rows[0] || null;
-  if (order && !isOrderVisibleToViewer(order.approval_status, viewerRole)) {
+  if (
+    order &&
+    !isOrderVisibleToViewer(order.approval_status, viewerRole, {
+      order,
+      username,
+    })
+  ) {
     return null;
   }
   return order;

@@ -79,6 +79,7 @@ export default async function Page({ params }) {
     !isOrderVisibleToViewer(
       orderDetails.approval_status,
       userRole || payload?.role || payload?.userRole || "",
+      { order: orderDetails, username: payload?.username || "" },
     )
   ) {
     notFound();

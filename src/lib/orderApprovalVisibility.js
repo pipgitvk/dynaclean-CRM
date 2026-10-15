@@ -1,5 +1,7 @@
 /** Order list / detail visibility until SUPERADMIN/DIRECTOR approves on admin order flow. */
 
+import { passesReportVisibilityGate } from "@/lib/orderReportVisibility";
+
 export function normalizeOrderApprovalStatus(status) {
   return String(status ?? "").trim().toLowerCase();
 }
@@ -17,9 +19,20 @@ export function canViewUnapprovedOrder(userRole) {
   return r === "SUPERADMIN" || r === "DIRECTOR";
 }
 
-export function isOrderVisibleToViewer(approvalStatus, userRole) {
-  if (isOrderApprovedForListing(approvalStatus)) return true;
-  return canViewUnapprovedOrder(userRole);
+/**
+ * @param {{ order?: object, username?: string }} [context]
+ */
+export function isOrderVisibleToViewer(approvalStatus, userRole, context = {}) {
+  if (!isOrderApprovedForListing(approvalStatus)) {
+    if (!canViewUnapprovedOrder(userRole)) return false;
+  }
+  const { order, username } = context;
+  if (order != null) {
+    if (!passesReportVisibilityGate(order, userRole, { username })) {
+      return false;
+    }
+  }
+  return true;
 }
 
 export function sqlApprovedOrdersOnlyClause(tableAlias = "no") {
