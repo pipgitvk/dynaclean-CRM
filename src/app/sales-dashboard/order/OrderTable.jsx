@@ -20,6 +20,8 @@ import {
   sumOrderPaymentAmounts,
 } from "@/lib/orderPaymentHistory";
 import { deriveOrderListPaymentStatus } from "@/lib/paymentOrderStatus";
+import AccountantReportActionLinks from "@/components/orders/AccountantReportActionLinks";
+import { isAccountantOnlyMenuRole } from "@/lib/roleKeyUtils";
 import { isSalesRole } from "@/lib/isSalesRole";
 
 import DeleteButton from "@/components/accounts/DeleteButton";
@@ -592,6 +594,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
   const isAdmin = role === "admin";
   const isTeamLeader = role === "team leader";
   const isWarehouse = role === "warehouse incharge";
+  const accountantOnlyMenu = isAccountantOnlyMenuRole(userRole);
   const hasBooking =
     r.booking_id !== undefined &&
     r.booking_id !== null &&
@@ -639,6 +642,23 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
           className="absolute right-0 mt-2 w-56 origin-top-right rounded-lg bg-white shadow-lg ring-1 ring-black/5 z-20 border"
         >
           <div className="py-1 text-sm">
+            {accountantOnlyMenu ? (
+              <>
+                <AccountantReportActionLinks
+                  order={r}
+                  viewSalesHref={`/sales-dashboard/order/${r.order_id}`}
+                  uploadHref={`/user-dashboard/order/upload/${r.order_id}`}
+                  viewHref={`/user-dashboard/order/view/${r.order_id}`}
+                  onClick={(e) => e.stopPropagation()}
+                />
+                {r.report_file && (
+                  <div className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                    <EditPaymentButton order={r} />
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
             {canViewSales && (
               <Link
                 href={`/sales-dashboard/order/${r.order_id}`}
@@ -650,7 +670,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                 <span>View Sales</span>
               </Link>
             )}
-            {["accountant", "admin", "team leader"].includes(role) &&
+            {["admin", "team leader"].includes(role) &&
               (r.report_file ? (
                 <Link
                   href={`/user-dashboard/order/view/${r.order_id}`}
@@ -727,12 +747,14 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                   </Link>
                 </>
               )}
-            {["accountant", "admin"].includes(role) && r.report_file && (
+            {role === "admin" && r.report_file && (
               <div className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
                 <EditPaymentButton order={r} />
               </div>
             )}
             <UpdateDeliveryMenuItem order={r} />
+              </>
+            )}
           </div>
         </div>
       )}

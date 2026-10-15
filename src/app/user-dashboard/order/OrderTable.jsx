@@ -28,6 +28,8 @@ import toast from "react-hot-toast";
 import ReturnInitiateMenuItem from "@/components/orders/ReturnInitiateMenuItem";
 import { isSalesRole } from "@/lib/isSalesRole";
 import { isBookingAllowedForOrder } from "@/lib/orderBookingEligibility";
+import AccountantReportActionLinks from "@/components/orders/AccountantReportActionLinks";
+import { isAccountantOnlyMenuRole } from "@/lib/roleKeyUtils";
 
 // 👻 A sleek skeleton loader for a modern feel
 const SkeletonLoader = () => (
@@ -750,8 +752,8 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
   const isWarehouse = role === "warehouse incharge";
   const canManageInvoiceDocs =
     isSuperAdmin || isAdmin || isAccountant || isTeamLeader;
-  const canManageReturns =
-    isSuperAdmin || isAccountant || isTeamLeader;
+  const canManageReturns = isSuperAdmin || isTeamLeader;
+  const accountantOnlyMenu = isAccountantOnlyMenuRole(userRole);
   const canEditBooking = isSuperAdmin || isAdmin;
   const canAdminAfterReport = isAdmin && isBookingAllowedForOrder(r);
   const hasBooking =
@@ -801,6 +803,26 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
           className="absolute right-0 mt-2 w-56 origin-top-right rounded-lg bg-white shadow-lg ring-1 ring-black/5 z-20 border min-h-[40px]"
         >
           <div className="py-1 text-sm flex flex-col">
+            {accountantOnlyMenu ? (
+              <>
+                <AccountantReportActionLinks
+                  order={r}
+                  viewSalesHref={`/user-dashboard/order/${r.order_id}`}
+                  uploadHref={`/user-dashboard/order/upload/${r.order_id}`}
+                  viewHref={`/user-dashboard/order/view/${r.order_id}`}
+                  onClick={(e) => e.stopPropagation()}
+                />
+                {r.report_file && (
+                  <div
+                    className="px-3 py-2 w-full block"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <EditPaymentButton order={r} />
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
             <Link
               href={`/user-dashboard/order/${r.order_id}`}
               className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700 w-full block"
@@ -929,7 +951,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                     <ViewReturnBookingMenuItem order={r} />
                   </div>
                 )}
-                {(isSuperAdmin || isAdmin || isAccountant) &&
+                {(isSuperAdmin || isAdmin) &&
                   [3, 1, 2].includes(Number(r.is_returned)) &&
                   r.credit_note_id && (
                   <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>
@@ -953,12 +975,14 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                   </div>
                 )}
                 {/* After warehouse-in done, show view for admin + accountant + warehouse */}
-                {(isSuperAdmin || isAdmin || isAccountant || isWarehouse) &&
+                {(isSuperAdmin || isAdmin || isWarehouse) &&
                   Number(r.warehouse_in_done) === 1 && (
                   <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>
                     <WarehouseInMenuItem order={r} />
                   </div>
                 )}
+              </>
+            )}
               </>
             )}
           </div>

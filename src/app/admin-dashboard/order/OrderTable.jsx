@@ -39,6 +39,8 @@ import {
   canEditDeliveryProof,
 } from "@/lib/orderDocumentEditRules";
 import { isBookingAllowedForOrder } from "@/lib/orderBookingEligibility";
+import AccountantReportActionLinks from "@/components/orders/AccountantReportActionLinks";
+import { isAccountantOnlyMenuRole } from "@/lib/roleKeyUtils";
 import DeleteButton from "@/components/accounts/DeleteButton";
 import toast from "react-hot-toast";
 
@@ -2815,7 +2817,8 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
   const isSuperAdmin = role === "superadmin";
   const isAdmin = role === "admin";
   const isAccountant = role.includes("accountant");
-  const canManageReturns = isSuperAdmin || isAccountant;
+  const canManageReturns = isSuperAdmin;
+  const accountantOnlyMenu = isAccountantOnlyMenuRole(userRole);
   const canEditBooking = isSuperAdmin || isAdmin;
   const reportUploaded = isBookingAllowedForOrder(r);
   const canAdminAfterReport = (isAdmin || isSuperAdmin) && reportUploaded;
@@ -2887,6 +2890,23 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
           className="absolute right-0 mt-2 w-56 max-w-[calc(100vw-2rem)] origin-top-right rounded-lg bg-white shadow-lg ring-1 ring-black/5 z-20 border"
         >
           <div className="py-1 text-sm">
+            {accountantOnlyMenu ? (
+              <>
+                <AccountantReportActionLinks
+                  order={r}
+                  viewSalesHref={`/admin-dashboard/order/${r.order_id}`}
+                  uploadHref={`/admin-dashboard/order/upload/${r.order_id}`}
+                  viewHref={`/admin-dashboard/order/view/${r.order_id}`}
+                  onClick={(e) => e.stopPropagation()}
+                />
+                {r.report_file && (
+                  <div className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                    <EditPaymentButton order={r} />
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
             {canViewSales && (
               <Link
                 href={`/admin-dashboard/order/${r.order_id}`}
@@ -3011,7 +3031,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                   </Link>
                 </>
               )}
-            {["accountant", "superadmin"].includes(role) && r.report_file && (
+            {isSuperAdmin && r.report_file && (
               <div className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
                 <EditPaymentButton order={r} />
               </div>
@@ -3060,6 +3080,8 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
               <div className="border-t border-gray-100 mt-1 pt-1">
                 <DeletePermanentlyButton orderId={r.order_id} onDeleted={toggleMenu} />
               </div>
+            )}
+              </>
             )}
           </div>
         </div>

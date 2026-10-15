@@ -17,3 +17,10 @@ export function isJwtAccountingRole(role) {
   if (k === "ACCOUNTANT") return true;
   return /\bACCOUNTANT\b/.test(k);
 }
+
+/** Order actions: accountant may only upload/view invoice report (not booking/dispatch). */
+export function isAccountantOnlyMenuRole(role) {
+  const k = normalizeRoleKey(role || "");
+  if (k === "SUPERADMIN" || k === "DIRECTOR" || k === "ADMIN") return false;
+  return /\bACCOUNTANT\b/.test(k) || k === "ACCOUNTANT";
+}
