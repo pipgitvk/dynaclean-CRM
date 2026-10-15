@@ -589,7 +589,7 @@ export default function OrderTable({ orders, userRole }) {
       <p className="text-xs text-gray-500">Set filters, then click Search to update the list.</p>
 
       {/* 👨‍💼 TABLE VIEW for large screens */}
-      <div className="hidden lg:block overflow-x-auto overflow-y-auto max-h-[calc(100vh-300px)] bg-white rounded-xl shadow-lg">
+      <div className="hidden lg:block overflow-x-auto overflow-y-auto max-h-[calc(100vh-160px)] min-h-[calc(100vh-240px)] bg-white rounded-xl shadow-lg">
         <table className="w-full min-w-[1100px] text-sm">
           <thead className="bg-gray-800 text-white sticky top-0 z-10">
             <tr>
