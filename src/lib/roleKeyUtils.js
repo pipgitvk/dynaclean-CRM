@@ -25,9 +25,9 @@ export function isAccountantOnlyMenuRole(role) {
   return /\bACCOUNTANT\b/.test(k) || k === "ACCOUNTANT";
 }
 
-/** View Credit Note on order list — only superadmin and accountant roles. */
+/** View Credit Note on order list — superadmin, admin, and accountant roles. */
 export function canViewOrderCreditNoteRole(role) {
   const k = normalizeRoleKey(role || "");
-  if (k === "SUPERADMIN") return true;
+  if (k === "SUPERADMIN" || k === "ADMIN") return true;
   return /\bACCOUNTANT\b/.test(k) || k === "ACCOUNTANT";
 }

@@ -41,6 +41,7 @@ import {
 import { isBookingAllowedForOrder } from "@/lib/orderBookingEligibility";
 import AccountantReportActionLinks from "@/components/orders/AccountantReportActionLinks";
 import ViewCreditNoteMenuLink from "@/components/orders/ViewCreditNoteMenuLink";
+import { ViewReturnBookingMenuItem } from "@/components/orders/ReturnBookingWarehouseMenuItems";
 import { isAccountantOnlyMenuRole } from "@/lib/roleKeyUtils";
 import DeleteButton from "@/components/accounts/DeleteButton";
 import toast from "react-hot-toast";
@@ -3083,13 +3084,17 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
               hrefBase="/admin-dashboard"
               onClick={(e) => e.stopPropagation()}
             />
-            {canManageReturns &&
-              (Number(r.is_returned) === 3 || Number(r.return_booking_done) === 1) && (
+            {(canManageReturns || isAdmin) && Number(r.is_returned) === 3 && (
               <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>
                 <ReturnBookingMenuItem order={r} />
               </div>
             )}
-            {canManageReturns &&
+            {(canManageReturns || isAdmin) && Number(r.return_booking_done) === 1 && (
+              <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>
+                <ViewReturnBookingMenuItem order={r} />
+              </div>
+            )}
+            {(canManageReturns || isAdmin) &&
               Number(r.is_returned) === 3 &&
               Number(r.return_booking_done) === 1 &&
               Number(r.warehouse_in_done) !== 1 && (
@@ -3097,7 +3102,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                 <WarehouseInMenuItem order={r} />
               </div>
             )}
-            {canManageReturns && Number(r.warehouse_in_done) === 1 && (
+            {(canManageReturns || isAdmin) && Number(r.warehouse_in_done) === 1 && (
               <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>
                 <WarehouseInMenuItem order={r} />
               </div>

@@ -973,7 +973,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                     />
                   </div>
                 )}
-                {canManageReturns && Number(r.is_returned) === 3 && (
+                {(canManageReturns || isAdmin) && Number(r.is_returned) === 3 && (
                   <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>
                     <ReturnBookingMenuItem order={r} />
                   </div>
@@ -983,7 +983,8 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                     <MarkReturnBookingDoneMenuItem order={r} />
                   </div>
                 )}
-                {(canManageReturns || isWarehouse) && Number(r.return_booking_done) === 1 && (
+                {(canManageReturns || isAdmin || isWarehouse) &&
+                  Number(r.return_booking_done) === 1 && (
                   <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>
                     <ViewReturnBookingMenuItem order={r} />
                   </div>
@@ -995,7 +996,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                   linkClassName="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-teal-700 w-full"
                   onClick={(e) => e.stopPropagation()}
                 />
-                {isWarehouse &&
+                {(isWarehouse || isAdmin) &&
                   Number(r.is_returned) === 3 &&
                   Number(r.return_booking_done) === 1 &&
                   Number(r.warehouse_in_done) !== 1 && (
