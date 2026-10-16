@@ -10,6 +10,24 @@ import AddIncomingShipment from "./AddIncomingShipment";
 import EditIncomingShipment from "./EditIncomingShipment";
 import { findRelatedIncomingShipment } from "@/lib/incomingShipmentProductMatch";
 
+function normalizeStockCode(value) {
+  return String(value ?? "").trim();
+}
+
+function lowStockDedupeKey(p) {
+  const code = normalizeStockCode(p.product_code);
+  if (code) return `code:${code}`;
+  const num = normalizeStockCode(p.product_number);
+  if (num) return `num:${num}`;
+  const name = normalizeStockCode(p.item_name);
+  return name ? `name:${name}` : "";
+}
+
+function lowStockRowReactKey(p, idx) {
+  const base = lowStockDedupeKey(p);
+  return base ? `${base}:${idx}` : `low-stock-row:${idx}`;
+}
+
 function ProductStockList() {
   const [rows, setRows] = useState([]);
   const [q, setQ] = useState("");
@@ -497,7 +515,9 @@ function ProductStockList() {
   const allLowStockItems = useMemo(() => {
     const map = new Map();
     [...lowStockProducts, ...zeroStockProducts].forEach((p) => {
-      if (p.product_code) map.set(p.product_code, p);
+      const key = lowStockDedupeKey(p);
+      if (!key) return;
+      if (!map.has(key)) map.set(key, p);
     });
     return Array.from(map.values());
   }, [lowStockProducts, zeroStockProducts]);
@@ -519,7 +539,7 @@ function ProductStockList() {
       const displayStatus =
         incomingStatus || (isZero ? "Zero Stock" : "Low Stock");
       const incomingDateLabel = incomingDate
-        ? new formatCrmDateOnly(Date(incomingDate))
+        ? formatCrmDateOnly(incomingDate)
         : "";
 
       return {
@@ -694,7 +714,14 @@ function ProductStockList() {
       (a, b) => compareLowStockValues(a, b, lowStockSortKey) * dir,
     );
 
-    return items;
+    const seen = new Set();
+    return items.filter((row) => {
+      const key = lowStockDedupeKey(row);
+      if (!key) return true;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
   }, [
     lowStockEnrichedItems,
     lowStockSearch,
@@ -865,7 +892,7 @@ function ProductStockList() {
               <tbody>
                 {zeroStockProducts.map((p, idx) => (
                   <tr
-                    key={p.product_code || idx}
+                    key={lowStockRowReactKey(p, idx)}
                     className="border-t border-red-100 hover:bg-red-100/40 transition-colors"
                   >
                     <td className="px-5 py-3 font-bold text-red-800">{p.product_code}</td>
@@ -1016,7 +1043,7 @@ function ProductStockList() {
                     const incomingStatus = p._incomingStatus;
                     return (
                       <tr
-                        key={p.product_code || idx}
+                        key={lowStockRowReactKey(p, idx)}
                         className={`border-t transition-colors ${isZero ? "border-red-100 hover:bg-red-50/40" : "border-amber-100 hover:bg-amber-100/40"}`}
                       >
                         <td className={`px-5 py-3 font-bold ${isZero ? "text-red-800" : "text-amber-800"}`}>{p.product_code}</td>
