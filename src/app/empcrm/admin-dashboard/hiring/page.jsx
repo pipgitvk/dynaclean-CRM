@@ -76,6 +76,71 @@ const HR_SCORE_RATING_LABELS = {
 };
 
 const FILTER_STORAGE_KEY = "empcrm-hiring-filters-v1";
+const HIRING_PAGE_SIZES = [25, 50, 100];
+
+function HiringListPagination({
+  total,
+  page,
+  pageSize,
+  totalPages,
+  loading,
+  onPageChange,
+  onPageSizeChange,
+}) {
+  if (total <= 0) return null;
+  const rangeStart = (page - 1) * pageSize + 1;
+  const rangeEnd = Math.min(page * pageSize, total);
+  const go = (p) => {
+    const next = Math.min(Math.max(1, p), totalPages);
+    onPageChange(next);
+  };
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-slate-50/80 px-3 py-3 sm:px-4">
+      <p className="text-xs sm:text-sm text-slate-600">
+        <span className="font-semibold text-slate-900 tabular-nums">{total}</span> total
+        <span className="text-slate-500">
+          {" "}
+          · showing {rangeStart}–{rangeEnd}
+        </span>
+      </p>
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+        <label className="inline-flex items-center gap-2 text-xs sm:text-sm text-slate-600">
+          Per page
+          <select
+            value={pageSize}
+            onChange={(e) => onPageSizeChange(Number(e.target.value))}
+            className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-sm"
+          >
+            {HIRING_PAGE_SIZES.map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button
+          type="button"
+          disabled={page <= 1 || loading}
+          onClick={() => go(page - 1)}
+          className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-slate-50"
+        >
+          Previous
+        </button>
+        <span className="text-xs sm:text-sm text-slate-700 tabular-nums px-1">
+          Page {page} of {totalPages}
+        </span>
+        <button
+          type="button"
+          disabled={page >= totalPages || loading}
+          onClick={() => go(page + 1)}
+          className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-slate-50"
+        >
+          Next
+        </button>
+      </div>
+    </div>
+  );
+}
 
 const readStoredFilters = () => {
   if (typeof window === "undefined") return null;
@@ -139,6 +204,7 @@ function StatusChip({ status, tag }) {
 export default function HiringPage() {
   const pathname = usePathname();
   const hiringBase = getDirectorHrHiringBase(pathname);
+  const paginateList = hiringBase === "/director-dashboard/hiring";
   const [candidate_name, setCandidateName] = useState("");
   const [emp_contact, setEmpContact] = useState("");
   const [designation, setDesignation] = useState("");
@@ -182,6 +248,14 @@ export default function HiringPage() {
   const [designationOptions, setDesignationOptions] = useState([]);
   const [loadingDesignations, setLoadingDesignations] = useState(true);
   const [entries, setEntries] = useState([]);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const [listPagination, setListPagination] = useState({
+    total: 0,
+    pages: 1,
+    page: 1,
+    limit: 25,
+  });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null);
@@ -258,13 +332,28 @@ export default function HiringPage() {
       if (filterJoinTo) params.append("join_to", filterJoinTo);
       if (filterInterviewFrom) params.append("interview_from", filterInterviewFrom);
       if (filterInterviewTo) params.append("interview_to", filterInterviewTo);
-      
+      if (paginateList) {
+        params.append("page", String(page));
+        params.append("limit", String(pageSize));
+      }
+
       url += params.toString();
 
       const res = await fetch(url, { cache: "no-store" });
       const json = await res.json();
       if (json.success) {
         setEntries(json.entries || []);
+        if (json.pagination) {
+          setListPagination(json.pagination);
+        } else if (paginateList) {
+          const total = (json.entries || []).length;
+          setListPagination({
+            page,
+            limit: pageSize,
+            total,
+            pages: 1,
+          });
+        }
         if (typeof json.next_id === "number" && Number.isFinite(json.next_id)) {
           setNextId(json.next_id);
         }
@@ -276,7 +365,26 @@ export default function HiringPage() {
     }
   }, [
     filterCandidateName, filterEmpContact, filterStatus, filterNextFollowupFrom, filterNextFollowupTo,
-    filterMode, filterDesignation, filterJoinFrom, filterJoinTo, filterInterviewFrom, filterInterviewTo
+    filterMode, filterDesignation, filterJoinFrom, filterJoinTo, filterInterviewFrom, filterInterviewTo,
+    paginateList, page, pageSize,
+  ]);
+
+  useEffect(() => {
+    if (!paginateList) return;
+    setPage(1);
+  }, [
+    paginateList,
+    filterCandidateName,
+    filterEmpContact,
+    filterStatus,
+    filterNextFollowupFrom,
+    filterNextFollowupTo,
+    filterMode,
+    filterDesignation,
+    filterJoinFrom,
+    filterJoinTo,
+    filterInterviewFrom,
+    filterInterviewTo,
   ]);
 
   useEffect(() => {
@@ -675,6 +783,7 @@ export default function HiringPage() {
             Loading…
           </div>
         ) : (
+          <>
           <div className="overflow-x-auto overscroll-x-contain [scrollbar-gutter:stable]">
             <table className="min-w-[760px] w-full text-xs sm:text-sm">
               <thead className="border-b border-slate-200 bg-gradient-to-b from-slate-50 to-slate-100/90">
@@ -809,6 +918,21 @@ export default function HiringPage() {
               </tbody>
             </table>
           </div>
+          {paginateList && (
+            <HiringListPagination
+              total={listPagination.total ?? 0}
+              page={listPagination.page ?? page}
+              pageSize={listPagination.limit ?? pageSize}
+              totalPages={listPagination.pages ?? 1}
+              loading={loading}
+              onPageChange={setPage}
+              onPageSizeChange={(n) => {
+                setPageSize(n);
+                setPage(1);
+              }}
+            />
+          )}
+          </>
         )}
       </div>
 

@@ -225,9 +225,42 @@ export async function GET(req) {
       sql += ` AND DATE(h.created_at) <= ?`;
       params.push(createdTo);
     }
+
+    const usePagination =
+      searchParams.has("page") || searchParams.has("limit");
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
+    const limit = Math.min(
+      100,
+      Math.max(1, parseInt(searchParams.get("limit") || "25", 10)),
+    );
+
     sql += ` ORDER BY COALESCE(h.hire_date, DATE(h.interview_at), DATE(h.created_at)) DESC, h.id DESC`;
 
-    const [rows] = await conn.execute(sql, params);
+    let rows;
+    let pagination;
+    if (usePagination) {
+      const sqlBase = sql.replace(/\s+ORDER BY[\s\S]*$/i, "");
+      const countSql = sqlBase.replace(
+        /^SELECT[\s\S]+?\sFROM\s/i,
+        "SELECT COUNT(*) AS c FROM ",
+      );
+      const [countRows] = await conn.execute(countSql, params);
+      const total = Number(countRows[0]?.c ?? 0);
+      const offset = (page - 1) * limit;
+      [rows] = await conn.execute(`${sql} LIMIT ? OFFSET ?`, [
+        ...params,
+        limit,
+        offset,
+      ]);
+      pagination = {
+        page,
+        limit,
+        total,
+        pages: Math.max(1, Math.ceil(total / limit) || 1),
+      };
+    } else {
+      [rows] = await conn.execute(sql, params);
+    }
     let next_id = 1;
     try {
       const [[row]] = await conn.execute(
@@ -237,7 +270,14 @@ export async function GET(req) {
     } catch {
       /* table missing handled below if needed */
     }
-    return NextResponse.json({ success: true, entries: rows, next_id, designations, creators });
+    return NextResponse.json({
+      success: true,
+      entries: rows,
+      next_id,
+      designations,
+      creators,
+      ...(pagination ? { pagination } : {}),
+    });
   } catch (error) {
     console.error("[empcrm/hiring GET]", error);
     const msg = `${error?.message || ""} ${error?.sqlMessage || ""}`;
