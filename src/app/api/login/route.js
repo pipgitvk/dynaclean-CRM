@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import { getDbConnection } from "@/lib/db";
 import { getCurrentISTTime } from "@/lib/timezone";
+import {
+  isWithinLoginTimeWindow,
+  LOGIN_TIME_RESTRICTION_RANGE_LABEL,
+} from "@/lib/loginTimeRestriction";
 import { ensureLoginTimeRestrictionColumn } from "@/lib/ensureLoginTimeRestrictionColumn";
 import { verifyThirdPartyEngineerPassword } from "@/lib/thirdPartyEngineerPassword";
 import { THIRD_PARTY_ENGINEER_ROLE } from "@/lib/thirdPartyEngineerPortalSession";
@@ -189,18 +193,17 @@ export async function POST(request) {
     if (isTimeRestrictionEnabled) {
       const { hour, minute } = getCurrentISTTime();
       const currentTimeMinutes = hour * 60 + minute;
-      const startRange = 9 * 60; // 09:00 IST
-      const endRange = 19 * 60 + 15; // 19:15 IST
-
-      if (currentTimeMinutes < startRange || currentTimeMinutes > endRange) {
+      if (!isWithinLoginTimeWindow(currentTimeMinutes)) {
         await recordActivity(
           username,
           userRole,
           "FAILED",
-          `Login attempted outside allowed hours (09:00 - 19:15 IST). Current IST time: ${hour}:${String(minute).padStart(2, "0")}`,
+          `Login attempted outside allowed hours (${LOGIN_TIME_RESTRICTION_RANGE_LABEL}). Current IST time: ${hour}:${String(minute).padStart(2, "0")}`,
         );
         return NextResponse.json(
-          { error: "Login allowed only between 09:00 and 19:15 IST" },
+          {
+            error: `Login allowed only between ${LOGIN_TIME_RESTRICTION_RANGE_LABEL}`,
+          },
           { status: 403 },
         );
       }

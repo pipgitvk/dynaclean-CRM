@@ -137,8 +137,7 @@ export default function AttendanceStatusTracker({ username }) {
   );
 
   const canCheckIn = useCallback(() => {
-    // Check-in allowed anytime from 09:00 IST onwards (no early check-in before 9 AM)
-    return currentMinutes >= 9 * 60;
+    return currentMinutes >= 7 * 60;
   }, [currentMinutes]);
 
   const getCheckoutAction = useCallback(() => {
@@ -164,7 +163,7 @@ export default function AttendanceStatusTracker({ username }) {
         return {
           type: "waiting",
           status: "pending",
-          label: "Check-in at 9:00 am",
+          label: "Check-in at 7:00 am",
         };
       }
       return { type: "checkin", status: "pending", label: "Check In" };
