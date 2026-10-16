@@ -904,11 +904,17 @@ function LinkPaymentModal({ open, onClose, purchase, onLinked, currentStatementI
   );
 }
 
-export default function PurchasesPage() {
+const PURCHASES_PAGE_SIZE = 40;
+
+export default function PurchasesPage({ infiniteScroll = false }) {
   const { user } = useUser();
   const userRole = user?.userRole;
   
   const [purchases, setPurchases] = useState([]);
+  const [totalCount, setTotalCount] = useState(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const loadMoreRef = useRef(null);
   const [hoveredImg, setHoveredImg] = useState(null); // { src, x, y }
   const hoverTimerRef = useRef(null);
   const [search, setSearch] = useState("");
@@ -939,29 +945,94 @@ export default function PurchasesPage() {
 
   useEffect(() => {
     loadPurchaseData();
-  }, []);
+  }, [infiniteScroll]);
 
-  const loadPurchases = async () => {
+  const normalizePurchaseRows = (raw) =>
+    (Array.isArray(raw) ? raw : []).map((row) => {
+      const { category, sub_category } = resolvePurchaseCategory(row);
+      return { ...row, category, sub_category };
+    });
+
+  const loadPurchases = async ({ append = false, offset = 0 } = {}) => {
     try {
-      setLoading(true);
-      const res = await fetch("/api/stock-request");
+      if (append) setLoadingMore(true);
+      else setLoading(true);
+
+      const url = infiniteScroll
+        ? `/api/stock-request?limit=${PURCHASES_PAGE_SIZE}&offset=${offset}`
+        : "/api/stock-request";
+
+      const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
-        const rows = (Array.isArray(data) ? data : []).map((row) => {
-          const { category, sub_category } = resolvePurchaseCategory(row);
-          return { ...row, category, sub_category };
-        });
-        setPurchases(rows);
+        let rows;
+        if (infiniteScroll && data && Array.isArray(data.items)) {
+          rows = normalizePurchaseRows(data.items);
+          setTotalCount(Number(data.total ?? 0));
+          setHasMore(Boolean(data.hasMore));
+        } else {
+          rows = normalizePurchaseRows(data);
+          setTotalCount(rows.length);
+          setHasMore(false);
+        }
+
+        if (append) {
+          setPurchases((prev) => {
+            const seen = new Set(prev.map((p) => p.id));
+            const merged = [...prev];
+            for (const row of rows) {
+              if (!seen.has(row.id)) {
+                seen.add(row.id);
+                merged.push(row);
+              }
+            }
+            return merged;
+          });
+        } else {
+          setPurchases(rows);
+        }
         return rows;
       }
     } catch (error) {
       console.error("Error loading purchases:", error);
       toast.error("Failed to load purchases");
     } finally {
-      setLoading(false);
+      if (append) setLoadingMore(false);
+      else setLoading(false);
     }
     return [];
   };
+
+  const loadMorePurchases = useCallback(async () => {
+    if (!infiniteScroll || loading || loadingMore || !hasMore) return;
+    const offset = purchases.length;
+    const newRows = await loadPurchases({ append: true, offset });
+    if (!newRows?.length) return;
+    const seen = new Set(purchases.map((p) => p.id));
+    const merged = [...purchases];
+    for (const row of newRows) {
+      if (!seen.has(row.id)) merged.push(row);
+    }
+    await loadLinkedPurchaseIds(merged);
+  }, [infiniteScroll, loading, loadingMore, hasMore, purchases]);
+
+  useEffect(() => {
+    if (!infiniteScroll) return;
+    const el = loadMoreRef.current;
+    if (!el) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          loadMorePurchases();
+        }
+      },
+      { root: null, rootMargin: "200px", threshold: 0 },
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [infiniteScroll, loadMorePurchases, purchases.length, hasMore]);
 
   const loadLinkedPurchaseIds = async (purchaseRows = purchases) => {
     try {
@@ -1476,7 +1547,9 @@ export default function PurchasesPage() {
           </div>
 
           <div className="text-sm text-gray-600">
-            Showing {filteredPurchases.length} of {purchases.length} requests
+            {infiniteScroll
+              ? `Showing ${filteredPurchases.length} filtered · Loaded ${purchases.length}${totalCount != null ? ` of ${totalCount}` : ""} requests`
+              : `Showing ${filteredPurchases.length} of ${purchases.length} requests`}
           </div>
         </div>
         
@@ -1727,6 +1800,20 @@ export default function PurchasesPage() {
                 })}
               </tbody>
             </table>
+            {infiniteScroll && (
+              <div
+                ref={loadMoreRef}
+                className="py-4 text-center text-sm text-gray-500 border-t"
+              >
+                {loadingMore
+                  ? "Loading more…"
+                  : hasMore
+                    ? "Scroll for more"
+                    : purchases.length > 0
+                      ? "All purchases loaded"
+                      : null}
+              </div>
+            )}
           </div>
         )}
       </div>

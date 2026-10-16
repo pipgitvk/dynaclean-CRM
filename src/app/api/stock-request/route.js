@@ -283,6 +283,9 @@ export async function GET(req) {
     const { searchParams } = new URL(req.url);
     const fromDate = searchParams.get("fromDate");
     const toDate = searchParams.get("toDate");
+    const limitParam = searchParams.get("limit");
+    const offsetParam = searchParams.get("offset");
+    const usePagination = limitParam != null;
 
     let query = `
       SELECT 
@@ -352,7 +355,24 @@ export async function GET(req) {
       params.push(toDate);
     }
 
-    query += ` ORDER BY psr.created_at DESC`;
+    query += ` ORDER BY psr.created_at DESC, psr.id DESC`;
+
+    let total = null;
+    if (usePagination) {
+      const limit = Math.min(Math.max(parseInt(limitParam, 10) || 30, 1), 100);
+      const offset = Math.max(parseInt(offsetParam, 10) || 0, 0);
+      const countQuery = `
+        SELECT COUNT(*) AS c
+        FROM product_stock_request psr
+        WHERE 1=1
+        ${fromDate ? " AND DATE(psr.created_at) >= ?" : ""}
+        ${toDate ? " AND DATE(psr.created_at) <= ?" : ""}
+      `;
+      const [countRows] = await db.execute(countQuery, params);
+      total = Number(countRows[0]?.c ?? 0);
+      query += ` LIMIT ? OFFSET ?`;
+      params.push(limit, offset);
+    }
 
     const [requests] = await db.execute(query, params);
 
@@ -369,6 +389,16 @@ export async function GET(req) {
         catalog_image: row.catalog_image || null,
       };
     });
+
+    if (usePagination) {
+      const limit = Math.min(Math.max(parseInt(limitParam, 10) || 30, 1), 100);
+      const offset = Math.max(parseInt(offsetParam, 10) || 0, 0);
+      return NextResponse.json({
+        items: normalized,
+        total,
+        hasMore: offset + normalized.length < total,
+      });
+    }
 
     return NextResponse.json(normalized);
   } catch (error) {
