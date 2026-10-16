@@ -59,7 +59,7 @@ export default function SalesAchievedQuickCard() {
   const achievedPercent = hasTarget ? Math.round((completed / target) * 100) : 0;
   const ringPercent = Math.min(Math.max(achievedPercent, 0), 100);
   const strokeColor = getRingColor(achievedPercent);
-  const monthLabel = new formatCrmDateOnly(Date());
+  const monthLabel = formatCrmDateOnly(new Date());
 
   const ring = useMemo(() => {
     const radius = 22;
