@@ -6,62 +6,79 @@ import { MapPin } from "lucide-react";
 import SummaryStatCard from "@/components/sales/SummaryStatCard";
 import { isModuleKeyAllowed } from "@/lib/moduleAccess";
 
-export default function ScheduleVisitCard({ variant = "default", href, alwaysShow = false }) {
+export default function ScheduleVisitCard({
+  variant = "default",
+  href,
+  alwaysShow = false,
+  loadOnMount = true,
+}) {
   const [total, setTotal] = useState(0);
   const [pending, setPending] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(loadOnMount);
+  const [dataLoaded, setDataLoaded] = useState(false);
   const [allowed, setAllowed] = useState(alwaysShow);
 
   const linkHref = href || "/user-dashboard/schedule-visits";
 
-  useEffect(() => {
-    const init = async () => {
-      try {
-        const countPromise = fetch("/api/schedule-visit/count", {
+  const runFetch = async () => {
+    setLoading(true);
+    try {
+      const countPromise = fetch("/api/schedule-visit/count", {
+        credentials: "include",
+        cache: "no-store",
+      });
+
+      if (!alwaysShow) {
+        const modulesRes = await fetch("/api/my-modules", {
           credentials: "include",
           cache: "no-store",
         });
-
-        if (!alwaysShow) {
-          const modulesRes = await fetch("/api/my-modules", {
-            credentials: "include",
-            cache: "no-store",
-          });
-          if (modulesRes.ok) {
-            const { allowedModules } = await modulesRes.json();
-            if (!isModuleKeyAllowed("schedule-visits", allowedModules)) {
-              setAllowed(false);
-              setLoading(false);
-              return;
-            }
-          } else {
+        if (modulesRes.ok) {
+          const { allowedModules } = await modulesRes.json();
+          if (!isModuleKeyAllowed("schedule-visits", allowedModules)) {
             setAllowed(false);
             setLoading(false);
             return;
           }
+        } else {
+          setAllowed(false);
+          setLoading(false);
+          return;
         }
-
-        setAllowed(true);
-        const countRes = await countPromise;
-
-        if (countRes.ok) {
-          const data = await countRes.json();
-          if (data.success) {
-            setTotal(data.total || 0);
-            setPending(data.pending || 0);
-          }
-        }
-      } catch {
-        if (!alwaysShow) setAllowed(false);
-      } finally {
-        setLoading(false);
       }
-    };
 
-    init();
-  }, [alwaysShow]);
+      setAllowed(true);
+      const countRes = await countPromise;
 
-  if (!loading && !allowed) return null;
+      if (countRes.ok) {
+        const data = await countRes.json();
+        if (data.success) {
+          setTotal(data.total || 0);
+          setPending(data.pending || 0);
+        }
+      }
+      setDataLoaded(true);
+    } catch {
+      if (!alwaysShow) setAllowed(false);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!loadOnMount) return;
+    runFetch();
+  }, [alwaysShow, loadOnMount]);
+
+  const handleLinkClick = (e) => {
+    if (!loadOnMount && !dataLoaded) {
+      e.preventDefault();
+      runFetch();
+    }
+  };
+
+  if (loadOnMount && !loading && !allowed) return null;
+  if (!alwaysShow && dataLoaded && !loading && !allowed) return null;
 
   if (variant === "sales") {
     return (
@@ -98,7 +115,7 @@ export default function ScheduleVisitCard({ variant = "default", href, alwaysSho
   }
 
   return (
-    <Link href={linkHref}>
+    <Link href={linkHref} onClick={handleLinkClick}>
       <div className="bg-white rounded-lg shadow-md p-4 text-black cursor-pointer hover:shadow-lg transition-shadow h-full border-l-4 border-violet-500 min-h-[140px]">
         <div className="flex flex-col h-full justify-between">
           <div>
@@ -108,11 +125,17 @@ export default function ScheduleVisitCard({ variant = "default", href, alwaysSho
                 Schedule Visits
               </h2>
             </div>
-            <p className={`text-2xl font-bold mt-1 ${pending === 0 ? "text-green-600" : "text-red-600"}`}>
+            <p
+              className={`text-2xl font-bold mt-1 ${
+                pending === 0 ? "text-green-600" : "text-red-600"
+              }`}
+            >
               {loading ? "..." : total}
             </p>
             <p className="text-xs text-gray-600 mt-0.5">
-              {pending > 0 ? `${pending} pending approval` : "Total visits"}
+              {pending > 0
+                ? `${pending} pending approval`
+                : "Total visits"}
             </p>
           </div>
         </div>
