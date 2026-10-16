@@ -470,7 +470,7 @@ export default function ClientExpensesCardsClient({ rows }) {
                     </td>
                     <td className="p-3 text-gray-600 whitespace-nowrap">
                       {row.created_at
-                        ? new formatCrmDateOnly(Date(row.created_at))
+                        ? formatCrmDateOnly(row.created_at)
                         : "—"}
                     </td>
                     <td className="p-3">
