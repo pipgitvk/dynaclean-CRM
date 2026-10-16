@@ -19,6 +19,14 @@ import {
   buildOrderPaymentRows,
   sumOrderPaymentAmounts,
 } from "@/lib/orderPaymentHistory";
+import {
+  OrderListSearchInput,
+  OrderListSearchApplyButton,
+} from "@/components/orders/OrderListSearchFilterControls";
+import {
+  getOrderTableDefaultDateFrom,
+  getOrderTableDefaultDateTo,
+} from "@/lib/orderTableDateDefaults";
 import { deriveOrderListPaymentStatus } from "@/lib/paymentOrderStatus";
 
 import DeleteButton from "@/components/accounts/DeleteButton";
@@ -60,9 +68,9 @@ export default function OrderTable({ orders, userRole }) {
   const [appliedSearchQuery, setAppliedSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [appliedStatusFilter, setAppliedStatusFilter] = useState("");
-  const [dateFrom, setDateFrom] = useState("");
+  const [dateFrom, setDateFrom] = useState(() => getOrderTableDefaultDateFrom());
   const [appliedDateFrom, setAppliedDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const [dateTo, setDateTo] = useState(() => getOrderTableDefaultDateTo());
   const [appliedDateTo, setAppliedDateTo] = useState("");
   const [createdByFilter, setCreatedByFilter] = useState("");
   const [appliedCreatedByFilter, setAppliedCreatedByFilter] = useState("");
@@ -265,38 +273,14 @@ export default function OrderTable({ orders, userRole }) {
 
   return (
     <div className="space-y-6">
-      {/* 🔍 Search and Quick Status Filter */}
-      <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-        <div className="relative w-full sm:w-2/3">
-          <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-            <Search size={20} className="text-gray-400" />
-          </div>
-          <input
-            type="text"
-            placeholder="Search by ID, client, company, etc."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                handleApplySearch();
-              }
-            }}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200 ease-in-out"
-          />
-        </div>
-        <button
-          type="button"
-          onClick={handleApplySearch}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg w-full sm:w-auto"
-        >
-          Search
-        </button>
-      </div>
-
       {/* 🧰 Filters */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        <div>
+      <div className="flex flex-wrap items-end gap-3">
+        <OrderListSearchInput
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          onApply={handleApplySearch}
+        />
+        <div className="min-w-[140px] flex-1 sm:max-w-[200px]">
           <label className="block text-xs text-gray-600 mb-1">Status</label>
           <select
             value={statusFilter}
@@ -315,15 +299,15 @@ export default function OrderTable({ orders, userRole }) {
             <option value="fullyreturned">Fully Returned</option>
           </select>
         </div>
-        <div>
+        <div className="min-w-[140px] flex-1 sm:max-w-[200px]">
           <label className="block text-xs text-gray-600 mb-1">From Date</label>
           <TypeableDateFilterInput value={dateFrom} onChange={setDateFrom} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"/>
         </div>
-        <div>
+        <div className="min-w-[140px] flex-1 sm:max-w-[200px]">
           <label className="block text-xs text-gray-600 mb-1">To Date</label>
           <TypeableDateFilterInput value={dateTo} onChange={setDateTo} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"/>
         </div>
-        <div>
+        <div className="min-w-[140px] flex-1 sm:max-w-[200px]">
           <label className="block text-xs text-gray-600 mb-1">Created By</label>
           <select
             value={createdByFilter}
@@ -340,6 +324,7 @@ export default function OrderTable({ orders, userRole }) {
               ))}
           </select>
         </div>
+        <OrderListSearchApplyButton onApply={handleApplySearch} />
       </div>
       <p className="text-xs text-gray-500">Set filters, then click Search to update the list.</p>
 
