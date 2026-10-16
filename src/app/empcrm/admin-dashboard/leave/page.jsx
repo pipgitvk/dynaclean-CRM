@@ -14,8 +14,25 @@ import {
   User,
   AlertCircle,
   Sun,
-  BadgeCheck
+  BadgeCheck,
+  Eye,
+  FileText,
+  X
 } from "lucide-react";
+
+function getLeaveAttachmentHref(leave) {
+  if (!leave?.attachment_path) return null;
+  const p = String(leave.attachment_path);
+  if (p.startsWith("http://") || p.startsWith("https://")) return p;
+  return p.startsWith("/") ? p : `/${p}`;
+}
+
+function isLeaveAttachmentImage(leave) {
+  const mime = (leave?.attachment_mime_type || "").toLowerCase();
+  if (mime.startsWith("image/")) return true;
+  const name = leave?.attachment_filename || leave?.attachment_path || "";
+  return /\.(jpe?g|png|gif|webp|bmp|svg)$/i.test(name);
+}
 import SearchableSelect from "@/components/ui/SearchableSelect";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -40,6 +57,7 @@ export default function AdminLeaveManagement() {
   const [actionLoading, setActionLoading] = useState(false);
   const [showAcknowledgeModal, setShowAcknowledgeModal] = useState(false);
   const [acknowledgementRemark, setAcknowledgementRemark] = useState("");
+  const [attachmentViewer, setAttachmentViewer] = useState(null);
 
   // Reporting manager assignment (inside View modal)
   const [canAddReportingManager, setCanAddReportingManager] = useState(false);
@@ -659,6 +677,9 @@ export default function AdminLeaveManagement() {
                     Status
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Attachment
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Created By
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -725,6 +746,52 @@ export default function AdminLeaveManagement() {
                           </div>
                         )}
                       </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      {getLeaveAttachmentHref(leave) ? (
+                        <div className="flex items-center gap-2">
+                          {isLeaveAttachmentImage(leave) ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setAttachmentViewer({
+                                  href: getLeaveAttachmentHref(leave),
+                                  title: leave.attachment_filename || "Sick leave attachment",
+                                  isImage: true,
+                                })
+                              }
+                              className="shrink-0 rounded border border-gray-200 overflow-hidden hover:ring-2 hover:ring-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              title="View attachment"
+                            >
+                              <img
+                                src={getLeaveAttachmentHref(leave)}
+                                alt=""
+                                className="w-12 h-12 object-cover"
+                              />
+                            </button>
+                          ) : (
+                            <div className="w-12 h-12 rounded border border-gray-200 bg-gray-50 flex items-center justify-center shrink-0">
+                              <FileText className="w-6 h-6 text-gray-500" />
+                            </div>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setAttachmentViewer({
+                                href: getLeaveAttachmentHref(leave),
+                                title: leave.attachment_filename || "Sick leave attachment",
+                                isImage: isLeaveAttachmentImage(leave),
+                              })
+                            }
+                            className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            View
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-gray-400 text-sm">—</span>
+                      )}
                     </td>
                     <td className="px-6 py-4">
                       {leave.created_by ? (
@@ -1034,36 +1101,66 @@ export default function AdminLeaveManagement() {
                 <p className="text-gray-900 mt-1 p-3 bg-gray-50 rounded-lg">{selectedLeave.reason}</p>
               </div>
 
-              {/* Sick Leave Attachment */}
-              {selectedLeave.leave_type === "sick" && selectedLeave.attachment_path && (
+              {/* Sick leave / prescription attachment */}
+              {getLeaveAttachmentHref(selectedLeave) && (
                 <div className="bg-blue-50 border border-blue-300 rounded-lg p-4">
-                  <div className="flex items-start gap-3">
-                    <div className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0">
-                      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-blue-800 mb-2">Doctor Prescription / Test Report</p>
-                      <a
-                        href={selectedLeave.attachment_path}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        download={selectedLeave.attachment_filename}
-                        className="inline-flex items-center gap-2 px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                        </svg>
-                        Download {selectedLeave.attachment_filename && `(${selectedLeave.attachment_filename})`}
-                      </a>
-                      {selectedLeave.attachment_uploaded_at && (
-                        <p className="text-xs text-blue-600 mt-2">
-                          Uploaded: {formatDate(selectedLeave.attachment_uploaded_at)}
-                        </p>
-                      )}
-                    </div>
+                  <p className="text-sm font-medium text-blue-800 mb-3">
+                    Doctor Prescription / Test Report
+                    {selectedLeave.attachment_filename && (
+                      <span className="block text-xs font-normal text-blue-600 mt-0.5 truncate">
+                        {selectedLeave.attachment_filename}
+                      </span>
+                    )}
+                  </p>
+                  {isLeaveAttachmentImage(selectedLeave) && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setAttachmentViewer({
+                          href: getLeaveAttachmentHref(selectedLeave),
+                          title: selectedLeave.attachment_filename || "Sick leave attachment",
+                          isImage: true,
+                        })
+                      }
+                      className="mb-3 block max-w-full rounded-lg border border-blue-200 overflow-hidden hover:ring-2 hover:ring-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <img
+                        src={getLeaveAttachmentHref(selectedLeave)}
+                        alt={selectedLeave.attachment_filename || "Prescription"}
+                        className="max-h-64 w-full object-contain bg-white"
+                      />
+                    </button>
+                  )}
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setAttachmentViewer({
+                          href: getLeaveAttachmentHref(selectedLeave),
+                          title: selectedLeave.attachment_filename || "Sick leave attachment",
+                          isImage: isLeaveAttachmentImage(selectedLeave),
+                        })
+                      }
+                      className="inline-flex items-center gap-2 px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                      <Eye className="w-4 h-4" />
+                      View
+                    </button>
+                    <a
+                      href={getLeaveAttachmentHref(selectedLeave)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      download={selectedLeave.attachment_filename}
+                      className="inline-flex items-center gap-2 px-3 py-2 bg-white border border-blue-300 text-blue-800 text-sm rounded-lg hover:bg-blue-100 transition-colors"
+                    >
+                      Open in new tab
+                    </a>
                   </div>
+                  {selectedLeave.attachment_uploaded_at && (
+                    <p className="text-xs text-blue-600 mt-2">
+                      Uploaded: {formatDate(selectedLeave.attachment_uploaded_at)}
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -1341,6 +1438,66 @@ export default function AdminLeaveManagement() {
               >
                 {actionLoading ? "Processing..." : "Acknowledge"}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {attachmentViewer && (
+        <div
+          className="fixed inset-0 bg-black/70 flex items-center justify-center z-[60] p-4"
+          onClick={() => setAttachmentViewer(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Attachment preview"
+        >
+          <div
+            className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-3 p-4 border-b border-gray-200">
+              <p className="text-sm font-medium text-gray-900 truncate">{attachmentViewer.title}</p>
+              <div className="flex items-center gap-2 shrink-0">
+                <a
+                  href={attachmentViewer.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                >
+                  Open in new tab
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setAttachmentViewer(null)}
+                  className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100"
+                  aria-label="Close"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+            <div className="p-4 overflow-auto flex-1 flex items-center justify-center bg-gray-50 min-h-[200px]">
+              {attachmentViewer.isImage ? (
+                <img
+                  src={attachmentViewer.href}
+                  alt={attachmentViewer.title}
+                  className="max-w-full max-h-[70vh] object-contain"
+                />
+              ) : (
+                <div className="text-center space-y-3">
+                  <FileText className="w-12 h-12 text-gray-400 mx-auto" />
+                  <p className="text-sm text-gray-600">Preview not available for this file type.</p>
+                  <a
+                    href={attachmentViewer.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700"
+                  >
+                    <Eye className="w-4 h-4" />
+                    View file
+                  </a>
+                </div>
+              )}
             </div>
           </div>
         </div>
