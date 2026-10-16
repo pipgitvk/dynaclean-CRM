@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ShieldAlert, ArrowLeft, Users, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 
 export default function GlobalIpRestrictionPage() {
     const router = useRouter();
+    const isEmbed = useSearchParams().get("embed") === "1";
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [allIps, setAllIps] = useState([]);
@@ -103,7 +104,14 @@ export default function GlobalIpRestrictionPage() {
     };
 
     return (
-        <div className="max-w-2xl mx-auto p-6 bg-white shadow-lg rounded-xl mt-10 border-2 border-red-50">
+        <div
+            className={
+                isEmbed
+                    ? "bg-white p-4 sm:p-5"
+                    : "max-w-2xl mx-auto p-6 bg-white shadow-lg rounded-xl mt-10 border-2 border-red-50"
+            }
+        >
+            {!isEmbed && (
             <div className="flex items-center justify-between mb-8 border-b pb-4">
                 <div className="flex items-center space-x-3">
                     <div className="p-2 bg-red-100 rounded-lg">
@@ -118,15 +126,18 @@ export default function GlobalIpRestrictionPage() {
                     <ArrowLeft size={24} />
                 </Link>
             </div>
+            )}
 
+            {!isEmbed && (
             <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg flex items-start space-x-3">
                 <Users className="text-yellow-600 flex-shrink-0 mt-1" size={20} />
                 <p className="text-sm text-yellow-800">
                     <strong>Warning:</strong> These changes will affect every employee and representative in the system. Use this for office-wide IP restrictions.
                 </p>
             </div>
+            )}
 
-            <div className="space-y-6">
+            <div className={isEmbed ? "space-y-4" : "space-y-6"}>
                 {/* Toggle */}
                 <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-100">
                     <div>
@@ -152,13 +163,19 @@ export default function GlobalIpRestrictionPage() {
                     ) : allIps.length === 0 ? (
                         <p className="text-gray-500 text-sm">No IPs added yet.</p>
                     ) : (
-                        <div className="flex flex-wrap gap-2">
+                        <div
+                            className={
+                                isEmbed
+                                    ? "grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-[420px] overflow-y-auto pr-1"
+                                    : "flex flex-wrap gap-2"
+                            }
+                        >
                             {allIps.map((ip) => (
                                 <div
                                     key={ip}
-                                    className="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg border border-gray-200"
+                                    className="flex items-center justify-between gap-2 px-3 py-2 bg-gray-100 rounded-lg border border-gray-200 min-w-0"
                                 >
-                                    <span className="font-mono text-sm">{ip}</span>
+                                    <span className="font-mono text-sm truncate" title={ip}>{ip}</span>
                                     <button
                                         type="button"
                                         onClick={() => handleDeleteIp(ip)}
@@ -199,6 +216,7 @@ export default function GlobalIpRestrictionPage() {
                 </div>
 
                 {/* Action Buttons */}
+                {!isEmbed && (
                 <div className="flex justify-end pt-4 border-t">
                     <button
                         type="button"
@@ -208,6 +226,7 @@ export default function GlobalIpRestrictionPage() {
                         Cancel
                     </button>
                 </div>
+                )}
             </div>
         </div>
     );

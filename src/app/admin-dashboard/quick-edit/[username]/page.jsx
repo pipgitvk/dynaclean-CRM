@@ -3,7 +3,7 @@
 
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect, useRef } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import toast from "react-hot-toast";
 import {
@@ -153,6 +153,7 @@ function SectionBlock({ section, selected, canEdit, onToggleParent, onToggleChil
 const QuickEditPage = () => {
   const { username } = useParams();
   const router = useRouter();
+  const isEmbed = useSearchParams().get("embed") === "1";
   const [employee, setEmployee] = useState({
     username: "",
     email: "",
@@ -714,9 +715,18 @@ const QuickEditPage = () => {
   const totalAll = ALL_MODULE_KEYS.length;
   const allSelected = totalSelected === totalAll;
 
+  const profileSize = isEmbed ? 80 : 150;
+
   return (
-    <div className="bg-white shadow-md rounded-lg p-8 max-w-2xl mx-auto my-10">
+    <div
+      className={
+        isEmbed
+          ? "bg-white p-4 sm:p-5 max-w-none mx-0 my-0"
+          : "bg-white shadow-md rounded-lg p-8 max-w-2xl mx-auto my-10"
+      }
+    >
       {/* Header */}
+      {!isEmbed ? (
       <div className="text-center mb-6">
         <h1 className="text-3xl font-bold text-gray-900 mb-3">
           Quick Edit: {employee.username}
@@ -731,20 +741,37 @@ const QuickEditPage = () => {
           {employee.status == 1 ? "Active" : "Inactive"}
         </span>
       </div>
+      ) : (
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <span className="text-sm font-semibold text-gray-800">{employee.username}</span>
+          <span
+            className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${
+              employee.status == 1
+                ? "bg-emerald-100 text-emerald-800"
+                : "bg-gray-200 text-gray-700"
+            }`}
+          >
+            {employee.status == 1 ? "Active" : "Inactive"}
+          </span>
+        </div>
+      )}
 
       {/* Profile picture preview */}
-      <div className="flex justify-center mb-6">
+      <div className={`flex justify-center ${isEmbed ? "mb-4" : "mb-6"}`}>
         {(profileImageSrc && profileImageSrc.startsWith("/employees")) || newProfilePic ? (
           <Image
             src={profileImageSrc}
             alt="Profile Picture"
-            width={150}
-            height={150}
+            width={profileSize}
+            height={profileSize}
             className="rounded-full border-4 border-blue-200 object-cover"
             unoptimized
           />
         ) : (
-          <div className="flex items-center justify-center w-[150px] h-[150px] rounded-full border-4 border-gray-300 bg-gray-100 text-gray-500">
+          <div
+            className="flex items-center justify-center rounded-full border-4 border-gray-300 bg-gray-100 text-gray-500 text-sm"
+            style={{ width: profileSize, height: profileSize }}
+          >
             Profile
           </div>
         )}

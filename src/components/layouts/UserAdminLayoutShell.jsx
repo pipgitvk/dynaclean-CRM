@@ -7,6 +7,7 @@ import Sidebar from "@/components/user/Sidebar";
 import { UserProvider } from "@/context/UserContext";
 import { ThemeProvider, useTheme } from "@/context/ThemeContext";
 import ThemeSwitcher from "@/components/ThemeSwitcher";
+import EmbedLightBackground from "@/components/embed/EmbedLightBackground";
 
 function LayoutContent({
   children,
@@ -31,7 +32,8 @@ function LayoutContent({
   if (isEmbed) {
     return (
       <UserProvider>
-        <main className={`w-full ${theme.body.text}`}>
+        <EmbedLightBackground />
+        <main className={`w-full min-h-0 bg-gray-50 p-3 sm:p-4 text-gray-900`}>
           {children}
         </main>
       </UserProvider>

@@ -18,6 +18,8 @@ import {
 import { getModuleUrl } from "@/lib/moduleUrlMapping";
 import { getRoleDefaultModuleKeys } from "@/lib/roleDefaultModuleAccess";
 import { ADMIN_EMPLOYEES_RELOAD_MESSAGE } from "@/lib/employeesPageReload";
+import EmployeeIframeModal from "@/components/employees/EmployeeIframeModal";
+import { useEmployeeSubPageNavigation } from "@/hooks/useEmployeeSubPageNavigation";
 
 function uniqueStrings(arr) {
   return [...new Set((arr || []).map((v) => String(v || "").trim()).filter(Boolean))];
@@ -205,7 +207,7 @@ const EmployeeCard = ({
   maskEmail,
   maskNumber,
   maskStatus,
-  onOpenIframe,
+  openSubPage,
 }) => (
   <div className="bg-white shadow-md rounded-lg p-4 mb-4 border border-gray-200">
     <div className="mb-2">
@@ -253,7 +255,7 @@ const EmployeeCard = ({
       </button>
 
       <button
-        onClick={() => onOpenIframe(`/admin-dashboard/password/${employee.username}`, `Change Password — ${employee.username}`)}
+        onClick={() => openSubPage("password", employee.username, `Change Password — ${employee.username}`)}
         className="text-yellow-600 hover:text-yellow-900 font-medium flex items-center space-x-1 text-sm"
       >
         <Key size={16} />
@@ -261,7 +263,7 @@ const EmployeeCard = ({
       </button>
 
       <button
-        onClick={() => onOpenIframe(`/admin-dashboard/quick-edit/${employee.username}`, `Edit Employee — ${employee.username}`)}
+        onClick={() => openSubPage("quick-edit", employee.username, `Edit Employee — ${employee.username}`)}
         className="text-green-600 hover:text-green-900 font-medium flex items-center space-x-1 text-sm"
       >
         <Edit size={16} />
@@ -269,7 +271,7 @@ const EmployeeCard = ({
       </button>
 
       <button
-        onClick={() => onOpenIframe(`/admin-dashboard/ip-restrictions/${employee.username}`, `IP Restrictions — ${employee.username}`)}
+        onClick={() => openSubPage("ip-restrictions", employee.username, `IP Restrictions — ${employee.username}`)}
         className="text-purple-600 hover:text-purple-900 font-medium flex items-center space-x-1 text-sm"
       >
         <Shield size={16} />
@@ -313,7 +315,7 @@ const EmpTable = ({ employees }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("active");
   const [isMobile, setIsMobile] = useState(false);
-  const [iframePopup, setIframePopup] = useState({ open: false, url: "", title: "" });
+  const { iframePopup, openSubPage, closeIframe } = useEmployeeSubPageNavigation("admin-dashboard");
   const [showReportingManagerModal, setShowReportingManagerModal] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState("");
   const [selectedReportingManager, setSelectedReportingManager] = useState("");
@@ -378,12 +380,12 @@ const EmpTable = ({ employees }) => {
     const onMessage = (event) => {
       if (event.origin !== window.location.origin) return;
       if (event.data?.type !== ADMIN_EMPLOYEES_RELOAD_MESSAGE) return;
-      setIframePopup({ open: false, url: "", title: "" });
+      closeIframe();
       window.location.reload();
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, []);
+  }, [closeIframe]);
 
   useEffect(() => {
     const map = {};
@@ -686,27 +688,13 @@ const EmpTable = ({ employees }) => {
   return (
     <div className="bg-white shadow-md rounded-lg p-4 sm:p-6 overflow-hidden">
 
-      {/* Iframe Popup Modal */}
-      {iframePopup.open && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100] p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl flex flex-col" style={{ height: "90vh" }}>
-            <div className="flex justify-between items-center px-4 py-3 border-b">
-              <h2 className="text-base font-semibold text-gray-800">{iframePopup.title}</h2>
-              <button
-                onClick={() => setIframePopup({ open: false, url: "", title: "" })}
-                className="text-gray-500 hover:text-gray-700 p-1"
-              >
-                <X size={22} />
-              </button>
-            </div>
-            <iframe
-              src={iframePopup.url}
-              className="flex-1 w-full rounded-b-lg"
-              title={iframePopup.title}
-            />
-          </div>
-        </div>
-      )}
+      <EmployeeIframeModal
+        open={iframePopup.open}
+        url={iframePopup.url}
+        title={iframePopup.title}
+        pageKey={iframePopup.pageKey}
+        onClose={closeIframe}
+      />
       {/* ⭐ KPI SECTION */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <div className="p-4 bg-blue-100 rounded shadow text-center">
@@ -732,13 +720,14 @@ const EmpTable = ({ employees }) => {
         >
           Add Employee
         </Link>
-        <Link
-          href="/admin-dashboard/ip-restrictions"
+        <button
+          type="button"
+          onClick={() => openSubPage("global-ip-restrictions", null, "Global IP Settings")}
           className="text-white bg-red-600 hover:bg-red-700 font-medium whitespace-nowrap rounded-lg text-sm px-5 py-2.5 flex items-center justify-center space-x-2 shadow-md"
         >
           <Shield size={18} />
           <span>Global IP Settings</span>
-        </Link>
+        </button>
         <button
           type="button"
           onClick={async () => {
@@ -1013,7 +1002,7 @@ const EmpTable = ({ employees }) => {
                 maskEmail={maskEmail}
                 maskNumber={maskNumber}
                 maskStatus={maskStatus}
-                onOpenIframe={(url, title) => setIframePopup({ open: true, url: url + "?embed=1", title })}
+                openSubPage={openSubPage}
               />
             ))
           ) : (
@@ -1081,7 +1070,7 @@ const EmpTable = ({ employees }) => {
                         </button>
 
                         <button
-                          onClick={() => setIframePopup({ open: true, url: `/admin-dashboard/password/${employee.username}?embed=1`, title: `Change Password — ${employee.username}` })}
+                          onClick={() => openSubPage("password", employee.username, `Change Password — ${employee.username}`)}
                           className="text-yellow-600 hover:text-yellow-800"
                           title="Change Password"
                         >
@@ -1089,15 +1078,15 @@ const EmpTable = ({ employees }) => {
                         </button>
 
                         <button
-                          onClick={() => setIframePopup({ open: true, url: `/admin-dashboard/quick-edit/${employee.username}?embed=1`, title: `Edit Employee — ${employee.username}` })}
+                          onClick={() => openSubPage("quick-edit", employee.username, `Edit Employee — ${employee.username}`)}
                           className="text-green-600 hover:text-green-800"
                           title="Edit Employee"
                         >
-                          <Edit size={20} />
+                          <Edit size={22} />
                         </button>
 
                         <button
-                          onClick={() => setIframePopup({ open: true, url: `/admin-dashboard/ip-restrictions/${employee.username}?embed=1`, title: `IP Restrictions — ${employee.username}` })}
+                          onClick={() => openSubPage("ip-restrictions", employee.username, `IP Restrictions — ${employee.username}`)}
                           className="text-purple-600 hover:text-purple-800"
                           title="IP Restriction Settings"
                         >
