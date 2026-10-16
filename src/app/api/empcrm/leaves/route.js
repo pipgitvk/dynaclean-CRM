@@ -190,6 +190,18 @@ export async function POST(request) {
 
     let { leave_type, from_date, to_date, reason, is_half_day, half_day_type, has_time_range, start_time, end_time, start_date_time, end_date_time, attachment } = body;
 
+    const toBoolean = (val) => {
+      if (typeof val === "boolean") return val;
+      if (typeof val === "number") return val === 1;
+      if (typeof val === "string") {
+        const v = val.toLowerCase();
+        return v === "true" || v === "1" || v === "on" || v === "yes";
+      }
+      return false;
+    };
+    has_time_range = toBoolean(has_time_range);
+    is_half_day = toBoolean(is_half_day);
+
     // If combined datetime strings provided (e.g. "2026-09-10T14:30"), prefer them.
     // Unambiguous: time + date together. Extract date & time parts for DB columns.
     if (start_date_time) {
@@ -244,7 +256,7 @@ export async function POST(request) {
     }
 
     // Half-day specific validation
-    const isHalfDay = !!is_half_day;
+    const isHalfDay = is_half_day;
     if (isHalfDay) {
       to_date = from_date;
       if (half_day_type && !["1st_half", "2nd_half"].includes(half_day_type)) {
