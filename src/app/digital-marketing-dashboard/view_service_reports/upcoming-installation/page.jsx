@@ -1,11 +1,13 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { Eye } from "lucide-react";
+import UpcomingInstallationStatusFilter from "@/components/installation/UpcomingInstallationStatusFilter";
 import {
   getUpcomingInstallationDeliveryDisplay,
   getUpcomingInstallationRowClass,
   installationStatusDateColor,
+  matchesUpcomingInstallationStatusFilter,
 } from "@/lib/upcomingInstallationDeliveryDisplay";
 
 export default function UpcomingInstallationsPage() {
@@ -16,6 +18,7 @@ export default function UpcomingInstallationsPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [pageSize] = useState(50);
+  const [statusFilter, setStatusFilter] = useState("all");
 
   // Partial return modal state
   const [showReturnModal, setShowReturnModal] = useState(false);
@@ -159,13 +162,35 @@ export default function UpcomingInstallationsPage() {
       ? "Today"
       : `In ${days} days`;
 
+  const filteredRecords = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return records.filter((r) => {
+      if (!matchesUpcomingInstallationStatusFilter(r, statusFilter)) return false;
+      if (!q) return true;
+      return (
+        String(r.model ?? "").toLowerCase().includes(q) ||
+        String(r.company_name ?? "").toLowerCase().includes(q) ||
+        String(r.emp_name ?? "").toLowerCase().includes(q) ||
+        String(r.name ?? "").toLowerCase().includes(q) ||
+        String(r.contact ?? "").toLowerCase().includes(q) ||
+        String(r.invoice_number ?? "").toLowerCase().includes(q) ||
+        String(r.order_id ?? "").toLowerCase().includes(q) ||
+        String(r.serial_number ?? "").toLowerCase().includes(q) ||
+        String(r.delivery_address ?? "").toLowerCase().includes(q)
+      );
+    });
+  }, [records, searchQuery, statusFilter]);
+
   // ================= UI START ===================
   return (
     <div className="w-full max-w-full p-6">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-3xl font-bold">Upcoming Installations</h2>
-        <p className="text-sm text-gray-600">Total: {total} records</p>
+        <p className="text-sm text-gray-600">
+          Total: {filteredRecords.length}
+          {searchQuery || statusFilter !== "all" ? ` (filtered from ${total})` : ` records`}
+        </p>
       </div>
 
       {/* Search + Legend */}
@@ -178,7 +203,12 @@ export default function UpcomingInstallationsPage() {
           className="px-4 py-2 border rounded shadow-sm"
         />
 
-        <div className="flex gap-6">
+        <UpcomingInstallationStatusFilter
+          value={statusFilter}
+          onChange={setStatusFilter}
+        />
+
+        <div className="flex flex-wrap gap-6">
           <div className="flex items-center">
             <div className="w-4 h-4 bg-red-100 mr-2" />
             Overdue
@@ -200,7 +230,7 @@ export default function UpcomingInstallationsPage() {
 
       {/** ================= MOBILE VIEW (CARDS) ================= */}
       <div className="md:hidden space-y-4">
-        {records.map((r, i) => {
+        {filteredRecords.map((r, i) => {
           const delivery = deliveryDisplay(r);
           return (
           <div
@@ -289,7 +319,7 @@ export default function UpcomingInstallationsPage() {
             </tr>
           </thead>
           <tbody>
-            {records.map((r, i) => {
+            {filteredRecords.map((r, i) => {
               const delivery = deliveryDisplay(r);
               return (
               <tr key={i} className={getUpcomingInstallationRowClass(r)}>
