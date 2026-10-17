@@ -296,6 +296,7 @@ export async function GET(request) {
         username: emp.username,
         employee_code: profile.employee_code || emp.empId || profile.empId || "",
         employee_name: profile.full_name || emp.username,
+        employee_role: emp.userRole || profile.designation || profile.userRole || "",
         date_of_joining: dateOfJoining,
         date_of_joining_display: formatDojDisplay(dateOfJoining),
         father_or_spouse_name: fatherOrSpouse,

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { Search } from "lucide-react";
 
 function formatInr(n) {
   if (n == null || n === "" || !Number.isFinite(Number(n))) return "—";
@@ -32,15 +33,21 @@ const tdBase = "px-2 py-1.5 text-xs border border-gray-200 whitespace-nowrap tex
 const tdNum = `${tdBase} text-right tabular-nums`;
 const tdGreen = `${tdNum} bg-green-50 font-semibold`;
 
-export default function SalarySheetTable({ rows, monthLabel, companyName, loading }) {
-  const [filter, setFilter] = useState("");
+export default function SalarySheetTable({
+  rows,
+  monthLabel,
+  companyName,
+  loading,
+}) {
+  const [searchFilter, setSearchFilter] = useState("");
 
   const filtered = useMemo(() => {
-    const q = filter.trim().toLowerCase();
+    const q = searchFilter.trim().toLowerCase();
     if (!q) return rows || [];
     return (rows || []).filter((r) => {
       const hay = [
         r.employee_name,
+        r.employee_role,
         r.username,
         r.employee_code,
         r.father_or_spouse_name,
@@ -49,7 +56,7 @@ export default function SalarySheetTable({ rows, monthLabel, companyName, loadin
         .toLowerCase();
       return hay.includes(q);
     });
-  }, [rows, filter]);
+  }, [rows, searchFilter]);
 
   if (loading) {
     return (
@@ -94,16 +101,20 @@ export default function SalarySheetTable({ rows, monthLabel, companyName, loadin
         </p>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <input
-          type="search"
-          placeholder="Filter by name, code, username…"
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm min-w-[220px] focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
+      <div className="flex flex-wrap items-center gap-3 mb-2">
+        <label className="relative flex items-center min-w-[220px] sm:min-w-[280px]">
+          <Search className="absolute left-3 w-4 h-4 text-gray-400 pointer-events-none" />
+          <input
+            type="search"
+            placeholder="Search name, designation, code…"
+            value={searchFilter}
+            onChange={(e) => setSearchFilter(e.target.value)}
+            className="w-full border border-gray-300 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </label>
         <span className="text-xs text-gray-500">
-          {filtered.length} employee{filtered.length === 1 ? "" : "s"}
+          Showing {filtered.length} employee{filtered.length === 1 ? "" : "s"}
+          {searchFilter.trim() ? ` matching “${searchFilter.trim()}”` : ""}
         </span>
       </div>
 
@@ -111,7 +122,7 @@ export default function SalarySheetTable({ rows, monthLabel, companyName, loadin
         <table className="min-w-max w-full border-collapse bg-white">
           <thead className="sticky top-0 z-10">
             <tr>
-              <th colSpan={4} className={thBase}>Employee</th>
+              <th colSpan={5} className={thBase}>Employee</th>
               <th colSpan={4} className={thGreen}>Salary Rate</th>
               <th colSpan={11} className={thBase}>Attendance</th>
               <th colSpan={7} className={thGreen}>Gross Earned Salary</th>
@@ -121,6 +132,7 @@ export default function SalarySheetTable({ rows, monthLabel, companyName, loadin
             <tr>
               <th className={thBase}>Code</th>
               <th className={thBase}>Name</th>
+              <th className={thBase}>Designation</th>
               <th className={thBase}>DOJ</th>
               <th className={thBase}>Father / Spouse</th>
               <th className={thGreen}>Basic</th>
@@ -175,7 +187,7 @@ export default function SalarySheetTable({ rows, monthLabel, companyName, loadin
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={31} className="px-4 py-8 text-center text-sm text-gray-500">
+                <td colSpan={32} className="px-4 py-8 text-center text-sm text-gray-500">
                   No rows to display.
                 </td>
               </tr>
@@ -189,6 +201,9 @@ export default function SalarySheetTable({ rows, monthLabel, companyName, loadin
                   <tr key={r.username} className="hover:bg-gray-50/80">
                     <td className={tdBase}>{r.employee_code || "—"}</td>
                     <td className={tdBase}>{r.employee_name}</td>
+                    <td className={`${tdBase} text-gray-600`}>
+                      {r.employee_role || "—"}
+                    </td>
                     <td className={tdBase}>{r.date_of_joining_display || "—"}</td>
                     <td className={tdBase}>{r.father_or_spouse_name || "—"}</td>
                     <td className={tdNum}>{formatInr(r.rate_basic)}</td>

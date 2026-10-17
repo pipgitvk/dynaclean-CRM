@@ -9,6 +9,7 @@ function num(v) {
 const HEADERS = [
   "Employee Code",
   "Name of Employee",
+  "Designation",
   "DOJ",
   "Father / Spouse Name",
   "Basic (Rate)",
@@ -49,6 +50,7 @@ function rowToExcelCells(r) {
   return [
     r.employee_code ?? "",
     r.employee_name ?? "",
+    r.employee_role ?? "",
     r.date_of_joining_display ?? "",
     r.father_or_spouse_name ?? "",
     num(r.rate_basic),
