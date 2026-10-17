@@ -6,8 +6,13 @@ import toast from "react-hot-toast";
 export default function OrderInvoiceNumberEditor({
   orderId,
   initialValue = "",
+  onSaved,
 }) {
+  const [savedValue, setSavedValue] = useState(
+    String(initialValue || "").trim(),
+  );
   const [value, setValue] = useState(String(initialValue || "").trim());
+  const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -16,8 +21,10 @@ export default function OrderInvoiceNumberEditor({
   const wrapRef = useRef(null);
 
   useEffect(() => {
-    setValue(String(initialValue || "").trim());
-  }, [initialValue]);
+    const next = String(initialValue || "").trim();
+    setSavedValue(next);
+    if (!editing) setValue(next);
+  }, [initialValue, editing]);
 
   const fetchSuggestions = useCallback(async (q) => {
     const term = String(q || "").trim();
@@ -61,6 +68,20 @@ export default function OrderInvoiceNumberEditor({
     setSuggestions([]);
   };
 
+  const startEdit = () => {
+    setValue(savedValue);
+    setEditing(true);
+    setOpen(false);
+    setSuggestions([]);
+  };
+
+  const cancelEdit = () => {
+    setValue(savedValue);
+    setEditing(false);
+    setOpen(false);
+    setSuggestions([]);
+  };
+
   const save = async () => {
     const trimmed = String(value || "").trim();
     setSaving(true);
@@ -75,9 +96,13 @@ export default function OrderInvoiceNumberEditor({
       if (!res.ok || !data.success) {
         throw new Error(data.error || "Save failed");
       }
-      setValue(String(data.invoice_number || trimmed));
+      const next = String(data.invoice_number || trimmed);
+      setSavedValue(next);
+      setValue(next);
+      onSaved?.(next);
       toast.success("Invoice number saved");
       setOpen(false);
+      setEditing(false);
     } catch (err) {
       toast.error(err.message || "Could not save invoice number");
     } finally {
@@ -92,6 +117,21 @@ export default function OrderInvoiceNumberEditor({
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
   }, []);
+
+  if (!editing) {
+    return (
+      <div className="flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between">
+        <p className="font-medium text-gray-800">{savedValue || "-"}</p>
+        <button
+          type="button"
+          onClick={startEdit}
+          className="shrink-0 px-3 py-1.5 text-sm rounded-md border border-gray-300 bg-white text-gray-800 hover:bg-gray-50"
+        >
+          Edit
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div ref={wrapRef} className="relative">
@@ -108,14 +148,24 @@ export default function OrderInvoiceNumberEditor({
           className="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
           autoComplete="off"
         />
-        <button
-          type="button"
-          onClick={save}
-          disabled={saving}
-          className="shrink-0 px-3 py-2 text-sm rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
-        >
-          {saving ? "Saving…" : "Save"}
-        </button>
+        <div className="flex gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={cancelEdit}
+            disabled={saving}
+            className="px-3 py-2 text-sm rounded-md border border-gray-300 bg-white text-gray-800 hover:bg-gray-50 disabled:opacity-60"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={save}
+            disabled={saving}
+            className="px-3 py-2 text-sm rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
+          >
+            {saving ? "Saving…" : "Save"}
+          </button>
+        </div>
       </div>
 
       {open && (loading || suggestions.length > 0) && (
