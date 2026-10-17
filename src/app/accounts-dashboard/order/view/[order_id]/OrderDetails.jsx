@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Image from "next/image";
 import OrderDocumentFileCard from "@/components/orders/OrderDocumentFileCard";
+import OrderInvoiceNumberEditor from "@/components/orders/OrderInvoiceNumberEditor";
 import { sumOrderPaymentAmounts } from "@/lib/orderPaymentHistory";
 import {
   deriveOrderPaymentStatus,
@@ -132,7 +133,6 @@ export default function OrderDetails({ data }) {
           ["Email", orderDetails.email],
           ["Delivery Location", orderDetails.delivery_location],
           ["Client Delivery Date", formatDate(orderDetails.client_delivery_date)],
-          ["Invoice Number", orderDetails.invoice_number],
           ["Total Tax", currency(displayTax)],
           ["Total Amount", currency(displayTotal)],
           ["Total Paid Amount", currency(totalPaid)],
@@ -149,6 +149,13 @@ export default function OrderDetails({ data }) {
             <p className="font-medium text-gray-800">{value || "-"}</p>
           </div>
         ))}
+        <div>
+          <p className="text-gray-500 text-sm">Invoice Number</p>
+          <OrderInvoiceNumberEditor
+            orderId={orderDetails.order_id}
+            initialValue={orderDetails.invoice_number}
+          />
+        </div>
       </div>
 
       {/* Product Table */}
