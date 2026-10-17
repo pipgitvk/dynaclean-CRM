@@ -41,6 +41,7 @@ import {
 import {
   canViewOrderDeliveryDetailsRole,
   isAccountantOnlyMenuRole,
+  isSuperAdminRole,
 } from "@/lib/roleKeyUtils";
 
 import DeleteButton from "@/components/accounts/DeleteButton";
@@ -826,7 +827,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
     "team leader",
     "service head",
   ].includes(role);
-  const isSuperAdmin = role === "superadmin";
+  const isSuperAdmin = isSuperAdminRole(userRole);
   const isAdmin = role === "admin";
   const isAccountant = role.includes("accountant");
   const isTeamLeader = role === "team leader";
@@ -836,7 +837,8 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
   const canManageReturns = isSuperAdmin || isTeamLeader;
   const accountantOnlyMenu = isAccountantOnlyMenuRole(userRole);
   const canEditBooking = isSuperAdmin || isAdmin;
-  const canAdminAfterReport = isAdmin && isBookingAllowedForOrder(r);
+  const canAdminAfterReport =
+    (isAdmin || isSuperAdmin) && isBookingAllowedForOrder(r);
   const hasBooking =
     r.booking_id !== undefined &&
     r.booking_id !== null &&
@@ -1217,6 +1219,7 @@ function UpdateDeliveryMenuItem({ order, userRole }) {
   const [deliveryProof, setDeliveryProof] = useState(null);
   const [uploading, setUploading] = useState(false);
   const canViewDeliveryDetails = canViewOrderDeliveryDetailsRole(userRole);
+  const superAdmin = isSuperAdminRole(userRole);
 
   // Fetch current user
   useEffect(() => {
@@ -1244,6 +1247,8 @@ function UpdateDeliveryMenuItem({ order, userRole }) {
   const shouldShow = () => {
     if (Number(order.dispatch_status) !== 1) return false;
 
+    if (superAdmin) return true;
+
     if (canViewDeliveryDetails) {
       return isDelivered;
     }
@@ -1253,7 +1258,7 @@ function UpdateDeliveryMenuItem({ order, userRole }) {
     return true;
   };
 
-  const viewOnly = canViewDeliveryDetails && isDelivered;
+  const viewOnly = !superAdmin && canViewDeliveryDetails && isDelivered;
 
   const handleSave = async () => {
     if (!deliveredOn) {

@@ -31,10 +31,15 @@ function isSuperAdminRoleKey(k) {
   return k.replace(/\s/g, "") === "SUPERADMIN";
 }
 
-/** Order list: view delivery details (read-only) for admin, superadmin, and accountant. */
+export function isSuperAdminRole(role) {
+  return isSuperAdminRoleKey(normalizeRoleKey(role || ""));
+}
+
+/** Order list: view delivery details (read-only) for admin and accountant (not superadmin). */
 export function canViewOrderDeliveryDetailsRole(role) {
   const k = normalizeRoleKey(role || "");
-  if (isSuperAdminRoleKey(k) || k === "ADMIN") return true;
+  if (isSuperAdminRoleKey(k)) return false;
+  if (k === "ADMIN") return true;
   return /\bACCOUNTANT\b/.test(k) || k === "ACCOUNTANT";
 }
 

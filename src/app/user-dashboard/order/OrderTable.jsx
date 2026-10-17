@@ -40,6 +40,7 @@ import AccountantReportActionLinks from "@/components/orders/AccountantReportAct
 import {
   canViewOrderDeliveryDetailsRole,
   isAccountantOnlyMenuRole,
+  isSuperAdminRole,
 } from "@/lib/roleKeyUtils";
 import ViewCreditNoteMenuLink from "@/components/orders/ViewCreditNoteMenuLink";
 import AccountantReturnViewMenuItems from "@/components/orders/AccountantReturnViewMenuItems";
@@ -735,7 +736,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
       "superadmin",
     ].includes(role) ||
     isGem;
-  const isSuperAdmin = role === "superadmin";
+  const isSuperAdmin = isSuperAdminRole(userRole);
   const isAdmin = role === "admin";
   const isAccountant = role.includes("accountant");
   const isTeamLeader = role === "team leader";
@@ -745,7 +746,8 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
   const canManageReturns = isSuperAdmin || isTeamLeader;
   const accountantOnlyMenu = isAccountantOnlyMenuRole(userRole);
   const canEditBooking = isSuperAdmin || isAdmin;
-  const canAdminAfterReport = isAdmin && isBookingAllowedForOrder(r);
+  const canAdminAfterReport =
+    (isAdmin || isSuperAdmin) && isBookingAllowedForOrder(r);
   const hasBooking =
     r.booking_id !== undefined &&
     r.booking_id !== null &&
@@ -883,15 +885,36 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
               <>
                 {canManageInvoiceDocs &&
                   (r.report_file ? (
-                    <Link
-                      href={`/user-dashboard/order/view/${r.order_id}`}
-                      className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700 w-full block"
-                      title="View Report"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <FileText size={16} />
-                      <span>View Report</span>
-                    </Link>
+                    <>
+                      <Link
+                        href={`/user-dashboard/order/view/${r.order_id}`}
+                        className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700 w-full block"
+                        title="View Report"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <FileText size={16} />
+                        <span>View Report</span>
+                      </Link>
+                      {(isSuperAdmin || isAdmin) && dispatchStatus === 0 && (
+                        <Link
+                          href={`/user-dashboard/order/upload/${r.order_id}`}
+                          className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-blue-700 w-full block"
+                          title="Edit Report"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Pencil size={16} />
+                          <span>Edit Report</span>
+                        </Link>
+                      )}
+                      {isSuperAdmin && r.report_file && (
+                        <div
+                          className="px-3 py-2 w-full block"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <EditPaymentButton order={r} />
+                        </div>
+                      )}
+                    </>
                   ) : (
                     <div className="flex items-center">
                       <Link
@@ -972,7 +995,9 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                     <ReturnBookingMenuItem order={r} />
                   </div>
                 )}
-                {isWarehouse && Number(r.is_returned) === 3 && Number(r.return_booking_done) !== 1 && (
+                {(isWarehouse || isSuperAdmin) &&
+                  Number(r.is_returned) === 3 &&
+                  Number(r.return_booking_done) !== 1 && (
                   <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>
                     <MarkReturnBookingDoneMenuItem order={r} />
                   </div>
@@ -990,7 +1015,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                   linkClassName="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-teal-700 w-full"
                   onClick={(e) => e.stopPropagation()}
                 />
-                {(isWarehouse || isAdmin) &&
+                {(isWarehouse || isAdmin || isSuperAdmin) &&
                   Number(r.is_returned) === 3 &&
                   Number(r.return_booking_done) === 1 &&
                   Number(r.warehouse_in_done) !== 1 && (
@@ -1212,6 +1237,7 @@ function UpdateDeliveryMenuItem({ order, userRole }) {
   const [deliveryRemark, setDeliveryRemark] = useState("");
   const [uploading, setUploading] = useState(false);
   const canViewDeliveryDetails = canViewOrderDeliveryDetailsRole(userRole);
+  const superAdmin = isSuperAdminRole(userRole);
 
   // Fetch current user
   useEffect(() => {
@@ -1239,6 +1265,8 @@ function UpdateDeliveryMenuItem({ order, userRole }) {
   const shouldShow = () => {
     if (Number(order.dispatch_status) !== 1) return false;
 
+    if (superAdmin) return true;
+
     if (canViewDeliveryDetails) {
       return isDelivered;
     }
@@ -1248,7 +1276,7 @@ function UpdateDeliveryMenuItem({ order, userRole }) {
     return true;
   };
 
-  const viewOnly = canViewDeliveryDetails && isDelivered;
+  const viewOnly = !superAdmin && canViewDeliveryDetails && isDelivered;
 
   const handleSave = async () => {
     if (!deliveredOn) {

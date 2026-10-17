@@ -55,6 +55,7 @@ import AccountantReturnViewMenuItems from "@/components/orders/AccountantReturnV
 import {
   canViewOrderDeliveryDetailsRole,
   isAccountantOnlyMenuRole,
+  isSuperAdminRole,
 } from "@/lib/roleKeyUtils";
 import DeleteButton from "@/components/accounts/DeleteButton";
 import toast from "react-hot-toast";
@@ -2827,7 +2828,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
     "gem portal",
     "warehouse incharge",
   ].includes(role);
-  const isSuperAdmin = role === "superadmin";
+  const isSuperAdmin = isSuperAdminRole(userRole);
   const isAdmin = role === "admin";
   const isAccountant = role.includes("accountant");
   const canManageReturns = isSuperAdmin;
@@ -3423,6 +3424,7 @@ function UpdateDeliveryMenuItem({ order, userRole }) {
   const [deliveryRemark, setDeliveryRemark] = useState("");
   const [uploading, setUploading] = useState(false);
   const canViewDeliveryDetails = canViewOrderDeliveryDetailsRole(userRole);
+  const superAdmin = isSuperAdminRole(userRole);
 
   // Fetch current user
   useEffect(() => {
@@ -3451,6 +3453,8 @@ function UpdateDeliveryMenuItem({ order, userRole }) {
   const shouldShow = () => {
     if (Number(order.dispatch_status) !== 1) return false;
 
+    if (superAdmin) return true;
+
     if (canViewDeliveryDetails) {
       return isDelivered;
     }
@@ -3459,7 +3463,7 @@ function UpdateDeliveryMenuItem({ order, userRole }) {
     return true;
   };
 
-  const viewOnly = canViewDeliveryDetails && isDelivered;
+  const viewOnly = !superAdmin && canViewDeliveryDetails && isDelivered;
 
   const uploadDeliveryProofFile = async () => {
     if (!deliveryProof) return null;
