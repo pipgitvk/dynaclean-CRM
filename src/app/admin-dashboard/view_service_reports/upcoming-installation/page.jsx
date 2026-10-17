@@ -2,15 +2,18 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { Eye } from "lucide-react";
+import UpcomingInstallationStatusFilter from "@/components/installation/UpcomingInstallationStatusFilter";
 import {
   getUpcomingInstallationDeliveryDisplay,
   getUpcomingInstallationRowClass,
   installationStatusDateColor,
+  matchesUpcomingInstallationStatusFilter,
 } from "@/lib/upcomingInstallationDeliveryDisplay";
 
 export default function UpcomingInstallationsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState("products"); // Default to "products"
+  const [statusFilter, setStatusFilter] = useState("all");
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
@@ -150,13 +153,14 @@ export default function UpcomingInstallationsPage() {
 
   // ========= CLIENT-SIDE SEARCH FILTER ==========
   const filteredRecords = useMemo(() => {
-    if (!searchQuery.trim()) return records;
-    const q = searchQuery.toLowerCase();
-    return records.filter((r) =>
-      [r.model, r.name, r.company_name, r.emp_name, r.delivery_address, r.contact, String(r.order_id)]
-        .some((val) => val && String(val).toLowerCase().includes(q))
-    );
-  }, [records, searchQuery]);
+    const q = searchQuery.trim().toLowerCase();
+    return records.filter((r) => {
+      if (!matchesUpcomingInstallationStatusFilter(r, statusFilter)) return false;
+      if (!q) return true;
+      return [r.model, r.name, r.company_name, r.emp_name, r.delivery_address, r.contact, String(r.order_id)]
+        .some((val) => val && String(val).toLowerCase().includes(q));
+    });
+  }, [records, searchQuery, statusFilter]);
 
   // ========= UI HELPERS ==========
   const dateColor = installationStatusDateColor;
@@ -177,7 +181,10 @@ export default function UpcomingInstallationsPage() {
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-3xl font-bold">Upcoming Installations</h2>
         <p className="text-sm text-gray-600">
-          Total: {filteredRecords.length}{searchQuery ? ` (filtered from ${total})` : ` records`}
+          Total: {filteredRecords.length}
+          {searchQuery || statusFilter !== "all"
+            ? ` (filtered from ${total})`
+            : ` records`}
         </p>
       </div>
 
@@ -225,7 +232,12 @@ export default function UpcomingInstallationsPage() {
           </button>
         </div>
 
-        <div className="flex gap-6">
+        <UpcomingInstallationStatusFilter
+          value={statusFilter}
+          onChange={setStatusFilter}
+        />
+
+        <div className="flex flex-wrap gap-6">
           <div className="flex items-center"><div className="w-4 h-4 bg-red-100 mr-2" />Overdue</div>
           <div className="flex items-center"><div className="w-4 h-4 bg-yellow-100 mr-2" />Within 10 Days</div>
           <div className="flex items-center"><div className="w-4 h-4 bg-green-100 mr-2" />Actual Delivery Done</div>

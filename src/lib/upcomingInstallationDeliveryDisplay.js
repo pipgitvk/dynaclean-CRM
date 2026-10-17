@@ -20,6 +20,21 @@ export function getUpcomingInstallationRowClass(record) {
   return "bg-white";
 }
 
+/** completed | late | incoming | scheduled — matches row background rules. */
+export function getUpcomingInstallationStatusBucket(record) {
+  if (hasActualDeliveryDate(record)) return "completed";
+  const status = record?.installation_status;
+  if (status === "overdue") return "late";
+  if (status === "upcoming") return "incoming";
+  return "scheduled";
+}
+
+export function matchesUpcomingInstallationStatusFilter(record, statusFilter) {
+  const f = statusFilter || "all";
+  if (f === "all") return true;
+  return getUpcomingInstallationStatusBucket(record) === f;
+}
+
 /** Expected delivery date, or actual delivered_on in green when set. */
 export function getUpcomingInstallationDeliveryDisplay(record) {
   if (hasActualDeliveryDate(record)) {

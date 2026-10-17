@@ -1,12 +1,14 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Eye } from "lucide-react";
+import UpcomingInstallationStatusFilter from "@/components/installation/UpcomingInstallationStatusFilter";
 import {
   getUpcomingInstallationDeliveryDisplay,
   getUpcomingInstallationRowClass,
   installationStatusDateColor,
+  matchesUpcomingInstallationStatusFilter,
 } from "@/lib/upcomingInstallationDeliveryDisplay";
 
 export default function UpcomingInstallationsPage() {
@@ -24,6 +26,7 @@ export default function UpcomingInstallationsPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [pageSize] = useState(50);
+  const [statusFilter, setStatusFilter] = useState("all");
 
   // ========= ACTIONS ==========
   const handleAction = async (orderId, action) => {
@@ -92,21 +95,24 @@ export default function UpcomingInstallationsPage() {
       : `In ${days} days`;
 
   // ========= FILTERED RECORDS ==========
-  const filteredRecords = records.filter((r) => {
+  const filteredRecords = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    if (!q) return true;
-    return (
-      String(r.model ?? "").toLowerCase().includes(q) ||
-      String(r.company_name ?? "").toLowerCase().includes(q) ||
-      String(r.emp_name ?? "").toLowerCase().includes(q) ||
-      String(r.name ?? "").toLowerCase().includes(q) ||
-      String(r.contact ?? "").toLowerCase().includes(q) ||
-      String(r.invoice_number ?? "").toLowerCase().includes(q) ||
-      String(r.order_id ?? "").toLowerCase().includes(q) ||
-      String(r.serial_number ?? "").toLowerCase().includes(q) ||
-      String(r.delivery_address ?? "").toLowerCase().includes(q)
-    );
-  });
+    return records.filter((r) => {
+      if (!matchesUpcomingInstallationStatusFilter(r, statusFilter)) return false;
+      if (!q) return true;
+      return (
+        String(r.model ?? "").toLowerCase().includes(q) ||
+        String(r.company_name ?? "").toLowerCase().includes(q) ||
+        String(r.emp_name ?? "").toLowerCase().includes(q) ||
+        String(r.name ?? "").toLowerCase().includes(q) ||
+        String(r.contact ?? "").toLowerCase().includes(q) ||
+        String(r.invoice_number ?? "").toLowerCase().includes(q) ||
+        String(r.order_id ?? "").toLowerCase().includes(q) ||
+        String(r.serial_number ?? "").toLowerCase().includes(q) ||
+        String(r.delivery_address ?? "").toLowerCase().includes(q)
+      );
+    });
+  }, [records, searchQuery, statusFilter]);
 
   // ================= UI START ===================
   return (
@@ -123,7 +129,10 @@ export default function UpcomingInstallationsPage() {
             </p>
           )}
         </div>
-        <p className="text-sm text-gray-600">Total: {total} records</p>
+        <p className="text-sm text-gray-600">
+          Total: {filteredRecords.length}
+          {searchQuery || statusFilter !== "all" ? ` (filtered from ${total})` : ` records`}
+        </p>
       </div>
 
       {/* Search + Legend */}
@@ -172,7 +181,12 @@ export default function UpcomingInstallationsPage() {
           </div>
         )}
 
-        <div className="flex gap-6">
+        <UpcomingInstallationStatusFilter
+          value={statusFilter}
+          onChange={setStatusFilter}
+        />
+
+        <div className="flex flex-wrap gap-6">
           <div className="flex items-center">
             <div className="w-4 h-4 bg-red-100 mr-2" />
             Overdue

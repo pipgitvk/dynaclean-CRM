@@ -1,11 +1,13 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { Eye } from "lucide-react";
+import UpcomingInstallationStatusFilter from "@/components/installation/UpcomingInstallationStatusFilter";
 import {
   getUpcomingInstallationDeliveryDisplay,
   getUpcomingInstallationRowClass,
   installationStatusDateColor,
+  matchesUpcomingInstallationStatusFilter,
 } from "@/lib/upcomingInstallationDeliveryDisplay";
 
 export default function UpcomingInstallationsPage() {
@@ -16,6 +18,7 @@ export default function UpcomingInstallationsPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [pageSize] = useState(50);
+  const [statusFilter, setStatusFilter] = useState("all");
 
   // Partial return modal state
   const [showReturnModal, setShowReturnModal] = useState(false);
