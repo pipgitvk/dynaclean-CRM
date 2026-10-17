@@ -11,6 +11,15 @@ export function hasActualDeliveryDate(record) {
   return s !== "" && s !== "0000-00-00" && s !== "0";
 }
 
+/** Row background: green when actual delivery is recorded. */
+export function getUpcomingInstallationRowClass(record) {
+  if (hasActualDeliveryDate(record)) return "bg-green-100";
+  const status = record?.installation_status;
+  if (status === "overdue") return "bg-red-100";
+  if (status === "upcoming") return "bg-yellow-100";
+  return "bg-white";
+}
+
 /** Expected delivery date, or actual delivered_on in green when set. */
 export function getUpcomingInstallationDeliveryDisplay(record) {
   if (hasActualDeliveryDate(record)) {

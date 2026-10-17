@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Eye } from "lucide-react";
 import {
   getUpcomingInstallationDeliveryDisplay,
+  getUpcomingInstallationRowClass,
   installationStatusDateColor,
 } from "@/lib/upcomingInstallationDeliveryDisplay";
 
@@ -158,12 +159,6 @@ export default function UpcomingInstallationsPage() {
   }, [records, searchQuery]);
 
   // ========= UI HELPERS ==========
-  const getRowClass = (status) => {
-    if (status === "overdue") return "bg-red-100";
-    if (status === "upcoming") return "bg-yellow-100";
-    return "bg-white";
-  };
-
   const dateColor = installationStatusDateColor;
   const deliveryDisplay = getUpcomingInstallationDeliveryDisplay;
 
@@ -233,6 +228,7 @@ export default function UpcomingInstallationsPage() {
         <div className="flex gap-6">
           <div className="flex items-center"><div className="w-4 h-4 bg-red-100 mr-2" />Overdue</div>
           <div className="flex items-center"><div className="w-4 h-4 bg-yellow-100 mr-2" />Within 10 Days</div>
+          <div className="flex items-center"><div className="w-4 h-4 bg-green-100 mr-2" />Actual Delivery Done</div>
           <div className="flex items-center"><div className="w-4 h-4 bg-white border mr-2" />Scheduled</div>
         </div>
       </div>
@@ -254,8 +250,8 @@ export default function UpcomingInstallationsPage() {
             return (
             <div
               key={i}
-              className={`rounded-xl shadow p-4 border ${getRowClass(
-                r.installation_status
+              className={`rounded-xl shadow p-4 border ${getUpcomingInstallationRowClass(
+                r
               )}`}
             >
               <div className="text-lg font-bold mb-2">Order #{r.order_id}</div>
@@ -340,7 +336,7 @@ export default function UpcomingInstallationsPage() {
               {filteredRecords.map((r, i) => {
                 const delivery = deliveryDisplay(r);
                 return (
-                <tr key={i} className={getRowClass(r.installation_status)}>
+                <tr key={i} className={getUpcomingInstallationRowClass(r)}>
                   <td className="p-3">{r.order_id}</td>
                   <td className="p-3">{r.model}</td>
                   <td className="p-3">{r.name}</td>
