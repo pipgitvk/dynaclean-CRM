@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
+import { backfillHalfDayLeaveTotals } from "@/lib/empcrmLeaveDays";
 
 // GET: Fetch leave statistics
 export async function GET(request) {
@@ -103,22 +104,11 @@ export async function GET(request) {
       return Math.max(0, accrued);
     };
 
-    // 🛠️ BACKFILL: Fix corrupt half-day records (legacy bugs stored total_days=0 OR 1 instead of 0.5)
-    // This permanently corrects DB rows so SUM(total_days) matches expected 0.5 per half-day record.
-    try {
-      const [fixedInfo] = await conn.execute(
-        `UPDATE employee_leaves 
-         SET total_days = 0.5 
-         WHERE username = ? 
-           AND is_half_day = 1 
-           AND (total_days IS NULL OR total_days != 0.5)`,
-        [username]
+    const backfilled = await backfillHalfDayLeaveTotals(conn, username);
+    if (backfilled > 0) {
+      console.log(
+        `[stats-backfill] Normalized ${backfilled} half-day records → total_days=0.5 for user ${username}`,
       );
-      if (fixedInfo.affectedRows > 0) {
-        console.log(`[stats-backfill] Normalized ${fixedInfo.affectedRows} half-day records → total_days=0.5 for user ${username}`);
-      }
-    } catch (bfErr) {
-      console.warn("[stats-backfill] Could not apply half-day total_days fix:", bfErr.message);
     }
 
     // Fetch leave statistics for current year

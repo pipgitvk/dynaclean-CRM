@@ -17,6 +17,10 @@ import {
   SANDWICH_LEAVE_TYPES,
   unpaidLeavesForApprovalSandwich,
 } from "@/lib/unpaidLeaveSandwich";
+import {
+  backfillHalfDayLeaveTotals,
+  sumLeaveDaysByStatus,
+} from "@/lib/empcrmLeaveDays";
 
 // GET: Fetch leaves (admin sees all, users see only their own, reporting manager sees reportees only)
 export async function GET(request) {
@@ -510,6 +514,8 @@ export async function POST(request) {
         );
       }
 
+      await backfillHalfDayLeaveTotals(conn, session.username);
+
       const [balanceRows] = await conn.execute(
         `SELECT id, from_date, to_date, total_days, is_half_day, status
          FROM employee_leaves
@@ -520,13 +526,8 @@ export async function POST(request) {
         [session.username, leave_type]
       );
 
-      const takenCount = (balanceRows || [])
-        .filter((r) => r.status === "approved")
-        .reduce((sum, r) => sum + Number(r.total_days || 0), 0);
-
-      const pendingCount = (balanceRows || [])
-        .filter((r) => r.status === "pending")
-        .reduce((sum, r) => sum + Number(r.total_days || 0), 0);
+      const takenCount = sumLeaveDaysByStatus(balanceRows, "approved");
+      const pendingCount = sumLeaveDaysByStatus(balanceRows, "pending");
 
       const allowedKey = `${leave_type}_allowed`;
       const maxAllowed = Number(leavePolicy[allowedKey] || 0);
