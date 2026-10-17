@@ -90,6 +90,26 @@ export default function UpcomingInstallationsPage() {
       : "text-gray-800";
   };
 
+  const hasActualDeliveryDate = (record) => {
+    const raw = record?.delivered_on;
+    if (raw == null) return false;
+    const s = String(raw).trim();
+    return s !== "" && s !== "0000-00-00" && s !== "0";
+  };
+
+  const deliveryDisplay = (record) => {
+    if (hasActualDeliveryDate(record)) {
+      return {
+        text: record.delivered_on,
+        className: "text-green-600 font-bold",
+      };
+    }
+    return {
+      text: record.delivery_date,
+      className: dateColor(record.installation_status),
+    };
+  };
+
   const formatDays = (days) =>
     days < 0
       ? `${Math.abs(days)} days overdue`
@@ -196,7 +216,9 @@ export default function UpcomingInstallationsPage() {
 
       {/** ================= MOBILE VIEW (CARDS) ================= */}
       <div className="md:hidden space-y-4">
-        {filteredRecords.map((r, i) => (
+        {filteredRecords.map((r, i) => {
+          const delivery = deliveryDisplay(r);
+          return (
           <div
             key={i}
             className={`rounded-xl shadow p-4 border ${getRowClass(
@@ -233,8 +255,8 @@ export default function UpcomingInstallationsPage() {
               <p>
                 <b>Address:</b> {r.delivery_address}
               </p>
-              <p className={`${dateColor(r.installation_status)} mt-1`}>
-                <b>Delivery:</b> {r.delivery_date}
+              <p className={`${delivery.className} mt-1`}>
+                <b>Delivery:</b> {delivery.text}
               </p>
               <p className={`${dateColor(r.installation_status)}`}>
                 <b>Days:</b> {formatDays(r.days_until_installation)}
@@ -266,7 +288,8 @@ export default function UpcomingInstallationsPage() {
               </button>
             </div>
           </div>
-        ))}
+        );
+        })}
       </div>
 
       {/** ================= DESKTOP TABLE VIEW ================= */}
@@ -289,7 +312,9 @@ export default function UpcomingInstallationsPage() {
             </tr>
           </thead>
           <tbody>
-            {filteredRecords.map((r, i) => (
+            {filteredRecords.map((r, i) => {
+              const delivery = deliveryDisplay(r);
+              return (
               <tr key={i} className={getRowClass(r.installation_status)}>
                 <td className="p-3 font-semibold">
                   <div className="space-y-1 text-xs">
@@ -304,8 +329,8 @@ export default function UpcomingInstallationsPage() {
                 <td className="p-3">{r.company_name}</td>
                 <td className="p-3">{r.contact}</td>
                 <td className="p-3">{r.emp_name}</td>
-                <td className={`p-3 ${dateColor(r.installation_status)}`}>
-                  {r.delivery_date}
+                <td className={`p-3 ${delivery.className}`}>
+                  {delivery.text}
                 </td>
                 <td className={`p-3 ${dateColor(r.installation_status)}`}>
                   {formatDays(r.days_until_installation)}
@@ -340,7 +365,8 @@ export default function UpcomingInstallationsPage() {
                   </div>
                 </td>
               </tr>
-            ))}
+            );
+            })}
           </tbody>
         </table>
       </div>
