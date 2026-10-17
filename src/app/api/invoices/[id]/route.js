@@ -8,6 +8,7 @@ import {
   sendInvoicePaymentNoticeEmail,
 } from "@/lib/invoiceCustomerEmailNotice";
 import { ensureInvoiceItemsInsertReady } from "@/lib/ensureInvoiceItemsAutoIncrement";
+import { refreshOrdersAfterInvoiceRemoved } from "@/lib/orderInvoicePaymentClear";
 
 export async function GET(_req, context) {
   try {
@@ -477,6 +478,18 @@ export async function PATCH(req, context) {
 
     await conn.commit();
 
+    if (String(bodyStatus || "").trim().toUpperCase() === "CANCELLED") {
+      try {
+        await refreshOrdersAfterInvoiceRemoved(pool, {
+          invoice_number,
+          quotation_id,
+          buyers_order_no,
+        });
+      } catch (syncErr) {
+        console.error("Invoice PATCH order payment clear:", syncErr);
+      }
+    }
+
     /** @type {{ sent?: boolean, skipped?: boolean, reason?: string, error?: string } | null} */
     let customerEmailNotice = null;
     const shouldNotifyCustomer =
@@ -531,6 +544,61 @@ export async function PATCH(req, context) {
         console.error("Rollback error:", rollbackError);
       }
     }
+    return NextResponse.json(
+      { success: false, error: e.message || String(e) },
+      { status: 500 },
+    );
+  } finally {
+    try {
+      conn?.release?.();
+    } catch {}
+  }
+}
+
+export async function DELETE(_req, context) {
+  let conn;
+  try {
+    const payload = await getSessionPayload();
+    if (!payload) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { id } = await context.params;
+    const invoiceId = Number(id);
+    if (!Number.isFinite(invoiceId) || invoiceId <= 0) {
+      return NextResponse.json({ error: "Invalid invoice id" }, { status: 400 });
+    }
+
+    conn = await getDbConnection();
+
+    const [[inv]] = await conn.execute(
+      `SELECT id, invoice_number, quotation_id, buyers_order_no, type, created_by
+       FROM invoices WHERE id = ? LIMIT 1`,
+      [invoiceId],
+    );
+
+    if (!inv) {
+      return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+    }
+
+    if (!canAccessPerformaInvoice(payload, inv)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    await conn.execute(`DELETE FROM invoice_items WHERE invoice_id = ?`, [
+      invoiceId,
+    ]);
+    await conn.execute(`DELETE FROM invoices WHERE id = ?`, [invoiceId]);
+
+    try {
+      await refreshOrdersAfterInvoiceRemoved(conn, inv);
+    } catch (syncErr) {
+      console.error("Invoice DELETE order payment clear:", syncErr);
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (e) {
+    console.error("Invoice DELETE error:", e);
     return NextResponse.json(
       { success: false, error: e.message || String(e) },
       { status: 500 },

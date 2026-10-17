@@ -48,12 +48,14 @@ import {
 } from "@/lib/orderDocumentEditRules";
 import { isBookingAllowedForOrder } from "@/lib/orderBookingEligibility";
 import AccountantReportActionLinks from "@/components/orders/AccountantReportActionLinks";
+import OrderInvoiceMenuLinks from "@/components/orders/OrderInvoiceMenuLinks";
 import ViewCreditNoteMenuLink from "@/components/orders/ViewCreditNoteMenuLink";
 import { ViewReturnBookingMenuItem } from "@/components/orders/ReturnBookingWarehouseMenuItems";
 import AccountantReturnViewMenuItems from "@/components/orders/AccountantReturnViewMenuItems";
 import { isAccountantOnlyMenuRole } from "@/lib/roleKeyUtils";
 import DeleteButton from "@/components/accounts/DeleteButton";
 import toast from "react-hot-toast";
+import LinkedStatementPaymentCell from "@/components/orders/LinkedStatementPaymentCell";
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
@@ -891,6 +893,8 @@ export default function OrderTable({ orders, userRole }) {
         { header: "Order ID", key: "order_id", width: 15 },
         { header: "Quotation Number", key: "quote_number", width: 20 },
         { header: "Invoice Number", key: "invoice_number", width: 20 },
+        { header: "Linked Payment Date", key: "payment_received_date", width: 18 },
+        { header: "Amount Received (Linked)", key: "amount_received", width: 20 },
         { header: "Client Name", key: "client_name", width: 25 },
         { header: "Company Name", key: "company_name", width: 30 },
         { header: "Contact", key: "contact", width: 15 },
@@ -927,6 +931,10 @@ export default function OrderTable({ orders, userRole }) {
           order_id: order.order_id,
           quote_number: order.quote_number || "",
           invoice_number: order.invoice_number || "",
+          payment_received_date: order.payment_received_date
+            ? dayjs(order.payment_received_date).format("DD-MM-YYYY")
+            : "",
+          amount_received: Number(order.amount_received || 0),
           client_name: order.client_name || "",
           company_name: order.company_name || "",
           contact: order.contact || "",
@@ -2266,6 +2274,9 @@ export default function OrderTable({ orders, userRole }) {
                   )}
                 </div>
               </th>
+              <th className="px-3 py-3 font-semibold text-center">
+                Linked Payment
+              </th>
               <th 
                 className="px-3 py-3 font-semibold text-center cursor-pointer hover:bg-gray-700 transition-colors"
                 onClick={() => handleSort("duedate")}
@@ -2406,6 +2417,9 @@ export default function OrderTable({ orders, userRole }) {
                     <td className="px-3 py-3">
                       <ApprovalActions r={r} userRole={userRole} />
                     </td>
+                    <td className="px-3 py-3">
+                      <LinkedStatementPaymentCell order={r} />
+                    </td>
                     <td className="px-3 py-3 text-center">
                       {dayjs(r.duedate).format("DD-MM-YYYY")}
                     </td>
@@ -2422,7 +2436,7 @@ export default function OrderTable({ orders, userRole }) {
               })
             ) : (
               <tr>
-                <td colSpan={14} className="px-6 py-4 text-center text-gray-500">
+                <td colSpan={15} className="px-6 py-4 text-center text-gray-500">
                   No orders found.
                 </td>
               </tr>
@@ -2518,6 +2532,12 @@ export default function OrderTable({ orders, userRole }) {
                 </div>
                 <div>
                   <strong>Due Date:</strong> {dayjs(r.duedate).format("DD-MM-YYYY")}
+                </div>
+                <div className="pt-1">
+                  <strong>Linked Payment:</strong>
+                  <div className="mt-1 pl-1">
+                    <LinkedStatementPaymentCell order={r} />
+                  </div>
                 </div>
                 <div>
                   <strong>Total Amount:</strong> ₹{getTotalAmount(r).toLocaleString("en-IN", {
@@ -2900,6 +2920,11 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                     <span>View Booking</span>
                   </Link>
                 )}
+                <OrderInvoiceMenuLinks
+                  order={r}
+                  invoicesBasePath="/admin-dashboard/invoices"
+                  onClick={(e) => e.stopPropagation()}
+                />
                 {r.report_file && (
                   <div className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
                     <EditPaymentButton order={r} />
@@ -2949,6 +2974,13 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                 <span>View Sales</span>
               </Link>
             )}
+            {canManageInvoiceDocs && (
+              <OrderInvoiceMenuLinks
+                order={r}
+                invoicesBasePath="/admin-dashboard/invoices"
+                onClick={(e) => e.stopPropagation()}
+              />
+            )}
             {canManageInvoiceDocs &&
               (r.report_file ? (
                 <>
@@ -2965,11 +2997,11 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                     <Link
                       href={`/admin-dashboard/order/upload/${r.order_id}`}
                       className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-blue-700"
-                      title="Edit Invoice"
+                      title="Edit Report"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <Pencil size={16} />
-                      <span>Edit Invoice</span>
+                      <span>Edit Report</span>
                     </Link>
                   )}
                 </>

@@ -70,6 +70,33 @@ function paymentFieldsFromRows(rows) {
   };
 }
 
+/** Sum neworder.payment_amount whether single value or comma-separated. */
+export function sumPaymentAmountCsv(value) {
+  const parts = (value ?? "")
+    .toString()
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (!parts.length) return 0;
+  return parts
+    .map((p) => Number(p))
+    .filter((n) => !Number.isNaN(n))
+    .reduce((sum, n) => sum + n, 0);
+}
+
+/** Map statement-linked payment lines → neworder payment_id / payment_date / payment_amount CSV. */
+export function linkedPaymentsToOrderPaymentCsv(payments) {
+  const rows = (payments || []).map((p) => ({
+    id: p.trans_id ? String(p.trans_id).trim() : "",
+    date: p.date ? String(p.date).slice(0, 10) : "",
+    amount:
+      p.amount != null && p.amount !== "" && !Number.isNaN(Number(p.amount))
+        ? String(Number(p.amount))
+        : "",
+  }));
+  return paymentFieldsFromRows(rows.filter((r) => r.amount !== ""));
+}
+
 /**
  * When recording payment via API: avoid appending duplicate advance from booking.
  */

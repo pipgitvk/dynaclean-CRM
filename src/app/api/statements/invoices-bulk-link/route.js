@@ -399,6 +399,23 @@ export async function PATCH(req) {
       }
 
       await conn.commit();
+
+      try {
+        const { syncOrdersForInvoiceNumbers } = await import(
+          "@/lib/syncOrderLinkedPaymentFromInvoice"
+        );
+        const { ensureOrderLinkedPaymentColumns } = await import(
+          "@/lib/ensureOrderLinkedPaymentColumns"
+        );
+        await ensureOrderLinkedPaymentColumns(conn);
+        await syncOrdersForInvoiceNumbers(
+          conn,
+          sortedInvoices.map((i) => i.invoice_number),
+        );
+      } catch (syncErr) {
+        console.error("[invoices-bulk-link] order linked-payment sync:", syncErr);
+      }
+
       return new Response(JSON.stringify({ ok: true }), {
         status: 200,
         headers: { "Content-Type": "application/json" },

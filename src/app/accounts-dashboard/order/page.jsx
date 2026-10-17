@@ -4,6 +4,9 @@ import { getSessionPayload } from "@/lib/auth";
 import { appendSqlWhereClause, orderListApprovalWhereSql } from "@/lib/orderApprovalVisibility";
 import { orderListReportWhereSql } from "@/lib/orderReportVisibility";
 import { canViewAllOrders } from "@/lib/dataScope";
+import { ensureOrderLinkedPaymentColumns } from "@/lib/ensureOrderLinkedPaymentColumns";
+import { syncOrderLinkedPaymentFromInvoice } from "@/lib/syncOrderLinkedPaymentFromInvoice";
+import { attachActiveInvoiceFields } from "@/lib/activeInvoiceForOrder";
 
 // Secret for verifying JWT
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -25,6 +28,8 @@ export default async function OrdersPage() {
   }
 
   const conn = await getDbConnection();
+
+  await ensureOrderLinkedPaymentColumns(conn);
 
   // Ensure return / warehouse-in columns exist
   const safeAlters = [
@@ -53,6 +58,7 @@ export default async function OrdersPage() {
                 no.created_at, no.created_by , no.einvoice_file, no.booking_id, no.quote_number, no.duedate,
                 no.invoice_date , no.account_by ,no.booking_by , no.dispatch_person,
                 no.payment_id, no.payment_date, no.payment_amount, no.payment_status,no.totalamt, no.baseAmount, no.taxamt, no.transaction_id,
+                no.invoice_number, no.amount_received, no.payment_received_date, no.linked_payments_json,
                 MAX(qr.grand_total) AS quotation_grand_total,
                 no.delivery_date, no.delivered_on, no.delivery_status,no.delivery_proof,
                 COALESCE(no.delivery_remark, '') as delivery_remark,
@@ -122,9 +128,22 @@ export default async function OrdersPage() {
 
   const [orders] = await conn.execute(sql, params);
 
-  // await conn.end();
+  let enrichedOrders = [...orders];
+  const needsLinkedPaymentSync = enrichedOrders.filter(
+    (o) =>
+      String(o.invoice_number || "").trim() ||
+      String(o.quote_number || "").trim(),
+  );
+  for (const o of needsLinkedPaymentSync) {
+    const idx = enrichedOrders.findIndex((x) => x.order_id === o.order_id);
+    if (idx === -1) continue;
+    enrichedOrders[idx] = await syncOrderLinkedPaymentFromInvoice(
+      conn,
+      enrichedOrders[idx],
+    );
+  }
 
-  console.log("fetched orders:", orders);
+  enrichedOrders = await attachActiveInvoiceFields(conn, enrichedOrders);
 
   return (
     <div className=" mx-auto p-6">
@@ -156,7 +175,7 @@ export default async function OrdersPage() {
       </div>
 
 
-      <OrderTable orders={orders} userRole={userRole} />
+      <OrderTable orders={enrichedOrders} userRole={userRole} />
     </div>
   );
 }

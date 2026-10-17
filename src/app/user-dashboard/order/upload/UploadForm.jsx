@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
+import { useInvoiceLinkedPaymentAutofill } from "@/hooks/useInvoiceLinkedPaymentAutofill";
+import { useOrderUploadInvoicePrefill } from "@/hooks/useOrderUploadInvoicePrefill";
 
 const MAX_FILES_PER_FIELD = 5;
 const FILE_FIELD_NAMES = new Set([
@@ -12,32 +14,85 @@ const FILE_FIELD_NAMES = new Set([
   "deliverchallan",
 ]);
 
-export default function UploadForm({
-  orderDetails,
-  redirectPath = "/user-dashboard/order",
-}) {
-  const [form, setForm] = useState({
-    invoice_number: "",
-    duedate: "",
-    baseAmount: "",
-    taxamt: "",
-    totalamt: "",
-    remark: "",
+function orderDateInputValue(orderDetails) {
+  if (orderDetails?.invoice_date) {
+    return String(orderDetails.invoice_date).slice(0, 10);
+  }
+  if (orderDetails?.duedate) {
+    return String(orderDetails.duedate).slice(0, 10);
+  }
+  return "";
+}
+
+function buildFormStateFromOrder(orderDetails, { lockNonFileFields }) {
+  const emptyFiles = {
     ewaybill_file: [],
     einvoice_file: [],
     report_file: [],
     deliverchallan: [],
-    payment_id: "",
-    payment_date: "",
-    payment_amount: "",
-  });
+  };
+  if (!lockNonFileFields) {
+    return {
+      invoice_number: "",
+      duedate: "",
+      baseAmount: "",
+      taxamt: "",
+      totalamt: "",
+      remark: "",
+      ...emptyFiles,
+      payment_id: "",
+      payment_date: "",
+      payment_amount: "",
+    };
+  }
+  const paymentDate = orderDetails?.payment_date
+    ? String(orderDetails.payment_date).slice(0, 10)
+    : "";
+  return {
+    invoice_number: orderDetails?.invoice_number || "",
+    duedate: orderDateInputValue(orderDetails),
+    baseAmount: orderDetails?.baseAmount != null ? String(orderDetails.baseAmount) : "",
+    taxamt: orderDetails?.taxamt != null ? String(orderDetails.taxamt) : "",
+    totalamt: orderDetails?.totalamt != null ? String(orderDetails.totalamt) : "",
+    remark: orderDetails?.account_remark || "",
+    ...emptyFiles,
+    payment_id: orderDetails?.payment_id || "",
+    payment_date: paymentDate,
+    payment_amount:
+      orderDetails?.payment_amount != null
+        ? String(orderDetails.payment_amount)
+        : "",
+  };
+}
+
+export default function UploadForm({
+  orderDetails,
+  redirectPath = "/user-dashboard/order",
+  isEditMode = false,
+  nonFileFieldsReadOnly = false,
+}) {
+  const [form, setForm] = useState(() =>
+    buildFormStateFromOrder(orderDetails, {
+      lockNonFileFields: nonFileFieldsReadOnly,
+    }),
+  );
   const router = useRouter();
 
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [quoteTotalsLoaded, setQuoteTotalsLoaded] = useState(false);
+  const [invoicePrefillLoaded, setInvoicePrefillLoaded] = useState(false);
   const [paymentTermDays, setPaymentTermDays] = useState(null);
   const [computedPaymentStatus, setComputedPaymentStatus] = useState("pending");
+
+  useOrderUploadInvoicePrefill(orderDetails?.order_id, setForm, {
+    onPrefilled: () => {
+      setInvoicePrefillLoaded(true);
+      setQuoteTotalsLoaded(true);
+    },
+  });
+
+  useInvoiceLinkedPaymentAutofill(form.invoice_number, setForm);
 
   useEffect(() => {
     // Clear alert message once base amount is entered
@@ -49,7 +104,7 @@ export default function UploadForm({
   // Fetch amounts from quotation items using quote_number
   useEffect(() => {
     const quoteNumber = orderDetails?.quote_number;
-    if (!quoteNumber || quoteTotalsLoaded) return;
+    if (!quoteNumber || quoteTotalsLoaded || invoicePrefillLoaded) return;
 
     (async () => {
       try {
@@ -84,7 +139,7 @@ export default function UploadForm({
         // silent fail; user can still enter manually
       }
     })();
-  }, [orderDetails?.quote_number, quoteTotalsLoaded]);
+  }, [orderDetails?.quote_number, quoteTotalsLoaded, invoicePrefillLoaded]);
 
   // Compute payment status automatically
   useEffect(() => {
@@ -123,6 +178,13 @@ export default function UploadForm({
 
   const handleChange = (e) => {
     const { name, value, files } = e.target;
+    if (
+      nonFileFieldsReadOnly &&
+      !FILE_FIELD_NAMES.has(name) &&
+      name !== "remark"
+    ) {
+      return;
+    }
     if (files && FILE_FIELD_NAMES.has(name)) {
       const selected = Array.from(files);
       setForm((prev) => {
@@ -174,8 +236,14 @@ export default function UploadForm({
       setLoading(false);
       return;
     }
-    if (!form.report_file?.length) {
+    if (!form.report_file?.length && !isEditMode) {
       setMessage("❌ Please upload at least one Invoice PDF.");
+      setLoading(false);
+      return;
+    }
+
+    if (!form.remark?.trim()) {
+      setMessage("❌ Please enter remark.");
       setLoading(false);
       return;
     }
@@ -240,16 +308,18 @@ export default function UploadForm({
         />
       </div>
 
-      {/* Editable Inputs */}
+      {/* Invoice / payment / amounts */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <TextInput
+        <FormField
+          locked={nonFileFieldsReadOnly}
           name="invoice_number"
           label="Invoice Number"
           value={form.invoice_number}
           onChange={handleChange}
           required
         />
-        <TextInput
+        <FormField
+          locked={nonFileFieldsReadOnly}
           name="duedate"
           label="Invoice Date"
           type="date"
@@ -257,29 +327,40 @@ export default function UploadForm({
           onChange={handleChange}
           required
         />
-        <TextInput
+        <FormField
+          locked={nonFileFieldsReadOnly}
           name="payment_id"
           label="Payment ID (UTR No)"
           value={form.payment_id}
           onChange={handleChange}
           placeholder="Enter UTR No"
         />
-        <TextInput
+        <FormField
+          locked={nonFileFieldsReadOnly}
           name="payment_date"
           label="Payment Date"
           type="date"
           value={form.payment_date}
           onChange={handleChange}
         />
-        <TextInput
+        <FormField
+          locked={nonFileFieldsReadOnly}
           name="payment_amount"
           label="Payment Amount"
-          type="number"
+          type="text"
           value={form.payment_amount}
           onChange={handleChange}
         />
-        <ReadOnlyInput label="Payment Status" value={computedPaymentStatus} />
-        <TextInput
+        <ReadOnlyInput
+          label="Payment Status"
+          value={
+            nonFileFieldsReadOnly && orderDetails?.payment_status
+              ? orderDetails.payment_status
+              : computedPaymentStatus
+          }
+        />
+        <FormField
+          locked={nonFileFieldsReadOnly}
           name="baseAmount"
           label="Taxable Amount"
           type="number"
@@ -287,7 +368,8 @@ export default function UploadForm({
           onChange={handleChange}
           required
         />
-        <TextInput
+        <FormField
+          locked={nonFileFieldsReadOnly}
           name="taxamt"
           label="Tax Amount"
           type="number"
@@ -295,7 +377,8 @@ export default function UploadForm({
           onChange={handleChange}
           required={form.baseAmount !== ""}
         />
-        <TextInput
+        <FormField
+          locked={nonFileFieldsReadOnly}
           name="totalamt"
           label="Total Amount"
           type="number"
@@ -332,7 +415,7 @@ export default function UploadForm({
           name="report_file"
           label="Invoice PDF (Required)"
           files={form.report_file}
-          required
+          required={!isEditMode}
           onChange={handleChange}
           onRemove={handleRemoveFile}
         />
@@ -352,7 +435,11 @@ export default function UploadForm({
           className="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700 transition"
           disabled={loading}
         >
-          {loading ? "Uploading..." : "Upload Files"}
+          {loading
+            ? "Uploading..."
+            : isEditMode
+              ? "Save Changes"
+              : "Upload Files"}
         </button>
         <a
           href={redirectPath}
@@ -365,8 +452,47 @@ export default function UploadForm({
   );
 }
 
+function FormField({
+  locked,
+  label,
+  name,
+  value,
+  onChange,
+  type = "text",
+  required,
+  placeholder,
+}) {
+  if (locked) {
+    return (
+      <ReadOnlyInput
+        label={label}
+        value={value || "—"}
+      />
+    );
+  }
+  return (
+    <TextInput
+      label={label}
+      name={name}
+      value={value}
+      onChange={onChange}
+      type={type}
+      required={required}
+      placeholder={placeholder}
+    />
+  );
+}
+
 // Reusable Components
-function TextInput({ label, name, value, onChange, type = "text", required }) {
+function TextInput({
+  label,
+  name,
+  value,
+  onChange,
+  type = "text",
+  required,
+  placeholder,
+}) {
   return (
     <div>
       <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -377,6 +503,7 @@ function TextInput({ label, name, value, onChange, type = "text", required }) {
         name={name}
         required={required}
         value={value}
+        placeholder={placeholder}
         onChange={onChange}
         className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
       />

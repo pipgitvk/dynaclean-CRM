@@ -30,6 +30,21 @@ function normalizeTransId(t) {
   return t != null ? String(t).trim() : "";
 }
 
+function isRealInvoiceNumber(num) {
+  const n = String(num || "").trim();
+  if (!n) return false;
+  if (n.toLowerCase().includes("auto-generated")) return false;
+  return true;
+}
+
+/** Picker list: only unlinked credits, or rows tied to the invoice being edited. */
+function shouldShowStatementInPicker(statement, currentInvoiceNumber) {
+  const inv = String(statement.invoice_number || "").trim();
+  if (!inv) return true;
+  const currentInv = String(currentInvoiceNumber || "").trim();
+  return isRealInvoiceNumber(currentInv) && inv === currentInv;
+}
+
 /** Row cannot be newly selected: already on ANOTHER invoice or linked in DB to another invoice. */
 function isStatementRowLocked(statement, lockedTransIds, currentInvoiceNumber) {
   const tid = normalizeTransId(statement.trans_id);
@@ -99,22 +114,16 @@ export default function PaymentLinkModal({
   // Filter to credit only + date range
   useEffect(() => {
     if (!fetched) return;
-    let result = statements.filter((s) => s.type?.toLowerCase() === "credit");
-
-    // We MUST include statements that are already linked to this invoice, 
-    // even if they are outside the selected date range, so they can be unlinked.
     const alreadyLinkedTids = new Set(lockedTransIds.map(normalizeTransId));
     const currentInvTrim = String(currentInvoiceNumber || "").trim();
 
+    let result = statements.filter((s) => s.type?.toLowerCase() === "credit");
+    result = result.filter((s) =>
+      shouldShowStatementInPicker(s, currentInvoiceNumber),
+    );
+
     if (fromDate || toDate) {
       result = result.filter((s) => {
-        const tid = normalizeTransId(s.trans_id);
-        const inv = String(s.invoice_number || "").trim();
-        
-        // Keep if linked to this invoice or in lockedTransIds
-        if (tid && alreadyLinkedTids.has(tid)) return true;
-        if (currentInvTrim && inv === currentInvTrim) return true;
-
         const d = s.date || s.txn_dated_deb || s.txn_posted_date;
         let ok = true;
         if (fromDate && (!d || d < fromDate)) ok = false;
@@ -124,13 +133,17 @@ export default function PaymentLinkModal({
     }
 
     setFilteredStatements(result);
-    
-    // Initialize deductedIds with already linked statements
+
     const initialDeducted = new Set();
-    result.forEach(s => {
+    result.forEach((s) => {
       const tid = normalizeTransId(s.trans_id);
       const inv = String(s.invoice_number || "").trim();
-      if ((tid && alreadyLinkedTids.has(tid)) || (currentInvTrim && inv === currentInvTrim)) {
+      if (tid && alreadyLinkedTids.has(tid)) initialDeducted.add(s.id);
+      if (
+        isRealInvoiceNumber(currentInvTrim) &&
+        inv &&
+        inv === currentInvTrim
+      ) {
         initialDeducted.add(s.id);
       }
     });
@@ -331,7 +344,7 @@ export default function PaymentLinkModal({
                     {filteredStatements.length === 0 ? (
                       <tr>
                         <td colSpan={7} className="text-center py-6 text-gray-400">
-                          No statements found for the selected date range
+                          No unlinked credit statements found for the selected filters
                         </td>
                       </tr>
                     ) : (

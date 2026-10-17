@@ -7,6 +7,9 @@ import {
   hasOrderInvoiceReport,
   isBeforeDispatch,
 } from "@/lib/orderDocumentEditRules";
+import { ensureOrderLinkedPaymentColumns } from "@/lib/ensureOrderLinkedPaymentColumns";
+import { lookupInvoiceLinkedPayment } from "@/lib/invoiceLinkedPaymentLookup";
+import { sumPaymentAmountCsv } from "@/lib/orderPaymentHistory";
 
 const MAX_FILES_PER_FIELD = 5;
 
@@ -124,21 +127,52 @@ export async function POST(req) {
       }
     }
 
-    // Compute payment_status server-side
+    await ensureOrderLinkedPaymentColumns(conn);
+
+    let paymentIdSave = paymentId;
+    let paymentDateSave = paymentDate;
+    let paymentAmountSave =
+      fields.payment_amount !== undefined && fields.payment_amount !== ""
+        ? String(
+            Array.isArray(fields.payment_amount)
+              ? fields.payment_amount[0]
+              : fields.payment_amount,
+          )
+        : null;
+
+    let amountReceived = null;
+    let paymentReceivedDate = null;
+    let linkedPaymentsJson = null;
+    if (invoiceNumber && String(invoiceNumber).trim()) {
+      const linked = await lookupInvoiceLinkedPayment(
+        conn,
+        String(invoiceNumber).trim(),
+      );
+      if (linked?.found) {
+        const amt = Number(linked.payment_amount);
+        if (Number.isFinite(amt) && amt > 0) amountReceived = amt;
+        paymentReceivedDate = linked.payment_date || null;
+        if (Array.isArray(linked.payments) && linked.payments.length) {
+          linkedPaymentsJson = JSON.stringify(linked.payments);
+        }
+        if (linked.payment_amount_csv) {
+          paymentAmountSave = linked.payment_amount_csv;
+          paymentIdSave = linked.payment_id || paymentIdSave;
+          paymentDateSave = linked.payment_date || paymentDateSave;
+        } else if (amountReceived != null) {
+          paymentAmountSave = String(amountReceived);
+          paymentIdSave = linked.payment_id || paymentIdSave;
+          paymentDateSave = linked.payment_date || paymentDateSave;
+        }
+      }
+    }
+
+    // Compute payment_status server-side (supports comma-separated payment_amount)
     let paymentStatus = "pending";
-    const paid = Number(paymentAmount) || 0;
+    const paid = sumPaymentAmountCsv(paymentAmountSave);
     const total = Number(totalAmt) || 0;
 
-    // Determine overdue: invoice date + paymentTermDays < today
     let isOverdue = false;
-    // const invoiceDateIso = dueDate || existingOrder.duedate; // field named duedate but UI uses as invoice date
-    // if (invoiceDateIso && paymentTermDays > 0) {
-    //   const inv = new Date(invoiceDateIso);
-    //   const due = new Date(inv);
-    //   due.setDate(due.getDate() + paymentTermDays);
-    //   const today = new Date();
-    //   isOverdue = today.setHours(0,0,0,0) > due.setHours(0,0,0,0);
-    // }
 
     if (paid >= total && total > 0) paymentStatus = "paid";
     else if (paid > 0 && paid < total) paymentStatus = "partially paid";
@@ -168,6 +202,9 @@ export async function POST(req) {
         payment_id = ?,
         payment_date = ?,
         payment_amount = ?,
+        amount_received = ?,
+        payment_received_date = ?,
+        linked_payments_json = ?,
         payment_status = ?,
         account_status = ?, 
         account_by = ?,
@@ -183,9 +220,12 @@ export async function POST(req) {
         dueDate,
         taxAmt,
         totalAmt,
-        paymentId,
-        paymentDate,
-        isNaN(paid) ? null : paid,
+        paymentIdSave,
+        paymentDateSave,
+        paymentAmountSave,
+        amountReceived,
+        paymentReceivedDate,
+        linkedPaymentsJson,
         paymentStatus,
         1, // account_status
         accountBy,

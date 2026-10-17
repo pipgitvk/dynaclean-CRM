@@ -15,6 +15,7 @@ import {
   Download,
   ArrowUp,
   Pencil,
+  CreditCard,
 } from "lucide-react";
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import dayjs from "dayjs";
@@ -28,6 +29,7 @@ import {
 } from "@/lib/paymentOrderStatus";
 import { isBookingAllowedForOrder } from "@/lib/orderBookingEligibility";
 import AccountantReportActionLinks from "@/components/orders/AccountantReportActionLinks";
+import OrderInvoiceMenuLinks from "@/components/orders/OrderInvoiceMenuLinks";
 import {
   OrderListSearchInput,
   OrderListSearchApplyButton,
@@ -47,6 +49,7 @@ import {
 } from "@/components/orders/ReturnBookingWarehouseMenuItems";
 import ViewCreditNoteMenuLink from "@/components/orders/ViewCreditNoteMenuLink";
 import AccountantReturnViewMenuItems from "@/components/orders/AccountantReturnViewMenuItems";
+import LinkedStatementPaymentCell from "@/components/orders/LinkedStatementPaymentCell";
 
 // 👻 A sleek skeleton loader for a modern feel
 const SkeletonLoader = () => (
@@ -416,7 +419,8 @@ export default function OrderTable({ orders, userRole }) {
   const exportToCSV = () => {
     const headers = [
       "Order ID", "Quotation", "Created By", "Order Date", "Client Name", "Company Name",
-      "Contact", "Location", "Item Name", "Item Code", "Status", "Payment Status", "Due Date", "Total Amount", "Paid Amount",
+      "Contact", "Location", "Item Name", "Item Code", "Status", "Payment Status",
+      "Invoice Number", "Amount Received (Linked)", "Due Date", "Total Amount", "Paid Amount",
     ];
     const csvData = filteredOrders.map((order) => {
       const prevAmounts = (order.payment_amount || "")
@@ -441,6 +445,8 @@ export default function OrderTable({ orders, userRole }) {
         order.item_code,
         getStatusText(order).text,
         order.payment_status,
+        order.invoice_number || "",
+        order.amount_received ?? "",
         dayjs(order.duedate).format("DD-MM-YYYY"),
         order.totalamt || 0,
         totalPaid,
@@ -569,6 +575,7 @@ export default function OrderTable({ orders, userRole }) {
               <th className="px-3 py-3 font-semibold text-center">Status</th>
               <th className="px-3 py-3 font-semibold text-center">Payment</th>
               <th className="px-3 py-3 font-semibold text-center">Payment Pending</th>
+              <th className="px-3 py-3 font-semibold text-center">Linked Payment</th>
               <th className="px-3 py-3 font-semibold text-center">Due Date</th>
               {/* {canShowInstall && (
                 <th className="px-3 py-3 font-semibold text-center">Install</th>
@@ -674,6 +681,9 @@ export default function OrderTable({ orders, userRole }) {
                         </span>
                       )}
                     </td>
+                    <td className="px-3 py-3">
+                      <LinkedStatementPaymentCell order={r} />
+                    </td>
                     <td className="px-3 py-3 text-center">
                       {dayjs(r.duedate).format("DD-MM-YYYY")}
                     </td>
@@ -697,7 +707,7 @@ export default function OrderTable({ orders, userRole }) {
               })
             ) : (
               <tr>
-                <td colSpan={12} className="px-6 py-4 text-center text-gray-500">
+                <td colSpan={13} className="px-6 py-4 text-center text-gray-500">
                   No orders found.
                 </td>
               </tr>
@@ -776,6 +786,12 @@ export default function OrderTable({ orders, userRole }) {
                       })}
                     </span>
                   )}
+                </div>
+                <div className="pt-1">
+                  <strong>Linked Payment:</strong>
+                  <div className="mt-1 pl-1">
+                    <LinkedStatementPaymentCell order={r} />
+                  </div>
                 </div>
               </div>
             );
@@ -885,9 +901,14 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                     <span>View Booking</span>
                   </Link>
                 )}
+                <OrderInvoiceMenuLinks
+                  order={r}
+                  invoicesBasePath="/accounts-dashboard/invoices"
+                  onClick={(e) => e.stopPropagation()}
+                />
                 {r.report_file && (
-                  <div className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
-                    <EditPaymentButton order={r} />
+                  <div onClick={(e) => e.stopPropagation()}>
+                    <ViewPaymentButton order={r} />
                   </div>
                 )}
                 {hasBooking && dispatchStatus === 1 && (
@@ -953,11 +974,11 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                     <Link
                       href={`/accounts-dashboard/order/upload/${r.order_id}`}
                       className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-blue-700"
-                      title="Edit Invoice"
+                      title="Edit Report"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <Pencil size={16} />
-                      <span>Edit Invoice</span>
+                      <span>Edit Report</span>
                     </Link>
                   )}
                 </>
@@ -1093,19 +1114,9 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
   );
 }
 
-function EditPaymentButton({ order }) {
-  const router = useRouter();
+function ViewPaymentButton({ order }) {
   const [open, setOpen] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({
-    payment_id: order.payment_id || "",
-    payment_date: "",
-    payment_amount: "",
-    payment_status: order.payment_status || "",
-  });
-  const [status, setStatus] = useState(order.payment_status || "");
   const totalamt = order.totalamt || 0;
-
   const rows = buildOrderPaymentRows(order);
 
   const formatPrevDate = (d) => {
@@ -1116,70 +1127,28 @@ function EditPaymentButton({ order }) {
 
   const totalPaid = sumOrderPaymentAmounts(order);
 
-  const onChange = (e) => {
-    const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const save = async () => {
-    try {
-      setSaving(true);
-      const res = await fetch("/api/orders/payment", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          order_id: order.order_id,
-          payment_id: form.payment_id || null,
-          payment_date: form.payment_date || null,
-          payment_amount:
-            form.payment_amount === "" ? null : Number(form.payment_amount),
-        }),
-      });
-      const json = await res.json();
-      if (!res.ok || !json.success)
-        throw new Error(json.error || "Save failed");
-      setStatus(json.payment_status);
-      setForm((prev) => ({ ...prev, payment_status: json.payment_status }));
-      setOpen(false);
-      // Optionally refresh page/client state here
-      router.refresh();
-    } catch (e) {
-      console.error(e);
-      alert(e.message || "Failed to save");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const isPaid =
-    (order.payment_status || "")
-      .toString()
-      .trim()
-      .toLowerCase()
-      .replace(/\s+/g, "") === "paid";
-
   return (
     <>
       <button
+        type="button"
         onClick={(e) => {
           e.stopPropagation();
           setOpen(true);
         }}
-        className="inline-flex items-center justify-center px-2 py-1 rounded bg-purple-50 text-purple-700 hover:bg-purple-100 text-xs"
-        title={isPaid ? "View Payment" : "Edit Payment"}
+        className="flex w-full items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700 text-left"
+        title="View Payment"
       >
-        {isPaid ? "View Payment" : "Edit Payment"}
+        <CreditCard size={16} />
+        <span>View Payment</span>
       </button>
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
           <div className="bg-white rounded-lg shadow-lg p-4 w-full max-w-md">
-            <h3 className="font-semibold mb-3">
-              {isPaid ? "View Payment" : "Edit Payment"}
-            </h3>
+            <h3 className="font-semibold mb-3">View Payment</h3>
             <p>Total Amount : {totalamt}</p>
             <div className="space-y-3">
               <div className="text-xs text-gray-700">
-                <div className="font-medium mb-1">Previous Payments</div>
+                <div className="font-medium mb-1">Payments</div>
                 {rows.length ? (
                   <div className="border rounded">
                     <div className="grid grid-cols-3 text-gray-600 bg-gray-50 px-2 py-1">
@@ -1209,73 +1178,29 @@ function EditPaymentButton({ order }) {
                     </div>
                   </div>
                 ) : (
-                  <div className="text-gray-500">No previous payments</div>
+                  <div className="text-gray-500">No payments recorded</div>
                 )}
               </div>
-              {!isPaid && (
-                <>
-                  <Input
-                    label="Payment ID (UTR No)"
-                    name="payment_id"
-                    onChange={onChange}
-                  />
-                  <Input
-                    label="Payment Date"
-                    name="payment_date"
-                    type="date"
-                    onChange={onChange}
-                  />
-                  <Input
-                    label="Payment Amount"
-                    name="payment_amount"
-                    type="number"
-                    onChange={onChange}
-                  />
-                </>
-              )}
               <div className="text-sm text-gray-600">
                 Status:{" "}
                 <span className="font-medium">
-                  {form.payment_status || "-"}
+                  {order.payment_status || "-"}
                 </span>
               </div>
             </div>
-            <div className="mt-4 flex justify-end gap-2">
+            <div className="mt-4 flex justify-end">
               <button
+                type="button"
                 onClick={() => setOpen(false)}
                 className="px-3 py-1 rounded border"
               >
-                {isPaid ? "Close" : "Cancel"}
+                Close
               </button>
-              {!isPaid && (
-                <button
-                  onClick={save}
-                  disabled={saving}
-                  className="px-3 py-1 rounded bg-purple-600 text-white disabled:opacity-50"
-                >
-                  {saving ? "Saving..." : "Save"}
-                </button>
-              )}
             </div>
           </div>
         </div>
       )}
     </>
-  );
-}
-
-function Input({ label, name, value, onChange, type = "text" }) {
-  return (
-    <div>
-      <label className="block text-xs text-gray-600 mb-1">{label}</label>
-      <input
-        name={name}
-        type={type}
-        value={value}
-        onChange={onChange}
-        className="w-full border rounded px-2 py-1 text-sm"
-      />
-    </div>
   );
 }
 

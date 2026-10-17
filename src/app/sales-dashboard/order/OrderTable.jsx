@@ -29,6 +29,9 @@ import {
 } from "@/lib/orderTableDateDefaults";
 import { deriveOrderListPaymentStatus } from "@/lib/paymentOrderStatus";
 import AccountantReportActionLinks from "@/components/orders/AccountantReportActionLinks";
+import ViewPaymentButton, {
+  orderHasViewablePayment,
+} from "@/components/orders/ViewPaymentButton";
 import ReturnInitiateMenuItem from "@/components/orders/ReturnInitiateMenuItem";
 import ViewCreditNoteMenuLink from "@/components/orders/ViewCreditNoteMenuLink";
 import AccountantReturnViewMenuItems from "@/components/orders/AccountantReturnViewMenuItems";
@@ -701,6 +704,11 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                 <ClipboardList size={16} />
                 <span>View Sales</span>
               </Link>
+            )}
+            {canViewSales && orderHasViewablePayment(r) && (
+              <div onClick={(e) => e.stopPropagation()}>
+                <ViewPaymentButton order={r} />
+              </div>
             )}
             {["admin", "team leader"].includes(role) &&
               (r.report_file ? (

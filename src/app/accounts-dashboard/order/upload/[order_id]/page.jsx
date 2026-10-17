@@ -34,12 +34,13 @@ export default async function Page({ params }) {
   return (
     <div className="max-w-7xl mx-auto bg-white p-6 rounded-lg  my-6">
       <h1 className="text-2xl font-bold text-center mb-6">
-        {isEditMode ? "Edit Invoice & Tax Documents" : "Upload E-way Bill & E-invoice"}
+        {isEditMode ? "Edit Report & Tax Documents" : "Upload E-way Bill & E-invoice"}
       </h1>
       <UploadForm
         orderDetails={orderDetails}
         isEditMode={isEditMode}
         redirectPath="/accounts-dashboard/order"
+        nonFileFieldsReadOnly
       />
     </div>
   );

@@ -7,6 +7,7 @@ import {
   isAccountantRole,
 } from "@/lib/performaInvoiceAccess";
 import { ensureInvoiceItemsInsertReady } from "@/lib/ensureInvoiceItemsAutoIncrement";
+import { findActiveInvoiceForOrder } from "@/lib/activeInvoiceForOrder";
 
 /** Parse linked_trans_ids JSON or plain string → array of strings */
 function parseTransIds(raw) {
@@ -881,6 +882,27 @@ export async function POST(req) {
 
     const pool = await getDbConnection();
     conn = await pool.getConnection();
+
+    const isPerformaCreate =
+      String(invoice_type || "").trim().toLowerCase() === "performa";
+    if (!isPerformaCreate) {
+      const existing = await findActiveInvoiceForOrder(conn, {
+        order_id: buyers_order_no,
+        quote_number: quotation_id,
+      });
+      if (existing?.invoice_number) {
+        return NextResponse.json(
+          {
+            error:
+              `Is order ke liye invoice pehle se hai (${existing.invoice_number}). ` +
+              "Purana invoice delete ya cancel hone ke baad hi naya tax invoice bana sakte hain.",
+            existing_invoice_number: existing.invoice_number,
+            existing_invoice_id: existing.id,
+          },
+          { status: 409 },
+        );
+      }
+    }
 
     const createdBy = payload?.username || null;
 

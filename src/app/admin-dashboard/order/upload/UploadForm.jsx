@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
+import { useInvoiceLinkedPaymentAutofill } from "@/hooks/useInvoiceLinkedPaymentAutofill";
+import { useOrderUploadInvoicePrefill } from "@/hooks/useOrderUploadInvoicePrefill";
 
 const MAX_FILES_PER_FIELD = 5;
 const FILE_FIELD_NAMES = new Set([
@@ -37,8 +39,18 @@ export default function UploadForm({ orderDetails, isEditMode = false }) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [quoteTotalsLoaded, setQuoteTotalsLoaded] = useState(false);
+  const [invoicePrefillLoaded, setInvoicePrefillLoaded] = useState(false);
   const [paymentTermDays, setPaymentTermDays] = useState(null);
   const [computedPaymentStatus, setComputedPaymentStatus] = useState("pending");
+
+  useOrderUploadInvoicePrefill(orderDetails?.order_id, setForm, {
+    onPrefilled: () => {
+      setInvoicePrefillLoaded(true);
+      setQuoteTotalsLoaded(true);
+    },
+  });
+
+  useInvoiceLinkedPaymentAutofill(form.invoice_number, setForm);
 
   useEffect(() => {
     // Clear alert message once base amount is entered
@@ -50,7 +62,7 @@ export default function UploadForm({ orderDetails, isEditMode = false }) {
   // Fetch amounts from quotation items using quote_number
   useEffect(() => {
     const quoteNumber = orderDetails?.quote_number;
-    if (!quoteNumber || quoteTotalsLoaded) return;
+    if (!quoteNumber || quoteTotalsLoaded || invoicePrefillLoaded) return;
 
     (async () => {
       try {
@@ -85,7 +97,7 @@ export default function UploadForm({ orderDetails, isEditMode = false }) {
         // silent fail; user can still enter manually
       }
     })();
-  }, [orderDetails?.quote_number, quoteTotalsLoaded]);
+  }, [orderDetails?.quote_number, quoteTotalsLoaded, invoicePrefillLoaded]);
 
   // Compute payment status automatically
   useEffect(() => {

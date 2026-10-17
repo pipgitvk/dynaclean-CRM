@@ -4,6 +4,9 @@ import { getSessionPayload } from "@/lib/auth";
 import { canViewAllOrders } from "@/lib/dataScope";
 import { orderListApprovalWhereSql } from "@/lib/orderApprovalVisibility";
 import { orderListReportWhereSql } from "@/lib/orderReportVisibility";
+import { ensureOrderLinkedPaymentColumns } from "@/lib/ensureOrderLinkedPaymentColumns";
+import { syncOrderLinkedPaymentFromInvoice } from "@/lib/syncOrderLinkedPaymentFromInvoice";
+import { attachActiveInvoiceFields } from "@/lib/activeInvoiceForOrder";
 
 // Secret for verifying JWT
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -28,6 +31,8 @@ export default async function OrdersPage({ searchParams }) {
   }
 
   const conn = await getDbConnection();
+
+  await ensureOrderLinkedPaymentColumns(conn);
 
   // Ensure approval_remark and approval_date columns exist
   try {
@@ -99,7 +104,9 @@ export default async function OrdersPage({ searchParams }) {
                 no.client_name, no.contact, no.is_cancelled, no.dispatch_status,
                 no.created_at, no.created_by , no.einvoice_file, no.booking_id, no.quote_number, no.duedate,
                 no.invoice_date , no.account_by ,no.booking_by , no.dispatch_person,
-                no.payment_id, no.payment_date, no.payment_amount, no.payment_status,no.totalamt, no.transaction_id,
+                no.payment_id, no.payment_date, no.payment_amount, no.amount_received, no.payment_received_date,
+                no.linked_payments_json,
+                no.payment_status,no.totalamt, no.transaction_id,
                 no.baseAmount, no.taxamt,
                 no.delivery_date, no.delivered_on, no.delivery_status,no.delivery_proof,
                 COALESCE(no.delivery_remark, '') as delivery_remark,
@@ -177,7 +184,7 @@ export default async function OrdersPage({ searchParams }) {
 
   const [orders] = await conn.execute(sql, params);
 
-  const enrichedOrders = orders.map((order) => {
+  let enrichedOrders = orders.map((order) => {
     const raw = order.line_items_raw;
     const line_items =
       typeof raw === "string" && raw
@@ -195,6 +202,22 @@ export default async function OrdersPage({ searchParams }) {
         : [];
     return { ...order, line_items };
   });
+
+  const needsLinkedPaymentSync = enrichedOrders.filter(
+    (o) =>
+      String(o.invoice_number || "").trim() ||
+      String(o.quote_number || "").trim(),
+  );
+  for (const o of needsLinkedPaymentSync) {
+    const idx = enrichedOrders.findIndex((x) => x.order_id === o.order_id);
+    if (idx === -1) continue;
+    enrichedOrders[idx] = await syncOrderLinkedPaymentFromInvoice(
+      conn,
+      enrichedOrders[idx],
+    );
+  }
+
+  enrichedOrders = await attachActiveInvoiceFields(conn, enrichedOrders);
 
   // await conn.end();
 
