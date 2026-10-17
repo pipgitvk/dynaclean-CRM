@@ -52,6 +52,7 @@ export async function GET(req) {
         no.contact,
         no.created_by AS emp_name,
         DATE_FORMAT(no.delivery_date, '%Y-%m-%d') AS delivery_date,
+        DATE_FORMAT(no.delivered_on, '%Y-%m-%d') AS delivered_on,
         COALESCE(SUM(qi.total_price), 0) AS pricing_total,
         COALESCE(SUM(qi.quantity), 0) AS total_qty,
         CASE 
