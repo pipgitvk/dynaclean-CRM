@@ -1,6 +1,16 @@
 import { parseLinkedPurchaseTokens } from "@/lib/statementLinkedPurchases";
 import { linkedPaymentsToOrderPaymentCsv } from "@/lib/orderPaymentHistory";
 
+const COLLATE_UNICODE = "utf8mb4_unicode_ci";
+
+/** LIKE '%value%' without utf8mb4_bin vs unicode_ci mix on statements columns */
+function sqlLikeContains(columnExpr) {
+  return `${columnExpr} COLLATE ${COLLATE_UNICODE} LIKE CONCAT('%', TRIM(?) COLLATE ${COLLATE_UNICODE}, '%')`;
+}
+
+const INV_NUM_EQ =
+  `TRIM(invoice_number) COLLATE ${COLLATE_UNICODE} = TRIM(?) COLLATE ${COLLATE_UNICODE}`;
+
 function invoiceNumberTokens(raw) {
   if (raw == null || String(raw).trim() === "") return [];
   return String(raw)
@@ -112,8 +122,8 @@ async function fetchStatementCandidatesForInvoice(conn, inv) {
   const [baseRows] = await conn.execute(
     `SELECT id, trans_id, date, amount, linked_purchase_ids, invoice_number
      FROM statements
-     WHERE linked_purchase_ids LIKE CONCAT('%', ?, '%')
-        OR (invoice_number IS NOT NULL AND invoice_number != '' AND invoice_number LIKE CONCAT('%', ?, '%'))`,
+     WHERE ${sqlLikeContains("linked_purchase_ids")}
+        OR (CHAR_LENGTH(TRIM(COALESCE(invoice_number, ''))) > 0 AND ${sqlLikeContains("invoice_number")})`,
     [ipToken, invoiceNumber],
   );
 
@@ -122,10 +132,11 @@ async function fetchStatementCandidatesForInvoice(conn, inv) {
 
   const transIds = parseLinkedTransIds(inv.linked_trans_ids);
   if (transIds.length) {
-    const placeholders = transIds.map(() => "?").join(",");
     const [transRows] = await conn.execute(
       `SELECT id, trans_id, date, amount, linked_purchase_ids, invoice_number
-       FROM statements WHERE trans_id IN (${placeholders})`,
+       FROM statements WHERE TRIM(trans_id) COLLATE ${COLLATE_UNICODE} IN (${transIds
+         .map(() => `TRIM(?) COLLATE ${COLLATE_UNICODE}`)
+         .join(",")})`,
       transIds,
     );
     for (const row of transRows || []) byId.set(row.id, row);
@@ -146,7 +157,7 @@ export async function lookupInvoiceLinkedPayment(conn, invoiceNumberRaw) {
   const [invRows] = await conn.execute(
     `SELECT id, invoice_number, grand_total, amount_paid, linked_trans_ids
      FROM invoices
-     WHERE TRIM(invoice_number) = ?
+     WHERE ${INV_NUM_EQ}
      ORDER BY id DESC
      LIMIT 1`,
     [invoiceNumber],
@@ -194,7 +205,7 @@ export async function lookupInvoiceLinkedPayment(conn, invoiceNumberRaw) {
   const [stmtRows] = await conn.execute(
     `SELECT id, trans_id, date, amount, linked_purchase_ids, invoice_number
      FROM statements
-     WHERE invoice_number IS NOT NULL AND invoice_number != '' AND invoice_number LIKE CONCAT('%', ?, '%')`,
+     WHERE CHAR_LENGTH(TRIM(COALESCE(invoice_number, ''))) > 0 AND ${sqlLikeContains("invoice_number")}`,
     [invoiceNumber],
   );
 
