@@ -895,7 +895,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                         <FileText size={16} />
                         <span>View Report</span>
                       </Link>
-                      {(isSuperAdmin || isAdmin) && dispatchStatus === 0 && (
+                      {isSuperAdmin && dispatchStatus === 0 && (
                         <Link
                           href={`/user-dashboard/order/upload/${r.order_id}`}
                           className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-blue-700 w-full block"
