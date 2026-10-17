@@ -12,7 +12,7 @@ import {
   isSpecialPricePendingRow,
   resolveDealerPriceFromProductStock,
   resolveSpecialPriceTerm,
-  resolveSpecialPriceType,
+  displayPriceTypeLabel,
 } from "@/lib/specialPriceDefaults";
 import { bulkApproveSpecialPrices, bulkRejectSpecialPrices } from "./_actions";
 
@@ -396,7 +396,7 @@ export default function AdminSpecialPricingTable({
                     <p className="font-medium">₹ {row.last_negotiation_price ?? 0}</p>
                   </div>
                   <div>
-                    <p className="text-gray-500">Special price</p>
+                    <p className="text-gray-500">Requested price</p>
                     {meta.dealerPending ? (
                       <p className="text-gray-400 italic">Enter on approve</p>
                     ) : (
@@ -406,7 +406,7 @@ export default function AdminSpecialPricingTable({
                   <div>
                     <p className="text-gray-500">Price type</p>
                     <p className="capitalize font-bold text-red-600">
-                      {resolveSpecialPriceType(row.price_type)}
+                      {displayPriceTypeLabel(row.price_type)}
                     </p>
                   </div>
                   <div>
@@ -497,7 +497,7 @@ export default function AdminSpecialPricingTable({
               <th className="p-3 text-right">Original Price</th>
               <th className="p-3 text-right">Last Neg. Price</th>
               <th className="p-3 text-right min-w-[140px]">Stock DP</th>
-              <th className="p-3 text-right">Special Price</th>
+              <th className="p-3 text-right">Requested Price</th>
               <th className="p-3 text-left">Price Type</th>
               <th className="p-3 text-left">Price Term</th>
               <th className="p-3 text-center">Status</th>
@@ -621,7 +621,7 @@ export default function AdminSpecialPricingTable({
                       )}
                     </td>
                     <td className="p-3 text-sm capitalize font-bold text-red-600">
-                      {resolveSpecialPriceType(row.price_type)}
+                      {displayPriceTypeLabel(row.price_type)}
                     </td>
                     <td className="p-3 text-sm capitalize font-bold text-red-600">
                       {resolveSpecialPriceTerm(row.price_term)}
@@ -707,7 +707,7 @@ export default function AdminSpecialPricingTable({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-4 space-y-3">
             <h2 className="text-sm font-semibold">
-              Approve {selectedIds.length} special price
+              Approve {selectedIds.length} requested price
               {selectedIds.length === 1 ? "" : "s"}
             </h2>
             <form action={bulkAction} className="space-y-3">
@@ -762,7 +762,7 @@ export default function AdminSpecialPricingTable({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-4 space-y-3">
             <h2 className="text-sm font-semibold">
-              Reject {selectedIds.length} special price
+              Reject {selectedIds.length} requested price
               {selectedIds.length === 1 ? "" : "s"}
             </h2>
             <form action={bulkRejectAction} className="space-y-3">

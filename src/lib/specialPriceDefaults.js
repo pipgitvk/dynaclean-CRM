@@ -17,6 +17,18 @@ export function resolveSpecialPriceType(value) {
   return trimmed || SPECIAL_PRICE_TYPE_DEFAULT;
 }
 
+/** UI label for price_type (DB may still store "special price"). */
+export function displayPriceTypeLabel(value) {
+  const normalized = String(resolveSpecialPriceType(value)).trim().toLowerCase();
+  if (
+    normalized === SPECIAL_PRICE_TYPE_DEFAULT ||
+    normalized === "special"
+  ) {
+    return "Requested Price";
+  }
+  return resolveSpecialPriceType(value);
+}
+
 export function resolveSpecialPriceTerm(value) {
   const trimmed = String(value || "").trim();
   return trimmed || SPECIAL_PRICE_TERM_DEFAULT;

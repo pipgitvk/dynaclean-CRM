@@ -3,7 +3,7 @@
 import { useActionState, useEffect, useState } from "react";
 import {
   resolveSpecialPriceTerm,
-  resolveSpecialPriceType,
+  displayPriceTypeLabel,
 } from "@/lib/specialPriceDefaults";
 
 export default function SpecialPriceDetailsModal({
@@ -88,7 +88,7 @@ export default function SpecialPriceDetailsModal({
           <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col my-auto">
             <div className="flex items-center justify-between border-b px-3 sm:px-4 py-3 flex-shrink-0">
               <h2 className="text-sm font-semibold">
-                Special Price Details
+                Requested Price Details
               </h2>
               <button
                 type="button"
@@ -138,7 +138,7 @@ export default function SpecialPriceDetailsModal({
                 </div>
                 <div>
                   <div className="font-semibold text-gray-600">
-                    Special Price
+                    Requested Price
                   </div>
                   <div className="text-green-700 font-semibold">
                     ₹ {specialPrice ?? 0}
@@ -147,7 +147,7 @@ export default function SpecialPriceDetailsModal({
                 <div>
                   <div className="font-semibold text-gray-600">Price Type</div>
                   <div className="text-gray-800 capitalize">
-                    {resolveSpecialPriceType(priceType)}
+                    {displayPriceTypeLabel(priceType)}
                   </div>
                 </div>
                 <div>

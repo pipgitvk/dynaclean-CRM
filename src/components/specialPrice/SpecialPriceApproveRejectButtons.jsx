@@ -96,8 +96,8 @@ export default function SpecialPriceApproveRejectButtons({
                 {isApprove
                   ? needsDealerPrice
                     ? "Approve dealer price"
-                    : "Approve special price"
-                  : "Reject special price"}
+                    : "Approve requested price"
+                  : "Reject requested price"}
               </h2>
               <button
                 type="button"

@@ -112,7 +112,7 @@ export default function SpecialPricingFilterBar({
           className="border border-gray-300 rounded px-3 py-2 text-sm w-full min-w-0 bg-white"
         >
           <option value="">All Price Types</option>
-          <option value="special">Special Price</option>
+          <option value="special">Requested Price</option>
           <option value="dealer">Dealer Price</option>
         </select>
         <button

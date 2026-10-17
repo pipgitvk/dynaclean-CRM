@@ -4,7 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 
 const OPTIONS = [
   { value: "", label: "All Price Types" },
-  { value: "special", label: "Special Price" },
+  { value: "special", label: "Requested Price" },
   { value: "dealer", label: "Dealer Price" },
 ];
 
