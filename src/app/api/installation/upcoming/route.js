@@ -60,7 +60,12 @@ export async function GET(req) {
           WHEN no.delivery_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 10 DAY) THEN 'upcoming'
           ELSE 'scheduled'
         END AS installation_status,
-        DATEDIFF(no.delivery_date, CURDATE()) AS days_until_installation,
+        CASE
+          WHEN no.delivered_on IS NOT NULL
+            AND no.delivered_on > '1970-01-01'
+          THEN DATEDIFF(no.delivered_on, CURDATE())
+          ELSE DATEDIFF(no.delivery_date, CURDATE())
+        END AS days_until_installation,
         CASE
           WHEN EXISTS (
             SELECT 1 FROM warranty_products wp

@@ -9,6 +9,7 @@ import {
   getUpcomingInstallationRowClass,
   installationStatusDateColor,
   matchesUpcomingInstallationStatusFilter,
+  formatUpcomingInstallationDays,
 } from "@/lib/upcomingInstallationDeliveryDisplay";
 
 export default function UpcomingInstallationsPage() {
@@ -86,13 +87,6 @@ export default function UpcomingInstallationsPage() {
   // ========= UI HELPERS ==========
   const dateColor = installationStatusDateColor;
   const deliveryDisplay = getUpcomingInstallationDeliveryDisplay;
-
-  const formatDays = (days) =>
-    days < 0
-      ? `${Math.abs(days)} days overdue`
-      : days === 0
-      ? "Today"
-      : `In ${days} days`;
 
   // ========= FILTERED RECORDS ==========
   const filteredRecords = useMemo(() => {
@@ -251,7 +245,7 @@ export default function UpcomingInstallationsPage() {
                 <b>Delivery:</b> {delivery.text}
               </p>
               <p className={`${dateColor(r.installation_status)}`}>
-                <b>Days:</b> {formatDays(r.days_until_installation)}
+                <b>Days:</b> {formatUpcomingInstallationDays(r)}
               </p>
               <p className="mt-1">
                 <b>Warranty:</b>{" "}
@@ -325,7 +319,7 @@ export default function UpcomingInstallationsPage() {
                   {delivery.text}
                 </td>
                 <td className={`p-3 ${dateColor(r.installation_status)}`}>
-                  {formatDays(r.days_until_installation)}
+                  {formatUpcomingInstallationDays(r)}
                 </td>
                 <td className="p-3 text-center">
                   {Number(r.warranty_registered) === 1 ? (

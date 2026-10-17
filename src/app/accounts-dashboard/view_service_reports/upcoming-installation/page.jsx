@@ -8,6 +8,7 @@ import {
   getUpcomingInstallationRowClass,
   installationStatusDateColor,
   matchesUpcomingInstallationStatusFilter,
+  formatUpcomingInstallationDays,
 } from "@/lib/upcomingInstallationDeliveryDisplay";
 
 export default function UpcomingInstallationsPage() {
@@ -155,13 +156,6 @@ export default function UpcomingInstallationsPage() {
   const dateColor = installationStatusDateColor;
   const deliveryDisplay = getUpcomingInstallationDeliveryDisplay;
 
-  const formatDays = (days) =>
-    days < 0
-      ? `${Math.abs(days)} days overdue`
-      : days === 0
-      ? "Today"
-      : `In ${days} days`;
-
   const filteredRecords = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     return records.filter((r) => {
@@ -264,7 +258,7 @@ export default function UpcomingInstallationsPage() {
                 <b>Delivery:</b> {delivery.text}
               </p>
               <p className={`${dateColor(r.installation_status)}`}>
-                <b>Days:</b> {formatDays(r.days_until_installation)}
+                <b>Days:</b> {formatUpcomingInstallationDays(r)}
               </p>
             </div>
 
@@ -334,7 +328,7 @@ export default function UpcomingInstallationsPage() {
                   {delivery.text}
                 </td>
                 <td className={`p-3 ${dateColor(r.installation_status)}`}>
-                  {formatDays(r.days_until_installation)}
+                  {formatUpcomingInstallationDays(r)}
                 </td>
                 <td className="p-3">
                   <div className="flex flex-col gap-2 items-stretch">
