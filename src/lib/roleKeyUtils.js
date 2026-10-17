@@ -25,6 +25,19 @@ export function isAccountantOnlyMenuRole(role) {
   return /\bACCOUNTANT\b/.test(k) || k === "ACCOUNTANT";
 }
 
+function isSuperAdminRoleKey(k) {
+  if (!k) return false;
+  if (k === "SUPERADMIN") return true;
+  return k.replace(/\s/g, "") === "SUPERADMIN";
+}
+
+/** Order list: view delivery details (read-only) for admin, superadmin, and accountant. */
+export function canViewOrderDeliveryDetailsRole(role) {
+  const k = normalizeRoleKey(role || "");
+  if (isSuperAdminRoleKey(k) || k === "ADMIN") return true;
+  return /\bACCOUNTANT\b/.test(k) || k === "ACCOUNTANT";
+}
+
 /** View Credit Note on order list — superadmin, admin, and accountant roles. */
 export function canViewOrderCreditNoteRole(role) {
   const k = normalizeRoleKey(role || "");

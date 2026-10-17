@@ -38,7 +38,10 @@ import {
   getOrderTableDefaultDateFrom,
   getOrderTableDefaultDateTo,
 } from "@/lib/orderTableDateDefaults";
-import { isAccountantOnlyMenuRole } from "@/lib/roleKeyUtils";
+import {
+  canViewOrderDeliveryDetailsRole,
+  isAccountantOnlyMenuRole,
+} from "@/lib/roleKeyUtils";
 
 import DeleteButton from "@/components/accounts/DeleteButton";
 import ReturnInitiateMenuItem from "@/components/orders/ReturnInitiateMenuItem";
@@ -922,6 +925,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                     <span>View Dispatch</span>
                   </Link>
                 )}
+                <UpdateDeliveryMenuItem order={r} userRole={userRole} />
                 {dispatchStatus === 1 &&
                   ![1, 2, 3].includes(Number(r.is_returned || 0)) && (
                     <div
@@ -1063,7 +1067,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                   </Link>
                 </>
               )}
-            <UpdateDeliveryMenuItem order={r} />
+            <UpdateDeliveryMenuItem order={r} userRole={userRole} />
             {canManageReturns &&
               dispatchStatus === 1 &&
               ![1, 2, 3].includes(Number(r.is_returned || 0)) && (
@@ -1204,7 +1208,7 @@ function ViewPaymentButton({ order }) {
   );
 }
 
-function UpdateDeliveryMenuItem({ order }) {
+function UpdateDeliveryMenuItem({ order, userRole }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -1212,6 +1216,7 @@ function UpdateDeliveryMenuItem({ order }) {
   const [deliveredOn, setDeliveredOn] = useState("");
   const [deliveryProof, setDeliveryProof] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const canViewDeliveryDetails = canViewOrderDeliveryDetailsRole(userRole);
 
   // Fetch current user
   useEffect(() => {
@@ -1229,18 +1234,26 @@ function UpdateDeliveryMenuItem({ order }) {
     fetchUser();
   }, []);
 
+  const isDelivered =
+    Number(order.delivery_status) === 1 ||
+    (order.delivered_on != null &&
+      String(order.delivered_on).trim() !== "" &&
+      String(order.delivered_on) !== "0");
+
   // Check if menu item should be shown
   const shouldShow = () => {
-    // Only show if dispatch_status is 1
     if (Number(order.dispatch_status) !== 1) return false;
 
-    // Only show if current user is the booking_by person
+    if (canViewDeliveryDetails) {
+      return isDelivered;
+    }
+
     if (!currentUser || order.booking_by !== currentUser) return false;
 
     return true;
   };
 
-  const isDelivered = Number(order.delivery_status) === 1;
+  const viewOnly = canViewDeliveryDetails && isDelivered;
 
   const handleSave = async () => {
     if (!deliveredOn) {
@@ -1315,10 +1328,10 @@ function UpdateDeliveryMenuItem({ order }) {
           setOpen(true);
         }}
         className="w-full flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-blue-700 text-left"
-        title={isDelivered ? "View Delivery" : "Update Delivery Status"}
+        title={viewOnly || isDelivered ? "View Delivery" : "Update Delivery Status"}
       >
         <Truck size={16} />
-        <span>{isDelivered ? "View Delivery" : "Update Delivery"}</span>
+        <span>{viewOnly || isDelivered ? "View Delivery" : "Update Delivery"}</span>
       </button>
       {open && (
         <div
@@ -1467,7 +1480,7 @@ function UpdateDeliveryMenuItem({ order }) {
               >
                 {isDelivered ? "Close" : "Cancel"}
               </button>
-              {!isDelivered && (
+              {!viewOnly && !isDelivered && (
                 <button
                   onClick={handleSave}
                   disabled={saving || uploading}
