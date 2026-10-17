@@ -2,6 +2,10 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { Eye } from "lucide-react";
+import {
+  getUpcomingInstallationDeliveryDisplay,
+  installationStatusDateColor,
+} from "@/lib/upcomingInstallationDeliveryDisplay";
 
 export default function UpcomingInstallationsPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -160,33 +164,8 @@ export default function UpcomingInstallationsPage() {
     return "bg-white";
   };
 
-  const dateColor = (status) => {
-    return status === "overdue"
-      ? "text-red-600 font-bold"
-      : status === "upcoming"
-        ? "text-orange-600 font-bold"
-        : "text-gray-800";
-  };
-
-  const hasActualDeliveryDate = (record) => {
-    const raw = record?.delivered_on;
-    if (raw == null) return false;
-    const s = String(raw).trim();
-    return s !== "" && s !== "0000-00-00" && s !== "0";
-  };
-
-  const deliveryDisplay = (record) => {
-    if (hasActualDeliveryDate(record)) {
-      return {
-        text: record.delivered_on,
-        className: "text-green-600 font-bold",
-      };
-    }
-    return {
-      text: record.delivery_date,
-      className: dateColor(record.installation_status),
-    };
-  };
+  const dateColor = installationStatusDateColor;
+  const deliveryDisplay = getUpcomingInstallationDeliveryDisplay;
 
   const formatDays = (days) =>
     days < 0

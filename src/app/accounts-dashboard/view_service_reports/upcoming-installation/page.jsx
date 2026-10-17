@@ -2,6 +2,10 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { Eye } from "lucide-react";
+import {
+  getUpcomingInstallationDeliveryDisplay,
+  installationStatusDateColor,
+} from "@/lib/upcomingInstallationDeliveryDisplay";
 
 export default function UpcomingInstallationsPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -150,13 +154,8 @@ export default function UpcomingInstallationsPage() {
     return "bg-white";
   };
 
-  const dateColor = (status) => {
-    return status === "overdue"
-      ? "text-red-600 font-bold"
-      : status === "upcoming"
-      ? "text-orange-600 font-bold"
-      : "text-gray-800";
-  };
+  const dateColor = installationStatusDateColor;
+  const deliveryDisplay = getUpcomingInstallationDeliveryDisplay;
 
   const formatDays = (days) =>
     days < 0
@@ -202,7 +201,9 @@ export default function UpcomingInstallationsPage() {
 
       {/** ================= MOBILE VIEW (CARDS) ================= */}
       <div className="md:hidden space-y-4">
-        {records.map((r, i) => (
+        {records.map((r, i) => {
+          const delivery = deliveryDisplay(r);
+          return (
           <div
             key={i}
             className={`rounded-xl shadow p-4 border ${getRowClass(
@@ -230,8 +231,8 @@ export default function UpcomingInstallationsPage() {
               <p>
                 <b>Address:</b> {r.delivery_address}
               </p>
-              <p className={`${dateColor(r.installation_status)} mt-1`}>
-                <b>Delivery:</b> {r.delivery_date}
+              <p className={`${delivery.className} mt-1`}>
+                <b>Delivery:</b> {delivery.text}
               </p>
               <p className={`${dateColor(r.installation_status)}`}>
                 <b>Days:</b> {formatDays(r.days_until_installation)}
@@ -267,7 +268,8 @@ export default function UpcomingInstallationsPage() {
               </button>
             </div>
           </div>
-        ))}
+        );
+        })}
       </div>
 
       {/** ================= DESKTOP TABLE VIEW ================= */}
@@ -288,7 +290,9 @@ export default function UpcomingInstallationsPage() {
             </tr>
           </thead>
           <tbody>
-            {records.map((r, i) => (
+            {records.map((r, i) => {
+              const delivery = deliveryDisplay(r);
+              return (
               <tr key={i} className={getRowClass(r.installation_status)}>
                 <td className="p-3">{r.order_id}</td>
                 <td className="p-3">{r.model}</td>
@@ -297,8 +301,8 @@ export default function UpcomingInstallationsPage() {
                 <td className="p-3">{r.company_name}</td>
                 <td className="p-3">{r.contact}</td>
                 <td className="p-3">{r.emp_name}</td>
-                <td className={`p-3 ${dateColor(r.installation_status)}`}>
-                  {r.delivery_date}
+                <td className={`p-3 ${delivery.className}`}>
+                  {delivery.text}
                 </td>
                 <td className={`p-3 ${dateColor(r.installation_status)}`}>
                   {formatDays(r.days_until_installation)}
@@ -333,7 +337,8 @@ export default function UpcomingInstallationsPage() {
                   </div>
                 </td>
               </tr>
-            ))}
+            );
+            })}
           </tbody>
         </table>
       </div>
