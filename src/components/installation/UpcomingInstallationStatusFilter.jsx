@@ -4,7 +4,7 @@ const OPTIONS = [
   { id: "all", label: "All", active: "bg-gray-800 text-white", idle: "bg-gray-200 text-gray-800 hover:bg-gray-300" },
   {
     id: "completed",
-    label: "Completed",
+    label: "Completed Delivery",
     active: "bg-green-600 text-white",
     idle: "bg-green-100 text-green-900 hover:bg-green-200 border border-green-300",
   },
@@ -16,7 +16,7 @@ const OPTIONS = [
   },
   {
     id: "incoming",
-    label: "Incoming (10 days)",
+    label: "Incoming Delivery",
     active: "bg-yellow-500 text-white",
     idle: "bg-yellow-100 text-yellow-900 hover:bg-yellow-200 border border-yellow-300",
   },
