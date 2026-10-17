@@ -15,7 +15,7 @@ async function activeInvoiceExists(conn, invoiceNumber) {
   if (!num) return false;
   const [rows] = await conn.execute(
     `SELECT id FROM invoices
-     WHERE TRIM(invoice_number) = ?
+     WHERE TRIM(invoice_number) COLLATE utf8mb4_unicode_ci = TRIM(?) COLLATE utf8mb4_unicode_ci
        AND ${EXCLUDE_PROFORMA_INVOICE_SQL}
        AND (status IS NULL OR UPPER(TRIM(status)) <> 'CANCELLED')
      LIMIT 1`,
@@ -202,7 +202,9 @@ export async function syncOrdersForInvoiceNumbers(conn, invoiceNumbers) {
 
   for (const num of nums) {
     const [invRows] = await conn.execute(
-      `SELECT quotation_id FROM invoices WHERE TRIM(invoice_number) = ? ORDER BY id DESC LIMIT 1`,
+      `SELECT quotation_id FROM invoices
+       WHERE TRIM(invoice_number) COLLATE utf8mb4_unicode_ci = TRIM(?) COLLATE utf8mb4_unicode_ci
+       ORDER BY id DESC LIMIT 1`,
       [num],
     );
     const qid =
@@ -213,7 +215,8 @@ export async function syncOrdersForInvoiceNumbers(conn, invoiceNumbers) {
     const params = [num];
     let sql = `SELECT order_id, quote_number, invoice_number, totalamt, amount_received, payment_received_date,
               linked_payments_json, payment_id, payment_date, payment_amount, payment_status
-       FROM neworder WHERE TRIM(invoice_number) = ?`;
+       FROM neworder
+       WHERE TRIM(invoice_number) COLLATE utf8mb4_unicode_ci = TRIM(?) COLLATE utf8mb4_unicode_ci`;
     if (qid) {
       sql += ` OR quote_number = ?`;
       params.push(qid);

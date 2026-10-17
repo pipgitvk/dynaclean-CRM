@@ -80,9 +80,11 @@ export default async function UpcomingTasks({
 }) {
   // view-task route only exists under user-dashboard and admin-dashboard
   // sales-dashboard doesn't have its own view-task, so redirect there
-  const viewTaskPrefix = dashboardPrefix.includes("/sales-dashboard")
-    ? "/user-dashboard"
-    : dashboardPrefix;
+  const viewTaskPrefix =
+    dashboardPrefix.includes("/sales-dashboard") ||
+    dashboardPrefix.includes("/accounts-dashboard")
+      ? "/user-dashboard"
+      : dashboardPrefix;
   const connection = await getDbConnection();
 
   const [rows] = await connection.execute(

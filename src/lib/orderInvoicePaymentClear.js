@@ -1,5 +1,8 @@
 import { ensureOrderLinkedPaymentColumns } from "@/lib/ensureOrderLinkedPaymentColumns";
 
+const INV_CMP =
+  "TRIM(COALESCE(invoice_number, '')) COLLATE utf8mb4_unicode_ci = TRIM(?) COLLATE utf8mb4_unicode_ci";
+
 /** Order rows tied to an invoice (before/after delete). */
 export async function findOrderIdsForInvoice(conn, invoice) {
   const ids = new Set();
@@ -11,7 +14,7 @@ export async function findOrderIdsForInvoice(conn, invoice) {
 
   if (invNum) {
     const [rows] = await conn.execute(
-      `SELECT order_id FROM neworder WHERE TRIM(invoice_number) = ?`,
+      `SELECT order_id FROM neworder WHERE ${INV_CMP}`,
       [invNum],
     );
     for (const r of rows || []) ids.add(r.order_id);
@@ -20,7 +23,8 @@ export async function findOrderIdsForInvoice(conn, invoice) {
   if (buyersOrder) {
     const [rows] = await conn.execute(
       `SELECT order_id FROM neworder
-       WHERE CAST(order_id AS CHAR) = ? OR TRIM(COALESCE(invoice_number,'')) = ?`,
+       WHERE CAST(order_id AS CHAR) COLLATE utf8mb4_unicode_ci = TRIM(?) COLLATE utf8mb4_unicode_ci
+          OR ${INV_CMP}`,
       [buyersOrder, invNum || buyersOrder],
     );
     for (const r of rows || []) ids.add(r.order_id);
@@ -74,7 +78,7 @@ export async function clearOrderInvoicePaymentFields(
       payment_amount = NULL,
       payment_status = 'pending',
       invoice_number = CASE
-        WHEN ? <> '' AND TRIM(COALESCE(invoice_number, '')) = ?
+        WHEN CHAR_LENGTH(TRIM(?)) > 0 AND ${INV_CMP}
         THEN NULL
         ELSE invoice_number
       END
