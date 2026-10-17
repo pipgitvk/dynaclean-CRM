@@ -38,6 +38,7 @@ export const HR_TARGET_ALLOWED_DESIGNATIONS = [
   "Graphic Designer",
   "Machine Operator",
   "Business Development Officer",
+  "Factory Incharge",
 ];
 
 /**
