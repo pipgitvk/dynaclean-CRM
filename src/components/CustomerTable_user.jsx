@@ -21,6 +21,9 @@ const SkeletonRows = () => (
           <div className="h-4 bg-gray-200 rounded w-8"></div>
         </td>
         <td className="px-3 py-4">
+          <div className="h-4 bg-gray-200 rounded w-16"></div>
+        </td>
+        <td className="px-3 py-4">
           <div className="h-4 bg-gray-200 rounded w-full"></div>
         </td>
         <td className="px-3 py-4">
@@ -124,6 +127,7 @@ export default function CustomerTable({ customers, isLoading }) {
     const doc = new jsPDF();
     const tableData = filteredCustomers.map((c, i) => [
       i + 1,
+      c.customer_id ?? "",
       dayjs.utc(c.date_created).format("DD-MM-YYYY HH:mm"),
       c.lead_campaign,
       c.first_name,
@@ -133,7 +137,7 @@ export default function CustomerTable({ customers, isLoading }) {
       c.lead_source,
     ]);
     autoTable(doc, {
-      head: [["#", "Date", "Campaign", "Name", "Company", "Status", "Stage", "Source"]],
+      head: [["#", "Customer ID", "Date", "Campaign", "Name", "Company", "Status", "Stage", "Source"]],
       body: tableData,
       styles: { fontSize: 8 },
       headStyles: { fillColor: "#e5e7eb", textColor: 0, fontStyle: "bold" },
@@ -150,6 +154,7 @@ export default function CustomerTable({ customers, isLoading }) {
             <thead className="bg-gray-50 text-gray-600">
               <tr>
                 <th className="px-3 py-3 font-semibold text-center">#</th>
+                <th className="px-3 py-3 font-semibold text-left">Customer ID</th>
                 <th className="px-3 py-3 font-semibold text-left">Date</th>
                 <th className="px-3 py-3 font-semibold text-left">Campaign</th>
                 <th className="px-3 py-3 font-semibold text-left">Name</th>
@@ -199,6 +204,7 @@ export default function CustomerTable({ customers, isLoading }) {
           <thead className="bg-gray-50 text-gray-600 sticky top-0">
             <tr>
               <th className="px-3 py-3 font-semibold text-center">#</th>
+              <th className="px-3 py-3 font-semibold text-left">Customer ID</th>
               <th className="px-3 py-3 font-semibold text-left">Date</th>
               <th className="px-3 py-3 font-semibold text-left">Campaign</th>
               <th className="px-3 py-3 font-semibold text-left">Name</th>
@@ -218,6 +224,9 @@ export default function CustomerTable({ customers, isLoading }) {
                   className="hover:bg-gray-50 text-center transition-colors duration-150"
                 >
                   <td className="px-3 py-3">{i + 1}</td>
+                  <td className="px-3 py-3 text-left font-mono text-gray-700">
+                    {c.customer_id ?? "-"}
+                  </td>
                   <td className="px-3 py-3 text-left">
                     {dayjs.utc(c.date_created).format("DD-MM-YYYY HH:mm")}
                   </td>
@@ -250,7 +259,7 @@ export default function CustomerTable({ customers, isLoading }) {
               ))
             ) : (
               <tr>
-                <td colSpan="8" className="px-6 py-4 text-center text-gray-500">
+                <td colSpan="11" className="px-6 py-4 text-center text-gray-500">
                   No customers found.
                 </td>
               </tr>
@@ -273,6 +282,9 @@ export default function CustomerTable({ customers, isLoading }) {
                 </span>
               </div>
               <div className="space-y-1">
+                <div className="text-xs font-mono text-gray-600">
+                  <strong>Customer ID:</strong> {c.customer_id ?? "-"}
+                </div>
                 <div className="font-semibold text-lg text-gray-900">
                   {c.first_name}
                 </div>
