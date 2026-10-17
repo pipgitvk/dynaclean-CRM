@@ -8,6 +8,27 @@ import toast from "react-hot-toast";
 import { isGemRole } from "@/lib/isGemRole";
 import { isSalesRole } from "@/lib/isSalesRole";
 
+function parseTagList(raw) {
+  return String(raw ?? "")
+    .split(",")
+    .map((tag) => tag.trim())
+    .filter(Boolean);
+}
+
+function latestSalesTagsFromHistory(history) {
+  if (!Array.isArray(history) || history.length === 0) return [];
+  const sorted = [...history].sort((a, b) => {
+    const aTs = new Date(a.time_stamp || a.followed_date || 0).getTime();
+    const bTs = new Date(b.time_stamp || b.followed_date || 0).getTime();
+    return bTs - aTs;
+  });
+  for (const row of sorted) {
+    const parsed = parseTagList(row.multi_tag);
+    if (parsed.length > 0) return parsed;
+  }
+  return [];
+}
+
 export default function FollowupForm({ customerId, userRole = "" }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -391,6 +412,7 @@ export default function FollowupForm({ customerId, userRole = "" }) {
         ]);
 
         let latestCommMode = "";
+        let salesTagsFromHistory = [];
 
         // Fetch last comm_mode and followed_date from followup history
         if (followupResponse.ok) {
@@ -403,6 +425,11 @@ export default function FollowupForm({ customerId, userRole = "" }) {
             if (lastFollowup.comm_mode) {
               latestCommMode = lastFollowup.comm_mode;
             }
+            if (!isServiceSupport && !isGEM) {
+              salesTagsFromHistory = latestSalesTagsFromHistory(
+                followupData.history,
+              );
+            }
           }
         }
 
@@ -413,18 +440,8 @@ export default function FollowupForm({ customerId, userRole = "" }) {
           const serviceStatus = stageData.service_status || "";
           const gemStage = stageData.gem_stage || "New";
           const gemStatus = stageData.gem_status || "";
-          const serviceTags = stageData.service_tags
-            ? String(stageData.service_tags)
-                .split(",")
-                .map((tag) => tag.trim())
-                .filter(Boolean)
-            : [];
-          const gemTags = stageData.gem_tags
-            ? String(stageData.gem_tags)
-                .split(",")
-                .map((tag) => tag.trim())
-                .filter(Boolean)
-            : [];
+          const serviceTags = parseTagList(stageData.service_tags);
+          const gemTags = parseTagList(stageData.gem_tags);
 
           setCustomerCurrentStage(
             isServiceSupport ? serviceStage : isGEM ? gemStage : dbStage,
@@ -448,7 +465,7 @@ export default function FollowupForm({ customerId, userRole = "" }) {
               ? serviceTags
               : isGEM
                 ? gemTags
-                : prev.multi_tag,
+                : salesTagsFromHistory,
           }));
         }
       } catch (error) {

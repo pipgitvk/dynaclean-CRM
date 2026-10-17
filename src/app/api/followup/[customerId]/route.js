@@ -10,6 +10,17 @@ import { updateCustomerNotesLanguage } from "@/lib/customerFollowupNotesLanguage
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret";
 
+async function getLatestSalesMultiTag(conn, customerId) {
+  const [rows] = await conn.execute(
+    `SELECT multi_tag FROM customers_followup
+     WHERE customer_id = ? AND multi_tag IS NOT NULL AND TRIM(multi_tag) != ''
+     ORDER BY time_stamp DESC, followed_date DESC
+     LIMIT 1`,
+    [customerId],
+  );
+  return rows[0]?.multi_tag ?? null;
+}
+
 // GET: Fetch follow-up history for a customer
 export async function GET(req, { params }) {
   const { customerId } = await params;
@@ -49,7 +60,8 @@ export async function GET(req, { params }) {
       notes,
       notes_language,
       followed_by,
-      time_stamp
+      time_stamp,
+      multi_tag
      FROM customers_followup
      WHERE customer_id = ?`;
 
@@ -61,7 +73,7 @@ export async function GET(req, { params }) {
     queryParams.push(currentUser);
   }
 
-  sql += ` ORDER BY followed_date DESC`;
+  sql += ` ORDER BY time_stamp DESC, followed_date DESC`;
 
   const [rows] = await conn.execute(sql, queryParams);
 
@@ -217,6 +229,14 @@ export async function POST(req, { params }) {
     ? String(data.gem_tags || "").trim().slice(0, 255) || null
     : null;
 
+  let insertMultiTag = null;
+  if (isServiceSupport || isGEM) {
+    insertMultiTag = await getLatestSalesMultiTag(conn, customerId);
+  } else {
+    const submitted = String(data.multi_tag ?? "").trim();
+    insertMultiTag = submitted || (await getLatestSalesMultiTag(conn, customerId));
+  }
+
   await conn.execute(
     `INSERT INTO customers_followup 
     (customer_id, name, contact, email, next_followup_date, service_next_followup, gem_next_followup, followed_date, comm_mode, notes, notes_language, followed_by, multi_tag, purpose)
@@ -234,7 +254,7 @@ export async function POST(req, { params }) {
       data.notes,
       notesLanguage,
       followedBy,
-      isServiceSupport ? null : data.multi_tag || null,
+      insertMultiTag,
       purpose,
     ],
   );
@@ -276,7 +296,7 @@ export async function POST(req, { params }) {
         secondRowNotes,
         notesLanguage,
         followedBy,
-        data.multi_tag || null,
+        insertMultiTag,
         purpose,
       ],
     );
