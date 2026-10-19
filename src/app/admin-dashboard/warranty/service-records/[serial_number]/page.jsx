@@ -2,11 +2,28 @@
 
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
+import {
+  attachmentHrefForUi,
+  attachmentServeHref,
+  splitAttachmentList,
+} from "@/lib/attachmentPathUtils";
+
+function attachmentItemsFromRow(row) {
+  const list = splitAttachmentList(row?.attachments);
+  if (list.length > 0) return list;
+  if (row?.attachments == null) return [];
+  const fallback = String(row.attachments).trim();
+  return fallback ? [fallback] : [];
+}
 
 const downloadFile = (filename) => {
+  const href = attachmentServeHref(filename) || attachmentHrefForUi(filename);
+  if (!href) return;
   const link = document.createElement("a");
-  link.href = `/api/serve-attachment?path=attachments/${filename}`;
-  link.download = filename || "download";
+  link.href = href;
+  link.target = "_blank";
+  link.rel = "noopener noreferrer";
+  link.download = String(filename || "download").split("/").pop() || "download";
   link.style.display = "none";
   document.body.appendChild(link);
   link.click();
@@ -143,7 +160,7 @@ export default function ServiceRecordsPage() {
                       ? "bg-gray-100"
                       : "bg-white";
 
-                const attachments = row.attachments?.split(",") || [];
+                const attachments = attachmentItemsFromRow(row);
 
                 return (
                   <tr key={row.service_id} className={bgColorClass}>
@@ -185,17 +202,27 @@ export default function ServiceRecordsPage() {
                       {row.company_cost}
                     </td>
                     <td className="p-2 border border-gray-300 space-y-1">
-                      {attachments.map((att, idx) => (
-                        <a
-                          key={idx}
-                          href={`/attachments/${att}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:underline block"
-                        >
-                          doc{idx + 1}
-                        </a>
-                      ))}
+                      {attachments.length === 0 ? (
+                        <span className="text-gray-400">—</span>
+                      ) : (
+                        attachments.map((att, idx) => {
+                          const href = attachmentHrefForUi(att);
+                          return (
+                            <a
+                              key={`${row.service_id}-${idx}-${att}`}
+                              href={href || "#"}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:underline block"
+                              onClick={(e) => {
+                                if (!href) e.preventDefault();
+                              }}
+                            >
+                              doc{idx + 1}
+                            </a>
+                          );
+                        })
+                      )}
                     </td>
                     <td className="p-2 border border-gray-300">
                       <div className="flex gap-3 flex-wrap items-center justify-center">
@@ -224,7 +251,10 @@ export default function ServiceRecordsPage() {
                         {/* Download File Icon */}
                         {row.attachments ? (
                           <div
-                            onClick={() => downloadFile(row.attachments.split(",")[0].trim())}
+                            onClick={() => {
+                              const first = attachmentItemsFromRow(row)[0];
+                              if (first) downloadFile(first);
+                            }}
                             title="Download File"
                             className="cursor-pointer"
                           >

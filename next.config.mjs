@@ -53,6 +53,14 @@ const nextConfig = {
           source: "/Order/:path*",
           destination: "/api/serve/Order/:path*",
         },
+        {
+          source: "/attachments/:path*",
+          destination: "/api/serve/attachments/:path*",
+        },
+        {
+          source: "/completion_files/:path*",
+          destination: "/api/serve/completion_files/:path*",
+        },
       ],
       beforeFiles: [],
       fallback: [],
