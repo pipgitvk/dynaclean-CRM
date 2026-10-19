@@ -215,7 +215,7 @@ export default function ServiceRecordsPage() {
 
                         {/* View Report Icon */}
                         <a
-                          href={`/admin-dashboard/warranty/completion_report/${row.service_id}`}
+                          href={`/admin-dashboard/warranty/completion-report/${row.service_id}`}
                           title="View Report"
                         >
                           <FileIcon available={true} />
@@ -241,7 +241,7 @@ export default function ServiceRecordsPage() {
                           <div
                             onClick={() => {
                               window.open(
-                                `/admin-dashboard/warranty/completion_report/${row.service_id}`,
+                                `/admin-dashboard/warranty/completion-report/${row.service_id}`,
                                 "_blank"
                               );
                               setTimeout(() => window.print(), 500);
