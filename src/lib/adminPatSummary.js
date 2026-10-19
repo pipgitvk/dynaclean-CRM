@@ -11,10 +11,11 @@ const ORDER_APPROVED_SQL = `
   )
 `;
 
-/** PAT: invoice/order report uploaded; not cancelled or rejected. */
+/** PAT: invoice/order report uploaded; not cancelled, rejected, or returned. */
 const PAT_ORDER_ELIGIBILITY_SQL = `
   AND COALESCE(no.is_cancelled, 0) = 0
   AND LOWER(TRIM(COALESCE(no.approval_status, ''))) <> 'rejected'
+  AND COALESCE(no.is_returned, 0) NOT IN (1, 2, 3)
   AND ${sqlHasInvoiceReportClause("no")}
 `;
 
@@ -824,7 +825,7 @@ export async function buildAdminPatSummary(
     periodLabel,
     dateFrom,
     dateTo,
-    note: "All amounts ex-GST. Order-based lines (A, B, D) include only orders with invoice/report uploaded; cancelled and rejected orders are excluded. Line D: sold qty × latest purchase price_per_unit from Purchases. Salary from monthly_salary_records; operating expenses from client_expenses (by entry date). Tax & interest are zero until configured.",
+    note: "All amounts ex-GST. Order-based lines (A, B, D) include only orders with invoice/report uploaded; cancelled, rejected, and returned orders are excluded. Line D: sold qty × latest purchase price_per_unit from Purchases. Salary from monthly_salary_records; operating expenses from client_expenses (by entry date). Tax & interest are zero until configured.",
     lines: {
       revenueSales: {
         id: "A",
