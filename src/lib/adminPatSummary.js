@@ -345,54 +345,6 @@ export async function fetchApprovedOrderTaxableRevenue(conn, dateFrom, dateTo) {
 }
 
 /**
- * PAT line D: sold qty (Revenue from Sales orders in period) × latest purchase
- * price_per_unit per product from product_stock_request (same field as /purchase/purchases).
- */
-export async function fetchPurchaseCogsFromSalesLatestPurchasePrice(
-  conn,
-  dateFrom,
-  dateTo,
-) {
-  try {
-    const [rows] = await conn.execute(
-      `
-        SELECT COALESCE(SUM(sold.qty_sold * COALESCE(latest.latest_price, 0)), 0) AS total
-        FROM (
-          SELECT
-            LOWER(TRIM(qi.item_code)) AS code_key,
-            SUM(COALESCE(qi.quantity, 1)) AS qty_sold
-          FROM neworder no
-          ${ORDER_QUOTATION_HEADER_JOIN}
-          WHERE ${STAT_ORDER_WHERE}
-            AND TRIM(COALESCE(qi.item_code, '')) <> ''
-          GROUP BY LOWER(TRIM(qi.item_code))
-        ) sold
-        LEFT JOIN (
-          SELECT code_key, latest_price
-          FROM (
-            SELECT
-              LOWER(TRIM(product_code)) AS code_key,
-              COALESCE(price_per_unit, 0) AS latest_price,
-              ROW_NUMBER() OVER (
-                PARTITION BY LOWER(TRIM(product_code))
-                ORDER BY created_at DESC, id DESC
-              ) AS rn
-            FROM product_stock_request
-            WHERE TRIM(COALESCE(product_code, '')) <> ''
-          ) ranked
-          WHERE rn = 1
-        ) latest ON latest.code_key = sold.code_key
-      `,
-      [dateFrom, dateTo],
-    );
-    return Number(rows[0]?.total) || 0;
-  } catch (e) {
-    console.error("fetchPurchaseCogsFromSalesLatestPurchasePrice:", e);
-    return 0;
-  }
-}
-
-/**
  * AMC/CAMC lines: quotation item_code may be SKU (AMC/CAMC) or products_list.item_code
  * (e.g. 1002500173) with item_name AMC/CAMC.
  */
@@ -567,6 +519,112 @@ const AMC_LINE_TAXABLE_SQL = `
     0
   )
 `;
+
+/** Spare sales/purchases may use spare_list.id or spare_number as the code string. */
+const PAT_INVENTORY_KEY_FROM_QI_SQL = `
+  COALESCE(
+    (
+      SELECT CONCAT('spare:', sl.id)
+      FROM spare_list sl
+      WHERE CAST(sl.id AS CHAR) = TRIM(qi.item_code)
+         OR CAST(sl.spare_number AS CHAR) = TRIM(qi.item_code)
+      LIMIT 1
+    ),
+    CONCAT('product:', LOWER(TRIM(qi.item_code)))
+  )
+`;
+
+const PAT_INVENTORY_KEY_FROM_PSR_CODE_SQL = `
+  COALESCE(
+    (
+      SELECT CONCAT('spare:', sl.id)
+      FROM spare_list sl
+      WHERE CAST(sl.id AS CHAR) = TRIM(psr.product_code)
+         OR CAST(sl.spare_number AS CHAR) = TRIM(psr.product_code)
+      LIMIT 1
+    ),
+    CONCAT('product:', LOWER(TRIM(psr.product_code)))
+  )
+`;
+
+const PAT_LATEST_PURCHASE_BY_INVENTORY_SQL = `
+  SELECT inventory_key, unit_price AS latest_price, purchase_id, purchase_date, purchase_kind
+  FROM (
+    SELECT
+      inventory_key,
+      unit_price,
+      purchase_id,
+      purchase_date,
+      purchase_kind,
+      ROW_NUMBER() OVER (
+        PARTITION BY inventory_key
+        ORDER BY purchase_date DESC, purchase_id DESC
+      ) AS rn
+    FROM (
+      SELECT
+        ${PAT_INVENTORY_KEY_FROM_PSR_CODE_SQL} AS inventory_key,
+        COALESCE(psr.price_per_unit, 0) AS unit_price,
+        psr.id AS purchase_id,
+        psr.created_at AS purchase_date,
+        'PP' AS purchase_kind
+      FROM product_stock_request psr
+      WHERE TRIM(COALESCE(psr.product_code, '')) <> ''
+      UNION ALL
+      SELECT
+        CONCAT('spare:', ssr.spare_id) AS inventory_key,
+        COALESCE(ssr.price_per_unit, 0) AS unit_price,
+        ssr.id AS purchase_id,
+        ssr.created_at AS purchase_date,
+        'SP' AS purchase_kind
+      FROM spare_stock_request ssr
+      WHERE ssr.spare_id IS NOT NULL
+    ) purchases_all
+  ) ranked
+  WHERE rn = 1
+`;
+
+const PAT_SOLD_LINES_BY_INVENTORY_SQL = `
+  SELECT
+    inventory_key,
+    MIN(item_code_display) AS item_code_display,
+    SUM(line_qty) AS qty_sold
+  FROM (
+    SELECT
+      ${PAT_INVENTORY_KEY_FROM_QI_SQL} AS inventory_key,
+      TRIM(qi.item_code) AS item_code_display,
+      COALESCE(qi.quantity, 1) AS line_qty
+    FROM neworder no
+    ${ORDER_QUOTATION_HEADER_JOIN}
+    WHERE ${STAT_ORDER_WHERE}
+      AND TRIM(COALESCE(qi.item_code, '')) <> ''
+  ) sale_lines
+  GROUP BY inventory_key
+`;
+
+/**
+ * PAT line D: sold qty × latest purchase price_per_unit (product_stock_request + spare_stock_request).
+ */
+export async function fetchPurchaseCogsFromSalesLatestPurchasePrice(
+  conn,
+  dateFrom,
+  dateTo,
+) {
+  try {
+    const [rows] = await conn.execute(
+      `
+        SELECT COALESCE(SUM(sold.qty_sold * COALESCE(latest.latest_price, 0)), 0) AS total
+        FROM (${PAT_SOLD_LINES_BY_INVENTORY_SQL}) sold
+        LEFT JOIN (${PAT_LATEST_PURCHASE_BY_INVENTORY_SQL}) latest
+          ON latest.inventory_key = sold.inventory_key
+      `,
+      [dateFrom, dateTo],
+    );
+    return Number(rows[0]?.total) || 0;
+  } catch (e) {
+    console.error("fetchPurchaseCogsFromSalesLatestPurchasePrice:", e);
+    return 0;
+  }
+}
 
 export async function fetchMachineRepairIncomeFromOrders(conn, dateFrom, dateTo) {
   try {
@@ -816,36 +874,12 @@ export async function fetchPatDrillRows(conn, section, dateFrom, dateTo) {
             sold.qty_sold,
             latest.purchase_id,
             latest.purchase_date,
+            latest.purchase_kind,
             COALESCE(latest.latest_price, 0) AS unit_price,
             sold.qty_sold * COALESCE(latest.latest_price, 0) AS line_total
-          FROM (
-            SELECT
-              TRIM(qi.item_code) AS item_code_display,
-              LOWER(TRIM(qi.item_code)) AS code_key,
-              SUM(COALESCE(qi.quantity, 1)) AS qty_sold
-            FROM neworder no
-            ${ORDER_QUOTATION_HEADER_JOIN}
-            WHERE ${STAT_ORDER_WHERE}
-              AND TRIM(COALESCE(qi.item_code, '')) <> ''
-            GROUP BY TRIM(qi.item_code), LOWER(TRIM(qi.item_code))
-          ) sold
-          LEFT JOIN (
-            SELECT code_key, latest_price, purchase_id, purchase_date
-            FROM (
-              SELECT
-                LOWER(TRIM(product_code)) AS code_key,
-                COALESCE(price_per_unit, 0) AS latest_price,
-                id AS purchase_id,
-                created_at AS purchase_date,
-                ROW_NUMBER() OVER (
-                  PARTITION BY LOWER(TRIM(product_code))
-                  ORDER BY created_at DESC, id DESC
-                ) AS rn
-              FROM product_stock_request
-              WHERE TRIM(COALESCE(product_code, '')) <> ''
-            ) ranked
-            WHERE rn = 1
-          ) latest ON latest.code_key = sold.code_key
+          FROM (${PAT_SOLD_LINES_BY_INVENTORY_SQL}) sold
+          LEFT JOIN (${PAT_LATEST_PURCHASE_BY_INVENTORY_SQL}) latest
+            ON latest.inventory_key = sold.inventory_key
           ORDER BY sold.item_code_display ASC
         `,
         [dateFrom, dateTo],
@@ -857,8 +891,10 @@ export async function fetchPatDrillRows(conn, section, dateFrom, dateTo) {
         const purchaseDate = r.purchase_date
           ? dayjs(r.purchase_date).format("D MMM YYYY")
           : "—";
+        const purchaseLabel =
+          r.purchase_kind === "SP" ? "Spare purchase" : "Purchase";
         const purchaseRef = purchaseId
-          ? `Purchase #${purchaseId} · ${purchaseDate} · ₹${unit.toLocaleString("en-IN")}/unit`
+          ? `${purchaseLabel} #${purchaseId} · ${purchaseDate} · ₹${unit.toLocaleString("en-IN")}/unit`
           : "No matching purchase";
         return {
           id: r.item_code_display,
