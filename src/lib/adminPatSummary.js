@@ -667,12 +667,13 @@ export async function buildAdminPatSummary(
   const otherOperatingIncome = otherIncomeLines.reduce((s, r) => s + r.amount, 0);
   const totalRevenue = revenueSales + otherOperatingIncome;
 
+  // Same source & date field as admin-dashboard/purchase/purchases (product_stock_request, created_at, net_amount).
   const purchaseCogs = await safeSum(
     conn,
-    `SELECT COALESCE(SUM(COALESCE(total_amount, grand_total, taxable_amount, 0)), 0) AS total
-     FROM spare_purchase
-     WHERE DATE(COALESCE(purchase_date, created_at)) >= ?
-       AND DATE(COALESCE(purchase_date, created_at)) <= ?`,
+    `SELECT COALESCE(SUM(COALESCE(net_amount, 0)), 0) AS total
+     FROM product_stock_request
+     WHERE DATE(created_at) >= ?
+       AND DATE(created_at) <= ?`,
     [dateFrom, dateTo],
   );
 
