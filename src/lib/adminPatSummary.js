@@ -776,6 +776,7 @@ export async function buildAdminPatSummary(
         id: "D",
         label: "Less: Purchase Cost of Goods Sold / Manufacturing Cost",
         amount: purchaseCogs,
+        drillSection: "purchase_cogs",
       },
       grossProfit: { id: "E", label: "Gross Profit (C − D)", amount: grossProfit },
       expenses: {
@@ -806,6 +807,74 @@ export async function buildAdminPatSummary(
 }
 
 export async function fetchPatDrillRows(conn, section, dateFrom, dateTo) {
+  if (section === "purchase_cogs") {
+    try {
+      const [rows] = await conn.execute(
+        `
+          SELECT
+            sold.item_code_display,
+            sold.qty_sold,
+            latest.purchase_id,
+            latest.purchase_date,
+            COALESCE(latest.latest_price, 0) AS unit_price,
+            sold.qty_sold * COALESCE(latest.latest_price, 0) AS line_total
+          FROM (
+            SELECT
+              TRIM(qi.item_code) AS item_code_display,
+              LOWER(TRIM(qi.item_code)) AS code_key,
+              SUM(COALESCE(qi.quantity, 1)) AS qty_sold
+            FROM neworder no
+            ${ORDER_QUOTATION_HEADER_JOIN}
+            WHERE ${STAT_ORDER_WHERE}
+              AND TRIM(COALESCE(qi.item_code, '')) <> ''
+            GROUP BY TRIM(qi.item_code), LOWER(TRIM(qi.item_code))
+          ) sold
+          LEFT JOIN (
+            SELECT code_key, latest_price, purchase_id, purchase_date
+            FROM (
+              SELECT
+                LOWER(TRIM(product_code)) AS code_key,
+                COALESCE(price_per_unit, 0) AS latest_price,
+                id AS purchase_id,
+                created_at AS purchase_date,
+                ROW_NUMBER() OVER (
+                  PARTITION BY LOWER(TRIM(product_code))
+                  ORDER BY created_at DESC, id DESC
+                ) AS rn
+              FROM product_stock_request
+              WHERE TRIM(COALESCE(product_code, '')) <> ''
+            ) ranked
+            WHERE rn = 1
+          ) latest ON latest.code_key = sold.code_key
+          ORDER BY sold.item_code_display ASC
+        `,
+        [dateFrom, dateTo],
+      );
+      return rows.map((r) => {
+        const qty = Number(r.qty_sold) || 0;
+        const unit = Number(r.unit_price) || 0;
+        const purchaseId = r.purchase_id;
+        const purchaseDate = r.purchase_date
+          ? dayjs(r.purchase_date).format("D MMM YYYY")
+          : "—";
+        const purchaseRef = purchaseId
+          ? `Purchase #${purchaseId} · ${purchaseDate} · ₹${unit.toLocaleString("en-IN")}/unit`
+          : "No matching purchase";
+        return {
+          id: r.item_code_display,
+          col1: r.item_code_display,
+          col2: String(qty),
+          col3: purchaseRef,
+          amount: Number(r.line_total) || qty * unit,
+          purchaseId: purchaseId ?? null,
+        };
+      });
+    } catch (e) {
+      console.error("fetchPatDrillRows purchase_cogs:", e);
+      return [];
+    }
+  }
+
   if (section === "revenue_sales") {
     const [rows] = await conn.execute(
       `

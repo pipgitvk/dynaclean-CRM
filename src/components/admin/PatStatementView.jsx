@@ -480,6 +480,13 @@ function PatRow({
                           <th className="px-2 py-1.5">Freight line · By</th>
                           <th className="px-2 py-1.5 text-right">Taxable (ex-GST)</th>
                         </>
+                      ) : row.drillSection === "purchase_cogs" ? (
+                        <>
+                          <th className="px-2 py-1.5">Product code</th>
+                          <th className="px-2 py-1.5 text-right">Qty sold</th>
+                          <th className="px-2 py-1.5">Latest purchase (price/unit)</th>
+                          <th className="px-2 py-1.5 text-right">COGS total</th>
+                        </>
                       ) : (
                         <>
                           <th className="px-2 py-1.5">Ref</th>
@@ -513,7 +520,11 @@ function PatRow({
                               d.col1
                             )}
                           </td>
-                          <td className="px-2 py-1.5">{d.col2}</td>
+                          <td
+                            className={`px-2 py-1.5 ${row.drillSection === "purchase_cogs" ? "text-right tabular-nums" : ""}`}
+                          >
+                            {d.col2}
+                          </td>
                           <td className="px-2 py-1.5">{d.col3}</td>
                           <td className="px-2 py-1.5 text-right tabular-nums">
                             {formatPatInr(d.amount)}
@@ -526,11 +537,30 @@ function PatRow({
                           colSpan={4}
                           className="px-2 py-3 text-center text-slate-500"
                         >
-                          No orders in this period for this line.
+                          {row.drillSection === "purchase_cogs"
+                            ? "No sold products in this period."
+                            : "No orders in this period for this line."}
                         </td>
                       </tr>
                     )}
                   </tbody>
+                  {row.drillSection === "purchase_cogs" && drillRows.length > 0 ? (
+                    <tfoot className="border-t-2 border-slate-200 bg-slate-50 font-semibold text-slate-800">
+                      <tr>
+                        <td colSpan={3} className="px-2 py-2 text-right text-xs uppercase tracking-wide">
+                          Total (D)
+                        </td>
+                        <td className="px-2 py-2 text-right tabular-nums">
+                          {formatPatInr(
+                            drillRows.reduce(
+                              (sum, d) => sum + (Number(d.amount) || 0),
+                              0,
+                            ),
+                          )}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  ) : null}
                 </table>
               </div>
             ) : (
@@ -662,7 +692,7 @@ export default function PatStatementView() {
       { ...L.revenueSales, toggleKey: "A", drillSection: "revenue_sales" },
       { ...L.otherOperatingIncome, toggleKey: "B" },
       { ...L.totalRevenue, bold: true, variant: rowVariantForId("C") },
-      { ...L.purchaseCogs, toggleKey: "D" },
+      { ...L.purchaseCogs, toggleKey: "D", drillSection: "purchase_cogs" },
       { ...L.grossProfit, bold: true, variant: rowVariantForId("E") },
       { ...L.expenses, toggleKey: "F", drillSection: "expenses" },
       { ...L.ebit, bold: true, variant: rowVariantForId("G") },
