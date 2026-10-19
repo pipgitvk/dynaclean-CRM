@@ -1,4 +1,5 @@
 import dayjs from "dayjs";
+import { sqlHasInvoiceReportClause } from "@/lib/orderReportVisibility";
 
 const ORDER_APPROVED_SQL = `
   (
@@ -10,11 +11,18 @@ const ORDER_APPROVED_SQL = `
   )
 `;
 
+/** PAT: invoice/order report uploaded; not cancelled or rejected. */
+const PAT_ORDER_ELIGIBILITY_SQL = `
+  AND COALESCE(no.is_cancelled, 0) = 0
+  AND LOWER(TRIM(COALESCE(no.approval_status, ''))) <> 'rejected'
+  AND ${sqlHasInvoiceReportClause("no")}
+`;
+
 const STAT_ORDER_WHERE = `
   DATE(no.created_at) >= ?
   AND DATE(no.created_at) <= ?
   AND ${ORDER_APPROVED_SQL}
-  AND COALESCE(no.is_cancelled, 0) = 0
+  ${PAT_ORDER_ELIGIBILITY_SQL}
 `;
 
 /** AMC income: use invoice date when set (order may be created earlier). */
@@ -22,7 +30,7 @@ const AMC_STAT_ORDER_WHERE = `
   DATE(COALESCE(no.invoice_date, no.created_at)) >= ?
   AND DATE(COALESCE(no.invoice_date, no.created_at)) <= ?
   AND ${ORDER_APPROVED_SQL}
-  AND COALESCE(no.is_cancelled, 0) = 0
+  ${PAT_ORDER_ELIGIBILITY_SQL}
 `;
 
 function parsePatDateInput(value) {
@@ -816,7 +824,7 @@ export async function buildAdminPatSummary(
     periodLabel,
     dateFrom,
     dateTo,
-    note: "All amounts ex-GST. Line D: sold product qty (Revenue from Sales orders) × latest purchase price_per_unit from Purchases. Salary from monthly_salary_records; operating expenses from client_expenses (by entry date). Tax & interest are zero until configured.",
+    note: "All amounts ex-GST. Order-based lines (A, B, D) include only orders with invoice/report uploaded; cancelled and rejected orders are excluded. Line D: sold qty × latest purchase price_per_unit from Purchases. Salary from monthly_salary_records; operating expenses from client_expenses (by entry date). Tax & interest are zero until configured.",
     lines: {
       revenueSales: {
         id: "A",

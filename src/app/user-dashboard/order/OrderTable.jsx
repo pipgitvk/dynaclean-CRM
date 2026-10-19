@@ -970,7 +970,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                     <span>Edit Booking</span>
                   </Link>
                 )}
-                {(canManageReturns) && hasBooking && (
+                {hasBooking && (canManageReturns || canEditBooking) && (
                     <Link
                       href={`/user-dashboard/order/view-booking/${r.order_id}`}
                       className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700 w-full block"
