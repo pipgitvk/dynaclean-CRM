@@ -906,6 +906,16 @@ function LinkPaymentModal({ open, onClose, purchase, onLinked, currentStatementI
 
 const PURCHASES_PAGE_SIZE = 40;
 
+function defaultPurchaseCreatedDateFrom() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+}
+
+function defaultPurchaseCreatedDateTo() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 export default function PurchasesPage({ infiniteScroll = false }) {
   const { user } = useUser();
   const userRole = user?.userRole;
@@ -920,8 +930,8 @@ export default function PurchasesPage({ infiniteScroll = false }) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
+  const [startDate, setStartDate] = useState(defaultPurchaseCreatedDateFrom);
+  const [endDate, setEndDate] = useState(defaultPurchaseCreatedDateTo);
   const [invoiceNumberFilter, setInvoiceNumberFilter] = useState("");
   const [invoiceDateStart, setInvoiceDateStart] = useState("");
   const [invoiceDateEnd, setInvoiceDateEnd] = useState("");
