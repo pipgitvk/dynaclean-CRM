@@ -1,11 +1,15 @@
 import { jwtVerify } from "jose";
 import { getSessionPayload } from "@/lib/auth";
 import { userHasManualPaymentsModuleAccess } from "@/lib/userModuleAccessServer";
+import { normalizeRoleKey } from "@/lib/roleKeyUtils";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret";
 
 export async function hasManualPaymentsAccess(username, role) {
   if (!username) return false;
+  const roleKey = normalizeRoleKey(role);
+  // Same company-wide list as accounts dashboard (not scoped to creator).
+  if (roleKey === "SALES CUM BACKOFFICE") return true;
   return userHasManualPaymentsModuleAccess(username, role);
 }
 
