@@ -43,6 +43,13 @@ export function canViewOrderDeliveryDetailsRole(role) {
   return /\bACCOUNTANT\b/.test(k) || k === "ACCOUNTANT";
 }
 
+/** Mark delivery / update proof on any order (not limited to booking_by). */
+export function canManageAnyOrderDeliveryRole(role) {
+  const k = normalizeRoleKey(role || "");
+  if (isSuperAdminRoleKey(k)) return true;
+  return k === "ADMIN";
+}
+
 /** View Credit Note on order list — superadmin, admin, and accountant roles. */
 export function canViewOrderCreditNoteRole(role) {
   const k = normalizeRoleKey(role || "");

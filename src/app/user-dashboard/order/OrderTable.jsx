@@ -38,6 +38,7 @@ import { isSalesRole } from "@/lib/isSalesRole";
 import { isBookingAllowedForOrder } from "@/lib/orderBookingEligibility";
 import AccountantReportActionLinks from "@/components/orders/AccountantReportActionLinks";
 import {
+  canManageAnyOrderDeliveryRole,
   canViewOrderDeliveryDetailsRole,
   isAccountantOnlyMenuRole,
   isSuperAdminRole,
@@ -1238,6 +1239,7 @@ function UpdateDeliveryMenuItem({ order, userRole }) {
   const [uploading, setUploading] = useState(false);
   const canViewDeliveryDetails = canViewOrderDeliveryDetailsRole(userRole);
   const superAdmin = isSuperAdminRole(userRole);
+  const canManageAnyDelivery = canManageAnyOrderDeliveryRole(userRole);
 
   // Fetch current user
   useEffect(() => {
@@ -1265,7 +1267,7 @@ function UpdateDeliveryMenuItem({ order, userRole }) {
   const shouldShow = () => {
     if (Number(order.dispatch_status) !== 1) return false;
 
-    if (superAdmin) return true;
+    if (superAdmin || canManageAnyDelivery) return true;
 
     if (canViewDeliveryDetails) {
       return isDelivered;
@@ -1276,7 +1278,11 @@ function UpdateDeliveryMenuItem({ order, userRole }) {
     return true;
   };
 
-  const viewOnly = !superAdmin && canViewDeliveryDetails && isDelivered;
+  const viewOnly =
+    !superAdmin &&
+    !canManageAnyDelivery &&
+    canViewDeliveryDetails &&
+    isDelivered;
 
   const handleSave = async () => {
     if (!deliveredOn) {

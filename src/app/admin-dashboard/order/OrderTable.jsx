@@ -53,6 +53,7 @@ import ViewCreditNoteMenuLink from "@/components/orders/ViewCreditNoteMenuLink";
 import { ViewReturnBookingMenuItem } from "@/components/orders/ReturnBookingWarehouseMenuItems";
 import AccountantReturnViewMenuItems from "@/components/orders/AccountantReturnViewMenuItems";
 import {
+  canManageAnyOrderDeliveryRole,
   canViewOrderDeliveryDetailsRole,
   isAccountantOnlyMenuRole,
   isSuperAdminRole,
@@ -3474,6 +3475,7 @@ function UpdateDeliveryMenuItem({ order, userRole }) {
   const [uploading, setUploading] = useState(false);
   const canViewDeliveryDetails = canViewOrderDeliveryDetailsRole(userRole);
   const superAdmin = isSuperAdminRole(userRole);
+  const canManageAnyDelivery = canManageAnyOrderDeliveryRole(userRole);
 
   // Fetch current user
   useEffect(() => {
@@ -3502,7 +3504,7 @@ function UpdateDeliveryMenuItem({ order, userRole }) {
   const shouldShow = () => {
     if (Number(order.dispatch_status) !== 1) return false;
 
-    if (superAdmin) return true;
+    if (superAdmin || canManageAnyDelivery) return true;
 
     if (canViewDeliveryDetails) {
       return isDelivered;
@@ -3512,7 +3514,11 @@ function UpdateDeliveryMenuItem({ order, userRole }) {
     return true;
   };
 
-  const viewOnly = !superAdmin && canViewDeliveryDetails && isDelivered;
+  const viewOnly =
+    !superAdmin &&
+    !canManageAnyDelivery &&
+    canViewDeliveryDetails &&
+    isDelivered;
 
   const uploadDeliveryProofFile = async () => {
     if (!deliveryProof) return null;

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { canEditDeliveryProof } from "@/lib/orderDocumentEditRules";
+import { canManageAnyOrderDeliveryRole } from "@/lib/roleKeyUtils";
 
 export async function POST(request) {
   try {
@@ -38,7 +39,16 @@ export async function POST(request) {
 
     const order = orderRows[0];
 
-    if (order.booking_by !== currentUsername) {
+    const [roleRows] = await conn.execute(
+      "SELECT userRole FROM rep_list WHERE username = ? LIMIT 1",
+      [currentUsername],
+    );
+    const userRole = roleRows[0]?.userRole || payload.role || "";
+    const canManageDelivery =
+      order.booking_by === currentUsername ||
+      canManageAnyOrderDeliveryRole(userRole);
+
+    if (!canManageDelivery) {
       return NextResponse.json(
         { error: "Only the booking person can update delivery status" },
         { status: 403 },
