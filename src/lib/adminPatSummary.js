@@ -345,6 +345,54 @@ export async function fetchApprovedOrderTaxableRevenue(conn, dateFrom, dateTo) {
 }
 
 /**
+ * PAT line D: sold qty (Revenue from Sales orders in period) × latest purchase
+ * price_per_unit per product from product_stock_request (same field as /purchase/purchases).
+ */
+export async function fetchPurchaseCogsFromSalesLatestPurchasePrice(
+  conn,
+  dateFrom,
+  dateTo,
+) {
+  try {
+    const [rows] = await conn.execute(
+      `
+        SELECT COALESCE(SUM(sold.qty_sold * COALESCE(latest.latest_price, 0)), 0) AS total
+        FROM (
+          SELECT
+            LOWER(TRIM(qi.item_code)) AS code_key,
+            SUM(COALESCE(qi.quantity, 1)) AS qty_sold
+          FROM neworder no
+          ${ORDER_QUOTATION_HEADER_JOIN}
+          WHERE ${STAT_ORDER_WHERE}
+            AND TRIM(COALESCE(qi.item_code, '')) <> ''
+          GROUP BY LOWER(TRIM(qi.item_code))
+        ) sold
+        LEFT JOIN (
+          SELECT code_key, latest_price
+          FROM (
+            SELECT
+              LOWER(TRIM(product_code)) AS code_key,
+              COALESCE(price_per_unit, 0) AS latest_price,
+              ROW_NUMBER() OVER (
+                PARTITION BY LOWER(TRIM(product_code))
+                ORDER BY created_at DESC, id DESC
+              ) AS rn
+            FROM product_stock_request
+            WHERE TRIM(COALESCE(product_code, '')) <> ''
+          ) ranked
+          WHERE rn = 1
+        ) latest ON latest.code_key = sold.code_key
+      `,
+      [dateFrom, dateTo],
+    );
+    return Number(rows[0]?.total) || 0;
+  } catch (e) {
+    console.error("fetchPurchaseCogsFromSalesLatestPurchasePrice:", e);
+    return 0;
+  }
+}
+
+/**
  * AMC/CAMC lines: quotation item_code may be SKU (AMC/CAMC) or products_list.item_code
  * (e.g. 1002500173) with item_name AMC/CAMC.
  */
@@ -667,14 +715,10 @@ export async function buildAdminPatSummary(
   const otherOperatingIncome = otherIncomeLines.reduce((s, r) => s + r.amount, 0);
   const totalRevenue = revenueSales + otherOperatingIncome;
 
-  // Same source & date field as admin-dashboard/purchase/purchases (product_stock_request, created_at, net_amount).
-  const purchaseCogs = await safeSum(
+  const purchaseCogs = await fetchPurchaseCogsFromSalesLatestPurchasePrice(
     conn,
-    `SELECT COALESCE(SUM(COALESCE(net_amount, 0)), 0) AS total
-     FROM product_stock_request
-     WHERE DATE(created_at) >= ?
-       AND DATE(created_at) <= ?`,
-    [dateFrom, dateTo],
+    dateFrom,
+    dateTo,
   );
 
   const grossProfit = totalRevenue - purchaseCogs;
@@ -714,7 +758,7 @@ export async function buildAdminPatSummary(
     periodLabel,
     dateFrom,
     dateTo,
-    note: "All amounts ex-GST. Salary from monthly_salary_records; operating expenses from client_expenses (by entry date). Tax & interest are zero until configured.",
+    note: "All amounts ex-GST. Line D: sold product qty (Revenue from Sales orders) × latest purchase price_per_unit from Purchases. Salary from monthly_salary_records; operating expenses from client_expenses (by entry date). Tax & interest are zero until configured.",
     lines: {
       revenueSales: {
         id: "A",
