@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, usePathname } from "next/navigation";
+import "@/app/user-dashboard/view-service-report/[service_id]/print.css";
 import {
   getInstallationReportLink,
   productAttachmentSrc,
@@ -34,14 +35,19 @@ export default function WarrantyCompletionReportPage() {
 
   if (loading) return <p className="text-center mt-10">Loading...</p>;
   if (error) return <p className="text-center mt-10 text-red-600">{error}</p>;
+  if (!data?.service) {
+    return (
+      <p className="text-center mt-10 text-red-600">Service data not found.</p>
+    );
+  }
 
-  const {
-    service,
-    product,
-    attachments,
-    completion_images,
-    installation_report,
-  } = data;
+  const service = data.service;
+  const product = data.product || {};
+  const attachments = Array.isArray(data.attachments) ? data.attachments : [];
+  const completion_images = Array.isArray(data.completion_images)
+    ? data.completion_images
+    : [];
+  const installation_report = data.installation_report;
 
   const reportLink = getInstallationReportLink(
     installation_report,
@@ -59,7 +65,8 @@ export default function WarrantyCompletionReportPage() {
     : null;
 
   return (
-    <div className="max-w-4xl mx-auto p-6 bg-white rounded shadow mt-6">
+    <div className="print-page-wrapper">
+    <div className="print-card max-w-4xl mx-auto p-6 bg-white rounded shadow mt-6 print:mt-0 print:shadow-none">
       <h1 className="text-2xl font-bold mb-4 text-blue-600 text-center">
         Service Report
       </h1>
@@ -155,7 +162,7 @@ export default function WarrantyCompletionReportPage() {
       </div>
 
       {reportLink && (
-        <div className="mt-4">
+        <div className="mt-4 no-print">
           <a
             href={reportLink.href}
             target="_blank"
@@ -183,7 +190,7 @@ export default function WarrantyCompletionReportPage() {
         </div>
       )}
 
-      <div className="mt-6 text-center">
+      <div className="mt-6 text-center no-print">
         <button
           type="button"
           onClick={() => window.print()}
@@ -192,6 +199,7 @@ export default function WarrantyCompletionReportPage() {
           Print Report
         </button>
       </div>
+    </div>
     </div>
   );
 }

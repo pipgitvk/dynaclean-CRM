@@ -9,6 +9,7 @@ import {
   isInstallationReportFile,
   productAttachmentSrc,
 } from "@/lib/serviceInstallationReport";
+import "@/app/user-dashboard/view-service-report/[service_id]/print.css";
 
 export default function ServiceReportPage() {
   const { service_id } = useParams();
@@ -28,7 +29,13 @@ export default function ServiceReportPage() {
           throw new Error(`Error: ${response.statusText}`);
         }
         const data = await response.json();
-        setServiceData(data);
+        const record = data.record || data;
+        const product = data.product || data.warranty_info || {};
+        setServiceData({
+          ...record,
+          warranty_info: product,
+          warranty_expiry: data.warranty_expiry || "",
+        });
       } catch (err) {
         setError(err.message);
         toast.error(`Failed to load service report: ${err.message}`);
@@ -108,8 +115,8 @@ export default function ServiceReportPage() {
     : [];
 
   return (
-    <div className="min-h-screen bg-gray-100 p-4 sm:p-8">
-      <div className="max-w-4xl mx-auto bg-white shadow-lg rounded-lg p-6 sm:p-8">
+    <div className="print-page-wrapper min-h-screen bg-gray-100 p-4 sm:p-8 print:p-0 print:bg-white">
+      <div className="print-card max-w-4xl mx-auto bg-white shadow-lg rounded-lg p-6 sm:p-8 print:shadow-none">
         <h2 className="text-3xl font-bold text-blue-700 mb-6 text-center border-b-2 pb-4 border-blue-200">
           Service Report
         </h2>
@@ -124,23 +131,23 @@ export default function ServiceReportPage() {
               <strong>Service ID:</strong> {currentServiceId}
             </p>
             <p>
-              <strong>Customer Name:</strong> {warranty_info.customer_name}
+              <strong>Customer Name:</strong> {warranty_info?.customer_name || "—"}
             </p>
             <p>
-              <strong>Email:</strong> {warranty_info.email}
+              <strong>Email:</strong> {warranty_info?.email || "—"}
             </p>
             <p>
-              <strong>Contact:</strong> {warranty_info.contact}
+              <strong>Contact:</strong> {warranty_info?.contact || "—"}
             </p>
             <p>
-              <strong>Address:</strong> {warranty_info.customer_address}
+              <strong>Address:</strong> {warranty_info?.customer_address || "—"}
             </p>
             <p>
               <strong>Installed Address:</strong>{" "}
-              {warranty_info.installed_address}
+              {warranty_info?.installed_address || "—"}
             </p>
             <p>
-              <strong>Invoice Number:</strong> {warranty_info.invoice_number}
+              <strong>Invoice Number:</strong> {warranty_info?.invoice_number || "—"}
             </p>
           </div>
           <div className="info-box p-4 rounded-md">
@@ -148,30 +155,31 @@ export default function ServiceReportPage() {
               Product & Warranty Info
             </h4>
             <p>
-              <strong>Invoice Date:</strong> {warranty_info.invoice_date}
+              <strong>Invoice Date:</strong> {warranty_info?.invoice_date || "—"}
             </p>
             <p>
-              <strong>Product Name:</strong> {warranty_info.product_name}
+              <strong>Product Name:</strong> {warranty_info?.product_name || "—"}
             </p>
             <p>
-              <strong>Specification:</strong> {warranty_info.specification}
+              <strong>Specification:</strong> {warranty_info?.specification || "—"}
             </p>
             <p>
-              <strong>Serial No.:</strong> {warranty_info.serial_number}
+              <strong>Serial No.:</strong> {warranty_info?.serial_number || "—"}
             </p>
             <p>
               <strong>Installation Date:</strong>{" "}
-              {warranty_info.installation_date}
+              {warranty_info?.installation_date || "—"}
             </p>
             <p>
-              <strong>Warranty Period:</strong> {warranty_info.warranty_period}{" "}
+              <strong>Warranty Period:</strong>{" "}
+              {warranty_info?.warranty_period ?? "—"}{" "}
               months
             </p>
             <p>
-              <strong>Warranty Expiry:</strong> {warranty_expiry}
+              <strong>Warranty Expiry:</strong> {warranty_expiry || "—"}
             </p>
             <p>
-              <strong>Model:</strong> {warranty_info.model}
+              <strong>Model:</strong> {warranty_info?.model || "—"}
             </p>
           </div>
           <div className="col-span-full info-box bg-orange-50 p-4 rounded-md border border-orange-200">
@@ -295,7 +303,7 @@ export default function ServiceReportPage() {
         </div>
 
         {/* Print Preview and Back Button */}
-        <div className="mt-8 flex justify-between items-center">
+        <div className="mt-8 flex justify-between items-center no-print">
           <button
             onClick={() => window.print()}
             className="px-6 py-3 bg-gray-700 text-white font-semibold rounded-md shadow-md hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors duration-200"

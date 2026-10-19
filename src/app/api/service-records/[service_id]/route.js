@@ -92,6 +92,17 @@ const noStoreHeaders = {
   Pragma: "no-cache",
 };
 
+function computeWarrantyExpiryLabel(product) {
+  if (!product?.installation_date) return "";
+  const months = Number(product.warranty_period);
+  if (!Number.isFinite(months) || months <= 0) return "";
+  const installed = new Date(product.installation_date);
+  if (Number.isNaN(installed.getTime())) return "";
+  const expiry = new Date(installed);
+  expiry.setMonth(expiry.getMonth() + months);
+  return expiry.toLocaleDateString("en-IN");
+}
+
 function mergeServiceReportRow(serviceRecord, reportRow) {
   if (!reportRow) return serviceRecord;
 
@@ -226,12 +237,18 @@ export async function GET(request, context) {
       warrantyProduct = warrantyRows.length > 0 ? warrantyRows[0] : {};
     }
 
+    const warranty_expiry = computeWarrantyExpiryLabel(warrantyProduct);
+
     return NextResponse.json(
       {
         record: mergedRecord,
         product: warrantyProduct,
         install: installationData,
         fetchedAt: Date.now(),
+        // Flat fields for legacy service-report / update pages
+        ...mergedRecord,
+        warranty_info: warrantyProduct,
+        warranty_expiry,
       },
       { headers: noStoreHeaders }
     );

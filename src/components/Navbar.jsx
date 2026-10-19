@@ -344,10 +344,11 @@ export default function Navbar({ onToggleSidebar, showSalesMeta = false }) {
 
   return (
     <nav
+      data-dashboard-navbar
       className={
         showSalesMeta
-          ? "w-full min-h-16 h-auto border-b border-slate-200 bg-white py-2 shadow-[0_1px_3px_rgba(0,0,0,0.06)] flex flex-col gap-2 min-[1100px]:min-h-16 min-[1100px]:flex-row min-[1100px]:items-center min-[1100px]:justify-between px-3 min-[1100px]:px-5 md:px-6 lg:px-8 flex-shrink-0"
-          : `w-full min-h-16 h-auto py-2 min-[1100px]:py-0 min-[1100px]:h-16 bg-gradient-to-r ${
+          ? "print:hidden w-full min-h-16 h-auto border-b border-slate-200 bg-white py-2 shadow-[0_1px_3px_rgba(0,0,0,0.06)] flex flex-col gap-2 min-[1100px]:min-h-16 min-[1100px]:flex-row min-[1100px]:items-center min-[1100px]:justify-between px-3 min-[1100px]:px-5 md:px-6 lg:px-8 flex-shrink-0"
+          : `print:hidden w-full min-h-16 h-auto py-2 min-[1100px]:py-0 min-[1100px]:h-16 bg-gradient-to-r ${
               theme.navbar?.gradient || theme.sidebar.gradient
             } ${theme.navbar?.textureClass || ""} shadow-lg flex flex-col gap-2 min-[1100px]:flex-row min-[1100px]:items-center min-[1100px]:justify-between px-3 min-[1100px]:px-4 md:px-6 lg:px-8 border-b ${
               theme.sidebar.border

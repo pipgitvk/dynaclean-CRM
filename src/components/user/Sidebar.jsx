@@ -272,8 +272,9 @@ export default function Sidebar({
 
   return (
     <div
+      data-dashboard-sidebar
       className={clsx(
-        `h-full bg-gradient-to-b ${theme.sidebar.gradient} ${theme.sidebar.text} ${theme.sidebar.textureClass || ""} overflow-y-auto overflow-x-hidden [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden transition-all duration-300 ease-in-out shadow-2xl border-r ${theme.sidebar.border}`,
+        `print:hidden h-full bg-gradient-to-b ${theme.sidebar.gradient} ${theme.sidebar.text} ${theme.sidebar.textureClass || ""} overflow-y-auto overflow-x-hidden [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden transition-all duration-300 ease-in-out shadow-2xl border-r ${theme.sidebar.border}`,
         isOpen ? "w-72" : "w-0",
       )}
       style={{

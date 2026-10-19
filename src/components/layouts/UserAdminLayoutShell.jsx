@@ -41,7 +41,9 @@ function LayoutContent({
   }
 
   return (
-    <div className={`flex h-screen ${theme.body.bg} transition-colors duration-300`}>
+    <div
+      className={`dashboard-print-shell flex h-screen ${theme.body.bg} transition-colors duration-300`}
+    >
       <Sidebar
         isOpen={sidebarOpen}
         menuItems={menuItems}
@@ -54,7 +56,7 @@ function LayoutContent({
         <Navbar onToggleSidebar={() => setSidebarOpen((prev) => !prev)} />
         <UserProvider>
           <main
-            className={`min-h-0 min-w-0 w-full flex-1 overflow-auto p-2 sm:p-3 md:p-4 ${theme.body.text}`}
+            className={`dashboard-print-main min-h-0 min-w-0 w-full flex-1 overflow-auto p-2 sm:p-3 md:p-4 print:p-0 print:overflow-visible ${theme.body.text}`}
           >
             {children}
           </main>
