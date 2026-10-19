@@ -5,6 +5,10 @@ import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import toast from "react-hot-toast"; // For notifications
+import {
+  isInstallationReportFile,
+  productAttachmentSrc,
+} from "@/lib/serviceInstallationReport";
 
 export default function ServiceReportPage() {
   const { service_id } = useParams();
@@ -242,10 +246,12 @@ export default function ServiceReportPage() {
           </div>
 
           {/* Digital Report Download Button */}
-          {digitalReportFilename && digitalReportFilename.trim() !== "" && (
+          {isInstallationReportFile(digitalReportFilename) && (
             <div className="mt-4 text-center">
               <a
-                href={`${baseUrl}/attachments/${digitalReportFilename}`}
+                href={`/api/open-attachment?path=${encodeURIComponent(
+                  productAttachmentSrc(digitalReportFilename),
+                )}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-block px-6 py-3 bg-indigo-600 text-white font-semibold rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors duration-200"
