@@ -28,8 +28,28 @@ import {
   getOrderListRemainingPayment,
 } from "@/lib/paymentOrderStatus";
 import { isBookingAllowedForOrder } from "@/lib/orderBookingEligibility";
+import {
+  canCreateFollowUpBooking,
+  canOpenDispatchForOrder,
+  canViewDispatchPanelForOrder,
+  canShowOrderDeliveryActions,
+  isRemainDispatchRound,
+  orderHasDispatchedStock,
+} from "@/lib/orderDeliveryEligibility";
+import {
+  isOrderFullyDelivered,
+  isOrderPartialDelivery,
+  orderHasDeliveryRecord,
+} from "@/lib/orderDeliveryStatus";
+import {
+  getDeliveryBatchForView,
+  orderHasSecondDeliveryBatch,
+} from "@/lib/orderDeliveryBatches";
 import AccountantReportActionLinks from "@/components/orders/AccountantReportActionLinks";
 import OrderInvoiceMenuLinks from "@/components/orders/OrderInvoiceMenuLinks";
+import DispatchProductSelectModal from "@/components/orders/DispatchProductSelectModal";
+import OrderBookingViewMenuLinks from "@/components/orders/OrderBookingViewMenuLinks";
+import OrderDeliveryMenuLinks from "@/components/orders/OrderDeliveryMenuLinks";
 import {
   OrderListSearchInput,
   OrderListSearchApplyButton,
@@ -39,6 +59,7 @@ import {
   getOrderTableDefaultDateTo,
 } from "@/lib/orderTableDateDefaults";
 import {
+  canManageAnyOrderDeliveryRole,
   canViewOrderDeliveryDetailsRole,
   isAccountantOnlyMenuRole,
   isSuperAdminRole,
@@ -829,6 +850,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
   }
 
   const popRef = useRef(null);
+  const [bookingProductSelectOpen, setBookingProductSelectOpen] = useState(false);
   const role = (userRole || "").toString().trim().toLowerCase();
   const canViewSales = [
     "back office",
@@ -851,14 +873,24 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
   const canManageReturns = isSuperAdmin || isTeamLeader;
   const accountantOnlyMenu = isAccountantOnlyMenuRole(userRole);
   const canEditBooking = isSuperAdmin || isAdmin;
-  const canAdminAfterReport =
-    (isAdmin || isSuperAdmin) && isBookingAllowedForOrder(r);
+  const reportUploaded = isBookingAllowedForOrder(r);
+  const canAdminAfterReport = (isAdmin || isSuperAdmin) && reportUploaded;
+  const canManageBookingActions =
+    isSuperAdmin ||
+    isAdmin ||
+    canManageReturns ||
+    canAdminAfterReport ||
+    ((isTeamLeader || isWarehouse) && reportUploaded);
   const hasBooking =
     r.booking_id !== undefined &&
     r.booking_id !== null &&
     String(r.booking_id).trim() !== "" &&
     String(r.booking_id) !== "0";
   const dispatchStatus = Number(r.dispatch_status);
+  const followUpBooking = canCreateFollowUpBooking(r);
+  const canOpenDispatch = canOpenDispatchForOrder(r);
+  const remainDispatchRound = isRemainDispatchRound(r);
+  const canViewDispatchPanel = canViewDispatchPanelForOrder(r);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -894,6 +926,19 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
       >
         <MoreVertical size={18} />
       </button>
+      <DispatchProductSelectModal
+        open={bookingProductSelectOpen}
+        orderId={r.order_id}
+        nextHref={`/accounts-dashboard/order/upload-booking/${r.order_id}`}
+        onClose={() => setBookingProductSelectOpen(false)}
+        title={
+          followUpBooking
+            ? "Select remaining products for booking"
+            : "Select products for booking"
+        }
+        confirmLabel="Continue to booking"
+        partialHint="Partial Dispatch"
+      />
       {isOpen && (
         <div
           ref={popRef}
@@ -909,17 +954,12 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                   viewHref={`/accounts-dashboard/order/view/${r.order_id}`}
                   onClick={(e) => e.stopPropagation()}
                 />
-                {hasBooking && (
-                  <Link
-                    href={`/accounts-dashboard/order/view-booking/${r.order_id}`}
-                    className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
-                    title="View Booking"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <FileCheck size={16} />
-                    <span>View Booking</span>
-                  </Link>
-                )}
+                <OrderBookingViewMenuLinks
+                  order={r}
+                  basePath="/accounts-dashboard/order"
+                  canSee={hasBooking}
+                  onClick={(e) => e.stopPropagation()}
+                />
                 <OrderInvoiceMenuLinks
                   order={r}
                   invoicesBasePath="/accounts-dashboard/invoices"
@@ -930,7 +970,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                     <ViewPaymentButton order={r} />
                   </div>
                 )}
-                {hasBooking && dispatchStatus === 1 && (
+                {canViewDispatchPanel && (
                   <Link
                     href={`/accounts-dashboard/order/dispatch/view/${r.order_id}`}
                     className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
@@ -941,7 +981,11 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                     <span>View Dispatch</span>
                   </Link>
                 )}
-                <UpdateDeliveryMenuItem order={r} userRole={userRole} />
+                <OrderDeliveryMenuLinks
+                  order={r}
+                  userRole={userRole}
+                  DeliveryMenuItem={UpdateDeliveryMenuItem}
+                />
                 {dispatchStatus === 1 &&
                   ![1, 2, 3].includes(Number(r.is_returned || 0)) && (
                     <div
@@ -990,7 +1034,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                     <FileText size={16} />
                     <span>View Report</span>
                   </Link>
-                  {isSuperAdmin && dispatchStatus === 0 && (
+                  {(isSuperAdmin || isAdmin) && dispatchStatus === 0 && (
                     <Link
                       href={`/accounts-dashboard/order/upload/${r.order_id}`}
                       className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-blue-700"
@@ -1018,20 +1062,35 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                   </div>
                 </div>
               ))}
-            {(canManageReturns || canAdminAfterReport) &&
-              !hasBooking &&
-              isBookingAllowedForOrder(r) && (
-                <Link
-                  href={`/accounts-dashboard/order/upload-booking/${r.order_id}`}
-                  className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-green-700"
-                  title="Create Booking"
-                  onClick={(e) => e.stopPropagation()}
+            {canManageBookingActions &&
+              (!hasBooking || followUpBooking) && (
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-2 px-3 py-2 hover:bg-gray-50 text-green-700 text-left"
+                  title={
+                    followUpBooking
+                      ? "Create booking for remaining products"
+                      : "Create Booking"
+                  }
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setBookingProductSelectOpen(true);
+                    toggleMenu();
+                  }}
                 >
                   <UploadCloud size={16} />
-                  <span>Create Booking</span>
-                </Link>
+                  <span>
+                    {followUpBooking
+                      ? "Create Booking (Remaining)"
+                      : "Create Booking"}
+                  </span>
+                </button>
               )}
-            {canEditBooking && hasBooking && dispatchStatus === 0 && (
+            {canEditBooking &&
+              hasBooking &&
+              !followUpBooking &&
+              !orderHasDispatchedStock(r) &&
+              dispatchStatus !== 1 && (
               <Link
                 href={`/accounts-dashboard/order/upload-booking/${r.order_id}`}
                 className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-blue-700"
@@ -1042,48 +1101,47 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                 <span>Edit Booking</span>
               </Link>
             )}
-            {(canManageReturns || canAdminAfterReport) && hasBooking && (
-                <Link
-                  href={`/accounts-dashboard/order/view-booking/${r.order_id}`}
-                  className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
-                  title="View Booking"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <FileCheck size={16} />
-                  <span>View Booking</span>
-                </Link>
-              )}
-            {(isWarehouse || isSuperAdmin || canAdminAfterReport) &&
-              hasBooking &&
-              dispatchStatus === 0 && (
-              <>
-                <Link
-                  href={`/user-dashboard/order/dispatch/${r.order_id}`}
-                  className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
-                  title="Dispatch"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <CheckCircle size={16} />
-                  <span>Dispatch</span>
-                </Link>
-              </>
+            <OrderBookingViewMenuLinks
+              order={r}
+              basePath="/accounts-dashboard/order"
+              canSee={hasBooking && (canManageReturns || canEditBooking || isAccountant)}
+              onClick={(e) => e.stopPropagation()}
+            />
+            {(isWarehouse || isSuperAdmin || isAdmin || canAdminAfterReport) &&
+              canOpenDispatch && (
+              <Link
+                href={`/accounts-dashboard/order/dispatch/${r.order_id}`}
+                className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
+                title={
+                  remainDispatchRound
+                    ? "Dispatch remaining products"
+                    : "Dispatch"
+                }
+                onClick={(e) => e.stopPropagation()}
+              >
+                <CheckCircle size={16} />
+                <span>
+                  {remainDispatchRound ? "Dispatch (Remain)" : "Dispatch"}
+                </span>
+              </Link>
             )}
-            {(isWarehouse || canManageReturns) &&
-              hasBooking &&
-              dispatchStatus === 1 && (
-                <>
-                  <Link
-                    href={`/accounts-dashboard/order/dispatch/view/${r.order_id}`}
-                    className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
-                    title="View Dispatch"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <Search size={16} />
-                    <span>View Dispatch</span>
-                  </Link>
-                </>
-              )}
-            <UpdateDeliveryMenuItem order={r} userRole={userRole} />
+            {(isWarehouse || canManageReturns || isAdmin || canViewSales) &&
+              canViewDispatchPanel && (
+              <Link
+                href={`/accounts-dashboard/order/dispatch/view/${r.order_id}`}
+                className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
+                title="View Dispatch"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <Search size={16} />
+                <span>View Dispatch</span>
+              </Link>
+            )}
+            <OrderDeliveryMenuLinks
+              order={r}
+              userRole={userRole}
+              DeliveryMenuItem={UpdateDeliveryMenuItem}
+            />
             {canManageReturns &&
               dispatchStatus === 1 &&
               ![1, 2, 3].includes(Number(r.is_returned || 0)) && (
@@ -1224,18 +1282,19 @@ function ViewPaymentButton({ order }) {
   );
 }
 
-function UpdateDeliveryMenuItem({ order, userRole }) {
+function UpdateDeliveryMenuItem({ order, userRole, variant = "auto" }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [deliveredOn, setDeliveredOn] = useState("");
   const [deliveryProof, setDeliveryProof] = useState(null);
+  const [deliveryRemark, setDeliveryRemark] = useState("");
   const [uploading, setUploading] = useState(false);
   const canViewDeliveryDetails = canViewOrderDeliveryDetailsRole(userRole);
   const superAdmin = isSuperAdminRole(userRole);
+  const canManageAnyDelivery = canManageAnyOrderDeliveryRole(userRole);
 
-  // Fetch current user
   useEffect(() => {
     const fetchUser = async () => {
       try {
@@ -1251,28 +1310,22 @@ function UpdateDeliveryMenuItem({ order, userRole }) {
     fetchUser();
   }, []);
 
-  const isDelivered =
-    Number(order.delivery_status) === 1 ||
-    (order.delivered_on != null &&
-      String(order.delivered_on).trim() !== "" &&
-      String(order.delivered_on) !== "0");
+  const isFullyDelivered = isOrderFullyDelivered(order);
+  const hasDeliveryRecord = orderHasDeliveryRecord(order);
 
-  // Check if menu item should be shown
   const shouldShow = () => {
-    if (Number(order.dispatch_status) !== 1) return false;
-
-    if (superAdmin) return true;
-
-    if (canViewDeliveryDetails) {
-      return isDelivered;
-    }
-
+    if (!canShowOrderDeliveryActions(order)) return false;
+    if (superAdmin || canManageAnyDelivery) return true;
+    if (canViewDeliveryDetails) return hasDeliveryRecord;
     if (!currentUser || order.booking_by !== currentUser) return false;
-
     return true;
   };
 
-  const viewOnly = !superAdmin && canViewDeliveryDetails && isDelivered;
+  const viewOnly =
+    !superAdmin &&
+    !canManageAnyDelivery &&
+    canViewDeliveryDetails &&
+    hasDeliveryRecord;
 
   const handleSave = async () => {
     if (!deliveredOn) {
@@ -1284,7 +1337,6 @@ function UpdateDeliveryMenuItem({ order, userRole }) {
       setSaving(true);
       let deliveryProofUrl = null;
 
-      // Upload delivery proof if file is selected
       if (deliveryProof) {
         setUploading(true);
         const formData = new FormData();
@@ -1311,6 +1363,7 @@ function UpdateDeliveryMenuItem({ order, userRole }) {
           order_id: order.order_id,
           delivered_on: deliveredOn,
           delivery_proof: deliveryProofUrl,
+          delivery_remark: deliveryRemark,
         }),
       });
 
@@ -1331,7 +1384,64 @@ function UpdateDeliveryMenuItem({ order, userRole }) {
     }
   };
 
-  if (!shouldShow()) return null;
+  if (variant === "view_first") {
+    if (!canShowOrderDeliveryActions(order) || !hasDeliveryRecord) return null;
+  } else if (variant === "view_remain") {
+    if (
+      !canShowOrderDeliveryActions(order) ||
+      !orderHasSecondDeliveryBatch(order)
+    ) {
+      return null;
+    }
+  } else if (variant === "update_remain") {
+    if (
+      !canShowOrderDeliveryActions(order) ||
+      isFullyDelivered ||
+      !hasDeliveryRecord
+    ) {
+      return null;
+    }
+  } else if (variant === "view") {
+    if (!canShowOrderDeliveryActions(order) || !hasDeliveryRecord) return null;
+  } else if (variant === "update") {
+    if (!canShowOrderDeliveryActions(order) || isFullyDelivered) return null;
+  } else if (!shouldShow()) {
+    return null;
+  }
+
+  const batchForModal =
+    variant === "view_first"
+      ? getDeliveryBatchForView(order, "first")
+      : variant === "view_remain"
+        ? getDeliveryBatchForView(order, "remain")
+        : null;
+  const displayOrder = batchForModal
+    ? {
+        ...order,
+        delivered_on: batchForModal.delivered_on,
+        delivery_proof: batchForModal.delivery_proof,
+        delivery_remark: batchForModal.delivery_remark,
+      }
+    : order;
+
+  const readOnlyDeliveryModal =
+    variant === "view_first" ||
+    variant === "view_remain" ||
+    variant === "view" ||
+    (variant === "auto" && (viewOnly || isFullyDelivered));
+
+  const menuLabel =
+    variant === "view_first"
+      ? "View Delivery"
+      : variant === "view_remain"
+        ? "View Delivery (Remain)"
+        : variant === "update_remain"
+          ? "Update Delivery (Remain)"
+          : variant === "update"
+            ? "Update Delivery"
+            : readOnlyDeliveryModal
+              ? "View Delivery"
+              : "Update Delivery";
 
   const formatDate = (d) => {
     if (!d) return "-";
@@ -1347,10 +1457,10 @@ function UpdateDeliveryMenuItem({ order, userRole }) {
           setOpen(true);
         }}
         className="w-full flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-blue-700 text-left"
-        title={viewOnly || isDelivered ? "View Delivery" : "Update Delivery Status"}
+        title={readOnlyDeliveryModal ? "View Delivery" : "Update Delivery Status"}
       >
         <Truck size={16} />
-        <span>{viewOnly || isDelivered ? "View Delivery" : "Update Delivery"}</span>
+        <span>{menuLabel}</span>
       </button>
       {open && (
         <div
@@ -1362,7 +1472,13 @@ function UpdateDeliveryMenuItem({ order, userRole }) {
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="text-lg font-semibold mb-4">
-              {isDelivered ? "Delivery Details" : "Update Delivery Status"}
+              {readOnlyDeliveryModal
+                ? variant === "view_remain"
+                  ? "Delivery Details (Remain)"
+                  : "Delivery Details"
+                : variant === "update_remain"
+                  ? "Update Delivery (Remain)"
+                  : "Update Delivery Status"}
             </h3>
 
             <div className="space-y-4">
@@ -1390,14 +1506,14 @@ function UpdateDeliveryMenuItem({ order, userRole }) {
                 </p>
               </div>
 
-              {isDelivered ? (
+              {readOnlyDeliveryModal ? (
                 <>
                   <div>
                     <label className="block text-sm text-gray-700 font-medium mb-1">
                       Actual Delivery Date:
                     </label>
                     <p className="text-sm font-medium text-gray-800">
-                      {formatDate(order.delivered_on)}
+                      {formatDate(displayOrder.delivered_on)}
                     </p>
                   </div>
 
@@ -1405,10 +1521,10 @@ function UpdateDeliveryMenuItem({ order, userRole }) {
                     <label className="block text-sm text-gray-700 font-medium mb-1">
                       Delivery Proof:
                     </label>
-                    {order.delivery_proof ? (
+                    {displayOrder.delivery_proof ? (
                       <div className="flex gap-3">
                         <a
-                          href={order.delivery_proof}
+                          href={displayOrder.delivery_proof}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 text-sm font-medium transition"
@@ -1435,7 +1551,7 @@ function UpdateDeliveryMenuItem({ order, userRole }) {
                           View
                         </a>
                         <a
-                          href={order.delivery_proof}
+                          href={displayOrder.delivery_proof}
                           download
                           className="inline-flex items-center gap-1 px-3 py-1.5 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 text-sm font-medium transition"
                         >
@@ -1497,9 +1613,9 @@ function UpdateDeliveryMenuItem({ order, userRole }) {
                 onClick={() => setOpen(false)}
                 className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm font-medium"
               >
-                {isDelivered ? "Close" : "Cancel"}
+                {readOnlyDeliveryModal ? "Close" : "Cancel"}
               </button>
-              {!viewOnly && !isDelivered && (
+              {!readOnlyDeliveryModal && (
                 <button
                   onClick={handleSave}
                   disabled={saving || uploading}

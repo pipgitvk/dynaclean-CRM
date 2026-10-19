@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { resolveStoredFileUrl } from "@/lib/resolveStoredFileUrl";
 
-export default function ViewOrderDetails({ data }) {
+export default function ViewOrderDetails({ data, orderBasePath }) {
   const {
     orderDetails,
     items,
@@ -11,6 +11,7 @@ export default function ViewOrderDetails({ data }) {
     currentStage,
     currentIndex,
     progressPercent,
+    bookingViewLabel,
   } = data;
 
   const currency = (val) =>
@@ -35,9 +36,14 @@ export default function ViewOrderDetails({ data }) {
 
   return (
     <div className="max-w-7xl mx-auto p-6">
-      <h1 className="text-2xl font-bold mb-4 text-center">
+      <h1 className="text-2xl font-bold mb-1 text-center">
         View Order by Quotation
       </h1>
+      {bookingViewLabel && (
+        <p className="text-sm text-amber-800 mb-4 text-center">
+          {bookingViewLabel}
+        </p>
+      )}
 
       {/* Progress Bar */}
       <div className="mb-6">

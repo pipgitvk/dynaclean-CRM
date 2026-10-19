@@ -5,6 +5,15 @@ import { sqlColumnInActiveServiceSupportUsers } from "@/lib/serviceSupportTeamSc
 import { appendSqlWhereClause, orderListApprovalWhereSql } from "@/lib/orderApprovalVisibility";
 import { orderListReportWhereSql } from "@/lib/orderReportVisibility";
 import { canViewAllOrders } from "@/lib/dataScope";
+import {
+  ORDER_LIST_DISPATCHED_STOCK_COUNT_SELECT,
+  ORDER_LIST_PENDING_DISPATCH_UNITS_SELECT,
+} from "@/lib/orderDeliveryEligibility";
+import {
+  attachBookingBatchesToOrders,
+  attachDispatchPendingToOrders,
+} from "@/lib/orderBookingBatches";
+import { attachDeliveryBatchesToOrders } from "@/lib/orderDeliveryBatches";
 
 // Secret for verifying JWT
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -51,6 +60,8 @@ export default async function OrdersPage() {
   let sql = `SELECT
                 no.order_id, no.report_file, no.po_file, no.payment_proof, no.booking_url,
                 no.client_name, no.contact, no.is_cancelled, no.dispatch_status,
+                ${ORDER_LIST_DISPATCHED_STOCK_COUNT_SELECT},
+                ${ORDER_LIST_PENDING_DISPATCH_UNITS_SELECT},
                 no.created_at, no.created_by , no.einvoice_file, no.booking_id, no.quote_number, no.duedate,
                 no.invoice_date , no.account_by ,no.booking_by , no.dispatch_person,
                 no.payment_id, no.payment_date, no.payment_amount, no.payment_status,no.totalamt, no.baseAmount, no.taxamt, no.transaction_id,
@@ -121,10 +132,19 @@ export default async function OrdersPage() {
   sql += " GROUP BY no.order_id ORDER BY no.created_at DESC";
 
   const [orders] = await conn.execute(sql, params);
+  let ordersWithBatches = await attachBookingBatchesToOrders(conn, orders);
+  ordersWithBatches = await attachDispatchPendingToOrders(
+    conn,
+    ordersWithBatches,
+  );
+  ordersWithBatches = await attachDeliveryBatchesToOrders(
+    conn,
+    ordersWithBatches,
+  );
 
   // await conn.end();
 
-  console.log("fetched orders:", orders);
+  console.log("fetched orders:", ordersWithBatches);
 
   return (
     <div className=" mx-auto p-6">
@@ -156,7 +176,7 @@ export default async function OrdersPage() {
       </div>
 
 
-      <OrderTable orders={orders} userRole={userRole} />
+      <OrderTable orders={ordersWithBatches} userRole={userRole} />
     </div>
   );
 }

@@ -20,7 +20,9 @@ export default function DispatchFormPage({ params }) {
   useEffect(() => {
     const load = async () => {
       try {
-        const res = await fetch(`/api/dispatch?order_id=${order_id}`);
+        const res = await fetch(
+          `/api/dispatch?order_id=${order_id}&scope=active`,
+        );
         const json = await res.json();
         console.log("Dispatch data load:", json);
         if (json.success) {

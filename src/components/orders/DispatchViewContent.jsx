@@ -30,7 +30,9 @@ export default function DispatchViewContent() {
   useEffect(() => {
     const load = async () => {
       try {
-        const res = await fetch(`/api/dispatch?order_id=${order_id}`);
+        const res = await fetch(
+          `/api/dispatch?order_id=${order_id}&scope=dispatched`,
+        );
         const json = await res.json();
         if (json.success) setRows(json.data || []);
       } finally {

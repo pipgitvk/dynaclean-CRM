@@ -21,11 +21,32 @@ export default function DispatchFormPage({ params }) {
   useEffect(() => {
     const load = async () => {
       try {
-        const res = await fetch(`/api/dispatch?order_id=${order_id}`);
-        const json = await res.json();
-        if (json.success) {
-          const data = json.data || [];
-          setRows(data);
+        const fetchActive = async () => {
+          const res = await fetch(
+            `/api/dispatch?order_id=${order_id}&scope=active`,
+          );
+          const json = await res.json();
+          return json.success ? json.data || [] : [];
+        };
+
+        let data = await fetchActive();
+        if (data.length === 0) {
+          const actRes = await fetch("/api/dispatch/activate-remain", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ order_id }),
+          });
+          const actJson = await actRes.json();
+          if (actRes.ok && actJson.success) {
+            data = await fetchActive();
+          }
+        }
+
+        if (data.length === 0) {
+          router.replace(`/admin-dashboard/order/dispatch/view/${order_id}`);
+          return;
+        }
+        setRows(data);
           // Track which rows already have serial numbers from database
           const idsWithSerialNo = new Set(
             data.filter(r => r.serial_no && r.serial_no.trim() !== "").map(r => r.id)
@@ -55,13 +76,12 @@ export default function DispatchFormPage({ params }) {
             }
           });
           setAccessoriesChecked(checkedState);
-        }
       } finally {
         setLoading(false);
       }
     };
     load();
-  }, [order_id]);
+  }, [order_id, router]);
 
   const fetchStockForRow = async (rowId, quoteNumber, godown, itemCode) => {
     if (!quoteNumber || !godown || !itemCode) {
@@ -289,8 +309,13 @@ export default function DispatchFormPage({ params }) {
       });
       const doneJson = await doneRes.json();
       if (!doneRes.ok || !doneJson.success) throw new Error(doneJson.error || "Failed to mark dispatch complete");
-      alert("Dispatch updated and marked complete");
-      router.push(`/user-dashboard/order/dispatch/view/${order_id}`);
+      const partial = Number(doneJson.dispatch_status) === 2;
+      alert(
+        partial
+          ? "This dispatch batch is complete. Remaining products can be booked and dispatched later."
+          : "Dispatch complete for all products on this order.",
+      );
+      router.replace(`/admin-dashboard/order/dispatch/view/${order_id}`);
     } catch (e) {
       alert(e.message || "Failed to save");
     } finally {

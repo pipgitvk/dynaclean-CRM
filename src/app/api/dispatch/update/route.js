@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
+import { canMutateDispatchRole } from "@/lib/roleKeyUtils";
 import { deductCheckedAccessoryStock } from "@/lib/deductAccessoryStock";
 import { isSpare1110 } from "@/lib/isSpare1110";
 import {
@@ -48,8 +49,7 @@ export async function POST(req) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const role = tokenPayload.role;
     const username = tokenPayload.username;
-    const roleUpperUpdate = String(role).toUpperCase();
-    if (!["WAREHOUSE INCHARGE", "ADMIN"].includes(roleUpperUpdate)) {
+    if (!canMutateDispatchRole(role)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

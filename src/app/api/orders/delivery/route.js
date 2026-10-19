@@ -3,6 +3,19 @@ import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { canEditDeliveryProof } from "@/lib/orderDocumentEditRules";
 import { canManageAnyOrderDeliveryRole } from "@/lib/roleKeyUtils";
+import {
+  dispatchStatusAllowsDeliveryUpdate,
+  orderHasDispatchedStockForOrderId,
+} from "@/lib/orderDeliveryEligibility";
+import {
+  DELIVERY_STATUS_FULL,
+  DELIVERY_STATUS_PARTIAL,
+  resolveDeliveryStatusAfterUpdate,
+} from "@/lib/orderDeliveryStatus";
+import {
+  ensureOrderDeliveryBatchesTable,
+  persistOrderDeliveryBatch,
+} from "@/lib/orderDeliveryBatches";
 
 export async function POST(request) {
   try {
@@ -55,16 +68,28 @@ export async function POST(request) {
       );
     }
 
-    if (Number(order.dispatch_status) !== 1) {
+    const hasDispatchedStock = await orderHasDispatchedStockForOrderId(
+      conn,
+      order_id,
+    );
+    if (
+      !dispatchStatusAllowsDeliveryUpdate(
+        order.dispatch_status,
+        hasDispatchedStock,
+      )
+    ) {
       return NextResponse.json(
-        { error: "Delivery can only be updated after dispatch is done" },
+        {
+          error:
+            "Delivery can be updated only after at least one item is dispatched",
+        },
         { status: 400 },
       );
     }
 
-    const isDelivered = Number(order.delivery_status) === 1;
+    const isFullyDelivered = Number(order.delivery_status) === DELIVERY_STATUS_FULL;
 
-    if (isDelivered && update_proof_only) {
+    if (isFullyDelivered && update_proof_only) {
       if (!canEditDeliveryProof(order)) {
         return NextResponse.json(
           { error: "Delivery proof can only be edited within 24 hours of delivery." },
@@ -90,17 +115,56 @@ export async function POST(request) {
       });
     }
 
-    if (isDelivered) {
+    if (isFullyDelivered) {
       return NextResponse.json(
         { error: "Delivery is already marked as complete" },
         { status: 400 },
       );
     }
 
+    const nextDeliveryStatus = await resolveDeliveryStatusAfterUpdate(
+      conn,
+      order_id,
+      order.dispatch_status,
+    );
+
+    const deliveredOnVal = delivered_on || new Date();
+    await ensureOrderDeliveryBatchesTable(conn);
+
+    const [batch1] = await conn.execute(
+      `SELECT id FROM order_delivery_batches WHERE order_id = ? AND sequence_no = 1 LIMIT 1`,
+      [order_id],
+    );
+    if (
+      !batch1?.length &&
+      (Number(order.delivery_status) === DELIVERY_STATUS_PARTIAL ||
+        order.delivered_on ||
+        order.delivery_proof)
+    ) {
+      await conn.execute(
+        `INSERT INTO order_delivery_batches
+          (order_id, sequence_no, delivered_on, delivery_proof, delivery_remark)
+         VALUES (?, 1, ?, ?, ?)`,
+        [
+          order_id,
+          order.delivered_on || null,
+          order.delivery_proof || null,
+          order.delivery_remark || null,
+        ],
+      );
+    }
+
+    await persistOrderDeliveryBatch(conn, order_id, {
+      delivered_on: deliveredOnVal,
+      delivery_proof: delivery_proof || null,
+      delivery_remark: delivery_remark || null,
+    });
+
     await conn.execute(
-      "UPDATE neworder SET delivery_status = 1, delivered_on = ?, delivery_proof = ?, delivery_remark = ? WHERE order_id = ?",
+      "UPDATE neworder SET delivery_status = ?, delivered_on = ?, delivery_proof = ?, delivery_remark = ? WHERE order_id = ?",
       [
-        delivered_on || new Date(),
+        nextDeliveryStatus,
+        deliveredOnVal,
         delivery_proof || null,
         delivery_remark || null,
         order_id,

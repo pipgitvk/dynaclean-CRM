@@ -894,8 +894,8 @@ export async function POST(req) {
         return NextResponse.json(
           {
             error:
-              `Is order ke liye invoice pehle se hai (${existing.invoice_number}). ` +
-              "Purana invoice delete ya cancel hone ke baad hi naya tax invoice bana sakte hain.",
+              `An invoice already exists for this order (${existing.invoice_number}). ` +
+              "Delete or cancel the existing invoice before creating a new tax invoice.",
             existing_invoice_number: existing.invoice_number,
             existing_invoice_id: existing.id,
           },

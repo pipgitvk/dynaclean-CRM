@@ -50,6 +50,18 @@ export function canManageAnyOrderDeliveryRole(role) {
   return k === "ADMIN";
 }
 
+/** Save dispatch rows, prepare selection, complete dispatch (warehouse + leadership). */
+export function canMutateDispatchRole(role) {
+  const k = normalizeRoleKey(role || "");
+  return (
+    k === "WAREHOUSE INCHARGE" ||
+    k === "ADMIN" ||
+    isSuperAdminRoleKey(k) ||
+    k === "DIRECTOR" ||
+    k === "TEAM LEADER"
+  );
+}
+
 /** View Credit Note on order list — superadmin, admin, and accountant roles. */
 export function canViewOrderCreditNoteRole(role) {
   const k = normalizeRoleKey(role || "");

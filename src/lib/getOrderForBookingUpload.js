@@ -2,6 +2,12 @@ import { getDbConnection } from "@/lib/db";
 import { hasOrderInvoiceReport } from "@/lib/orderDocumentEditRules";
 import { isBookingAllowedForOrder } from "@/lib/orderBookingEligibility";
 import { isOrderVisibleToViewer } from "@/lib/orderApprovalVisibility";
+import {
+  canCreateFollowUpBooking,
+  ORDER_LIST_DISPATCHED_STOCK_COUNT_SELECT,
+  ORDER_LIST_PENDING_DISPATCH_UNITS_SELECT,
+  orderHasDispatchedStock,
+} from "@/lib/orderDeliveryEligibility";
 
 export { hasOrderInvoiceReport };
 
@@ -29,7 +35,7 @@ export function canEditOrderBooking(role) {
 
 export function resolveBookingUploadPage(order, role) {
   const booked = hasOrderBooking(order);
-  const dispatched = Number(order.dispatch_status) === 1;
+  const dispatchStatus = Number(order.dispatch_status);
 
   if (!booked && !isBookingAllowedForOrder(order)) {
     return {
@@ -40,7 +46,7 @@ export function resolveBookingUploadPage(order, role) {
     };
   }
 
-  if (booked && dispatched) {
+  if (booked && dispatchStatus === 1) {
     return {
       redirectToView: true,
       redirectToUploadReport: false,
@@ -49,8 +55,38 @@ export function resolveBookingUploadPage(order, role) {
     };
   }
 
-  const isEditMode = booked && !dispatched;
-  if (isEditMode && !canEditOrderBooking(role)) {
+  if (canCreateFollowUpBooking(order)) {
+    return {
+      redirectToView: false,
+      redirectToUploadReport: false,
+      isEditMode: false,
+      initialBooking: null,
+    };
+  }
+
+  const wantsEditBooking =
+    booked &&
+    (dispatchStatus === 0 ||
+      (dispatchStatus === 2 && !orderHasDispatchedStock(order)));
+
+  if (wantsEditBooking) {
+    if (!canEditOrderBooking(role)) {
+      return {
+        redirectToView: true,
+        redirectToUploadReport: false,
+        isEditMode: false,
+        initialBooking: null,
+      };
+    }
+    return {
+      redirectToView: false,
+      redirectToUploadReport: false,
+      isEditMode: true,
+      initialBooking: getInitialBookingValues(order),
+    };
+  }
+
+  if (booked) {
     return {
       redirectToView: true,
       redirectToUploadReport: false,
@@ -62,8 +98,8 @@ export function resolveBookingUploadPage(order, role) {
   return {
     redirectToView: false,
     redirectToUploadReport: false,
-    isEditMode,
-    initialBooking: isEditMode ? getInitialBookingValues(order) : null,
+    isEditMode: false,
+    initialBooking: null,
   };
 }
 
@@ -79,7 +115,9 @@ export async function getOrderForBookingUpload(
        no.client_delivery_date, no.booking_id, no.booking_date, no.booking_url, no.admin_remark,
        no.delivery_date, no.dispatch_status, no.report_file, no.approval_status,
        no.totalamt, no.baseAmount, no.taxamt,
-       qr.grand_total AS quotation_grand_total
+       qr.grand_total AS quotation_grand_total,
+       ${ORDER_LIST_DISPATCHED_STOCK_COUNT_SELECT},
+       ${ORDER_LIST_PENDING_DISPATCH_UNITS_SELECT}
      FROM neworder no
      LEFT JOIN quotations_records qr ON qr.quote_number = no.quote_number
      WHERE no.order_id = ?`,

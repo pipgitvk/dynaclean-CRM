@@ -4,6 +4,11 @@ import { getSessionPayload } from "@/lib/auth";
 import { sendImportCrmSmtpEmail } from "@/lib/importCrmEmail";
 import { canEditOrderBooking } from "@/lib/getOrderForBookingUpload";
 import { isBookingAllowedForOrder } from "@/lib/orderBookingEligibility";
+import { isFollowUpBookingOrder } from "@/lib/dispatchPartialSelection";
+import {
+  ensureBatch1SnapshotBeforeFollowUp,
+  persistOrderBookingBatch,
+} from "@/lib/orderBookingBatches";
 
 export async function POST(req) {
   try {
@@ -53,9 +58,7 @@ export async function POST(req) {
     }
 
     const order = orderRows[0];
-    const isDispatched = Number(order.dispatch_status) === 1;
-
-    if (isDispatched) {
+    if (Number(order.dispatch_status) === 1) {
       return NextResponse.json(
         { error: "Booking details cannot be edited after dispatch." },
         { status: 403 },
@@ -67,7 +70,9 @@ export async function POST(req) {
       order.booking_id !== undefined &&
       String(order.booking_id).trim() !== "" &&
       String(order.booking_id) !== "0";
-    const isBookingEdit = Boolean(isEdit) || hadExistingBooking;
+    const followUpBooking = await isFollowUpBookingOrder(conn, orderId);
+    const isBookingEdit =
+      (Boolean(isEdit) || hadExistingBooking) && !followUpBooking;
 
     if (isBookingEdit && !canEditOrderBooking(payload?.role ?? payload?.userRole)) {
       return NextResponse.json(
@@ -125,6 +130,10 @@ export async function POST(req) {
     
     console.log(`📊 Order ${orderId}: Total=${totalAmount}, Paid=${paidAmount}, Pending=${pending_amount}`);
 
+    if (followUpBooking) {
+      await ensureBatch1SnapshotBeforeFollowUp(conn, orderId, order);
+    }
+
     // ✅ Step 2: Update neworder table with booking info
     await conn.execute(
       `UPDATE neworder SET 
@@ -146,6 +155,21 @@ export async function POST(req) {
         expected_delivery_date ?? null,
         orderId ?? null,
       ]
+    );
+
+    await persistOrderBookingBatch(
+      conn,
+      orderId,
+      order.quote_number,
+      {
+        booking_id,
+        booking_url,
+        booking_date,
+        expected_delivery_date,
+        adminremark,
+        bookingBy,
+      },
+      { isFollowUp: followUpBooking },
     );
 
     // ✅ Step 3: Send email with custom template (not from database)

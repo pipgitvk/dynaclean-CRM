@@ -22,11 +22,28 @@ export default function DispatchFormPage({ params }) {
   useEffect(() => {
     const load = async () => {
       try {
-        const res = await fetch(`/api/dispatch?order_id=${order_id}`);
-        const json = await res.json();
-        console.log("Dispatch data load:", json);
-        if (json.success) {
-          const data = json.data || [];
+        const fetchActive = async () => {
+          const res = await fetch(
+            `/api/dispatch?order_id=${order_id}&scope=active`,
+          );
+          const json = await res.json();
+          return json.success ? json.data || [] : [];
+        };
+
+        let data = await fetchActive();
+        if (data.length === 0) {
+          const actRes = await fetch("/api/dispatch/activate-remain", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ order_id }),
+          });
+          const actJson = await actRes.json();
+          if (actRes.ok && actJson.success) {
+            data = await fetchActive();
+          }
+        }
+
+        if (data.length > 0) {
           setRows(data);
           // Track which rows already have serial numbers from database
           const idsWithSerialNo = new Set(

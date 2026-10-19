@@ -3,14 +3,15 @@ import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { isSpare1110 } from "@/lib/isSpare1110";
 import { isDelhiGodown, pickRowColumn } from "@/lib/godownStock";
+import { computeDispatchCompletionStatus } from "@/lib/dispatchPartialSelection";
+import { canMutateDispatchRole } from "@/lib/roleKeyUtils";
 
 export async function POST(req) {
   try {
     const payload = await getSessionPayload();
     if (!payload) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const role = payload.role;
-    const roleUpperComplete = String(role).toUpperCase();
-    if (!["WAREHOUSE INCHARGE", "ADMIN", "SUPERADMIN", "DIRECTOR", "TEAM LEADER"].includes(roleUpperComplete)) {
+    if (!canMutateDispatchRole(role)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -33,9 +34,27 @@ export async function POST(req) {
     // Block completion until all PRODUCT dispatch rows have serial numbers filled
     // Products are identified by item_code containing at least one alphabet character;
     // spares (purely numeric codes) are allowed to have empty serial numbers.
-    const [dispatchRows] = await conn.execute(
-      `SELECT item_code, item_name, serial_no, godown, stock_deducted FROM dispatch WHERE quote_number = ?`,
-      [quoteNumber]
+    const [activeBatchRows] = await conn.execute(
+      `SELECT id, item_code, item_name, serial_no, godown, stock_deducted, dispatch_active
+       FROM dispatch
+       WHERE TRIM(quote_number) = TRIM(?)
+         AND COALESCE(dispatch_active, 1) = 1`,
+      [quoteNumber],
+    );
+
+    if (!activeBatchRows?.length) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "No open dispatch batch for this order. Use View Dispatch or create booking for remaining products.",
+        },
+        { status: 400 },
+      );
+    }
+
+    const dispatchRows = (activeBatchRows || []).filter(
+      (row) => Number(row.stock_deducted) !== 1,
     );
 
     const pendingProductSerials = dispatchRows.filter((row) => {
@@ -55,9 +74,41 @@ export async function POST(req) {
 
     const dispatchPerson = payload.username || payload.name || null;
 
+    // Ensure this batch is marked shipped (Save may have skipped stock_deducted in edge cases)
     await conn.execute(
-      `UPDATE neworder SET dispatch_status = 1, dispatch_person = ? WHERE order_id = ?`,
-      [dispatchPerson, orderId]
+      `UPDATE dispatch
+       SET stock_deducted = 1, updated_at = NOW()
+       WHERE TRIM(quote_number) = TRIM(?)
+         AND COALESCE(dispatch_active, 1) = 1
+         AND COALESCE(stock_deducted, 0) = 0`,
+      [quoteNumber],
+    );
+
+    const nextDispatchStatus = await computeDispatchCompletionStatus(
+      conn,
+      orderId,
+    );
+
+    await conn.execute(
+      `UPDATE neworder SET dispatch_status = ?, dispatch_person = ? WHERE order_id = ?`,
+      [nextDispatchStatus, dispatchPerson, orderId],
+    );
+
+    // Close completed batch + any leftover undispatched rows (remain booking will re-activate)
+    await conn.execute(
+      `UPDATE dispatch
+       SET dispatch_active = 0, updated_at = NOW()
+       WHERE TRIM(quote_number) = TRIM(?)
+         AND COALESCE(dispatch_active, 1) = 1`,
+      [quoteNumber],
+    );
+
+    await conn.execute(
+      `UPDATE dispatch
+       SET dispatch_active = 0, updated_at = NOW()
+       WHERE TRIM(quote_number) = TRIM(?)
+         AND COALESCE(stock_deducted, 0) = 0`,
+      [quoteNumber],
     );
 
     // ✅ Deduct spare stock: insert OUT entry in stock_list and update stock_summary
@@ -225,7 +276,11 @@ export async function POST(req) {
       // Don't fail the request if email fails
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({
+      success: true,
+      dispatch_status: nextDispatchStatus,
+      is_partial_dispatch: nextDispatchStatus === 2,
+    });
   } catch (e) {
     console.error("Dispatch complete error:", e);
     return NextResponse.json({ success: false, error: e.message }, { status: 500 });

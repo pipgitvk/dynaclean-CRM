@@ -16,6 +16,7 @@ export default function ViewOrderDetails({
     currentStage,
     currentIndex,
     progressPercent,
+    bookingViewLabel,
   } = data;
 
   const currency = (val) =>
@@ -50,9 +51,16 @@ export default function ViewOrderDetails({
   return (
     <div className="max-w-7xl mx-auto p-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-        <h1 className="text-2xl font-bold text-center sm:text-left">
-          View Order by Quotation
-        </h1>
+        <div>
+          <h1 className="text-2xl font-bold text-center sm:text-left">
+            View Order by Quotation
+          </h1>
+          {bookingViewLabel && (
+            <p className="text-sm text-amber-800 mt-1 text-center sm:text-left">
+              {bookingViewLabel}
+            </p>
+          )}
+        </div>
         {canEditBooking && (
           <Link
             href={`${orderBasePath}/upload-booking/${orderDetails.order_id}`}

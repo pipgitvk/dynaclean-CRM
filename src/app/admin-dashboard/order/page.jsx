@@ -5,11 +5,46 @@ import { canViewAllOrders } from "@/lib/dataScope";
 import { orderListApprovalWhereSql } from "@/lib/orderApprovalVisibility";
 import { orderListReportWhereSql } from "@/lib/orderReportVisibility";
 import { ensureOrderLinkedPaymentColumns } from "@/lib/ensureOrderLinkedPaymentColumns";
-import { syncOrderLinkedPaymentFromInvoice } from "@/lib/syncOrderLinkedPaymentFromInvoice";
 import { attachActiveInvoiceFields } from "@/lib/activeInvoiceForOrder";
+import {
+  attachBookingBatchesToOrders,
+  attachDispatchPendingToOrders,
+} from "@/lib/orderBookingBatches";
+import { attachDeliveryBatchesToOrders } from "@/lib/orderDeliveryBatches";
 
 // Secret for verifying JWT
 const JWT_SECRET = process.env.JWT_SECRET;
+
+let orderListSchemaReady = false;
+
+const ORDER_LIST_SCHEMA_ALTERS = [
+  "ALTER TABLE neworder ADD COLUMN approval_remark TEXT NULL DEFAULT NULL",
+  "ALTER TABLE neworder ADD COLUMN approval_date DATETIME NULL DEFAULT NULL",
+  "ALTER TABLE neworder ADD COLUMN return_booking_done TINYINT(1) DEFAULT 0",
+  "ALTER TABLE neworder ADD COLUMN return_booking_ref VARCHAR(255) NULL",
+  "ALTER TABLE neworder ADD COLUMN return_booking_date DATE NULL",
+  "ALTER TABLE neworder ADD COLUMN expected_pickup_date DATE NULL",
+  "ALTER TABLE neworder ADD COLUMN return_booking_url VARCHAR(500) NULL",
+  "ALTER TABLE neworder ADD COLUMN return_booking_remarks TEXT NULL",
+  "ALTER TABLE neworder ADD COLUMN return_booking_by VARCHAR(255) NULL",
+  "ALTER TABLE neworder ADD COLUMN warehouse_in_done TINYINT(1) DEFAULT 0",
+  "ALTER TABLE neworder ADD COLUMN warehouse_in_date DATE NULL",
+  "ALTER TABLE neworder ADD COLUMN warehouse_in_image VARCHAR(500) NULL",
+  "ALTER TABLE neworder ADD COLUMN warehouse_in_by VARCHAR(100) NULL",
+  "ALTER TABLE credit_notes ADD COLUMN IF NOT EXISTS is_saved TINYINT(1) NOT NULL DEFAULT 0",
+  "ALTER TABLE credit_notes ADD COLUMN IF NOT EXISTS saved_at DATETIME NULL DEFAULT NULL",
+];
+
+async function ensureOrderListSchema(conn) {
+  if (orderListSchemaReady) return;
+  await ensureOrderLinkedPaymentColumns(conn);
+  for (const sql of ORDER_LIST_SCHEMA_ALTERS) {
+    try {
+      await conn.execute(sql);
+    } catch (_) {}
+  }
+  orderListSchemaReady = true;
+}
 
 export default async function OrdersPage({ searchParams }) {
   const payload = await getSessionPayload();
@@ -32,64 +67,7 @@ export default async function OrdersPage({ searchParams }) {
 
   const conn = await getDbConnection();
 
-  await ensureOrderLinkedPaymentColumns(conn);
-
-  // Ensure approval_remark and approval_date columns exist
-  try {
-    await conn.execute(
-      "ALTER TABLE neworder ADD COLUMN approval_remark TEXT NULL DEFAULT NULL"
-    );
-  } catch (_) {}
-  try {
-    await conn.execute(
-      "ALTER TABLE neworder ADD COLUMN approval_date DATETIME NULL DEFAULT NULL"
-    );
-  } catch (_) {}
-  // Ensure return booking columns exist
-  try {
-    await conn.execute("ALTER TABLE neworder ADD COLUMN return_booking_done TINYINT(1) DEFAULT 0");
-  } catch (_) {}
-  try {
-    await conn.execute("ALTER TABLE neworder ADD COLUMN return_booking_ref VARCHAR(255) NULL");
-  } catch (_) {}
-  try {
-    await conn.execute("ALTER TABLE neworder ADD COLUMN return_booking_date DATE NULL");
-  } catch (_) {}
-  try {
-    await conn.execute("ALTER TABLE neworder ADD COLUMN expected_pickup_date DATE NULL");
-  } catch (_) {}
-  try {
-    await conn.execute("ALTER TABLE neworder ADD COLUMN return_booking_url VARCHAR(500) NULL");
-  } catch (_) {}
-  try {
-    await conn.execute("ALTER TABLE neworder ADD COLUMN return_booking_remarks TEXT NULL");
-  } catch (_) {}
-  try {
-    await conn.execute("ALTER TABLE neworder ADD COLUMN return_booking_by VARCHAR(255) NULL");
-  } catch (_) {}
-  // Ensure warehouse-in columns exist
-  try {
-    await conn.execute("ALTER TABLE neworder ADD COLUMN warehouse_in_done TINYINT(1) DEFAULT 0");
-  } catch (_) {}
-  try {
-    await conn.execute("ALTER TABLE neworder ADD COLUMN warehouse_in_date DATE NULL");
-  } catch (_) {}
-  try {
-    await conn.execute("ALTER TABLE neworder ADD COLUMN warehouse_in_image VARCHAR(500) NULL");
-  } catch (_) {}
-  try {
-    await conn.execute("ALTER TABLE neworder ADD COLUMN warehouse_in_by VARCHAR(100) NULL");
-  } catch (_) {}
-  try {
-    await conn.execute(
-      "ALTER TABLE credit_notes ADD COLUMN IF NOT EXISTS is_saved TINYINT(1) NOT NULL DEFAULT 0"
-    );
-  } catch (_) {}
-  try {
-    await conn.execute(
-      "ALTER TABLE credit_notes ADD COLUMN IF NOT EXISTS saved_at DATETIME NULL DEFAULT NULL"
-    );
-  } catch (_) {}
+  await ensureOrderListSchema(conn);
 
   // 1. Fetch the user role
   const [roleRows] = await conn.execute(
@@ -102,6 +80,8 @@ export default async function OrdersPage({ searchParams }) {
   let sql = `SELECT 
                 no.order_id, no.report_file, no.po_file, no.payment_proof, no.booking_url,
                 no.client_name, no.contact, no.is_cancelled, no.dispatch_status,
+                0 AS dispatched_stock_count,
+                0 AS pending_dispatch_units,
                 no.created_at, no.created_by , no.einvoice_file, no.booking_id, no.quote_number, no.duedate,
                 no.invoice_date , no.account_by ,no.booking_by , no.dispatch_person,
                 no.payment_id, no.payment_date, no.payment_amount, no.amount_received, no.payment_received_date,
@@ -203,21 +183,10 @@ export default async function OrdersPage({ searchParams }) {
     return { ...order, line_items };
   });
 
-  const needsLinkedPaymentSync = enrichedOrders.filter(
-    (o) =>
-      String(o.invoice_number || "").trim() ||
-      String(o.quote_number || "").trim(),
-  );
-  for (const o of needsLinkedPaymentSync) {
-    const idx = enrichedOrders.findIndex((x) => x.order_id === o.order_id);
-    if (idx === -1) continue;
-    enrichedOrders[idx] = await syncOrderLinkedPaymentFromInvoice(
-      conn,
-      enrichedOrders[idx],
-    );
-  }
-
   enrichedOrders = await attachActiveInvoiceFields(conn, enrichedOrders);
+  enrichedOrders = await attachBookingBatchesToOrders(conn, enrichedOrders);
+  enrichedOrders = await attachDispatchPendingToOrders(conn, enrichedOrders);
+  enrichedOrders = await attachDeliveryBatchesToOrders(conn, enrichedOrders);
 
   // await conn.end();
 

@@ -3,6 +3,7 @@ import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { ensureAddedAccessoryDispatchRows } from "@/lib/seedAddedAccessoryDispatch";
 import { isSalesRole } from "@/lib/isSalesRole";
+import { ensureDispatchActiveColumn } from "@/lib/dispatchPartialSelection";
 
 const DISPATCH_VIEW_ROLES = [
   "WAREHOUSE INCHARGE",
@@ -57,15 +58,35 @@ export async function GET(req) {
 
     if (orderId) {
       try {
+        await ensureDispatchActiveColumn(conn);
         await ensureAddedAccessoryDispatchRows(conn, quoteNumber);
       } catch (seedErr) {
         console.error("Dispatch GET ensure added accessories:", seedErr);
       }
     }
 
+    const scope = (searchParams.get("scope") || "").trim().toLowerCase();
+    let whereExtra = `(
+           COALESCE(stock_deducted, 0) = 1
+           OR COALESCE(dispatch_active, 1) = 1
+         )`;
+    if (scope === "active") {
+      whereExtra = `COALESCE(stock_deducted, 0) = 0 AND COALESCE(dispatch_active, 1) = 1`;
+    } else if (scope === "dispatched") {
+      whereExtra = `(
+           COALESCE(stock_deducted, 0) = 1
+           OR (serial_no IS NOT NULL AND TRIM(serial_no) <> '')
+         )`;
+    }
+
     const [dispatchRows] = await conn.execute(
-      `SELECT id, quote_number, item_name, item_code, serial_no, remarks, photos, godown, accessories_checklist, created_at, updated_at
-       FROM dispatch WHERE quote_number = ? ORDER BY id ASC`,
+      `SELECT id, quote_number, item_name, item_code, serial_no, remarks, photos, godown, accessories_checklist, created_at, updated_at,
+              COALESCE(stock_deducted, 0) AS stock_deducted,
+              COALESCE(dispatch_active, 1) AS dispatch_active
+       FROM dispatch
+       WHERE TRIM(CONVERT(quote_number USING utf8mb4)) = TRIM(?)
+         AND ${whereExtra}
+       ORDER BY id ASC`,
       [quoteNumber]
     );
 
