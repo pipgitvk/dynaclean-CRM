@@ -3,8 +3,13 @@ import OrderTable from "./OrderTable";
 import { getSessionPayload } from "@/lib/auth";
 import { sqlColumnInActiveServiceSupportUsers } from "@/lib/serviceSupportTeamScope";
 import { appendSqlWhereClause, orderListApprovalWhereSql } from "@/lib/orderApprovalVisibility";
-import { orderListReportWhereSql } from "@/lib/orderReportVisibility";
+import {
+  isPostAccountPipelineRole,
+  orderListReportWhereSql,
+  passesReportVisibilityGate,
+} from "@/lib/orderReportVisibility";
 import { canViewAllOrders } from "@/lib/dataScope";
+import { normalizeRoleKey } from "@/lib/roleKeyUtils";
 import {
   ORDER_LIST_DISPATCHED_STOCK_COUNT_SELECT,
   ORDER_LIST_PENDING_DISPATCH_UNITS_SELECT,
@@ -103,8 +108,9 @@ export default async function OrdersPage() {
                 credit_notes cn ON CAST(cn.order_id AS CHAR) COLLATE utf8mb4_unicode_ci = CAST(no.order_id AS CHAR) COLLATE utf8mb4_unicode_ci AND cn.is_saved = 1`;
 
   const params = [];
+  const roleKey = normalizeRoleKey(userRole);
 
-  if (userRole === "SERVICE HEAD") {
+  if (roleKey === "SERVICE HEAD") {
     sql += `
     WHERE 
       no.created_by COLLATE utf8mb4_unicode_ci = ?
@@ -114,10 +120,18 @@ export default async function OrdersPage() {
         WHERE userRole LIKE '%SALES%'
       )`;
     params.push(username);
-  } else if (String(userRole).trim().toUpperCase() === "SERVICE SUPPORT") {
+  } else if (roleKey === "SERVICE SUPPORT") {
     sql += ` WHERE ${sqlColumnInActiveServiceSupportUsers("no.created_by")}`;
   } else if (
-    !["ACCOUNTANT", "ADMIN", "WAREHOUSE INCHARGE", "TEAM LEADER", "DIRECTOR"].includes(String(userRole).toUpperCase())
+    ![
+      "ACCOUNTANT",
+      "ADMIN",
+      "WAREHOUSE INCHARGE",
+      "TEAM LEADER",
+      "DIRECTOR",
+      "SUPERADMIN",
+    ].includes(roleKey) &&
+    !canViewAllOrders(userRole)
   ) {
     sql += " WHERE no.created_by = ?";
     params.push(username);
@@ -132,7 +146,13 @@ export default async function OrdersPage() {
   sql += " GROUP BY no.order_id ORDER BY no.created_at DESC";
 
   const [orders] = await conn.execute(sql, params);
-  let ordersWithBatches = await attachBookingBatchesToOrders(conn, orders);
+  // Belt-and-suspenders: ADMIN/WH/TL never see pending invoice / incomplete report
+  const visibleOrders = isPostAccountPipelineRole(userRole)
+    ? orders.filter((o) =>
+        passesReportVisibilityGate(o, userRole, { username }),
+      )
+    : orders;
+  let ordersWithBatches = await attachBookingBatchesToOrders(conn, visibleOrders);
   ordersWithBatches = await attachDispatchPendingToOrders(
     conn,
     ordersWithBatches,

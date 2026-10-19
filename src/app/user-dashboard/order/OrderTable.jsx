@@ -64,6 +64,7 @@ import {
   isAccountantOnlyMenuRole,
   isSuperAdminRole,
 } from "@/lib/roleKeyUtils";
+import { isPostAccountPipelineRole } from "@/lib/orderReportVisibility";
 import ViewCreditNoteMenuLink from "@/components/orders/ViewCreditNoteMenuLink";
 import AccountantReturnViewMenuItems from "@/components/orders/AccountantReturnViewMenuItems";
 
@@ -100,6 +101,7 @@ const SkeletonLoader = () => (
 );
 
 export default function OrderTable({ orders, userRole }) {
+  const hidePendingInvoiceFilter = isPostAccountPipelineRole(userRole);
   const [searchQuery, setSearchQuery] = useState("");
   const [appliedSearchQuery, setAppliedSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -411,7 +413,9 @@ export default function OrderTable({ orders, userRole }) {
           >
             <option value="">All Status</option>
             <option value="orderinitialized">Order Initiated</option>
-            <option value="pendinginvoice">Pending Invoice</option>
+            {!hidePendingInvoiceFilter && (
+              <option value="pendinginvoice">Pending Invoice</option>
+            )}
             <option value="invoiceuploaded">Invoice Uploaded</option>
             <option value="bookingdone">Booking Done</option>
             <option value="dispatchdone">Dispatch Done</option>

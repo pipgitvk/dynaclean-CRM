@@ -17,9 +17,12 @@ export function sqlHasInvoiceReportClause(tableAlias = "no") {
   return `(TRIM(COALESCE(${col}, '')) != '' AND TRIM(COALESCE(${col}, '')) != '0')`;
 }
 
-/** @returns {string|null} */
-export function orderListReportWhereSql(userRole, { seesAllOrders = false } = {}) {
-  if (!seesAllOrders) return null;
+/**
+ * Admin / warehouse / team leader order lists: only orders with invoice report.
+ * (`seesAllOrders` kept for call-site compat; ignored — post-account roles always filter.)
+ * @returns {string|null}
+ */
+export function orderListReportWhereSql(userRole, _opts = {}) {
   if (!isPostAccountPipelineRole(userRole)) return null;
   return sqlHasInvoiceReportClause("no");
 }
@@ -29,11 +32,13 @@ export function passesReportVisibilityGate(order, userRole, { username } = {}) {
   if (isSuperAdminRole(userRole)) return true;
   if (isJwtAccountingRole(userRole)) return true;
 
+  // ADMIN / WH / TL must not see pending-invoice / incomplete-report orders
+  // (including orders they created).
+  if (isPostAccountPipelineRole(userRole)) return false;
+
   const creator = String(order?.created_by ?? "").trim();
   const viewer = String(username ?? "").trim();
   if (creator && viewer && creator === viewer) return true;
-
-  if (isPostAccountPipelineRole(userRole)) return false;
 
   return true;
 }
