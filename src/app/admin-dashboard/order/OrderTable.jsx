@@ -581,6 +581,96 @@ function getStatusText(order) {
   };
 }
 
+function orderMatchesListFilters(order, filters, options = {}) {
+  const {
+    appliedSearchQuery = "",
+    appliedStatusFilter = "",
+    appliedDateFrom = "",
+    appliedDateTo = "",
+    appliedCreatedByFilter = "",
+    appliedLeadCampaignFilter = "",
+    appliedApprovalStatusFilter = "",
+    appliedPaymentStatusFilter = "",
+    appliedModelNameFilters = [],
+  } = filters;
+  const { omitCreatedBy = false } = options;
+
+  const approval = normalizeApprovalStatus(order.approval_status);
+  const approvalFilter = appliedApprovalStatusFilter
+    .toString()
+    .trim()
+    .toLowerCase();
+
+  if (approvalFilter) {
+    if (approval !== approvalFilter) return false;
+  } else if (approval === "rejected") {
+    return false;
+  }
+
+  if (appliedStatusFilter) {
+    const orderStatus = getStatusText(order)
+      .text.toLowerCase()
+      .replace(/\s+/g, "");
+    if (appliedStatusFilter === "pendingdispatched") {
+      if (Number(order.dispatch_status) === 1) return false;
+    } else if (appliedStatusFilter === "dispatchdone") {
+      if (Number(order.dispatch_status) !== 1) return false;
+    } else if (orderStatus !== appliedStatusFilter.toLowerCase()) {
+      return false;
+    }
+  }
+
+  if (!orderCreatedInDateRange(order, appliedDateFrom, appliedDateTo)) return false;
+
+  if (
+    !omitCreatedBy &&
+    appliedCreatedByFilter &&
+    order.created_by !== appliedCreatedByFilter
+  ) {
+    return false;
+  }
+
+  if (appliedLeadCampaignFilter) {
+    const campaignKey = normalizeLeadCampaignKey(order.lead_campaign);
+    if (appliedLeadCampaignFilter === "__none__") {
+      if (campaignKey) return false;
+    } else if (campaignKey !== appliedLeadCampaignFilter) {
+      return false;
+    }
+  }
+
+  if (appliedPaymentStatusFilter === "paid" && !isOrderPaid(order)) {
+    return false;
+  }
+  if (appliedPaymentStatusFilter === "unpaid" && isOrderPaid(order)) {
+    return false;
+  }
+  if (appliedPaymentStatusFilter === "unpaid" && order.is_cancelled) {
+    return false;
+  }
+
+  if (!orderMatchesModelFilters(order, appliedModelNameFilters)) {
+    return false;
+  }
+
+  const lowercasedQuery = appliedSearchQuery.toLowerCase();
+  if (lowercasedQuery) {
+    const matchesSearch =
+      order.order_id?.toLowerCase().includes(lowercasedQuery) ||
+      order.client_name?.toLowerCase().includes(lowercasedQuery) ||
+      order.company_name?.toLowerCase().includes(lowercasedQuery) ||
+      order.contact?.toLowerCase().includes(lowercasedQuery) ||
+      order.state?.toLowerCase().includes(lowercasedQuery) ||
+      formatLeadCampaignLabel(order.lead_campaign)
+        .toLowerCase()
+        .includes(lowercasedQuery) ||
+      normalizeLeadCampaignKey(order.lead_campaign).includes(lowercasedQuery);
+    if (!matchesSearch) return false;
+  }
+
+  return true;
+}
+
 export default function OrderTable({ orders, userRole }) {
   const [productCatalog, setProductCatalog] = useState([]);
   const [spareCatalog, setSpareCatalog] = useState([]);
@@ -978,78 +1068,52 @@ export default function OrderTable({ orders, userRole }) {
     }
   };
 
+  const listFilterState = useMemo(
+    () => ({
+      appliedSearchQuery,
+      appliedStatusFilter,
+      appliedDateFrom,
+      appliedDateTo,
+      appliedCreatedByFilter,
+      appliedLeadCampaignFilter,
+      appliedApprovalStatusFilter,
+      appliedPaymentStatusFilter,
+      appliedModelNameFilters,
+    }),
+    [
+      appliedSearchQuery,
+      appliedStatusFilter,
+      appliedDateFrom,
+      appliedDateTo,
+      appliedCreatedByFilter,
+      appliedLeadCampaignFilter,
+      appliedApprovalStatusFilter,
+      appliedPaymentStatusFilter,
+      appliedModelNameFilters,
+    ],
+  );
+
+  const createdByFilterOptions = useMemo(() => {
+    if (!orders?.length) return [];
+    const users = new Set();
+    orders.forEach((order) => {
+      if (
+        orderMatchesListFilters(order, listFilterState, { omitCreatedBy: true }) &&
+        order.created_by
+      ) {
+        users.add(String(order.created_by).trim());
+      }
+    });
+    return [...users].sort((a, b) => a.localeCompare(b));
+  }, [orders, listFilterState]);
+
   // Filter + sort orders (shared by table, stat cards, and amount summary)
   const filteredOrders = useMemo(() => {
     if (!orders) return [];
 
-    const lowercasedQuery = appliedSearchQuery.toLowerCase();
-    let result = orders.filter((order) => {
-      const approval = normalizeApprovalStatus(order.approval_status);
-      const approvalFilter = appliedApprovalStatusFilter
-        .toString()
-        .trim()
-        .toLowerCase();
-
-      if (approvalFilter) {
-        if (approval !== approvalFilter) return false;
-      } else if (approval === "rejected") {
-        return false;
-      }
-
-      if (appliedStatusFilter) {
-        const orderStatus = getStatusText(order)
-          .text.toLowerCase()
-          .replace(/\s+/g, "");
-        if (appliedStatusFilter === "pendingdispatched") {
-          if (Number(order.dispatch_status) === 1) return false;
-        } else if (appliedStatusFilter === "dispatchdone") {
-          if (Number(order.dispatch_status) !== 1) return false;
-        } else if (orderStatus !== appliedStatusFilter.toLowerCase()) {
-          return false;
-        }
-      }
-
-      if (!orderCreatedInDateRange(order, appliedDateFrom, appliedDateTo)) return false;
-
-      if (appliedCreatedByFilter && order.created_by !== appliedCreatedByFilter) {
-        return false;
-      }
-
-      if (appliedLeadCampaignFilter) {
-        const campaignKey = normalizeLeadCampaignKey(order.lead_campaign);
-        if (appliedLeadCampaignFilter === "__none__") {
-          if (campaignKey) return false;
-        } else if (campaignKey !== appliedLeadCampaignFilter) {
-          return false;
-        }
-      }
-
-      if (appliedPaymentStatusFilter === "paid" && !isOrderPaid(order)) {
-        return false;
-      }
-      if (appliedPaymentStatusFilter === "unpaid" && isOrderPaid(order)) {
-        return false;
-      }
-      if (appliedPaymentStatusFilter === "unpaid" && order.is_cancelled) {
-        return false;
-      }
-
-      if (!orderMatchesModelFilters(order, appliedModelNameFilters)) {
-        return false;
-      }
-
-      return (
-        order.order_id?.toLowerCase().includes(lowercasedQuery) ||
-        order.client_name?.toLowerCase().includes(lowercasedQuery) ||
-        order.company_name?.toLowerCase().includes(lowercasedQuery) ||
-        order.contact?.toLowerCase().includes(lowercasedQuery) ||
-        order.state?.toLowerCase().includes(lowercasedQuery) ||
-        formatLeadCampaignLabel(order.lead_campaign)
-          .toLowerCase()
-          .includes(lowercasedQuery) ||
-        normalizeLeadCampaignKey(order.lead_campaign).includes(lowercasedQuery)
-      );
-    });
+    let result = orders.filter((order) =>
+      orderMatchesListFilters(order, listFilterState),
+    );
 
     return [...result].sort((a, b) => {
       const valA = getSortValue(a, sortColumn);
@@ -1063,20 +1127,7 @@ export default function OrderTable({ orders, userRole }) {
       if (valA > valB) return sortDirection === "asc" ? 1 : -1;
       return 0;
     });
-  }, [
-    appliedSearchQuery,
-    orders,
-    appliedStatusFilter,
-    appliedDateFrom,
-    appliedDateTo,
-    appliedCreatedByFilter,
-    appliedLeadCampaignFilter,
-    appliedApprovalStatusFilter,
-    appliedPaymentStatusFilter,
-    sortColumn,
-    sortDirection,
-    appliedModelNameFilters,
-  ]);
+  }, [orders, listFilterState, sortColumn, sortDirection]);
 
   const catalogByCode = useMemo(() => {
     const map = new Map();
@@ -2112,13 +2163,11 @@ export default function OrderTable({ orders, userRole }) {
             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
           >
             <option value="">All Users</option>
-            {[...new Set(orders?.map((o) => o.created_by).filter(Boolean))]
-              .sort()
-              .map((user) => (
-                <option key={user} value={user}>
-                  {user}
-                </option>
-              ))}
+            {createdByFilterOptions.map((user) => (
+              <option key={user} value={user}>
+                {user}
+              </option>
+            ))}
           </select>
         </div>
 
