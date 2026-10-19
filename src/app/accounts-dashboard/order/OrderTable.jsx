@@ -365,32 +365,29 @@ export default function OrderTable({ orders, userRole }) {
     );
   };
 
-  const filteredOrders = useMemo(() => {
-    if (!orders) return [];
-
-    const lowercasedQuery = appliedSearchQuery.toLowerCase();
-    return orders.filter((order) => {
-      if (appliedStatusFilter) {
+  const matchesListFilters = useCallback(
+    (order, { omitCreatedBy = false } = {}) => {
+      if (statusFilter) {
         const orderStatus = getStatusText(order)
           .text.toLowerCase()
           .replace(/\s+/g, "");
-        if (orderStatus !== appliedStatusFilter.toLowerCase()) return false;
+        if (orderStatus !== statusFilter.toLowerCase()) return false;
       }
 
-      if (appliedDateFrom || appliedDateTo) {
+      if (dateFrom || dateTo) {
         const created = order.created_at ? new Date(order.created_at) : null;
         if (!created || isNaN(created)) return false;
-        if (appliedDateFrom) {
-          const from = new Date(appliedDateFrom + "T00:00:00");
+        if (dateFrom) {
+          const from = new Date(dateFrom + "T00:00:00");
           if (created < from) return false;
         }
-        if (appliedDateTo) {
-          const to = new Date(appliedDateTo + "T23:59:59");
+        if (dateTo) {
+          const to = new Date(dateTo + "T23:59:59");
           if (created > to) return false;
         }
       }
 
-      if (appliedCreatedByFilter && order.created_by !== appliedCreatedByFilter) {
+      if (!omitCreatedBy && createdByFilter && order.created_by !== createdByFilter) {
         return false;
       }
 
@@ -398,9 +395,12 @@ export default function OrderTable({ orders, userRole }) {
         return false;
       }
 
-      if (appliedPaymentTermsFilter && order.payment_terms !== appliedPaymentTermsFilter) {
+      if (paymentTermsFilter && order.payment_terms !== paymentTermsFilter) {
         return false;
       }
+
+      const lowercasedQuery = searchQuery.toLowerCase();
+      if (!lowercasedQuery) return true;
 
       return (
         order.order_id?.toLowerCase().includes(lowercasedQuery) ||
@@ -409,16 +409,32 @@ export default function OrderTable({ orders, userRole }) {
         order.contact?.toLowerCase().includes(lowercasedQuery) ||
         order.state?.toLowerCase().includes(lowercasedQuery)
       );
+    },
+    [
+      searchQuery,
+      statusFilter,
+      paymentTermsFilter,
+      dateFrom,
+      dateTo,
+      createdByFilter,
+    ],
+  );
+
+  const createdByFilterOptions = useMemo(() => {
+    if (!orders?.length) return [];
+    const users = new Set();
+    orders.forEach((order) => {
+      if (matchesListFilters(order, { omitCreatedBy: true }) && order.created_by) {
+        users.add(String(order.created_by).trim());
+      }
     });
-  }, [
-    orders,
-    appliedSearchQuery,
-    appliedStatusFilter,
-    appliedPaymentTermsFilter,
-    appliedDateFrom,
-    appliedDateTo,
-    appliedCreatedByFilter,
-  ]);
+    return [...users].sort((a, b) => a.localeCompare(b));
+  }, [orders, matchesListFilters]);
+
+  const filteredOrders = useMemo(() => {
+    if (!orders) return [];
+    return orders.filter((order) => matchesListFilters(order));
+  }, [orders, matchesListFilters]);
 
   const exportToCSV = () => {
     const headers = [
@@ -534,13 +550,11 @@ export default function OrderTable({ orders, userRole }) {
             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
           >
             <option value="">All Users</option>
-            {[...new Set(orders?.map((o) => o.created_by).filter(Boolean))]
-              .sort()
-              .map((user) => (
-                <option key={user} value={user}>
-                  {user}
-                </option>
-              ))}
+            {createdByFilterOptions.map((user) => (
+              <option key={user} value={user}>
+                {user}
+              </option>
+            ))}
           </select>
         </div>
         <div className="min-w-[140px] flex-1 sm:max-w-[200px]">
