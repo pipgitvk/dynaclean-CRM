@@ -9,7 +9,11 @@ import {
 } from "@/lib/orderDocumentEditRules";
 import { ensureOrderLinkedPaymentColumns } from "@/lib/ensureOrderLinkedPaymentColumns";
 import { lookupInvoiceLinkedPayment } from "@/lib/invoiceLinkedPaymentLookup";
-import { sumPaymentAmountCsv } from "@/lib/orderPaymentHistory";
+import {
+  linkedPaymentsToOrderPaymentCsv,
+  mergeOrderPaymentWithLinkedCsv,
+  sumPaymentAmountCsv,
+} from "@/lib/orderPaymentHistory";
 
 const MAX_FILES_PER_FIELD = 5;
 
@@ -96,7 +100,9 @@ export async function POST(req) {
     // Find quote_number and order state
     const [orderRows] = await conn.execute(
       `SELECT quote_number, duedate, dispatch_status,
-              ewaybill_file, einvoice_file, report_file, deliverchallan
+              ewaybill_file, einvoice_file, report_file, deliverchallan,
+              payment_id, payment_date, payment_amount, payment_status,
+              amount_received, payment_received_date, linked_payments_json
        FROM neworder WHERE order_id = ?`,
       [orderId]
     );
@@ -155,16 +161,46 @@ export async function POST(req) {
         if (Array.isArray(linked.payments) && linked.payments.length) {
           linkedPaymentsJson = JSON.stringify(linked.payments);
         }
+        const fromPayments = linkedPaymentsToOrderPaymentCsv(
+          linked.payments || [],
+        );
+        let linkedCsv = null;
         if (linked.payment_amount_csv) {
-          paymentAmountSave = linked.payment_amount_csv;
-          paymentIdSave = linked.payment_id || paymentIdSave;
-          paymentDateSave = linked.payment_date || paymentDateSave;
+          linkedCsv = {
+            payment_id: linked.payment_id || fromPayments.payment_id,
+            payment_date: linked.payment_date || fromPayments.payment_date,
+            payment_amount: linked.payment_amount_csv,
+          };
+        } else if (fromPayments.payment_amount) {
+          linkedCsv = fromPayments;
         } else if (amountReceived != null) {
-          paymentAmountSave = String(amountReceived);
-          paymentIdSave = linked.payment_id || paymentIdSave;
-          paymentDateSave = linked.payment_date || paymentDateSave;
+          linkedCsv = {
+            payment_id: linked.payment_id || null,
+            payment_date: linked.payment_date || null,
+            payment_amount: String(amountReceived),
+          };
+        }
+
+        if (linkedCsv?.payment_amount) {
+          const merged = mergeOrderPaymentWithLinkedCsv(existingOrder, linkedCsv);
+          paymentAmountSave = merged.payment_amount;
+          paymentIdSave = merged.payment_id || paymentIdSave;
+          paymentDateSave = merged.payment_date || paymentDateSave;
         }
       }
+    }
+
+    if (!paymentAmountSave && existingOrder.payment_amount) {
+      paymentAmountSave = String(existingOrder.payment_amount);
+      paymentIdSave = paymentIdSave ?? existingOrder.payment_id ?? null;
+      paymentDateSave = paymentDateSave ?? existingOrder.payment_date ?? null;
+    }
+    if (amountReceived == null && existingOrder.amount_received != null) {
+      amountReceived = existingOrder.amount_received;
+      paymentReceivedDate =
+        paymentReceivedDate ?? existingOrder.payment_received_date ?? null;
+      linkedPaymentsJson =
+        linkedPaymentsJson ?? existingOrder.linked_payments_json ?? null;
     }
 
     // Compute payment_status server-side (supports comma-separated payment_amount)
@@ -177,7 +213,9 @@ export async function POST(req) {
     if (paid >= total && total > 0) paymentStatus = "paid";
     else if (paid > 0 && paid < total) paymentStatus = "partially paid";
     else if (paid === 0 && isOverdue) paymentStatus = "over due";
-    else paymentStatus = "pending";
+    else if (paid === 0 && existingOrder.payment_status) {
+      paymentStatus = existingOrder.payment_status;
+    } else paymentStatus = "pending";
 
     // Save to DB (merge file fields when not re-uploaded)
     const mergedReportPath = reportPath || existingOrder.report_file || "";

@@ -84,6 +84,60 @@ export function sumPaymentAmountCsv(value) {
     .reduce((sum, n) => sum + n, 0);
 }
 
+function rowsFromPaymentCsvFields(payment_id, payment_date, payment_amount) {
+  const amounts = splitCsv(payment_amount).filter(Boolean);
+  if (!amounts.length) return [];
+
+  const dates = splitCsv(payment_date);
+  const ids = splitCsv(payment_id);
+  return amounts.map((amount, i) => ({
+    id: ids[i] || "",
+    date: dates[i] || dates[0] || "",
+    amount: String(amount).trim(),
+  }));
+}
+
+/**
+ * Keep existing order payments; append statement-linked lines (skip duplicate UTR/trans_id).
+ */
+export function mergeOrderPaymentWithLinkedCsv(order, linkedCsv) {
+  const existing = buildOrderPaymentRows(order);
+  if (!linkedCsv?.payment_amount) {
+    return paymentFieldsFromRows(existing);
+  }
+
+  const linked = rowsFromPaymentCsvFields(
+    linkedCsv.payment_id,
+    linkedCsv.payment_date,
+    linkedCsv.payment_amount,
+  ).filter((r) => {
+    const amt = Number(r.amount);
+    return !Number.isNaN(amt) && amt !== 0;
+  });
+
+  if (!linked.length) {
+    return paymentFieldsFromRows(existing);
+  }
+
+  const seenTransIds = new Set(
+    existing
+      .map((r) => (r.id || "").trim())
+      .filter(Boolean),
+  );
+
+  const merged = [...existing];
+  for (const row of linked) {
+    const id = (row.id || "").trim();
+    if (id) {
+      if (seenTransIds.has(id)) continue;
+      seenTransIds.add(id);
+    }
+    merged.push(row);
+  }
+
+  return paymentFieldsFromRows(merged);
+}
+
 /** Map statement-linked payment lines → neworder payment_id / payment_date / payment_amount CSV. */
 export function linkedPaymentsToOrderPaymentCsv(payments) {
   const rows = (payments || []).map((p) => ({

@@ -5,7 +5,6 @@ import { appendSqlWhereClause, orderListApprovalWhereSql } from "@/lib/orderAppr
 import { orderListReportWhereSql } from "@/lib/orderReportVisibility";
 import { canViewAllOrders } from "@/lib/dataScope";
 import { ensureOrderLinkedPaymentColumns } from "@/lib/ensureOrderLinkedPaymentColumns";
-import { syncOrderLinkedPaymentFromInvoice } from "@/lib/syncOrderLinkedPaymentFromInvoice";
 import { attachActiveInvoiceFields } from "@/lib/activeInvoiceForOrder";
 import {
   ORDER_LIST_DISPATCHED_STOCK_COUNT_SELECT,
@@ -140,19 +139,6 @@ export default async function OrdersPage() {
   const [orders] = await conn.execute(sql, params);
 
   let enrichedOrders = [...orders];
-  const needsLinkedPaymentSync = enrichedOrders.filter(
-    (o) =>
-      String(o.invoice_number || "").trim() ||
-      String(o.quote_number || "").trim(),
-  );
-  for (const o of needsLinkedPaymentSync) {
-    const idx = enrichedOrders.findIndex((x) => x.order_id === o.order_id);
-    if (idx === -1) continue;
-    enrichedOrders[idx] = await syncOrderLinkedPaymentFromInvoice(
-      conn,
-      enrichedOrders[idx],
-    );
-  }
 
   enrichedOrders = await attachActiveInvoiceFields(conn, enrichedOrders);
   enrichedOrders = await attachBookingBatchesToOrders(conn, enrichedOrders);

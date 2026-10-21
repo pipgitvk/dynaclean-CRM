@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { lookupOrderUploadPrefill } from "@/lib/orderInvoiceUploadLookup";
-import { syncOrderLinkedPaymentFromInvoice } from "@/lib/syncOrderLinkedPaymentFromInvoice";
 
 export async function GET(req) {
   try {
@@ -22,19 +21,6 @@ export async function GET(req) {
 
     const conn = await getDbConnection();
     const result = await lookupOrderUploadPrefill(conn, orderId);
-
-    if (!result.found) {
-      const [orderRows] = await conn.execute(
-        `SELECT order_id, quote_number, invoice_number, totalamt, amount_received,
-                payment_received_date, linked_payments_json, payment_id, payment_date,
-                payment_amount, payment_status
-         FROM neworder WHERE order_id = ? LIMIT 1`,
-        [String(orderId).trim()],
-      );
-      if (orderRows?.length) {
-        await syncOrderLinkedPaymentFromInvoice(conn, orderRows[0]);
-      }
-    }
 
     return NextResponse.json(result);
   } catch (err) {
