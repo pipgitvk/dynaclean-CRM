@@ -542,12 +542,6 @@ const allMenuItems = [
         icon: "ClipboardList",
       },
       {
-        path: "/admin-dashboard/spares-new",
-        name: "Spares New",
-        roles: ["SUPERADMIN"],
-        icon: "ClipboardList",
-      },
-      {
         path: "/admin-dashboard/product-accessories",
         name: "Product Accessories",
         roles: ["SUPERADMIN"],
