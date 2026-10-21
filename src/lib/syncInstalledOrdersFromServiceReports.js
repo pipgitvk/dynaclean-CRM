@@ -1,8 +1,14 @@
+import { sqlTrimUtf8EqColumns } from "@/lib/sqlUtf8Compare";
+
 /**
  * When a linked service has a completed installation report, mark the order installed
  * so it drops off Upcoming Installations (same as manual "Installed" action).
  */
 export async function syncInstalledOrdersFromCompletedInstallationReports(db) {
+  const serialEq = sqlTrimUtf8EqColumns("sr.serial_number", "d.serial_no");
+  const serviceIdEq = sqlTrimUtf8EqColumns("ir.service_id", "sr.service_id");
+  const quoteEq = sqlTrimUtf8EqColumns("d.quote_number", "no.quote_number");
+
   const [result] = await db.query(`
     UPDATE neworder no
     SET no.installation_status = 1
@@ -11,10 +17,10 @@ export async function syncInstalledOrdersFromCompletedInstallationReports(db) {
         SELECT 1
         FROM dispatch d
         INNER JOIN service_records sr
-          ON sr.serial_number COLLATE utf8mb4_unicode_ci = d.serial_no COLLATE utf8mb4_unicode_ci
+          ON ${serialEq}
         LEFT JOIN installation_reports ir
-          ON ir.service_id COLLATE utf8mb4_unicode_ci = sr.service_id COLLATE utf8mb4_unicode_ci
-        WHERE d.quote_number COLLATE utf8mb4_unicode_ci = no.quote_number COLLATE utf8mb4_unicode_ci
+          ON ${serviceIdEq}
+        WHERE ${quoteEq}
           AND d.serial_no IS NOT NULL
           AND d.serial_no <> ''
           AND UPPER(TRIM(sr.status)) = 'COMPLETED'

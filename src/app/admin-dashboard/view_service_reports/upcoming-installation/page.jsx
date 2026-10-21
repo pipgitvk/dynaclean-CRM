@@ -18,6 +18,7 @@ export default function UpcomingInstallationsPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
@@ -132,6 +133,7 @@ export default function UpcomingInstallationsPage() {
   // ========= FETCH DATA ==========
   const fetchData = useCallback(async (filter) => {
     setLoading(true);
+    setFetchError("");
     try {
       const res = await fetch(`/api/installation/upcoming?type=${filter}`, {
         cache: "no-store",
@@ -139,6 +141,7 @@ export default function UpcomingInstallationsPage() {
       const data = await res.json();
       if (!res.ok) {
         console.error("Upcoming installations API error:", data);
+        setFetchError(data.error || data.message || "Failed to load installations");
         setRecords([]);
         return;
       }
@@ -149,6 +152,7 @@ export default function UpcomingInstallationsPage() {
       setCurrentPage(data.currentPage || 1);
     } catch (err) {
       console.error("Fetch error", err);
+      setFetchError("Network error while loading installations");
       setRecords([]);
     } finally {
       setLoading(false);
@@ -262,7 +266,11 @@ export default function UpcomingInstallationsPage() {
         <div className="text-center py-10 text-gray-500">Loading...</div>
       )}
 
-      {!loading && filteredRecords.length === 0 && (
+      {!loading && fetchError && (
+        <div className="text-center py-10 text-red-600">{fetchError}</div>
+      )}
+
+      {!loading && !fetchError && filteredRecords.length === 0 && (
         <div className="text-center py-10 text-gray-500">No records found.</div>
       )}
 

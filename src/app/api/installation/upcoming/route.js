@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { UNREGISTERED_PRODUCT_ORDER_SQL, IS_PRODUCT_DISPATCH_ITEM_SQL } from "@/lib/pendingProductRegistrationCount";
 import { syncInstalledOrdersFromCompletedInstallationReports } from "@/lib/syncInstalledOrdersFromServiceReports";
+import { sqlTrimUtf8EqColumns } from "@/lib/sqlUtf8Compare";
 
 /**
  * API route for upcoming installations.
@@ -30,7 +31,7 @@ export async function GET(req) {
       typeFilter = `
         AND EXISTS (
           SELECT 1 FROM spare_list sl 
-          WHERE sl.spare_number COLLATE utf8mb4_unicode_ci = d.item_code COLLATE utf8mb4_unicode_ci
+          WHERE ${sqlTrimUtf8EqColumns("sl.spare_number", "d.item_code")}
         )
       `;
     }
@@ -49,8 +50,8 @@ export async function GET(req) {
         (
           SELECT GROUP_CONCAT(DISTINCT sr2.service_id ORDER BY sr2.service_id SEPARATOR ', ')
           FROM dispatch d2
-          INNER JOIN service_records sr2 ON sr2.serial_number COLLATE utf8mb4_unicode_ci = d2.serial_no COLLATE utf8mb4_unicode_ci
-          WHERE d2.quote_number COLLATE utf8mb4_unicode_ci = no.quote_number COLLATE utf8mb4_unicode_ci
+          INNER JOIN service_records sr2 ON ${sqlTrimUtf8EqColumns("sr2.serial_number", "d2.serial_no")}
+          WHERE ${sqlTrimUtf8EqColumns("d2.quote_number", "no.quote_number")}
             AND d2.serial_no IS NOT NULL
             AND d2.serial_no <> ''
         ) AS service_id,
@@ -78,14 +79,13 @@ export async function GET(req) {
         CASE
           WHEN EXISTS (
             SELECT 1 FROM warranty_products wp
-            WHERE TRIM(wp.serial_number) COLLATE utf8mb4_unicode_ci
-                = TRIM(d.serial_no) COLLATE utf8mb4_unicode_ci
+            WHERE ${sqlTrimUtf8EqColumns("wp.serial_number", "d.serial_no")}
           ) THEN 1
           ELSE 0
         END AS warranty_registered
       FROM neworder no
-       JOIN dispatch d ON d.quote_number COLLATE utf8mb4_unicode_ci = no.quote_number COLLATE utf8mb4_unicode_ci
-       LEFT JOIN quotation_items qi ON qi.quote_number COLLATE utf8mb4_unicode_ci = no.quote_number COLLATE utf8mb4_unicode_ci
+       JOIN dispatch d ON ${sqlTrimUtf8EqColumns("d.quote_number", "no.quote_number")}
+       LEFT JOIN quotation_items qi ON ${sqlTrimUtf8EqColumns("qi.quote_number", "no.quote_number")}
        WHERE d.serial_no IS NOT NULL AND d.serial_no <> ''
        AND no.installation_status = 0
        AND (no.is_returned = 0 OR no.is_returned = 2 OR no.is_returned IS NULL)
