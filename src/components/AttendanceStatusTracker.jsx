@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CircleCheck, LogOut } from "lucide-react";
+import { CircleCheck, LogOut, X } from "lucide-react";
 import { MdFastfood } from "react-icons/md";
 import { FaBuildingCircleCheck } from "react-icons/fa6";
 import { SiGitea } from "react-icons/si";
@@ -31,6 +31,7 @@ export default function AttendanceStatusTracker({ username }) {
   const [nowMs, setNowMs] = useState(Date.now());
   const [actionLoading, setActionLoading] = useState(false);
   const [breakRemainingSec, setBreakRemainingSec] = useState(null);
+  const [showCheckoutConfirm, setShowCheckoutConfirm] = useState(false);
 
   const refreshData = useCallback(async () => {
     try {
@@ -366,6 +367,7 @@ export default function AttendanceStatusTracker({ username }) {
         actionInfo.type === "checkout" &&
         actionInfo.status === "ready"
       ) {
+        setShowCheckoutConfirm(false);
         toast.success("Checked out successfully.");
       } else if (
         actionInfo.status === "ready" &&
@@ -497,7 +499,10 @@ export default function AttendanceStatusTracker({ username }) {
       {showCheckout ? (
         <button
           type="button"
-          onClick={() => performAction(checkoutInfo)}
+          onClick={() => {
+            if (checkoutInfo.status === "completed") return;
+            setShowCheckoutConfirm(true);
+          }}
           disabled={actionLoading || checkoutInfo.status === "completed"}
           className={buildButtonClasses(checkoutInfo, { isPrimary: false })}
           title={titleFor(checkoutInfo)}
@@ -517,6 +522,62 @@ export default function AttendanceStatusTracker({ username }) {
           )}
         </button>
       ) : null}
+
+      {showCheckoutConfirm && checkoutInfo?.status === "ready" && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="checkout-confirm-title"
+        >
+          <div className="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <h2
+                id="checkout-confirm-title"
+                className="text-lg font-semibold text-gray-900"
+              >
+                Confirm checkout
+              </h2>
+              <button
+                type="button"
+                onClick={() => setShowCheckoutConfirm(false)}
+                disabled={actionLoading}
+                className="rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50"
+                aria-label="Close"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <p className="mb-6 text-sm text-gray-600">
+              Are you sure you want to check out for today? Your location will be
+              recorded when you confirm.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowCheckoutConfirm(false)}
+                disabled={actionLoading}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => performAction(checkoutInfo)}
+                disabled={actionLoading}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                {actionLoading ? (
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                ) : (
+                  <LogOut size={16} aria-hidden />
+                )}
+                Checkout
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
