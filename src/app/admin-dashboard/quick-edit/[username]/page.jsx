@@ -18,6 +18,7 @@ import {
   notifyEmployeesListReload,
   reloadEmployeesAdminPage,
 } from "@/lib/employeesPageReload";
+import { useEmployeeRoleOptions } from "@/hooks/useEmployeeRoleOptions";
 
 function uniqueStrings(arr) {
   return [...new Set((arr || []).map((v) => String(v || "").trim()).filter(Boolean))];
@@ -154,6 +155,7 @@ const QuickEditPage = () => {
   const { username } = useParams();
   const router = useRouter();
   const isEmbed = useSearchParams().get("embed") === "1";
+  const { roles: userRoleOptions } = useEmployeeRoleOptions();
   const [employee, setEmployee] = useState({
     username: "",
     email: "",
@@ -845,33 +847,17 @@ const QuickEditPage = () => {
               className="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
             >
               <option value="">-- Select Role --</option>
-              <option value="DIRECTOR">DIRECTOR</option>
-              <option value="ACCOUNTANT">ACCOUNTANT</option>
-              <option value="TEAM LEADER">TEAM LEADER</option>
-              <option value="SALES">SALES</option>
-              <option value="SALES CUM BACKOFFICE">SALES CUM BACKOFFICE</option>
-              <option value="SALES HEAD">SALES HEAD</option>
-              <option value="DIGITAL MARKETER">DIGITAL MARKETER</option>
-              <option value="ADMIN">ADMIN</option>
-              <option value="HR">HR</option>
-              <option value="HR HEAD">HR HEAD</option>
-              <option value="JUNIOR HR EXECUTIVE">JUNIOR HR EXECUTIVE</option>
-              <option value="HR EXECUTIVE">HR EXECUTIVE</option>
-              <option value="HR RECRUITER">HR RECRUITER</option>
-              <option value="GEM">GEM</option>
-              <option value="GRAPHIC DESIGNER">GRAPHIC DESIGNER</option>
-              <option value="DESIGN ENGINEER">DESIGN ENGINEER</option>
-              <option value="DEVELOPER">DEVELOPER</option>
-              <option value="SERVICE ENGINEER">SERVICE ENGINEER</option>
-              <option value="SERVICE TECHNICIAN">SERVICE TECHNICIAN</option>
-              <option value="SERVICE HEAD">SERVICE HEAD</option>
-              <option value="SERVICE SUPPORT">SERVICE SUPPORT</option>
-              <option value="WELDER">WELDER</option>
-              <option value="WELDER HELPER">WELDER HELPER</option>
-              <option value="WAREHOUSE INCHARGE">WAREHOUSE INCHARGE</option>
-              <option value="EA">EA</option>
-              <option value="MACHINE OPERATOR">MACHINE OPERATOR</option>
-              <option value="PRODUCTION ENGINEER">PRODUCTION ENGINEER</option>
+              {userRoleOptions.map((role) => (
+                <option key={role} value={role}>
+                  {role}
+                </option>
+              ))}
+              {(employee.userRole || "").trim() &&
+                !userRoleOptions.includes((employee.userRole || "").trim()) && (
+                  <option value={(employee.userRole || "").trim()}>
+                    {(employee.userRole || "").trim()}
+                  </option>
+                )}
             </select>
           </div>
           <div>

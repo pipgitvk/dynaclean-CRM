@@ -11,6 +11,10 @@ import {
   applyRoleDenyModuleRestrictions,
   applySuperadminOnlyModuleRestrictions,
 } from "@/lib/moduleAccess";
+import {
+  getRoleDefaultModulesForBulkUi,
+  saveRoleDefaultModulesForBulkUi,
+} from "@/lib/crmEmployeeRoles";
 
 const VALID_OPERATIONS = new Set(["REPLACE", "MERGE", "REMOVE"]);
 
@@ -57,13 +61,30 @@ export async function GET(req) {
   const db = await getDbConnection();
   await ensureModuleAccessColumn(db);
 
+  if (searchParams.get("defaultsOnly") === "1") {
+    const moduleKeys = await getRoleDefaultModulesForBulkUi(db, role);
+    return NextResponse.json({
+      role,
+      moduleKeys,
+      userCount: 0,
+      source: "role-default",
+    });
+  }
+
+  const rolePreset = await getRoleDefaultModulesForBulkUi(db, role);
+
   const [rows] = await db.query(
     `SELECT module_access, userRole FROM rep_list WHERE UPPER(TRIM(userRole)) = ?`,
     [role],
   );
 
   if (!rows.length) {
-    return NextResponse.json({ role, moduleKeys: [] });
+    return NextResponse.json({
+      role,
+      moduleKeys: rolePreset,
+      userCount: 0,
+      source: "role-default",
+    });
   }
 
   const unionSet = new Set();
@@ -75,9 +96,19 @@ export async function GET(req) {
   }
 
   const known = new Set(ALL_MODULE_KEYS);
-  const moduleKeys = uniqueStrings([...unionSet]).filter((k) => known.has(k));
+  let moduleKeys = uniqueStrings([...unionSet]).filter((k) => known.has(k));
+  let source = "users-union";
+  if (moduleKeys.length === 0) {
+    moduleKeys = rolePreset;
+    source = "role-default";
+  }
 
-  return NextResponse.json({ role, moduleKeys, userCount: rows.length });
+  return NextResponse.json({
+    role,
+    moduleKeys,
+    userCount: rows.length,
+    source,
+  });
 }
 
 export async function POST(req) {
@@ -160,6 +191,12 @@ export async function POST(req) {
       [JSON.stringify(next), username],
     );
     updated += 1;
+  }
+
+  if (operation === "REPLACE") {
+    for (const r of roles) {
+      await saveRoleDefaultModulesForBulkUi(db, r, moduleKeys);
+    }
   }
 
   return NextResponse.json({

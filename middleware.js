@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 import { normalizeRoleKey, isJwtAccountingRole } from "@/lib/roleKeyUtils";
+import { getRoleDashboardPath } from "@/lib/getRoleDashboardPath";
 
 /** Attendance rules: SUPERADMIN + ADMIN + HR roles. */
 const ATTENDANCE_RULES_MIDDLEWARE_ROLES = [
@@ -53,25 +54,8 @@ export async function middleware(request) {
       const role = payload.role;
       const roleNorm = String(role ?? "").trim().toUpperCase();
 
-      if (role === "SUPERADMIN") {
-        return NextResponse.redirect(new URL("/admin-dashboard", request.url));
-      } else if (roleNorm === "DIRECTOR") {
-        return NextResponse.redirect(new URL("/director-dashboard", request.url));
-      } else if (roleNorm.includes("SALES")) {
-        return NextResponse.redirect(new URL("/sales-dashboard", request.url));
-      } else if (roleNorm.includes("SERVICE") && roleNorm.includes("HEAD")) {
-        return NextResponse.redirect(new URL("/service-head-dashboard", request.url));
-      } else if (roleNorm.includes("HR")) {
-        return NextResponse.redirect(new URL("/hr-dashboard", request.url));
-      } else if (roleNorm.includes("DIGITAL") || roleNorm.includes("MARKETER")) {
-        return NextResponse.redirect(new URL("/digital-marketing-dashboard", request.url));
-      } else if (roleNorm.includes("ACCOUNTANT")) {
-        return NextResponse.redirect(new URL("/accounts-dashboard", request.url));
-      } else if (roleNorm === "THIRD PARTY ENGINEER") {
-        return NextResponse.redirect(new URL("/third-party-engineer-dashboard", request.url));
-      } else {
-        return NextResponse.redirect(new URL("/user-dashboard", request.url));
-      }
+      const home = getRoleDashboardPath(role);
+      return NextResponse.redirect(new URL(home, request.url));
     } catch {
       return NextResponse.next();
     }

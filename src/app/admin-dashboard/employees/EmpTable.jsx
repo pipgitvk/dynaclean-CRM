@@ -5,7 +5,18 @@ import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Cookies from "js-cookie";
 import Link from "next/link";
-import { LogIn, Key, Edit, Shield, UserPlus, X, ExternalLink, Clock } from "lucide-react";
+import {
+  LogIn,
+  Key,
+  Edit,
+  Shield,
+  UserPlus,
+  X,
+  ExternalLink,
+  Clock,
+  BadgePlus,
+  Trash2,
+} from "lucide-react";
 import { getRoleDashboardPath } from "@/lib/getRoleDashboardPath";
 import SearchableSelect from "@/components/ui/SearchableSelect";
 import toast from "react-hot-toast";
@@ -20,6 +31,8 @@ import { getRoleDefaultModuleKeys } from "@/lib/roleDefaultModuleAccess";
 import { ADMIN_EMPLOYEES_RELOAD_MESSAGE } from "@/lib/employeesPageReload";
 import EmployeeIframeModal from "@/components/employees/EmployeeIframeModal";
 import { useEmployeeSubPageNavigation } from "@/hooks/useEmployeeSubPageNavigation";
+import { useEmployeeRoleOptions } from "@/hooks/useEmployeeRoleOptions";
+import { ROLE_DASHBOARD_HOME_OPTIONS } from "@/lib/employeeRoles";
 
 function uniqueStrings(arr) {
   return [...new Set((arr || []).map((v) => String(v || "").trim()).filter(Boolean))];
@@ -332,8 +345,15 @@ const EmpTable = ({ employees }) => {
   const [bulkModuleSearch, setBulkModuleSearch] = useState("");
   const [togglingTimeRestriction, setTogglingTimeRestriction] = useState("");
   const [timeRestrictionMap, setTimeRestrictionMap] = useState({});
+  const [showManageRolesModal, setShowManageRolesModal] = useState(false);
+  const [roleEntries, setRoleEntries] = useState([]);
+  const [newRoleName, setNewRoleName] = useState("");
+  const [newRoleDashboard, setNewRoleDashboard] = useState("/user-dashboard");
+  const [rolesModalLoading, setRolesModalLoading] = useState(false);
+  const [rolesModalSaving, setRolesModalSaving] = useState(false);
   const bulkUserEditedRef = useRef(false);
   const router = useRouter();
+  const { roles: allRoles, reload: reloadEmployeeRoles } = useEmployeeRoleOptions();
 
   const persistBulkSelectionForRole = useCallback((role, modules) => {
     const key = String(role || "").trim();
@@ -355,7 +375,10 @@ const EmpTable = ({ employees }) => {
       );
       if (!res.ok) return [];
       const data = await res.json();
-      const modules = Array.isArray(data?.moduleKeys) ? data.moduleKeys : [];
+      let modules = Array.isArray(data?.moduleKeys) ? data.moduleKeys : [];
+      if (!modules.length) {
+        modules = getRoleDefaultModuleKeys(key);
+      }
       setBulkRoleSelections((prev) => ({ ...(prev || {}), [key]: modules }));
       if (applyToSelection && !bulkUserEditedRef.current) {
         setBulkSelectedModules(modules);
@@ -529,36 +552,104 @@ const EmpTable = ({ employees }) => {
 
   const maskStatus = (status) => (status == 1 ? "Active" : "Inactive");
 
-  const allRoles = [
-    "ACCOUNTANT",
-    "TEAM LEADER",
-    "SALES",
-    "SALES CUM BACKOFFICE",
-    "SALES HEAD",
-    "DIGITAL MARKETER",
-    "ADMIN",
-    "DIRECTOR",
-    "HR",
-    "HR HEAD",
-    "JUNIOR HR EXECUTIVE",
-    "HR EXECUTIVE",
-    "HR RECRUITER",
-    "GEM",
-    "GRAPHIC DESIGNER",
-    "DESIGN ENGINEER",
-    "DEVELOPER",
-    "SERVICE ENGINEER",
-    "SERVICE TECHNICIAN",
-    "SERVICE HEAD",
-    "SERVICE SUPPORT ",
-    "WELDER",
-    "WELDER HELPER",
-    "WAREHOUSE INCHARGE",
-    "EA",
-    "MACHINE OPERATOR",
-    "PRODUCTION ENGINEER",
-    "BUSINESS DEVELOPMENT OFFICER",
-  ];
+  const loadRolesModalData = useCallback(async () => {
+    setRolesModalLoading(true);
+    try {
+      const res = await fetch(`/api/admin/employee-roles?t=${Date.now()}`, {
+        cache: "no-store",
+      });
+      if (!res.ok) {
+        toast.error("Could not load roles.");
+        return;
+      }
+      const data = await res.json();
+      setRoleEntries(
+        Array.isArray(data?.entries)
+          ? data.entries
+          : Array.isArray(data?.custom)
+            ? data.custom
+            : [],
+      );
+      await reloadEmployeeRoles();
+    } catch {
+      toast.error("Could not load roles.");
+    } finally {
+      setRolesModalLoading(false);
+    }
+  }, [reloadEmployeeRoles]);
+
+  const openManageRolesModal = async () => {
+    setShowManageRolesModal(true);
+    setNewRoleName("");
+    setNewRoleDashboard("/user-dashboard");
+    await loadRolesModalData();
+  };
+
+  const submitNewRole = async () => {
+    const name = String(newRoleName || "").trim();
+    if (!name) {
+      toast.error("Enter a role name.");
+      return;
+    }
+    setRolesModalSaving(true);
+    try {
+      const res = await fetch("/api/admin/employee-roles", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          roleName: name,
+          dashboardPath: newRoleDashboard,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(data?.message || "Failed to create role.");
+        return;
+      }
+      toast.success(`Role "${data?.created?.roleName || name}" created.`);
+      setNewRoleName("");
+      setRoleEntries(
+        Array.isArray(data?.entries)
+          ? data.entries
+          : Array.isArray(data?.custom)
+            ? data.custom
+            : [],
+      );
+      await reloadEmployeeRoles();
+    } catch {
+      toast.error("Failed to create role.");
+    } finally {
+      setRolesModalSaving(false);
+    }
+  };
+
+  const deleteCustomRole = async (id, roleName) => {
+    if (!window.confirm(`Delete custom role "${roleName}"?`)) return;
+    setRolesModalSaving(true);
+    try {
+      const res = await fetch(`/api/admin/employee-roles?id=${id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(data?.message || "Could not delete role.");
+        return;
+      }
+      toast.success("Role deleted.");
+      setRoleEntries(
+        Array.isArray(data?.entries)
+          ? data.entries
+          : Array.isArray(data?.custom)
+            ? data.custom
+            : [],
+      );
+      await reloadEmployeeRoles();
+    } catch {
+      toast.error("Could not delete role.");
+    } finally {
+      setRolesModalSaving(false);
+    }
+  };
 
   const bulkModuleTree = useMemo(
     () => getModuleTreeForEmployeeBulkUi(bulkRole),
@@ -600,7 +691,7 @@ const EmpTable = ({ employees }) => {
     setBulkTouched(false);
     const key = String(role || "").trim();
     const cached = bulkRoleSelections?.[key];
-    if (Array.isArray(cached)) {
+    if (Array.isArray(cached) && cached.length > 0) {
       setBulkSelectedModules(cached);
     } else {
       await fetchRoleModulesFromDB(role, { applyToSelection: true });
@@ -641,12 +732,33 @@ const EmpTable = ({ employees }) => {
     setBulkSelectedModules(allSelected ? [] : [...ALL_MODULE_KEYS]);
   };
 
-  const applyDefaultModules = () => {
+  const applyDefaultModules = async () => {
+    const trimmedRole = String(bulkRole || "").trim();
+    if (!trimmedRole) return;
     bulkUserEditedRef.current = true;
     setBulkTouched(true);
-    const trimmedRole = String(bulkRole || "").trim();
-    const defaults = getRoleDefaultModuleKeys(trimmedRole);
-    setBulkSelectedModules(defaults);
+    setBulkRoleLoading(true);
+    try {
+      const res = await fetch(
+        `/api/admin/bulk-module-access?role=${encodeURIComponent(trimmedRole)}&defaultsOnly=1&t=${Date.now()}`,
+        { cache: "no-store" },
+      );
+      let defaults = getRoleDefaultModuleKeys(trimmedRole);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data?.moduleKeys) && data.moduleKeys.length > 0) {
+          defaults = data.moduleKeys;
+        }
+      }
+      setBulkSelectedModules(defaults);
+      persistBulkSelectionForRole(trimmedRole, defaults);
+    } catch {
+      const defaults = getRoleDefaultModuleKeys(trimmedRole);
+      setBulkSelectedModules(defaults);
+      persistBulkSelectionForRole(trimmedRole, defaults);
+    } finally {
+      setBulkRoleLoading(false);
+    }
   };
 
   const submitBulkModules = async () => {
@@ -730,16 +842,23 @@ const EmpTable = ({ employees }) => {
         </button>
         <button
           type="button"
+          onClick={openManageRolesModal}
+          className="text-white bg-violet-600 hover:bg-violet-700 font-medium whitespace-nowrap rounded-lg text-sm px-5 py-2.5 flex items-center justify-center space-x-2 shadow-md"
+        >
+          <BadgePlus size={18} />
+          <span>Manage Roles</span>
+        </button>
+        <button
+          type="button"
           onClick={async () => {
             bulkUserEditedRef.current = false;
             setBulkTouched(false);
             const key = String(bulkRole || "").trim();
             const cached = bulkRoleSelections?.[key];
-            if (Array.isArray(cached)) {
+            setShowGlobalModulesModal(true);
+            if (Array.isArray(cached) && cached.length > 0) {
               setBulkSelectedModules(cached);
-              setShowGlobalModulesModal(true);
             } else {
-              setShowGlobalModulesModal(true);
               await fetchRoleModulesFromDB(bulkRole, { applyToSelection: true });
             }
           }}
@@ -748,6 +867,121 @@ const EmpTable = ({ employees }) => {
           <span>Global Module Access</span>
         </button>
       </div>
+
+      {showManageRolesModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full p-6 max-h-[90vh] overflow-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold text-gray-800">Manage Employee Roles</h2>
+              <button
+                type="button"
+                onClick={() => setShowManageRolesModal(false)}
+                className="text-gray-500 hover:text-gray-700 p-1"
+                disabled={rolesModalSaving}
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <p className="text-sm text-gray-600 mb-4">
+              Roles are stored in database table <code className="text-xs bg-gray-100 px-1 rounded">crm_employee_roles</code>.
+              New custom roles appear in Add Employee, Quick Edit, and Global Module Access.
+            </p>
+
+            <div className="space-y-3 border rounded-lg p-4 bg-gray-50 mb-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Role name
+                </label>
+                <input
+                  value={newRoleName}
+                  onChange={(e) => setNewRoleName(e.target.value)}
+                  placeholder="e.g. REGIONAL MANAGER"
+                  className="w-full border rounded-md px-3 py-2 text-sm"
+                  disabled={rolesModalSaving}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Dashboard home
+                </label>
+                <select
+                  value={newRoleDashboard}
+                  onChange={(e) => setNewRoleDashboard(e.target.value)}
+                  className="w-full border rounded-md px-3 py-2 text-sm"
+                  disabled={rolesModalSaving}
+                >
+                  {ROLE_DASHBOARD_HOME_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <button
+                type="button"
+                onClick={submitNewRole}
+                disabled={rolesModalSaving || rolesModalLoading}
+                className="w-full py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 disabled:opacity-50 text-sm font-medium"
+              >
+                {rolesModalSaving ? "Saving..." : "Create role"}
+              </button>
+            </div>
+
+            <div className="text-sm font-semibold text-gray-800 mb-2">All roles</div>
+            {rolesModalLoading ? (
+              <p className="text-sm text-gray-500">Loading...</p>
+            ) : roleEntries.length === 0 ? (
+              <p className="text-sm text-gray-500">No roles in table yet.</p>
+            ) : (
+              <div className="border rounded-lg overflow-hidden">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-gray-50 text-left text-gray-600">
+                    <tr>
+                      <th className="px-3 py-2 font-medium">Role</th>
+                      <th className="px-3 py-2 font-medium">Dashboard</th>
+                      <th className="px-3 py-2 font-medium">Type</th>
+                      <th className="px-3 py-2 font-medium w-12" />
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {roleEntries.map((r) => (
+                      <tr key={r.id} className="hover:bg-gray-50/80">
+                        <td className="px-3 py-2 font-medium text-gray-900">{r.roleName}</td>
+                        <td className="px-3 py-2 text-gray-600 text-xs">{r.dashboardPath}</td>
+                        <td className="px-3 py-2">
+                          <span
+                            className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${
+                              r.isBuiltin
+                                ? "bg-slate-100 text-slate-700"
+                                : "bg-violet-100 text-violet-800"
+                            }`}
+                          >
+                            {r.isBuiltin ? "Built-in" : "Custom"}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          {!r.isBuiltin && (
+                            <button
+                              type="button"
+                              onClick={() => deleteCustomRole(r.id, r.roleName)}
+                              disabled={rolesModalSaving}
+                              className="text-red-600 hover:text-red-800 p-1 disabled:opacity-50"
+                              title="Delete role"
+                            >
+                              <Trash2 size={18} />
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {showGlobalModulesModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">

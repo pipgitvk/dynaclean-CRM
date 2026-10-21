@@ -1,40 +1,7 @@
 import { getDbConnection } from "@/lib/db";
 import { NextResponse } from "next/server";
 import { ensureRepListMachineCodeColumn } from "@/lib/ensureRepListMachineCode";
-import { HR_TARGET_ALLOWED_DESIGNATIONS } from "@/lib/designationDedupe";
-
-const ALLOWED_USER_ROLES = new Set([
-  ...HR_TARGET_ALLOWED_DESIGNATIONS,
-  "DIRECTOR",
-  "JUNIOR HR EXECUTIVE",
-  "HR RECRUITER",
-  "HR EXECUTIVE",
-  "GEM",
-  "ACCOUNTANT",
-  "TEAM LEADER",
-  "SALES",
-  "SALES CUM BACKOFFICE",
-  "SALES HEAD",
-  "DIGITAL MARKETER",
-  "ADMIN",
-  "HR",
-  "HR HEAD",
-  "GRAPHIC DESIGNER",
-  "DESIGN ENGINEER",
-  "DEVELOPER",
-  "SERVICE ENGINEER",
-  "SERVICE TECHNICIAN",
-  "SERVICE HEAD",
-  "SERVICE SUPPORT",
-  "WELDER",
-  "WELDER HELPER",
-  "WAREHOUSE INCHARGE",
-  "FACTORY INCHARGE",
-  "EA",
-  "MACHINE OPERATOR",
-  "PRODUCTION ENGINEER",
-  "BUSINESS DEVELOPMENT OFFICER",
-]);
+import { resolveAllowedEmployeeRole } from "@/lib/crmEmployeeRoles";
 
 export async function POST(request) {
   try {
@@ -55,8 +22,8 @@ export async function POST(request) {
       return NextResponse.json({ error: "Required fields are missing." }, { status: 400 });
     }
 
-    const roleStr = String(userRole ?? "").trim();
-    if (!roleStr || !ALLOWED_USER_ROLES.has(roleStr)) {
+    const roleStr = await resolveAllowedEmployeeRole(userRole);
+    if (!roleStr) {
       return NextResponse.json({ error: "Invalid user role." }, { status: 400 });
     }
 

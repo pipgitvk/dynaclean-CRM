@@ -1,41 +1,11 @@
 "use client";
 
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
-
-const USER_ROLE_OPTIONS = [
-  "DIRECTOR",
-  "ACCOUNTANT",
-  "TEAM LEADER",
-  "SALES",
-  "SALES CUM BACKOFFICE",
-  "SALES HEAD",
-  "DIGITAL MARKETER",
-  "ADMIN",
-  "HR",
-  "HR HEAD",
-  "JUNIOR HR EXECUTIVE",
-  "HR EXECUTIVE",
-  "HR RECRUITER",
-  "GEM",
-  "GRAPHIC DESIGNER",
-  "DESIGN ENGINEER",
-  "DEVELOPER",
-  "SERVICE ENGINEER",
-  "SERVICE TECHNICIAN",
-  "SERVICE HEAD",
-  "SERVICE SUPPORT",
-  "WELDER",
-  "WELDER HELPER",
-  "WAREHOUSE INCHARGE",
-  "FACTORY INCHARGE",
-  "EA",
-  "MACHINE OPERATOR",
-  "PRODUCTION ENGINEER",
-  "BUSINESS DEVELOPMENT OFFICER",
-];
+import { useEmployeeRoleOptions } from "@/hooks/useEmployeeRoleOptions";
+import { BASE_EMPLOYEE_ROLES } from "@/lib/employeeRoles";
 
 const EMPLOYEE_TYPE_OPTIONS = [
   "Select Type",
@@ -45,6 +15,7 @@ const EMPLOYEE_TYPE_OPTIONS = [
 
 export default function CreateEmployeeForm() {
   const router = useRouter();
+  const { roles: userRoleOptions } = useEmployeeRoleOptions();
   const [formData, setFormData] = useState({
     username: "",
     email: "",
@@ -53,7 +24,7 @@ export default function CreateEmployeeForm() {
     password: "",
     number: "",
     profile_pic: "default.png",
-    userRole: USER_ROLE_OPTIONS[0] ?? "",
+    userRole: BASE_EMPLOYEE_ROLES[0] ?? "",
     employeeType: EMPLOYEE_TYPE_OPTIONS[0] ?? "",
     machineCode: "",
   });
@@ -65,6 +36,14 @@ export default function CreateEmployeeForm() {
     phone: "",
     dob: "",
   });
+
+  useEffect(() => {
+    if (!userRoleOptions.length) return;
+    setFormData((prev) => {
+      if (userRoleOptions.includes(prev.userRole)) return prev;
+      return { ...prev, userRole: userRoleOptions[0] };
+    });
+  }, [userRoleOptions]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -124,7 +103,7 @@ export default function CreateEmployeeForm() {
           password: "",
           number: "",
           profile_pic: "default.png",
-          userRole: USER_ROLE_OPTIONS[0] || "",
+          userRole: userRoleOptions[0] || "",
           employeeType: "Select Type",
           machineCode: "",
         });
@@ -319,7 +298,7 @@ export default function CreateEmployeeForm() {
             required
             className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
           >
-            {USER_ROLE_OPTIONS.map((role) => (
+            {userRoleOptions.map((role) => (
               <option key={role} value={role}>
                 {role}
               </option>
