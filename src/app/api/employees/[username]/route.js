@@ -6,6 +6,7 @@ import path from "path";
 import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 import { getMainSessionPayload } from "@/lib/auth";
+import { cacheDelete } from "@/lib/cache";
 import { ensureRepListMachineCodeColumn } from "@/lib/ensureRepListMachineCode";
 import {
   getModuleAccessForDisplay,
@@ -262,6 +263,8 @@ export async function PUT(request, { params }) {
     // Append the WHERE param and execute
     const finalParams = [...queryParams, effectiveUsername];
     const [result] = await db.query(query, finalParams);
+
+    cacheDelete(`user:${effectiveUsername}`);
 
     return NextResponse.json({
       message:

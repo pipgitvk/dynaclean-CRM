@@ -21,6 +21,7 @@ import {
   toHrEmployeeCrmSidebarItem,
 } from "@/lib/hrEmployeeCrmAccess";
 import { getReportees } from "@/lib/reportingManager";
+import { getRepListUserRole } from "@/lib/repListUserRole";
 
 // Role to dashboard prefix mapping
 function getDashboardPrefix(roleKey) {
@@ -1214,7 +1215,7 @@ async function getUserModuleAccess(username, roleKey) {
       [username],
     );
     if (!rows.length) return [];
-    const role = roleKey || rows[0].userRole;
+    const role = rows[0].userRole || roleKey;
     return resolveModuleAccess(rows[0].module_access ?? null, role);
   } catch (err) {
     const msg = String(err?.message || "").toLowerCase();
@@ -1227,9 +1228,13 @@ async function getUserModuleAccess(username, roleKey) {
 
 export default async function getSidebarMenuItems() {
   const payload = await getSessionPayload();
-  const role = (payload?.role ?? payload?.userRole) || "GUEST";
-  const roleKey = normalizeRoleKey(role) || "GUEST";
+  let role = (payload?.role ?? payload?.userRole) || "GUEST";
   const username = payload?.username || null;
+  if (username) {
+    const dbRole = await getRepListUserRole(username);
+    if (dbRole) role = dbRole;
+  }
+  const roleKey = normalizeRoleKey(role) || "GUEST";
 
   const empCrmChildren = await getEmpCrmUserMenuChildrenForRole();
   let menuWithEmpCrm = injectEmpCrmChildren(allMenuItems, empCrmChildren);

@@ -47,18 +47,17 @@ export default function Navbar({ onToggleSidebar, showSalesMeta = false }) {
   };
 
   useEffect(() => {
-    // Get username from localStorage or session
     const storedUser = localStorage.getItem("username");
-
     if (storedUser) {
       setUsername(storedUser);
     }
+    handleUser();
   }, []);
 
   useEffect(() => {
-    if (!username) {
-      handleUser();
-    }
+    const onFocus = () => handleUser();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
   }, []);
 
   useEffect(() => {
@@ -176,11 +175,27 @@ export default function Navbar({ onToggleSidebar, showSalesMeta = false }) {
 
   const handleUser = async () => {
     try {
-      const response = await fetch("/api/me");
+      const response = await fetch("/api/me", {
+        credentials: "include",
+        cache: "no-store",
+      });
+      if (!response.ok) return;
       const data = await response.json();
-      setUsername(data.username);
-      setUserRole(data.userRole);
-      // console.log("User", data);
+      const prevRole = userRole;
+      if (data.username) {
+        setUsername(data.username);
+        localStorage.setItem("username", data.username);
+      }
+      if (data.userRole) {
+        setUserRole(data.userRole);
+      }
+      if (
+        prevRole &&
+        data.userRole &&
+        normalizeRoleKey(prevRole) !== normalizeRoleKey(data.userRole)
+      ) {
+        router.refresh();
+      }
     } catch (err) {
       console.error("Failed to fetch user data", err);
     }
