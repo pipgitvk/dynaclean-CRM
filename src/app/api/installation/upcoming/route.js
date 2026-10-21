@@ -30,7 +30,7 @@ export async function GET(req) {
       typeFilter = `
         AND EXISTS (
           SELECT 1 FROM spare_list sl 
-          WHERE sl.spare_number = d.item_code
+          WHERE sl.spare_number COLLATE utf8mb4_unicode_ci = d.item_code COLLATE utf8mb4_unicode_ci
         )
       `;
     }
@@ -49,8 +49,8 @@ export async function GET(req) {
         (
           SELECT GROUP_CONCAT(DISTINCT sr2.service_id ORDER BY sr2.service_id SEPARATOR ', ')
           FROM dispatch d2
-          INNER JOIN service_records sr2 ON sr2.serial_number = d2.serial_no
-          WHERE d2.quote_number = no.quote_number
+          INNER JOIN service_records sr2 ON sr2.serial_number COLLATE utf8mb4_unicode_ci = d2.serial_no COLLATE utf8mb4_unicode_ci
+          WHERE d2.quote_number COLLATE utf8mb4_unicode_ci = no.quote_number COLLATE utf8mb4_unicode_ci
             AND d2.serial_no IS NOT NULL
             AND d2.serial_no <> ''
         ) AS service_id,

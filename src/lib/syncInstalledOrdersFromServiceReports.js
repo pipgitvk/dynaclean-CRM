@@ -11,10 +11,10 @@ export async function syncInstalledOrdersFromCompletedInstallationReports(db) {
         SELECT 1
         FROM dispatch d
         INNER JOIN service_records sr
-          ON sr.serial_number = d.serial_no
+          ON sr.serial_number COLLATE utf8mb4_unicode_ci = d.serial_no COLLATE utf8mb4_unicode_ci
         LEFT JOIN installation_reports ir
-          ON ir.service_id = sr.service_id
-        WHERE d.quote_number = no.quote_number
+          ON ir.service_id COLLATE utf8mb4_unicode_ci = sr.service_id COLLATE utf8mb4_unicode_ci
+        WHERE d.quote_number COLLATE utf8mb4_unicode_ci = no.quote_number COLLATE utf8mb4_unicode_ci
           AND d.serial_no IS NOT NULL
           AND d.serial_no <> ''
           AND UPPER(TRIM(sr.status)) = 'COMPLETED'

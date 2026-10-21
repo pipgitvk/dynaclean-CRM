@@ -4,7 +4,7 @@
 export const IS_PRODUCT_DISPATCH_ITEM_SQL = (dispatchAlias = "d") => `
   EXISTS (
     SELECT 1 FROM products_list pl
-    WHERE pl.item_code = ${dispatchAlias}.item_code
+    WHERE pl.item_code COLLATE utf8mb4_unicode_ci = ${dispatchAlias}.item_code COLLATE utf8mb4_unicode_ci
   )
 `;
 
