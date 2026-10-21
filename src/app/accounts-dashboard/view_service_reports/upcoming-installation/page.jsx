@@ -271,12 +271,12 @@ export default function UpcomingInstallationsPage() {
               >
                 <Eye size={14} className="mr-1" /> View
               </Link>
-              <button
+              {/* <button
                 onClick={() => handleAction(r.order_id, "INSTALLED")}
                 className="w-full px-3 py-2 bg-green-600 text-white text-xs rounded hover:bg-green-700"
               >
                 Installed
-              </button>
+              </button> */}
               <button
                 onClick={() => openReturnModal(r.order_id)}
                 className="w-full px-3 py-2 bg-orange-600 text-white text-xs rounded hover:bg-orange-700"
@@ -339,12 +339,12 @@ export default function UpcomingInstallationsPage() {
                     >
                       <Eye size={14} className="mr-1" /> View
                     </Link>
-                    <button
+                    {/* <button
                       onClick={() => handleAction(r.order_id, "INSTALLED")}
                       className="px-3 py-1.5 bg-green-600 text-white rounded text-xs hover:bg-green-700"
                     >
                       Installed
-                    </button>
+                    </button> */}
                     <button
                       onClick={() => openReturnModal(r.order_id)}
                       className="px-3 py-1.5 bg-orange-600 text-white rounded text-xs hover:bg-orange-700"

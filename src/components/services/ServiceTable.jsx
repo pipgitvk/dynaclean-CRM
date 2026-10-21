@@ -237,16 +237,25 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
     );
   };
 
+  const canAssignServiceEngineer = () => {
+    const roleNorm = String(role ?? "").trim().toUpperCase();
+    return (
+      roleNorm === "ADMIN" ||
+      roleNorm === "SUPERADMIN" ||
+      roleNorm === "TEAM LEADER" ||
+      roleNorm === "SERVICE HEAD" ||
+      roleNorm === "SERVICE SUPPORT"
+    );
+  };
+
   const renderRowActionIcons = (record) => (
     <>
       {record.status?.toUpperCase() !== "COMPLETED" &&
-        (role === "ADMIN" ||
-          role === "SERVICE HEAD" ||
-          role === "SERVICE SUPPORT") && (
+        canAssignServiceEngineer() && (
           <button
             type="button"
             onClick={() => openAssignModal(record)}
-            title="Assign"
+            title="Assign Engineer"
             className={`${actionIconClass} bg-indigo-500 hover:bg-indigo-600`}
           >
             <UserPlus className="w-4 h-4" />

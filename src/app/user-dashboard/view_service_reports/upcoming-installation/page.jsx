@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Eye } from "lucide-react";
 import UpcomingInstallationStatusFilter from "@/components/installation/UpcomingInstallationStatusFilter";
+import UpcomingInstallationReferenceIds from "@/components/installation/UpcomingInstallationReferenceIds";
 import {
   getUpcomingInstallationDeliveryDisplay,
   getUpcomingInstallationRowClass,
@@ -103,6 +104,7 @@ export default function UpcomingInstallationsPage() {
         String(r.invoice_number ?? "").toLowerCase().includes(q) ||
         String(r.order_id ?? "").toLowerCase().includes(q) ||
         String(r.serial_number ?? "").toLowerCase().includes(q) ||
+        String(r.service_id ?? "").toLowerCase().includes(q) ||
         String(r.delivery_address ?? "").toLowerCase().includes(q)
       );
     });
@@ -211,15 +213,11 @@ export default function UpcomingInstallationsPage() {
               r
             )}`}
           >
-            <div className="text-lg font-bold mb-2">Order #{r.order_id}</div>
+            <div className="mb-2">
+              <UpcomingInstallationReferenceIds record={r} className="text-sm" />
+            </div>
 
             <div className="space-y-1 text-sm">
-              <p>
-                <b>Invoice #:</b> {r.invoice_number || "N/A"}
-              </p>
-              <p>
-                <b>Order #:</b> {r.order_id}
-              </p>
               <p>
                 <b>Serial #:</b> {r.serial_number || "N/A"}
               </p>
@@ -266,12 +264,12 @@ export default function UpcomingInstallationsPage() {
               >
                 <Eye size={14} className="mr-1" /> View
               </Link>
-              <button
+              {/* <button
                 onClick={() => handleAction(r.order_id, "INSTALLED")}
                 className="w-full px-3 py-2 bg-green-600 text-white text-xs rounded hover:bg-green-700"
               >
                 Installed
-              </button>
+              </button> */}
             </div>
           </div>
         );
@@ -283,7 +281,7 @@ export default function UpcomingInstallationsPage() {
         <table className="w-full text-sm table-auto border-collapse">
           <thead className="bg-gray-800 text-white">
             <tr>
-              <th className="p-3">Invoice # | Order ID | Serial #</th>
+              <th className="p-3">Inv | Ord | Ser</th>
               <th className="p-3">Model</th>
               <th className="p-3">Name</th>
               <th className="p-3">Delivery Address</th>
@@ -303,11 +301,7 @@ export default function UpcomingInstallationsPage() {
               return (
               <tr key={i} className={getUpcomingInstallationRowClass(r)}>
                 <td className="p-3 font-semibold">
-                  <div className="space-y-1 text-xs">
-                    <div><span className="text-blue-600 font-bold">Inv:</span> {r.invoice_number || "N/A"}</div>
-                    <div><span className="text-green-600 font-bold">Ord:</span> {r.order_id}</div>
-                    <div><span className="text-purple-600 font-bold">Ser:</span> {r.serial_number || "N/A"}</div>
-                  </div>
+                  <UpcomingInstallationReferenceIds record={r} />
                 </td>
                 <td className="p-3">{r.model}</td>
                 <td className="p-3">{r.name}</td>
@@ -342,12 +336,12 @@ export default function UpcomingInstallationsPage() {
                     >
                       <Eye size={14} className="mr-1" /> View
                     </Link>
-                    <button
+                    {/* <button
                       onClick={() => handleAction(r.order_id, "INSTALLED")}
                       className="px-3 py-1.5 bg-green-600 text-white rounded text-xs hover:bg-green-700"
                     >
                       Installed
-                    </button>
+                    </button> */}
                   </div>
                 </td>
               </tr>

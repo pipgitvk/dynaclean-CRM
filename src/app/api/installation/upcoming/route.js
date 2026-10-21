@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { UNREGISTERED_PRODUCT_ORDER_SQL, IS_PRODUCT_DISPATCH_ITEM_SQL } from "@/lib/pendingProductRegistrationCount";
+import { syncInstalledOrdersFromCompletedInstallationReports } from "@/lib/syncInstalledOrdersFromServiceReports";
 
 /**
  * API route for upcoming installations.
@@ -45,6 +46,14 @@ export async function GET(req) {
         no.quote_number,
         no.invoice_number,
         GROUP_CONCAT(DISTINCT d.serial_no SEPARATOR ', ') AS serial_number,
+        (
+          SELECT GROUP_CONCAT(DISTINCT sr2.service_id ORDER BY sr2.service_id SEPARATOR ', ')
+          FROM dispatch d2
+          INNER JOIN service_records sr2 ON sr2.serial_number = d2.serial_no
+          WHERE d2.quote_number = no.quote_number
+            AND d2.serial_no IS NOT NULL
+            AND d2.serial_no <> ''
+        ) AS service_id,
         GROUP_CONCAT(DISTINCT d.item_code SEPARATOR ', ') AS model,
         GROUP_CONCAT(DISTINCT d.item_name SEPARATOR ', ') AS name,
         no.delivery_location AS delivery_address,
@@ -90,9 +99,16 @@ export async function GET(req) {
     `;
 
     const pool = await getDbConnection();
+    let autoInstalled = 0;
+    try {
+      autoInstalled = await syncInstalledOrdersFromCompletedInstallationReports(pool);
+    } catch (syncErr) {
+      console.error("Upcoming installations sync skipped:", syncErr?.message || syncErr);
+    }
     const [rows] = await pool.query(query);
 
     return NextResponse.json({
+      autoInstalled,
       installations: rows,
       total: rows.length,
       totalPages: 1,

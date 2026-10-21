@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { Eye } from "lucide-react";
 import UpcomingInstallationStatusFilter from "@/components/installation/UpcomingInstallationStatusFilter";
+import UpcomingInstallationReferenceIds from "@/components/installation/UpcomingInstallationReferenceIds";
 import {
   getUpcomingInstallationDeliveryDisplay,
   getUpcomingInstallationRowClass,
@@ -132,8 +133,15 @@ export default function UpcomingInstallationsPage() {
   const fetchData = useCallback(async (filter) => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/installation/upcoming?type=${filter}`);
+      const res = await fetch(`/api/installation/upcoming?type=${filter}`, {
+        cache: "no-store",
+      });
       const data = await res.json();
+      if (!res.ok) {
+        console.error("Upcoming installations API error:", data);
+        setRecords([]);
+        return;
+      }
 
       setRecords(data.installations || []);
       setTotalPages(data.totalPages || 1);
@@ -158,7 +166,17 @@ export default function UpcomingInstallationsPage() {
     return records.filter((r) => {
       if (!matchesUpcomingInstallationStatusFilter(r, statusFilter)) return false;
       if (!q) return true;
-      return [r.model, r.name, r.company_name, r.emp_name, r.delivery_address, r.contact, String(r.order_id)]
+      return [
+        r.model,
+        r.name,
+        r.company_name,
+        r.emp_name,
+        r.delivery_address,
+        r.contact,
+        String(r.order_id),
+        String(r.invoice_number ?? ""),
+        String(r.service_id ?? ""),
+      ]
         .some((val) => val && String(val).toLowerCase().includes(q));
     });
   }, [records, searchQuery, statusFilter]);
@@ -186,7 +204,7 @@ export default function UpcomingInstallationsPage() {
       <div className="flex flex-col gap-4 mb-6">
         <input
           type="text"
-          placeholder="Search by order ID, model, company, employee, contact..."
+          placeholder="Search by invoice, order, service ID, model, company, contact..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="px-4 py-2 border rounded shadow-sm"
@@ -260,7 +278,12 @@ export default function UpcomingInstallationsPage() {
                 r
               )}`}
             >
-              <div className="text-lg font-bold mb-2">Order #{r.order_id}</div>
+              <div className="mb-2">
+                <UpcomingInstallationReferenceIds
+                  record={r}
+                  className="text-sm"
+                />
+              </div>
 
               <div className="space-y-1 text-sm">
                 <p><b>Model:</b> {r.model}</p>
@@ -294,12 +317,12 @@ export default function UpcomingInstallationsPage() {
                 >
                   <Eye size={14} className="mr-1" /> View
                 </Link>
-                <button
+                {/* <button
                   onClick={() => handleAction(r.order_id, "INSTALLED")}
                   className="w-full px-3 py-2 bg-green-600 text-white text-xs rounded hover:bg-green-700"
                 >
                   Installed
-                </button>
+                </button> */}
                 {/* <button
                   onClick={() => openReturnModal(r.order_id)}
                   className="w-full px-3 py-2 bg-orange-600 text-white text-xs rounded hover:bg-orange-700"
@@ -325,7 +348,7 @@ export default function UpcomingInstallationsPage() {
           <table className="w-full text-sm table-auto border-collapse">
             <thead className="bg-gray-800 text-white">
               <tr>
-                <th className="p-3">Order ID</th>
+                <th className="p-3">Inv | Ord | Ser</th>
                 <th className="p-3">Model</th>
                 <th className="p-3">Name</th>
                 <th className="p-3">Delivery Address</th>
@@ -343,7 +366,9 @@ export default function UpcomingInstallationsPage() {
                 const delivery = deliveryDisplay(r);
                 return (
                 <tr key={i} className={getUpcomingInstallationRowClass(r)}>
-                  <td className="p-3">{r.order_id}</td>
+                  <td className="p-3 font-semibold">
+                    <UpcomingInstallationReferenceIds record={r} />
+                  </td>
                   <td className="p-3">{r.model}</td>
                   <td className="p-3">{r.name}</td>
                   <td className="p-3">{r.delivery_address}</td>
@@ -377,12 +402,12 @@ export default function UpcomingInstallationsPage() {
                       >
                         <Eye size={14} className="mr-1" /> View
                       </Link>
-                      <button
+                      {/* <button
                         onClick={() => handleAction(r.order_id, "INSTALLED")}
                         className="px-3 py-1.5 bg-green-600 text-white rounded text-xs hover:bg-green-700"
                       >
                         Installed
-                      </button>
+                      </button> */}
                       {/* <button
                         onClick={() => openReturnModal(r.order_id)}
                         className="px-3 py-1.5 bg-orange-600 text-white rounded text-xs hover:bg-orange-700"
