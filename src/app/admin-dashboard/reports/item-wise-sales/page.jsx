@@ -3,6 +3,10 @@
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect } from "react";
 import dayjs from "dayjs";
+import {
+  getOrderTableDefaultDateFrom,
+  getOrderTableDefaultDateTo,
+} from "@/lib/orderTableDateDefaults";
 
 function formatInr(n) {
   const v = Number(n) || 0;
@@ -10,8 +14,8 @@ function formatInr(n) {
 }
 
 export default function ItemWiseSalesPage() {
-  const [from, setFrom] = useState(dayjs().startOf("month").format("YYYY-MM-DD"));
-  const [to, setTo] = useState(dayjs().endOf("month").format("YYYY-MM-DD"));
+  const [from, setFrom] = useState(() => getOrderTableDefaultDateFrom());
+  const [to, setTo] = useState(() => getOrderTableDefaultDateTo());
   const [employee, setEmployee] = useState("");
   const [employeeOptions, setEmployeeOptions] = useState([]);
   const [data, setData] = useState([]);

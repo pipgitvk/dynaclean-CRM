@@ -12,6 +12,10 @@ import ManualFilterSearchButton, {
 } from "@/components/ui/ManualFilterSearchButton";
 import Link from "next/link";
 import dayjs from "dayjs";
+import {
+  getOrderTableDefaultDateFrom,
+  getOrderTableDefaultDateTo,
+} from "@/lib/orderTableDateDefaults";
 import { Download, Search, Calendar, DollarSign, ArrowUp, ArrowDown, Trash2, X, PhoneCall, History, Loader2 } from "lucide-react";
 
 export default function PaymentPendingReport() {
@@ -24,10 +28,16 @@ export default function PaymentPendingReport() {
   const [deletingAll, setDeletingAll] = useState(false);
   const [totalOrdersCardClicks, setTotalOrdersCardClicks] = useState(0);
   
-  const [dueDateFrom, setDueDateFrom] = useState("");
-  const [appliedDueDateFrom, setAppliedDueDateFrom] = useState("");
-  const [dueDateTo, setDueDateTo] = useState("");
-  const [appliedDueDateTo, setAppliedDueDateTo] = useState("");
+  const [dueDateFrom, setDueDateFrom] = useState(() =>
+    getOrderTableDefaultDateFrom(),
+  );
+  const [appliedDueDateFrom, setAppliedDueDateFrom] = useState(() =>
+    getOrderTableDefaultDateFrom(),
+  );
+  const [dueDateTo, setDueDateTo] = useState(() => getOrderTableDefaultDateTo());
+  const [appliedDueDateTo, setAppliedDueDateTo] = useState(() =>
+    getOrderTableDefaultDateTo(),
+  );
   const [statusFilter, setStatusFilter] = useState("all");
   const [appliedStatusFilter, setAppliedStatusFilter] = useState("all");
   const [followupModalOpen, setFollowupModalOpen] = useState(false);
@@ -274,12 +284,12 @@ export default function PaymentPendingReport() {
                   <button
                     type="button"
                     onClick={() => {
-                      setDueDateFrom("");
-                      setDueDateTo("");
+                      setDueDateFrom(getOrderTableDefaultDateFrom());
+                      setDueDateTo(getOrderTableDefaultDateTo());
                       setStatusFilter("all");
                       setSearchQuery("");
-                      setAppliedDueDateFrom("");
-                      setAppliedDueDateTo("");
+                      setAppliedDueDateFrom(getOrderTableDefaultDateFrom());
+                      setAppliedDueDateTo(getOrderTableDefaultDateTo());
                       setAppliedStatusFilter("all");
                       setAppliedSearchQuery("");
                     }}

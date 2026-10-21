@@ -3,10 +3,14 @@
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useEffect, useState } from "react";
 import dayjs from "dayjs";
+import {
+  getOrderTableDefaultDateFrom,
+  getOrderTableDefaultDateTo,
+} from "@/lib/orderTableDateDefaults";
 
 export default function FollowupsClient({ leadSource }) {
-  const [from, setFrom] = useState(dayjs().format("YYYY-MM-DD"));
-  const [to, setTo] = useState("");
+  const [from, setFrom] = useState(() => getOrderTableDefaultDateFrom());
+  const [to, setTo] = useState(() => getOrderTableDefaultDateTo());
   const [commMode, setCommMode] = useState("");
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -33,8 +37,8 @@ export default function FollowupsClient({ leadSource }) {
   };
 
   const reset = () => {
-    setFrom(dayjs().format("YYYY-MM-DD"));
-    setTo("");
+    setFrom(getOrderTableDefaultDateFrom());
+    setTo(getOrderTableDefaultDateTo());
     setCommMode("");
     fetchData();
   };

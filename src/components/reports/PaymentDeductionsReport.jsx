@@ -6,6 +6,10 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import dayjs from "dayjs";
 import {
+  getOrderTableDefaultDateFrom,
+  getOrderTableDefaultDateTo,
+} from "@/lib/orderTableDateDefaults";
+import {
   Search,
   Download,
   X,
@@ -35,8 +39,8 @@ export default function PaymentDeductionsReport({ paymentPendingPath }) {
   const [deductionTypeFilter, setDeductionTypeFilter] = useState("all");
   const [claimableFilter, setClaimableFilter] = useState("all");
   const [claimStatusFilter, setClaimStatusFilter] = useState("all");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const [dateFrom, setDateFrom] = useState(() => getOrderTableDefaultDateFrom());
+  const [dateTo, setDateTo] = useState(() => getOrderTableDefaultDateTo());
   const [orderIdFilter, setOrderIdFilter] = useState(initialOrderId);
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [updatingId, setUpdatingId] = useState(null);
@@ -156,8 +160,8 @@ export default function PaymentDeductionsReport({ paymentPendingPath }) {
     setDeductionTypeFilter("all");
     setClaimableFilter("all");
     setClaimStatusFilter("all");
-    setDateFrom("");
-    setDateTo("");
+    setDateFrom(getOrderTableDefaultDateFrom());
+    setDateTo(getOrderTableDefaultDateTo());
     setOrderIdFilter("");
   };
 
