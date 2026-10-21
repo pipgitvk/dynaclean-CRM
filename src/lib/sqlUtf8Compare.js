@@ -5,8 +5,13 @@
  */
 export const UTF8_COLLATE = "utf8mb4_unicode_ci";
 
-function utf8Trim(expr) {
+/** SQL expression: normalize a column/value for safe string compare */
+export function sqlUtf8TrimExpr(expr) {
   return `TRIM(CONVERT(${expr} USING utf8mb4))`;
+}
+
+function utf8Trim(expr) {
+  return sqlUtf8TrimExpr(expr);
 }
 
 /** SQL: trimmed column equals trimmed bound parameter */

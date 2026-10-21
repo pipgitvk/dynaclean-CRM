@@ -1,119 +1,46 @@
 // /app/api/installations/upcoming/route.js
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
-import { UNREGISTERED_PRODUCT_ORDER_SQL, IS_PRODUCT_DISPATCH_ITEM_SQL } from "@/lib/pendingProductRegistrationCount";
+import { buildUpcomingInstallationsQuery } from "@/lib/upcomingInstallationsQuery";
 import { syncInstalledOrdersFromCompletedInstallationReports } from "@/lib/syncInstalledOrdersFromServiceReports";
-import { sqlTrimUtf8EqColumns } from "@/lib/sqlUtf8Compare";
 
 /**
  * API route for upcoming installations.
- *  - neworder (primary)
- *  - quotations (to get model(s) and item_name) via quote_number
- *
- * Highlights installations within 10 days and past expected delivery dates.
  * Query parameters:
  *   ?type=products|spares|all
- *   ?registration=unregistered  (orders with at least one unregistered product)
+ *   ?registration=unregistered
+ *   ?sync=1  optional: run auto-installed sync (slow; off by default)
  */
 export async function GET(req) {
   try {
     const { searchParams } = new URL(req.url);
     const registration = searchParams.get("registration");
+    const runSync = searchParams.get("sync") === "1";
     const type =
       registration === "unregistered"
         ? "products"
         : searchParams.get("type") || "products";
 
-    let typeFilter = "";
-    if (type === "products") {
-      typeFilter = `AND ${IS_PRODUCT_DISPATCH_ITEM_SQL("d")}`;
-    } else if (type === "spares") {
-      typeFilter = `
-        AND EXISTS (
-          SELECT 1 FROM spare_list sl 
-          WHERE ${sqlTrimUtf8EqColumns("sl.spare_number", "d.item_code")}
-        )
-      `;
-    }
-    // If type === "all", no filter needed
-
-    const registrationFilter =
-      registration === "unregistered" ? `AND ${UNREGISTERED_PRODUCT_ORDER_SQL}` : "";
-
-    const query = `
-      SELECT
-        no.id,
-        no.order_id,
-        no.quote_number,
-        no.invoice_number,
-        GROUP_CONCAT(DISTINCT d.serial_no SEPARATOR ', ') AS serial_number,
-        (
-          SELECT GROUP_CONCAT(DISTINCT sr2.service_id ORDER BY sr2.service_id SEPARATOR ', ')
-          FROM dispatch d2
-          INNER JOIN service_records sr2 ON ${sqlTrimUtf8EqColumns("sr2.serial_number", "d2.serial_no")}
-          WHERE ${sqlTrimUtf8EqColumns("d2.quote_number", "no.quote_number")}
-            AND d2.serial_no IS NOT NULL
-            AND d2.serial_no <> ''
-        ) AS service_id,
-        GROUP_CONCAT(DISTINCT d.item_code SEPARATOR ', ') AS model,
-        GROUP_CONCAT(DISTINCT d.item_name SEPARATOR ', ') AS name,
-        no.delivery_location AS delivery_address,
-        no.company_name,
-        no.contact,
-        no.created_by AS emp_name,
-        DATE_FORMAT(no.delivery_date, '%Y-%m-%d') AS delivery_date,
-        DATE_FORMAT(no.delivered_on, '%Y-%m-%d') AS delivered_on,
-        COALESCE(SUM(qi.total_price), 0) AS pricing_total,
-        COALESCE(SUM(qi.quantity), 0) AS total_qty,
-        CASE 
-          WHEN no.delivery_date < CURDATE() THEN 'overdue'
-          WHEN no.delivery_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 10 DAY) THEN 'upcoming'
-          ELSE 'scheduled'
-        END AS installation_status,
-        CASE
-          WHEN no.delivered_on IS NOT NULL
-            AND no.delivered_on > '1970-01-01'
-          THEN DATEDIFF(no.delivered_on, CURDATE())
-          ELSE DATEDIFF(no.delivery_date, CURDATE())
-        END AS days_until_installation,
-        CASE
-          WHEN EXISTS (
-            SELECT 1 FROM warranty_products wp
-            WHERE ${sqlTrimUtf8EqColumns("wp.serial_number", "d.serial_no")}
-          ) THEN 1
-          ELSE 0
-        END AS warranty_registered
-      FROM neworder no
-       JOIN dispatch d ON ${sqlTrimUtf8EqColumns("d.quote_number", "no.quote_number")}
-       LEFT JOIN quotation_items qi ON ${sqlTrimUtf8EqColumns("qi.quote_number", "no.quote_number")}
-       WHERE d.serial_no IS NOT NULL AND d.serial_no <> ''
-       AND no.installation_status = 0
-       AND (no.is_returned = 0 OR no.is_returned = 2 OR no.is_returned IS NULL)
-       AND (no.is_cancelled = 0 or no.is_cancelled IS NULL)
-       AND no.delivery_date IS NOT NULL
-       AND no.dispatch_status = 1
-      ${typeFilter}
-      ${registrationFilter}
-      GROUP BY no.id
-      ORDER BY days_until_installation ASC;
-    `;
+    const query = buildUpcomingInstallationsQuery({ type, registration });
 
     const pool = await getDbConnection();
-    let autoInstalled = 0;
-    try {
-      autoInstalled = await syncInstalledOrdersFromCompletedInstallationReports(pool);
-    } catch (syncErr) {
-      console.error("Upcoming installations sync skipped:", syncErr?.message || syncErr);
+
+    if (runSync) {
+      try {
+        await syncInstalledOrdersFromCompletedInstallationReports(pool);
+      } catch (syncErr) {
+        console.error("Upcoming installations sync skipped:", syncErr?.message || syncErr);
+      }
     }
+
     const [rows] = await pool.query(query);
 
     return NextResponse.json({
-      autoInstalled,
       installations: rows,
       total: rows.length,
       totalPages: 1,
       currentPage: 1,
-      pageSize: rows.length
+      pageSize: rows.length,
     });
   } catch (error) {
     console.error("Error fetching upcoming installations:", error);
@@ -123,7 +50,7 @@ export async function GET(req) {
         message: "Failed to fetch upcoming installations",
         error: error.message,
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

@@ -138,6 +138,16 @@ export default function UpcomingInstallationsPage() {
       const res = await fetch(`/api/installation/upcoming?type=${filter}`, {
         cache: "no-store",
       });
+      const isJson = (res.headers.get("content-type") || "").includes("application/json");
+      if (!isJson) {
+        const msg =
+          res.status === 504
+            ? "Server timed out loading installations. Try again or ask admin to optimize."
+            : `Server error (${res.status}). Could not load installations.`;
+        setFetchError(msg);
+        setRecords([]);
+        return;
+      }
       const data = await res.json();
       if (!res.ok) {
         console.error("Upcoming installations API error:", data);
