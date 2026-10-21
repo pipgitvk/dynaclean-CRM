@@ -3,34 +3,39 @@
 import { formatCrmDateOnly } from "@/lib/crmDateFormat";
 
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import React from "react";
 import { Search } from "lucide-react";
 import Link from "next/link";
+
+async function fetchJson(url, { timeoutMs = 120_000 } = {}) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { signal: controller.signal });
+    return { res, data: await res.json().catch(() => null) };
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 export default function ProductsNewContent() {
   const [products, setProducts] = useState([]);
   const [search, setSearch] = useState("");
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [availableStock, setAvailableStock] = useState([]);
-  const [stockTransactions, setStockTransactions] = useState([]);
-  const [stockSummary, setStockSummary] = useState([]);
-  const [invoices, setInvoices] = useState([]);
-  const [quotations, setQuotations] = useState([]);
-  const [orders, setOrders] = useState([]);
-  const [purchaseData, setPurchaseData] = useState([]);
-  const [salesData, setSalesData] = useState([]);
+  const [listLoadError, setListLoadError] = useState("");
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState("");
+  const [detailReloadKey, setDetailReloadKey] = useState(0);
   const [combinedData, setCombinedData] = useState([]);
+  const [selectedStock, setSelectedStock] = useState(null);
+  const [purchasePricePerUnit, setPurchasePricePerUnit] = useState(0);
+  const [salePricePerUnit, setSalePricePerUnit] = useState(0);
   const [combinedSearch, setCombinedSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
-  const [activeTab, setActiveTab] = useState("transactions");
-  const [transactionSearch, setTransactionSearch] = useState("");
-  const [summarySearch, setSummarySearch] = useState("");
-  const [invoiceSearch, setInvoiceSearch] = useState("");
-  const [quotationSearch, setQuotationSearch] = useState("");
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [transferHistory, setTransferHistory] = useState([]);
@@ -40,262 +45,120 @@ export default function ProductsNewContent() {
   const [transferring, setTransferring] = useState(false);
 
   useEffect(() => {
-    fetchProducts();
-    fetchAvailableStock();
-    fetchStockTransactions();
-    fetchStockSummary();
-    fetchInvoices();
-    fetchQuotations();
-    fetchOrders();
-    fetchPurchaseData();
-    fetchSalesData();
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      setListLoadError("");
+      try {
+        const { res, data } = await fetchJson("/api/products/list", {
+          timeoutMs: 90_000,
+        });
+        if (cancelled) return;
+        if (!res.ok || data?.error) {
+          setProducts([]);
+          setListLoadError(data?.error || "Could not load products");
+          return;
+        }
+        setProducts(Array.isArray(data) ? data : []);
+      } catch (err) {
+        if (!cancelled) {
+          setProducts([]);
+          setListLoadError(
+            err?.name === "AbortError"
+              ? "Products list timed out. Refresh and try again."
+              : "Could not load products list.",
+          );
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const fetchProducts = async () => {
-    try {
-      const res = await fetch("/api/products/list");
-      const data = await res.json();
-      setProducts(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.error("Error fetching products:", err);
-      setProducts([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchAvailableStock = async () => {
-    try {
-      const res = await fetch("/api/available-stock");
-      const data = await res.json();
-      setAvailableStock(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.error("Error fetching available stock:", err);
-      setAvailableStock([]);
-    }
-  };
-
-  const fetchStockTransactions = async () => {
-    try {
-      const res = await fetch("/api/product-stock-summary");
-      const data = await res.json();
-      setStockTransactions(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.error("Error fetching stock transactions:", err);
-      setStockTransactions([]);
-    }
-  };
-
-  const fetchStockSummary = async () => {
-    try {
-      const res = await fetch("/api/product-stock-status");
-      const data = await res.json();
-      setStockSummary(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.error("Error fetching stock summary:", err);
-      setStockSummary([]);
-    }
-  };
-
-  const fetchInvoices = async () => {
-    try {
-      const res = await fetch("/api/invoice-table");
-      const data = await res.json();
-      console.log("Invoices API response:", data);
-      if (data.success && data.data) {
-        setInvoices(Array.isArray(data.data) ? data.data : []);
-      } else {
-        setInvoices([]);
-      }
-    } catch (err) {
-      console.error("Error fetching invoices:", err);
-      setInvoices([]);
-    }
-  };
-
-  const fetchQuotations = async () => {
-    try {
-      const res = await fetch("/api/quotations-show");
-      const data = await res.json();
-      console.log("Quotations API response:", data);
-      setQuotations(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.error("Error fetching quotations:", err);
-      setQuotations([]);
-    }
-  };
-
-  const fetchOrders = async () => {
-    try {
-      const res = await fetch("/api/orders");
-      const data = await res.json();
-      console.log("Orders API response:", data);
-      const ordersData = data.data || data;
-      console.log("Orders data array:", ordersData);
-      setOrders(Array.isArray(ordersData) ? ordersData : []);
-    } catch (err) {
-      console.error("Error fetching orders:", err);
-      setOrders([]);
-    }
-  };
-
-  const fetchPurchaseData = async () => {
-    try {
-      const res = await fetch("/api/stock-request");
-      const data = await res.json();
-      console.log("Purchase API response:", data);
-      setPurchaseData(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.error("Error fetching purchase data:", err);
-      setPurchaseData([]);
-    }
-  };
-
-  const fetchSalesData = async () => {
-    try {
-      const res = await fetch("/api/sales");
-      const data = await res.json();
-      console.log("Sales API response:", data);
-      setSalesData(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.error("Error fetching sales data:", err);
-      setSalesData([]);
-    }
-  };
-
-  const combineData = () => {
-    if (!selectedProduct) return;
-
-    const combined = [];
-
-    console.log("Selected product item_code:", selectedProduct.item_code);
-    console.log("Orders data:", orders);
-    console.log("Orders length:", orders.length);
-
-    // Add stock transactions - only OUT (Sale) and TRANSFER records
-    stockTransactions
-      .filter(t => t.product_code === selectedProduct.item_code)
-      .filter(t => t.stock_status === 'out' || t.stock_status === 'OUT' || t.stock_status === 'transfer' || t.stock_status === 'TRANSFER')
-      .forEach(t => {
-        const isOut = t.stock_status === 'out' || t.stock_status === 'OUT';
-        const isTransfer = t.stock_status === 'transfer' || t.stock_status === 'TRANSFER';
-        let transactionType = isTransfer ? 'Transfer' : 'Sale';
-        let typeColor = isTransfer ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800';
-
-        combined.push({
-          type: transactionType,
-          typeColor: typeColor,
-          data: t,
-          display: {
-            main: t.product_code,
-            sub1: t.stock_status,
-            sub2: `₹${(t.net_amount || 0).toLocaleString()}`,
-            quantity: t.quantity,
-            date: t.updated_at
-          }
-        });
-      });
-
-    // Add purchase data from product_stock_request - only show those with IDs
-    purchaseData
-      .filter(p => p.product_code === selectedProduct.item_code)
-      .forEach(p => {
-        combined.push({
-          type: 'Purchase',
-          typeColor: 'bg-green-100 text-green-800',
-          data: p,
-          display: {
-            main: `${p.product_code} (ID: ${p.id})`,
-            sub1: 'IN',
-            sub2: `₹${(p.net_amount || 0).toLocaleString()}`,
-            quantity: p.quantity,
-            date: p.created_at
-          }
-        });
-      });
-
-    // Add invoices
-    invoices
-      .filter(i => i.items && i.items.some(item => item.product_code === selectedProduct.item_code || item.item_code === selectedProduct.item_code))
-      .forEach(i => {
-        const matchingItems = i.items.filter(item => item.product_code === selectedProduct.item_code || item.item_code === selectedProduct.item_code);
-        const totalQty = matchingItems.reduce((sum, item) => sum + (Number(item.quantity) || Number(item.qty) || 0), 0);
-        combined.push({
-          type: 'Invoice',
-          typeColor: 'bg-purple-100 text-purple-800',
-          data: i,
-          display: {
-            main: i.invoice_number,
-            sub1: i.buyer_name,
-            sub2: `₹${(i.grand_total || 0).toLocaleString()}`,
-            quantity: totalQty || 0,
-            date: i.order_date,
-            id: i.invoice_number
-          }
-        });
-      });
-
-    // Add quotations
-    quotations
-      .filter(q => q.items && q.items.some(item => item.product_code === selectedProduct.item_code || item.item_code === selectedProduct.item_code))
-      .forEach(q => {
-        const matchingItems = q.items.filter(item => item.product_code === selectedProduct.item_code || item.item_code === selectedProduct.item_code);
-        const totalQty = matchingItems.reduce((sum, item) => sum + (Number(item.quantity) || Number(item.qty) || 0), 0);
-        combined.push({
-          type: 'Quotation',
-          typeColor: 'bg-orange-100 text-orange-800',
-          data: q,
-          display: {
-            main: q.quote_number,
-            sub1: q.company_name,
-            sub2: `₹${(q.grand_total || q.total_amount || 0).toLocaleString()}`,
-            quantity: totalQty || 0,
-            date: q.quote_date,
-            id: q.quote_number
-          }
-        });
-      });
-
-    // Add orders
-    console.log("Total orders:", orders.length);
-    const filteredOrders = orders.filter(o => {
-      const itemCodeMatch = o.item_code === selectedProduct.item_code;
-      const itemNameMatch = o.item_name === selectedProduct.item_name;
-      const match = itemCodeMatch || itemNameMatch;
-      console.log("Order:", o.order_id, "item_code:", o.item_code, "item_name:", o.item_name, "matches:", match);
-      return match;
-    });
-    console.log("Filtered orders count:", filteredOrders.length);
-
-    // Group orders by order_id to avoid duplicates
-    const groupedOrders = {};
-    filteredOrders.forEach(o => {
-      if (!groupedOrders[o.order_id]) {
-        groupedOrders[o.order_id] = o;
-      }
-    });
-
-    // Orders are not added to the combined data as per user request
-
-    setCombinedData(combined.sort((a, b) => {
-    const dateA = a.display.date ? new Date(a.display.date) : new Date(0);
-    const dateB = b.display.date ? new Date(b.display.date) : new Date(0);
-    return dateB - dateA; // Sort by date descending (newest first)
-  }));
-  };
-
   useEffect(() => {
-    combineData();
-  }, [selectedProduct, stockTransactions, stockSummary, invoices, quotations, orders, purchaseData]);
+    if (!selectedProduct?.item_code) {
+      setCombinedData([]);
+      setSelectedStock(null);
+      setPurchasePricePerUnit(0);
+      setSalePricePerUnit(0);
+      setDetailError("");
+      return;
+    }
+
+    let cancelled = false;
+    const code = encodeURIComponent(selectedProduct.item_code);
+    const name = encodeURIComponent(selectedProduct.item_name || "");
+
+    (async () => {
+      setDetailLoading(true);
+      setDetailError("");
+      try {
+        const { res, data } = await fetchJson(
+          `/api/products/item-history?product_code=${code}&item_name=${name}`,
+          { timeoutMs: 120_000 },
+        );
+        if (cancelled) return;
+        if (!res.ok || data?.error) {
+          setCombinedData([]);
+          setDetailError(data?.error || "Failed to load product details");
+          return;
+        }
+        setCombinedData(Array.isArray(data.combined) ? data.combined : []);
+        setSelectedStock(data.stock || null);
+        setPurchasePricePerUnit(Number(data.purchasePricePerUnit) || 0);
+        setSalePricePerUnit(Number(data.salePricePerUnit) || 0);
+      } catch (err) {
+        if (!cancelled) {
+          setCombinedData([]);
+          setDetailError(
+            err?.name === "AbortError"
+              ? "Request timed out. Click the product again to retry."
+              : "Failed to load product details",
+          );
+        }
+      } finally {
+        if (!cancelled) setDetailLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedProduct?.item_code, selectedProduct?.item_name, detailReloadKey]);
+
+  const reloadProductDetail = useCallback(() => {
+    setDetailReloadKey((k) => k + 1);
+  }, []);
+
+  const fetchProductsListQuiet = useCallback(async () => {
+    try {
+      const { res, data } = await fetchJson("/api/products/list", {
+        timeoutMs: 90_000,
+      });
+      if (res.ok && Array.isArray(data)) setProducts(data);
+    } catch {
+      /* keep existing list */
+    }
+  }, []);
 
   const getAvailableQty = (productCode) => {
-    const stock = availableStock.find(s => s.product_code === productCode);
-    if (!stock) return { total: 0, delhi: 0, south: 0 };
-    return {
-      total: (stock.delhi || 0) + (stock.south || 0),
-      delhi: stock.delhi || 0,
-      south: stock.south || 0
-    };
+    if (
+      selectedProduct?.item_code === productCode &&
+      selectedStock &&
+      (selectedStock.delhi || selectedStock.south || selectedStock.total)
+    ) {
+      return {
+        total: Number(selectedStock.total) || 0,
+        delhi: Number(selectedStock.delhi) || 0,
+        south: Number(selectedStock.south) || 0,
+      };
+    }
+    const row = products.find((p) => p.item_code === productCode);
+    const total = Number(row?.total_qty) || 0;
+    return { total, delhi: 0, south: 0 };
   };
 
   const getStockColor = (productCode) => {
@@ -314,60 +177,6 @@ export default function ProductsNewContent() {
     // Generate a consistent color based on product code
     const index = productCode.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % colors.length;
     return colors[index];
-  };
-
-  const getPurchaseNetAmount = (productCode) => {
-    const productPurchases = purchaseData.filter(p => 
-      p.product_code === productCode || 
-      p.product_name === selectedProduct?.item_name ||
-      p.specification === selectedProduct?.item_name
-    );
-    console.log("Purchase data for product:", productCode, productPurchases);
-    
-    if (productPurchases.length === 0) return 0;
-    
-    // Sort by date to get latest purchase
-    const sortedPurchases = productPurchases.sort((a, b) => {
-      const dateA = a.created_at || a.date || a.purchase_date ? new Date(a.created_at || a.date || a.purchase_date) : new Date(0);
-      const dateB = b.created_at || b.date || b.purchase_date ? new Date(b.created_at || b.date || b.purchase_date) : new Date(0);
-      return dateB - dateA;
-    });
-    
-    const latestPurchase = sortedPurchases[0];
-    const price = Number(latestPurchase.price_per_unit) || 0;
-    console.log("Latest purchase:", latestPurchase, "Price:", price);
-    return price;
-  };
-
-  const getSalesNetAmount = (productCode) => {
-    const productSales = salesData.filter(s => 
-      s.product_code === productCode || 
-      s.product_name === selectedProduct?.item_name ||
-      s.specification === selectedProduct?.item_name
-    );
-    console.log("Sales data for product:", productCode, productSales);
-    
-    if (productSales.length === 0) return 0;
-    
-    // Sort by date to get latest sale
-    const sortedSales = productSales.sort((a, b) => {
-      const dateA = a.created_at || a.date || a.sale_date ? new Date(a.created_at || a.date || a.sale_date) : new Date(0);
-      const dateB = b.created_at || b.date || b.sale_date ? new Date(b.created_at || b.date || b.sale_date) : new Date(0);
-      return dateB - dateA;
-    });
-    
-    // Find first sale with non-zero net amount
-    const validSale = sortedSales.find(s => Number(s.net_amount) > 0);
-    
-    if (!validSale) return 0;
-    
-    const quantity = Number(validSale.quantity) || 1;
-    const netAmount = Number(validSale.net_amount) || 0;
-    
-    // If quantity > 1, divide net amount by quantity to get per-unit value
-    const displayValue = quantity > 1 ? (netAmount / quantity) : netAmount;
-    console.log("Valid sale:", validSale, "Quantity:", quantity, "Net Amount:", netAmount, "Display Value:", displayValue);
-    return displayValue;
   };
 
   const handleTransfer = async () => {
@@ -414,7 +223,8 @@ export default function ProductsNewContent() {
       setTransferQuantity("");
       setFromGodown("");
       setToGodown("");
-      fetchAvailableStock();
+      reloadProductDetail();
+      fetchProductsListQuiet();
     } catch (error) {
       console.error("Transfer error:", error);
       alert("Transfer failed. Please try again.");
@@ -483,6 +293,8 @@ export default function ProductsNewContent() {
         <div className="flex-1 overflow-y-auto">
           {loading ? (
             <div className="p-4 text-center text-gray-500">Loading...</div>
+          ) : listLoadError ? (
+            <div className="p-4 text-center text-red-600 text-sm">{listLoadError}</div>
           ) : filteredProducts.length === 0 ? (
             <div className="p-4 text-center text-gray-500">No products found</div>
           ) : (
@@ -519,6 +331,16 @@ export default function ProductsNewContent() {
       <div className="flex-1 p-4 md:p-6 overflow-y-auto">
         {selectedProduct ? (
           <>
+            {detailLoading && (
+              <div className="mb-4 rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+                Loading product history…
+              </div>
+            )}
+            {detailError && !detailLoading && (
+              <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {detailError}
+              </div>
+            )}
             {/* Purchase and Sales Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 max-w-4xl">
               <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-3 md:p-4">
@@ -526,7 +348,7 @@ export default function ProductsNewContent() {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-gray-500 text-xs font-medium">Purchase Price: <span className="text-lg font-bold text-gray-900">₹{getPurchaseNetAmount(selectedProduct.item_code).toLocaleString("en-IN", { maximumFractionDigits: 0 })}</span></p>
+                      <p className="text-gray-500 text-xs font-medium">Purchase Price: <span className="text-lg font-bold text-gray-900">₹{purchasePricePerUnit.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</span></p>
                     </div>
                     <div className="p-2 bg-green-100 rounded-lg">
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -536,7 +358,7 @@ export default function ProductsNewContent() {
                   </div>
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-gray-500 text-xs font-medium">Sales Price: <span className="text-lg font-bold text-gray-900">₹{getSalesNetAmount(selectedProduct.item_code).toLocaleString("en-IN", { maximumFractionDigits: 0 })}</span></p>
+                      <p className="text-gray-500 text-xs font-medium">Sales Price: <span className="text-lg font-bold text-gray-900">₹{salePricePerUnit.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</span></p>
                     </div>
                     <div className="p-2 bg-blue-100 rounded-lg">
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -614,7 +436,7 @@ export default function ProductsNewContent() {
                   </div>
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-gray-500 text-xs font-medium">Stock Value: <span className="text-lg font-bold text-gray-900">₹{(getAvailableQty(selectedProduct.item_code).total * getPurchaseNetAmount(selectedProduct.item_code)).toLocaleString("en-IN", { maximumFractionDigits: 0 })}</span></p>
+                      <p className="text-gray-500 text-xs font-medium">Stock Value: <span className="text-lg font-bold text-gray-900">₹{(getAvailableQty(selectedProduct.item_code).total * purchasePricePerUnit).toLocaleString("en-IN", { maximumFractionDigits: 0 })}</span></p>
                     </div>
                     <div className="p-2 bg-orange-100 rounded-lg">
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">

@@ -2,8 +2,19 @@
 
 import { Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import dynamic from "next/dynamic";
 import ProductsNewContent from "./ProductsNewContent";
-import SparesNewContent from "../spares-new/SparesNewContent";
+
+const SparesNewContent = dynamic(
+  () => import("../spares-new/SparesNewContent"),
+  {
+    loading: () => (
+      <div className="flex h-full items-center justify-center text-gray-500">
+        Loading spares…
+      </div>
+    ),
+  },
+);
 
 function InventoryTabBar({ activeTab }) {
   const router = useRouter();
