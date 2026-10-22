@@ -4024,8 +4024,8 @@ function UpdateDeliveryMenuItem({ order, userRole, variant = "auto" }) {
 }
 
 function canRevertOrder(dispatchStatus) {
-  // Cannot revert if order is dispatched
-  return !dispatchStatus;
+  const s = Number(dispatchStatus);
+  return s !== 1 && s !== 2;
 }
 
 function WarehouseInMenuItem({ order }) {
@@ -4452,7 +4452,7 @@ function ApprovalActions({ r, userRole }) {
 
   const handleAction = async (action) => {
     if (action === "pending") {
-      if (r.dispatch_status) {
+      if (!revertAllowed) {
         toast.error("Cannot revert: Order is already dispatched.");
         return;
       }
@@ -4479,16 +4479,12 @@ function ApprovalActions({ r, userRole }) {
           <span>Approved</span>
           <ApprovalRemarkHover remark={savedRemark} />
         </div>
-        {isSuperAdmin && (
+        {isSuperAdmin && revertAllowed && (
           <button
             onClick={() => handleAction("pending")}
-            disabled={loading || !revertAllowed}
-            className={`text-xs ${revertAllowed ? "text-gray-500 hover:text-orange-600 underline" : "text-gray-400 cursor-not-allowed"}`}
-            title={
-              r.dispatch_status 
-                ? "Cannot revert: Order is already dispatched" 
-                : "Reset to Pending"
-            }
+            disabled={loading}
+            className="text-xs text-gray-500 hover:text-orange-600 underline"
+            title="Reset to Pending"
           >
             Revert
           </button>
@@ -4507,16 +4503,12 @@ function ApprovalActions({ r, userRole }) {
           <span>Rejected</span>
           <ApprovalRemarkHover remark={savedRemark} />
         </div>
-        {isSuperAdmin && (
+        {isSuperAdmin && revertAllowed && (
           <button
             onClick={() => handleAction("pending")}
-            disabled={loading || !revertAllowed}
-            className={`text-xs ${revertAllowed ? "text-gray-500 hover:text-orange-600 underline" : "text-gray-400 cursor-not-allowed"}`}
-            title={
-              r.dispatch_status 
-                ? "Cannot revert: Order is already dispatched" 
-                : "Reset to Pending"
-            }
+            disabled={loading}
+            className="text-xs text-gray-500 hover:text-orange-600 underline"
+            title="Reset to Pending"
           >
             Revert
           </button>

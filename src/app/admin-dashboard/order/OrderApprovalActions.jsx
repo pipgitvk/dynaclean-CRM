@@ -20,11 +20,17 @@ function canRevert(approvalDate) {
   return hoursPassed < REVERT_WINDOW_HOURS;
 }
 
+function isDispatched(dispatchStatus) {
+  const s = Number(dispatchStatus);
+  return s === 1 || s === 2;
+}
+
 export default function OrderApprovalActions({
   orderId,
   approvalStatus,
   userRole,
   approvalDate,
+  dispatchStatus,
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -32,7 +38,8 @@ export default function OrderApprovalActions({
   const [remark, setRemark] = useState("");
   const isSuperAdmin =
     (userRole || "").toString().trim().toUpperCase() === "SUPERADMIN";
-  const revertAllowed = canRevert(approvalDate);
+  const revertAllowed =
+    canRevert(approvalDate) && !isDispatched(dispatchStatus);
 
   const submitAction = async (action, remarkVal) => {
     setLoading(true);
@@ -66,7 +73,11 @@ export default function OrderApprovalActions({
   const handleAction = async (action) => {
     if (action === "pending") {
       if (!revertAllowed) {
-        toast.error("Revert is only allowed within 4 hours of approval/rejection.");
+        if (isDispatched(dispatchStatus)) {
+          toast.error("Cannot revert: Order is already dispatched.");
+        } else {
+          toast.error("Revert is only allowed within 4 hours of approval/rejection.");
+        }
         return;
       }
       if (!confirm("Reset this order to Pending approval?")) return;
@@ -87,12 +98,12 @@ export default function OrderApprovalActions({
           <CheckCircle size={16} />
           <span>Approved</span>
         </div>
-        {isSuperAdmin && (
+        {isSuperAdmin && revertAllowed && (
           <button
             onClick={() => handleAction("pending")}
             disabled={loading}
-            className={`text-sm mt-1 ${revertAllowed ? "text-gray-500 hover:text-orange-600 underline" : "text-gray-400 cursor-not-allowed"}`}
-            title={revertAllowed ? "Reset to Pending (within 4 hours)" : "Revert disabled after 4 hours"}
+            className="text-sm mt-1 text-gray-500 hover:text-orange-600 underline"
+            title="Reset to Pending (within 4 hours)"
           >
             Revert
           </button>
@@ -107,12 +118,12 @@ export default function OrderApprovalActions({
           <XCircle size={16} />
           <span>Rejected</span>
         </div>
-        {isSuperAdmin && (
+        {isSuperAdmin && revertAllowed && (
           <button
             onClick={() => handleAction("pending")}
             disabled={loading}
-            className={`text-sm mt-1 ${revertAllowed ? "text-gray-500 hover:text-orange-600 underline" : "text-gray-400 cursor-not-allowed"}`}
-            title={revertAllowed ? "Reset to Pending (within 4 hours)" : "Revert disabled after 4 hours"}
+            className="text-sm mt-1 text-gray-500 hover:text-orange-600 underline"
+            title="Reset to Pending (within 4 hours)"
           >
             Revert
           </button>

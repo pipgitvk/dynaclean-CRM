@@ -79,10 +79,8 @@ export async function POST(req) {
                 [orderId]
             );
             const order = orderRows[0];
-            const dispatchStatus = order?.dispatch_status;
-
-            // Check if order is dispatched
-            if (dispatchStatus) {
+            const dispatchStatus = Number(order?.dispatch_status);
+            if (dispatchStatus === 1 || dispatchStatus === 2) {
                 return NextResponse.json(
                     { success: false, error: "Cannot revert: Order is already dispatched." },
                     { status: 400 }
