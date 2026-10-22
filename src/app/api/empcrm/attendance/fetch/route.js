@@ -56,7 +56,7 @@ export async function GET(request) {
 
     // Fetch approved leaves for the user
     const [leaves] = await db.query(
-      `SELECT from_date, to_date, leave_type, reason, is_half_day, half_day_type, start_time, end_time
+      `SELECT username, from_date, to_date, leave_type, reason, is_half_day, half_day_type, start_time, end_time
        FROM employee_leaves
        WHERE username = ?
        AND status = 'approved'
@@ -70,7 +70,7 @@ export async function GET(request) {
     console.log("this is the holidays", holidays);
     console.log("this is the approved leaves", leaves);
 
-    return NextResponse.json({ attendance: rows, holidays, leaves });
+    return NextResponse.json({ username, attendance: rows, holidays, leaves });
   } catch (error) {
     console.error("Error fetching attendance logs:", error);
     return NextResponse.json(

@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Calendar, ChevronDown } from "lucide-react";
 import { isHalfDayByRules } from "@/lib/attendanceRulesEngine";
+import { isPayrollHalfDayFromUnapprovedAutoCheckout } from "@/lib/attendanceLogForPayroll";
 import { rowHasMeaningfulCheckinOrCheckout } from "@/lib/attendanceMeaningfulPunch";
 import { dateToYmdKey } from "@/lib/salaryPayDaysFromAttendance";
 import { eachDayInLeaveRange } from "@/lib/leaveContinuousDays";
@@ -106,7 +107,9 @@ export default function AttendanceSummaryGrid({ logs, holidays, leaves, rules, c
         if (k) leaveMap.set(k, leave);
       }
     });
-    const isHalfDay = (log) => isHalfDayByRules(log, rules);
+    const isHalfDay = (log) =>
+      isPayrollHalfDayFromUnapprovedAutoCheckout(log) ||
+      isHalfDayByRules(log, rules);
     return { dateMap, holidayMap, leaveMap, isHalfDay };
   }, [logs, holidays, leaves, rules]);
 
