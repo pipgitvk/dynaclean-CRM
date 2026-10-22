@@ -30,6 +30,7 @@ export default function SpecialPricingFilterBar({
     const result = [];
     (suggestions || []).forEach((sugg) => {
       [
+        sugg.customerId,
         sugg.customerName,
         sugg.productName,
         sugg.productCode,
@@ -79,7 +80,7 @@ export default function SpecialPricingFilterBar({
             }
           }}
           list="special-price-approvals-search"
-          placeholder="Search customer, product, code…"
+          placeholder="Search customer ID, name, product, code…"
           className="border border-gray-300 rounded px-3 py-2 text-sm w-full min-w-0 sm:col-span-2 lg:col-span-2"
         />
         <datalist id="special-price-approvals-search">

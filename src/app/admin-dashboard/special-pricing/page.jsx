@@ -42,6 +42,7 @@ export default async function AdminSpecialPricingPage({ searchParams }) {
   if (searchQuery) {
     const like = `%${searchQuery}%`;
     conditions.push(`(
+      CAST(sp.customer_id AS CHAR) LIKE ? OR
       c.first_name LIKE ? OR
       c.last_name LIKE ? OR
       CASE 
@@ -52,7 +53,7 @@ export default async function AdminSpecialPricingPage({ searchParams }) {
       sp.status LIKE ? OR
       sp.price_type LIKE ?
     )`);
-    whereParams.push(like, like, like, like, like, like);
+    whereParams.push(like, like, like, like, like, like, like);
   }
 
   if (statusFilter === "pending") {
@@ -179,6 +180,7 @@ export default async function AdminSpecialPricingPage({ searchParams }) {
 
   const [suggestionRows] = await conn.execute(`
     SELECT
+      sp.customer_id,
       c.first_name,
       c.last_name,
       CASE
@@ -232,6 +234,7 @@ export default async function AdminSpecialPricingPage({ searchParams }) {
         initialType={typeFilter}
         initialPriceType={priceTypeFilter}
         suggestions={suggestionRows.map((row) => ({
+          customerId: row.customer_id != null ? String(row.customer_id) : "",
           customerName: `${row.first_name || ""} ${row.last_name || ""}`.trim(),
           productName: row.item_name,
           productCode: row.product_code,
