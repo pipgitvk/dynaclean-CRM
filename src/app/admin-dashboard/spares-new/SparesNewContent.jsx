@@ -4,6 +4,10 @@ import { formatCrmDateOnly } from "@/lib/crmDateFormat";
 
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  INVENTORY_SIDEBAR_SORT_OPTIONS,
+  sortInventorySidebarRows,
+} from "@/lib/inventorySidebarSort";
 import { Search } from "lucide-react";
 import Link from "next/link";
 import InventoryPriceEditMenu from "@/components/inventory/InventoryPriceEditMenu";
@@ -45,6 +49,7 @@ function typeColor(type) {
 export default function SparesNewContent() {
   const [spares, setSpares] = useState([]);
   const [search, setSearch] = useState("");
+  const [sidebarSort, setSidebarSort] = useState("min_qty_desc");
   const [selectedSpare, setSelectedSpare] = useState(null);
   const [loading, setLoading] = useState(true);
   const [listLoadError, setListLoadError] = useState("");
@@ -204,7 +209,7 @@ export default function SparesNewContent() {
 
   const filteredSpares = useMemo(() => {
     const q = search.toLowerCase();
-    return spares.filter((s) => {
+    const filtered = spares.filter((s) => {
       return (
         String(s.spare_number ?? "").toLowerCase().includes(q) ||
         String(s.item_name ?? "").toLowerCase().includes(q) ||
@@ -213,7 +218,8 @@ export default function SparesNewContent() {
         String(s.model ?? "").toLowerCase().includes(q)
       );
     });
-  }, [spares, search]);
+    return sortInventorySidebarRows(filtered, sidebarSort);
+  }, [spares, search, sidebarSort]);
 
   const filteredCombined = useMemo(() => {
     return historyRows
@@ -281,6 +287,18 @@ export default function SparesNewContent() {
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
             />
           </div>
+          <select
+            value={sidebarSort}
+            onChange={(e) => setSidebarSort(e.target.value)}
+            className="mt-2 w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+            aria-label="Sort spares list"
+          >
+            {INVENTORY_SIDEBAR_SORT_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                Sort: {opt.label}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div className="flex-1 overflow-y-auto">

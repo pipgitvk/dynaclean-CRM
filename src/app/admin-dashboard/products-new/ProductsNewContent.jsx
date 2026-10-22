@@ -3,7 +3,11 @@
 import { formatCrmDateOnly } from "@/lib/crmDateFormat";
 
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  INVENTORY_SIDEBAR_SORT_OPTIONS,
+  sortInventorySidebarRows,
+} from "@/lib/inventorySidebarSort";
 import React from "react";
 import { Search } from "lucide-react";
 import Link from "next/link";
@@ -23,6 +27,7 @@ async function fetchJson(url, { timeoutMs = 120_000 } = {}) {
 export default function ProductsNewContent() {
   const [products, setProducts] = useState([]);
   const [search, setSearch] = useState("");
+  const [sidebarSort, setSidebarSort] = useState("min_qty_desc");
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [listLoadError, setListLoadError] = useState("");
@@ -268,14 +273,17 @@ export default function ProductsNewContent() {
     fetchTransferHistory();
   };
 
-  const filteredProducts = products.filter((product) => {
+  const filteredProducts = useMemo(() => {
     const searchLower = search.toLowerCase();
-    return (
-      (product.item_code || "").toLowerCase().includes(searchLower) ||
-      (product.item_name || "").toLowerCase().includes(searchLower) ||
-      String(product.product_number || "").toLowerCase().includes(searchLower)
-    );
-  });
+    const filtered = products.filter((product) => {
+      return (
+        (product.item_code || "").toLowerCase().includes(searchLower) ||
+        (product.item_name || "").toLowerCase().includes(searchLower) ||
+        String(product.product_number || "").toLowerCase().includes(searchLower)
+      );
+    });
+    return sortInventorySidebarRows(filtered, sidebarSort);
+  }, [products, search, sidebarSort]);
 
   return (
     <div className="flex h-full flex-col bg-gray-50 md:flex-row">
@@ -301,6 +309,18 @@ export default function ProductsNewContent() {
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
             />
           </div>
+          <select
+            value={sidebarSort}
+            onChange={(e) => setSidebarSort(e.target.value)}
+            className="mt-2 w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+            aria-label="Sort products list"
+          >
+            {INVENTORY_SIDEBAR_SORT_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                Sort: {opt.label}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div className="flex-1 overflow-y-auto">
