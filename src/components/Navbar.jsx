@@ -305,11 +305,19 @@ export default function Navbar({ onToggleSidebar, showSalesMeta = false }) {
             >
               <div className="text-sm min-w-0">
                 <div className="font-medium truncate">
-                  {c.first_name} {c.company && `(${c.company})`}
+                  {c.company?.trim() ||
+                    [c.first_name, c.last_name].filter(Boolean).join(" ").trim() ||
+                    "Unnamed"}
                 </div>
                 <div className="text-xs text-gray-500 truncate">
-                  ID: {c.customer_id} • {c.lead_source || "—"}
+                  ID: {c.customer_id}
+                  {c.phone ? ` • ${c.phone}` : ""}
                 </div>
+                {c.lead_source ? (
+                  <div className="text-xs text-gray-400 truncate">
+                    Lead source: {c.lead_source}
+                  </div>
+                ) : null}
               </div>
               <button
                 type="button"

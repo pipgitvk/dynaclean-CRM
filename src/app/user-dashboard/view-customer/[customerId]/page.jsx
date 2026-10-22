@@ -16,6 +16,10 @@ import {
 } from "@/lib/customerHierarchyFollowups";
 import { isGemRole } from "@/lib/isGemRole";
 import { isServiceSupportRole, sqlColumnInActiveServiceSupportUsers } from "@/lib/serviceSupportTeamScope";
+import {
+  customerOrderMatchParams,
+  sqlCustomerOrderBelongsToCustomer,
+} from "@/lib/customerOrderScope";
 import { userHasModuleKey } from "@/lib/userModuleAccessServer";
 import Link from "next/link";
 import axios from "axios";
@@ -98,16 +102,20 @@ export default async function CustomerPage({ params }) {
   const isServiceSupport = isServiceSupportRole(userRole);
   const canSeeAllOrders =
     isPrivilegedRole || isAssignedOrLeadSourceOwner || isServiceSupport;
+  const orderMatch = sqlCustomerOrderBelongsToCustomer("no", "qr");
+  const orderCountFrom = `FROM neworder no LEFT JOIN quotations_records qr ON no.quote_number = qr.quote_number`;
   const orderCountQuery = isServiceSupport
-    ? `SELECT COUNT(*) AS orderCount FROM neworder WHERE customer_id = ? AND ${sqlColumnInActiveServiceSupportUsers("created_by")}`
+    ? `SELECT COUNT(DISTINCT no.order_id) AS orderCount ${orderCountFrom}
+       WHERE ${orderMatch} AND ${sqlColumnInActiveServiceSupportUsers("no.created_by")}`
     : canSeeAllOrders
-      ? `SELECT COUNT(*) AS orderCount FROM neworder WHERE customer_id = ?`
-      : `SELECT COUNT(*) AS orderCount FROM neworder WHERE customer_id = ? AND created_by = ?`;
+      ? `SELECT COUNT(DISTINCT no.order_id) AS orderCount ${orderCountFrom} WHERE ${orderMatch}`
+      : `SELECT COUNT(DISTINCT no.order_id) AS orderCount ${orderCountFrom}
+         WHERE ${orderMatch} AND no.created_by = ?`;
   const orderCountParams = isServiceSupport
-    ? [customerId]
+    ? customerOrderMatchParams(customerId)
     : canSeeAllOrders
-      ? [customerId]
-      : [customerId, username];
+      ? customerOrderMatchParams(customerId)
+      : [...customerOrderMatchParams(customerId), username];
   const [[{ orderCount }]] = await conn.execute(orderCountQuery, orderCountParams);
 
   let latestQuoteNumber = "";

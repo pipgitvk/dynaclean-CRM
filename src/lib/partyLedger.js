@@ -262,12 +262,26 @@ async function getPartyNameAliases(conn, decodedCompany, customerId) {
     );
     for (const r of custRows) {
       const company = String(r.company || "").trim();
-      if (company) {
-        aliases.add(company);
-        continue;
-      }
+      if (company) aliases.add(company);
       const person = String(r.full_name || r.first_name || "").trim();
       if (person) aliases.add(person);
+    }
+
+    try {
+      const [quoteNames] = await conn.execute(
+        `SELECT DISTINCT TRIM(company_name) AS company_name
+         FROM quotations_records
+         WHERE CAST(customer_id AS CHAR) = ?
+           AND company_name IS NOT NULL
+           AND TRIM(company_name) != ''`,
+        [cid],
+      );
+      for (const row of quoteNames) {
+        const qn = String(row.company_name || "").trim();
+        if (qn) aliases.add(qn);
+      }
+    } catch (_) {
+      /* quotations_records optional */
     }
   }
 

@@ -17,6 +17,10 @@ import {
   collectHierarchyCustomerIds,
   fetchCustomerFollowupHistory,
 } from "@/lib/customerHierarchyFollowups";
+import {
+  customerOrderMatchParams,
+  sqlCustomerOrderBelongsToCustomer,
+} from "@/lib/customerOrderScope";
 
 export default async function CustomerPage({ params }) {
   const { customerId } = await params;
@@ -113,10 +117,19 @@ export default async function CustomerPage({ params }) {
   const isAssignedOrLeadSourceOwner =
     customer.assigned_to === username || customer.lead_source === username;
   const canSeeAllOrders = isPrivilegedRole || isAssignedOrLeadSourceOwner;
+  const orderMatch = sqlCustomerOrderBelongsToCustomer("no", "qr");
   const orderCountQuery = canSeeAllOrders
-    ? `SELECT COUNT(*) AS orderCount FROM neworder WHERE customer_id = ?`
-    : `SELECT COUNT(*) AS orderCount FROM neworder WHERE customer_id = ? AND created_by = ?`;
-  const orderCountParams = canSeeAllOrders ? [customerId] : [customerId, username];
+    ? `SELECT COUNT(DISTINCT no.order_id) AS orderCount
+       FROM neworder no
+       LEFT JOIN quotations_records qr ON no.quote_number = qr.quote_number
+       WHERE ${orderMatch}`
+    : `SELECT COUNT(DISTINCT no.order_id) AS orderCount
+       FROM neworder no
+       LEFT JOIN quotations_records qr ON no.quote_number = qr.quote_number
+       WHERE ${orderMatch} AND no.created_by = ?`;
+  const orderCountParams = canSeeAllOrders
+    ? customerOrderMatchParams(customerId)
+    : [...customerOrderMatchParams(customerId), username];
   const [[{ orderCount }]] = await conn.execute(orderCountQuery, orderCountParams);
 
   let latestQuoteNumber = "";
@@ -475,7 +488,7 @@ export default async function CustomerPage({ params }) {
                 Special Price
               </Link>
               <Link
-                href={`/admin-dashboard/invoices/buyer/${encodeURIComponent(customer.id || customer.first_name)}`}
+                href={`/admin-dashboard/accounting/ledger?customerId=${encodeURIComponent(customerId)}`}
                 className="btn w-full md:w-auto md:flex-shrink-0 whitespace-nowrap text-white bg-indigo-600 hover:bg-indigo-700 py-2 px-4 rounded-md text-center transition duration-300"
               >
                 View Ledger
