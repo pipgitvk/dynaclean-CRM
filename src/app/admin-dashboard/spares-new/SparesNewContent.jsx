@@ -49,7 +49,7 @@ function typeColor(type) {
 export default function SparesNewContent() {
   const [spares, setSpares] = useState([]);
   const [search, setSearch] = useState("");
-  const [sidebarSort, setSidebarSort] = useState("min_qty_desc");
+  const [sidebarSort, setSidebarSort] = useState("qty_desc");
   const [selectedSpare, setSelectedSpare] = useState(null);
   const [loading, setLoading] = useState(true);
   const [listLoadError, setListLoadError] = useState("");
@@ -218,8 +218,9 @@ export default function SparesNewContent() {
         String(s.model ?? "").toLowerCase().includes(q)
       );
     });
-    return sortInventorySidebarRows(filtered, sidebarSort);
-  }, [spares, search, sidebarSort]);
+    const stockOf = (spare) => getAvailableQty(spare).total;
+    return sortInventorySidebarRows(filtered, sidebarSort, { stockOf });
+  }, [spares, search, sidebarSort, getAvailableQty]);
 
   const filteredCombined = useMemo(() => {
     return historyRows

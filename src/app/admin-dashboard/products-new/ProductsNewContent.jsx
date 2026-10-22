@@ -27,7 +27,7 @@ async function fetchJson(url, { timeoutMs = 120_000 } = {}) {
 export default function ProductsNewContent() {
   const [products, setProducts] = useState([]);
   const [search, setSearch] = useState("");
-  const [sidebarSort, setSidebarSort] = useState("min_qty_desc");
+  const [sidebarSort, setSidebarSort] = useState("qty_desc");
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [listLoadError, setListLoadError] = useState("");
@@ -282,8 +282,19 @@ export default function ProductsNewContent() {
         String(product.product_number || "").toLowerCase().includes(searchLower)
       );
     });
-    return sortInventorySidebarRows(filtered, sidebarSort);
-  }, [products, search, sidebarSort]);
+    const stockOf = (product) => {
+      if (
+        selectedProduct?.item_code === product.item_code &&
+        selectedStock &&
+        (selectedStock.delhi || selectedStock.south || selectedStock.total)
+      ) {
+        return Number(selectedStock.total) || 0;
+      }
+      const n = Number(product.total_qty);
+      return Number.isFinite(n) ? n : 0;
+    };
+    return sortInventorySidebarRows(filtered, sidebarSort, { stockOf });
+  }, [products, search, sidebarSort, selectedProduct?.item_code, selectedStock]);
 
   return (
     <div className="flex h-full flex-col bg-gray-50 md:flex-row">
