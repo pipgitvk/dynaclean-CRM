@@ -6,6 +6,7 @@ import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Search } from "lucide-react";
 import Link from "next/link";
+import InventoryPriceEditMenu from "@/components/inventory/InventoryPriceEditMenu";
 
 async function fetchJson(url, { timeoutMs = 120_000 } = {}) {
   const controller = new AbortController();
@@ -191,6 +192,16 @@ export default function SparesNewContent() {
     [historyRows]
   );
 
+  const handleSparePricesSaved = useCallback((updated) => {
+    if (!updated?.id) return;
+    setSpares((prev) =>
+      prev.map((s) => (s.id === updated.id ? { ...s, ...updated } : s)),
+    );
+    setSelectedSpare((prev) =>
+      prev?.id === updated.id ? { ...prev, ...updated } : prev,
+    );
+  }, []);
+
   const filteredSpares = useMemo(() => {
     const q = search.toLowerCase();
     return spares.filter((s) => {
@@ -313,7 +324,12 @@ export default function SparesNewContent() {
                         {spare.type || spare.make || "—"}
                       </div>
                     </div>
-                    <div className="flex-shrink-0 ml-3">
+                    <div className="flex-shrink-0 ml-2 flex items-center gap-1">
+                      <InventoryPriceEditMenu
+                        kind="spare"
+                        row={spare}
+                        onSaved={handleSparePricesSaved}
+                      />
                       <div
                         className={`w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold ${getStockColor(spare.spare_number)}`}
                       >

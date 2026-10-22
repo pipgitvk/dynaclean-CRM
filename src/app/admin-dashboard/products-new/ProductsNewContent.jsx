@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from "react";
 import React from "react";
 import { Search } from "lucide-react";
 import Link from "next/link";
+import InventoryPriceEditMenu from "@/components/inventory/InventoryPriceEditMenu";
 
 async function fetchJson(url, { timeoutMs = 120_000 } = {}) {
   const controller = new AbortController();
@@ -131,6 +132,18 @@ export default function ProductsNewContent() {
 
   const reloadProductDetail = useCallback(() => {
     setDetailReloadKey((k) => k + 1);
+  }, []);
+
+  const handleProductPricesSaved = useCallback((updated) => {
+    if (!updated?.item_code) return;
+    setProducts((prev) =>
+      prev.map((p) =>
+        p.item_code === updated.item_code ? { ...p, ...updated } : p,
+      ),
+    );
+    setSelectedProduct((prev) =>
+      prev?.item_code === updated.item_code ? { ...prev, ...updated } : prev,
+    );
   }, []);
 
   const fetchProductsListQuiet = useCallback(async () => {
@@ -314,7 +327,12 @@ export default function ProductsNewContent() {
                       <div className="text-xs text-gray-500 mt-1">{product.item_code}</div>
                       <div className="text-xs text-gray-400 mt-1">{product.product_number || "-"}</div>
                     </div>
-                    <div className="flex-shrink-0 ml-3">
+                    <div className="flex-shrink-0 ml-2 flex items-center gap-1">
+                      <InventoryPriceEditMenu
+                        kind="product"
+                        row={product}
+                        onSaved={handleProductPricesSaved}
+                      />
                       <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold ${getStockColor(product.item_code)}`}>
                         {qty.total}
                       </div>

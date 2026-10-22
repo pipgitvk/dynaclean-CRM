@@ -43,7 +43,7 @@ export default async function BuyerInvoicesPage({ params, searchParams }) {
   try {
     let resolvedCustomerId = customerIdParam;
     if (!resolvedCustomerId) {
-      const conn = await getDbConnection();
+    const conn = await getDbConnection();
       const [cidRows] = await conn.execute(
         `SELECT customer_id FROM customers
          WHERE LOWER(TRIM(COALESCE(company, ''))) = LOWER(?)
