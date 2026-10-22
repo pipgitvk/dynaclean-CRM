@@ -1041,7 +1041,9 @@ export default function OrderTable({ orders, userRole }) {
         { header: "Approval Status", key: "approval_status", width: 15 },
         { header: "Taxable Amount", key: "baseAmount", width: 15 },
         { header: "Tax Amount", key: "taxamt", width: 15 },
-        { header: "Amount Details", key: "amount_details", width: 35 },
+        { header: "Total Amount", key: "total_amount", width: 16 },
+        { header: "Paid Amount", key: "paid_amount", width: 16 },
+        { header: "Balance Amount", key: "balance_amount", width: 16 },
       ];
 
       // Style the header row
@@ -1057,8 +1059,7 @@ export default function OrderTable({ orders, userRole }) {
         const totalAmt = getTotalAmount(order);
         const paidAmt = getTotalPaidAmount(order);
         const balanceAmt = getBalanceAmount(order);
-        const amountDetails = `Total: ₹${totalAmt.toFixed(2)}\nPaid: ₹${paidAmt.toFixed(2)}\nBalance: ₹${balanceAmt.toFixed(2)}`;
-        
+
         worksheet.addRow({
           order_id: order.order_id,
           quote_number: order.quote_number || "",
@@ -1081,7 +1082,9 @@ export default function OrderTable({ orders, userRole }) {
           approval_status: order.approval_status || "",
           baseAmount: Number(order.baseAmount || 0),
           taxamt: Number(order.taxamt || 0),
-          amount_details: amountDetails,
+          total_amount: Number(totalAmt) || 0,
+          paid_amount: Number(paidAmt) || 0,
+          balance_amount: Number(balanceAmt) || 0,
         });
       });
 
