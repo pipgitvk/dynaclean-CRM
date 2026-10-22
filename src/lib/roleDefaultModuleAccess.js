@@ -153,7 +153,6 @@ export const ROLE_DEFAULT_MODULE_KEYS = {
     "client-expenses",
     "delivery-challan",
     "statements",
-    "salary-slips",
     "salary-management",
     "salary-sheet",
     "attendance-sheet",

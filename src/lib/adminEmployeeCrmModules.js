@@ -24,6 +24,17 @@ export const HR_ADMIN_EMPLOYEE_CRM_MODULE_KEYS = ADMIN_EMPLOYEE_CRM_MODULES.map(
 
 export const HR_ONLY_MODULE_KEYS = [...HR_ADMIN_EMPLOYEE_CRM_MODULE_KEYS];
 
+/** Non-HR roles (e.g. ACCOUNTANT) may receive these via Global Module Access on /admin-dashboard/employees */
+export const ACCOUNTANT_GRANTABLE_EMP_MODULE_KEYS = new Set(["salary-slips"]);
+
+export function isAccountantGrantableEmpModuleKey(moduleKey, roleKey) {
+  const r = String(roleKey || "")
+    .trim()
+    .toUpperCase();
+  if (!r.includes("ACCOUNTANT")) return false;
+  return ACCOUNTANT_GRANTABLE_EMP_MODULE_KEYS.has(String(moduleKey || "").trim());
+}
+
 /** Shown under Admin Employee CRM for HR — hide same keys from HR Operations (GMA + sidebar). */
 export const HR_OPERATIONS_KEYS_IN_ADMIN_EMPLOYEE_CRM = new Set([
   "attendance-rules",

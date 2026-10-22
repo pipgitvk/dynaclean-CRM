@@ -3,6 +3,7 @@ import {
   ADMIN_EMPLOYEE_CRM_MODULES,
   HR_ADMIN_EMPLOYEE_CRM_MODULE_KEYS,
   HR_ONLY_MODULE_KEYS,
+  isAccountantGrantableEmpModuleKey,
   isHrOperationsKeyDuplicatedInAdminEmployeeCrm,
   resolveEmpCrmAdminModuleKey,
 } from "@/lib/adminEmployeeCrmModules";
@@ -48,7 +49,10 @@ export function isHrEmployeeCrmRole(roleKey) {
 export function stripHrOnlyModulesForNonHrRoles(allowedKeys, role) {
   if (!Array.isArray(allowedKeys)) return allowedKeys;
   if (isHrEmployeeCrmRole(role)) return allowedKeys;
-  return allowedKeys.filter((k) => !HR_ONLY_MODULE_KEYS.includes(k));
+  return allowedKeys.filter((k) => {
+    if (!HR_ONLY_MODULE_KEYS.includes(k)) return true;
+    return isAccountantGrantableEmpModuleKey(k, role);
+  });
 }
 
 export function mapEmpCrmAdminPathToHrDashboard(path) {

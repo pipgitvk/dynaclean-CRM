@@ -1,4 +1,7 @@
-import { ADMIN_EMPLOYEE_CRM_MODULES } from "@/lib/adminEmployeeCrmModules";
+import {
+  ADMIN_EMPLOYEE_CRM_MODULES,
+  isAccountantGrantableEmpModuleKey,
+} from "@/lib/adminEmployeeCrmModules";
 import { getRoleDefaultModuleKeys } from "@/lib/roleDefaultModuleAccess";
 import {
   HR_ADMIN_EMPLOYEE_CRM_MODULE_KEYS,
@@ -139,6 +142,7 @@ export const MODULE_TREE = [
       { key: "attendance-log", label: "All Attendance details" },
       { key: "attendance-sheet", label: "Attendance Sheet" },
       { key: "salary-sheet", label: "Salary Sheet" },
+      { key: "salary-slips", label: "Salary Slips" },
     ],
   },
   {
@@ -163,7 +167,6 @@ export const MODULE_TREE = [
       { key: "client-expenses", label: "Main Expenses" },
       { key: "delivery-challan", label: "Delivery Challan" },
       { key: "statements", label: "Statements" },
-      { key: "salary-slips", label: "Salary Slips" },
     ],
   },
   {
@@ -414,7 +417,6 @@ export const SUPERADMIN_MODULE_UI_NODES = [
       { kind: "leaf", key: "client-expenses", label: "Main Expenses" },
       { kind: "leaf", key: "delivery-challan", label: "Delivery Challan" },
       { kind: "leaf", key: "statements", label: "Statements" },
-      { kind: "leaf", key: "salary-slips", label: "Salary Slips" },
     ],
   },
   {
@@ -426,6 +428,7 @@ export const SUPERADMIN_MODULE_UI_NODES = [
       { kind: "leaf", key: "employee-crm", label: "Employee CRM" },
       { kind: "leaf", key: "attendance-sheet", label: "Attendance Sheet" },
       { kind: "leaf", key: "salary-sheet", label: "Salary Sheet" },
+      { kind: "leaf", key: "salary-slips", label: "Salary Slips" },
     ],
   },
   {
@@ -561,7 +564,13 @@ function filterModuleUiNodesForRole(nodes, roleKey, parentGroupId = "") {
   const out = [];
   for (const node of nodes || []) {
     if (node.kind === "leaf") {
-      if (HR_ONLY_MODULE_KEYS.includes(node.key) && !hrRole) continue;
+      if (
+        HR_ONLY_MODULE_KEYS.includes(node.key) &&
+        !hrRole &&
+        !isAccountantGrantableEmpModuleKey(node.key, roleKey)
+      ) {
+        continue;
+      }
       if (
         hrRole &&
         parentGroupId === "employees" &&
@@ -576,11 +585,31 @@ function filterModuleUiNodesForRole(nodes, roleKey, parentGroupId = "") {
       ) {
         continue;
       }
+      if (
+        !hrRole &&
+        parentGroupId === "hr-operations" &&
+        isAccountantGrantableEmpModuleKey(node.key, roleKey)
+      ) {
+        continue;
+      }
+      if (
+        !hrRole &&
+        parentGroupId === "hr-admin-employee-crm" &&
+        isAccountantGrantableEmpModuleKey(node.key, roleKey)
+      ) {
+        continue;
+      }
       out.push(node);
       continue;
     }
     if (node.kind === "single") {
-      if (HR_ONLY_MODULE_KEYS.includes(node.key) && !hrRole) continue;
+      if (
+        HR_ONLY_MODULE_KEYS.includes(node.key) &&
+        !hrRole &&
+        !isAccountantGrantableEmpModuleKey(node.key, roleKey)
+      ) {
+        continue;
+      }
       out.push(node);
       continue;
     }
