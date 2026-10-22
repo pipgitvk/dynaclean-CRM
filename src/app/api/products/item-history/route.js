@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
-import { enrichProductStockTransactions } from "@/lib/enrichProductStockTransactions";
 import {
   sqlTrimUtf8Eq,
   sqlTrimUtf8EqColumns,
@@ -72,8 +71,7 @@ export async function GET(request) {
       [productCode],
     );
 
-    const enrichedStock = enrichProductStockTransactions(stockRows || []);
-    for (const t of enrichedStock) {
+    for (const t of stockRows || []) {
       const st = String(t.stock_status || "").toLowerCase();
       const isOut = st === "out";
       const isTransfer = st === "transfer";
@@ -186,7 +184,7 @@ export async function GET(request) {
     }
 
     let salePricePerUnit = 0;
-    const latestSale = enrichedStock.find((t) => {
+    const latestSale = (stockRows || []).find((t) => {
       const st = String(t.stock_status || "").toLowerCase();
       return st === "out" && Number(t.net_amount) > 0;
     });
