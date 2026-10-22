@@ -223,6 +223,16 @@ export async function POST(request) {
     if (!isHrRole(payload.role)) {
       return NextResponse.json({ message: "Forbidden." }, { status: 403 });
     }
+    const roleKey = String(payload.role || "").trim().toUpperCase();
+    if (roleKey !== "SUPERADMIN") {
+      return NextResponse.json(
+        {
+          message:
+            "Only SUPERADMIN can approve or reject automatic check-outs.",
+        },
+        { status: 403 },
+      );
+    }
 
     const body = await request.json();
     const username = String(body.username || "").trim();

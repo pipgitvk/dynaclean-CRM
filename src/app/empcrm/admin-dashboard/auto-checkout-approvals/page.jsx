@@ -40,9 +40,12 @@ export default function AutoCheckoutApprovalsPage() {
               Automatic check-out approval
             </h1>
             <p className="mt-1 text-sm text-gray-600">
-              Approve system check-outs (default 9:00 PM; earlier when pending or
-              approved leave applies). Until approved, records stay{" "}
-              <span className="font-semibold text-red-600">Automatic</span>.
+              SUPERADMIN approves system check-outs (default 9:00 PM). Until
+              approved, the employee&apos;s{" "}
+              <span className="font-semibold">Present</span> counts as{" "}
+              <span className="font-semibold">half-day</span> and{" "}
+              <span className="font-semibold">Half-Days</span> +1. After approve,
+              full present applies.
             </p>
           </div>
           <Link

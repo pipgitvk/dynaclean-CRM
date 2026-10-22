@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { applyAutomaticCheckouts } from "@/lib/attendanceAutoCheckout";
+import { ensureAttendanceAutoCheckoutApprovalsTable } from "@/lib/ensureAttendanceAutoCheckoutApprovalsTable";
 
 export const dynamic = 'force-dynamic';
 
@@ -22,24 +23,28 @@ export async function GET(request) {
 
     const db = await getDbConnection();
     await applyAutomaticCheckouts(db, { username });
+    await ensureAttendanceAutoCheckoutApprovalsTable(db);
     console.log("Database connection established.");
 
     const [rows] = await db.query(
       `SELECT
-        date,
-        checkin_time,
-        checkout_time,
-        break_morning_start,
-        break_morning_end,
-        break_lunch_start,
-        break_lunch_end,
-        break_evening_start,
-        break_evening_end,
-        checkout_address,
-        checkin_photo
-      FROM attendance_logs
-      WHERE username = ?
-      ORDER BY date DESC`,
+        a.date,
+        a.checkin_time,
+        a.checkout_time,
+        a.break_morning_start,
+        a.break_morning_end,
+        a.break_lunch_start,
+        a.break_lunch_end,
+        a.break_evening_start,
+        a.break_evening_end,
+        a.checkout_address,
+        a.checkin_photo,
+        ap.status AS auto_checkout_approval_status
+      FROM attendance_logs a
+      LEFT JOIN attendance_auto_checkout_approvals ap
+        ON ap.username = a.username AND ap.log_date = a.date
+      WHERE a.username = ?
+      ORDER BY a.date DESC`,
       [username]
     );
 

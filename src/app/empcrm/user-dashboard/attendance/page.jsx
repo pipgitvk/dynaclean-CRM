@@ -24,6 +24,12 @@ import {
   isAutomaticCheckoutAddress,
 } from "@/lib/attendanceAutoCheckoutConstants";
 import {
+  countsHalfDayInSummaryForPresent,
+  formatPresentSummaryCount,
+  isPayrollHalfDayFromUnapprovedAutoCheckout,
+  presentCreditForPresentRow,
+} from "@/lib/attendanceLogForPayroll";
+import {
   attendanceDateKey as attendanceDateYmd,
   leaveDateRangeKeys,
 } from "@/lib/leaveDateRange";
@@ -31,20 +37,40 @@ import {
 const AUTO_CHECKOUT_WARNING_TITLE =
   "No manual check-out — automatic check-out at 9:00 PM only.";
 
+function getDefaultAttendanceMonthRange() {
+  const today = dayjs();
+  return {
+    from: today.startOf("month").format("YYYY-MM-DD"),
+    to: today.format("YYYY-MM-DD"),
+  };
+}
+
 function CheckoutTimeDisplay({ log }) {
   const time = formatTime(log.checkout_time);
   if (!isAutomaticCheckoutAddress(log.checkout_address)) return time;
+  const pending =
+    String(log.auto_checkout_approval_status || "").toLowerCase() !==
+    "approved";
   return (
-    <span
-      className="inline-flex items-center gap-1 text-red-600 font-bold"
-      title={AUTO_CHECKOUT_WARNING_TITLE}
-    >
-      <AlertTriangle
-        className="w-4 h-4 shrink-0"
-        aria-label="Automatic checkout warning"
-      />
-      <span>{time}</span>
-      <span className="text-xs sm:text-sm">{AUTO_CHECKOUT_ATTENDANCE_ADDRESS}</span>
+    <span className="inline-flex flex-col items-end gap-0.5">
+      <span
+        className="inline-flex items-center gap-1 text-red-600 font-bold"
+        title={AUTO_CHECKOUT_WARNING_TITLE}
+      >
+        <AlertTriangle
+          className="w-4 h-4 shrink-0"
+          aria-label="Automatic checkout warning"
+        />
+        <span>{time}</span>
+        <span className="text-xs sm:text-sm">
+          {AUTO_CHECKOUT_ATTENDANCE_ADDRESS}
+        </span>
+      </span>
+      {pending && (
+        <span className="text-[10px] font-medium text-orange-700">
+          Half-day until admin approval
+        </span>
+      )}
     </span>
   );
 }
@@ -80,8 +106,12 @@ function RegStatusBadge({ status, acknowledgedAt }) {
 const AttendancePage = () => {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [fromDate, setFromDate] = useState("");
-  const [toDate, setToDate] = useState("");
+  const [fromDate, setFromDate] = useState(
+    () => getDefaultAttendanceMonthRange().from,
+  );
+  const [toDate, setToDate] = useState(
+    () => getDefaultAttendanceMonthRange().to,
+  );
   const [filterStatus, setFilterStatus] = useState("all");
   const [holidays, setHolidays] = useState([]);
   const [leaves, setLeaves] = useState([]);
@@ -348,8 +378,9 @@ const AttendancePage = () => {
 
   const handleShowAll = () => {
     setFilterStatus("all");
-    setFromDate("");
-    setToDate("");
+    const { from, to } = getDefaultAttendanceMonthRange();
+    setFromDate(from);
+    setToDate(to);
   };
 
   // Helper: derive half_day_type from start_time / end_time using standard lunch break (13:00).
@@ -543,11 +574,18 @@ const AttendancePage = () => {
       if (log.type === "holiday") acc.holidays++;
       if (log.type === "sunday" || log.isSunday) acc.sundays++;
       if (log.type === "present") {
-        acc.present++;
-        const cls = classifyAttendanceDay(log, rules, graceHalfDaysUsed);
-        graceHalfDaysUsed = cls.graceHalfDaysUsed;
-        map.set(k, cls.kind);
-        if (cls.kind === "halfDay") acc.halfDays++;
+        acc.present += presentCreditForPresentRow(log);
+        let cls;
+        if (isPayrollHalfDayFromUnapprovedAutoCheckout(log)) {
+          cls = { kind: "halfDay", graceHalfDaysUsed: graceHalfDaysUsed };
+        } else {
+          cls = classifyAttendanceDay(log, rules, graceHalfDaysUsed);
+          graceHalfDaysUsed = cls.graceHalfDaysUsed;
+        }
+        const dayKind =
+          countsHalfDayInSummaryForPresent(log, cls.kind) ? "halfDay" : cls.kind;
+        map.set(k, dayKind);
+        if (countsHalfDayInSummaryForPresent(log, cls.kind)) acc.halfDays++;
         if (cls.kind === "lateDay") acc.lateDays++;
       }
     }
@@ -632,8 +670,13 @@ const AttendancePage = () => {
         {/* Summary Statistics Section */}
         <div className="grid grid-cols-2 md:grid-cols-8 gap-4 mb-8 text-center">
           <div className="bg-white p-4 rounded-lg shadow-md">
-            <p className="text-2xl font-bold text-green-600">{summary.present}</p>
+            <p className="text-2xl font-bold text-green-600">
+              {formatPresentSummaryCount(summary.present)}
+            </p>
             <p className="text-sm text-gray-500">Present</p>
+            <p className="text-[11px] text-gray-400 mt-1 leading-tight">
+              Automatic check-out = half-day until SUPERADMIN approves
+            </p>
           </div>
           <div className="bg-white p-4 rounded-lg shadow-md">
             <p className="text-2xl font-bold text-orange-600">{summary.absents}</p>
@@ -710,7 +753,7 @@ const AttendancePage = () => {
           <div className="flex flex-wrap gap-2">
             <button
               onClick={handleShowAll}
-              className={`px-4 py-2 rounded-md font-medium text-sm transition-colors duration-200 ${filterStatus === "all" && !fromDate && !toDate
+              className={`px-4 py-2 rounded-md font-medium text-sm transition-colors duration-200 ${filterStatus === "all"
                   ? "bg-blue-600 text-white shadow-md"
                   : "bg-gray-200 text-gray-700 hover:bg-gray-300"
                 }`}
