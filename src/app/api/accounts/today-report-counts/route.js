@@ -2,7 +2,10 @@ import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { PAYMENT_PENDING_ORDER_SQL_WHERE } from "@/lib/paymentPendingFilters";
-import { calculateAdjustedOrderTotal } from "@/lib/paymentOrderStatus";
+import {
+  calculateAdjustedOrderTotal,
+  computeOrderPaymentRemaining,
+} from "@/lib/paymentOrderStatus";
 import { sumOrderPaymentAmounts } from "@/lib/orderPaymentHistory";
 
 async function columnExists(conn, tableName, columnName) {
@@ -58,7 +61,11 @@ async function getPaymentPendingCountLikeReport(conn) {
     const totalAmt = await calculateAdjustedOrderTotal(conn, order);
     const paidAmount = sumOrderPaymentAmounts(order);
     const deductionAmount = deductionByOrder.get(order.order_id) || 0;
-    const remaining = Math.max(0, totalAmt - paidAmount - deductionAmount);
+    const { remaining } = computeOrderPaymentRemaining(
+      totalAmt,
+      paidAmount,
+      deductionAmount,
+    );
     if (remaining > 0) pendingCount += 1;
   }
 

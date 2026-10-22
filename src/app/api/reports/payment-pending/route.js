@@ -4,7 +4,11 @@ import { getSessionPayload } from "@/lib/auth";
 import { ensurePaymentPendingFollowupsTable } from "@/lib/ensurePaymentPendingFollowupsTable";
 import { ensurePaymentDeductionsTable } from "@/lib/ensurePaymentDeductionsTable";
 import { PAYMENT_PENDING_ORDER_SQL_WHERE } from "@/lib/paymentPendingFilters";
-import { calculateAdjustedOrderTotal } from "@/lib/paymentOrderStatus";
+import {
+  calculateAdjustedOrderTotal,
+  computeOrderPaymentRemaining,
+  roundInr,
+} from "@/lib/paymentOrderStatus";
 import { sumOrderPaymentAmounts } from "@/lib/orderPaymentHistory";
 
 export async function GET(request) {
@@ -113,9 +117,10 @@ export async function GET(request) {
             const paidAmount = sumOrderPaymentAmounts(order);
             const deductionInfo = deductionByOrder.get(order.order_id);
             const deductionAmount = deductionInfo?.total || 0;
-            const remaining = Math.max(
-              0,
-              totalAmt - paidAmount - deductionAmount,
+            const { remaining, displayPaid } = computeOrderPaymentRemaining(
+              totalAmt,
+              paidAmount,
+              deductionAmount,
             );
 
             return {
@@ -125,9 +130,9 @@ export async function GET(request) {
                 company_name: order.company_name,
                 contact: order.contact,
                 created_by: order.created_by,
-                total_amount: totalAmt,
-                paid_amount: paidAmount,
-                deduction_amount: deductionAmount,
+                total_amount: roundInr(totalAmt),
+                paid_amount: displayPaid,
+                deduction_amount: roundInr(deductionAmount),
                 remaining_amount: remaining,
                 due_date: order.duedate,
                 next_followup_date: order.next_followup_date || null,

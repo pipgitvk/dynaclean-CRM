@@ -5,6 +5,33 @@
 import { sumOrderPaymentAmounts } from "@/lib/orderPaymentHistory";
 import { hasOrderInvoiceReport } from "@/lib/orderDocumentEditRules";
 
+/** Paise/rounding drift (e.g. ₹0.40 on ₹802.40) — treat as fully settled in reports. */
+export const PAYMENT_REMAINING_TOLERANCE_INR = 1;
+
+export function roundInr(amount) {
+  return Math.round((Number(amount) || 0) * 100) / 100;
+}
+
+export function normalizePaymentRemaining(remaining) {
+  const r = roundInr(remaining);
+  if (r <= PAYMENT_REMAINING_TOLERANCE_INR) return 0;
+  return r;
+}
+
+/**
+ * @returns {{ remaining: number, rawRemaining: number, displayPaid: number }}
+ */
+export function computeOrderPaymentRemaining(total, paid, deduction = 0) {
+  const t = roundInr(total);
+  const p = roundInr(paid);
+  const d = roundInr(deduction);
+  const rawRemaining = Math.max(0, t - p - d);
+  const remaining = normalizePaymentRemaining(rawRemaining);
+  const displayPaid =
+    remaining === 0 && rawRemaining > 0 ? roundInr(t - d) : p;
+  return { remaining, rawRemaining, displayPaid };
+}
+
 /** Matches order list UI: quotation grand total, then invoice totalamt. */
 export function getOrderTotalForPayment(order) {
   const quotationTotal = Number(order?.quotation_grand_total) || 0;
@@ -39,15 +66,16 @@ export function getOrderListRemainingPayment(order) {
   }
   const total = getOrderTotalForPayment(order);
   const paidAmount = sumOrderPaymentAmounts(order);
-  const remaining = Math.max(0, total - paidAmount);
+  const { remaining } = computeOrderPaymentRemaining(total, paidAmount, 0);
   const statusKey = (deriveOrderListPaymentStatus(order) || "")
     .toString()
     .trim()
     .toLowerCase()
     .replace(/\s+/g, "");
-  if (statusKey === "paid" && remaining < 0.01) {
+  if (statusKey === "paid" && remaining <= 0) {
     return null;
   }
+  if (remaining <= 0) return null;
   return remaining;
 }
 
@@ -126,10 +154,12 @@ export async function calculateAdjustedOrderTotal(pool, order) {
 }
 
 export function derivePaymentStatus({ total, paidAmount, deductionAmount, isOverdue }) {
-  const settled = paidAmount + deductionAmount;
+  const t = roundInr(total);
+  const settled = roundInr(paidAmount) + roundInr(deductionAmount);
+  const tol = PAYMENT_REMAINING_TOLERANCE_INR;
 
-  if (total > 0 && settled >= total) {
-    return paidAmount >= total ? "paid" : "partially paid";
+  if (t > 0 && settled >= t - tol) {
+    return roundInr(paidAmount) >= t - tol ? "paid" : "partially paid";
   }
   if (paidAmount > 0 || deductionAmount > 0) return "partially paid";
   if (isOverdue) return "over due";
@@ -180,7 +210,11 @@ export async function getOrderPaymentBreakdown(pool, orderId) {
     isOverdue = today.setHours(0, 0, 0, 0) > due.setHours(0, 0, 0, 0);
   }
 
-  const remainingAmount = totalAmount - paidAmount - deductionAmount;
+  const { remaining: remainingAmount, displayPaid } = computeOrderPaymentRemaining(
+    totalAmount,
+    paidAmount,
+    deductionAmount,
+  );
   const paymentStatus = derivePaymentStatus({
     total: getOrderTotalForPayment(order) || totalAmount,
     paidAmount,
@@ -190,7 +224,7 @@ export async function getOrderPaymentBreakdown(pool, orderId) {
 
   return {
     totalAmount,
-    paidAmount,
+    paidAmount: displayPaid,
     deductionAmount,
     remainingAmount,
     paymentStatus,
