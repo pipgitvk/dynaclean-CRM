@@ -813,6 +813,40 @@ export async function buildLedgerForParty(decodedCompany, customerIdFilter = nul
     return 0;
   });
 
+  const enrichedInvoices = invoices.map((inv) => {
+    const linkedStatements = statementRows.filter((stmt) => {
+      const inLinkedTransIds = parseTransIds(inv.linked_trans_ids).includes(
+        stmt.trans_id,
+      );
+      const matchesInvoiceNumber = stmt.invoice_number === inv.invoice_number;
+      const hasLinkedInvoiceId = parseLinkedPurchaseIds(
+        stmt.linked_purchase_ids,
+      ).some(
+        (token) =>
+          token.startsWith("IP") &&
+          parseInt(token.replace("IP", ""), 10) === inv.id,
+      );
+      return inLinkedTransIds || matchesInvoiceNumber || hasLinkedInvoiceId;
+    });
+
+    const totalLinkedAmount = linkedStatements.reduce((sum, stmt) => {
+      const key = `${inv.id}-${stmt.trans_id}`;
+      return sum + (allocationMap[key] || 0);
+    }, 0);
+
+    const balance_amount = Math.max(
+      0,
+      Number(inv.grand_total) - totalLinkedAmount,
+    );
+
+    return {
+      ...inv,
+      linkedStatements,
+      balance_amount,
+      totalLinkedAmount,
+    };
+  });
+
   const serialized = combined.map((e) => ({
     ...e,
     entry_date: String(e.entry_date).slice(0, 10),
@@ -821,7 +855,11 @@ export async function buildLedgerForParty(decodedCompany, customerIdFilter = nul
       : undefined,
   }));
 
-  return { entries: serialized, customerId: customerIdForCompany };
+  return {
+    entries: serialized,
+    customerId: customerIdForCompany,
+    invoices: enrichedInvoices,
+  };
 }
 
 /** Sum debit/credit from ledger rows — same math as LedgerTableClient net balance. */

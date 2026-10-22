@@ -44,18 +44,6 @@ export default function LedgerTableClient({
   const [sortCol, setSortCol] = useState("entry_date");
   const [sortDir, setSortDir] = useState("asc");
 
-  const minDate = useMemo(() => {
-    if (!initialRows || initialRows.length === 0) return dayjs().startOf("year").format("YYYY-MM-DD");
-    const dates = initialRows.map((r) => String(r.entry_date).slice(0, 10)).sort();
-    return dates[0];
-  }, [initialRows]);
-
-  const maxDate = useMemo(() => {
-    if (!initialRows || initialRows.length === 0) return dayjs().format("YYYY-MM-DD");
-    const dates = initialRows.map((r) => String(r.entry_date).slice(0, 10)).sort();
-    return dates[dates.length - 1];
-  }, [initialRows]);
-
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
 
@@ -65,11 +53,6 @@ export default function LedgerTableClient({
     company_address_line2: "Gandhi Nagar, Ganapathy, Coimbatore, Tamil Nadu - 641006",
     company_email: "sales@dynacleanindustries.com",
   });
-
-  useEffect(() => {
-    if (!dateFrom && minDate) setDateFrom(minDate);
-    if (!dateTo && maxDate) setDateTo(maxDate);
-  }, [minDate, maxDate]);
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -378,10 +361,14 @@ export default function LedgerTableClient({
             <TypeableDateFilterInput value={dateTo} onChange={setDateTo} className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
           </div>
           <button
-            onClick={() => { setDateFrom(minDate); setDateTo(maxDate); }}
+            type="button"
+            onClick={() => {
+              setDateFrom("");
+              setDateTo("");
+            }}
             className="px-4 py-2 text-sm font-semibold text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
           >
-            Reset
+            Clear dates
           </button>
         </div>
       </div>

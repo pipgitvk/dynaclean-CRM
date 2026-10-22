@@ -117,8 +117,22 @@ export default function BuyerCards() {
   const totalBuyerPages = buyerMeta.totalPages || 1;
   const buyerTotal = buyerMeta.total || 0;
 
-  const handleCardClick = (buyerName) => {
-    router.push(`/admin-dashboard/invoices/buyer/${encodeURIComponent(buyerName)}`);
+  const handleCardClick = (buyer) => {
+    const name =
+      typeof buyer === "string"
+        ? buyer
+        : buyer?.buyer_name || buyer?.name || "";
+    if (!name) return;
+    const params = new URLSearchParams();
+    const cid =
+      typeof buyer === "object" && buyer?.customer_id != null
+        ? String(buyer.customer_id).trim()
+        : "";
+    if (cid && cid !== "0") params.set("customer_id", cid);
+    const qs = params.toString();
+    router.push(
+      `/admin-dashboard/invoices/buyer/${encodeURIComponent(name)}${qs ? `?${qs}` : ""}`,
+    );
   };
 
   const fetchAllInvoices = async (page = 1) => {
@@ -305,7 +319,7 @@ export default function BuyerCards() {
             <BuyerCard
               key={`${buyer.customer_id}-${buyer.buyer_name}`}
               buyer={buyer}
-              onClick={() => handleCardClick(buyer.buyer_name)}
+              onClick={() => handleCardClick(buyer)}
             />
           ))}
         </div>

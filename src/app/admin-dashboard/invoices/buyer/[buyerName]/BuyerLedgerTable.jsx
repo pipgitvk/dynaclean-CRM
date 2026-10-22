@@ -52,27 +52,8 @@ export default function BuyerLedgerTable({ rows: initialRows, buyerName, billing
     company_email: "sales@dynacleanindustries.com",
   });
 
-  // Calculate min/max dates from actual data
-  const minDate = useMemo(() => {
-    if (initialRows.length === 0) return dayjs().startOf("month").format("YYYY-MM-DD");
-    const dates = initialRows.map(r => String(r.entry_date).slice(0, 10)).sort();
-    return dates[0] || dayjs().startOf("month").format("YYYY-MM-DD");
-  }, [initialRows]);
-  
-  const maxDate = useMemo(() => {
-    if (initialRows.length === 0) return dayjs().endOf("month").format("YYYY-MM-DD");
-    const dates = initialRows.map(r => String(r.entry_date).slice(0, 10)).sort();
-    return dates[dates.length - 1] || dayjs().endOf("month").format("YYYY-MM-DD");
-  }, [initialRows]);
-
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-
-  useEffect(() => {
-    // Set dates after component mounts (to use calculated min/max)
-    if (!dateFrom && minDate) setDateFrom(minDate);
-    if (!dateTo && maxDate) setDateTo(maxDate);
-  }, [minDate, maxDate, dateFrom, dateTo]);
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -133,11 +114,15 @@ export default function BuyerLedgerTable({ rows: initialRows, buyerName, billing
       return 0;
     });
 
-    // Filter by date range
-    return data.filter((r) => {
-      const entryDate = String(r.entry_date).slice(0, 10);
-      return entryDate >= dateFrom && entryDate <= dateTo;
-    });
+    if (dateFrom || dateTo) {
+      return data.filter((r) => {
+        const entryDate = String(r.entry_date).slice(0, 10);
+        if (dateFrom && entryDate < dateFrom) return false;
+        if (dateTo && entryDate > dateTo) return false;
+        return true;
+      });
+    }
+    return data;
   }, [rows, sortCol, sortDir, dateFrom, dateTo]);
 
   const totals = useMemo(() => {
@@ -598,13 +583,14 @@ left("Closing Balance", col.particulars, y, 9, true);
             <TypeableDateFilterInput value={dateTo} onChange={setDateTo} className="px-3 py-2 border border-gray-300 rounded-lg outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"/>
           </div>
           <button
+            type="button"
             onClick={() => {
-              setDateFrom(dayjs().startOf("month").format("YYYY-MM-DD"));
-              setDateTo(dayjs().endOf("month").format("YYYY-MM-DD"));
+              setDateFrom("");
+              setDateTo("");
             }}
             className="px-4 py-2 text-sm font-semibold text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
           >
-            Reset
+            Clear dates
           </button>
         </div>
       </div>

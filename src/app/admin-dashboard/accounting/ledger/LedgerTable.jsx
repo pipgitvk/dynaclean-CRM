@@ -31,8 +31,8 @@ const EMPTY_FORM = {
 export default function LedgerTable({ rows: initialRows }) {
   const [rows, setRows] = useState(initialRows ?? []);
   const [searchQuery, setSearchQuery] = useState("");
-  const [dateFrom, setDateFrom] = useState(dayjs().startOf("month").format("YYYY-MM-DD"));
-  const [dateTo, setDateTo] = useState(dayjs().endOf("month").format("YYYY-MM-DD"));
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [vchTypeFilter, setVchTypeFilter] = useState("");
   const [sortCol, setSortCol] = useState("entry_date");
   const [sortDir, setSortDir] = useState("desc");
