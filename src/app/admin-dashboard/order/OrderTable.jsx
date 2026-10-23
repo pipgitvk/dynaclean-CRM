@@ -47,6 +47,7 @@ import { Pie } from "react-chartjs-2";
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
 import {
   canEditDeliveryProof,
+  hasOrderInvoiceReport,
 } from "@/lib/orderDocumentEditRules";
 import { isBookingAllowedForOrder } from "@/lib/orderBookingEligibility";
 import {
@@ -445,6 +446,23 @@ function amountWithoutGst(order) {
 /** Calculate total paid amount from comma-separated payment amounts */
 function getTotalPaidAmount(order) {
   return sumOrderPaymentAmounts(order);
+}
+
+/** Booking advance before accountant invoice report — grey; after report — green. */
+function getOrderPaidAmountUiClasses(order) {
+  const advanceOnly = !hasOrderInvoiceReport(order);
+  if (advanceOnly) {
+    return {
+      label: "font-semibold text-gray-500",
+      value:
+        "font-bold text-gray-500 underline decoration-gray-400 underline-offset-2 hover:text-gray-700",
+    };
+  }
+  return {
+    label: "font-semibold text-green-700",
+    value:
+      "font-bold text-green-600 underline decoration-green-400 underline-offset-2 hover:text-green-800",
+  };
 }
 
 /** Calculate total amount - use quotation grand_total as primary source */
@@ -2439,6 +2457,7 @@ export default function OrderTable({ orders, userRole }) {
               filteredOrders.map((r, i) => {
                 const status = getStatusText(r);
                 const pay = getPaymentBadge(deriveOrderListPaymentStatus(r));
+                const paidUi = getOrderPaidAmountUiClasses(r);
                 return (
                   <tr
                     key={r.order_id}
@@ -2541,12 +2560,12 @@ export default function OrderTable({ orders, userRole }) {
                           </span>
                         </div>
                         <div className="flex justify-between gap-4">
-                          <span className="font-semibold text-green-700">Paid:</span>
+                          <span className={paidUi.label}>Paid:</span>
                           <OrderPaymentHistoryTrigger
                             order={r}
                             paymentStatusRaw={deriveOrderListPaymentStatus(r)}
                             totalAmount={getTotalAmount(r)}
-                            className="font-bold text-green-600 underline decoration-green-400 underline-offset-2 hover:text-green-800"
+                            className={paidUi.value}
                           >
                             ₹
                             {getTotalPaidAmount(r).toLocaleString("en-IN", {
@@ -2603,6 +2622,7 @@ export default function OrderTable({ orders, userRole }) {
           filteredOrders.map((r, i) => {
             const status = getStatusText(r);
             const pay = getPaymentBadge(deriveOrderListPaymentStatus(r));
+            const paidUi = getOrderPaidAmountUiClasses(r);
             return (
               <div
                 key={r.order_id}
@@ -2706,7 +2726,7 @@ export default function OrderTable({ orders, userRole }) {
                     order={r}
                     paymentStatusRaw={deriveOrderListPaymentStatus(r)}
                     totalAmount={getTotalAmount(r)}
-                    className="text-green-600 font-semibold underline decoration-green-400 underline-offset-2 hover:text-green-800"
+                    className={paidUi.value}
                   >
                     ₹
                     {getTotalPaidAmount(r).toLocaleString("en-IN", {
