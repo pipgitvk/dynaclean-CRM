@@ -9,7 +9,10 @@ import {
   computeOrderPaymentRemaining,
   roundInr,
 } from "@/lib/paymentOrderStatus";
-import { sumOrderPaymentAmounts } from "@/lib/orderPaymentHistory";
+import {
+    buildPaymentLinesForDisplay,
+    sumOrderPaymentAmounts,
+} from "@/lib/orderPaymentHistory";
 import { ensureOrderDeliveryBatchesTable } from "@/lib/orderDeliveryBatches";
 import { sqlTrimUtf8EqColumns } from "@/lib/sqlUtf8Compare";
 import {
@@ -53,6 +56,11 @@ export async function GET(request) {
         o.baseAmount,
         o.taxamt,
         o.payment_amount,
+        o.payment_id,
+        o.payment_date,
+        o.amount_received,
+        o.payment_received_date,
+        o.linked_payments_json,
         o.transaction_id,
         qr.grand_total AS quotation_grand_total,
         o.payment_status,
@@ -227,6 +235,7 @@ export async function GET(request) {
             const installationDates =
                 installationDatesByOrder.get(order.order_id) ||
                 uniqueSortedDateStrings([]);
+            const paymentLines = buildPaymentLinesForDisplay(order);
 
             return {
                 order_id: order.order_id,
@@ -237,6 +246,7 @@ export async function GET(request) {
                 created_by: order.created_by,
                 total_amount: roundInr(totalAmt),
                 paid_amount: displayPaid,
+                payment_lines: paymentLines,
                 deduction_amount: roundInr(deductionAmount),
                 remaining_amount: remaining,
                 due_date: computedDue,

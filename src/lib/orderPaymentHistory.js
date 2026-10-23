@@ -1,3 +1,5 @@
+import { parseOrderLinkedPayments } from "@/lib/orderLinkedPaymentsDisplay";
+
 /**
  * Order payments are stored as comma-separated CSV on neworder:
  * payment_id, payment_date, payment_amount.
@@ -50,6 +52,51 @@ function collapseDuplicateAdvanceEntry(rows) {
     return [withId[0]];
   }
   return rows;
+}
+
+/** Payment-pending popover / reports: CSV rows + statement linked_payments_json. */
+export function buildPaymentLinesForDisplay(order) {
+  const csvLines = buildOrderPaymentRows(order).map((row) => ({
+    ref: (row.id || "").trim() || null,
+    date: (row.date || "").trim() || null,
+    amount: Number(row.amount) || 0,
+  }));
+
+  const linked = parseOrderLinkedPayments(order);
+  if (!linked.length) {
+    return csvLines;
+  }
+
+  const fromLinked = linked
+    .map((p) => ({
+      ref: String(p.trans_id ?? "").trim() || null,
+      date: p.date ? String(p.date).slice(0, 10) : null,
+      amount: Number(p.amount) || 0,
+    }))
+    .filter((r) => r.amount > 0);
+
+  if (!csvLines.length) {
+    return fromLinked;
+  }
+
+  const linkedHasMeta = fromLinked.some((l) => l.date || l.ref);
+  if (fromLinked.length === csvLines.length) {
+    return csvLines.map((line, i) => ({
+      amount: line.amount || fromLinked[i]?.amount || 0,
+      date: line.date || fromLinked[i]?.date || null,
+      ref: line.ref || fromLinked[i]?.ref || null,
+    }));
+  }
+
+  if (linkedHasMeta && fromLinked.length >= csvLines.length) {
+    return fromLinked;
+  }
+
+  return csvLines.map((line, i) => ({
+    ...line,
+    date: line.date || fromLinked[i]?.date || null,
+    ref: line.ref || fromLinked[i]?.ref || null,
+  }));
 }
 
 export function sumOrderPaymentAmounts(order) {
