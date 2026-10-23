@@ -8,6 +8,8 @@ import {
   sortPaymentPendingOrders,
 } from "@/lib/filterPaymentPendingOrders";
 import PaymentPendingStatsBar from "@/components/reports/PaymentPendingStatsBar";
+import PaymentPendingOrderDetailsModal from "@/components/reports/PaymentPendingOrderDetailsModal";
+import { formatPaymentPendingDateList } from "@/lib/paymentPendingOrderDates";
 import ManualFilterSearchButton, {
   MANUAL_FILTER_HINT,
 } from "@/components/ui/ManualFilterSearchButton";
@@ -37,6 +39,8 @@ export default function PaymentPendingReport() {
   const [appliedCompletionFilter, setAppliedCompletionFilter] = useState("pending");
   const [followupModalOpen, setFollowupModalOpen] = useState(false);
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
+  const [orderDetailsOpen, setOrderDetailsOpen] = useState(false);
+  const [orderDetailsOrderId, setOrderDetailsOrderId] = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const canAddDeduction = ["ACCOUNTANT", "PRODUCTION ACCOUNTANT", "ADMIN", "SUPERADMIN"].includes(userRole);
 
@@ -115,9 +119,9 @@ export default function PaymentPendingReport() {
   };
 
   const exportToCSV = () => {
-    const headers = ["Order ID", "Customer Name", "Company", "Contact", "Employee", "Total Amount", "Paid Amount", "Deduction Amount", "Remaining Amount", "Due Date", "Tag", "Next Followup", "Last Remark"];
+    const headers = ["Order ID", "Customer Name", "Company", "Contact", "Employee", "Total Amount", "Paid Amount", "Deduction Amount", "Remaining Amount", "Delivery Date", "Installation Date", "Due Date", "Tag", "Next Followup", "Last Remark"];
     const csvData = filteredOrders.map(order => [
-      order.order_id,
+      [order.order_id, ...(order.service_ids || [])].filter(Boolean).join(" / "),
       order.client_name,
       order.company_name,
       order.contact,
@@ -126,7 +130,9 @@ export default function PaymentPendingReport() {
       order.paid_amount.toFixed(2),
       Number(order.deduction_amount || 0).toFixed(2),
       order.remaining_amount.toFixed(2),
-      dayjs(order.due_date).format("DD-MM-YYYY"),
+      formatPaymentPendingDateList(order.delivery_dates) || "-",
+      formatPaymentPendingDateList(order.installation_dates) || "-",
+      order.due_date ? dayjs(order.due_date).format("DD-MM-YYYY") : "-",
       order.latest_deduction || "",
       order.next_followup_date ? dayjs(order.next_followup_date).format("DD-MM-YYYY hh:mm A") : "",
       order.latest_remark || ""
@@ -194,6 +200,8 @@ export default function PaymentPendingReport() {
       <td className="px-4 py-3 border-b"><div className="h-4 bg-gray-300 rounded w-20"></div></td>
       <td className="px-4 py-3 border-b"><div className="h-4 bg-gray-300 rounded w-16"></div></td>
       <td className="px-4 py-3 border-b"><div className="h-4 bg-gray-300 rounded w-16"></div></td>
+      <td className="px-4 py-3 border-b"><div className="h-4 bg-gray-300 rounded w-20"></div></td>
+      <td className="px-4 py-3 border-b"><div className="h-4 bg-gray-300 rounded w-20"></div></td>
       <td className="px-4 py-3 border-b"><div className="h-4 bg-gray-300 rounded w-20"></div></td>
       <td className="px-4 py-3 border-b"><div className="h-4 bg-gray-300 rounded w-16"></div></td>
       <td className="px-4 py-3 border-b"><div className="h-4 bg-gray-300 rounded w-24"></div></td>
@@ -391,6 +399,18 @@ export default function PaymentPendingReport() {
                 >
                   Remaining <SortIcon columnKey="remaining_amount" />
                 </th>
+                <th
+                  className="px-4 py-3 text-center font-semibold cursor-pointer hover:bg-gray-700 transition-colors"
+                  onClick={() => handleSort("delivery_dates")}
+                >
+                  Delivery Date <SortIcon columnKey="delivery_dates" />
+                </th>
+                <th
+                  className="px-4 py-3 text-center font-semibold cursor-pointer hover:bg-gray-700 transition-colors"
+                  onClick={() => handleSort("installation_dates")}
+                >
+                  Installation Date <SortIcon columnKey="installation_dates" />
+                </th>
                 <th 
                   className="px-4 py-3 text-center font-semibold cursor-pointer hover:bg-gray-700 transition-colors"
                   onClick={() => handleSort('due_date')}
@@ -423,11 +443,23 @@ export default function PaymentPendingReport() {
                 Array.from({ length: 10 }).map((_, idx) => <SkeletonRow key={idx} />)
               ) : filteredOrders.length > 0 ? (
                 filteredOrders.map((order, index) => {
-                  const isOverdue = dayjs(order.due_date).isBefore(dayjs(), 'day');
+                  const isOverdue =
+                    order.due_date &&
+                    dayjs(order.due_date).isBefore(dayjs(), "day");
                   return (
                     <tr key={index} className="hover:bg-gray-50 transition-colors">
                       <td className="px-4 py-3 border-b font-medium text-gray-800">
-                        <div>{order.order_id}</div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setOrderDetailsOrderId(order.order_id);
+                            setOrderDetailsOpen(true);
+                          }}
+                          className="text-left font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                          title="View order details"
+                        >
+                          {order.order_id}
+                        </button>
                         {order.quote_number && (
                           <Link
                             href={`/admin-dashboard/quotations/${encodeURIComponent(order.quote_number)}`}
@@ -436,6 +468,20 @@ export default function PaymentPendingReport() {
                           >
                             {order.quote_number}
                           </Link>
+                        )}
+                        {order.service_ids?.length > 0 && (
+                          <div className="mt-1 space-y-0.5 text-[11px]">
+                            {order.service_ids.map((serviceId) => (
+                              <Link
+                                key={serviceId}
+                                href={`/admin-dashboard/view-service-report/${encodeURIComponent(serviceId)}`}
+                                className="block font-mono font-medium text-indigo-600 hover:text-indigo-800 hover:underline"
+                                title="View service"
+                              >
+                                {serviceId}
+                              </Link>
+                            ))}
+                          </div>
                         )}
                       </td>
                       <td className="px-4 py-3 border-b">
@@ -460,13 +506,39 @@ export default function PaymentPendingReport() {
                           </div>
                         )}
                       </td>
+                      <td className="px-4 py-3 border-b text-center text-xs text-gray-800 whitespace-normal min-w-[7rem]">
+                        {order.delivery_dates?.length ? (
+                          <div className="space-y-0.5">
+                            {order.delivery_dates.map((d) => (
+                              <div key={d}>{dayjs(d).format("DD-MM-YYYY")}</div>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-gray-400">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 border-b text-center text-xs text-gray-800 whitespace-normal min-w-[7rem]">
+                        {order.installation_dates?.length ? (
+                          <div className="space-y-0.5">
+                            {order.installation_dates.map((d) => (
+                              <div key={d}>{dayjs(d).format("DD-MM-YYYY")}</div>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-gray-400">—</span>
+                        )}
+                      </td>
                       <td className="px-4 py-3 border-b text-center">
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                          isOverdue ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
-                        }`}>
-                          {dayjs(order.due_date).format("DD-MM-YYYY")}
-                          {isOverdue && " ⚠️"}
-                        </span>
+                        {order.due_date ? (
+                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                            isOverdue ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
+                          }`}>
+                            {dayjs(order.due_date).format("DD-MM-YYYY")}
+                            {isOverdue && " ⚠️"}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">—</span>
+                        )}
                       </td>
                       <td className="px-4 py-3 border-b text-center">
                         {order.latest_deduction ? (
@@ -544,7 +616,7 @@ export default function PaymentPendingReport() {
                 })
               ) : (
                 <tr>
-                  <td colSpan={12} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={14} className="px-6 py-8 text-center text-gray-500">
                     No pending payments found
                   </td>
                 </tr>
@@ -574,6 +646,16 @@ export default function PaymentPendingReport() {
           setSelectedOrder(null);
         }}
         order={selectedOrder}
+      />
+
+      <PaymentPendingOrderDetailsModal
+        open={orderDetailsOpen}
+        orderId={orderDetailsOrderId}
+        userRole={userRole}
+        onClose={() => {
+          setOrderDetailsOpen(false);
+          setOrderDetailsOrderId(null);
+        }}
       />
     </div>
   );

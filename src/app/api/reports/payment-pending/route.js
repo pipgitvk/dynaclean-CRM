@@ -10,6 +10,14 @@ import {
   roundInr,
 } from "@/lib/paymentOrderStatus";
 import { sumOrderPaymentAmounts } from "@/lib/orderPaymentHistory";
+import { ensureOrderDeliveryBatchesTable } from "@/lib/orderDeliveryBatches";
+import { sqlTrimUtf8EqColumns } from "@/lib/sqlUtf8Compare";
+import {
+  collectOrderDeliveryDateStrings,
+  computeDueDateFromDeliveryAndTerms,
+  pickDeliveryAnchorForDueDate,
+  uniqueSortedDateStrings,
+} from "@/lib/paymentPendingOrderDates";
 
 export async function GET(request) {
     try {
@@ -49,9 +57,12 @@ export async function GET(request) {
         qr.grand_total AS quotation_grand_total,
         o.payment_status,
         o.duedate,
+        o.delivery_date,
+        o.delivered_on,
         o.created_at,
         o.company_name,
         o.is_returned,
+        qr.payment_term_days,
         c.customer_id,
         ppf_latest.next_followup_date AS next_followup_date,
         ppf_latest.notes AS latest_remark
@@ -78,11 +89,89 @@ export async function GET(request) {
             sql += ` AND o.created_by COLLATE utf8mb4_unicode_ci = ?`;
         }
 
-        sql += ` ORDER BY duedate ASC`;
-
         const [rows] = (role === "SALES" || role === "GEM PORTAL" || role === "GEM")
             ? await pool.query(sql, [username])
             : await pool.query(sql);
+
+        const orderIds = rows.map((order) => order.order_id).filter(Boolean);
+        const deliveryBatchDatesByOrder = new Map();
+        const installationDatesByOrder = new Map();
+        const serviceIdsByOrder = new Map();
+
+        if (orderIds.length > 0) {
+            const conn = await pool.getConnection();
+            try {
+                await ensureOrderDeliveryBatchesTable(conn);
+                const placeholders = orderIds.map(() => "?").join(",");
+
+                const [deliveryBatchRows] = await conn.execute(
+                    `SELECT order_id, delivered_on
+                     FROM order_delivery_batches
+                     WHERE order_id IN (${placeholders})
+                       AND delivered_on IS NOT NULL`,
+                    orderIds,
+                );
+                for (const row of deliveryBatchRows || []) {
+                    if (!deliveryBatchDatesByOrder.has(row.order_id)) {
+                        deliveryBatchDatesByOrder.set(row.order_id, []);
+                    }
+                    deliveryBatchDatesByOrder.get(row.order_id).push(row.delivered_on);
+                }
+
+                const serialJoin = sqlTrimUtf8EqColumns(
+                    "sr.serial_number",
+                    "d.serial_no",
+                );
+                const quoteJoin = sqlTrimUtf8EqColumns(
+                    "no.quote_number",
+                    "d.quote_number",
+                );
+                try {
+                    const [installationRows] = await conn.execute(
+                        `SELECT no.order_id,
+                                GROUP_CONCAT(
+                                  DISTINCT DATE_FORMAT(sr.completed_date, '%Y-%m-%d')
+                                  ORDER BY sr.completed_date
+                                  SEPARATOR ','
+                                ) AS installation_dates,
+                                GROUP_CONCAT(
+                                  DISTINCT sr.service_id
+                                  ORDER BY sr.service_id
+                                  SEPARATOR ','
+                                ) AS service_ids
+                         FROM neworder no
+                         INNER JOIN dispatch d ON ${quoteJoin}
+                         INNER JOIN service_records sr
+                           ON ${serialJoin}
+                          AND UPPER(TRIM(sr.service_type)) = 'INSTALLATION'
+                          AND UPPER(TRIM(sr.status)) = 'COMPLETED'
+                          AND sr.completed_date IS NOT NULL
+                         WHERE no.order_id IN (${placeholders})
+                           AND d.serial_no IS NOT NULL
+                           AND TRIM(d.serial_no) <> ''
+                         GROUP BY no.order_id`,
+                        orderIds,
+                    );
+                    for (const row of installationRows || []) {
+                        const dateParts = String(row.installation_dates || "")
+                            .split(",")
+                            .map((s) => s.trim())
+                            .filter(Boolean);
+                        installationDatesByOrder.set(row.order_id, dateParts);
+
+                        const idParts = String(row.service_ids || "")
+                            .split(",")
+                            .map((s) => s.trim())
+                            .filter(Boolean);
+                        serviceIdsByOrder.set(row.order_id, idParts);
+                    }
+                } catch (instErr) {
+                    console.error("Error fetching installation dates:", instErr);
+                }
+            } finally {
+                conn.release();
+            }
+        }
 
         const deductionByOrder = new Map();
         if (rows.length > 0) {
@@ -123,6 +212,22 @@ export async function GET(request) {
               deductionAmount,
             );
 
+            const deliveryDates = collectOrderDeliveryDateStrings({
+                deliveredOn: order.delivered_on,
+                deliveryBatchDates:
+                    deliveryBatchDatesByOrder.get(order.order_id) || [],
+            });
+            const deliveryAnchor = pickDeliveryAnchorForDueDate(deliveryDates);
+            const paymentTermDays = Number(order.payment_term_days) || 0;
+            const computedDue =
+                computeDueDateFromDeliveryAndTerms(
+                    deliveryAnchor,
+                    paymentTermDays,
+                ) || order.duedate;
+            const installationDates =
+                installationDatesByOrder.get(order.order_id) ||
+                uniqueSortedDateStrings([]);
+
             return {
                 order_id: order.order_id,
                 quote_number: order.quote_number,
@@ -134,7 +239,11 @@ export async function GET(request) {
                 paid_amount: displayPaid,
                 deduction_amount: roundInr(deductionAmount),
                 remaining_amount: remaining,
-                due_date: order.duedate,
+                due_date: computedDue,
+                delivery_dates: deliveryDates,
+                installation_dates: installationDates,
+                service_ids: serviceIdsByOrder.get(order.order_id) || [],
+                payment_term_days: paymentTermDays,
                 next_followup_date: order.next_followup_date || null,
                 latest_remark: order.latest_remark || null,
                 payment_status: order.payment_status || 'pending',
@@ -152,6 +261,12 @@ export async function GET(request) {
         } else if (completionFilter === "completed") {
             filteredOrders = orders.filter((order) => order.remaining_amount <= 0);
         }
+
+        filteredOrders.sort((a, b) => {
+            const aDue = a.due_date ? new Date(a.due_date).getTime() : 0;
+            const bDue = b.due_date ? new Date(b.due_date).getTime() : 0;
+            return aDue - bDue;
+        });
 
         return NextResponse.json({
             success: true,

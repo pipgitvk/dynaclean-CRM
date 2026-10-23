@@ -25,7 +25,10 @@ export function filterPaymentPendingOrders(
         order.client_name?.toLowerCase().includes(query) ||
         order.company_name?.toLowerCase().includes(query) ||
         order.contact?.toLowerCase().includes(query) ||
-        order.created_by?.toLowerCase().includes(query),
+        order.created_by?.toLowerCase().includes(query) ||
+        (order.service_ids || []).some((id) =>
+          String(id).toLowerCase().includes(query),
+        ),
     );
   }
 
@@ -72,7 +75,17 @@ export function sortPaymentPendingOrders(orders, sortConfig) {
     let aVal = a[sortConfig.key];
     let bVal = b[sortConfig.key];
 
-    if (
+    if (sortConfig.key === "delivery_dates") {
+      aVal = dayjs((a.delivery_dates || [])[a.delivery_dates?.length - 1]).unix();
+      bVal = dayjs((b.delivery_dates || [])[b.delivery_dates?.length - 1]).unix();
+    } else if (sortConfig.key === "installation_dates") {
+      aVal = dayjs(
+        (a.installation_dates || [])[a.installation_dates?.length - 1],
+      ).unix();
+      bVal = dayjs(
+        (b.installation_dates || [])[b.installation_dates?.length - 1],
+      ).unix();
+    } else if (
       sortConfig.key === "due_date" ||
       sortConfig.key === "next_followup_date"
     ) {
