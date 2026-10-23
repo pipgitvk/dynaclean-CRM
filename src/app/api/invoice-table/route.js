@@ -63,6 +63,11 @@ const LATEST_ORDER_MATCH = `
     no.invoice_number COLLATE utf8mb4_unicode_ci = invoices.invoice_number COLLATE utf8mb4_unicode_ci
     OR no.quote_number COLLATE utf8mb4_unicode_ci = CAST(invoices.quotation_id AS CHAR) COLLATE utf8mb4_unicode_ci
     OR CAST(qr.\`S.No.\` AS CHAR) = CAST(invoices.quotation_id AS CHAR)
+    OR (
+      invoices.buyers_order_no IS NOT NULL
+      AND TRIM(invoices.buyers_order_no) <> ''
+      AND CAST(no.order_id AS CHAR) COLLATE utf8mb4_unicode_ci = TRIM(invoices.buyers_order_no) COLLATE utf8mb4_unicode_ci
+    )
   )
 `;
 
@@ -128,6 +133,7 @@ function buildInvoiceSelectSql(derivedStatusSql, latestOrderIdSql) {
     id,
     invoice_number,
     quotation_id,
+    buyers_order_no,
     customer_name AS buyer_name,
     customer_id,
     gst_number,
@@ -153,6 +159,7 @@ function buildSimpleInvoiceSelectSql() {
     id,
     invoice_number,
     quotation_id,
+    buyers_order_no,
     customer_name AS buyer_name,
     customer_id,
     gst_number,
@@ -203,6 +210,9 @@ function deriveInvoiceStatus(invoice, order) {
   }
 
   const invoiceStatus = String(invoice.status || "").trim().toUpperCase();
+  if (invoiceStatus === "CANCELLED") {
+    return "CANCELLED";
+  }
   const grandTotal = Number(invoice.grand_total) || 0;
   const rawBalance = Number(invoice.balance_amount);
   const balance = Number.isFinite(rawBalance)
@@ -229,6 +239,15 @@ function orderMatchesInvoice(invoice, order) {
     invoice.invoice_number &&
     order.invoice_number &&
     invoice.invoice_number === order.invoice_number
+  ) {
+    return true;
+  }
+
+  const buyersOrder = String(invoice.buyers_order_no || "").trim();
+  if (
+    buyersOrder &&
+    order.order_id != null &&
+    String(order.order_id).trim() === buyersOrder
   ) {
     return true;
   }
@@ -272,8 +291,17 @@ async function bulkFetchLatestOrdersForInvoices(conn, invoices) {
         .filter((value) => value != null && value !== ""),
     ),
   ];
+  const buyersOrderNos = [
+    ...new Set(
+      invoices
+        .map((inv) => String(inv.buyers_order_no || "").trim())
+        .filter(Boolean),
+    ),
+  ];
 
-  if (!invoiceNumbers.length && !quotationIds.length) return new Map();
+  if (!invoiceNumbers.length && !quotationIds.length && !buyersOrderNos.length) {
+    return new Map();
+  }
 
   const conditions = [];
   const values = [];
@@ -293,6 +321,13 @@ async function bulkFetchLatestOrdersForInvoices(conn, invoices) {
     values.push(...quotationIds.map(String));
     conditions.push(`CAST(qr.\`S.No.\` AS CHAR) IN (${placeholders})`);
     values.push(...quotationIds.map(String));
+  }
+
+  if (buyersOrderNos.length) {
+    conditions.push(
+      `CAST(no.order_id AS CHAR) COLLATE utf8mb4_unicode_ci IN (${buyersOrderNos.map(() => "?").join(",")})`,
+    );
+    values.push(...buyersOrderNos);
   }
 
   const [orders] = await conn.execute(
@@ -325,10 +360,17 @@ async function bulkFetchLatestOrdersForInvoices(conn, invoices) {
 
 function applyOrderMetaToRows(rows, orderMap) {
   return rows.map((invoice) => {
+    const order = orderMap.get(invoice.id);
+    const derived = deriveInvoiceStatus(invoice, order);
+    const status =
+      derived ||
+      String(invoice.status || "").trim() ||
+      invoice.payment_status ||
+      null;
     return {
       ...invoice,
-      status: invoice.payment_status || invoice.status,
-      order_id: orderMap.get(invoice.id)?.order_id ?? null,
+      status,
+      order_id: order?.order_id ?? null,
     };
   });
 }

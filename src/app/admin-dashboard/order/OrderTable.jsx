@@ -3172,6 +3172,14 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                       <span>Edit Report</span>
                     </Link>
                   )}
+                  {isSuperAdmin && (
+                    <div
+                      className="border-t border-gray-100 mt-1 pt-1"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <DeleteButton orderId={r.order_id} />
+                    </div>
+                  )}
                 </>
               ) : (
                 <>

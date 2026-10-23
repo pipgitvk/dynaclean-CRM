@@ -3,6 +3,7 @@ import { getDbConnection } from "@/lib/db";
 import { NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 import { syncPreBookingsForOrder } from "@/lib/syncPreBookingsForOrder";
+import { cancelActiveInvoiceForOrder } from "@/lib/cancelInvoiceForOrder";
 
 export async function POST(req) {
     try {
@@ -68,10 +69,23 @@ export async function POST(req) {
                 }
             }
         } else if (action === 'reject') {
+            const [rejectOrderRows] = await conn.execute(
+                `SELECT order_id, quote_number, invoice_number, report_file
+                 FROM neworder WHERE order_id = ? LIMIT 1`,
+                [orderId],
+            );
             await conn.execute(
                 "UPDATE neworder SET approval_status = 'rejected', is_cancelled = 1, approval_remark = ?, approval_date = NOW() WHERE order_id = ?",
                 [remarkVal, orderId]
             );
+            const rejectOrder = rejectOrderRows?.[0];
+            if (rejectOrder) {
+                try {
+                    await cancelActiveInvoiceForOrder(conn, rejectOrder);
+                } catch (invErr) {
+                    console.error("[orders/approve reject] invoice cancel:", invErr);
+                }
+            }
         } else {
             // Reset to pending (undo approve/reject) - only if not dispatched
             const [orderRows] = await conn.execute(
