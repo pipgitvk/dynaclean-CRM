@@ -10,9 +10,11 @@ import {
   Eye,
   RefreshCw,
   Loader2,
-  MoreHorizontal,
   Shield,
+  FileSpreadsheet,
+  FileText,
 } from "lucide-react";
+import { applyTLCustomersChipFilter } from "@/lib/tlCustomersChipFilter";
 import Link from "next/link";
 import { NOTES_LANGUAGE_OPTIONS } from "@/constants/notesLanguageOptions";
 import dayjs from "dayjs";
@@ -71,6 +73,7 @@ export default function TLCustomersTable({
   const [activeFilter, setActiveFilter] = useState("all");
   const [showQuotePopup, setShowQuotePopup] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [exportingFormat, setExportingFormat] = useState(null);
   const [products, setProducts] = useState(productsList);
   const [showProductsDropdown, setShowProductsDropdown] = useState(false);
   const [productSearch, setProductSearch] = useState("");
@@ -138,54 +141,18 @@ export default function TLCustomersTable({
   const customersForKPI =
     allCustomersForKPI.length > 0 ? allCustomersForKPI : customers;
 
-  const getFilteredCustomers = () => {
-    const now = dayjs();
-    
-    // If pre-booking toggle is ON, show only customers with pre-booking data
-    let baseCustomers = customers;
-    if (preBookingOnly) {
-      baseCustomers = customers.filter((customer) => customer.has_pre_booking);
-    }
+  const chipFilterContext = useMemo(
+    () => ({
+      tlOnly,
+      isSuperAdmin,
+      statusFilter: selectedStatus,
+      preBookingOnly,
+    }),
+    [tlOnly, isSuperAdmin, selectedStatus, preBookingOnly],
+  );
 
-    switch (activeFilter) {
-      case "upcoming":
-        return baseCustomers.filter(
-          (customer) =>
-            allowCustomerByStatus(customer) &&
-            customer.multi_tag &&
-            customer.multi_tag.toLowerCase().includes("strong followup"),
-        );
-
-      case "due":
-        return baseCustomers.filter((customer) => {
-          if (!allowCustomerByStatus(customer)) return false;
-
-          // Exclude closed stages
-          const excludedStages = [
-            "Won (Order Received)",
-            "Lost",
-            "Disqualified / Invalid Lead",
-          ];
-          if (excludedStages.includes(customer.stage)) return false;  
-
-          const followupTime = pickEffectiveNextFollowup(customer);
-          if (!followupTime) return false;
-
-          return followupTime.isBefore(now); // Overdue
-        });
-
-      case "prime":
-        return baseCustomers.filter(
-          (customer) =>
-            allowCustomerByStatus(customer) &&
-            customer.multi_tag &&
-            customer.multi_tag.toLowerCase().includes("prime"),
-        );
-
-      default:
-        return baseCustomers.filter((customer) => allowCustomerByStatus(customer));
-    }
-  };
+  const getFilteredCustomers = () =>
+    applyTLCustomersChipFilter(customers, activeFilter, chipFilterContext);
 
   // Get counts for each filter using KPI data (all customers)
   const getFilterCounts = () => {
@@ -377,6 +344,40 @@ export default function TLCustomersTable({
     startTransition(() => {
       router.push(`${basePath}?${buildFilterParams().toString()}`);
     });
+  };
+
+  const handleExport = async (format) => {
+    if (!isAdmin) return;
+    setExportingFormat(format);
+    try {
+      const params = buildFilterParams();
+      params.set("activeFilter", activeFilter);
+      params.set("format", format);
+      const res = await fetch(`/api/tl-customers/export?${params.toString()}`);
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.message || "Export failed");
+      }
+      const blob = await res.blob();
+      const disposition = res.headers.get("Content-Disposition") || "";
+      const match = disposition.match(/filename="([^"]+)"/);
+      const fallback =
+        format === "excel" ? "tl-customers.xlsx" : "tl-customers.pdf";
+      const fileName = match?.[1] || fallback;
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = fileName;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      alert(err.message || "Could not download file.");
+    } finally {
+      setExportingFormat(null);
+    }
   };
 
   const handleReset = () => {
@@ -876,6 +877,37 @@ export default function TLCustomersTable({
                     )}
                     Reset
                   </button>
+
+                  {isAdmin && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => handleExport("excel")}
+                        disabled={Boolean(exportingFormat) || isPending}
+                        className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {exportingFormat === "excel" ? (
+                          <Loader2 size={18} className="animate-spin" />
+                        ) : (
+                          <FileSpreadsheet size={18} />
+                        )}
+                        Excel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleExport("pdf")}
+                        disabled={Boolean(exportingFormat) || isPending}
+                        className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {exportingFormat === "pdf" ? (
+                          <Loader2 size={18} className="animate-spin" />
+                        ) : (
+                          <FileText size={18} />
+                        )}
+                        PDF
+                      </button>
+                    </>
+                  )}
 
                   <div className="flex flex-wrap items-center gap-3 sm:gap-4 sm:ml-2 sm:pl-4 sm:border-l border-gray-200">
                   <div className="flex items-center gap-2">
