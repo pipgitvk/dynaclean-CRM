@@ -680,6 +680,13 @@ const allMenuItems = [
         icon: "Receipt",
       },
       {
+        path: "/admin-dashboard/delivery-challan",
+        name: "Delivery Challan",
+        accessKey: "delivery-challan",
+        roles: ["ALL"],
+        icon: "Package",
+      },
+      {
         path: "/admin-dashboard/bank-masters",
         name: "Bank Management",
         accessKey: "bank-management",
