@@ -12,6 +12,148 @@ import autoTable from "jspdf-autotable";
 import ExcelJS from "exceljs";
 import EditStatementForm from "./EditStatementForm";
 
+function linkedModuleTypeToStatementType(linkedModuleType) {
+  const t = String(linkedModuleType || "").trim();
+  if (t === "Expense") return "expense";
+  if (t === "DD") return "dd_management";
+  if (t === "Invoice") return "invoices";
+  if (t === "Purchases") return "purchase_billings";
+  if (t === "Assets") return "expense";
+  return "";
+}
+
+function StatementLinkedModulesCell({
+  row,
+  getLinkedPurchaseRefs,
+  onEdit,
+  onOpenInvoice,
+}) {
+  const hasInvoice = !!String(row.invoice_number || "").trim();
+  const refs = getLinkedPurchaseRefs(row);
+  const visibleRefs = hasInvoice ? refs.filter((x) => x.prefix !== "IP") : refs;
+  const ipRefs = refs.filter((x) => x.prefix === "IP");
+
+  const hasAnyLink =
+    hasInvoice ||
+    ipRefs.length > 0 ||
+    visibleRefs.length > 0 ||
+    row.dd_id ||
+    row.client_expense_id ||
+    (row.linked_module_id && row.linked_module_type);
+
+  const chip =
+    "inline-block px-1.5 py-0.5 text-xs font-mono rounded whitespace-nowrap hover:underline cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-400";
+
+  const open = (statementType) => onEdit(row.id, statementType);
+
+  return (
+    <div className="space-y-1">
+      {hasInvoice && (
+        <button
+          type="button"
+          onClick={() =>
+            onOpenInvoice({ invoiceNumber: row.invoice_number })
+          }
+          className={`${chip} bg-blue-100 text-blue-700`}
+          title="View invoice"
+        >
+          {row.invoice_number}
+        </button>
+      )}
+      {ipRefs.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {ipRefs.map((x) => (
+            <button
+              key={`ip-${x.id}`}
+              type="button"
+              onClick={() => onOpenInvoice({ invoiceDbId: x.id })}
+              className={`${chip} bg-blue-100 text-blue-700`}
+              title="View invoice"
+            >
+              INV{x.id}
+            </button>
+          ))}
+        </div>
+      )}
+      {visibleRefs.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {visibleRefs.map((x) => (
+            <button
+              key={`${x.prefix}-${x.id}`}
+              type="button"
+              onClick={() => open("purchase_billings")}
+              className={`${chip} bg-slate-100 text-slate-800 font-bold`}
+              title="Edit — Purchase Billings"
+            >
+              {x.prefix}
+              {x.id}
+            </button>
+          ))}
+        </div>
+      )}
+      {row.dd_id && (
+        <button
+          type="button"
+          onClick={() => open("dd_management")}
+          className={`${chip} bg-purple-100 text-purple-700 font-bold`}
+          title="Edit — DD Management"
+        >
+          DD{row.dd_id}
+        </button>
+      )}
+      {row.client_expense_id && (
+        <button
+          type="button"
+          onClick={() => open("expense")}
+          className={`${chip} bg-orange-100 text-orange-700 font-bold`}
+          title="Edit — Expense"
+        >
+          EXP{row.client_expense_id}
+        </button>
+      )}
+      {row.linked_module_id && row.linked_module_type && (
+        <button
+          type="button"
+          onClick={() => {
+            if (row.linked_module_type === "Invoice") {
+              onOpenInvoice({ invoiceDbId: row.linked_module_id });
+              return;
+            }
+            open(linkedModuleTypeToStatementType(row.linked_module_type));
+          }}
+          className={`${chip} font-bold ${
+            row.linked_module_type === "Assets"
+              ? "bg-indigo-100 text-indigo-700"
+              : row.linked_module_type === "Invoice"
+                ? "bg-blue-100 text-blue-700"
+                : row.linked_module_type === "Purchases"
+                  ? "bg-green-100 text-green-700"
+                  : row.linked_module_type === "DD"
+                    ? "bg-purple-100 text-purple-700"
+                    : row.linked_module_type === "Expense"
+                      ? "bg-orange-100 text-orange-700"
+                      : "bg-gray-100 text-gray-700"
+          }`}
+          title="Edit statement link"
+        >
+          {row.linked_module_type === "Assets"
+            ? `ASS${row.linked_module_id}`
+            : row.linked_module_type === "Invoice"
+              ? `INV${row.linked_module_id}`
+              : row.linked_module_type === "Purchases"
+                ? `PUR${row.linked_module_id}`
+                : row.linked_module_type === "DD"
+                  ? `DD${row.linked_module_id}`
+                  : row.linked_module_type === "Expense"
+                    ? `EXP${row.linked_module_id}`
+                    : `${row.linked_module_type}${row.linked_module_id}`}
+        </button>
+      )}
+      {!hasAnyLink && <span className="text-gray-300 text-xs">—</span>}
+    </div>
+  );
+}
+
 export default function StatementTable({ rows }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -44,7 +186,39 @@ export default function StatementTable({ rows }) {
   const [linkedTypeFilter, setLinkedTypeFilter] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: "id", direction: "desc" });
   const [modalId, setModalId] = useState(null);
-  const [editStatementId, setEditStatementId] = useState(null);
+  const [editModal, setEditModal] = useState(null);
+  const [invoiceView, setInvoiceView] = useState(null);
+
+  const openStatementEdit = (id, statementType = "") => {
+    setEditModal({ id, statementType: statementType || "" });
+  };
+
+  const openInvoiceInModal = async ({ invoiceNumber, invoiceDbId }) => {
+    const num = invoiceNumber != null ? String(invoiceNumber).trim() : "";
+    if (num) {
+      setInvoiceView({ invoiceNumber: num });
+      return;
+    }
+    const dbId = Number(invoiceDbId);
+    if (!Number.isFinite(dbId) || dbId <= 0) return;
+    setInvoiceView({ loading: true, label: `INV${dbId}` });
+    try {
+      const res = await fetch(`/api/invoices/${dbId}`, {
+        credentials: "include",
+      });
+      const data = await res.json();
+      const resolved = data?.invoice?.invoice_number;
+      if (!res.ok || !resolved) {
+        toast.error(data?.error || "Invoice not found");
+        setInvoiceView(null);
+        return;
+      }
+      setInvoiceView({ invoiceNumber: String(resolved).trim() });
+    } catch {
+      toast.error("Failed to load invoice");
+      setInvoiceView(null);
+    }
+  };
   const [expense, setExpense] = useState(null);
   const [expenseLoading, setExpenseLoading] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -1194,97 +1368,12 @@ export default function StatementTable({ rows }) {
                     )}
                   </td>
                   <td className="p-3">
-                    <div className="space-y-1">
-                      {row.invoice_number && (
-                        <div>
-                          <span 
-                            className="px-1.5 py-0.5 bg-blue-100 text-blue-700 text-xs font-mono rounded whitespace-nowrap"
-                            title={row.invoice_number}
-                          >
-                            {row.invoice_number}
-                          </span>
-                        </div>
-                      )}
-                      {/* Show linked invoice IDs from linked_purchase_ids (IP prefix) */}
-                      {(() => {
-                        const raw = row?.linked_purchase_ids;
-                        if (!raw) return null;
-                        let arr = [];
-                        try {
-                          const parsed = JSON.parse(String(raw));
-                          if (Array.isArray(parsed)) arr = parsed;
-                        } catch {
-                          arr = String(raw).split(",").map(s => s.trim()).filter(Boolean);
-                        }
-                        const invIds = arr
-                          .map(v => String(v).trim().toUpperCase())
-                          .filter(v => /^IP\d+$/.test(v))
-                          .map(v => v.replace('IP', ''));
-                        if (invIds.length === 0) return null;
-                        return (
-                          <div className="flex flex-wrap gap-1">
-                            {invIds.map(id => (
-                              <span key={id} className="px-1.5 py-0.5 bg-blue-100 text-blue-700 text-xs font-mono rounded">
-                                INV{id}
-                              </span>
-                            ))}
-                          </div>
-                        );
-                      })()}
-                      {(() => {
-                        const refs = getLinkedPurchaseRefs(row);
-                        if (refs.length > 0) {
-                          // Hide IP-prefixed refs when an invoice_number already covers them (P299 is redundant when INV299 shown)
-                          const hasInvoice = !!String(row.invoice_number || "").trim();
-                          const visibleRefs = hasInvoice
-                            ? refs.filter(x => x.prefix !== "IP")
-                            : refs;
-                          if (visibleRefs.length === 0) return null;
-                          return (
-                            <div>
-                              <span className="text-xs font-mono text-slate-700">
-                                {visibleRefs.map((x) => `P${x.id}`).join(", ")}
-                              </span>
-                            </div>
-                          );
-                        }
-                        return null;
-                      })()}
-                      {row.dd_id && (
-                        <div>
-                          <span className="px-1.5 py-0.5 bg-purple-100 text-purple-700 text-xs font-bold rounded">
-                            DD{row.dd_id}
-                          </span>
-                        </div>
-                      )}
-                      {row.client_expense_id && (
-                        <div>
-                          <span className="px-1.5 py-0.5 bg-orange-100 text-orange-700 text-xs font-bold rounded">
-                            EXP{row.client_expense_id}
-                          </span>
-                        </div>
-                      )}
-                      {!row.invoice_number && !getLinkedPurchaseRefs(row).length && !row.dd_id && !row.client_expense_id && !row.linked_module_id && (
-                        <span className="text-gray-300 text-xs">—</span>
-                      )}
-                      {row.linked_module_id && row.linked_module_type && (
-                        <div>
-                          <span className={`px-1.5 py-0.5 rounded text-xs font-bold ${
-                            row.linked_module_type === 'Assets' ? 'bg-indigo-100 text-indigo-700' :
-                            row.linked_module_type === 'Invoice' ? 'bg-blue-100 text-blue-700' :
-                            row.linked_module_type === 'Purchases' ? 'bg-green-100 text-green-700' :
-                            row.linked_module_type === 'DD' ? 'bg-purple-100 text-purple-700' :
-                            row.linked_module_type === 'Expense' ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-700'
-                          }`}>
-                            {row.linked_module_type === 'Assets' ? `ASS${row.linked_module_id}` :
-                             row.linked_module_type === 'Invoice' ? `INV${row.linked_module_id}` :
-                             row.linked_module_type === 'Purchases' ? `PUR${row.linked_module_id}` :
-                             row.linked_module_type === 'DD' ? `DD${row.linked_module_id}` :
-                             row.linked_module_type === 'Expense' ? `EXP${row.linked_module_id}` : `${row.linked_module_type}${row.linked_module_id}`}
-                          </span>
-                        </div>
-                      )}
-                    </div>
+                    <StatementLinkedModulesCell
+                      row={row}
+                      getLinkedPurchaseRefs={getLinkedPurchaseRefs}
+                      onEdit={openStatementEdit}
+                      onOpenInvoice={openInvoiceInModal}
+                    />
                   </td>
                   <td
                     className="p-3 font-medium"
@@ -1307,7 +1396,7 @@ export default function StatementTable({ rows }) {
                     </button>
                     <button
                       type="button"
-                      onClick={() => setEditStatementId(row.id)}
+                      onClick={() => openStatementEdit(row.id)}
                       className="text-yellow-600 hover:text-yellow-800"
                       title="Edit"
                     >
@@ -1369,79 +1458,14 @@ export default function StatementTable({ rows }) {
               )}
             </div>
             <div>
-              <strong>Linked Modules:</strong>{" "}
-              <div className="space-y-1 mt-1">
-                {row.invoice_number && (
-                  <span className="block px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-mono rounded w-fit">
-                    {row.invoice_number}
-                  </span>
-                )}
-                {/* Show linked invoice IDs from linked_purchase_ids (IP prefix) */}
-                {(() => {
-                  const raw = row?.linked_purchase_ids;
-                  if (!raw) return null;
-                  let arr = [];
-                  try {
-                    const parsed = JSON.parse(String(raw));
-                    if (Array.isArray(parsed)) arr = parsed;
-                  } catch {
-                    arr = String(raw).split(",").map(s => s.trim()).filter(Boolean);
-                  }
-                  const invIds = arr
-                    .map(v => String(v).trim().toUpperCase())
-                    .filter(v => /^IP\d+$/.test(v))
-                    .map(v => v.replace('IP', ''));
-                  if (invIds.length === 0) return null;
-                  return invIds.map(id => (
-                    <span key={id} className="block px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-mono rounded w-fit">
-                      INV{id}
-                    </span>
-                  ));
-                })()}
-                {(() => {
-                  const refs = getLinkedPurchaseRefs(row);
-                  if (refs.length > 0) {
-                    const hasInvoice = !!String(row.invoice_number || "").trim();
-                    const visibleRefs = hasInvoice
-                      ? refs.filter(x => x.prefix !== "IP")
-                      : refs;
-                    if (visibleRefs.length === 0) return null;
-                    return (
-                      <span className="block text-xs font-mono text-slate-700">
-                        {visibleRefs.map((x) => `P${x.id}`).join(", ")}
-                      </span>
-                    );
-                  }
-                  return null;
-                })()}
-                {row.dd_id && (
-                  <span className="block px-2 py-0.5 bg-purple-100 text-purple-700 text-xs font-bold rounded w-fit">
-                    DD{row.dd_id}
-                  </span>
-                )}
-                {row.client_expense_id && (
-                  <span className="block px-2 py-0.5 bg-orange-100 text-orange-700 text-xs font-bold rounded w-fit">
-                    EXP#{row.client_expense_id}
-                  </span>
-                )}
-                {row.linked_module_id && row.linked_module_type && (
-                  <span className={`block px-2 py-0.5 rounded text-xs font-bold w-fit ${
-                    row.linked_module_type === 'Assets' ? 'bg-indigo-100 text-indigo-700' :
-                    row.linked_module_type === 'Invoice' ? 'bg-blue-100 text-blue-700' :
-                    row.linked_module_type === 'Purchases' ? 'bg-green-100 text-green-700' :
-                    row.linked_module_type === 'DD' ? 'bg-purple-100 text-purple-700' :
-                    row.linked_module_type === 'Expense' ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-700'
-                  }`}>
-                    {row.linked_module_type === 'Assets' ? `ASS${row.linked_module_id}` :
-                     row.linked_module_type === 'Invoice' ? `INV${row.linked_module_id}` :
-                     row.linked_module_type === 'Purchases' ? `PUR${row.linked_module_id}` :
-                     row.linked_module_type === 'DD' ? `DD${row.linked_module_id}` :
-                     row.linked_module_type === 'Expense' ? `EXP${row.linked_module_id}` : `${row.linked_module_type}${row.linked_module_id}`}
-                  </span>
-                )}
-                {!row.invoice_number && !getLinkedPurchaseRefs(row).length && !row.dd_id && !row.client_expense_id && !row.linked_module_id && (
-                  <span className="text-gray-400">—</span>
-                )}
+              <strong>Linked Modules:</strong>
+              <div className="mt-1">
+                <StatementLinkedModulesCell
+                  row={row}
+                  getLinkedPurchaseRefs={getLinkedPurchaseRefs}
+                  onEdit={openStatementEdit}
+                  onOpenInvoice={openInvoiceInModal}
+                />
               </div>
             </div>
             <div>
@@ -1464,7 +1488,7 @@ export default function StatementTable({ rows }) {
               </button>
               <button
                 type="button"
-                onClick={() => setEditStatementId(row.id)}
+                onClick={() => openStatementEdit(row.id)}
                 className="text-yellow-600 hover:text-yellow-800"
               >
                 <Pencil size={16} /> Edit
@@ -1779,17 +1803,65 @@ export default function StatementTable({ rows }) {
         </div>
       )}
 
+      {/* Invoice view modal */}
+      {invoiceView != null && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-3 sm:p-4 bg-black/50">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl max-h-[96vh] flex flex-col">
+            <div className="flex items-center justify-between px-4 sm:px-6 py-3 border-b shrink-0 gap-2">
+              <h3 className="text-base sm:text-lg font-semibold text-gray-800 truncate">
+                {invoiceView.loading
+                  ? "Loading invoice…"
+                  : invoiceView.invoiceNumber}
+              </h3>
+              <div className="flex items-center gap-2 shrink-0">
+                {!invoiceView.loading && invoiceView.invoiceNumber && (
+                  <Link
+                    href={`/admin-dashboard/invoices/${encodeURIComponent(invoiceView.invoiceNumber)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs sm:text-sm text-blue-600 hover:underline whitespace-nowrap"
+                  >
+                    Open in tab
+                  </Link>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setInvoiceView(null)}
+                  className="p-1 hover:bg-gray-100 rounded"
+                  aria-label="Close"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 min-h-0 overflow-hidden bg-gray-50">
+              {invoiceView.loading ? (
+                <div className="p-12 text-center text-gray-500">
+                  Loading invoice…
+                </div>
+              ) : (
+                <iframe
+                  title={`Invoice ${invoiceView.invoiceNumber}`}
+                  src={`/admin-dashboard/invoices/${encodeURIComponent(invoiceView.invoiceNumber)}?embed=1`}
+                  className="w-full h-[min(85vh,900px)] border-0 bg-white"
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Edit Statement Modal */}
-      {editStatementId != null && (
+      {editModal != null && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[92vh] flex flex-col">
             <div className="flex items-center justify-between px-6 py-4 border-b shrink-0">
               <h3 className="text-lg font-semibold text-gray-800">
-                Edit Statement #{editStatementId}
+                Edit Statement #{editModal.id}
               </h3>
               <button
                 type="button"
-                onClick={() => setEditStatementId(null)}
+                onClick={() => setEditModal(null)}
                 className="p-1 hover:bg-gray-100 rounded"
                 aria-label="Close"
               >
@@ -1798,13 +1870,14 @@ export default function StatementTable({ rows }) {
             </div>
             <div className="overflow-y-auto flex-1 p-4 sm:p-6">
               <EditStatementForm
-                key={editStatementId}
-                statementId={String(editStatementId)}
+                key={`${editModal.id}-${editModal.statementType}`}
+                statementId={String(editModal.id)}
+                initialStatementType={editModal.statementType}
                 embedded
-                onClose={() => setEditStatementId(null)}
+                onClose={() => setEditModal(null)}
                 onSuccess={() => {
                   router.refresh();
-                  setEditStatementId(null);
+                  setEditModal(null);
                 }}
               />
             </div>

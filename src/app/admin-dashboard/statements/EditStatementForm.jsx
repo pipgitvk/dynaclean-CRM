@@ -7,11 +7,61 @@ import dayjs from "dayjs";
 import toast from "react-hot-toast";
 import StatementExpensePicker from "./StatementExpensePicker";
 
+/** Dropdown values in this form */
+export function inferStatementTypeFromRow(row) {
+  if (!row || typeof row !== "object") return "";
+  const failed =
+    row.failed_transaction_id != null &&
+    String(row.failed_transaction_id).trim() !== "" &&
+    String(row.failed_transaction_id) !== "0";
+  const cancelled =
+    row.cancelled_transaction_id != null &&
+    String(row.cancelled_transaction_id).trim() !== "" &&
+    String(row.cancelled_transaction_id) !== "0";
+  if (failed) return "failed_transaction";
+  if (cancelled) return "cancelled_transaction";
+
+  const mod = String(row.linked_module_type || "").trim();
+  if (mod === "Expense") return "expense";
+  if (mod === "DD") return "dd_management";
+  if (mod === "Invoice") return "invoices";
+  if (mod === "Purchases") return "purchase_billings";
+
+  if (row.client_expense_id != null && String(row.client_expense_id).trim() !== "") {
+    return "expense";
+  }
+  if (row.dd_id != null && String(row.dd_id).trim() !== "") {
+    return "dd_management";
+  }
+  if (row.invoice_number != null && String(row.invoice_number).trim() !== "") {
+    return "invoices";
+  }
+
+  const raw = row.linked_purchase_ids;
+  if (raw != null && String(raw).trim() !== "") {
+    let arr = [];
+    try {
+      const parsed = JSON.parse(String(raw));
+      if (Array.isArray(parsed)) arr = parsed;
+    } catch {
+      arr = String(raw).split(",").map((s) => s.trim()).filter(Boolean);
+    }
+    for (const v of arr) {
+      const s = String(v).trim().toUpperCase();
+      if (/^IP\d+$/.test(s)) return "invoices";
+      if (/^(PP|PS|SP)\d+$/.test(s)) return "purchase_billings";
+    }
+  }
+
+  return "";
+}
+
 export default function EditStatementForm({
   statementId,
   onClose,
   onSuccess,
   embedded = false,
+  initialStatementType = "",
 }) {
   const id = statementId;
   const router = useRouter();
@@ -115,6 +165,10 @@ export default function EditStatementForm({
           initialType = "failed_transaction";
         } else if (row.cancelled_transaction_id != null && String(row.cancelled_transaction_id).trim() !== "" && String(row.cancelled_transaction_id) !== "0") {
           initialType = "cancelled_transaction";
+        } else if (initialStatementType) {
+          initialType = initialStatementType;
+        } else {
+          initialType = inferStatementTypeFromRow(row);
         }
         setStatementType(initialType);
         setIsTypeLocked(initialType === "failed_transaction" || initialType === "cancelled_transaction");
@@ -146,7 +200,7 @@ export default function EditStatementForm({
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, [id, initialStatementType]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -337,6 +391,10 @@ export default function EditStatementForm({
           value={statementType}
           onChange={(e) => {
             const value = e.target.value;
+            if (embedded) {
+              setStatementType(value);
+              return;
+            }
             if (value === "invoices") {
               if (userRole.includes("ACCOUNTANT") || userRole === "USER") {
                 router.push("/user-dashboard/invoices");
