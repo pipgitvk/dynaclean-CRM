@@ -704,6 +704,20 @@ export async function GET(req) {
 
     const { searchParams } = new URL(req.url);
 
+    if (searchParams.get("distinctEmployees") === "1") {
+      const conn = await getDbConnection();
+      const [rows] = await conn.execute(
+        `SELECT DISTINCT TRIM(employee_name) AS name
+         FROM invoices
+         WHERE employee_name IS NOT NULL AND TRIM(employee_name) <> ''
+         ORDER BY name ASC`,
+      );
+      return NextResponse.json({
+        success: true,
+        employees: (rows || []).map((r) => r.name).filter(Boolean),
+      });
+    }
+
     const page = Number(searchParams.get("page")) || 1;
     const limit = Number(searchParams.get("limit")) || 20;
     const offset = (page - 1) * limit;

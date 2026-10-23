@@ -5,6 +5,7 @@ import React, { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import MultiInvoiceLinkModal from "@/app/user-dashboard/invoices/MultiInvoiceLinkModal";
+import SearchableSelect from "@/components/ui/SearchableSelect";
 
 const InvoiceEditModal = dynamic(() => import("./InvoiceEditModal"), { ssr: false });
 
@@ -35,6 +36,8 @@ export default function InvoiceTable({ onSummaryUpdate }) {
   const [toDate, setToDate] = useState(formatDateForInput(lastDayOfMonth));
   const [invoiceTypeFilter, setInvoiceTypeFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [employeeFilter, setEmployeeFilter] = useState("");
+  const [employeeOptions, setEmployeeOptions] = useState([]);
 
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
@@ -131,6 +134,7 @@ export default function InvoiceTable({ onSummaryUpdate }) {
     if (search) params.append("search", search);
     if (invoiceTypeFilter) params.append("invoiceType", invoiceTypeFilter);
     if (statusFilter) params.append("status", statusFilter);
+    if (employeeFilter) params.append("employeeName", employeeFilter);
 
     try {
       const res = await fetch(`/api/invoice-table?${params.toString()}`);
@@ -193,7 +197,27 @@ export default function InvoiceTable({ onSummaryUpdate }) {
 
   useEffect(() => {
     resetAndFetch();
-  }, [fromDate, toDate, sortBy, sortOrder, invoiceTypeFilter, statusFilter]);
+  }, [fromDate, toDate, sortBy, sortOrder, invoiceTypeFilter, statusFilter, employeeFilter]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/invoice-table?distinctEmployees=1");
+        const data = await res.json();
+        if (!cancelled && data?.success && Array.isArray(data.employees)) {
+          setEmployeeOptions(
+            data.employees.map((name) => ({ value: name, label: name })),
+          );
+        }
+      } catch (e) {
+        console.error("Failed to load invoice employees:", e);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -231,6 +255,7 @@ export default function InvoiceTable({ onSummaryUpdate }) {
     setToDate(formatDateForInput(lastDay));
     setInvoiceTypeFilter("");
     setStatusFilter("");
+    setEmployeeFilter("");
     setSortBy("created_at");
     setSortOrder("desc");
     setFetchError(null);
@@ -367,6 +392,16 @@ export default function InvoiceTable({ onSummaryUpdate }) {
             <option value="PARTIAL PAID">Partial Paid</option>
             <option value="CANCELLED">Cancelled</option>
           </select>
+          <div className="min-w-[11rem] w-full sm:w-52">
+            <SearchableSelect
+              options={[{ value: "", label: "All employees" }, ...employeeOptions]}
+              value={employeeFilter}
+              onChange={setEmployeeFilter}
+              placeholder="All employees"
+              searchPlaceholder="Search employee..."
+              className="py-1.5 min-h-[34px]"
+            />
+          </div>
         </div>
         <div className="flex flex-col sm:flex-row gap-2 items-center">
           <input
