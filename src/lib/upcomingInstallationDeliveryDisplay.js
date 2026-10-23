@@ -76,6 +76,77 @@ export function matchesUpcomingInstallationStatusFilter(record, statusFilter) {
   return getUpcomingInstallationStatusBucket(record) === f;
 }
 
+export function formatUpcomingInstallationYmd(value) {
+  const d = parseYmdDate(value);
+  if (!d) return "—";
+  return d.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function displayYmdOrRaw(value) {
+  const formatted = formatUpcomingInstallationYmd(value);
+  if (formatted !== "—") return formatted;
+  const raw = value != null ? String(value).trim() : "";
+  return raw || "—";
+}
+
+/** Scheduled expected delivery (neworder.delivery_date). */
+export function getUpcomingInstallationExpectedDateDisplay(record) {
+  return {
+    text: displayYmdOrRaw(record?.delivery_date),
+    className: installationStatusDateColor(record?.installation_status),
+  };
+}
+
+/**
+ * Compare expected vs actual delivery.
+ * Delivered after expected → Delay; before → Early (calendar days).
+ */
+export function getUpcomingInstallationEarlyDelayDisplay(record) {
+  if (!hasActualDeliveryDate(record)) {
+    return { text: "—", className: "text-gray-400" };
+  }
+  const exp = parseYmdDate(record?.delivery_date);
+  const del = parseYmdDate(record?.delivered_on);
+  if (!exp || !del) {
+    return { text: "—", className: "text-gray-400" };
+  }
+  const diffDays = Math.round(
+    (startOfLocalDay(exp) - startOfLocalDay(del)) / 86400000,
+  );
+  if (diffDays === 0) {
+    return {
+      text: "On time (0 days)",
+      className: "text-gray-700 font-medium",
+    };
+  }
+  if (diffDays > 0) {
+    return {
+      text: `Early ${diffDays} day${diffDays === 1 ? "" : "s"}`,
+      className: "text-green-700 font-semibold",
+    };
+  }
+  const late = Math.abs(diffDays);
+  return {
+    text: `Delay ${late} day${late === 1 ? "" : "s"}`,
+    className: "text-red-600 font-semibold",
+  };
+}
+
+/** Actual delivery when recorded (neworder.delivered_on). */
+export function getUpcomingInstallationActualDeliveryDisplay(record) {
+  if (!hasActualDeliveryDate(record)) {
+    return { text: "—", className: "text-gray-400" };
+  }
+  return {
+    text: displayYmdOrRaw(record.delivered_on),
+    className: "text-green-600 font-bold",
+  };
+}
+
 /** Expected delivery date, or actual delivered_on in green when set. */
 export function getUpcomingInstallationDeliveryDisplay(record) {
   if (hasActualDeliveryDate(record)) {

@@ -5,12 +5,31 @@ import { Eye } from "lucide-react";
 import UpcomingInstallationStatusFilter from "@/components/installation/UpcomingInstallationStatusFilter";
 import UpcomingInstallationReferenceIds from "@/components/installation/UpcomingInstallationReferenceIds";
 import {
-  getUpcomingInstallationDeliveryDisplay,
+  getUpcomingInstallationExpectedDateDisplay,
+  getUpcomingInstallationActualDeliveryDisplay,
   getUpcomingInstallationRowClass,
   installationStatusDateColor,
   matchesUpcomingInstallationStatusFilter,
   formatUpcomingInstallationDays,
+  getUpcomingInstallationEarlyDelayDisplay,
 } from "@/lib/upcomingInstallationDeliveryDisplay";
+
+function UpcomingInstallationDeliveryColumn({ record }) {
+  const expected = getUpcomingInstallationExpectedDateDisplay(record);
+  const actual = getUpcomingInstallationActualDeliveryDisplay(record);
+  return (
+    <div className="space-y-0.5 text-xs sm:text-sm leading-snug min-w-[9rem]">
+      <div>
+        <span className="text-gray-500 font-medium">Exp:</span>{" "}
+        <span className={expected.className}>{expected.text}</span>
+      </div>
+      <div>
+        <span className="text-gray-500 font-medium">Act:</span>{" "}
+        <span className={actual.className}>{actual.text}</span>
+      </div>
+    </div>
+  );
+}
 
 export default function UpcomingInstallationsPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -197,8 +216,6 @@ export default function UpcomingInstallationsPage() {
 
   // ========= UI HELPERS ==========
   const dateColor = installationStatusDateColor;
-  const deliveryDisplay = getUpcomingInstallationDeliveryDisplay;
-
   // ================= UI START ===================
   return (
     <div className="w-full max-w-full p-6">
@@ -288,7 +305,6 @@ export default function UpcomingInstallationsPage() {
       {!loading && (
         <div className="md:hidden space-y-4">
           {filteredRecords.map((r, i) => {
-            const delivery = deliveryDisplay(r);
             return (
             <div
               key={i}
@@ -310,8 +326,17 @@ export default function UpcomingInstallationsPage() {
                 <p><b>Contact:</b> {r.contact}</p>
                 <p><b>Emp:</b> {r.emp_name}</p>
                 <p><b>Address:</b> {r.delivery_address}</p>
-                <p className={`${delivery.className} mt-1`}>
-                  <b>Delivery:</b> {delivery.text}
+                <div className="mt-1">
+                  <b>Delivery:</b>
+                  <UpcomingInstallationDeliveryColumn record={r} />
+                </div>
+                <p
+                  className={
+                    getUpcomingInstallationEarlyDelayDisplay(r).className
+                  }
+                >
+                  <b>Early/Delay:</b>{" "}
+                  {getUpcomingInstallationEarlyDelayDisplay(r).text}
                 </p>
                 <p className={`${dateColor(r.installation_status)}`}>
                   <b>Days:</b> {formatUpcomingInstallationDays(r)}
@@ -373,7 +398,12 @@ export default function UpcomingInstallationsPage() {
                 <th className="p-3">Company</th>
                 <th className="p-3">Contact</th>
                 <th className="p-3">Emp</th>
-                <th className="p-3">Delivery</th>
+                <th className="p-3" title="Expected and actual delivery dates">
+                  Delivery
+                </th>
+                <th className="p-3" title="Early or delay vs expected delivery">
+                  Early/Delay
+                </th>
                 <th className="p-3">Days</th>
                 <th className="p-3">Warranty</th>
                 <th className="p-3">Actions</th>
@@ -381,7 +411,7 @@ export default function UpcomingInstallationsPage() {
             </thead>
             <tbody>
               {filteredRecords.map((r, i) => {
-                const delivery = deliveryDisplay(r);
+                const earlyDelay = getUpcomingInstallationEarlyDelayDisplay(r);
                 return (
                 <tr key={i} className={getUpcomingInstallationRowClass(r)}>
                   <td className="p-3 font-semibold">
@@ -393,8 +423,11 @@ export default function UpcomingInstallationsPage() {
                   <td className="p-3">{r.company_name}</td>
                   <td className="p-3">{r.contact}</td>
                   <td className="p-3">{r.emp_name}</td>
-                  <td className={`p-3 ${delivery.className}`}>
-                    {delivery.text}
+                  <td className="p-3 align-top">
+                    <UpcomingInstallationDeliveryColumn record={r} />
+                  </td>
+                  <td className={`p-3 whitespace-nowrap ${earlyDelay.className}`}>
+                    {earlyDelay.text}
                   </td>
                   <td className={`p-3 ${dateColor(r.installation_status)}`}>
                     {formatUpcomingInstallationDays(r)}
