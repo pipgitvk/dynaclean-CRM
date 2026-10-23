@@ -1,11 +1,46 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Image from "next/image";
+
+async function resolvePriceWithSpecial(customerId, productCode, basePrice, itemType = null) {
+  if (!customerId || !productCode) {
+    return { finalPrice: basePrice, specialPrice: null };
+  }
+
+  try {
+    const specialRes = await fetch("/api/special-price/check", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        customer_id: Number(customerId) || customerId,
+        product_code: productCode,
+        item_type: itemType || undefined,
+      }),
+    });
+
+    const specialData = await specialRes.json();
+    if (
+      specialRes.ok &&
+      specialData?.special_price != null &&
+      specialData.special_price !== ""
+    ) {
+      const specialPrice = parseFloat(specialData.special_price);
+      if (Number.isFinite(specialPrice)) {
+        return { finalPrice: specialPrice, specialPrice };
+      }
+    }
+  } catch (err) {
+    console.error("❌ Special price fetch error", err);
+  }
+
+  return { finalPrice: basePrice, specialPrice: null };
+}
 
 export default function QuotationTable({
   items,
   setItems,
+  customerId,
   cgstRate = 9,
   sgstRate = 9,
   igstRate = 0,
@@ -13,6 +48,11 @@ export default function QuotationTable({
 }) {
   const [productSuggestions, setProductSuggestions] = useState([]);
   const [activeRowIndex, setActiveRowIndex] = useState(null);
+  const itemsRef = useRef(items);
+
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
 
   const handleChange = (index, field, value) => {
     const updated = [...items];
@@ -37,13 +77,26 @@ export default function QuotationTable({
     }
   };
 
-  const fetchProductDetails = async (code, index, isSuggestion = false) => {
+  const fetchProductDetails = async (
+    code,
+    index,
+    isSuggestion = false,
+    itemType = null,
+  ) => {
     try {
+      const customerParam = customerId
+        ? `&customerId=${encodeURIComponent(customerId)}`
+        : "";
       const res = await fetch(
-        `/api/get-product-details?code=${code}&mode=${isSuggestion ? "suggestion" : "full"}`
+        `/api/get-product-details?code=${encodeURIComponent(code)}&mode=${isSuggestion ? "suggestion" : "full"}${customerParam}`,
       );
       const data = await res.json();
-      if (!data || data.length === 0) return;
+      if (!res.ok || !Array.isArray(data) || data.length === 0) {
+        if (!res.ok) {
+          console.error("❌ Product fetch failed:", data);
+        }
+        return;
+      }
 
       if (isSuggestion) {
         setProductSuggestions(data);
@@ -52,27 +105,89 @@ export default function QuotationTable({
       }
 
       const item = data[0];
+      const resolvedCode = item.item_code || code;
+      const resolvedType =
+        itemType || item.item_type || item.source || "product";
+      const basePrice = parseFloat(item.price_per_unit) || 0;
+
+      let specialPrice = null;
+      if (customerId) {
+        const resolved = await resolvePriceWithSpecial(
+          customerId,
+          resolvedCode,
+          basePrice,
+          resolvedType,
+        );
+        specialPrice = resolved.specialPrice;
+      } else if (item.special_price != null) {
+        const parsed = parseFloat(item.special_price);
+        if (Number.isFinite(parsed)) specialPrice = parsed;
+      }
+
+      const finalPrice =
+        specialPrice != null && Number.isFinite(specialPrice)
+          ? specialPrice
+          : basePrice;
+
       const imageUrl = item.image_path || "";
 
-      const updated = [...items];
-      updated[index] = {
-        ...updated[index],
-        productCode: item.item_code || code,
-        name: item.item_name || "",
-        hsn: item.hsn_sac || "",
-        specification: item.specification || "",
-        unit: item.unit || "",
-        price: parseFloat(item.price_per_unit) || 0,
-        last_negotiation_price: parseFloat(item.last_negotiation_price) || 0,
-        gst: parseFloat(item.gst_rate) || 18,
-        imageUrl,
-      };
-      setItems(updated);
+      setItems((prev) => {
+        const updated = [...prev];
+        updated[index] = {
+          ...updated[index],
+          productCode: resolvedCode,
+          item_type: resolvedType,
+          name: item.item_name || "",
+          hsn: item.hsn_sac || "",
+          specification: item.specification || "",
+          unit: item.unit || "",
+          price: finalPrice,
+          original_price:
+            parseFloat(item.original_price) ||
+            parseFloat(item.price_per_unit) ||
+            0,
+          special_price: specialPrice,
+          last_negotiation_price: parseFloat(item.last_negotiation_price) || 0,
+          gst: parseFloat(item.gst_rate) || 18,
+          imageUrl,
+        };
+        return updated;
+      });
       setProductSuggestions([]);
     } catch (err) {
       console.error("❌ Product fetch error", err);
     }
   };
+
+  const reapplySpecialPrices = useCallback(async () => {
+    if (!customerId) return;
+
+    const prev = itemsRef.current;
+    if (!prev.some((i) => String(i.productCode ?? "").trim())) return;
+
+    const next = await Promise.all(
+      prev.map(async (row) => {
+        const code = String(row.productCode ?? "").trim();
+        if (!code) return row;
+        const base =
+          parseFloat(row.original_price) || parseFloat(row.price) || 0;
+        const { specialPrice } = await resolvePriceWithSpecial(
+          customerId,
+          code,
+          base,
+          row.item_type || null,
+        );
+        if (specialPrice == null) return row;
+        return { ...row, price: specialPrice, special_price: specialPrice };
+      }),
+    );
+
+    setItems(next);
+  }, [customerId, setItems]);
+
+  useEffect(() => {
+    reapplySpecialPrices();
+  }, [customerId, reapplySpecialPrices]);
 
   const addRow = () => {
     // Use combined rate from form (cgstRate + sgstRate for intrastate, or igstRate for interstate)
@@ -171,14 +286,28 @@ export default function QuotationTable({
                       <ul className="absolute z-10 bg-white border rounded shadow-sm mt-1 max-h-40 overflow-y-auto w-48 text-xs">
                         {productSuggestions.map((p, i) => (
                           <li
-                            key={i}
+                            key={`${p.source || "product"}-${p.item_code}-${i}`}
                             onClick={() => {
                               handleChange(idx, "productCode", p.item_code);
-                              fetchProductDetails(p.item_code, idx);
+                              fetchProductDetails(
+                                p.item_code,
+                                idx,
+                                false,
+                                p.source || "product",
+                              );
                               setProductSuggestions([]);
                             }}
                             className="px-2 py-1 cursor-pointer hover:bg-emerald-100"
                           >
+                            <span
+                              className={`mr-1 px-1 rounded text-[10px] font-semibold ${
+                                p.source === "spare"
+                                  ? "bg-purple-100 text-purple-700"
+                                  : "bg-blue-100 text-blue-700"
+                              }`}
+                            >
+                              {p.source === "spare" ? "Spare" : "Product"}
+                            </span>
                             <span className="font-semibold">{p.item_code}</span> – {p.item_name}
                           </li>
                         ))}
@@ -219,6 +348,12 @@ export default function QuotationTable({
                     onBlur={(e) => handleBlur(idx, "price", e.target.value)}
                     className="border p-1 w-24 text-xs rounded"
                   />
+                  {item.special_price != null &&
+                    Number.isFinite(Number(item.special_price)) && (
+                      <p className="mt-0.5 text-[10px] font-medium text-green-700">
+                        Special price applied
+                      </p>
+                    )}
                 </td>
                 {/* GST % — editable, pre-filled from product */}
                 <td className="border px-2 py-2">

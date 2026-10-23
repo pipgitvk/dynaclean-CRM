@@ -864,7 +864,14 @@ export default function QuotationForm() {
         </div>
 
         {/* Quotation Items Table */}
-        <QuotationItemsTable items={items} setItems={setItems} cgstRate={cgstRate} sgstRate={sgstRate} igstRate={igstRate} />
+        <QuotationItemsTable
+          items={items}
+          setItems={setItems}
+          customerId={form.customer_id}
+          cgstRate={cgstRate}
+          sgstRate={sgstRate}
+          igstRate={igstRate}
+        />
 
         {/* Tax Summary */}
         <TaxAndSummary

@@ -529,6 +529,7 @@ export default function QuotationEditForm({ quoteId }) {
       <QuotationItemsTable
         items={items}
         setItems={setItems}
+        customerId={form.customer_id}
         cgstRate={cgstRate}
         sgstRate={sgstRate}
         igstRate={igstRate}
