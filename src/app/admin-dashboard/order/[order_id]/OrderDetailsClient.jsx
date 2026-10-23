@@ -9,6 +9,7 @@ import {
   ORDER_PIPELINE_STAGES,
   deriveOrderPipelineProgress,
 } from "@/lib/orderPipelineStage";
+import OrderShipmentTrackingList from "@/components/orders/OrderShipmentTrackingList";
 
 const DOCUMENT_FIELDS = [
   { label: "E-way Bill", key: "ewaybill_file" },
@@ -29,6 +30,7 @@ export default function OrderDetailsClient({
   orderId,
   gstin,
   userRole,
+  shipmentTracks = [],
 }) {
   const formatDate = (value) => {
     if (!value) return "";
@@ -86,6 +88,8 @@ export default function OrderDetailsClient({
 
   return (
     <div className="p-4 space-y-6">
+      <OrderShipmentTrackingList tracks={shipmentTracks} />
+
       {/* Progress Bar */}
       <div className="space-y-2">
         <div className="relative w-full h-3 bg-gray-300 rounded-full">

@@ -4,12 +4,16 @@ import OrderDetailsClient from "./OrderDetailsClient";
 import dayjs from "dayjs";
 import { getSessionPayload } from "@/lib/auth";
 import { isOrderVisibleToViewer } from "@/lib/orderApprovalVisibility";
+import { ensureOrderShipmentTrackingColumns } from "@/lib/ensureOrderShipmentTrackingColumns";
+import { fetchBookingBatchesForOrder } from "@/lib/orderBookingBatches";
+import { collectOrderShipmentTracks } from "@/lib/orderShipmentTracking";
 
 export const dynamic = "force-dynamic";
 
 async function fetchOrderData(orderId) {
   console.log("order id", orderId);
   const conn = await getDbConnection();
+  await ensureOrderShipmentTrackingColumns(conn);
 
   const [orderRows] = await conn.execute(
     "SELECT * FROM neworder WHERE order_id = ?",
@@ -44,13 +48,15 @@ async function fetchOrderData(orderId) {
     gstin = null;
   }
 
-  // await conn.end();
+  const bookingBatches = await fetchBookingBatchesForOrder(conn, orderId);
+  const shipmentTracks = collectOrderShipmentTracks(orderDetails, bookingBatches);
 
   return {
     orderDetails,
     items,
     statuses,
     gstin,
+    shipmentTracks,
   };
 }
 
@@ -71,7 +77,7 @@ export default async function Page({ params }) {
     userRole = roleRows[0]?.userRole || "";
   }
 
-  const { orderDetails, items, statuses, gstin } =
+  const { orderDetails, items, statuses, gstin, shipmentTracks } =
     await fetchOrderData(orderId);
 
   if (
@@ -113,6 +119,7 @@ export default async function Page({ params }) {
         orderId={orderId}
         gstin={gstin}
         userRole={userRole}
+        shipmentTracks={shipmentTracks}
       />
     </div>
   );
