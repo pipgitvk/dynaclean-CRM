@@ -128,6 +128,15 @@ function buildDerivedStatusSql(latestOrderStatusSql) {
   `;
 }
 
+const INVOICE_CUSTOMER_COMPANY_SQL = `
+  (
+    SELECT TRIM(c.company)
+    FROM customers c
+    WHERE c.customer_id = invoices.customer_id
+    LIMIT 1
+  )
+`;
+
 function buildInvoiceSelectSql(derivedStatusSql, latestOrderIdSql) {
   return `
     id,
@@ -135,6 +144,7 @@ function buildInvoiceSelectSql(derivedStatusSql, latestOrderIdSql) {
     quotation_id,
     buyers_order_no,
     customer_name AS buyer_name,
+    ${INVOICE_CUSTOMER_COMPANY_SQL} AS company_name,
     customer_id,
     gst_number,
     gst_consignee,
@@ -161,6 +171,7 @@ function buildSimpleInvoiceSelectSql() {
     quotation_id,
     buyers_order_no,
     customer_name AS buyer_name,
+    ${INVOICE_CUSTOMER_COMPANY_SQL} AS company_name,
     customer_id,
     gst_number,
     gst_consignee,
@@ -742,8 +753,17 @@ export async function GET(req) {
     const values = [];
 
     if (search) {
-      where += " AND (invoice_number LIKE ? OR customer_name LIKE ?)";
-      values.push(`%${search}%`, `%${search}%`);
+      const term = `%${search}%`;
+      where += ` AND (
+        invoice_number LIKE ?
+        OR customer_name LIKE ?
+        OR EXISTS (
+          SELECT 1 FROM customers c
+          WHERE c.customer_id = invoices.customer_id
+            AND c.company LIKE ?
+        )
+      )`;
+      values.push(term, term, term);
     }
 
     if (fromDate) {

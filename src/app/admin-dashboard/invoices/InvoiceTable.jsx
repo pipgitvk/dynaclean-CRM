@@ -406,7 +406,7 @@ export default function InvoiceTable({ onSummaryUpdate }) {
         <div className="flex flex-col sm:flex-row gap-2 items-center">
           <input
             type="text"
-            placeholder="Search by invoice or buyer..."
+            placeholder="Search by invoice, buyer, or company..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="border px-3 py-1 rounded w-full md:w-64"
@@ -538,7 +538,14 @@ export default function InvoiceTable({ onSummaryUpdate }) {
                         </span>
                       )}
                     </td>
-                    <td className={`px-4 py-2 ${i.parent_id ? 'pl-8' : ''}`}>{i.buyer_name}</td>
+                    <td className={`px-4 py-2 ${i.parent_id ? "pl-8" : ""}`}>
+                      <div className="font-medium">{i.buyer_name || "—"}</div>
+                      {i.company_name ? (
+                        <div className="text-xs text-gray-600 mt-0.5">
+                          {i.company_name}
+                        </div>
+                      ) : null}
+                    </td>
                     <td className={`px-4 py-2 text-sm font-mono ${i.parent_id ? 'pl-8' : ''}`}>{i.gst_consignee || "-"}</td>
                     <td className={`px-4 py-2 ${i.parent_id ? 'pl-8' : ''}`}>{i.employee_name || "-"}</td>
                     <td className={`px-4 py-2 ${i.parent_id ? 'pl-8' : ''}`}>{i.created_by || "-"}</td>
