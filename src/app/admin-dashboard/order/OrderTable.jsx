@@ -448,6 +448,12 @@ function getTotalPaidAmount(order) {
   return sumOrderPaymentAmounts(order);
 }
 
+/** Stat cards / totals: only accountant order-report payment (not grey booking advance). */
+function getAccountantReportPaidAmount(order) {
+  if (!hasOrderInvoiceReport(order)) return 0;
+  return sumOrderPaymentAmounts(order);
+}
+
 /** Booking advance before accountant invoice report — grey; after report — green. */
 function getOrderPaidAmountUiClasses(order) {
   const advanceOnly = !hasOrderInvoiceReport(order);
@@ -1322,7 +1328,7 @@ export default function OrderTable({ orders, userRole }) {
     const stats = ordersForStatCards.reduce(
       (acc, order) => {
         const taxable = getPaymentColumnAmount(order);
-        const paidOrder = getTotalPaidAmount(order);
+        const paidOrder = getAccountantReportPaidAmount(order);
         const approval = (order.approval_status || "")
           .toString()
           .trim()
@@ -1350,7 +1356,7 @@ export default function OrderTable({ orders, userRole }) {
             acc.pendingDispatchAmount += taxable;
           }
 
-          const pmtStatus = deriveOrderPaymentStatus(order)
+          const pmtStatus = deriveOrderListPaymentStatus(order)
             .toString()
             .trim()
             .toLowerCase()
@@ -1653,7 +1659,7 @@ export default function OrderTable({ orders, userRole }) {
         if (o.approval_status !== "approved") return acc;
         if (isOrderExcludedFromStatCards(o)) return acc;
         acc.totalAmount += getTotalAmount(o);
-        acc.paidAmount += getTotalPaidAmount(o);
+        acc.paidAmount += getAccountantReportPaidAmount(o);
         acc.taxableAmount += getPaymentColumnAmount(o);
         acc.balanceAmount += getBalanceAmount(o);
         return acc;
