@@ -185,6 +185,31 @@ export function mergeOrderPaymentWithLinkedCsv(order, linkedCsv) {
   return paymentFieldsFromRows(merged);
 }
 
+/**
+ * Accountant order report upload: payment CSV from form + invoice/statement link only.
+ * Does not include booking advance already on neworder (order/new).
+ */
+export function resolveAccountUploadPaymentCsv(
+  { payment_id, payment_date, payment_amount },
+  linkedCsv,
+) {
+  const base = {
+    payment_id: (payment_id ?? "").toString().trim(),
+    payment_date: (payment_date ?? "").toString().trim(),
+    payment_amount:
+      payment_amount != null && payment_amount !== ""
+        ? String(payment_amount).trim()
+        : "",
+    transaction_id: "",
+  };
+
+  if (linkedCsv?.payment_amount) {
+    return mergeOrderPaymentWithLinkedCsv(base, linkedCsv);
+  }
+
+  return paymentFieldsFromRows(buildOrderPaymentRows(base));
+}
+
 /** Map statement-linked payment lines → neworder payment_id / payment_date / payment_amount CSV. */
 export function linkedPaymentsToOrderPaymentCsv(payments) {
   const rows = (payments || []).map((p) => ({

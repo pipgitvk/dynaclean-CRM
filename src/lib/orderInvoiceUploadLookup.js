@@ -12,55 +12,7 @@ function formatDateOnly(val) {
   return d.toISOString().slice(0, 10);
 }
 
-async function quotationIdCandidates(conn, quoteNumber) {
-  const candidates = new Set();
-  const qn = String(quoteNumber || "").trim();
-  if (!qn) return [];
-  candidates.add(qn);
-  try {
-    const [qRows] = await conn.execute(
-      "SELECT `S.No.` AS sno FROM quotations_records WHERE quote_number = ? LIMIT 1",
-      [qn],
-    );
-    if (qRows?.[0]?.sno != null && qRows[0].sno !== "") {
-      candidates.add(String(qRows[0].sno));
-    }
-  } catch (_) {
-    /* ignore */
-  }
-  return [...candidates];
-}
-
 async function fetchLatestInvoiceForOrder(conn, order) {
-  const orderIdStr = String(order.order_id || "").trim();
-  const quoteNumber = String(order.quote_number || "").trim();
-  const ids = await quotationIdCandidates(conn, quoteNumber);
-
-  if (ids.length || orderIdStr) {
-    const params = [...ids];
-    const parts = [];
-    if (ids.length) {
-      parts.push(`quotation_id IN (${ids.map(() => "?").join(",")})`);
-    }
-    if (orderIdStr) {
-      parts.push("TRIM(buyers_order_no) = ?");
-      params.push(orderIdStr);
-    }
-    const [rows] = await conn.execute(
-      `SELECT id, invoice_number, invoice_date, subtotal, cgst, sgst, igst, total_tax, grand_total
-       FROM invoices
-       WHERE (${parts.join(" OR ")})
-         AND invoice_number IS NOT NULL
-         AND TRIM(invoice_number) <> ''
-         AND ${EXCLUDE_PROFORMA_INVOICE_SQL}
-         AND (status IS NULL OR UPPER(TRIM(status)) <> 'CANCELLED')
-       ORDER BY id DESC
-       LIMIT 1`,
-      params,
-    );
-    if (rows?.length) return rows[0];
-  }
-
   const invNum = await resolveInvoiceNumberForOrder(conn, order);
   if (!invNum) return null;
 
@@ -69,6 +21,7 @@ async function fetchLatestInvoiceForOrder(conn, order) {
      FROM invoices
      WHERE TRIM(invoice_number) = ?
        AND ${EXCLUDE_PROFORMA_INVOICE_SQL}
+       AND (status IS NULL OR UPPER(TRIM(status)) <> 'CANCELLED')
      ORDER BY id DESC
      LIMIT 1`,
     [invNum],

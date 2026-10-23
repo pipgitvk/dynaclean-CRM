@@ -203,24 +203,21 @@ export async function syncOrdersForInvoiceNumbers(conn, invoiceNumbers) {
 
   for (const num of nums) {
     const [invRows] = await conn.execute(
-      `SELECT quotation_id FROM invoices
+      `SELECT buyers_order_no FROM invoices
        WHERE ${sqlTrimUtf8Eq("invoice_number")}
        ORDER BY id DESC LIMIT 1`,
       [num],
     );
-    const qid =
-      invRows?.[0]?.quotation_id != null && invRows[0].quotation_id !== ""
-        ? String(invRows[0].quotation_id)
-        : null;
+    const buyersOrder = String(invRows?.[0]?.buyers_order_no ?? "").trim();
 
     const params = [num];
     let sql = `SELECT order_id, quote_number, invoice_number, totalamt, amount_received, payment_received_date,
               linked_payments_json, payment_id, payment_date, payment_amount, payment_status
        FROM neworder
        WHERE ${sqlTrimUtf8Eq("invoice_number")}`;
-    if (qid) {
-      sql += ` OR quote_number = ?`;
-      params.push(qid);
+    if (buyersOrder) {
+      sql += ` OR CAST(order_id AS CHAR) = ?`;
+      params.push(buyersOrder);
     }
 
     const [rows] = await conn.execute(sql, params);

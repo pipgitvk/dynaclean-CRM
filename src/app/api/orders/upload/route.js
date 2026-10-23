@@ -11,7 +11,7 @@ import { ensureOrderLinkedPaymentColumns } from "@/lib/ensureOrderLinkedPaymentC
 import { lookupInvoiceLinkedPayment } from "@/lib/invoiceLinkedPaymentLookup";
 import {
   linkedPaymentsToOrderPaymentCsv,
-  mergeOrderPaymentWithLinkedCsv,
+  resolveAccountUploadPaymentCsv,
   sumPaymentAmountCsv,
 } from "@/lib/orderPaymentHistory";
 
@@ -135,17 +135,16 @@ export async function POST(req) {
 
     await ensureOrderLinkedPaymentColumns(conn);
 
-    let paymentIdSave = paymentId;
-    let paymentDateSave = paymentDate;
-    let paymentAmountSave =
+    const formPaymentAmount =
       fields.payment_amount !== undefined && fields.payment_amount !== ""
         ? String(
             Array.isArray(fields.payment_amount)
               ? fields.payment_amount[0]
               : fields.payment_amount,
           )
-        : null;
+        : "";
 
+    let linkedCsv = null;
     let amountReceived = null;
     let paymentReceivedDate = null;
     let linkedPaymentsJson = null;
@@ -164,7 +163,6 @@ export async function POST(req) {
         const fromPayments = linkedPaymentsToOrderPaymentCsv(
           linked.payments || [],
         );
-        let linkedCsv = null;
         if (linked.payment_amount_csv) {
           linkedCsv = {
             payment_id: linked.payment_id || fromPayments.payment_id,
@@ -180,21 +178,20 @@ export async function POST(req) {
             payment_amount: String(amountReceived),
           };
         }
-
-        if (linkedCsv?.payment_amount) {
-          const merged = mergeOrderPaymentWithLinkedCsv(existingOrder, linkedCsv);
-          paymentAmountSave = merged.payment_amount;
-          paymentIdSave = merged.payment_id || paymentIdSave;
-          paymentDateSave = merged.payment_date || paymentDateSave;
-        }
       }
     }
 
-    if (!paymentAmountSave && existingOrder.payment_amount) {
-      paymentAmountSave = String(existingOrder.payment_amount);
-      paymentIdSave = paymentIdSave ?? existingOrder.payment_id ?? null;
-      paymentDateSave = paymentDateSave ?? existingOrder.payment_date ?? null;
-    }
+    const resolvedPayment = resolveAccountUploadPaymentCsv(
+      {
+        payment_id: paymentId,
+        payment_date: paymentDate,
+        payment_amount: formPaymentAmount,
+      },
+      linkedCsv,
+    );
+    let paymentIdSave = resolvedPayment.payment_id || paymentId || null;
+    let paymentDateSave = resolvedPayment.payment_date || paymentDate || null;
+    let paymentAmountSave = resolvedPayment.payment_amount || null;
     if (amountReceived == null && existingOrder.amount_received != null) {
       amountReceived = existingOrder.amount_received;
       paymentReceivedDate =

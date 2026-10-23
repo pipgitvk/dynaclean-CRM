@@ -1,38 +1,27 @@
+import { EXCLUDE_PROFORMA_INVOICE_SQL } from "@/lib/ledgerInvoiceFilters";
+
 /**
- * Invoice number on neworder may be empty until upload; resolve from invoices.quotation_id.
+ * Invoice for this order only (not shared across orders on the same quotation).
+ * 1) neworder.invoice_number  2) invoices.buyers_order_no = order_id
  */
 export async function resolveInvoiceNumberForOrder(conn, order) {
   const direct = String(order?.invoice_number || "").trim();
   if (direct) return direct;
 
-  const quoteNumber = String(order?.quote_number || "").trim();
-  if (!quoteNumber) return "";
+  const orderId = String(order?.order_id ?? "").trim();
+  if (!orderId) return "";
 
-  const candidates = new Set([quoteNumber]);
-
-  try {
-    const [qRows] = await conn.execute(
-      "SELECT `S.No.` AS sno FROM quotations_records WHERE quote_number = ? LIMIT 1",
-      [quoteNumber],
-    );
-    if (qRows?.[0]?.sno != null && qRows[0].sno !== "") {
-      candidates.add(String(qRows[0].sno));
-    }
-  } catch (_) {
-    /* optional */
-  }
-
-  const ids = [...candidates];
-  const placeholders = ids.map(() => "?").join(",");
   const [invRows] = await conn.execute(
     `SELECT invoice_number
      FROM invoices
-     WHERE quotation_id IN (${placeholders})
+     WHERE TRIM(COALESCE(buyers_order_no, '')) = ?
        AND invoice_number IS NOT NULL
        AND TRIM(invoice_number) <> ''
+       AND ${EXCLUDE_PROFORMA_INVOICE_SQL}
+       AND (status IS NULL OR UPPER(TRIM(status)) <> 'CANCELLED')
      ORDER BY id DESC
      LIMIT 1`,
-    ids,
+    [orderId],
   );
 
   if (!invRows?.length) return "";

@@ -10,7 +10,6 @@ export async function findOrderIdsForInvoice(conn, invoice) {
 
   const invNum = String(invoice.invoice_number || "").trim();
   const buyersOrder = String(invoice.buyers_order_no || "").trim();
-  const qid = invoice.quotation_id != null ? String(invoice.quotation_id).trim() : "";
 
   if (invNum) {
     const [rows] = await conn.execute(
@@ -23,32 +22,10 @@ export async function findOrderIdsForInvoice(conn, invoice) {
   if (buyersOrder) {
     const [rows] = await conn.execute(
       `SELECT order_id FROM neworder
-       WHERE CAST(order_id AS CHAR) COLLATE utf8mb4_unicode_ci = TRIM(?) COLLATE utf8mb4_unicode_ci
-          OR ${INV_CMP}`,
-      [buyersOrder, invNum || buyersOrder],
+       WHERE CAST(order_id AS CHAR) COLLATE utf8mb4_unicode_ci = TRIM(?) COLLATE utf8mb4_unicode_ci`,
+      [buyersOrder],
     );
     for (const r of rows || []) ids.add(r.order_id);
-  }
-
-  if (qid) {
-    const [byQuote] = await conn.execute(
-      `SELECT order_id FROM neworder WHERE quote_number = ?`,
-      [qid],
-    );
-    for (const r of byQuote || []) ids.add(r.order_id);
-
-    const [qRows] = await conn.execute(
-      "SELECT quote_number FROM quotations_records WHERE TRIM(CAST(`S.No.` AS CHAR)) = ? LIMIT 1",
-      [qid],
-    );
-    const qn = qRows?.[0]?.quote_number;
-    if (qn) {
-      const [rows] = await conn.execute(
-        `SELECT order_id FROM neworder WHERE quote_number = ?`,
-        [String(qn)],
-      );
-      for (const r of rows || []) ids.add(r.order_id);
-    }
   }
 
   return [...ids];
