@@ -145,18 +145,66 @@ export default function QuotationEditForm({ quoteId }) {
         setRoundOff(origRound);
 
         // Map DB items to form items shape
-        const mappedItems = (data.items || []).map((item) => ({
-          productCode: item.item_code || "",
-          imageUrl: item.img_url || "",
-          name: item.item_name || "",
-          hsn: item.hsn_sac || "",
-          specification: item.specification || "",
-          unit: item.unit || "",
-          quantity: parseFloat(item.quantity) || 1,
-          price: parseFloat(item.price_per_unit) || 0,
-          gst: parseFloat(item.gst) || 18,
-        }));
-        const finalItems = mappedItems.length > 0 ? mappedItems : [
+        const mappedItems = (data.items || []).map((item) => {
+          const qty = parseFloat(item.quantity) || 1;
+          const priceFromUnit = parseFloat(item.price_per_unit);
+          const priceFromTaxable =
+            (parseFloat(item.total_taxable_amt) || parseFloat(item.taxable_price) || 0) /
+            qty;
+          const price =
+            Number.isFinite(priceFromUnit) && priceFromUnit > 0
+              ? priceFromUnit
+              : priceFromTaxable > 0
+                ? priceFromTaxable
+                : 0;
+          return {
+            productCode: String(item.item_code ?? ""),
+            imageUrl: item.img_url || "",
+            name: item.item_name || "",
+            hsn: item.hsn_sac || "",
+            specification: item.specification || "",
+            unit: item.unit || "",
+            quantity: qty,
+            price,
+            gst: parseFloat(item.gst) || 18,
+          };
+        });
+        const enrichedItems = await (async () => {
+          const customerId = h.customer_id || "";
+          return Promise.all(
+            mappedItems.map(async (row) => {
+              const code = String(row.productCode ?? "").trim();
+              if (!code || (row.price && row.price > 0)) return row;
+              try {
+                const customerParam = customerId
+                  ? `&customerId=${encodeURIComponent(customerId)}`
+                  : "";
+                const res = await fetch(
+                  `/api/get-product-details?code=${encodeURIComponent(code)}&mode=full${customerParam}`,
+                );
+                const data = await res.json();
+                if (!res.ok || !Array.isArray(data) || !data.length) return row;
+                const p = data[0];
+                const special =
+                  p.special_price != null ? parseFloat(p.special_price) : null;
+                const catalog = parseFloat(p.price_per_unit) || 0;
+                const resolvedPrice =
+                  special != null && Number.isFinite(special) ? special : catalog;
+                if (!resolvedPrice) return row;
+                return {
+                  ...row,
+                  productCode: String(p.item_code ?? code),
+                  price: resolvedPrice,
+                  imageUrl: row.imageUrl || p.image_path || "",
+                  gst: row.gst || parseFloat(p.gst_rate) || 18,
+                };
+              } catch {
+                return row;
+              }
+            }),
+          );
+        })();
+        const finalItems = enrichedItems.length > 0 ? enrichedItems : [
           { productCode: "", imageUrl: "", name: "", hsn: "", specification: "", unit: "", quantity: 1, price: 0, gst: 18 }
         ];
         setItems(finalItems);
