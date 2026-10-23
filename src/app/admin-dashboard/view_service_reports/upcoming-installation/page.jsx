@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Eye } from "lucide-react";
 import UpcomingInstallationStatusFilter from "@/components/installation/UpcomingInstallationStatusFilter";
 import UpcomingInstallationReferenceIds from "@/components/installation/UpcomingInstallationReferenceIds";
+import UpcomingInstallationServiceStatusColumn from "@/components/installation/UpcomingInstallationServiceStatusColumn";
 import {
   getUpcomingInstallationExpectedDateDisplay,
   getUpcomingInstallationActualDeliveryDisplay,
@@ -338,6 +339,10 @@ export default function UpcomingInstallationsPage() {
                   <b>Early/Delay:</b>{" "}
                   {getUpcomingInstallationEarlyDelayDisplay(r).text}
                 </p>
+                <div className="mt-1">
+                  <b>Status:</b>
+                  <UpcomingInstallationServiceStatusColumn record={r} />
+                </div>
                 <p className={`${dateColor(r.installation_status)}`}>
                   <b>Days:</b> {formatUpcomingInstallationDays(r)}
                 </p>
@@ -405,6 +410,9 @@ export default function UpcomingInstallationsPage() {
                   Early/Delay
                 </th>
                 <th className="p-3">Days</th>
+                <th className="p-3" title="Service record status">
+                  Status
+                </th>
                 <th className="p-3">Warranty</th>
                 <th className="p-3">Actions</th>
               </tr>
@@ -431,6 +439,9 @@ export default function UpcomingInstallationsPage() {
                   </td>
                   <td className={`p-3 ${dateColor(r.installation_status)}`}>
                     {formatUpcomingInstallationDays(r)}
+                  </td>
+                  <td className="p-3 align-top">
+                    <UpcomingInstallationServiceStatusColumn record={r} />
                   </td>
                   <td className="p-3 text-center">
                     {Number(r.warranty_registered) === 1 ? (

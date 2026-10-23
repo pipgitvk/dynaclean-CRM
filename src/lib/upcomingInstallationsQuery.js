@@ -52,6 +52,7 @@ export function buildUpcomingInstallationsQuery({ type = "products", registratio
       no.invoice_number,
       agg.serial_number,
       svc.service_id,
+      svc.service_details,
       agg.model,
       agg.name,
       no.delivery_location AS delivery_address,
@@ -94,7 +95,22 @@ export function buildUpcomingInstallationsQuery({ type = "products", registratio
     LEFT JOIN (
       SELECT
         ${quoteKeyD2} AS quote_key,
-        GROUP_CONCAT(DISTINCT sr2.service_id ORDER BY sr2.service_id SEPARATOR ', ') AS service_id
+        GROUP_CONCAT(DISTINCT sr2.service_id ORDER BY sr2.service_id SEPARATOR ', ') AS service_id,
+        GROUP_CONCAT(
+          CONCAT_WS(
+            '~',
+            sr2.service_id,
+            COALESCE(sr2.status, ''),
+            COALESCE(
+              DATE_FORMAT(sr2.planned_date, '%Y-%m-%d'),
+              DATE_FORMAT(sr2.complaint_date, '%Y-%m-%d'),
+              ''
+            ),
+            COALESCE(sr2.assigned_to, '')
+          )
+          ORDER BY sr2.service_id
+          SEPARATOR ';;'
+        ) AS service_details
       FROM dispatch d2
       ${joinPendingOrderOnQuote("d2.quote_number")}
       INNER JOIN service_records sr2
