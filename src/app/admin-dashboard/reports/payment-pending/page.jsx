@@ -14,7 +14,7 @@ import ManualFilterSearchButton, {
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import dayjs from "dayjs";
-import { Download, Search, Calendar, DollarSign, ArrowUp, ArrowDown, RotateCcw, PhoneCall, History, Loader2, MinusCircle, List } from "lucide-react";
+import { Download, Search, Calendar, DollarSign, ArrowUp, ArrowDown, RotateCcw, X, PhoneCall, History, Loader2, MinusCircle, List } from "lucide-react";
 
 export default function PaymentPendingReport() {
   const router = useRouter();
