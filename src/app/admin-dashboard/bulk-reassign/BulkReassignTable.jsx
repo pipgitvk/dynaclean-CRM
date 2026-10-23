@@ -43,6 +43,14 @@ function getCustomerLeadTypes(customer) {
     return types;
 }
 
+function formatLeadSourceOptionLabel(option) {
+    if (!option?.username) return "";
+    if (Number(option.status) === 0) {
+        return `${option.username} (Inactive)`;
+    }
+    return option.username;
+}
+
 function customerMatchesLeadType(customer, leadType) {
     if (leadType === "all") {
         return getCustomerLeadTypes(customer).length > 0;
@@ -98,7 +106,7 @@ function SearchableDropdown({ options, value, onChange, placeholder, className =
                 onClick={() => setIsOpen(!isOpen)}
             >
                 <span className={value ? "text-gray-900" : "text-gray-500"}>
-                    {selectedOption ? selectedOption.username : placeholder}
+                    {selectedOption ? formatLeadSourceOptionLabel(selectedOption) : placeholder}
                 </span>
                 <ChevronDown className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
             </div>
@@ -138,7 +146,7 @@ function SearchableDropdown({ options, value, onChange, placeholder, className =
                                             className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
                                             onClick={() => handleSelect(option.username)}
                                         >
-                                            {option.username}
+                                            {formatLeadSourceOptionLabel(option)}
                                         </div>
                                     ))}
                                 </div>
@@ -150,7 +158,7 @@ function SearchableDropdown({ options, value, onChange, placeholder, className =
                                     className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
                                     onClick={() => handleSelect(option.username)}
                                 >
-                                    {option.username}
+                                    {formatLeadSourceOptionLabel(option)}
                                 </div>
                             ))
                         )}
