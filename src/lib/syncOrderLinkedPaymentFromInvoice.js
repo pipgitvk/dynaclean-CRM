@@ -9,13 +9,14 @@ import {
   refreshOrdersAfterInvoiceRemoved,
 } from "@/lib/orderInvoicePaymentClear";
 import { EXCLUDE_PROFORMA_INVOICE_SQL } from "@/lib/ledgerInvoiceFilters";
+import { sqlTrimUtf8Eq } from "@/lib/sqlUtf8Compare";
 
 async function activeInvoiceExists(conn, invoiceNumber) {
   const num = String(invoiceNumber || "").trim();
   if (!num) return false;
   const [rows] = await conn.execute(
     `SELECT id FROM invoices
-     WHERE TRIM(invoice_number) COLLATE utf8mb4_unicode_ci = TRIM(?) COLLATE utf8mb4_unicode_ci
+     WHERE ${sqlTrimUtf8Eq("invoice_number")}
        AND ${EXCLUDE_PROFORMA_INVOICE_SQL}
        AND (status IS NULL OR UPPER(TRIM(status)) <> 'CANCELLED')
      LIMIT 1`,
@@ -203,7 +204,7 @@ export async function syncOrdersForInvoiceNumbers(conn, invoiceNumbers) {
   for (const num of nums) {
     const [invRows] = await conn.execute(
       `SELECT quotation_id FROM invoices
-       WHERE TRIM(invoice_number) COLLATE utf8mb4_unicode_ci = TRIM(?) COLLATE utf8mb4_unicode_ci
+       WHERE ${sqlTrimUtf8Eq("invoice_number")}
        ORDER BY id DESC LIMIT 1`,
       [num],
     );
@@ -216,7 +217,7 @@ export async function syncOrdersForInvoiceNumbers(conn, invoiceNumbers) {
     let sql = `SELECT order_id, quote_number, invoice_number, totalamt, amount_received, payment_received_date,
               linked_payments_json, payment_id, payment_date, payment_amount, payment_status
        FROM neworder
-       WHERE TRIM(invoice_number) COLLATE utf8mb4_unicode_ci = TRIM(?) COLLATE utf8mb4_unicode_ci`;
+       WHERE ${sqlTrimUtf8Eq("invoice_number")}`;
     if (qid) {
       sql += ` OR quote_number = ?`;
       params.push(qid);

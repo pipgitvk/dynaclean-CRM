@@ -1,15 +1,12 @@
 import { parseLinkedPurchaseTokens } from "@/lib/statementLinkedPurchases";
 import { linkedPaymentsToOrderPaymentCsv } from "@/lib/orderPaymentHistory";
+import {
+  sqlLikeUtf8Contains,
+  sqlTrimUtf8Eq,
+  sqlUtf8TrimExpr,
+} from "@/lib/sqlUtf8Compare";
 
-const COLLATE_UNICODE = "utf8mb4_unicode_ci";
-
-/** LIKE '%value%' without utf8mb4_bin vs unicode_ci mix on statements columns */
-function sqlLikeContains(columnExpr) {
-  return `${columnExpr} COLLATE ${COLLATE_UNICODE} LIKE CONCAT('%', TRIM(?) COLLATE ${COLLATE_UNICODE}, '%')`;
-}
-
-const INV_NUM_EQ =
-  `TRIM(invoice_number) COLLATE ${COLLATE_UNICODE} = TRIM(?) COLLATE ${COLLATE_UNICODE}`;
+const INV_NUM_EQ = sqlTrimUtf8Eq("invoice_number");
 
 function invoiceNumberTokens(raw) {
   if (raw == null || String(raw).trim() === "") return [];
@@ -122,8 +119,8 @@ async function fetchStatementCandidatesForInvoice(conn, inv) {
   const [baseRows] = await conn.execute(
     `SELECT id, trans_id, date, amount, linked_purchase_ids, invoice_number
      FROM statements
-     WHERE ${sqlLikeContains("linked_purchase_ids")}
-        OR (CHAR_LENGTH(TRIM(COALESCE(invoice_number, ''))) > 0 AND ${sqlLikeContains("invoice_number")})`,
+     WHERE ${sqlLikeUtf8Contains("linked_purchase_ids")}
+        OR (CHAR_LENGTH(TRIM(COALESCE(invoice_number, ''))) > 0 AND ${sqlLikeUtf8Contains("invoice_number")})`,
     [ipToken, invoiceNumber],
   );
 
@@ -134,8 +131,8 @@ async function fetchStatementCandidatesForInvoice(conn, inv) {
   if (transIds.length) {
     const [transRows] = await conn.execute(
       `SELECT id, trans_id, date, amount, linked_purchase_ids, invoice_number
-       FROM statements WHERE TRIM(trans_id) COLLATE ${COLLATE_UNICODE} IN (${transIds
-         .map(() => `TRIM(?) COLLATE ${COLLATE_UNICODE}`)
+       FROM statements WHERE ${sqlUtf8TrimExpr("trans_id")} IN (${transIds
+         .map(() => "TRIM(?)")
          .join(",")})`,
       transIds,
     );
@@ -205,7 +202,7 @@ export async function lookupInvoiceLinkedPayment(conn, invoiceNumberRaw) {
   const [stmtRows] = await conn.execute(
     `SELECT id, trans_id, date, amount, linked_purchase_ids, invoice_number
      FROM statements
-     WHERE CHAR_LENGTH(TRIM(COALESCE(invoice_number, ''))) > 0 AND ${sqlLikeContains("invoice_number")}`,
+     WHERE CHAR_LENGTH(TRIM(COALESCE(invoice_number, ''))) > 0 AND ${sqlLikeUtf8Contains("invoice_number")}`,
     [invoiceNumber],
   );
 
