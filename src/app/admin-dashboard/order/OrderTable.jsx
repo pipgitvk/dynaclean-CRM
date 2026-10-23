@@ -28,6 +28,7 @@ import {
   buildOrderPaymentRows,
   sumOrderPaymentAmounts,
 } from "@/lib/orderPaymentHistory";
+import { OrderPaymentHistoryTrigger } from "@/components/orders/OrderPaymentHistoryModal";
 import {
   deriveOrderPaymentStatus,
   deriveOrderListPaymentStatus,
@@ -2518,11 +2519,14 @@ export default function OrderTable({ orders, userRole }) {
                             maximumFractionDigits: 2,
                           })}
                         </div>
-                        <span
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${pay.cls}`}
+                        <OrderPaymentHistoryTrigger
+                          order={r}
+                          paymentStatusRaw={deriveOrderListPaymentStatus(r)}
+                          totalAmount={getTotalAmount(r)}
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border underline decoration-current underline-offset-2 hover:opacity-90 ${pay.cls}`}
                         >
                           {pay.text}
-                        </span>
+                        </OrderPaymentHistoryTrigger>
                       </div>
                     </td>
                     <td className="px-3 py-3">
@@ -2538,12 +2542,18 @@ export default function OrderTable({ orders, userRole }) {
                         </div>
                         <div className="flex justify-between gap-4">
                           <span className="font-semibold text-green-700">Paid:</span>
-                          <span className="font-bold text-green-600">
-                            ₹{getTotalPaidAmount(r).toLocaleString("en-IN", {
+                          <OrderPaymentHistoryTrigger
+                            order={r}
+                            paymentStatusRaw={deriveOrderListPaymentStatus(r)}
+                            totalAmount={getTotalAmount(r)}
+                            className="font-bold text-green-600 underline decoration-green-400 underline-offset-2 hover:text-green-800"
+                          >
+                            ₹
+                            {getTotalPaidAmount(r).toLocaleString("en-IN", {
                               minimumFractionDigits: 2,
                               maximumFractionDigits: 2,
                             })}
-                          </span>
+                          </OrderPaymentHistoryTrigger>
                         </div>
                         <div className="flex justify-between gap-4">
                           <span className="font-semibold text-orange-700">Balance:</span>
@@ -2618,11 +2628,14 @@ export default function OrderTable({ orders, userRole }) {
                           })}
                         </div>
                       )}
-                      <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${pay.cls}`}
+                      <OrderPaymentHistoryTrigger
+                        order={r}
+                        paymentStatusRaw={deriveOrderListPaymentStatus(r)}
+                        totalAmount={getTotalAmount(r)}
+                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border underline decoration-current underline-offset-2 hover:opacity-90 ${pay.cls}`}
                       >
                         {pay.text}
-                      </span>
+                      </OrderPaymentHistoryTrigger>
                     </div>
                     <span className="shrink-0">
                       <ActionButtons
@@ -2688,10 +2701,19 @@ export default function OrderTable({ orders, userRole }) {
                   })}
                 </div>
                 <div>
-                  <strong>Paid Amount:</strong> <span className="text-green-600">₹{getTotalPaidAmount(r).toLocaleString("en-IN", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}</span>
+                  <strong>Paid Amount:</strong>{" "}
+                  <OrderPaymentHistoryTrigger
+                    order={r}
+                    paymentStatusRaw={deriveOrderListPaymentStatus(r)}
+                    totalAmount={getTotalAmount(r)}
+                    className="text-green-600 font-semibold underline decoration-green-400 underline-offset-2 hover:text-green-800"
+                  >
+                    ₹
+                    {getTotalPaidAmount(r).toLocaleString("en-IN", {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </OrderPaymentHistoryTrigger>
                 </div>
                 <div>
                   <strong>Balance Amount:</strong> <span className="text-orange-600">₹{getBalanceAmount(r).toLocaleString("en-IN", {
