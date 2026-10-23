@@ -10,6 +10,7 @@ import { Eye, Pencil, X, Upload, Download, FileSpreadsheet, Search, Trash2, Buil
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import ExcelJS from "exceljs";
+import EditStatementForm from "./EditStatementForm";
 
 export default function StatementTable({ rows }) {
   const router = useRouter();
@@ -43,6 +44,7 @@ export default function StatementTable({ rows }) {
   const [linkedTypeFilter, setLinkedTypeFilter] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: "id", direction: "desc" });
   const [modalId, setModalId] = useState(null);
+  const [editStatementId, setEditStatementId] = useState(null);
   const [expense, setExpense] = useState(null);
   const [expenseLoading, setExpenseLoading] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -1303,13 +1305,14 @@ export default function StatementTable({ rows }) {
                     >
                       <Eye size={16} />
                     </button>
-                    <Link
-                      href={`/admin-dashboard/statements/edit/${row.id}`}
+                    <button
+                      type="button"
+                      onClick={() => setEditStatementId(row.id)}
                       className="text-yellow-600 hover:text-yellow-800"
                       title="Edit"
                     >
                       <Pencil size={16} />
-                    </Link>
+                    </button>
                   </td>
                 </tr>
               ))
@@ -1459,9 +1462,13 @@ export default function StatementTable({ rows }) {
               <button type="button" onClick={() => setModalId(row.id)} className="text-blue-600 hover:underline">
                 <Eye size={16} /> View
               </button>
-              <Link href={`/admin-dashboard/statements/edit/${row.id}`} className="text-yellow-600 hover:text-yellow-800">
+              <button
+                type="button"
+                onClick={() => setEditStatementId(row.id)}
+                className="text-yellow-600 hover:text-yellow-800"
+              >
                 <Pencil size={16} /> Edit
-              </Link>
+              </button>
             </div>
           </div>
         ))}
@@ -1767,6 +1774,39 @@ export default function StatementTable({ rows }) {
                   {forceImporting ? "Importing..." : `Force Import (${selectedSkipped.size})`}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Statement Modal */}
+      {editStatementId != null && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[92vh] flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b shrink-0">
+              <h3 className="text-lg font-semibold text-gray-800">
+                Edit Statement #{editStatementId}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setEditStatementId(null)}
+                className="p-1 hover:bg-gray-100 rounded"
+                aria-label="Close"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="overflow-y-auto flex-1 p-4 sm:p-6">
+              <EditStatementForm
+                key={editStatementId}
+                statementId={String(editStatementId)}
+                embedded
+                onClose={() => setEditStatementId(null)}
+                onSuccess={() => {
+                  router.refresh();
+                  setEditStatementId(null);
+                }}
+              />
             </div>
           </div>
         </div>
