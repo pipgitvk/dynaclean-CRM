@@ -2,7 +2,7 @@
 
 import { useRouter, usePathname } from "next/navigation";
 import { createPortal } from "react-dom";
-import { Menu, User, Plus, UserPlus, Search, Bell, X, DollarSign } from "lucide-react";
+import { Menu, User, Plus, UserPlus, Search, Bell, X, DollarSign, ExternalLink } from "lucide-react";
 import HeaderLogoutButton from "@/components/HeaderLogoutButton";
 import { useTheme } from "@/context/ThemeContext";
 import { useState, useEffect, useRef } from "react";
@@ -284,6 +284,13 @@ export default function Navbar({ onToggleSidebar, showSalesMeta = false }) {
     !isThirdPartyEngineerPortal &&
     normalizeRoleKey(userRole) !== "DESIGN ENGINEER";
 
+  const customerViewHref = (customerId) => {
+    const base = pathname?.startsWith("/admin-dashboard")
+      ? "admin-dashboard"
+      : "user-dashboard";
+    return `/${base}/view-customer/${customerId}`;
+  };
+
   const searchDropdown =
     typeof window !== "undefined" &&
     showDropdown &&
@@ -319,21 +326,31 @@ export default function Navbar({ onToggleSidebar, showSalesMeta = false }) {
                   </div>
                 ) : null}
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowDropdown(false);
-                  setResults([]);
-                  setQuery("");
-                  const base = pathname?.startsWith("/admin-dashboard")
-                    ? "admin-dashboard"
-                    : "user-dashboard";
-                  router.push(`/${base}/view-customer/${c.customer_id}`);
-                }}
-                className="text-xs px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 flex-shrink-0"
-              >
-                View
-              </button>
+              <div className="flex items-center gap-1 flex-shrink-0">
+                <a
+                  href={customerViewHref(c.customer_id)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="p-1.5 text-gray-600 hover:text-blue-700 hover:bg-blue-50 rounded border border-transparent hover:border-blue-200"
+                  title="Open in new tab"
+                  aria-label="Open customer in new tab"
+                >
+                  <ExternalLink size={16} />
+                </a>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowDropdown(false);
+                    setResults([]);
+                    setQuery("");
+                    router.push(customerViewHref(c.customer_id));
+                  }}
+                  className="text-xs px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+                >
+                  View
+                </button>
+              </div>
             </div>
           ))}
         </div>
