@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import dayjs from "dayjs";
 import { useState, useEffect, useRef, useMemo } from "react";
 import toast from "react-hot-toast";
-import { Eye, Pencil, X, Upload, Download, FileSpreadsheet, Search, Trash2, Building2 } from "lucide-react";
+import { Pencil, X, Upload, Download, FileSpreadsheet, Search, Trash2, Building2 } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import ExcelJS from "exceljs";
@@ -42,9 +42,15 @@ function StatementLinkedModulesCell({
     (row.linked_module_id && row.linked_module_type);
 
   const chip =
-    "inline-block px-1.5 py-0.5 text-xs font-mono rounded whitespace-nowrap hover:underline cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-400";
+    "inline-block px-1.5 py-0.5 text-xs font-mono rounded whitespace-nowrap focus:outline-none focus:ring-1 focus:ring-blue-400";
+  const viewLink =
+    `${chip} underline decoration-current/50 hover:decoration-current cursor-pointer`;
+  const editChip =
+    `${chip} hover:underline cursor-pointer`;
 
   const open = (statementType) => onEdit(row.id, statementType);
+  const expenseViewHref = (expenseId) =>
+    `/admin-dashboard/client-expenses/${expenseId}?from=statements`;
 
   return (
     <div className="space-y-1">
@@ -54,7 +60,7 @@ function StatementLinkedModulesCell({
           onClick={() =>
             onOpenInvoice({ invoiceNumber: row.invoice_number })
           }
-          className={`${chip} bg-blue-100 text-blue-700`}
+          className={`${viewLink} bg-blue-100 text-blue-700`}
           title="View invoice"
         >
           {row.invoice_number}
@@ -67,7 +73,7 @@ function StatementLinkedModulesCell({
               key={`ip-${x.id}`}
               type="button"
               onClick={() => onOpenInvoice({ invoiceDbId: x.id })}
-              className={`${chip} bg-blue-100 text-blue-700`}
+              className={`${viewLink} bg-blue-100 text-blue-700`}
               title="View invoice"
             >
               INV{x.id}
@@ -82,7 +88,7 @@ function StatementLinkedModulesCell({
               key={`${x.prefix}-${x.id}`}
               type="button"
               onClick={() => open("purchase_billings")}
-              className={`${chip} bg-slate-100 text-slate-800 font-bold`}
+              className={`${editChip} bg-slate-100 text-slate-800 font-bold`}
               title="Edit — Purchase Billings"
             >
               {x.prefix}
@@ -95,59 +101,65 @@ function StatementLinkedModulesCell({
         <button
           type="button"
           onClick={() => open("dd_management")}
-          className={`${chip} bg-purple-100 text-purple-700 font-bold`}
+          className={`${editChip} bg-purple-100 text-purple-700 font-bold`}
           title="Edit — DD Management"
         >
           DD{row.dd_id}
         </button>
       )}
       {row.client_expense_id && (
-        <button
-          type="button"
-          onClick={() => open("expense")}
-          className={`${chip} bg-orange-100 text-orange-700 font-bold`}
-          title="Edit — Expense"
+        <Link
+          href={expenseViewHref(row.client_expense_id)}
+          className={`${viewLink} bg-orange-100 text-orange-700 font-bold`}
+          title="View expense"
         >
           EXP{row.client_expense_id}
-        </button>
+        </Link>
       )}
       {row.linked_module_id && row.linked_module_type && (
-        <button
-          type="button"
-          onClick={() => {
-            if (row.linked_module_type === "Invoice") {
-              onOpenInvoice({ invoiceDbId: row.linked_module_id });
-              return;
+        row.linked_module_type === "Expense" ? (
+          <Link
+            href={expenseViewHref(row.linked_module_id)}
+            className={`${viewLink} bg-orange-100 text-orange-700 font-bold`}
+            title="View expense"
+          >
+            EXP{row.linked_module_id}
+          </Link>
+        ) : row.linked_module_type === "Invoice" ? (
+          <button
+            type="button"
+            onClick={() => onOpenInvoice({ invoiceDbId: row.linked_module_id })}
+            className={`${viewLink} bg-blue-100 text-blue-700 font-bold`}
+            title="View invoice"
+          >
+            INV{row.linked_module_id}
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() =>
+              open(linkedModuleTypeToStatementType(row.linked_module_type))
             }
-            open(linkedModuleTypeToStatementType(row.linked_module_type));
-          }}
-          className={`${chip} font-bold ${
-            row.linked_module_type === "Assets"
-              ? "bg-indigo-100 text-indigo-700"
-              : row.linked_module_type === "Invoice"
-                ? "bg-blue-100 text-blue-700"
+            className={`${editChip} font-bold ${
+              row.linked_module_type === "Assets"
+                ? "bg-indigo-100 text-indigo-700"
                 : row.linked_module_type === "Purchases"
                   ? "bg-green-100 text-green-700"
                   : row.linked_module_type === "DD"
                     ? "bg-purple-100 text-purple-700"
-                    : row.linked_module_type === "Expense"
-                      ? "bg-orange-100 text-orange-700"
-                      : "bg-gray-100 text-gray-700"
-          }`}
-          title="Edit statement link"
-        >
-          {row.linked_module_type === "Assets"
-            ? `ASS${row.linked_module_id}`
-            : row.linked_module_type === "Invoice"
-              ? `INV${row.linked_module_id}`
+                    : "bg-gray-100 text-gray-700"
+            }`}
+            title="Edit statement link"
+          >
+            {row.linked_module_type === "Assets"
+              ? `ASS${row.linked_module_id}`
               : row.linked_module_type === "Purchases"
                 ? `PUR${row.linked_module_id}`
                 : row.linked_module_type === "DD"
                   ? `DD${row.linked_module_id}`
-                  : row.linked_module_type === "Expense"
-                    ? `EXP${row.linked_module_id}`
-                    : `${row.linked_module_type}${row.linked_module_id}`}
-        </button>
+                  : `${row.linked_module_type}${row.linked_module_id}`}
+          </button>
+        )
       )}
       {!hasAnyLink && <span className="text-gray-300 text-xs">—</span>}
     </div>
@@ -1306,7 +1318,6 @@ export default function StatementTable({ rows }) {
               >
                 Balance<SortIcon column="balance" />
               </th>
-              <th className="p-3">Action</th>
             </tr>
           </thead>
           <tbody className="text-gray-800 divide-y divide-gray-200">
@@ -1367,13 +1378,23 @@ export default function StatementTable({ rows }) {
                       <span className="text-gray-300 text-xs">—</span>
                     )}
                   </td>
-                  <td className="p-3">
-                    <StatementLinkedModulesCell
-                      row={row}
-                      getLinkedPurchaseRefs={getLinkedPurchaseRefs}
-                      onEdit={openStatementEdit}
-                      onOpenInvoice={openInvoiceInModal}
-                    />
+                  <td className="p-3 align-top">
+                    <div className="group relative pr-7 min-h-[1.75rem]">
+                      <StatementLinkedModulesCell
+                        row={row}
+                        getLinkedPurchaseRefs={getLinkedPurchaseRefs}
+                        onEdit={openStatementEdit}
+                        onOpenInvoice={openInvoiceInModal}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => openStatementEdit(row.id)}
+                        className="absolute right-0 top-0 p-0.5 rounded text-yellow-600 hover:text-yellow-800 hover:bg-yellow-50 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+                        title="Edit statement"
+                      >
+                        <Pencil size={16} />
+                      </button>
+                    </div>
                   </td>
                   <td
                     className="p-3 font-medium"
@@ -1385,29 +1406,11 @@ export default function StatementTable({ rows }) {
                   >
                     {displayBalance(row) != null ? `₹${displayBalance(row).toLocaleString("en-IN", { minimumFractionDigits: 2 })}` : "—"}
                   </td>
-                  <td className="p-3 flex gap-2 items-center">
-                    <button
-                      type="button"
-                      onClick={() => setModalId(row.id)}
-                      className="text-blue-600 hover:underline"
-                      title="View"
-                    >
-                      <Eye size={16} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => openStatementEdit(row.id)}
-                      className="text-yellow-600 hover:text-yellow-800"
-                      title="Edit"
-                    >
-                      <Pencil size={16} />
-                    </button>
-                  </td>
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan="16" className="p-4 text-center text-gray-500">
+                <td colSpan="15" className="p-4 text-center text-gray-500">
                   No entries found.
                 </td>
               </tr>
@@ -1459,13 +1462,21 @@ export default function StatementTable({ rows }) {
             </div>
             <div>
               <strong>Linked Modules:</strong>
-              <div className="mt-1">
+              <div className="mt-1 relative pr-8">
                 <StatementLinkedModulesCell
                   row={row}
                   getLinkedPurchaseRefs={getLinkedPurchaseRefs}
                   onEdit={openStatementEdit}
                   onOpenInvoice={openInvoiceInModal}
                 />
+                <button
+                  type="button"
+                  onClick={() => openStatementEdit(row.id)}
+                  className="absolute right-0 top-0 p-1 text-yellow-600 hover:text-yellow-800"
+                  title="Edit statement"
+                >
+                  <Pencil size={16} />
+                </button>
               </div>
             </div>
             <div>
@@ -1481,18 +1492,6 @@ export default function StatementTable({ rows }) {
                   <Building2 size={11} />{row.account_number}
                 </span>
               ) : <span className="text-gray-400 text-xs">—</span>}
-            </div>
-            <div className="flex items-center gap-4 pt-2">
-              <button type="button" onClick={() => setModalId(row.id)} className="text-blue-600 hover:underline">
-                <Eye size={16} /> View
-              </button>
-              <button
-                type="button"
-                onClick={() => openStatementEdit(row.id)}
-                className="text-yellow-600 hover:text-yellow-800"
-              >
-                <Pencil size={16} /> Edit
-              </button>
             </div>
           </div>
         ))}

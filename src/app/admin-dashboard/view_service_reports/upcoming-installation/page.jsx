@@ -18,6 +18,7 @@ import {
 function UpcomingInstallationDeliveryColumn({ record }) {
   const expected = getUpcomingInstallationExpectedDateDisplay(record);
   const actual = getUpcomingInstallationActualDeliveryDisplay(record);
+  const earlyDelay = getUpcomingInstallationEarlyDelayDisplay(record);
   return (
     <div className="space-y-0.5 text-xs sm:text-sm leading-snug min-w-[9rem]">
       <div>
@@ -27,6 +28,10 @@ function UpcomingInstallationDeliveryColumn({ record }) {
       <div>
         <span className="text-gray-500 font-medium">Act:</span>{" "}
         <span className={actual.className}>{actual.text}</span>
+      </div>
+      <div>
+        <span className="text-gray-500 font-medium">Early/Delay:</span>{" "}
+        <span className={earlyDelay.className}>{earlyDelay.text}</span>
       </div>
     </div>
   );
@@ -331,14 +336,6 @@ export default function UpcomingInstallationsPage() {
                   <b>Delivery:</b>
                   <UpcomingInstallationDeliveryColumn record={r} />
                 </div>
-                <p
-                  className={
-                    getUpcomingInstallationEarlyDelayDisplay(r).className
-                  }
-                >
-                  <b>Early/Delay:</b>{" "}
-                  {getUpcomingInstallationEarlyDelayDisplay(r).text}
-                </p>
                 <div className="mt-1">
                   <b>Status:</b>
                   <UpcomingInstallationServiceStatusColumn record={r} />
@@ -403,11 +400,11 @@ export default function UpcomingInstallationsPage() {
                 <th className="p-3">Company</th>
                 <th className="p-3">Contact</th>
                 <th className="p-3">Emp</th>
-                <th className="p-3" title="Expected and actual delivery dates">
+                <th
+                  className="p-3"
+                  title="Expected and actual delivery dates, early or delay vs expected"
+                >
                   Delivery
-                </th>
-                <th className="p-3" title="Early or delay vs expected delivery">
-                  Early/Delay
                 </th>
                 <th className="p-3">Days</th>
                 <th className="p-3" title="Service record status">
@@ -419,7 +416,6 @@ export default function UpcomingInstallationsPage() {
             </thead>
             <tbody>
               {filteredRecords.map((r, i) => {
-                const earlyDelay = getUpcomingInstallationEarlyDelayDisplay(r);
                 return (
                 <tr key={i} className={getUpcomingInstallationRowClass(r)}>
                   <td className="p-3 font-semibold">
@@ -433,9 +429,6 @@ export default function UpcomingInstallationsPage() {
                   <td className="p-3">{r.emp_name}</td>
                   <td className="p-3 align-top">
                     <UpcomingInstallationDeliveryColumn record={r} />
-                  </td>
-                  <td className={`p-3 whitespace-nowrap ${earlyDelay.className}`}>
-                    {earlyDelay.text}
                   </td>
                   <td className={`p-3 ${dateColor(r.installation_status)}`}>
                     {formatUpcomingInstallationDays(r)}
