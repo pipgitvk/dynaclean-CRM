@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { ensureServiceRecordsPlannedDateColumn } from "@/lib/ensureServiceRecordsPlannedDateColumn";
+import { syncInstallationOrderStatusFromServiceReports } from "@/lib/syncInstalledOrdersFromServiceReports";
 
 function normalizePlannedDate(value) {
   if (value == null || String(value).trim() === "") return null;
@@ -59,7 +60,12 @@ export async function POST(req) {
        WHERE service_id = ?`,
       [normalizedStatus, desc, plannedDate, service_id]
     );
-    // await conn.end();
+
+    try {
+      await syncInstallationOrderStatusFromServiceReports(conn);
+    } catch (syncErr) {
+      console.error("installation order sync after status update:", syncErr?.message || syncErr);
+    }
 
     return NextResponse.json({ success: true, message: "Status updated" });
   } catch (error) {

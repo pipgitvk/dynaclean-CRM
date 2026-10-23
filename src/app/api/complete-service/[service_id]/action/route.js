@@ -3,6 +3,7 @@ import { getDbConnection } from "@/lib/db";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 import { sendTemplatedEmail } from "@/lib/template-utils";
+import { syncInstallationOrderStatusFromServiceReports } from "@/lib/syncInstalledOrdersFromServiceReports";
 import { v4 as uuidv4 } from "uuid";
 
 // Helper to save base64 signature
@@ -557,6 +558,14 @@ export async function POST(request, context) {
         }
       } catch (emailErr) {
         console.error("⚠️ Completion email failed (non-fatal):", emailErr);
+      }
+    }
+
+    if (status === "COMPLETED" && conn) {
+      try {
+        await syncInstallationOrderStatusFromServiceReports(conn);
+      } catch (syncErr) {
+        console.error("installation order sync skipped:", syncErr?.message || syncErr);
       }
     }
 

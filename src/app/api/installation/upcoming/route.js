@@ -2,20 +2,18 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { buildUpcomingInstallationsQuery } from "@/lib/upcomingInstallationsQuery";
-import { syncInstalledOrdersFromCompletedInstallationReports } from "@/lib/syncInstalledOrdersFromServiceReports";
+import { syncInstallationOrderStatusMarkOnly } from "@/lib/syncInstalledOrdersFromServiceReports";
 
 /**
  * API route for upcoming installations.
  * Query parameters:
  *   ?type=products|spares|all
  *   ?registration=unregistered
- *   ?sync=1  optional: run auto-installed sync (slow; off by default)
  */
 export async function GET(req) {
   try {
     const { searchParams } = new URL(req.url);
     const registration = searchParams.get("registration");
-    const runSync = searchParams.get("sync") === "1";
     const type =
       registration === "unregistered"
         ? "products"
@@ -25,15 +23,11 @@ export async function GET(req) {
 
     const pool = await getDbConnection();
 
-    if (runSync) {
-      try {
-        await syncInstalledOrdersFromCompletedInstallationReports(pool);
-      } catch (syncErr) {
-        console.error("Upcoming installations sync skipped:", syncErr?.message || syncErr);
-      }
-    }
-
     const [rows] = await pool.query(query);
+
+    syncInstallationOrderStatusMarkOnly(pool).catch((syncErr) => {
+      console.error("Upcoming installations background sync:", syncErr?.message || syncErr);
+    });
 
     return NextResponse.json({
       installations: rows,
