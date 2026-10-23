@@ -1,3 +1,5 @@
+import { mkdir, writeFile } from "fs/promises";
+import path from "path";
 import { NextResponse } from "next/server";
 import { getSessionPayload } from "@/lib/auth";
 import { ensureServiceReportStepsTable } from "@/lib/ensureServiceReportStepsTable";
@@ -11,6 +13,8 @@ export const maxDuration = 120;
 
 const VIDEO_STEPS = ["video_360", "video_problem", "video_damaged", "video_completion"];
 const MAX_VIDEO_BYTES = 200 * 1024 * 1024;
+const MAX_MANUAL_REPORT_BYTES = 25 * 1024 * 1024;
+const MANUAL_REPORT_EXT = new Set([".pdf", ".jpg", ".jpeg", ".png", ".webp"]);
 
 const EXT_BY_MIME = {
   "video/mp4": ".mp4",
@@ -32,6 +36,17 @@ function videoExtension(file) {
   return null;
 }
 
+function manualReportExtension(file) {
+  const fromName = String(file?.name || "").match(/\.[a-z0-9]+$/i)?.[0]?.toLowerCase();
+  if (fromName && MANUAL_REPORT_EXT.has(fromName)) return fromName;
+  const mime = String(file?.type || "").toLowerCase();
+  if (mime === "application/pdf") return ".pdf";
+  if (mime === "image/jpeg") return ".jpg";
+  if (mime === "image/png") return ".png";
+  if (mime === "image/webp") return ".webp";
+  return null;
+}
+
 async function loadService(conn, serviceId) {
   const [[row]] = await conn.execute(
     `SELECT
@@ -41,6 +56,7 @@ async function loadService(conn, serviceId) {
         sr.serial_number,
         sr.service_type,
         sr.assigned_to,
+        sr.installation_report,
         s.video_360,
         s.video_problem,
         s.video_damaged,
@@ -64,6 +80,7 @@ function payloadFromRow(row) {
       serial_number: row.serial_number,
       service_type: row.service_type,
       assigned_to: row.assigned_to,
+      installation_report: row.installation_report || null,
     },
     steps: {
       video_360: row.video_360 || null,
@@ -133,25 +150,28 @@ export async function POST(request, context) {
     const isComplaintService = String(existing.service_type || "").trim().toUpperCase() === "COMPLAINT";
     const isInstallationService = String(existing.service_type || "").trim().toUpperCase() === "INSTALLATION";
     const isInstallationVideoAction = action === "installation_completion_video";
-    
-    if (isInstallationVideoAction && !isInstallationService) {
+    const isManualInstallationReport = action === "manual_installation_report";
+
+    if ((isInstallationVideoAction || isManualInstallationReport) && !isInstallationService) {
       return NextResponse.json(
-        { message: "Installation completion video is only for installation services." },
+        { message: "This action is only for installation services." },
         { status: 400 },
       );
     }
-    
-    if (!isInstallationVideoAction && !isComplaintService) {
+
+    if (!isInstallationVideoAction && !isManualInstallationReport && !isComplaintService) {
       return NextResponse.json(
         { message: "Video steps are only for complaint services." },
         { status: 400 },
       );
     }
-    
-    const current = payloadFromRow(existing).steps;
-    const blocked = missingBefore(current, action);
-    if (blocked) {
-      return NextResponse.json({ message: blocked }, { status: 400 });
+
+    if (!isInstallationVideoAction && !isManualInstallationReport) {
+      const current = payloadFromRow(existing).steps;
+      const blocked = missingBefore(current, action);
+      if (blocked) {
+        return NextResponse.json({ message: blocked }, { status: 400 });
+      }
     }
 
     if (VIDEO_STEPS.includes(action)) {
@@ -211,6 +231,37 @@ export async function POST(request, context) {
          ON DUPLICATE KEY UPDATE video_completion = ?`,
         [serviceId, videoUrl, videoUrl],
       );
+    } else if (isManualInstallationReport) {
+      const file = formData.get("file");
+      if (!file || typeof file === "string" || file.size <= 0) {
+        return NextResponse.json({ message: "Choose a report file to upload." }, { status: 400 });
+      }
+      if (file.size > MAX_MANUAL_REPORT_BYTES) {
+        return NextResponse.json({ message: "File is too large. Maximum size is 25 MB." }, { status: 400 });
+      }
+      const ext = manualReportExtension(file);
+      if (!ext) {
+        return NextResponse.json(
+          { message: "Upload a PDF or image (jpg, png, webp)." },
+          { status: 400 },
+        );
+      }
+
+      const buffer = Buffer.from(await file.arrayBuffer());
+      const fileName = `manual-install-${serviceId}-${Date.now()}${ext}`;
+      const uploadDir = path.join(process.cwd(), "public", "attachments");
+      await mkdir(uploadDir, { recursive: true });
+      await writeFile(path.join(uploadDir, fileName), buffer);
+
+      await conn.execute(
+        `UPDATE service_records
+         SET installation_report = ?,
+             status = 'COMPLETED',
+             completed_date = COALESCE(completed_date, CURDATE())
+         WHERE service_id = ?`,
+        [fileName, serviceId],
+      );
+      await conn.execute(`INSERT IGNORE INTO service_reports (service_id) VALUES (?)`, [serviceId]);
     } else if (action === "work_start") {
       await conn.execute(
         `INSERT INTO service_report_steps (service_id, work_started_at)
