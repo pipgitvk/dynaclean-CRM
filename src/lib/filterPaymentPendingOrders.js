@@ -1,5 +1,12 @@
 import dayjs from "dayjs";
 
+function orderDueDayjs(order) {
+  const raw = order?.due_date ?? order?.duedate;
+  if (raw == null || raw === "") return null;
+  const d = dayjs(raw);
+  return d.isValid() ? d.startOf("day") : null;
+}
+
 /**
  * Client-side filters for payment-pending report rows (search, due range, overdue tag).
  */
@@ -22,27 +29,35 @@ export function filterPaymentPendingOrders(
     );
   }
 
-  if (dueDateFrom) {
-    filtered = filtered.filter((order) =>
-      dayjs(order.due_date).isAfter(dayjs(dueDateFrom).subtract(1, "day"), "day"),
-    );
+  const fromDay = dueDateFrom ? dayjs(dueDateFrom).startOf("day") : null;
+  const toDay = dueDateTo ? dayjs(dueDateTo).startOf("day") : null;
+
+  if (fromDay?.isValid()) {
+    filtered = filtered.filter((order) => {
+      const due = orderDueDayjs(order);
+      if (!due) return false;
+      return !due.isBefore(fromDay, "day");
+    });
   }
-  if (dueDateTo) {
-    filtered = filtered.filter((order) =>
-      dayjs(order.due_date).isBefore(dayjs(dueDateTo).add(1, "day"), "day"),
-    );
+  if (toDay?.isValid()) {
+    filtered = filtered.filter((order) => {
+      const due = orderDueDayjs(order);
+      if (!due) return false;
+      return !due.isAfter(toDay, "day");
+    });
   }
 
   if (statusFilter && statusFilter !== "all") {
     const today = dayjs().startOf("day");
     if (statusFilter === "due") {
-      filtered = filtered.filter((order) =>
-        dayjs(order.due_date).isBefore(today, "day"),
-      );
+      filtered = filtered.filter((order) => {
+        const due = orderDueDayjs(order);
+        return due != null && due.isBefore(today, "day");
+      });
     } else if (statusFilter === "no-due") {
       filtered = filtered.filter((order) => {
-        const orderDate = dayjs(order.due_date).startOf("day");
-        return !orderDate.isBefore(today, "day");
+        const due = orderDueDayjs(order);
+        return due != null && !due.isBefore(today, "day");
       });
     }
   }
