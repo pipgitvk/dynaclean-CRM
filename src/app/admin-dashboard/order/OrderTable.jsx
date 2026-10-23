@@ -36,6 +36,7 @@ import ExcelJS from "exceljs";
 import {
   OrderListSearchInput,
   OrderListSearchApplyButton,
+  OrderListSearchResetButton,
 } from "@/components/orders/OrderListSearchFilterControls";
 import {
   getOrderTableDefaultDateFrom,
@@ -202,6 +203,20 @@ function readOrderTableFilterState() {
     modelNameFilters: parseModelFiltersFromStorage(savedModel),
     approvalStatusFilter: localStorage.getItem("orderTable_approvalStatusFilter") || "",
     paymentStatusFilter: localStorage.getItem("orderTable_paymentStatusFilter") || "",
+  };
+}
+
+function defaultOrderTableFilterState() {
+  return {
+    searchQuery: "",
+    statusFilter: "",
+    dateFrom: getOrderTableDefaultDateFrom(),
+    dateTo: getOrderTableDefaultDateTo(),
+    createdByFilter: "",
+    leadCampaignFilter: "",
+    modelNameFilters: [],
+    approvalStatusFilter: "",
+    paymentStatusFilter: "",
   };
 }
 
@@ -713,6 +728,7 @@ export default function OrderTable({ orders, userRole }) {
   const [productCatalog, setProductCatalog] = useState([]);
   const [spareCatalog, setSpareCatalog] = useState([]);
   const searchParams = useSearchParams();
+  const router = useRouter();
 
   const [searchQuery, setSearchQuery] = useState(
     () => readOrderTableFilterState().searchQuery,
@@ -855,6 +871,35 @@ export default function OrderTable({ orders, userRole }) {
     approvalStatusFilter,
     paymentStatusFilter,
   ]);
+
+  const handleResetFilters = useCallback(() => {
+    const defaults = defaultOrderTableFilterState();
+    setSearchQuery(defaults.searchQuery);
+    setAppliedSearchQuery(defaults.searchQuery);
+    setStatusFilter(defaults.statusFilter);
+    setAppliedStatusFilter(defaults.statusFilter);
+    setDateFrom(defaults.dateFrom);
+    setAppliedDateFrom(defaults.dateFrom);
+    setDateTo(defaults.dateTo);
+    setAppliedDateTo(defaults.dateTo);
+    setCreatedByFilter(defaults.createdByFilter);
+    setAppliedCreatedByFilter(defaults.createdByFilter);
+    setLeadCampaignFilter(defaults.leadCampaignFilter);
+    setAppliedLeadCampaignFilter(defaults.leadCampaignFilter);
+    setModelNameFilters(defaults.modelNameFilters);
+    setAppliedModelNameFilters(defaults.modelNameFilters);
+    setApprovalStatusFilter(defaults.approvalStatusFilter);
+    setAppliedApprovalStatusFilter(defaults.approvalStatusFilter);
+    setPaymentStatusFilter(defaults.paymentStatusFilter);
+    setAppliedPaymentStatusFilter(defaults.paymentStatusFilter);
+    setModelSearchText("");
+    setShowModelDropdown(false);
+    persistOrderTableFilterState(defaults);
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("orderTable_modelNameFilter");
+    }
+    router.replace("/admin-dashboard/order", { scroll: false });
+  }, [router]);
 
   const toggleMenu = (id) => {
     setOpenMenuId(openMenuId === id ? null : id);
@@ -2245,7 +2290,10 @@ export default function OrderTable({ orders, userRole }) {
           </select>
         </div>
 
-        <OrderListSearchApplyButton onApply={handleApplySearch} />
+        <div className="flex items-end shrink-0 order-last gap-2">
+          <OrderListSearchResetButton onReset={handleResetFilters} />
+          <OrderListSearchApplyButton onApply={handleApplySearch} embedded />
+        </div>
       </div>
 
       <p className="mt-2 text-xs text-gray-500">

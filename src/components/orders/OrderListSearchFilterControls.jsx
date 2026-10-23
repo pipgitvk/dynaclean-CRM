@@ -1,6 +1,6 @@
 "use client";
 
-import { Search } from "lucide-react";
+import { RotateCcw, Search } from "lucide-react";
 
 /** Search field — first in the filter row; applies on Enter via onApply. */
 export function OrderListSearchInput({ searchQuery, setSearchQuery, onApply }) {
@@ -31,18 +31,32 @@ export function OrderListSearchInput({ searchQuery, setSearchQuery, onApply }) {
   );
 }
 
-/** Apply all filters — last in the filter row. */
-export function OrderListSearchApplyButton({ onApply }) {
+/** Clear filters to defaults (caller applies list + persistence). */
+export function OrderListSearchResetButton({ onReset }) {
   return (
-    <div className="flex items-end shrink-0 order-last">
-      <button
-        type="button"
-        onClick={onApply}
-        className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors whitespace-nowrap"
-      >
-        <Search size={16} aria-hidden />
-        Search
-      </button>
-    </div>
+    <button
+      type="button"
+      onClick={onReset}
+      className="inline-flex items-center gap-1.5 px-4 py-2 border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition-colors whitespace-nowrap"
+    >
+      <RotateCcw size={16} aria-hidden />
+      Reset
+    </button>
   );
+}
+
+/** Apply all filters — last in the filter row when used alone. */
+export function OrderListSearchApplyButton({ onApply, embedded = false }) {
+  const button = (
+    <button
+      type="button"
+      onClick={onApply}
+      className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors whitespace-nowrap"
+    >
+      <Search size={16} aria-hidden />
+      Search
+    </button>
+  );
+  if (embedded) return button;
+  return <div className="flex items-end shrink-0 order-last">{button}</div>;
 }
