@@ -13,13 +13,31 @@ export async function POST(req) {
     dbConnection = await getDbConnection();
 
     const [orderRows] = await dbConnection.execute(
-      `SELECT order_id, quote_number, invoice_number, report_file
+      `SELECT order_id, quote_number, invoice_number, report_file, is_cancelled,
+              dispatch_status, installation_status, is_returned
        FROM neworder WHERE order_id = ? LIMIT 1`,
       [orderId],
     );
     const order = orderRows?.[0];
     if (!order) {
       return NextResponse.json({ message: "Order not found" }, { status: 404 });
+    }
+
+    const dispatch = Number(order.dispatch_status);
+    if (
+      order.is_cancelled ||
+      dispatch === 1 ||
+      dispatch === 2 ||
+      order.installation_status ||
+      Number(order.is_returned || 0) !== 0
+    ) {
+      return NextResponse.json(
+        {
+          message:
+            "Order cannot be cancelled after dispatch. Cancel is only allowed before dispatch (up to booking done).",
+        },
+        { status: 400 },
+      );
     }
 
     await dbConnection.execute(

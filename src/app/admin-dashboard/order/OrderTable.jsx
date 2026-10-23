@@ -3172,7 +3172,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                       <span>Edit Report</span>
                     </Link>
                   )}
-                  {isSuperAdmin && (
+                  {isSuperAdmin && canShowOrderCancelMenu(r) && (
                     <div
                       className="border-t border-gray-100 mt-1 pt-1"
                       onClick={(e) => e.stopPropagation()}
@@ -3193,7 +3193,9 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                     <span>Upload Report</span>
                   </Link>
                   <div onClick={(e) => e.stopPropagation()}>
-                    {isSuperAdmin && <DeleteButton orderId={r.order_id} />}
+                    {isSuperAdmin && canShowOrderCancelMenu(r) && (
+                      <DeleteButton orderId={r.order_id} />
+                    )}
                   </div>
                 </>
               ))}
@@ -4082,6 +4084,18 @@ function UpdateDeliveryMenuItem({ order, userRole, variant = "auto" }) {
 function canRevertOrder(dispatchStatus) {
   const s = Number(dispatchStatus);
   return s !== 1 && s !== 2;
+}
+
+/** Order Cancel: allowed through booking done; hidden once dispatch starts or later. */
+function canShowOrderCancelMenu(order) {
+  if (!order || order.is_cancelled) return false;
+  const dispatch = Number(order.dispatch_status);
+  if (dispatch === 1 || dispatch === 2) return false;
+  if (order.installation_status) return false;
+  if (Number(order.is_returned || 0) !== 0) return false;
+  if (isOrderFullyDelivered(order) || isOrderPartialDelivery(order)) return false;
+  if (orderHasDispatchedStock(order)) return false;
+  return true;
 }
 
 function WarehouseInMenuItem({ order }) {
