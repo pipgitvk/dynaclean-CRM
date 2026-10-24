@@ -72,6 +72,7 @@ import {
 import ViewCreditNoteMenuLink from "@/components/orders/ViewCreditNoteMenuLink";
 import AccountantReturnViewMenuItems from "@/components/orders/AccountantReturnViewMenuItems";
 import LinkedStatementPaymentCell from "@/components/orders/LinkedStatementPaymentCell";
+import { orderMatchesSearchQuery } from "@/lib/orderListClientSearch";
 
 const PAGE_SIZE = 40;
 const SCROLL_LOAD_OFFSET_PX = 200;
@@ -172,11 +173,14 @@ export default function OrderTable({ userRole }) {
         createdBy: appliedCreatedByFilter,
         paymentTerms: appliedPaymentTermsFilter,
       };
+      const controller = new AbortController();
+
       if (append) {
         setLoadingMore(true);
       } else {
         setListLoading(true);
         setFetchError(null);
+        setOrders([]);
       }
 
       const params = new URLSearchParams();
@@ -189,11 +193,12 @@ export default function OrderTable({ userRole }) {
       if (f.paymentTerms) params.set("paymentTerms", f.paymentTerms);
 
       try {
-        if (!append && fetchAbortRef.current) {
-          fetchAbortRef.current.abort();
+        if (!append) {
+          if (fetchAbortRef.current) {
+            fetchAbortRef.current.abort();
+          }
+          fetchAbortRef.current = controller;
         }
-        const controller = new AbortController();
-        if (!append) fetchAbortRef.current = controller;
 
         const res = await fetch(`/api/accounts/orders/list?${params.toString()}`, {
           signal: controller.signal,
@@ -226,7 +231,7 @@ export default function OrderTable({ userRole }) {
           setFetchError(err?.message || "Failed to load orders");
         }
       } finally {
-        if (fetchAbortRef.current?.signal.aborted && !append) return;
+        if (!append && fetchAbortRef.current !== controller) return;
         if (append) {
           setLoadingMore(false);
         } else {
@@ -542,11 +547,12 @@ export default function OrderTable({ userRole }) {
 
   const matchesListFilters = useCallback(
     (order, { omitCreatedBy = false } = {}) => {
-      if (statusFilter) {
+      const activeStatus = appliedStatusFilter || statusFilter;
+      if (activeStatus) {
         const orderStatus = getStatusText(order)
           .text.toLowerCase()
           .replace(/\s+/g, "");
-        if (orderStatus !== statusFilter.toLowerCase()) return false;
+        if (orderStatus !== activeStatus.toLowerCase()) return false;
       }
 
       if (order.approval_status === "pending") {
@@ -561,9 +567,17 @@ export default function OrderTable({ userRole }) {
         return false;
       }
 
+      if (!orderMatchesSearchQuery(order, searchQuery)) return false;
+
       return true;
     },
-    [statusFilter, appliedCreatedByFilter, appliedPaymentTermsFilter],
+    [
+      searchQuery,
+      statusFilter,
+      appliedStatusFilter,
+      appliedCreatedByFilter,
+      appliedPaymentTermsFilter,
+    ],
   );
 
   const createdByFilterOptions = useMemo(() => {

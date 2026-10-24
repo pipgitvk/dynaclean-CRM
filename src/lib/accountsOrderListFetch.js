@@ -174,11 +174,20 @@ export async function fetchAccountsOrderListPage(
   }
   if (search) {
     const term = `%${search}%`;
-    sql = appendSqlWhereClause(
-      sql,
-      `(no.order_id LIKE ? OR no.client_name LIKE ? OR qr.company_name LIKE ? OR no.contact LIKE ? OR qr.state LIKE ?)`,
-    );
-    params.push(term, term, term, term, term);
+    const trimmed = search.trim();
+    if (/^\d+$/.test(trimmed)) {
+      sql = appendSqlWhereClause(sql, "no.order_id LIKE ?");
+      params.push(term);
+    } else if (/^quote/i.test(trimmed.replace(/\s/g, ""))) {
+      sql = appendSqlWhereClause(sql, "no.quote_number LIKE ?");
+      params.push(term);
+    } else {
+      sql = appendSqlWhereClause(
+        sql,
+        `(no.order_id LIKE ? OR no.quote_number LIKE ? OR no.client_name LIKE ? OR qr.company_name LIKE ? OR no.contact LIKE ? OR qr.state LIKE ?)`,
+      );
+      params.push(term, term, term, term, term, term);
+    }
   }
 
   sql += " GROUP BY no.order_id ORDER BY no.created_at DESC LIMIT ? OFFSET ?";
