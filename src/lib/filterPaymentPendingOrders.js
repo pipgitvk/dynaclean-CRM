@@ -7,12 +7,88 @@ function orderDueDayjs(order) {
   return d.isValid() ? d.startOf("day") : null;
 }
 
+/** Days past due (0 = due today). Negative = not yet due. Null if no due date. */
+export function getPaymentPendingDaysOverdue(order) {
+  const due = orderDueDayjs(order);
+  if (!due) return null;
+  const today = dayjs().startOf("day");
+  return today.diff(due, "day");
+}
+
+export const PAYMENT_PENDING_AGING_OPTIONS = [
+  { value: "", label: "All aging" },
+  { value: "not-due", label: "Not Due" },
+  { value: "0-7", label: "0–7 Days" },
+  { value: "8-30", label: "8–30 Days" },
+  { value: "31-60", label: "31–60 Days" },
+  { value: "61-90", label: "61–90 Days" },
+  { value: "90+", label: "90+ Days" },
+];
+
+export const PAYMENT_PENDING_AMOUNT_OPTIONS = [
+  { value: "", label: "All amounts" },
+  { value: "lt10k", label: "< ₹10K" },
+  { value: "10k-50k", label: "₹10–50K" },
+  { value: "50k-1l", label: "₹50K–1L" },
+  { value: "1l-5l", label: "₹1–5L" },
+  { value: "gt5l", label: "> ₹5L" },
+];
+
+function matchesPaymentPendingAging(order, agingFilter) {
+  if (!agingFilter) return true;
+  const overdue = getPaymentPendingDaysOverdue(order);
+  if (overdue === null) return false;
+  switch (agingFilter) {
+    case "not-due":
+      return overdue < 0;
+    case "0-7":
+      return overdue >= 0 && overdue <= 7;
+    case "8-30":
+      return overdue >= 8 && overdue <= 30;
+    case "31-60":
+      return overdue >= 31 && overdue <= 60;
+    case "61-90":
+      return overdue >= 61 && overdue <= 90;
+    case "90+":
+      return overdue > 90;
+    default:
+      return true;
+  }
+}
+
+function matchesPaymentPendingAmountBucket(order, amountFilter) {
+  if (!amountFilter) return true;
+  const amt = Number(order.remaining_amount) || 0;
+  switch (amountFilter) {
+    case "lt10k":
+      return amt < 10000;
+    case "10k-50k":
+      return amt >= 10000 && amt < 50000;
+    case "50k-1l":
+      return amt >= 50000 && amt < 100000;
+    case "1l-5l":
+      return amt >= 100000 && amt < 500000;
+    case "gt5l":
+      return amt >= 500000;
+    default:
+      return true;
+  }
+}
+
 /**
  * Client-side filters for payment-pending report rows (search, due range, overdue tag).
  */
 export function filterPaymentPendingOrders(
   orders,
-  { searchQuery, dueDateFrom, dueDateTo, statusFilter },
+  {
+    searchQuery,
+    dueDateFrom,
+    dueDateTo,
+    statusFilter,
+    employeeFilter,
+    agingFilter,
+    pendingAmountFilter,
+  },
 ) {
   let filtered = orders || [];
 
@@ -63,6 +139,24 @@ export function filterPaymentPendingOrders(
         return due != null && !due.isBefore(today, "day");
       });
     }
+  }
+
+  if (employeeFilter) {
+    filtered = filtered.filter(
+      (order) => String(order.created_by || "").trim() === employeeFilter,
+    );
+  }
+
+  if (agingFilter) {
+    filtered = filtered.filter((order) =>
+      matchesPaymentPendingAging(order, agingFilter),
+    );
+  }
+
+  if (pendingAmountFilter) {
+    filtered = filtered.filter((order) =>
+      matchesPaymentPendingAmountBucket(order, pendingAmountFilter),
+    );
   }
 
   return filtered;

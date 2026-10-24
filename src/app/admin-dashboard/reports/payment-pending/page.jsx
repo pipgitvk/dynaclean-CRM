@@ -6,6 +6,8 @@ import {
   filterPaymentPendingOrders,
   formatPaymentPendingInr,
   sortPaymentPendingOrders,
+  PAYMENT_PENDING_AGING_OPTIONS,
+  PAYMENT_PENDING_AMOUNT_OPTIONS,
 } from "@/lib/filterPaymentPendingOrders";
 import PaymentPendingStatsBar from "@/components/reports/PaymentPendingStatsBar";
 import PaymentPendingOrderDetailsModal from "@/components/reports/PaymentPendingOrderDetailsModal";
@@ -114,6 +116,12 @@ export default function PaymentPendingReport() {
   const [appliedStatusFilter, setAppliedStatusFilter] = useState("all");
   const [completionFilter, setCompletionFilter] = useState("pending");
   const [appliedCompletionFilter, setAppliedCompletionFilter] = useState("pending");
+  const [employeeFilter, setEmployeeFilter] = useState("");
+  const [appliedEmployeeFilter, setAppliedEmployeeFilter] = useState("");
+  const [agingFilter, setAgingFilter] = useState("");
+  const [appliedAgingFilter, setAppliedAgingFilter] = useState("");
+  const [pendingAmountFilter, setPendingAmountFilter] = useState("");
+  const [appliedPendingAmountFilter, setAppliedPendingAmountFilter] = useState("");
   const [followupModalOpen, setFollowupModalOpen] = useState(false);
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
   const [orderDetailsOpen, setOrderDetailsOpen] = useState(false);
@@ -147,11 +155,23 @@ export default function PaymentPendingReport() {
     fetchReport(appliedCompletionFilter);
   }, [fetchReport, appliedCompletionFilter]);
 
+  const employeeOptions = useMemo(() => {
+    const names = new Set();
+    for (const order of orders) {
+      const name = String(order.created_by || "").trim();
+      if (name) names.add(name);
+    }
+    return [...names].sort((a, b) => a.localeCompare(b));
+  }, [orders]);
+
   const handleApplySearch = useCallback(() => {
     setAppliedSearchQuery(searchQuery);
     setAppliedDueDateFrom(dueDateFrom);
     setAppliedDueDateTo(dueDateTo);
     setAppliedStatusFilter(statusFilter);
+    setAppliedEmployeeFilter(employeeFilter);
+    setAppliedAgingFilter(agingFilter);
+    setAppliedPendingAmountFilter(pendingAmountFilter);
     if (completionFilter !== appliedCompletionFilter) {
       setAppliedCompletionFilter(completionFilter);
     }
@@ -160,6 +180,9 @@ export default function PaymentPendingReport() {
     dueDateFrom,
     dueDateTo,
     statusFilter,
+    employeeFilter,
+    agingFilter,
+    pendingAmountFilter,
     completionFilter,
     appliedCompletionFilter,
   ]);
@@ -170,6 +193,9 @@ export default function PaymentPendingReport() {
       dueDateFrom: appliedDueDateFrom,
       dueDateTo: appliedDueDateTo,
       statusFilter: appliedStatusFilter,
+      employeeFilter: appliedEmployeeFilter,
+      agingFilter: appliedAgingFilter,
+      pendingAmountFilter: appliedPendingAmountFilter,
     });
     return sortPaymentPendingOrders(filtered, sortConfig);
   }, [
@@ -178,6 +204,9 @@ export default function PaymentPendingReport() {
     appliedDueDateFrom,
     appliedDueDateTo,
     appliedStatusFilter,
+    appliedEmployeeFilter,
+    appliedAgingFilter,
+    appliedPendingAmountFilter,
     sortConfig,
   ]);
 
@@ -376,6 +405,58 @@ export default function PaymentPendingReport() {
                 </select>
               </div>
 
+              <div className="min-w-[8rem] flex-shrink-0 w-[9.5rem]">
+                <label className="mb-1 block text-[11px] font-medium text-gray-600">
+                  Employee
+                </label>
+                <select
+                  value={employeeFilter}
+                  onChange={(e) => setEmployeeFilter(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">All employees</option>
+                  {employeeOptions.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="min-w-[8rem] flex-shrink-0 w-[9.5rem]">
+                <label className="mb-1 block text-[11px] font-medium text-gray-600">
+                  Aging
+                </label>
+                <select
+                  value={agingFilter}
+                  onChange={(e) => setAgingFilter(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {PAYMENT_PENDING_AGING_OPTIONS.map((opt) => (
+                    <option key={opt.value || "all"} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="min-w-[8rem] flex-shrink-0 w-[9.5rem]">
+                <label className="mb-1 block text-[11px] font-medium text-gray-600">
+                  Pending amount
+                </label>
+                <select
+                  value={pendingAmountFilter}
+                  onChange={(e) => setPendingAmountFilter(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {PAYMENT_PENDING_AMOUNT_OPTIONS.map((opt) => (
+                    <option key={opt.value || "all"} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               <div className="flex flex-shrink-0 flex-wrap items-center gap-2 pb-0.5">
               <ManualFilterSearchButton
                 onClick={handleApplySearch}
@@ -390,11 +471,17 @@ export default function PaymentPendingReport() {
                   setStatusFilter("all");
                   setCompletionFilter("pending");
                   setSearchQuery("");
+                  setEmployeeFilter("");
+                  setAgingFilter("");
+                  setPendingAmountFilter("");
                   setAppliedDueDateFrom("");
                   setAppliedDueDateTo("");
                   setAppliedStatusFilter("all");
                   setAppliedSearchQuery("");
                   setAppliedCompletionFilter("pending");
+                  setAppliedEmployeeFilter("");
+                  setAppliedAgingFilter("");
+                  setAppliedPendingAmountFilter("");
                 }}
                 className="inline-flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 transition-colors"
                 title="Reset filters"
