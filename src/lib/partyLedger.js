@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
-import { EXCLUDE_PROFORMA_INVOICE_SQL } from "@/lib/ledgerInvoiceFilters";
+import { LEDGER_INVOICE_SQL } from "@/lib/ledgerInvoiceFilters";
 import { parseLinkedStatementIds } from "@/lib/statementLinkedPurchases";
 
 function parseTransIds(raw) {
@@ -357,7 +357,7 @@ export async function buildLedgerForParty(decodedCompany, customerIdFilter = nul
        created_at
      FROM invoices
      WHERE (${invoiceWhereParts.join(" OR ")})
-       AND ${EXCLUDE_PROFORMA_INVOICE_SQL}
+       AND ${LEDGER_INVOICE_SQL}
      ORDER BY COALESCE(order_date, invoice_date) DESC, id DESC`,
     invoiceParams,
   );
@@ -561,7 +561,7 @@ export async function buildLedgerForParty(decodedCompany, customerIdFilter = nul
       const [allInvRows] = await conn.execute(
         `SELECT id, grand_total, linked_trans_ids, invoice_number
          FROM invoices
-         WHERE (${queryParts.join(" OR ")}) AND ${EXCLUDE_PROFORMA_INVOICE_SQL}`,
+         WHERE (${queryParts.join(" OR ")}) AND ${LEDGER_INVOICE_SQL}`,
         queryParams
       );
       allLinkedInvoices = allInvRows;

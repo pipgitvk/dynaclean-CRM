@@ -17,9 +17,7 @@ async function ensureInvoiceStatusColumn(conn) {
 export async function cancelActiveInvoiceForOrder(conn, orderLike) {
   const reportFile = String(orderLike?.report_file || "").trim();
   const orderInvoiceNumber = String(orderLike?.invoice_number || "").trim();
-  if (!reportFile && !orderInvoiceNumber) {
-    return { cancelled: false, reason: "no_invoice_on_order" };
-  }
+  const orderId = String(orderLike?.order_id ?? "").trim();
 
   const inv = await findActiveInvoiceForOrder(conn, {
     order_id: orderLike.order_id,
@@ -42,10 +40,26 @@ export async function cancelActiveInvoiceForOrder(conn, orderLike) {
         invoice_number: orderInvoiceNumber,
       };
     }
-    return { cancelled: false, reason: "no_active_linked_invoice" };
+  }
+
+  if (!inv?.id && orderId) {
+    await ensureInvoiceStatusColumn(conn);
+    const [updateResult] = await conn.execute(
+      `UPDATE invoices
+       SET status = 'CANCELLED'
+       WHERE TRIM(buyers_order_no) = ?
+         AND (status IS NULL OR UPPER(TRIM(status)) <> 'CANCELLED')`,
+      [orderId],
+    );
+    if (Number(updateResult?.affectedRows) > 0) {
+      return { cancelled: true, invoice_number: orderInvoiceNumber || null };
+    }
   }
 
   if (!inv?.id) {
+    if (!reportFile && !orderInvoiceNumber && !orderId) {
+      return { cancelled: false, reason: "no_invoice_on_order" };
+    }
     return { cancelled: false, reason: "no_active_linked_invoice" };
   }
 

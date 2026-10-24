@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
-import { EXCLUDE_PROFORMA_INVOICE_SQL_I } from "@/lib/ledgerInvoiceFilters";
+import { LEDGER_INVOICE_SQL_I } from "@/lib/ledgerInvoiceFilters";
 import {
   loadPartyLedgerNetMaps,
   resolveCustomerIdForParty,
@@ -236,7 +236,7 @@ export async function GET(req) {
          FROM invoices i
          WHERE i.customer_name IS NOT NULL
            AND TRIM(i.customer_name) != ''
-           AND ${EXCLUDE_PROFORMA_INVOICE_SQL_I}
+           AND ${LEDGER_INVOICE_SQL_I}
          GROUP BY TRIM(i.customer_name)`,
       ),
       safeQuery(
@@ -251,7 +251,7 @@ export async function GET(req) {
          FROM invoices i
          WHERE i.customer_name IS NOT NULL
            AND TRIM(i.customer_name) != ''
-           AND ${EXCLUDE_PROFORMA_INVOICE_SQL_I}
+           AND ${LEDGER_INVOICE_SQL_I}
          GROUP BY TRIM(i.customer_name), i.customer_id`,
       ),
       safeQuery(
@@ -269,7 +269,7 @@ export async function GET(req) {
          FROM invoices i
          WHERE i.customer_id IS NOT NULL
            AND i.customer_id != 0
-           AND ${EXCLUDE_PROFORMA_INVOICE_SQL_I}
+           AND ${LEDGER_INVOICE_SQL_I}
          GROUP BY CAST(i.customer_id AS CHAR)`,
       ),
       safeQuery(
