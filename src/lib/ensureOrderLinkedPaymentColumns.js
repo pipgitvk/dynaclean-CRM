@@ -14,4 +14,9 @@ export async function ensureOrderLinkedPaymentColumns(conn) {
       "ALTER TABLE neworder ADD COLUMN linked_payments_json TEXT NULL DEFAULT NULL",
     );
   } catch (_) {}
+  try {
+    await conn.execute(
+      "ALTER TABLE neworder ADD COLUMN invoice_number VARCHAR(100) NULL DEFAULT NULL",
+    );
+  } catch (_) {}
 }

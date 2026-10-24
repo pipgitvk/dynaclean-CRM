@@ -329,8 +329,15 @@ export default function InvoiceForm({
         finalPaymentStatus = "UNPAID";
       }
 
+      const buyersOrderNo = String(
+        form.buyers_order_no || orderId || initialOrderId || "",
+      ).trim();
+
       const dataToSend = {
         ...form,
+        buyers_order_no: buyersOrderNo,
+        order_id: buyersOrderNo || undefined,
+        quotation_id: form.quotation_id || quotationNumber || undefined,
         invoice_number: invoiceNumber,
         invoice_date: invoiceDate,
         invoice_type: invoiceType,
@@ -433,6 +440,10 @@ const fetchQuotationAndFill = async (quoteNoArg) => {
     // Fill only available quotation fields
     setForm((prev) => ({
       ...prev,
+      buyers_order_no:
+        prev.buyers_order_no ||
+        String(orderId || initialOrderId || "").trim() ||
+        prev.buyers_order_no,
       customer_name: quotation.customer_name,
       customer_email: quotation.customer_email,
       customer_phone: quotation.customer_contact,

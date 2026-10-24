@@ -251,8 +251,15 @@ Thanks for doing business with us!`,
       else if (balanceAmount > 0 && balanceAmount < taxSummary.grandTotal) finalPaymentStatus = "PARTIAL";
       else if (balanceAmount >= taxSummary.grandTotal) finalPaymentStatus = "UNPAID";
 
+      const buyersOrderNo = String(
+        form.buyers_order_no || orderId || initialOrderId || "",
+      ).trim();
+
       const dataToSend = {
         ...form,
+        buyers_order_no: buyersOrderNo,
+        order_id: buyersOrderNo || undefined,
+        quotation_id: form.quotation_id || quotationNumber || undefined,
         invoice_number: invoiceNumber,
         invoice_date: invoiceDate,
         invoice_type: invoiceType,
@@ -352,7 +359,14 @@ Thanks for doing business with us!`,
         due_date: quotation.due_date ? quotation.due_date.split("T")[0] : "",
       };
 
-      setForm((prev) => ({ ...prev, ...nextForm }));
+      setForm((prev) => ({
+        ...prev,
+        ...nextForm,
+        buyers_order_no:
+          prev.buyers_order_no ||
+          String(orderId || initialOrderId || "").trim() ||
+          prev.buyers_order_no,
+      }));
 
       const interstate = isInterstateInvoiceSupply({
         buyerGstin: nextForm.gst_number,

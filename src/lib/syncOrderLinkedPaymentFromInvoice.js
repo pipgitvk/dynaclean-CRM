@@ -74,6 +74,12 @@ export async function syncOrderLinkedPaymentFromInvoice(conn, order) {
       });
     }
     if (backfillInvoiceNumber) {
+      await conn.execute(
+        `UPDATE neworder SET invoice_number = ?
+         WHERE order_id = ?
+           AND (invoice_number IS NULL OR TRIM(invoice_number) = '')`,
+        [invoiceNumber, orderId],
+      );
       return { ...order, invoice_number: invoiceNumber };
     }
     return order;

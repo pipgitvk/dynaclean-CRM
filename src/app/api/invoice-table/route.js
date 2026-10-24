@@ -10,6 +10,7 @@ import { ensureInvoiceItemsInsertReady } from "@/lib/ensureInvoiceItemsAutoIncre
 import { findActiveInvoiceForOrder } from "@/lib/activeInvoiceForOrder";
 import { syncInvoiceAndOrderPaymentLink } from "@/lib/syncInvoiceOrderPaymentLink";
 import { settleStatementsForInvoicePayment } from "@/lib/settleStatementsForInvoicePayment";
+import { linkCreatedInvoiceToNeworder } from "@/lib/linkCreatedInvoiceToNeworder";
 
 /** Parse linked_trans_ids JSON or plain string → array of strings */
 function parseTransIds(raw) {
@@ -949,6 +950,7 @@ export async function POST(req) {
       notes = null,
       terms_conditions = null,
       buyers_order_no = null,
+      order_id: bodyOrderId = null,
       eway_bill_no = null,
       delivery_challan_no = null,
       linked_trans_ids = null,
@@ -970,6 +972,11 @@ export async function POST(req) {
         ? JSON.stringify(linked_trans_ids)
         : null;
 
+    const resolvedBuyersOrderNo = String(
+      buyers_order_no ?? bodyOrderId ?? "",
+    ).trim();
+    const buyersOrderNoSql = resolvedBuyersOrderNo || null;
+
     const pool = await getDbConnection();
     conn = await pool.getConnection();
 
@@ -977,7 +984,7 @@ export async function POST(req) {
       String(invoice_type || "").trim().toLowerCase() === "performa";
     if (!isPerformaCreate) {
       const existing = await findActiveInvoiceForOrder(conn, {
-        order_id: buyers_order_no,
+        order_id: buyersOrderNoSql,
         quote_number: quotation_id,
       });
       if (existing?.invoice_number) {
@@ -1213,7 +1220,7 @@ export async function POST(req) {
         pushCol("payment_status", payment_status);
         pushCol("notes", notes);
         pushCol("terms_conditions", terms_conditions);
-        pushCol("buyers_order_no", buyers_order_no);
+        pushCol("buyers_order_no", buyersOrderNoSql);
         pushCol("eway_bill_no", eway_bill_no);
         pushCol("delivery_challan_no", delivery_challan_no);
         pushCol("customer_id", customerIdSql);
@@ -1307,6 +1314,20 @@ export async function POST(req) {
 
     await conn.commit();
 
+    const isPerformaInvoice =
+      String(invoice_type || "").trim().toLowerCase() === "performa";
+    if (!isPerformaInvoice && resolvedBuyersOrderNo) {
+      try {
+        await linkCreatedInvoiceToNeworder(conn, {
+          orderId: resolvedBuyersOrderNo,
+          invoiceNumber: finalInvoiceNumber,
+          invoiceDate: invoice_date,
+        });
+      } catch (linkErr) {
+        console.error("Invoice POST link neworder.invoice_number:", linkErr);
+      }
+    }
+
     try {
       const transIdsForSettle = parseTransIds(linkedTransIdsJson);
       if (invoiceId && transIdsForSettle.length) {
@@ -1321,9 +1342,7 @@ export async function POST(req) {
     }
 
     try {
-      const orderId = buyers_order_no
-        ? String(buyers_order_no).trim()
-        : "";
+      const orderId = resolvedBuyersOrderNo;
       await syncInvoiceAndOrderPaymentLink(conn, {
         invoiceNumbers: [finalInvoiceNumber],
         orderIds: orderId ? [orderId] : [],
