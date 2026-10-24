@@ -76,6 +76,7 @@ export async function GET(request) {
         pd.claimable,
         pd.claim_status,
         pd.claim_received_date,
+        pd.claim_received_by,
         o.client_name,
         o.company_name,
         o.contact,
@@ -146,6 +147,7 @@ export async function GET(request) {
       claimable: Number(row.claimable) === 1,
       claim_status: row.claim_status || "not received",
       claim_received_date: row.claim_received_date || null,
+      claim_received_by: row.claim_received_by || "",
       recorded_by: row.recorded_by || "",
       recorded_date: row.recorded_date || null,
     }));

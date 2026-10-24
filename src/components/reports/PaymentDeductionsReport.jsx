@@ -101,7 +101,8 @@ export default function PaymentDeductionsReport({ paymentPendingPath }) {
       "Claimable",
       "Claim Status",
       "Claim Received Date",
-      "Recorded By",
+      "Created By",
+      "Claim Received By",
       "Recorded Date",
     ];
     const rows = deductions.map((d) => [
@@ -115,7 +116,8 @@ export default function PaymentDeductionsReport({ paymentPendingPath }) {
       d.claimable ? "Yes" : "No",
       d.claim_status,
       d.claim_received_date ? dayjs(d.claim_received_date).format("DD-MM-YYYY") : "",
-      d.recorded_by,
+      d.recorded_by || "",
+      d.claim_received_by || "",
       d.recorded_date ? dayjs(d.recorded_date).format("DD-MM-YYYY hh:mm A") : "",
     ]);
 
@@ -306,19 +308,21 @@ export default function PaymentDeductionsReport({ paymentPendingPath }) {
                 <th className="px-3 py-3 text-center font-semibold">Claimable</th>
                 <th className="px-3 py-3 text-center font-semibold">Claim Status</th>
                 <th className="px-3 py-3 text-center font-semibold">Claim Date</th>
+                <th className="px-3 py-3 text-left font-semibold">Created By</th>
+                <th className="px-3 py-3 text-left font-semibold">Claim Received By</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
               {loading ? (
                 <tr>
-                  <td colSpan={10} className="px-6 py-10 text-center text-gray-500">
+                  <td colSpan={12} className="px-6 py-10 text-center text-gray-500">
                     <Loader2 className="mx-auto mb-2 animate-spin" size={20} />
                     Loading deductions...
                   </td>
                 </tr>
               ) : deductions.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="px-6 py-10 text-center text-gray-500">
+                  <td colSpan={12} className="px-6 py-10 text-center text-gray-500">
                     No deductions found
                   </td>
                 </tr>
@@ -377,6 +381,12 @@ export default function PaymentDeductionsReport({ paymentPendingPath }) {
                       {item.claim_received_date
                         ? dayjs(item.claim_received_date).format("DD-MM-YYYY")
                         : "-"}
+                    </td>
+                    <td className="px-3 py-3 text-xs text-gray-700">
+                      {item.recorded_by || "-"}
+                    </td>
+                    <td className="px-3 py-3 text-xs text-gray-700">
+                      {item.claim_received_by || "-"}
                     </td>
                   </tr>
                 ))

@@ -39,6 +39,11 @@ export async function ensurePaymentDeductionsTable() {
     pool
       .execute(`ALTER TABLE payment_deductions ADD COLUMN claim_received_date DATETIME NULL`)
       .catch((e) => (e?.errno === 1060 ? null : Promise.reject(e))),
+    pool
+      .execute(
+        `ALTER TABLE payment_deductions ADD COLUMN claim_received_by VARCHAR(100) NULL`,
+      )
+      .catch((e) => (e?.errno === 1060 ? null : Promise.reject(e))),
   ];
 
   try {
