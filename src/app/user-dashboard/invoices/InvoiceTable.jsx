@@ -4,7 +4,12 @@ import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { Loader2 } from "lucide-react";
+import { Loader2, Mail } from "lucide-react";
+import toast from "react-hot-toast";
+import {
+  sendInvoiceCustomerEmail,
+  customerEmailSendMessage,
+} from "@/lib/sendInvoiceCustomerEmailClient";
 import MultiInvoiceLinkModal from "./MultiInvoiceLinkModal";
 
 function InvoiceTableLoadingState({ label = "Loading invoices…" }) {
@@ -63,6 +68,7 @@ export default function InvoiceTable({ onSummaryUpdate }) {
   const [sortOrder, setSortOrder] = useState("desc");
   const [fetchError, setFetchError] = useState(null);
   const [editId, setEditId] = useState(null);
+  const [sendingEmailId, setSendingEmailId] = useState(null);
   
   // Link payment modal
   const [showLinkModal, setShowLinkModal] = useState(false);
@@ -275,6 +281,29 @@ export default function InvoiceTable({ onSummaryUpdate }) {
     } else {
       setSortBy(column);
       setSortOrder("desc");
+    }
+  };
+
+  const handleSendCustomerEmail = async (invoice) => {
+    if (invoice.type === "performa") {
+      toast.error("Performa invoice par email nahi bhejte.");
+      return;
+    }
+    const email = String(invoice.customer_email || "").trim();
+    if (!email) {
+      toast.error("Is invoice par customer email nahi hai — Edit se email add karein.");
+      return;
+    }
+    setSendingEmailId(invoice.id);
+    try {
+      const { out } = await sendInvoiceCustomerEmail(invoice.id, email);
+      const msg = customerEmailSendMessage(out, email);
+      if (msg.type === "success") toast.success(msg.message);
+      else toast.error(msg.message);
+    } catch (err) {
+      toast.error(err?.message || "Email send failed");
+    } finally {
+      setSendingEmailId(null);
     }
   };
 
@@ -660,6 +689,29 @@ export default function InvoiceTable({ onSummaryUpdate }) {
                         >
                           Edit
                         </button>
+                        {i.type !== "performa" && (
+                          <button
+                            type="button"
+                            onClick={() => handleSendCustomerEmail(i)}
+                            disabled={
+                              sendingEmailId === i.id ||
+                              !String(i.customer_email || "").trim()
+                            }
+                            className="inline-flex items-center justify-center w-8 h-8 rounded bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                            title={
+                              String(i.customer_email || "").trim()
+                                ? `Email invoice to ${i.customer_email}`
+                                : "Customer email missing"
+                            }
+                            aria-label="Send invoice email to customer"
+                          >
+                            {sendingEmailId === i.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Mail className="h-4 w-4" />
+                            )}
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={() => {

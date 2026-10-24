@@ -416,9 +416,6 @@ export default function InvoiceEditModal({
         cgst_rate: cgstRate,
         sgst_rate: sgstRate,
         igst_rate: igstRate,
-        send_customer_payment_notice:
-          invoiceType !== "performa" &&
-          Boolean(String(form.customer_email || "").trim()),
       };
 
       const removedTransIds = originalLinkedTransIdsRef.current.filter(tid => !linkedTransIds.includes(tid));
@@ -476,22 +473,7 @@ export default function InvoiceEditModal({
           }
         }
       }
-      const mailed =
-        invoiceType !== "performa" &&
-        !!String(form.customer_email || "").trim();
-      const n = out.customerEmailNotice;
-      if (mailed && n) {
-        if (n.sent) {
-          toast.success(
-            "Invoice updated. Invoice PDF and payment summary have been emailed to the customer.",
-          );
-        } else {
-          toast.success("Invoice updated");
-          toast.error(n.error || "Customer mail send nahi ho payi.");
-        }
-      } else {
-        toast.success("Invoice updated");
-      }
+      toast.success("Invoice updated");
       onSaved?.();
       onClose?.();
     } catch (err) {
@@ -621,6 +603,11 @@ export default function InvoiceEditModal({
                       setForm({ ...form, customer_email: e.target.value })
                     }
                   />
+                  {invoiceType !== "performa" && (
+                    <p className="mt-1 text-xs text-gray-500">
+                      Save par email auto nahi jayegi — invoice list mein mail icon se bhejein.
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-gray-600 mb-1">Phone</label>
@@ -902,7 +889,7 @@ export default function InvoiceEditModal({
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t">
+              <div className="flex flex-wrap items-center justify-end gap-2 pt-2 border-t">
                 <button
                   type="button"
                   onClick={onClose}

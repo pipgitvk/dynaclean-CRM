@@ -6,7 +6,12 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import MultiInvoiceLinkModal from "@/app/user-dashboard/invoices/MultiInvoiceLinkModal";
 import SearchableSelect from "@/components/ui/SearchableSelect";
-import { Loader2 } from "lucide-react";
+import { Loader2, Mail } from "lucide-react";
+import toast from "react-hot-toast";
+import {
+  sendInvoiceCustomerEmail,
+  customerEmailSendMessage,
+} from "@/lib/sendInvoiceCustomerEmailClient";
 
 const InvoiceEditModal = dynamic(() => import("./InvoiceEditModal"), { ssr: false });
 
@@ -74,6 +79,7 @@ export default function InvoiceTable({ onSummaryUpdate }) {
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState(new Set());
   const [selectedInvoices, setSelectedInvoices] = useState([]);
   const [reconciling, setReconciling] = useState(false);
+  const [sendingEmailId, setSendingEmailId] = useState(null);
   const [expandedInvoiceId, setExpandedInvoiceId] = useState(null);
   const [linkedDetailsById, setLinkedDetailsById] = useState({});
   const [loadingLinkedId, setLoadingLinkedId] = useState(null);
@@ -366,6 +372,29 @@ export default function InvoiceTable({ onSummaryUpdate }) {
     // Update selected invoices data
     const selected = invoices.filter(inv => newSelected.has(inv.id));
     setSelectedInvoices(selected);
+  };
+
+  const handleSendCustomerEmail = async (invoice) => {
+    if (invoice.type === "performa") {
+      toast.error("Performa invoice par email nahi bhejte.");
+      return;
+    }
+    const email = String(invoice.customer_email || "").trim();
+    if (!email) {
+      toast.error("Is invoice par customer email nahi hai — Edit se email add karein.");
+      return;
+    }
+    setSendingEmailId(invoice.id);
+    try {
+      const { out } = await sendInvoiceCustomerEmail(invoice.id, email);
+      const msg = customerEmailSendMessage(out, email);
+      if (msg.type === "success") toast.success(msg.message);
+      else toast.error(msg.message);
+    } catch (err) {
+      toast.error(err?.message || "Email send failed");
+    } finally {
+      setSendingEmailId(null);
+    }
   };
 
   const handleLinkPaymentClick = () => {
@@ -785,6 +814,29 @@ export default function InvoiceTable({ onSummaryUpdate }) {
                         >
                           Edit
                         </button>
+                        {i.type !== "performa" && (
+                          <button
+                            type="button"
+                            onClick={() => handleSendCustomerEmail(i)}
+                            disabled={
+                              sendingEmailId === i.id ||
+                              !String(i.customer_email || "").trim()
+                            }
+                            className="inline-flex items-center justify-center w-8 h-8 rounded bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                            title={
+                              String(i.customer_email || "").trim()
+                                ? `Email invoice to ${i.customer_email}`
+                                : "Customer email missing"
+                            }
+                            aria-label="Send invoice email to customer"
+                          >
+                            {sendingEmailId === i.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Mail className="h-4 w-4" />
+                            )}
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={() => {

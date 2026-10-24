@@ -2,11 +2,6 @@ import { getDbConnection } from "@/lib/db";
 import { NextResponse } from "next/server";
 import { getSessionPayload } from "@/lib/auth";
 import { canAccessPerformaInvoice } from "@/lib/performaInvoiceAccess";
-import { isPerformaInvoice } from "@/lib/ledgerInvoiceFilters";
-import {
-  loadInvoiceWithItemsForPdf,
-  sendInvoicePaymentNoticeEmail,
-} from "@/lib/invoiceCustomerEmailNotice";
 import { ensureInvoiceItemsInsertReady } from "@/lib/ensureInvoiceItemsAutoIncrement";
 import { refreshOrdersAfterInvoiceRemoved } from "@/lib/orderInvoicePaymentClear";
 import { syncInvoiceAndOrderPaymentLink } from "@/lib/syncInvoiceOrderPaymentLink";
@@ -158,7 +153,6 @@ export async function PATCH(req, context) {
       created_at = null,
       customer_id: bodyCustomerId,
       linked_trans_ids: bodyLinkedTransIds,
-      send_customer_payment_notice = false,
       cgst_rate: bodyCgstRate = null,
       sgst_rate: bodySgstRate = null,
       igst_rate: bodyIgstRate = null,
@@ -503,51 +497,7 @@ export async function PATCH(req, context) {
       }
     }
 
-    /** @type {{ sent?: boolean, skipped?: boolean, reason?: string, error?: string } | null} */
-    let customerEmailNotice = null;
-    const shouldNotifyCustomer =
-      send_customer_payment_notice === true ||
-      send_customer_payment_notice === "true";
-    if (shouldNotifyCustomer) {
-      try {
-        const invFull = await loadInvoiceWithItemsForPdf(pool, invoiceId);
-        if (invFull && isPerformaInvoice(invFull)) {
-          customerEmailNotice = {
-            sent: false,
-            skipped: true,
-            reason: "performa_invoice_no_email",
-          };
-        } else {
-        const emailTrim =
-          customer_email != null ? String(customer_email).trim() : "";
-        if (!emailTrim) {
-          customerEmailNotice = {
-            sent: false,
-            skipped: true,
-            reason: "missing_customer_email",
-          };
-        } else {
-          if (invFull) {
-            customerEmailNotice =
-              await sendInvoicePaymentNoticeEmail(invFull);
-          } else {
-            customerEmailNotice = {
-              sent: false,
-              error: "invoice_reload_failed",
-            };
-          }
-        }
-        }
-      } catch (emailErr) {
-        console.error("Invoice PATCH customer email:", emailErr);
-        customerEmailNotice = {
-          sent: false,
-          error: emailErr?.message || String(emailErr),
-        };
-      }
-    }
-
-    return NextResponse.json({ success: true, invoiceId, customerEmailNotice });
+    return NextResponse.json({ success: true, invoiceId });
   } catch (e) {
     console.error("Invoice PATCH error:", e);
     if (conn) {

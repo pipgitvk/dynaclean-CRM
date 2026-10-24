@@ -174,6 +174,7 @@ function buildSimpleInvoiceSelectSql() {
     quotation_id,
     buyers_order_no,
     customer_name AS buyer_name,
+    customer_email,
     ${INVOICE_CUSTOMER_COMPANY_SQL} AS company_name,
     customer_id,
     gst_number,
