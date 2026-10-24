@@ -16,6 +16,8 @@ import {
   appendSqlWhereClause,
   orderListApprovalWhereSql,
 } from "@/lib/orderApprovalVisibility";
+import { ensureNeworderBookingPaymentColumns } from "@/lib/ensureNeworderBookingPaymentColumns";
+import { seedOrderBookingPaymentSnapshot } from "@/lib/seedOrderBookingPaymentSnapshot";
 
 const UPLOAD_DIR = path.join(process.cwd(), "public", "uploads");
 
@@ -180,6 +182,16 @@ export async function POST(req) {
     console.log("📦 Parsed Fields:", fields);
     console.log("📁 Parsed Files:", files);
 
+    const transactionId = String(
+      fields.transactionId ?? fields.transaction_id ?? "",
+    ).trim();
+    const paymentAmount = String(
+      fields.paymentAmount ?? fields.payment_amount ?? "",
+    ).trim();
+    const paymentDate = String(
+      fields.paymentDate ?? fields.payment_date ?? "",
+    ).trim();
+
     const {
       quote_number,
       client_name,
@@ -193,9 +205,6 @@ export async function POST(req) {
       salesRemark,
       clientDeliveryDate,
       poNumber,
-      paymentDate,
-      transactionId,
-      paymentAmount,
       item_name,
       item_code,
       specification,
@@ -291,6 +300,7 @@ export async function POST(req) {
     // console.log("Generated Order ID:", orderId);
 
     await ensureNeworderQuotationIdColumn(conn);
+    await ensureNeworderBookingPaymentColumns(conn);
 
     const [quotationRows] = await conn.execute(
       `SELECT customer_id, payment_term_days, grand_total, \`S.No.\` AS quotation_id
@@ -391,6 +401,16 @@ export async function POST(req) {
         customerIdFromQuotation,
       ],
     );
+
+    try {
+      await seedOrderBookingPaymentSnapshot(conn, orderId, {
+        transactionId,
+        paymentDate,
+        paymentAmount,
+      });
+    } catch (seedErr) {
+      console.error("⚠️ Booking payment snapshot seed failed:", seedErr);
+    }
 
     // 6. Send Email if pending approval
     if (approvalStatus === "pending") {
