@@ -80,9 +80,28 @@ export function isInterstateInvoiceSupply({
 }
 
 export function totalGstPercentFromInvoiceItem(item, fallback = 18) {
-  if (isBatteryOperatedInvoiceItem(item)) {
-    return BATTERY_OPERATED_GST_PERCENT;
+  const catalogGst =
+    item?.gst_rate != null && String(item.gst_rate).trim() !== ""
+      ? item.gst_rate
+      : item?.product_gst_rate;
+
+  if (
+    isBatteryOperatedInvoiceItem(item) ||
+    (catalogGst != null &&
+      String(catalogGst).trim() !== "" &&
+      Number(catalogGst) > 0)
+  ) {
+    return effectiveGstPercentForProduct(
+      {
+        item_name: item?.item_name,
+        item_code: item?.item_code,
+        description: item?.description,
+        gst_rate: catalogGst,
+      },
+      fallback,
+    );
   }
+
   const igst = Number(item?.igst_percent) || 0;
   const cgst = Number(item?.cgst_percent) || 0;
   const sgst = Number(item?.sgst_percent) || 0;

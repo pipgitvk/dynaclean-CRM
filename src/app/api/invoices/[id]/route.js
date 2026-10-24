@@ -80,7 +80,12 @@ export async function GET(_req, context) {
     }
 
     const [items] = await conn.execute(
-      `SELECT *, item_code as product_code, image_url as imageUrl FROM invoice_items WHERE invoice_id = ? ORDER BY id ASC`,
+      `SELECT ii.*, ii.item_code AS product_code, ii.image_url AS imageUrl,
+              pl.gst_rate AS product_gst_rate
+       FROM invoice_items ii
+       LEFT JOIN products_list pl ON pl.item_code = ii.item_code
+       WHERE ii.invoice_id = ?
+       ORDER BY ii.id ASC`,
       [invoiceId],
     );
 

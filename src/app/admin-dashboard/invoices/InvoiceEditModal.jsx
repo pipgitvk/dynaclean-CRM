@@ -16,7 +16,7 @@ import {
 import {
   applyTaxPercentsToInvoiceItems,
   getStateCodeFromGstin,
-  headerRatesForInterstate,
+  invoiceHeaderTaxRates,
   isInterstateInvoiceSupply,
   parseStateCodeFromDisplay,
   totalGstPercentFromInvoiceItem,
@@ -86,6 +86,10 @@ function mapItemFromDb(row) {
     cgst_percent: Number(row.cgst_percent) || 0,
     sgst_percent: Number(row.sgst_percent) || 0,
     igst_percent: Number(row.igst_percent) || 0,
+    product_gst_rate:
+      row.product_gst_rate != null && String(row.product_gst_rate).trim() !== ""
+        ? Number(row.product_gst_rate)
+        : null,
   };
   mapped.gst = totalGstPercentFromInvoiceItem(mapped);
   return mapped;
@@ -99,7 +103,7 @@ function applyBuyerGstTaxToEditState(form, items, setters) {
     parseCodeFromDisplay: parseStateCodeFromDisplay,
   });
   const nextItems = applyTaxPercentsToInvoiceItems(items, interstate);
-  const rates = headerRatesForInterstate(interstate);
+  const rates = invoiceHeaderTaxRates(nextItems, interstate);
   setters.setItems(nextItems);
   setters.setCgstRate(rates.cgstRate);
   setters.setSgstRate(rates.sgstRate);
@@ -160,6 +164,28 @@ export default function InvoiceEditModal({
   const originalLinkedTransIdsRef = useRef([]);
   const [buyerTaxReady, setBuyerTaxReady] = useState(false);
 
+  const interstateSupply = useMemo(
+    () =>
+      isInterstateInvoiceSupply({
+        buyerGstin: form.gst_number?.trim(),
+        buyerStateCode: form.state_code,
+        stateDisplay: form.state,
+        parseCodeFromDisplay: parseStateCodeFromDisplay,
+      }),
+    [form.gst_number, form.state, form.state_code],
+  );
+
+  const lineTaxSignature = useMemo(
+    () =>
+      items
+        .map(
+          (i) =>
+            `${i.item_code ?? ""}|${i.item_name ?? ""}|${i.description ?? ""}|${i.product_gst_rate ?? ""}|${i.gst ?? ""}`,
+        )
+        .join("§"),
+    [items],
+  );
+
   const taxSummary = useMemo(() => {
     let subtotal = 0;
     let cgst = 0;
@@ -211,29 +237,38 @@ export default function InvoiceEditModal({
       }
     }
 
+    const interstate = interstateSupply;
+    const { cgstRate: cR, sgstRate: sR, igstRate: iR } = invoiceHeaderTaxRates(
+      items,
+      interstate,
+    );
+    setCgstRate(cR);
+    setSgstRate(sR);
+    setIgstRate(iR);
+
     setItems((prev) => {
-      const interstate = isInterstateInvoiceSupply({
-        buyerGstin: gstinValue,
-        buyerStateCode: form.state_code,
-        stateDisplay: form.state,
-        parseCodeFromDisplay: parseStateCodeFromDisplay,
-      });
       const next = applyTaxPercentsToInvoiceItems(prev, interstate);
-      const rates = headerRatesForInterstate(interstate);
-      setCgstRate(rates.cgstRate);
-      setSgstRate(rates.sgstRate);
-      setIgstRate(rates.igstRate);
       const same =
         prev.length === next.length &&
         prev.every(
           (row, idx) =>
             row.cgst_percent === next[idx].cgst_percent &&
             row.sgst_percent === next[idx].sgst_percent &&
-            row.igst_percent === next[idx].igst_percent,
+            row.igst_percent === next[idx].igst_percent &&
+            row.gst === next[idx].gst,
         );
       return same ? prev : next;
     });
-  }, [open, loading, buyerTaxReady, form.gst_number, form.state, form.state_code]);
+  }, [
+    open,
+    loading,
+    buyerTaxReady,
+    form.gst_number,
+    form.state,
+    form.state_code,
+    lineTaxSignature,
+    interstateSupply,
+  ]);
 
   useEffect(() => {
     if (!open || !invoiceId) return;
@@ -334,7 +369,16 @@ export default function InvoiceEditModal({
     }
     setSaving(true);
     try {
-      const itemsWithTotals = items.map((item) => {
+      const interstate = isInterstateInvoiceSupply({
+        buyerGstin: form.gst_number,
+        buyerStateCode: form.state_code,
+        stateDisplay: form.state,
+        parseCodeFromDisplay: parseStateCodeFromDisplay,
+      });
+      const taxedItems = applyTaxPercentsToInvoiceItems(items, interstate);
+      const headerRates = invoiceHeaderTaxRates(taxedItems, interstate);
+
+      const itemsWithTotals = taxedItems.map((item) => {
         const qty = item.quantity || 0;
         const rate = item.rate || 0;
         const discountAmount = item.discount_amount || 0;
@@ -357,18 +401,42 @@ export default function InvoiceEditModal({
         };
       });
 
+      const saveSubtotal = itemsWithTotals.reduce(
+        (sum, item) => sum + (Number(item.taxable_value) || 0),
+        0,
+      );
+      const saveCgst = itemsWithTotals.reduce(
+        (sum, item) => sum + (Number(item.cgst_amount) || 0),
+        0,
+      );
+      const saveSgst = itemsWithTotals.reduce(
+        (sum, item) => sum + (Number(item.sgst_amount) || 0),
+        0,
+      );
+      const saveIgst = itemsWithTotals.reduce(
+        (sum, item) => sum + (Number(item.igst_amount) || 0),
+        0,
+      );
+      const saveTotalTax = saveCgst + saveSgst + saveIgst;
+      const totalBeforeRound = saveSubtotal + saveTotalTax;
+      let saveRoundOff = parseFloat(roundOff) || 0;
+      if (isAutoRoundOff) {
+        saveRoundOff = Math.round(totalBeforeRound) - totalBeforeRound;
+      }
+      const saveGrandTotal = totalBeforeRound + saveRoundOff;
+
       const amountPaid = Number(form.amount_paid || 0);
-      const balanceAmount = Math.max(0, taxSummary.grandTotal - amountPaid);
+      const balanceAmount = Math.max(0, saveGrandTotal - amountPaid);
 
       // Auto-set payment status based on balance amount
       let finalPaymentStatus = form.payment_status;
-      if (balanceAmount === 0 && taxSummary.grandTotal > 0) {
+      if (balanceAmount === 0 && saveGrandTotal > 0) {
         // If balance is 0, automatically mark as PAID
         finalPaymentStatus = "PAID";
-      } else if (balanceAmount > 0 && balanceAmount < taxSummary.grandTotal) {
+      } else if (balanceAmount > 0 && balanceAmount < saveGrandTotal) {
         // If balance is between 0 and grand total, mark as PARTIAL
         finalPaymentStatus = "PARTIAL";
-      } else if (balanceAmount === taxSummary.grandTotal) {
+      } else if (balanceAmount === saveGrandTotal) {
         // If balance equals grand total, mark as UNPAID
         finalPaymentStatus = "UNPAID";
       }
@@ -394,13 +462,13 @@ export default function InvoiceEditModal({
         state: form.state || null,
         state_code: form.state_code || null,
         items: itemsWithTotals,
-        subtotal: taxSummary.subtotal,
-        cgst: taxSummary.cgst,
-        sgst: taxSummary.sgst,
-        igst: taxSummary.igst,
-        total_tax: taxSummary.totalTax,
-        round_off: parseFloat(roundOff) || 0,
-        grand_total: taxSummary.grandTotal,
+        subtotal: saveSubtotal,
+        cgst: saveCgst,
+        sgst: saveSgst,
+        igst: saveIgst,
+        total_tax: saveTotalTax,
+        round_off: saveRoundOff,
+        grand_total: saveGrandTotal,
         amount_paid: amountPaid,
         balance_amount: balanceAmount,
         payment_status: finalPaymentStatus,
@@ -413,9 +481,9 @@ export default function InvoiceEditModal({
         created_at: createdAtLocal || null,
         customer_id: String(form.customer_id || "").trim() || null,
         linked_trans_ids: linkedTransIds,
-        cgst_rate: cgstRate,
-        sgst_rate: sgstRate,
-        igst_rate: igstRate,
+        cgst_rate: headerRates.cgstRate,
+        sgst_rate: headerRates.sgstRate,
+        igst_rate: headerRates.igstRate,
       };
 
       const removedTransIds = originalLinkedTransIdsRef.current.filter(tid => !linkedTransIds.includes(tid));
