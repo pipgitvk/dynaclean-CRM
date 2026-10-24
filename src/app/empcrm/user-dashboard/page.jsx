@@ -2,8 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { User, FileText, Calendar, Clock, Grid3x3, DollarSign, Receipt, Settings, CheckSquare, Wallet } from "lucide-react";
-import AttendanceTracker from "@/components/empcrm/AttendanceTracker";
-
 export default function UserEmpCrmDashboard() {
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -212,14 +210,6 @@ export default function UserEmpCrmDashboard() {
               </button>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* Attendance Tracker Section */}
-      {userData && (
-        <div className="mt-8">
-          <h2 className="text-2xl font-bold text-gray-800 mb-6">Today's Attendance</h2>
-          <AttendanceTracker username={userData.username} />
         </div>
       )}
 
