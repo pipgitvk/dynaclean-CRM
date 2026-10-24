@@ -1,7 +1,7 @@
   "use client";
 
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import MultiInvoiceLinkModal from "./MultiInvoiceLinkModal";
@@ -9,36 +9,25 @@ import MultiInvoiceLinkModal from "./MultiInvoiceLinkModal";
 const InvoiceEditModal = dynamic(() => import("@/app/admin-dashboard/invoices/InvoiceEditModal"), { ssr: false });
 
 export default function InvoiceTable({ onSummaryUpdate }) {
-  const getMonthStartEnd = () => {
-    const now = new Date();
-    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    return { firstDay, lastDay };
-  };
-  
-  const formatDateForInput = (date) => {
-    const y = date.getFullYear();
-    const m = String(date.getMonth() + 1).padStart(2, '0');
-    const d = String(date.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
-  };
-
-  const { firstDay: firstDayOfMonth, lastDay: lastDayOfMonth } = getMonthStartEnd();
+  const PAGE_SIZE = 40;
+  const SCROLL_LOAD_OFFSET_PX = 200;
+  const pageRef = useRef(1);
 
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [fromDate, setFromDate] = useState(formatDateForInput(firstDayOfMonth));
-  const [toDate, setToDate] = useState(formatDateForInput(lastDayOfMonth));
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
   const [invoiceTypeFilter, setInvoiceTypeFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
 
-  // Single page — fetch all records
-  const [currentPage] = useState(1);
-  const limit = 10000;
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [scrollLoadEnabled, setScrollLoadEnabled] = useState(false);
   const [meta, setMeta] = useState({
     page: 1,
-    limit: 10000,
+    limit: PAGE_SIZE,
     total: 0,
     totalPages: 1,
   });
@@ -54,144 +43,203 @@ export default function InvoiceTable({ onSummaryUpdate }) {
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState(new Set());
   const [selectedInvoices, setSelectedInvoices] = useState([]);
 
-  const fetchData = async () => {
-    setLoading(true);
+  const processInvoicesForView = (data) => {
+    const grouped = {};
+
+    data.forEach((invoice) => {
+      if (invoice.parent_id) {
+        if (!grouped[invoice.parent_id]) {
+          grouped[invoice.parent_id] = { parent: null, children: [] };
+        }
+        grouped[invoice.parent_id].children.push(invoice);
+      } else {
+        if (!grouped[invoice.id]) {
+          grouped[invoice.id] = { parent: null, children: [] };
+        }
+        grouped[invoice.id].parent = invoice;
+      }
+    });
+
+    data.forEach((inv) => {
+      inv.totalLinkedAmount =
+        inv.linkedStatements?.reduce(
+          (sum, stmt) => sum + Number(stmt.amount || 0),
+          0,
+        ) || 0;
+    });
+
+    const sortedData = [];
+    const processedIds = new Set();
+    const groupIds = Object.keys(grouped)
+      .map(Number)
+      .sort((a, b) => b - a);
+
+    groupIds.forEach((parentId) => {
+      const group = grouped[parentId];
+      if (group.parent && !processedIds.has(group.parent.id)) {
+        if (group.parent.type !== "performa") {
+          sortedData.push(group.parent);
+          processedIds.add(group.parent.id);
+        }
+      }
+      group.children
+        .sort((a, b) => a.id - b.id)
+        .forEach((child) => {
+          if (!processedIds.has(child.id) && child.type !== "performa") {
+            sortedData.push(child);
+            processedIds.add(child.id);
+          }
+        });
+    });
+
+    return sortedData;
+  };
+
+  const fetchData = async ({ page = 1, append = false } = {}) => {
+    if (append) {
+      setLoadingMore(true);
+    } else {
+      setLoading(true);
+      setFetchError(null);
+    }
 
     const params = new URLSearchParams();
-    params.append("page", currentPage);
-    params.append("limit", limit);
+    params.append("page", page);
+    params.append("limit", PAGE_SIZE);
     params.append("sort", sortBy);
     params.append("order", sortOrder);
+    params.append("includeDetails", "0");
+    params.append("includeCount", "0");
 
     if (fromDate) params.append("fromDate", fromDate);
     if (toDate) params.append("toDate", toDate);
     if (search) params.append("search", search);
     if (invoiceTypeFilter) params.append("invoiceType", invoiceTypeFilter);
     if (statusFilter) params.append("status", statusFilter);
-    params.append("includeDetails", "1");
-    params.append("includeCount", "0");
 
     try {
-      setFetchError(null);
-      const res = await fetch(`/api/invoice-table?${params.toString()}`);
+      if (!append && fetchAbortRef.current) {
+        fetchAbortRef.current.abort();
+      }
+      const controller = new AbortController();
+      if (!append) fetchAbortRef.current = controller;
+
+      const res = await fetch(`/api/invoice-table?${params.toString()}`, {
+        signal: controller.signal,
+      });
       const response = await res.json();
-      console.log("response data :", response);
 
       if (response.success) {
-        let data = response.data || [];
-        
-        // Group invoices by parent_id and sort so parent appears first, then children
-        const grouped = {};
-        
-        // First pass: organize by parent
-        data.forEach(invoice => {
-          if (invoice.parent_id) {
-            // This is a child
-            if (!grouped[invoice.parent_id]) {
-              grouped[invoice.parent_id] = { parent: null, children: [] };
-            }
-            grouped[invoice.parent_id].children.push(invoice);
-          } else {
-            // This is a standalone or parent
-            if (!grouped[invoice.id]) {
-              grouped[invoice.id] = { parent: null, children: [] };
-            }
-            grouped[invoice.id].parent = invoice;
-          }
-        });
-
-        // Calculate per invoice linked amount (for display only)
-        data.forEach(inv => {
-          inv.totalLinkedAmount = inv.linkedStatements?.reduce(
-            (sum, stmt) => sum + Number(stmt.amount || 0),
-            0
-          ) || 0;
-        });
-
-        // Build final sorted array: parent followed by its children
-        const sortedData = [];
-        const processedIds = new Set();
-
-        // Sort groups by parent id
-        const groupIds = Object.keys(grouped)
-          .map(Number)
-          .sort((a, b) => b - a); // Descending order (highest first)
-
-        groupIds.forEach(parentId => {
-          const group = grouped[parentId];
-          if (group.parent && !processedIds.has(group.parent.id)) {
-            // Skip performa invoices
-            if (group.parent.type !== 'performa') {
-              sortedData.push(group.parent);
-              processedIds.add(group.parent.id);
-            }
-          }
-          // Add children sorted by id (ascending)
-          group.children.sort((a, b) => a.id - b.id).forEach(child => {
-            if (!processedIds.has(child.id) && child.type !== 'performa') {
-              sortedData.push(child);
-              processedIds.add(child.id);
+        const data = response.data || [];
+        const sortedData = processInvoicesForView(data);
+        setInvoices((prev) => {
+          if (!append) return sortedData;
+          const existing = new Set(prev.map((inv) => inv.id));
+          const merged = [...prev];
+          sortedData.forEach((inv) => {
+            if (!existing.has(inv.id)) {
+              existing.add(inv.id);
+              merged.push(inv);
             }
           });
+          return merged;
         });
-
-        setInvoices(sortedData);
         setMeta(response.meta);
-
-        // Calculate and update summary data - exclude performa and cancelled invoices
-        const filteredForSummary = sortedData.filter(
-          (inv) => inv.type !== "performa" && inv.status !== "CANCELLED",
-        );
-        const summaryData = {
-          grandTotal: filteredForSummary.reduce((sum, inv) => sum + Number(inv.grand_total || 0), 0),
-          balanceAmount: filteredForSummary.reduce((sum, inv) => sum + Number(inv.balance_amount || 0), 0),
-          taxAmount: filteredForSummary.reduce((sum, inv) => sum + Number(inv.tax_amount || 0), 0),
-          totalInvoices: filteredForSummary.length,
-        };
-        
-        if (onSummaryUpdate) {
-          onSummaryUpdate(summaryData);
+        setCurrentPage(page);
+        pageRef.current = page;
+        if (typeof response.meta?.hasMore === "boolean") {
+          setHasMore(response.meta.hasMore);
+        } else {
+          setHasMore(data.length === PAGE_SIZE);
         }
-      } else {
+      } else if (!append) {
         setInvoices([]);
         setFetchError(response.detail || response.error || "Failed to load invoices");
-        if (onSummaryUpdate) {
-          onSummaryUpdate({ grandTotal: 0, balanceAmount: 0, taxAmount: 0, totalInvoices: 0 });
-        }
       }
     } catch (err) {
+      if (err?.name === "AbortError") return;
       console.error("Fetch invoices failed:", err);
-      setInvoices([]);
-      setFetchError(err?.message || "Failed to load invoices");
-      if (onSummaryUpdate) {
-        onSummaryUpdate({ grandTotal: 0, balanceAmount: 0, taxAmount: 0, totalInvoices: 0 });
+      if (!append) {
+        setInvoices([]);
+        setFetchError(err?.message || "Failed to load invoices");
       }
     } finally {
-      setLoading(false);
+      if (fetchAbortRef.current?.signal.aborted && !append) return;
+      if (append) {
+        setLoadingMore(false);
+      } else {
+        setLoading(false);
+        setScrollLoadEnabled(true);
+      }
     }
   };
 
+  const resetAndFetch = () => {
+    setCurrentPage(1);
+    pageRef.current = 1;
+    setHasMore(true);
+    setScrollLoadEnabled(false);
+    setLinkedDetailsById({});
+    setExpandedInvoiceId(null);
+    fetchData({ page: 1, append: false });
+  };
+
+  const fetchDataRef = useRef(fetchData);
+  fetchDataRef.current = fetchData;
+
+  const loadMore = useCallback(() => {
+    if (loading || loadingMore || !hasMore) return;
+    fetchDataRef.current({ page: pageRef.current + 1, append: true });
+  }, [loading, loadingMore, hasMore]);
+
   useEffect(() => {
-    fetchData();
+    resetAndFetch();
   }, [fromDate, toDate, sortBy, sortOrder, invoiceTypeFilter, statusFilter]);
 
   useEffect(() => {
+    if (skipInitialSearchFetch.current) {
+      skipInitialSearchFetch.current = false;
+      return;
+    }
     const t = setTimeout(() => {
-      fetchData();
+      resetAndFetch();
     }, 500);
     return () => clearTimeout(t);
   }, [search]);
 
+  useEffect(() => {
+    if (!onSummaryUpdate) return;
+    const filteredForSummary = invoices.filter(
+      (inv) => inv.type !== "performa" && inv.status !== "CANCELLED",
+    );
+    onSummaryUpdate({
+      grandTotal: filteredForSummary.reduce(
+        (sum, inv) => sum + Number(inv.grand_total || 0),
+        0,
+      ),
+      balanceAmount: filteredForSummary.reduce(
+        (sum, inv) => sum + Number(inv.balance_amount || 0),
+        0,
+      ),
+      taxAmount: filteredForSummary.reduce(
+        (sum, inv) => sum + Number(inv.tax_amount || 0),
+        0,
+      ),
+      totalInvoices: filteredForSummary.length,
+    });
+  }, [invoices, onSummaryUpdate]);
+
   const handleReset = () => {
-    const { firstDay, lastDay } = getMonthStartEnd();
     setSearch("");
-    setFromDate(formatDateForInput(firstDay));
-    setToDate(formatDateForInput(lastDay));
+    setFromDate("");
+    setToDate("");
     setInvoiceTypeFilter("");
     setStatusFilter("");
     setSortBy("created_at");
     setSortOrder("desc");
     setFetchError(null);
+    setSelectedInvoiceIds(new Set());
+    setSelectedInvoices([]);
   };
 
   const handleSort = (column) => {
@@ -273,6 +321,90 @@ export default function InvoiceTable({ onSummaryUpdate }) {
 
   // State to track expanded invoices for showing linked statements
   const [expandedInvoiceId, setExpandedInvoiceId] = useState(null);
+  const [linkedDetailsById, setLinkedDetailsById] = useState({});
+  const [loadingLinkedId, setLoadingLinkedId] = useState(null);
+  const skipInitialSearchFetch = useRef(true);
+  const fetchAbortRef = useRef(null);
+
+  const invoiceMayHaveLinkedPayments = (inv) => {
+    const paid = Number(inv?.amount_paid || 0);
+    const status = String(inv?.status || "").toUpperCase();
+    return (
+      paid > 0 ||
+      status === "PAID" ||
+      status.includes("PARTIAL")
+    );
+  };
+
+  const getLinkedStatementsForRow = (inv) =>
+    linkedDetailsById[inv.id]?.linkedStatements ||
+    inv.linkedStatements ||
+    [];
+
+  const getTotalLinkedAmountForRow = (inv) =>
+    linkedDetailsById[inv.id]?.totalLinkedAmount ??
+    inv.totalLinkedAmount ??
+    0;
+
+  const fetchLinkedDetails = async (invoiceId) => {
+    if (linkedDetailsById[invoiceId] || loadingLinkedId === invoiceId) return;
+    setLoadingLinkedId(invoiceId);
+    try {
+      const params = new URLSearchParams({
+        page: "1",
+        limit: "1",
+        includeDetails: "1",
+        includeCount: "0",
+        invoiceIds: String(invoiceId),
+      });
+      const res = await fetch(`/api/invoice-table?${params.toString()}`);
+      const response = await res.json();
+      if (response.success && response.data?.[0]) {
+        const row = response.data[0];
+        const stmts = row.linkedStatements || [];
+        const totalLinkedAmount =
+          row.totalLinkedAmount ??
+          stmts.reduce((sum, stmt) => sum + Number(stmt.amount || 0), 0);
+        setLinkedDetailsById((prev) => ({
+          ...prev,
+          [invoiceId]: { linkedStatements: stmts, totalLinkedAmount },
+        }));
+      }
+    } catch (err) {
+      console.error("Failed to load linked payments:", err);
+    } finally {
+      setLoadingLinkedId(null);
+    }
+  };
+
+  const toggleLinkedPayments = async (inv) => {
+    if (expandedInvoiceId === inv.id) {
+      setExpandedInvoiceId(null);
+      return;
+    }
+    setExpandedInvoiceId(inv.id);
+    await fetchLinkedDetails(inv.id);
+  };
+
+  useEffect(() => {
+    if (!scrollLoadEnabled) return;
+
+    const scrollRoot = document.querySelector("main.overflow-auto");
+    if (!scrollRoot) return;
+
+    const onScroll = () => {
+      if (loading || loadingMore || !hasMore) return;
+      const nearBottom =
+        scrollRoot.scrollTop + scrollRoot.clientHeight >=
+        scrollRoot.scrollHeight - SCROLL_LOAD_OFFSET_PX;
+      if (nearBottom) {
+        loadMore();
+      }
+    };
+
+    scrollRoot.addEventListener("scroll", onScroll, { passive: true });
+    return () => scrollRoot.removeEventListener("scroll", onScroll);
+  }, [scrollLoadEnabled, loadMore, hasMore, loading, loadingMore]);
 
   return (
     <div className="bg-white rounded shadow p-4">
@@ -396,14 +528,22 @@ export default function InvoiceTable({ onSummaryUpdate }) {
                 </td>
               </tr>
             ) : invoices.length ? (
-              invoices.map((i) => (
+              invoices.map((i) => {
+                const linkedStatements = getLinkedStatementsForRow(i);
+                const totalLinkedAmount = getTotalLinkedAmountForRow(i);
+                const showLinkedExpand =
+                  linkedStatements.length > 0 || invoiceMayHaveLinkedPayments(i);
+
+                return (
                 <React.Fragment key={i.id}>
                   <tr className={`border-t hover:bg-gray-50 ${selectedInvoiceIds.has(i.id) ? 'bg-blue-50' : ''}`}>
                     <td className="px-4 py-2 w-12">
-                      {i.linkedStatements && i.linkedStatements.length > 0 && (
+                      {showLinkedExpand && (
                         <button
-                          onClick={() => setExpandedInvoiceId(expandedInvoiceId === i.id ? null : i.id)}
+                          type="button"
+                          onClick={() => toggleLinkedPayments(i)}
                           className="text-gray-600 hover:text-blue-600"
+                          title="Linked payments"
                         >
                           {expandedInvoiceId === i.id ? '▼' : '▶'}
                         </button>
@@ -425,9 +565,9 @@ export default function InvoiceTable({ onSummaryUpdate }) {
                       {!i.parent_id && invoices.some(inv => inv.parent_id === i.id) && (
                         <span className="text-xs bg-blue-100 text-blue-700 ml-2 px-2 py-0.5 rounded">Parent</span>
                       )}
-                      {i.linkedStatements && i.linkedStatements.length > 0 && (
+                      {linkedStatements.length > 0 && (
                         <span className="text-xs bg-green-100 text-green-700 ml-2 px-2 py-0.5 rounded">
-                          {i.linkedStatements.length} Linked Payment{i.linkedStatements.length > 1 ? 's' : ''}
+                          {linkedStatements.length} Linked Payment{linkedStatements.length > 1 ? 's' : ''}
                         </span>
                       )}
                     </td>
@@ -473,9 +613,9 @@ export default function InvoiceTable({ onSummaryUpdate }) {
                       <span className={Number(i.balance_amount) > 0 ? 'text-red-600' : 'text-green-600'}>
                         ₹{Number(i.balance_amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                       </span>
-                      {i.totalLinkedAmount > 0 && (
+                      {totalLinkedAmount > 0 && (
                         <div className="text-xs text-gray-500">
-                          (-₹{Number(i.totalLinkedAmount).toLocaleString("en-IN", { minimumFractionDigits: 2 })})
+                          (-₹{Number(totalLinkedAmount).toLocaleString("en-IN", { minimumFractionDigits: 2 })})
                         </div>
                       )}
                     </td>
@@ -525,15 +665,21 @@ export default function InvoiceTable({ onSummaryUpdate }) {
                       </div>
                     </td>
                   </tr>
-                  {expandedInvoiceId === i.id && i.linkedStatements && i.linkedStatements.length > 0 && (
+                  {expandedInvoiceId === i.id && (
                     <tr>
                       <td colSpan="13" className="px-8 py-4 bg-gray-50">
+                        {loadingLinkedId === i.id ? (
+                          <p className="text-sm text-gray-600">Loading linked payments…</p>
+                        ) : linkedStatements.length === 0 ? (
+                          <p className="text-sm text-gray-500">No linked payments found.</p>
+                        ) : (
+                        <>
                         <div className="flex justify-between items-center mb-3">
                           <h4 className="font-semibold text-gray-700">Linked Payments:</h4>
                           <div className="text-right">
                             <span className="text-sm text-gray-600">Total Linked: </span>
                             <span className="text-lg font-bold text-red-600">
-                              ₹{Number(i.totalLinkedAmount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                              ₹{Number(totalLinkedAmount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                             </span>
                           </div>
                         </div>
@@ -550,7 +696,7 @@ export default function InvoiceTable({ onSummaryUpdate }) {
                               </tr>
                             </thead>
                             <tbody>
-                              {i.linkedStatements.map((stmt) => (
+                              {linkedStatements.map((stmt) => (
                                 <tr key={stmt.id} className="border-t">
                                   <td className="px-4 py-2">{stmt.id}</td>
                                   <td className="px-4 py-2 font-mono">{stmt.trans_id || "-"}</td>
@@ -579,11 +725,14 @@ export default function InvoiceTable({ onSummaryUpdate }) {
                             </tbody>
                           </table>
                         </div>
+                        </>
+                        )}
                       </td>
                     </tr>
                   )}
                 </React.Fragment>
-              ))
+              );
+              })
             ) : (
               <tr>
                 <td colSpan="13" className="text-center py-6 text-gray-500">
@@ -594,6 +743,26 @@ export default function InvoiceTable({ onSummaryUpdate }) {
           </tbody>
         </table>
       </div>
+      {!loading && invoices.length > 0 && (
+        <div className="mt-3 space-y-2">
+          <div className="flex items-center justify-between text-xs text-gray-600">
+            <span>
+              Loaded {invoices.length}
+              {meta.total != null && meta.total > 0
+                ? ` of ${meta.total}`
+                : ""}{" "}
+              invoices
+            </span>
+            {loadingMore ? (
+              <span className="font-medium text-blue-600">Loading more...</span>
+            ) : hasMore ? (
+              <span>Scroll down to load more</span>
+            ) : (
+              <span>All invoices loaded</span>
+            )}
+          </div>
+        </div>
+      )}
 
       {editId != null && (
         <InvoiceEditModal
@@ -601,7 +770,7 @@ export default function InvoiceTable({ onSummaryUpdate }) {
           open
           invoiceId={editId}
           onClose={() => setEditId(null)}
-          onSaved={fetchData}
+          onSaved={() => resetAndFetch()}
           viewHrefBase="/user-dashboard/invoices"
         />
       )}
@@ -618,7 +787,7 @@ export default function InvoiceTable({ onSummaryUpdate }) {
           selectedGrandTotal={selectedInvoices.reduce((sum, inv) => sum + Number(inv.grand_total || 0), 0)}
           invoices={invoices}
           onLinkSuccess={() => {
-            fetchData();
+            resetAndFetch();
           }}
         />
       )}

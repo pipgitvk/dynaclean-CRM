@@ -767,6 +767,18 @@ export async function GET(req) {
     let where = "WHERE 1=1";
     const values = [];
 
+    const invoiceIdsParam = searchParams.get("invoiceIds");
+    if (invoiceIdsParam) {
+      const ids = invoiceIdsParam
+        .split(",")
+        .map((s) => parseInt(String(s).trim(), 10))
+        .filter((n) => Number.isFinite(n) && n > 0);
+      if (ids.length > 0) {
+        where += ` AND id IN (${ids.map(() => "?").join(",")})`;
+        values.push(...ids);
+      }
+    }
+
     if (search) {
       const term = `%${search}%`;
       where += ` AND (
