@@ -113,6 +113,23 @@ export async function PATCH(req) {
         }
 
         await conn.commit();
+
+        try {
+          const { pushInvoiceIdsPaymentToNeworder } = await import(
+            "@/lib/pushInvoicePaymentToNeworder"
+          );
+          const clearResults = await pushInvoiceIdsPaymentToNeworder(
+            conn,
+            invoice_ids,
+          );
+          console.log(
+            `[invoices-bulk-link] unlink cleared neworder:`,
+            JSON.stringify(clearResults),
+          );
+        } catch (clearErr) {
+          console.error("[invoices-bulk-link] order clear on unlink:", clearErr);
+        }
+
         return new Response(JSON.stringify({ ok: true }), {
           status: 200,
           headers: { "Content-Type": "application/json" },
@@ -401,13 +418,24 @@ export async function PATCH(req) {
       await conn.commit();
 
       try {
+        const { pushInvoiceIdsPaymentToNeworder } = await import(
+          "@/lib/pushInvoicePaymentToNeworder"
+        );
+        const pushResults = await pushInvoiceIdsPaymentToNeworder(
+          conn,
+          invoice_ids,
+        );
+        console.log(
+          `[invoices-bulk-link] pushInvoicePaymentToNeworder:`,
+          JSON.stringify(pushResults),
+        );
+
         const { syncInvoiceAndOrderPaymentLink } = await import(
           "@/lib/syncInvoiceOrderPaymentLink"
         );
         const invoiceNumbers = sortedInvoices
           .map((i) => i.invoice_number)
           .filter(Boolean);
-        // Re-read buyers_order_no after commit (fresh amount_paid / links).
         let orderIds = [
           ...new Set(
             sortedInvoices
@@ -428,9 +456,6 @@ export async function PATCH(req) {
             ),
           ];
         }
-        console.log(
-          `[invoices-bulk-link] sync → orders: ${JSON.stringify(orderIds)} invoices: ${JSON.stringify(invoiceNumbers)}`,
-        );
         await syncInvoiceAndOrderPaymentLink(conn, {
           invoiceNumbers,
           orderIds,

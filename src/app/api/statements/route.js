@@ -479,6 +479,17 @@ export async function PATCH(req) {
         : "";
       if (invNum) {
         try {
+          const { pushInvoicePaymentToNeworder } = await import(
+            "@/lib/pushInvoicePaymentToNeworder"
+          );
+          const [invRows] = await conn.execute(
+            `SELECT invoice_number, buyers_order_no, amount_paid, linked_trans_ids
+             FROM invoices WHERE TRIM(invoice_number) = TRIM(?) ORDER BY id DESC LIMIT 1`,
+            [invNum],
+          );
+          if (invRows?.[0]) {
+            await pushInvoicePaymentToNeworder(conn, invRows[0]);
+          }
           const { syncInvoiceAndOrderPaymentLink } = await import(
             "@/lib/syncInvoiceOrderPaymentLink"
           );
