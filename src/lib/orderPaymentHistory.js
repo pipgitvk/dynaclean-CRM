@@ -106,6 +106,21 @@ export function sumOrderPaymentAmounts(order) {
     .reduce((sum, n) => sum + n, 0);
 }
 
+/** Order list Paid column: CSV + amount_received + linked_payments_json. */
+export function getOrderPaidAmountForDisplay(order) {
+  const fromCsv = sumOrderPaymentAmounts(order);
+  const fromReceived = Number(order?.amount_received);
+  const fromLinked = parseOrderLinkedPayments(order).reduce(
+    (s, p) => s + (Number(p.amount) || 0),
+    0,
+  );
+  return Math.max(
+    fromCsv,
+    Number.isFinite(fromReceived) && fromReceived > 0 ? fromReceived : 0,
+    fromLinked,
+  );
+}
+
 function paymentFieldsFromRows(rows) {
   if (!rows.length) {
     return { payment_id: null, payment_date: null, payment_amount: null };

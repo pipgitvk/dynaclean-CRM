@@ -130,7 +130,7 @@ export async function PATCH(req) {
 
       // Fetch invoices early so we have invoice_number for statement linking
       const [invoices] = await conn.query(
-        "SELECT id, grand_total, amount_paid, linked_trans_ids, invoice_number FROM invoices WHERE id IN (?)",
+        "SELECT id, grand_total, amount_paid, linked_trans_ids, invoice_number, buyers_order_no FROM invoices WHERE id IN (?)",
         [invoice_ids]
       );
 
@@ -193,7 +193,7 @@ export async function PATCH(req) {
 
       // First, get the CURRENT state of the invoices before any changes!
       const [currentInvoices] = await conn.query(
-        "SELECT id, grand_total, amount_paid, linked_trans_ids, invoice_number FROM invoices WHERE id IN (?)",
+        "SELECT id, grand_total, amount_paid, linked_trans_ids, invoice_number, buyers_order_no FROM invoices WHERE id IN (?)",
         [invoice_ids]
       );
 
@@ -404,10 +404,18 @@ export async function PATCH(req) {
         const { syncInvoiceAndOrderPaymentLink } = await import(
           "@/lib/syncInvoiceOrderPaymentLink"
         );
+        const orderIds = [
+          ...new Set(
+            sortedInvoices
+              .map((i) => String(i.buyers_order_no || "").trim())
+              .filter(Boolean),
+          ),
+        ];
         await syncInvoiceAndOrderPaymentLink(conn, {
           invoiceNumbers: sortedInvoices
             .map((i) => i.invoice_number)
             .filter(Boolean),
+          orderIds,
         });
       } catch (syncErr) {
         console.error("[invoices-bulk-link] order linked-payment sync:", syncErr);

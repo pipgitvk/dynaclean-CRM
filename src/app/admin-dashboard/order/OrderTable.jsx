@@ -26,6 +26,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import dayjs from "dayjs";
 import {
   buildOrderPaymentRows,
+  getOrderPaidAmountForDisplay,
   sumOrderPaymentAmounts,
 } from "@/lib/orderPaymentHistory";
 import { OrderPaymentHistoryTrigger } from "@/components/orders/OrderPaymentHistoryModal";
@@ -443,9 +444,9 @@ function amountWithoutGst(order) {
   return Math.max(0, total - tax);
 }
 
-/** Calculate total paid amount from comma-separated payment amounts */
+/** Calculate total paid amount (booking CSV + invoice-linked snapshot). */
 function getTotalPaidAmount(order) {
-  return sumOrderPaymentAmounts(order);
+  return getOrderPaidAmountForDisplay(order);
 }
 
 /** Stat cards / totals: only accountant order-report payment (not grey booking advance). */

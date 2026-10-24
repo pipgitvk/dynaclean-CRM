@@ -1,7 +1,9 @@
 import { lookupInvoiceLinkedPayment } from "@/lib/invoiceLinkedPaymentLookup";
 import { resolveInvoiceNumberForOrder } from "@/lib/resolveInvoiceNumberForOrder";
+import { parseOrderLinkedPayments } from "@/lib/orderLinkedPaymentsDisplay";
 import {
   linkedPaymentsToOrderPaymentCsv,
+  mergeOrderPaymentWithLinkedCsv,
   sumPaymentAmountCsv,
 } from "@/lib/orderPaymentHistory";
 import {
@@ -9,6 +11,7 @@ import {
   refreshOrdersAfterInvoiceRemoved,
 } from "@/lib/orderInvoicePaymentClear";
 import { EXCLUDE_PROFORMA_INVOICE_SQL } from "@/lib/ledgerInvoiceFilters";
+import { parseLinkedTransIds } from "@/lib/statementLinkedPurchases";
 import { sqlTrimUtf8Eq } from "@/lib/sqlUtf8Compare";
 
 async function activeInvoiceExists(conn, invoiceNumber) {
@@ -42,6 +45,47 @@ function derivePaymentStatus(paid, total) {
   if (p > 0 && p < t) return "partially paid";
   if (p === 0) return "pending";
   return "pending";
+}
+
+function mergeLinkedPaymentsJson(order, invoicePayments) {
+  const existing = parseOrderLinkedPayments(order);
+  const merged = [...existing];
+  const seen = new Set(
+    existing
+      .map((p) => (p.trans_id ? String(p.trans_id).trim() : ""))
+      .filter(Boolean),
+  );
+
+  for (const p of invoicePayments || []) {
+    const tid = p.trans_id ? String(p.trans_id).trim() : "";
+    const amt = Number(p.amount) || 0;
+    if (tid) {
+      if (seen.has(tid)) continue;
+      seen.add(tid);
+    } else if (amt <= 0) {
+      continue;
+    }
+    merged.push({
+      statement_id: p.statement_id ?? null,
+      trans_id: tid,
+      date: p.date || null,
+      amount: amt,
+    });
+  }
+
+  return merged.length ? JSON.stringify(merged) : null;
+}
+
+function invoicePaymentCsvFromLinked(payments, amountVal, pDate) {
+  let csv = linkedPaymentsToOrderPaymentCsv(payments);
+  if (!csv.payment_amount && amountVal != null && amountVal > 0) {
+    csv = {
+      payment_id: csv.payment_id || null,
+      payment_date: csv.payment_date || pDate || null,
+      payment_amount: String(amountVal),
+    };
+  }
+  return csv;
 }
 
 /**
@@ -85,108 +129,138 @@ export async function syncOrderLinkedPaymentFromInvoice(conn, order) {
     return order;
   }
 
-  const payments = Array.isArray(linked.payments) ? linked.payments : [];
-  const paymentsJson = payments.length ? JSON.stringify(payments) : null;
-  const csv = linkedPaymentsToOrderPaymentCsv(payments);
+  let payments = Array.isArray(linked.payments) ? linked.payments : [];
+  let amount = Number(linked.payment_amount);
+  let pDate = linked.payment_date || null;
 
-  const amount = Number(linked.payment_amount);
+  const [invMetaRows] = await conn.execute(
+    `SELECT amount_paid, linked_trans_ids, invoice_date
+     FROM invoices
+     WHERE ${sqlTrimUtf8Eq("invoice_number")}
+     ORDER BY id DESC LIMIT 1`,
+    [invoiceNumber],
+  );
+  const invMeta = invMetaRows?.[0];
+  const invAmountPaid = Number(invMeta?.amount_paid) || 0;
+  if (!(amount > 0) && invAmountPaid > 0) {
+    amount = invAmountPaid;
+  }
+
+  if (!payments.length && amount > 0) {
+    const tids = parseLinkedTransIds(invMeta?.linked_trans_ids);
+    if (tids.length) {
+      payments = tids.map((tid) => ({
+        statement_id: null,
+        trans_id: tid,
+        date: pDate,
+        amount,
+      }));
+    } else {
+      payments = [
+        {
+          statement_id: null,
+          trans_id: "",
+          date: pDate,
+          amount,
+        },
+      ];
+    }
+  }
+
   const amountVal = Number.isFinite(amount) && amount > 0 ? amount : null;
-  const pDate = linked.payment_date || null;
 
-  const paymentIdVal = csv.payment_id || null;
-  const paymentDateVal = csv.payment_date || null;
-  const paymentAmountVal =
-    csv.payment_amount ||
-    (amountVal != null ? String(amountVal) : null);
+  const invoiceCsv = invoicePaymentCsvFromLinked(payments, amountVal, pDate);
+  const incomingPaid =
+    sumPaymentAmountCsv(invoiceCsv.payment_amount) || amountVal || 0;
 
-  const storedNum = Number(order.amount_received);
-  const sameAmount =
-    (amountVal == null && (order.amount_received == null || order.amount_received === "")) ||
-    (Number.isFinite(storedNum) && amountVal != null && storedNum === amountVal);
-  const sameDate =
-    String(order.payment_received_date || "").slice(0, 10) ===
-    String(pDate || "").slice(0, 10);
-  const sameJson = String(order.linked_payments_json || "") === String(paymentsJson || "");
-  const samePaymentAmount =
-    String(order.payment_amount || "").trim() === String(paymentAmountVal || "").trim();
-  const samePaymentId =
-    String(order.payment_id || "").trim() === String(paymentIdVal || "").trim();
-  const sameInvoice =
-    String(order.invoice_number || "").trim() === invoiceNumber;
-
-  if (
-    sameAmount &&
-    sameDate &&
-    sameJson &&
-    samePaymentAmount &&
-    samePaymentId &&
-    sameInvoice
-  ) {
+  if (incomingPaid <= 0 && payments.length === 0) {
+    const sameInvoice =
+      String(order.invoice_number || "").trim() === invoiceNumber;
+    if (!sameInvoice) {
+      await conn.execute(
+        `UPDATE neworder SET invoice_number = ?
+         WHERE order_id = ?
+           AND (invoice_number IS NULL OR TRIM(invoice_number) = '')`,
+        [invoiceNumber, orderId],
+      );
+    }
     return {
       ...order,
-      invoice_number: invoiceNumber,
-      linked_payments: payments,
+      invoice_number: invoiceNumber || order.invoice_number,
     };
   }
 
-  const paidSum = sumPaymentAmountCsv(paymentAmountVal);
-  const paymentStatus = derivePaymentStatus(paidSum, order.totalamt);
+  const mergedCsv = mergeOrderPaymentWithLinkedCsv(order, invoiceCsv);
+  let paymentIdVal = mergedCsv.payment_id || null;
+  let paymentDateVal = mergedCsv.payment_date || null;
+  let paymentAmountVal = mergedCsv.payment_amount || null;
 
-  if (backfillInvoiceNumber) {
-    await conn.execute(
-      `UPDATE neworder SET
-        invoice_number = ?,
-        amount_received = ?,
-        payment_received_date = ?,
-        linked_payments_json = ?,
-        payment_id = ?,
-        payment_date = ?,
-        payment_amount = ?,
-        payment_status = ?
-       WHERE order_id = ?`,
-      [
-        invoiceNumber,
-        amountVal,
-        pDate,
-        paymentsJson,
-        paymentIdVal,
-        paymentDateVal,
-        paymentAmountVal,
-        paymentStatus,
-        orderId,
-      ],
-    );
-  } else {
-    await conn.execute(
-      `UPDATE neworder SET
-        amount_received = ?,
-        payment_received_date = ?,
-        linked_payments_json = ?,
-        payment_id = ?,
-        payment_date = ?,
-        payment_amount = ?,
-        payment_status = ?
-       WHERE order_id = ?`,
-      [
-        amountVal,
-        pDate,
-        paymentsJson,
-        paymentIdVal,
-        paymentDateVal,
-        paymentAmountVal,
-        paymentStatus,
-        orderId,
-      ],
-    );
+  if (!paymentAmountVal && incomingPaid > 0) {
+    const fallbackCsv = linkedPaymentsToOrderPaymentCsv(payments);
+    paymentAmountVal =
+      fallbackCsv.payment_amount || String(incomingPaid);
+    paymentIdVal = paymentIdVal || fallbackCsv.payment_id || order.payment_id;
+    paymentDateVal =
+      paymentDateVal ||
+      fallbackCsv.payment_date ||
+      pDate ||
+      order.payment_date;
   }
+
+  const paymentsJson = mergeLinkedPaymentsJson(order, payments);
+
+  const paidSum = sumPaymentAmountCsv(paymentAmountVal);
+  const existingReceived = Number(order.amount_received);
+  const amountReceivedVal =
+    paidSum > 0
+      ? paidSum
+      : Number.isFinite(existingReceived) && existingReceived > 0
+        ? existingReceived
+        : null;
+  const receivedDate =
+    paymentDateVal ||
+    order.payment_received_date ||
+    pDate ||
+    null;
+  const paymentStatus = derivePaymentStatus(
+    paidSum || amountReceivedVal || 0,
+    order.totalamt,
+  );
+
+  await conn.execute(
+    `UPDATE neworder SET
+      invoice_number = ?,
+      amount_received = ?,
+      payment_received_date = ?,
+      linked_payments_json = ?,
+      payment_id = ?,
+      payment_date = ?,
+      payment_amount = ?,
+      payment_status = ?
+     WHERE order_id = ?`,
+    [
+      invoiceNumber,
+      amountReceivedVal,
+      receivedDate,
+      paymentsJson,
+      paymentIdVal,
+      paymentDateVal,
+      paymentAmountVal,
+      paymentStatus,
+      orderId,
+    ],
+  );
 
   return {
     ...order,
     invoice_number: invoiceNumber,
-    amount_received: amountVal,
-    payment_received_date: pDate,
+    amount_received: amountReceivedVal,
+    payment_received_date: receivedDate,
     linked_payments_json: paymentsJson,
-    linked_payments: payments,
+    linked_payments: parseOrderLinkedPayments({
+      ...order,
+      linked_payments_json: paymentsJson,
+    }),
     payment_id: paymentIdVal,
     payment_date: paymentDateVal,
     payment_amount: paymentAmountVal,
@@ -218,7 +292,7 @@ export async function syncOrdersForInvoiceNumbers(conn, invoiceNumbers) {
 
     const params = [num];
     let sql = `SELECT order_id, quote_number, invoice_number, totalamt, amount_received, payment_received_date,
-              linked_payments_json, payment_id, payment_date, payment_amount, payment_status
+              linked_payments_json, payment_id, payment_date, payment_amount, payment_status, transaction_id
        FROM neworder
        WHERE ${sqlTrimUtf8Eq("invoice_number")}`;
     if (buyersOrder) {
