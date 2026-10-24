@@ -55,10 +55,6 @@ import {
   OrderListSearchApplyButton,
 } from "@/components/orders/OrderListSearchFilterControls";
 import {
-  getOrderTableDefaultDateFrom,
-  getOrderTableDefaultDateTo,
-} from "@/lib/orderTableDateDefaults";
-import {
   canManageAnyOrderDeliveryRole,
   canViewOrderDeliveryDetailsRole,
   isAccountantOnlyMenuRole,
@@ -76,39 +72,19 @@ import ViewCreditNoteMenuLink from "@/components/orders/ViewCreditNoteMenuLink";
 import AccountantReturnViewMenuItems from "@/components/orders/AccountantReturnViewMenuItems";
 import LinkedStatementPaymentCell from "@/components/orders/LinkedStatementPaymentCell";
 
-// 👻 A sleek skeleton loader for a modern feel
-const SkeletonLoader = () => (
-  <div className="animate-pulse space-y-4">
-    {/* Search bar and filter skeleton */}
-    <div className="h-10 bg-gray-200 rounded-lg w-full mb-6"></div>
+const PAGE_SIZE = 40;
+const SCROLL_LOAD_OFFSET_PX = 200;
 
-    {/* Desktop table skeleton */}
-    <div className="hidden lg:block overflow-x-auto">
-      <div className="bg-gray-200 h-12 rounded-t-lg"></div>
-      <div className="border border-gray-200 rounded-b-lg p-4 space-y-2">
-        {[...Array(5)].map((_, i) => (
-          <div key={i} className="h-10 bg-gray-200 rounded-lg"></div>
-        ))}
-      </div>
-    </div>
-
-    {/* Mobile card skeleton */}
-    <div className="lg:hidden space-y-4">
-      {[...Array(3)].map((_, i) => (
-        <div
-          key={i}
-          className="bg-gray-100 border rounded-xl shadow-sm p-4 space-y-2"
-        >
-          <div className="h-6 bg-gray-200 w-3/4 rounded"></div>
-          <div className="h-4 bg-gray-200 w-1/2 rounded"></div>
-          <div className="h-4 bg-gray-200 w-2/3 rounded"></div>
-        </div>
-      ))}
-    </div>
-  </div>
-);
-
-export default function OrderTable({ orders, userRole }) {
+export default function OrderTable({ userRole }) {
+  const [orders, setOrders] = useState([]);
+  const [listLoading, setListLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [scrollLoadEnabled, setScrollLoadEnabled] = useState(false);
+  const [fetchError, setFetchError] = useState(null);
+  const pageRef = useRef(1);
+  const fetchAbortRef = useRef(null);
+  const tableScrollRef = useRef(null);
   const searchParams = useSearchParams();
   // Initialize from localStorage with defaults
   const [searchQuery, setSearchQuery] = useState(() => {
@@ -149,10 +125,9 @@ export default function OrderTable({ orders, userRole }) {
   });
   const [dateFrom, setDateFrom] = useState(() => {
     if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("accountsOrderTable_dateFrom");
-      if (stored !== null) return stored;
+      return localStorage.getItem("accountsOrderTable_dateFrom") ?? "";
     }
-    return getOrderTableDefaultDateFrom();
+    return "";
   });
   const [appliedDateFrom, setAppliedDateFrom] = useState(() => {
     if (typeof window !== "undefined") {
@@ -162,10 +137,9 @@ export default function OrderTable({ orders, userRole }) {
   });
   const [dateTo, setDateTo] = useState(() => {
     if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("accountsOrderTable_dateTo");
-      if (stored !== null) return stored;
+      return localStorage.getItem("accountsOrderTable_dateTo") ?? "";
     }
-    return getOrderTableDefaultDateTo();
+    return "";
   });
   const [appliedDateTo, setAppliedDateTo] = useState(() => {
     if (typeof window !== "undefined") {
@@ -187,6 +161,99 @@ export default function OrderTable({ orders, userRole }) {
   });
   const [openMenuId, setOpenMenuId] = useState(null); // State to track which menu is open
 
+  const fetchOrdersPage = useCallback(
+    async ({ page = 1, append = false, filters } = {}) => {
+      const f = filters || {
+        search: appliedSearchQuery,
+        dateFrom: appliedDateFrom,
+        dateTo: appliedDateTo,
+        createdBy: appliedCreatedByFilter,
+        paymentTerms: appliedPaymentTermsFilter,
+      };
+      if (append) {
+        setLoadingMore(true);
+      } else {
+        setListLoading(true);
+        setFetchError(null);
+      }
+
+      const params = new URLSearchParams();
+      params.set("page", String(page));
+      params.set("limit", String(PAGE_SIZE));
+      if (f.search) params.set("search", f.search);
+      if (f.dateFrom) params.set("dateFrom", f.dateFrom);
+      if (f.dateTo) params.set("dateTo", f.dateTo);
+      if (f.createdBy) params.set("createdBy", f.createdBy);
+      if (f.paymentTerms) params.set("paymentTerms", f.paymentTerms);
+
+      try {
+        if (!append && fetchAbortRef.current) {
+          fetchAbortRef.current.abort();
+        }
+        const controller = new AbortController();
+        if (!append) fetchAbortRef.current = controller;
+
+        const res = await fetch(`/api/accounts/orders/list?${params.toString()}`, {
+          signal: controller.signal,
+        });
+        const json = await res.json();
+        if (!res.ok || !json.success) {
+          throw new Error(json.detail || json.error || "Failed to load orders");
+        }
+
+        const rows = json.data || [];
+        setOrders((prev) => {
+          if (!append) return rows;
+          const seen = new Set(prev.map((o) => o.order_id));
+          const merged = [...prev];
+          for (const row of rows) {
+            if (!seen.has(row.order_id)) {
+              seen.add(row.order_id);
+              merged.push(row);
+            }
+          }
+          return merged;
+        });
+        pageRef.current = page;
+        setHasMore(Boolean(json.meta?.hasMore));
+      } catch (err) {
+        if (err?.name === "AbortError") return;
+        console.error("Order list fetch failed:", err);
+        if (!append) {
+          setOrders([]);
+          setFetchError(err?.message || "Failed to load orders");
+        }
+      } finally {
+        if (fetchAbortRef.current?.signal.aborted && !append) return;
+        if (append) {
+          setLoadingMore(false);
+        } else {
+          setListLoading(false);
+          setScrollLoadEnabled(true);
+        }
+      }
+    },
+    [
+      appliedSearchQuery,
+      appliedDateFrom,
+      appliedDateTo,
+      appliedCreatedByFilter,
+      appliedPaymentTermsFilter,
+    ],
+  );
+
+  const resetAndFetchOrders = useCallback(() => {
+    pageRef.current = 1;
+    setHasMore(true);
+    setScrollLoadEnabled(false);
+    fetchOrdersPage({ page: 1, append: false });
+  }, [fetchOrdersPage]);
+
+  const loadMoreOrders = useCallback(() => {
+    if (listLoading || loadingMore || !hasMore) return;
+    fetchOrdersPage({ page: pageRef.current + 1, append: true });
+  }, [listLoading, loadingMore, hasMore, fetchOrdersPage]);
+
   const handleApplySearch = useCallback(() => {
     setAppliedSearchQuery(searchQuery);
     setAppliedStatusFilter(statusFilter);
@@ -202,6 +269,20 @@ export default function OrderTable({ orders, userRole }) {
       localStorage.setItem("accountsOrderTable_dateTo", dateTo);
       localStorage.setItem("accountsOrderTable_createdByFilter", createdByFilter);
     }
+    pageRef.current = 1;
+    setHasMore(true);
+    setScrollLoadEnabled(false);
+    fetchOrdersPage({
+      page: 1,
+      append: false,
+      filters: {
+        search: searchQuery,
+        dateFrom,
+        dateTo,
+        createdBy: createdByFilter,
+        paymentTerms: paymentTermsFilter,
+      },
+    });
   }, [
     searchQuery,
     statusFilter,
@@ -209,7 +290,39 @@ export default function OrderTable({ orders, userRole }) {
     dateFrom,
     dateTo,
     createdByFilter,
+    fetchOrdersPage,
   ]);
+
+  useEffect(() => {
+    fetchOrdersPage({ page: 1, append: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!scrollLoadEnabled) return;
+
+    const onScroll = (el) => {
+      if (listLoading || loadingMore || !hasMore) return;
+      const nearBottom =
+        el.scrollTop + el.clientHeight >= el.scrollHeight - SCROLL_LOAD_OFFSET_PX;
+      if (nearBottom) loadMoreOrders();
+    };
+
+    const tableEl = tableScrollRef.current;
+    const mainEl = document.querySelector("main.overflow-auto");
+
+    const onTableScroll = () => tableEl && onScroll(tableEl);
+    const onMainScroll = () => mainEl && onScroll(mainEl);
+
+    tableEl?.addEventListener("scroll", onTableScroll, { passive: true });
+    mainEl?.addEventListener("scroll", onMainScroll, { passive: true });
+
+    return () => {
+      tableEl?.removeEventListener("scroll", onTableScroll);
+      mainEl?.removeEventListener("scroll", onMainScroll);
+    };
+  }, [scrollLoadEnabled, loadMoreOrders, hasMore, listLoading, loadingMore]);
+
   useEffect(() => {
     const statusFromCard = searchParams.get("status");
     const fromCard = searchParams.get("fromCard");
@@ -230,8 +343,9 @@ export default function OrderTable({ orders, userRole }) {
       setAppliedDateTo("");
       setAppliedCreatedByFilter("");
       setAppliedPaymentTermsFilter("");
+      resetAndFetchOrders();
     }
-  }, [searchParams]);
+  }, [searchParams, resetAndFetchOrders]);
 
   const toggleMenu = (id) => {
     setOpenMenuId(openMenuId === id ? null : id);
@@ -395,50 +509,21 @@ export default function OrderTable({ orders, userRole }) {
         if (orderStatus !== statusFilter.toLowerCase()) return false;
       }
 
-      if (dateFrom || dateTo) {
-        const created = order.created_at ? new Date(order.created_at) : null;
-        if (!created || isNaN(created)) return false;
-        if (dateFrom) {
-          const from = new Date(dateFrom + "T00:00:00");
-          if (created < from) return false;
-        }
-        if (dateTo) {
-          const to = new Date(dateTo + "T23:59:59");
-          if (created > to) return false;
-        }
-      }
-
-      if (!omitCreatedBy && createdByFilter && order.created_by !== createdByFilter) {
-        return false;
-      }
-
       if (order.approval_status === "pending") {
         return false;
       }
 
-      if (paymentTermsFilter && order.payment_terms !== paymentTermsFilter) {
+      if (!omitCreatedBy && appliedCreatedByFilter && order.created_by !== appliedCreatedByFilter) {
         return false;
       }
 
-      const lowercasedQuery = searchQuery.toLowerCase();
-      if (!lowercasedQuery) return true;
+      if (appliedPaymentTermsFilter && order.payment_terms !== appliedPaymentTermsFilter) {
+        return false;
+      }
 
-      return (
-        order.order_id?.toLowerCase().includes(lowercasedQuery) ||
-        order.client_name?.toLowerCase().includes(lowercasedQuery) ||
-        order.company_name?.toLowerCase().includes(lowercasedQuery) ||
-        order.contact?.toLowerCase().includes(lowercasedQuery) ||
-        order.state?.toLowerCase().includes(lowercasedQuery)
-      );
+      return true;
     },
-    [
-      searchQuery,
-      statusFilter,
-      paymentTermsFilter,
-      dateFrom,
-      dateTo,
-      createdByFilter,
-    ],
+    [statusFilter, appliedCreatedByFilter, appliedPaymentTermsFilter],
   );
 
   const createdByFilterOptions = useMemo(() => {
@@ -506,12 +591,8 @@ export default function OrderTable({ orders, userRole }) {
     link.click();
   };
 
-  if (!orders) {
-    return <SkeletonLoader />;
-  }
-
-  if (orders.length === 0)
-    return <p className="text-gray-600">No orders submitted yet.</p>;
+  const showListLoadingEmpty = listLoading && filteredOrders.length === 0;
+  const showNoOrdersEmpty = !listLoading && filteredOrders.length === 0;
 
   return (
     <div className="space-y-6">
@@ -600,7 +681,14 @@ export default function OrderTable({ orders, userRole }) {
       <p className="text-xs text-gray-500">Set filters, then click Search to update the list.</p>
 
       {/* 👨‍💼 TABLE VIEW for large screens */}
-      <div className="hidden lg:block overflow-x-auto overflow-y-auto max-h-[calc(100vh-160px)] min-h-[calc(100vh-240px)] bg-white rounded-xl shadow-lg">
+      {fetchError && (
+        <p className="text-sm text-red-600">{fetchError}</p>
+      )}
+
+      <div
+        ref={tableScrollRef}
+        className="hidden lg:block overflow-x-auto overflow-y-auto max-h-[calc(100vh-160px)] min-h-[calc(100vh-240px)] bg-white rounded-xl shadow-lg"
+      >
         <table className="w-full min-w-[1100px] text-sm">
           <thead className="bg-gray-800 text-white sticky top-0 z-10">
             <tr>
@@ -744,16 +832,34 @@ export default function OrderTable({ orders, userRole }) {
                   </tr>
                 );
               })
-            ) : (
+            ) : showListLoadingEmpty ? (
+              <tr>
+                <td colSpan={13} className="px-6 py-8 text-center text-gray-600">
+                  Loading…
+                </td>
+              </tr>
+            ) : showNoOrdersEmpty ? (
               <tr>
                 <td colSpan={13} className="px-6 py-4 text-center text-gray-500">
                   No orders found.
                 </td>
               </tr>
-            )}
+            ) : null}
           </tbody>
         </table>
       </div>
+
+      {!listLoading && orders.length > 0 && (
+        <div className="flex items-center justify-between text-xs text-gray-600 px-1">
+          <span>
+            Showing {filteredOrders.length} of {orders.length} loaded
+            {hasMore ? " — scroll for more" : " — all loaded"}
+          </span>
+          {loadingMore && (
+            <span className="font-medium text-blue-600">Loading more…</span>
+          )}
+        </div>
+      )}
 
       {/* 📱 CARD VIEW for mobile */}
       <div className="lg:hidden space-y-4">
@@ -835,9 +941,11 @@ export default function OrderTable({ orders, userRole }) {
               </div>
             );
           })
-        ) : (
+        ) : showListLoadingEmpty ? (
+          <p className="text-center text-gray-600 py-8">Loading…</p>
+        ) : showNoOrdersEmpty ? (
           <p className="text-center text-gray-500">No orders found.</p>
-        )}
+        ) : null}
       </div>
     </div>
   );
