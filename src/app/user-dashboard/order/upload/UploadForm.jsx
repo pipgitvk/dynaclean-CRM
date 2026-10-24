@@ -250,14 +250,24 @@ export default function UploadForm({
 
     const formData = new FormData();
     formData.append("order_id", orderDetails.order_id);
+    const alwaysSendKeys = new Set([
+      "invoice_number",
+      "duedate",
+      "payment_id",
+      "payment_date",
+      "payment_amount",
+    ]);
     for (const key in form) {
       const value = form[key];
-      if (!value) continue;
       if (Array.isArray(value)) {
-        value.forEach((file) => formData.append(key, file));
-      } else {
-        formData.append(key, value);
+        if (value.length) {
+          value.forEach((file) => formData.append(key, file));
+        }
+        continue;
       }
+      if (value === "" && !alwaysSendKeys.has(key)) continue;
+      if (value == null && !alwaysSendKeys.has(key)) continue;
+      formData.append(key, value ?? "");
     }
 
     try {

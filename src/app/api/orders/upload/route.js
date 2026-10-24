@@ -17,6 +17,18 @@ import {
 
 const MAX_FILES_PER_FIELD = 5;
 
+/** mysql2 rejects `undefined` bind values; use SQL NULL instead. */
+function sqlBind(value) {
+  if (value === undefined) return null;
+  if (typeof value === "number" && Number.isNaN(value)) return null;
+  return value;
+}
+
+function firstField(value) {
+  if (value == null) return null;
+  return Array.isArray(value) ? value[0] : value;
+}
+
 // Normalize file input
 const getFile = (f) => (Array.isArray(f) ? f[0] : f);
 
@@ -45,15 +57,9 @@ export async function POST(req) {
     const taxAmt = parseFloat(fields.taxamt);
     const totalAmt = parseFloat(fields.totalamt);
 
-    const invoiceNumber = Array.isArray(fields.invoice_number)
-      ? fields.invoice_number[0]
-      : fields.invoice_number;
-    const dueDate = Array.isArray(fields.duedate)
-      ? fields.duedate[0]
-      : fields.duedate; // this is invoice date from UI
-    const remark = Array.isArray(fields.remark)
-      ? fields.remark[0]
-      : fields.remark || "";
+    const invoiceNumber = firstField(fields.invoice_number);
+    const dueDate = firstField(fields.duedate); // invoice date from UI
+    const remark = firstField(fields.remark) || "";
 
     // Validate mandatory remark field
     if (!remark || remark.trim() === "") {
@@ -64,33 +70,12 @@ export async function POST(req) {
     }
 
     // New payment fields
-    const paymentId = Array.isArray(fields.payment_id)
-      ? fields.payment_id[0]
-      : fields.payment_id || null;
-    const paymentDate = Array.isArray(fields.payment_date)
-      ? fields.payment_date[0]
-      : fields.payment_date || null;
+    const paymentId = firstField(fields.payment_id);
+    const paymentDate = firstField(fields.payment_date);
     const paymentAmount =
-      fields.payment_amount !== undefined
-        ? parseFloat(
-            Array.isArray(fields.payment_amount)
-              ? fields.payment_amount[0]
-              : fields.payment_amount
-          )
+      fields.payment_amount !== undefined && fields.payment_amount !== ""
+        ? parseFloat(firstField(fields.payment_amount))
         : null;
-
-    const reportPath = await saveFilesField(files.report_file);
-    if (!reportPath) {
-      return NextResponse.json(
-        { error: "Invoice PDF is required" },
-        { status: 400 },
-      );
-    }
-
-    // PDF → local, images → Cloudinary — up to 5 per field, comma-separated paths/URLs
-    const ewaybillPath = await saveFilesField(files.ewaybill_file);
-    const einvoicePath = await saveFilesField(files.einvoice_file);
-    const challanPath = await saveFilesField(files.deliverchallan);
 
     // DB connection
     const conn = await getDbConnection();
@@ -99,7 +84,7 @@ export async function POST(req) {
 
     // Find quote_number and order state
     const [orderRows] = await conn.execute(
-      `SELECT quote_number, duedate, dispatch_status,
+      `SELECT quote_number, duedate, invoice_date, dispatch_status,
               ewaybill_file, einvoice_file, report_file, deliverchallan,
               payment_id, payment_date, payment_amount, payment_status,
               amount_received, payment_received_date, linked_payments_json
@@ -119,6 +104,21 @@ export async function POST(req) {
       );
     }
 
+    const reportPath = await saveFilesField(files.report_file);
+    const mergedReportPathEarly =
+      reportPath || existingOrder.report_file || "";
+    if (!mergedReportPathEarly) {
+      return NextResponse.json(
+        { error: "Invoice PDF is required" },
+        { status: 400 },
+      );
+    }
+
+    // PDF → local, images → Cloudinary — up to 5 per field, comma-separated paths/URLs
+    const ewaybillPath = await saveFilesField(files.ewaybill_file);
+    const einvoicePath = await saveFilesField(files.einvoice_file);
+    const challanPath = await saveFilesField(files.deliverchallan);
+
     const quoteNumber = existingOrder.quote_number;
 
     // Get payment_term_days from quotation (if available)
@@ -137,11 +137,7 @@ export async function POST(req) {
 
     const formPaymentAmount =
       fields.payment_amount !== undefined && fields.payment_amount !== ""
-        ? String(
-            Array.isArray(fields.payment_amount)
-              ? fields.payment_amount[0]
-              : fields.payment_amount,
-          )
+        ? String(firstField(fields.payment_amount) ?? "")
         : "";
 
     let linkedCsv = null;
@@ -214,8 +210,14 @@ export async function POST(req) {
       paymentStatus = existingOrder.payment_status;
     } else paymentStatus = "pending";
 
+    const invoiceDateSave =
+      dueDate ||
+      existingOrder.duedate ||
+      existingOrder.invoice_date ||
+      null;
+
     // Save to DB (merge file fields when not re-uploaded)
-    const mergedReportPath = reportPath || existingOrder.report_file || "";
+    const mergedReportPath = mergedReportPathEarly;
     const mergedEwaybillPath =
       ewaybillPath || existingOrder.ewaybill_file || "";
     const mergedEinvoicePath =
@@ -246,25 +248,25 @@ export async function POST(req) {
         account_remark = ? 
       WHERE order_id = ?`,
       [
-        baseAmount,
-        mergedEwaybillPath,
-        mergedReportPath,
-        mergedEinvoicePath,
-        mergedChallanPath,
-        invoiceNumber,
-        dueDate,
-        taxAmt,
-        totalAmt,
-        paymentIdSave,
-        paymentDateSave,
-        paymentAmountSave,
-        amountReceived,
-        paymentReceivedDate,
-        linkedPaymentsJson,
-        paymentStatus,
+        sqlBind(baseAmount),
+        sqlBind(mergedEwaybillPath),
+        sqlBind(mergedReportPath),
+        sqlBind(mergedEinvoicePath),
+        sqlBind(mergedChallanPath),
+        sqlBind(invoiceNumber),
+        sqlBind(invoiceDateSave),
+        sqlBind(taxAmt),
+        sqlBind(totalAmt),
+        sqlBind(paymentIdSave),
+        sqlBind(paymentDateSave),
+        sqlBind(paymentAmountSave),
+        sqlBind(amountReceived),
+        sqlBind(paymentReceivedDate),
+        sqlBind(linkedPaymentsJson),
+        sqlBind(paymentStatus),
         1, // account_status
-        accountBy,
-        remark,
+        sqlBind(accountBy),
+        sqlBind(remark),
         orderId,
       ]
     );

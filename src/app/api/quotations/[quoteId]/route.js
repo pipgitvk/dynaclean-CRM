@@ -32,10 +32,16 @@ export async function GET(req, { params }) {
 
     const header = headerRows[0];
 
-    const [customerDetails] = await conn.execute(
-      `SELECT first_name, email, phone FROM customers WHERE customer_id = ?`,
-      [header.customer_id],
-    );
+    const customerId =
+      header.customer_id != null && header.customer_id !== ""
+        ? header.customer_id
+        : null;
+    const [customerDetails] = customerId
+      ? await conn.execute(
+          `SELECT first_name, email, phone FROM customers WHERE customer_id = ?`,
+          [customerId],
+        )
+      : [[]];
 
     const cust = customerDetails[0];
     const customerFirstName = cust?.first_name || "";
