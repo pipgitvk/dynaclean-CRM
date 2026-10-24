@@ -2,12 +2,17 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import {
+  effectiveGstPercentForProduct,
+  splitGstPercentForSupply,
+} from "@/lib/gstSupplyType";
 
 export default function InvoiceItemsTable({
   items,
   setItems,
   isEditMode = false,
   canEditHsn = false,
+  interstate = false,
 }) {
   const [productSuggestions, setProductSuggestions] = useState([]);
   const [activeRowIndex, setActiveRowIndex] = useState(null);
@@ -92,21 +97,31 @@ export default function InvoiceItemsTable({
       const item = data[0];
 
       const imageUrl = item.image_path || "";
+      const itemName = item.item_name || "";
+      const totalGst = effectiveGstPercentForProduct({
+        item_name: itemName,
+        item_code: item.item_code || code,
+        description: item.specification || "",
+        gst_rate: item.gst_rate,
+      });
+      const { cgst_percent, sgst_percent, igst_percent } =
+        splitGstPercentForSupply(totalGst, interstate);
 
       const updated = [...items];
       updated[index] = {
         ...updated[index],
         item_code: item.item_code || code,
         product_number: item.product_number || "",
-        item_name: item.item_name || "",
+        item_name: itemName,
         description: item.specification || "",
         hsn_code: item.hsn_sac || "",
         unit: item.unit || "",
         rate: parseFloat(item.price_per_unit) || 0,
         last_negotiation_price: parseFloat(item.last_negotiation_price) || 0,
-        cgst_percent: parseFloat(item.gst_rate) / 2 || 9,
-        sgst_percent: parseFloat(item.gst_rate) / 2 || 9,
-        igst_percent: 0,
+        gst: totalGst,
+        cgst_percent,
+        sgst_percent,
+        igst_percent,
         imageUrl,
         quantity: updated[index].quantity || 1,
         discount_percent: 0,

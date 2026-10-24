@@ -25,6 +25,41 @@ export function getStateCodeFromGstin(gstin) {
  * IGST when buyer place-of-supply state ≠ supplier (Delhi 07).
  * Different GSTIN in the same state still uses CGST+SGST (same as quotation form).
  */
+/** GST slab for products whose name indicates battery-operated equipment. */
+export const BATTERY_OPERATED_GST_PERCENT = 5;
+
+export function isBatteryOperatedProductName(name) {
+  const n = String(name || "").toLowerCase();
+  return (
+    /\bbattery[\s-]*operated\b/.test(n) ||
+    /\bbettery[\s-]*operated\b/.test(n)
+  );
+}
+
+export function isBatteryOperatedInvoiceItem(item) {
+  return (
+    isBatteryOperatedProductName(item?.item_name) ||
+    isBatteryOperatedProductName(item?.description) ||
+    isBatteryOperatedProductName(item?.item_code)
+  );
+}
+
+export function effectiveGstPercentForProduct(
+  { item_name, item_code, description, gst_rate },
+  fallback = 18,
+) {
+  if (
+    isBatteryOperatedProductName(item_name) ||
+    isBatteryOperatedProductName(item_code) ||
+    isBatteryOperatedProductName(description)
+  ) {
+    return BATTERY_OPERATED_GST_PERCENT;
+  }
+  const rate = Number(gst_rate);
+  if (rate > 0) return rate;
+  return fallback;
+}
+
 export function isInterstateInvoiceSupply({
   buyerGstin,
   buyerStateCode,
@@ -45,6 +80,9 @@ export function isInterstateInvoiceSupply({
 }
 
 export function totalGstPercentFromInvoiceItem(item, fallback = 18) {
+  if (isBatteryOperatedInvoiceItem(item)) {
+    return BATTERY_OPERATED_GST_PERCENT;
+  }
   const igst = Number(item?.igst_percent) || 0;
   const cgst = Number(item?.cgst_percent) || 0;
   const sgst = Number(item?.sgst_percent) || 0;
@@ -70,9 +108,22 @@ export function applyTaxPercentsToInvoiceItems(items, interstate) {
     const totalGst = totalGstPercentFromInvoiceItem(item);
     return {
       ...item,
+      gst: totalGst,
       ...splitGstPercentForSupply(totalGst, interstate),
     };
   });
+}
+
+/** Header CGST/SGST/IGST % for summary when all lines share one GST slab. */
+export function invoiceHeaderTaxRates(items, interstate, fallbackTotalGst = 18) {
+  const lines = items || [];
+  if (lines.length === 0) {
+    return headerRatesForInterstate(interstate, fallbackTotalGst);
+  }
+  const totals = lines.map((line) => totalGstPercentFromInvoiceItem(line));
+  const allSame = totals.every((r) => r === totals[0]);
+  const totalGst = allSame ? totals[0] : fallbackTotalGst;
+  return headerRatesForInterstate(interstate, totalGst);
 }
 
 export function headerRatesForInterstate(interstate, defaultTotalGst = 18) {

@@ -23,8 +23,9 @@ import {
 import {
   applyTaxPercentsToInvoiceItems,
   getStateCodeFromGstin,
-  headerRatesForInterstate,
+  invoiceHeaderTaxRates,
   isInterstateInvoiceSupply,
+  totalGstPercentFromInvoiceItem,
 } from "@/lib/gstSupplyType";
 
 
@@ -212,7 +213,29 @@ export default function InvoiceForm({
 
   const [isGeneratingInvoice, setIsGeneratingInvoice] = useState(true);
 
-  // Auto-set state from GSTIN + CGST/SGST vs IGST (quotation load uses same rules, not stored quote tax type)
+  const interstateSupply = useMemo(
+    () =>
+      isInterstateInvoiceSupply({
+        buyerGstin: form.gst_number?.trim(),
+        buyerStateCode: form.state_code,
+        stateDisplay: form.state,
+        parseCodeFromDisplay,
+      }),
+    [form.gst_number, form.state, form.state_code],
+  );
+
+  const lineTaxSignature = useMemo(
+    () =>
+      items
+        .map(
+          (i) =>
+            `${i.item_code ?? ""}|${i.item_name ?? ""}|${i.description ?? ""}|${i.gst ?? ""}`,
+        )
+        .join("§"),
+    [items],
+  );
+
+  // Auto-set state from GSTIN (quotation load uses same rules, not stored quote tax type)
   useEffect(() => {
     const gstinValue = form.gst_number?.trim();
 
@@ -227,16 +250,15 @@ export default function InvoiceForm({
         setShowStateSuggestions(false);
       }
     }
+  }, [form.gst_number, form.state, form.state_code, stateCodeToName]);
 
-    const interstate = isInterstateInvoiceSupply({
-      buyerGstin: gstinValue,
-      buyerStateCode: form.state_code,
-      stateDisplay: form.state,
-      parseCodeFromDisplay,
-    });
-
-    const { cgstRate: cR, sgstRate: sR, igstRate: iR } =
-      headerRatesForInterstate(interstate);
+  // Re-apply line GST when products / place-of-supply change (not only on GSTIN blur)
+  useEffect(() => {
+    const interstate = interstateSupply;
+    const { cgstRate: cR, sgstRate: sR, igstRate: iR } = invoiceHeaderTaxRates(
+      items,
+      interstate,
+    );
     setCgstRate(cR);
     setSgstRate(sR);
     setIgstRate(iR);
@@ -249,11 +271,12 @@ export default function InvoiceForm({
           (row, idx) =>
             row.cgst_percent === next[idx].cgst_percent &&
             row.sgst_percent === next[idx].sgst_percent &&
-            row.igst_percent === next[idx].igst_percent,
+            row.igst_percent === next[idx].igst_percent &&
+            row.gst === next[idx].gst,
         );
       return same ? prev : next;
     });
-  }, [form.gst_number, form.state, form.state_code, stateCodeToName]);
+  }, [lineTaxSignature, interstateSupply]);
 
   const [editableTerms, setEditableTerms] = useState(
     invoiceType === "performa"
@@ -488,13 +511,20 @@ const fetchQuotationAndFill = async (quoteNoArg) => {
         cgst_percent: cg,
         sgst_percent: sg,
         igst_percent: ig,
-        gst: ig || cg + sg || 18,
+        gst: totalGstPercentFromInvoiceItem({
+          item_name: it.item_name || "",
+          cgst_percent: cg,
+          sgst_percent: sg,
+          igst_percent: ig,
+          gst: ig || cg + sg,
+        }),
         imageUrl: it.img_url || "",
       };
     });
 
-    setItems(applyTaxPercentsToInvoiceItems(mappedItems, interstate));
-    const rates = headerRatesForInterstate(interstate);
+    const taxedItems = applyTaxPercentsToInvoiceItems(mappedItems, interstate);
+    setItems(taxedItems);
+    const rates = invoiceHeaderTaxRates(taxedItems, interstate);
     setCgstRate(rates.cgstRate);
     setSgstRate(rates.sgstRate);
     setIgstRate(rates.igstRate);
@@ -921,6 +951,7 @@ const fetchQuotationAndFill = async (quoteNoArg) => {
         items={items}
         setItems={setItems}
         canEditHsn={canEditHsn}
+        interstate={interstateSupply}
       />
 
       {/* Tax Summary */}
