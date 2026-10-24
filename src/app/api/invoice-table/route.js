@@ -191,24 +191,32 @@ function buildSimpleInvoiceSelectSql() {
   `;
 }
 
-function mapOrderToStatus(order) {
-  if (!order) return null;
-  if (
-    order.is_cancelled === 1 ||
-    String(order.approval_status || "").toLowerCase() === "rejected"
-  ) {
-    return "CANCELLED";
+/** Payment status for list UI — based on linked statements / amount_paid, not order booking status. */
+function derivePaymentDisplayStatus({
+  grandTotal,
+  balanceAmount,
+  totalLinkedAmount = 0,
+  amountPaid = 0,
+  storedStatus = "",
+}) {
+  const stored = String(storedStatus || "").trim().toUpperCase();
+  if (stored === "CANCELLED") return "CANCELLED";
+
+  const gt = Number(grandTotal) || 0;
+  if (gt <= 0) return stored || "UNPAID";
+
+  const bal = Math.max(0, Number(balanceAmount) || 0);
+  const linked = Number(totalLinkedAmount) || 0;
+  const paidOnInvoice = Number(amountPaid) || 0;
+  const hasPaymentEvidence = linked > 0.009 || paidOnInvoice > 0.009;
+
+  if (!hasPaymentEvidence) {
+    return "UNPAID";
   }
-  const paymentStatus = String(order.payment_status || "").toLowerCase();
-  if (paymentStatus === "paid") return "PAID";
-  if (
-    paymentStatus === "partial" ||
-    paymentStatus === "partial paid" ||
-    paymentStatus === "partially paid"
-  ) {
-    return "PARTIAL PAID";
-  }
-  return null;
+
+  if (bal <= 0.01) return "PAID";
+  if (bal < gt - 0.01) return "PARTIAL PAID";
+  return "UNPAID";
 }
 
 function deriveInvoiceStatus(invoice, order) {
@@ -224,25 +232,20 @@ function deriveInvoiceStatus(invoice, order) {
   if (invoiceStatus === "CANCELLED") {
     return "CANCELLED";
   }
+
   const grandTotal = Number(invoice.grand_total) || 0;
   const rawBalance = Number(invoice.balance_amount);
   const balance = Number.isFinite(rawBalance)
     ? rawBalance
     : grandTotal - Number(invoice.amount_paid || 0);
 
-  if (invoiceStatus === "PAID" || (balance === 0 && grandTotal > 0)) {
-    return "PAID";
-  }
-
-  const fromOrder = mapOrderToStatus(order);
-  if (fromOrder && fromOrder !== "CANCELLED") return fromOrder;
-
-  if (invoice.status && String(invoice.status).trim() !== "") {
-    return invoice.status;
-  }
-
-  if (balance > 0 && balance < grandTotal) return "PARTIAL PAID";
-  return null;
+  return derivePaymentDisplayStatus({
+    grandTotal,
+    balanceAmount: balance,
+    totalLinkedAmount: 0,
+    amountPaid: invoice.amount_paid,
+    storedStatus: invoice.status,
+  });
 }
 
 function orderMatchesInvoice(invoice, order) {
@@ -690,12 +693,21 @@ async function enrichInvoicesWithDetails(conn, rows) {
       Number(invoice.grand_total) - totalLinkedAmount,
     );
 
+    const displayStatus = derivePaymentDisplayStatus({
+      grandTotal: invoice.grand_total,
+      balanceAmount: newBalanceAmount,
+      totalLinkedAmount,
+      amountPaid: invoice.amount_paid,
+      storedStatus: invoice.status,
+    });
+
     return {
       ...invoice,
       items: itemsByInvoiceId.get(invoice.id) || [],
       linkedStatements,
       balance_amount: newBalanceAmount,
-      payment_status: invoice.payment_status,
+      payment_status: displayStatus,
+      status: displayStatus,
     };
   });
 }
