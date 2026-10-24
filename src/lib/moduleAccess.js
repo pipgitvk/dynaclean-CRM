@@ -54,7 +54,7 @@ export const MODULE_TREE = [
   },
   {
     key: "tl-management",
-    label: "TL Management",
+    label: "Leads Management",
     children: [
       { key: "tl-customers", label: "TL Customers" },
       { key: "add-customer", label: "Add Customer" },
@@ -231,7 +231,7 @@ export const MODULE_CHILD_KEYS_OTHERS_ONLY = new Set(["attendance-log"]);
 
 /**
  * Super-admin sidebar mirror for Global Module Access UI.
- * - kind "single": one module key, no nested list (like Dashboard / TL Management in sidebar).
+ * - kind "single": one module key, no nested list (like Dashboard / Leads Management in sidebar).
  * - kind "group": expandable; children are "leaf" rows or nested "group" (e.g. Procurement).
  */
 export const SUPERADMIN_MODULE_UI_NODES = [
@@ -251,7 +251,7 @@ export const SUPERADMIN_MODULE_UI_NODES = [
   {
     kind: "group",
     id: "tl-management",
-    label: "TL Management",
+    label: "Leads Management",
     children: [
       { kind: "leaf", key: "tl-customers", label: "TL Customers" },
       { kind: "leaf", key: "add-customer", label: "Add Customer" },
