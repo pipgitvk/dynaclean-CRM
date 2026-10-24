@@ -3,7 +3,6 @@
 import { useEffect, useState, useMemo, useRef } from "react";
 import InvoiceItemsTable from "./invoice-table";
 import TaxAndSummary from "./Tax-invoice";
-import PaymentLinkModal from "./PaymentLinkModal";
 import { usePathname, useRouter } from "next/navigation";
 import {
   navigateAfterInvoiceCreate,
@@ -35,9 +34,6 @@ export default function InvoiceForm({
   const autoFilledQuoteRef = useRef(false);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showPaymentLinkModal, setShowPaymentLinkModal] = useState(false);
-  const [linkedTransIds, setLinkedTransIds] = useState([]);
-  const [invoicePaymentStatus, setInvoicePaymentStatus] = useState("Unsettled");
 
   // Determine the display label based on invoice type
   const invoiceTypeLabel = invoiceType === "performa" ? "Performa Invoice" : "Invoice";
@@ -276,7 +272,7 @@ Thanks for doing business with us!`,
         cgst_rate: cgstRate,
         sgst_rate: sgstRate,
         igst_rate: igstRate,
-        linked_trans_ids: linkedTransIds.length > 0 ? linkedTransIds : null,
+        linked_trans_ids: null,
       };
 
       const res = await fetch("/api/invoice-table", {
@@ -288,23 +284,6 @@ Thanks for doing business with us!`,
       const data = await res.json();
       const created = res.ok && (data.success || data.invoiceNumber);
       if (created) {
-        if (linkedTransIds.length > 0 && data.invoiceNumber) {
-          try {
-            await fetch("/api/statements", {
-              method: "PATCH",
-              credentials: "include",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                trans_ids: linkedTransIds,
-                invoice_number: data.invoiceNumber,
-                invoice_id: data.invoiceId,
-                invoice_status: "Settled",
-              }),
-            });
-          } catch (patchErr) {
-            console.error("Failed to link statements:", patchErr);
-          }
-        }
         toast.success("Invoice created successfully");
         const redirectAfterOrder = resolveOrderListRedirectAfterInvoiceCreate({
           onSuccessRedirect,
@@ -454,13 +433,6 @@ Thanks for doing business with us!`,
         <div className="flex flex-wrap gap-2 ml-auto">
           <button
             type="button"
-            className="bg-blue-600 px-4 py-2 rounded text-white cursor-pointer hover:bg-blue-700"
-            onClick={() => setShowPaymentLinkModal(true)}
-          >
-            Payment Link
-          </button>
-          <button
-            type="button"
             className="bg-green-500 px-4 py-2 rounded text-white cursor-pointer hover:bg-green-600"
             onClick={() => setShowQuotationModal(true)}
           >
@@ -468,38 +440,6 @@ Thanks for doing business with us!`,
           </button>
         </div>
       </div>
-
-      {linkedTransIds.length > 0 && (
-        <div className="mx-4 flex flex-wrap items-center gap-2 bg-blue-50 border border-blue-200 rounded p-3">
-          <span className="text-xs font-semibold text-blue-700 mr-1">
-            Linked payments:
-          </span>
-          {linkedTransIds.map((tid) => (
-            <span
-              key={tid}
-              className="flex items-center gap-1 bg-blue-100 text-blue-800 text-xs font-mono px-2 py-1 rounded-full"
-            >
-              {tid}
-              <button
-                type="button"
-                onClick={() =>
-                  setLinkedTransIds((prev) => prev.filter((t) => t !== tid))
-                }
-                className="ml-1 text-blue-500 hover:text-red-500 font-bold leading-none"
-              >
-                &times;
-              </button>
-            </span>
-          ))}
-          <button
-            type="button"
-            onClick={() => setLinkedTransIds([])}
-            className="text-xs text-red-500 hover:underline ml-auto"
-          >
-            Clear all
-          </button>
-        </div>
-      )}
 
       <form onSubmit={handleSubmit} className="space-y-6 max-w-5xl mx-auto px-4 text-gray-800">
         {/* Header */}
@@ -633,7 +573,7 @@ Thanks for doing business with us!`,
 
           <div>
             <label className="text-sm text-gray-600">Amount Paid</label>
-            <input type="number" min="0" className="input w-full bg-gray-100 cursor-not-allowed" value={form.amount_paid} readOnly tabIndex={-1} title="Set via Payment Link or quotation load" />
+            <input type="number" min="0" className="input w-full bg-gray-100 cursor-not-allowed" value={form.amount_paid} readOnly tabIndex={-1} title="From quotation when applicable" />
           </div>
           <div>
             <label className="text-sm text-gray-600">Payment Status</label>
@@ -709,37 +649,6 @@ Thanks for doing business with us!`,
           </button>
         </div>
       </form>
-
-      <PaymentLinkModal
-        open={showPaymentLinkModal}
-        onClose={() => setShowPaymentLinkModal(false)}
-        defaultCustomerId={form.customer_id}
-        defaultAmount={taxSummary.grandTotal}
-        lockedTransIds={linkedTransIds}
-        currentInvoiceNumber={invoiceNumber}
-        onApply={(transIds, paymentStatus, amountPaid) => {
-          setLinkedTransIds(transIds);
-          setInvoicePaymentStatus(paymentStatus || "Unsettled");
-          if (amountPaid > 0) {
-            setForm((prev) => ({
-              ...prev,
-              amount_paid: amountPaid,
-              payment_status:
-                paymentStatus === "Settled"
-                  ? "PAID"
-                  : paymentStatus === "Partial Paid"
-                    ? "PARTIAL"
-                    : prev.payment_status,
-            }));
-          } else {
-            setForm((prev) => ({
-              ...prev,
-              amount_paid: 0,
-              payment_status: "UNPAID",
-            }));
-          }
-        }}
-      />
 
       {showQuotationModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">

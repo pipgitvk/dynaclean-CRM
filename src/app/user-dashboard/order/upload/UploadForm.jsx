@@ -48,12 +48,38 @@ function buildFormStateFromOrder(orderDetails, { lockNonFileFields }) {
   const paymentDate = orderDetails?.payment_date
     ? String(orderDetails.payment_date).slice(0, 10)
     : "";
+
+  let baseAmount =
+    orderDetails?.baseAmount != null && orderDetails.baseAmount !== ""
+      ? String(orderDetails.baseAmount)
+      : "";
+  let taxamt =
+    orderDetails?.taxamt != null && orderDetails.taxamt !== ""
+      ? String(orderDetails.taxamt)
+      : "";
+  let totalamt =
+    orderDetails?.totalamt != null && orderDetails.totalamt !== ""
+      ? String(orderDetails.totalamt)
+      : "";
+
+  const qTotal = Number(orderDetails?.quotation_grand_total);
+  const qSub = Number(orderDetails?.quotation_subtotal);
+  const qGst = Number(orderDetails?.quotation_gst);
+  if (!Number(totalamt) && qTotal > 0) {
+    totalamt = String(qTotal);
+    if (!Number(baseAmount) && qSub > 0) baseAmount = String(qSub);
+    if (!Number(taxamt) && qGst > 0) taxamt = String(qGst);
+    if (!Number(taxamt) && Number(baseAmount) > 0) {
+      taxamt = String(qTotal - Number(baseAmount));
+    }
+  }
+
   return {
     invoice_number: orderDetails?.invoice_number || "",
     duedate: orderDateInputValue(orderDetails),
-    baseAmount: orderDetails?.baseAmount != null ? String(orderDetails.baseAmount) : "",
-    taxamt: orderDetails?.taxamt != null ? String(orderDetails.taxamt) : "",
-    totalamt: orderDetails?.totalamt != null ? String(orderDetails.totalamt) : "",
+    baseAmount,
+    taxamt,
+    totalamt,
     remark: orderDetails?.account_remark || "",
     ...emptyFiles,
     payment_id: orderDetails?.payment_id || "",

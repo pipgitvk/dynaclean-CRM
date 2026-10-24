@@ -1,7 +1,7 @@
 // app/order/upload/[order_id]/page.jsx
 import { getDbConnection } from "@/lib/db";
 import { notFound, redirect } from "next/navigation";
-import UploadForm from "../UploadForm";
+import UploadForm from "@/app/user-dashboard/order/upload/UploadForm";
 import { shouldRedirectUploadPageToView } from "@/lib/orderDocumentEditRules";
 
 export const dynamic = "force-dynamic";
@@ -10,7 +10,13 @@ async function getOrderDetails(orderId) {
   const conn = await getDbConnection();
 
   const [rows] = await conn.execute(
-    "SELECT * FROM neworder WHERE order_id = ?",
+    `SELECT no.*,
+            qr.grand_total AS quotation_grand_total,
+            qr.subtotal AS quotation_subtotal,
+            qr.gst AS quotation_gst
+     FROM neworder no
+     LEFT JOIN quotations_records qr ON qr.quote_number = no.quote_number
+     WHERE no.order_id = ?`,
     [orderId],
   );
 
@@ -36,7 +42,12 @@ export default async function Page({ params }) {
       <h1 className="text-2xl font-bold text-center mb-6">
         {isEditMode ? "Edit Report & Tax Documents" : "Upload E-way Bill & E-invoice"}
       </h1>
-      <UploadForm orderDetails={orderDetails} isEditMode={isEditMode} />
+      <UploadForm
+        orderDetails={orderDetails}
+        isEditMode={isEditMode}
+        redirectPath="/admin-dashboard/order"
+        nonFileFieldsReadOnly
+      />
     </div>
   );
 }

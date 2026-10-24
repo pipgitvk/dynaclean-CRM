@@ -10,7 +10,13 @@ async function getOrderDetails(orderId) {
   const conn = await getDbConnection();
 
   const [rows] = await conn.execute(
-    "SELECT * FROM neworder WHERE order_id = ?",
+    `SELECT no.*,
+            qr.grand_total AS quotation_grand_total,
+            qr.subtotal AS quotation_subtotal,
+            qr.gst AS quotation_gst
+     FROM neworder no
+     LEFT JOIN quotations_records qr ON qr.quote_number = no.quote_number
+     WHERE no.order_id = ?`,
     [orderId],
   );
 
