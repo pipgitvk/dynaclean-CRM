@@ -1008,6 +1008,14 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                   order={r}
                   onClick={(e) => e.stopPropagation()}
                 />
+                {canShowOrderCancelMenu(r) && (
+                  <div
+                    className="border-t border-gray-100 mt-1 pt-1"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <DeleteButton orderId={r.order_id} />
+                  </div>
+                )}
               </>
             ) : (
               <>
@@ -1634,4 +1642,16 @@ function UpdateDeliveryMenuItem({ order, userRole, variant = "auto" }) {
       )}
     </>
   );
+}
+
+/** Order Cancel: allowed through booking done (incl. after invoice upload); hidden once dispatch starts. */
+function canShowOrderCancelMenu(order) {
+  if (!order || order.is_cancelled) return false;
+  const dispatch = Number(order.dispatch_status);
+  if (dispatch === 1 || dispatch === 2) return false;
+  if (order.installation_status) return false;
+  if (Number(order.is_returned || 0) !== 0) return false;
+  if (isOrderFullyDelivered(order) || isOrderPartialDelivery(order)) return false;
+  if (orderHasDispatchedStock(order)) return false;
+  return true;
 }
