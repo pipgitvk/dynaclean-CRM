@@ -1,7 +1,7 @@
 "use client";
 
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import MultiInvoiceLinkModal from "@/app/user-dashboard/invoices/MultiInvoiceLinkModal";
@@ -10,30 +10,17 @@ import SearchableSelect from "@/components/ui/SearchableSelect";
 const InvoiceEditModal = dynamic(() => import("./InvoiceEditModal"), { ssr: false });
 
 export default function InvoiceTable({ onSummaryUpdate }) {
-  const PAGE_SIZE = 100;
-  const SCROLL_THRESHOLD_PX = 160;
-
-  const getMonthStartEnd = () => {
-    const now = new Date();
-    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    return { firstDay, lastDay };
-  };
-
-  const formatDateForInput = (date) => {
-    const y = date.getFullYear();
-    const m = String(date.getMonth() + 1).padStart(2, "0");
-    const d = String(date.getDate()).padStart(2, "0");
-    return `${y}-${m}-${d}`;
-  };
-
-  const { firstDay: firstDayOfMonth, lastDay: lastDayOfMonth } = getMonthStartEnd();
+  const PAGE_SIZE = 40;
+  const SCROLL_LOAD_OFFSET_PX = 200;
+  const pageRef = useRef(1);
+  const fetchAbortRef = useRef(null);
+  const skipInitialSearchFetch = useRef(true);
 
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [fromDate, setFromDate] = useState(formatDateForInput(firstDayOfMonth));
-  const [toDate, setToDate] = useState(formatDateForInput(lastDayOfMonth));
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
   const [invoiceTypeFilter, setInvoiceTypeFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [employeeFilter, setEmployeeFilter] = useState("");
@@ -42,6 +29,7 @@ export default function InvoiceTable({ onSummaryUpdate }) {
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [scrollLoadEnabled, setScrollLoadEnabled] = useState(false);
   const [meta, setMeta] = useState({
     page: 1,
     limit: PAGE_SIZE,
@@ -60,6 +48,9 @@ export default function InvoiceTable({ onSummaryUpdate }) {
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState(new Set());
   const [selectedInvoices, setSelectedInvoices] = useState([]);
   const [reconciling, setReconciling] = useState(false);
+  const [expandedInvoiceId, setExpandedInvoiceId] = useState(null);
+  const [linkedDetailsById, setLinkedDetailsById] = useState({});
+  const [loadingLinkedId, setLoadingLinkedId] = useState(null);
 
   const processInvoicesForView = (data) => {
     // Filter out performa invoices
@@ -127,7 +118,7 @@ export default function InvoiceTable({ onSummaryUpdate }) {
     params.append("limit", PAGE_SIZE);
     params.append("sort", sortBy);
     params.append("order", sortOrder);
-    params.append("includeDetails", "1");
+    params.append("includeDetails", "0");
     params.append("includeCount", "0");
 
     if (fromDate) params.append("fromDate", fromDate);
@@ -138,9 +129,16 @@ export default function InvoiceTable({ onSummaryUpdate }) {
     if (employeeFilter) params.append("employeeName", employeeFilter);
 
     try {
-      const res = await fetch(`/api/invoice-table?${params.toString()}`);
+      if (!append && fetchAbortRef.current) {
+        fetchAbortRef.current.abort();
+      }
+      const controller = new AbortController();
+      if (!append) fetchAbortRef.current = controller;
+
+      const res = await fetch(`/api/invoice-table?${params.toString()}`, {
+        signal: controller.signal,
+      });
       const response = await res.json();
-      console.log("response data :", response);
 
       if (response.success) {
         const data = response.data || [];
@@ -159,6 +157,7 @@ export default function InvoiceTable({ onSummaryUpdate }) {
         });
         setMeta(response.meta);
         setCurrentPage(page);
+        pageRef.current = page;
         if (typeof response.meta?.hasMore === "boolean") {
           setHasMore(response.meta.hasMore);
         } else {
@@ -171,30 +170,40 @@ export default function InvoiceTable({ onSummaryUpdate }) {
         }
       }
     } catch (err) {
+      if (err?.name === "AbortError") return;
       console.error("Fetch invoices failed:", err);
       if (!append) {
         setInvoices([]);
         setFetchError(err?.message || "Failed to load invoices");
       }
     } finally {
+      if (fetchAbortRef.current?.signal.aborted && !append) return;
       if (append) {
         setLoadingMore(false);
       } else {
         setLoading(false);
+        setScrollLoadEnabled(true);
       }
     }
   };
 
   const resetAndFetch = () => {
     setCurrentPage(1);
+    pageRef.current = 1;
     setHasMore(true);
+    setScrollLoadEnabled(false);
+    setLinkedDetailsById({});
+    setExpandedInvoiceId(null);
     fetchData({ page: 1, append: false });
   };
 
-  const loadMore = () => {
+  const fetchDataRef = useRef(fetchData);
+  fetchDataRef.current = fetchData;
+
+  const loadMore = useCallback(() => {
     if (loading || loadingMore || !hasMore) return;
-    fetchData({ page: currentPage + 1, append: true });
-  };
+    fetchDataRef.current({ page: pageRef.current + 1, append: true });
+  }, [loading, loadingMore, hasMore]);
 
   useEffect(() => {
     resetAndFetch();
@@ -221,6 +230,10 @@ export default function InvoiceTable({ onSummaryUpdate }) {
   }, []);
 
   useEffect(() => {
+    if (skipInitialSearchFetch.current) {
+      skipInitialSearchFetch.current = false;
+      return;
+    }
     const t = setTimeout(() => {
       resetAndFetch();
     }, 500);
@@ -250,10 +263,9 @@ export default function InvoiceTable({ onSummaryUpdate }) {
   }, [invoices, onSummaryUpdate]);
 
   const handleReset = () => {
-    const { firstDay, lastDay } = getMonthStartEnd();
     setSearch("");
-    setFromDate(formatDateForInput(firstDay));
-    setToDate(formatDateForInput(lastDay));
+    setFromDate("");
+    setToDate("");
     setInvoiceTypeFilter("");
     setStatusFilter("");
     setEmployeeFilter("");
@@ -400,24 +412,85 @@ export default function InvoiceTable({ onSummaryUpdate }) {
       <span className="ml-1">↓</span>
     );
 
-  // State to track expanded invoices for showing linked statements
-  const [expandedInvoiceId, setExpandedInvoiceId] = useState(null);
+  const invoiceMayHaveLinkedPayments = (inv) => {
+    const paid = Number(inv?.amount_paid || 0);
+    const status = String(inv?.status || "").toUpperCase();
+    return (
+      paid > 0 ||
+      status === "PAID" ||
+      status.includes("PARTIAL")
+    );
+  };
+
+  const getLinkedStatementsForRow = (inv) =>
+    linkedDetailsById[inv.id]?.linkedStatements ||
+    inv.linkedStatements ||
+    [];
+
+  const getTotalLinkedAmountForRow = (inv) =>
+    linkedDetailsById[inv.id]?.totalLinkedAmount ??
+    inv.totalLinkedAmount ??
+    0;
+
+  const fetchLinkedDetails = async (invoiceId) => {
+    if (linkedDetailsById[invoiceId] || loadingLinkedId === invoiceId) return;
+    setLoadingLinkedId(invoiceId);
+    try {
+      const params = new URLSearchParams({
+        page: "1",
+        limit: "1",
+        includeDetails: "1",
+        includeCount: "0",
+        invoiceIds: String(invoiceId),
+      });
+      const res = await fetch(`/api/invoice-table?${params.toString()}`);
+      const response = await res.json();
+      if (response.success && response.data?.[0]) {
+        const row = response.data[0];
+        const stmts = row.linkedStatements || [];
+        const totalLinkedAmount =
+          row.totalLinkedAmount ??
+          stmts.reduce((sum, stmt) => sum + Number(stmt.amount || 0), 0);
+        setLinkedDetailsById((prev) => ({
+          ...prev,
+          [invoiceId]: { linkedStatements: stmts, totalLinkedAmount },
+        }));
+      }
+    } catch (err) {
+      console.error("Failed to load linked payments:", err);
+    } finally {
+      setLoadingLinkedId(null);
+    }
+  };
+
+  const toggleLinkedPayments = async (inv) => {
+    if (expandedInvoiceId === inv.id) {
+      setExpandedInvoiceId(null);
+      return;
+    }
+    setExpandedInvoiceId(inv.id);
+    await fetchLinkedDetails(inv.id);
+  };
 
   useEffect(() => {
-    const handleWindowScroll = () => {
+    if (!scrollLoadEnabled) return;
+
+    const scrollRoot = document.querySelector("main.overflow-auto");
+    if (!scrollRoot) return;
+
+    const onScroll = () => {
       if (loading || loadingMore || !hasMore) return;
-      const doc = document.documentElement;
       const nearBottom =
-        window.innerHeight + window.scrollY >=
-        doc.scrollHeight - SCROLL_THRESHOLD_PX;
+        scrollRoot.scrollTop + scrollRoot.clientHeight >=
+        scrollRoot.scrollHeight - SCROLL_LOAD_OFFSET_PX;
       if (nearBottom) {
         loadMore();
       }
     };
 
-    window.addEventListener("scroll", handleWindowScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleWindowScroll);
-  }, [loading, loadingMore, hasMore, currentPage]);
+    scrollRoot.addEventListener("scroll", onScroll, { passive: true });
+    return () => scrollRoot.removeEventListener("scroll", onScroll);
+  }, [scrollLoadEnabled, loadMore, hasMore, loading, loadingMore]);
 
   return (
     <div className="bg-white rounded shadow p-4">
@@ -469,15 +542,6 @@ export default function InvoiceTable({ onSummaryUpdate }) {
             onChange={(e) => setSearch(e.target.value)}
             className="border px-3 py-1 rounded w-full md:w-64"
           />
-          <button
-            type="button"
-            onClick={() => handleReconcileLinkedPayments("all")}
-            disabled={reconciling}
-            className="px-3 py-1 rounded whitespace-nowrap text-sm bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-50"
-            title="Order/statement par jo payment link hai, invoice par bhi dikhao + statements Settled"
-          >
-            {reconciling ? "Syncing…" : "Fix old payment links"}
-          </button>
           {selectedInvoiceIds.size > 0 && (
             <>
               <button
@@ -575,14 +639,22 @@ export default function InvoiceTable({ onSummaryUpdate }) {
                 </td>
               </tr>
             ) : invoices.length ? (
-              invoices.map((i) => (
+              invoices.map((i) => {
+                const linkedStatements = getLinkedStatementsForRow(i);
+                const totalLinkedAmount = getTotalLinkedAmountForRow(i);
+                const showLinkedExpand =
+                  linkedStatements.length > 0 || invoiceMayHaveLinkedPayments(i);
+
+                return (
                 <React.Fragment key={i.id}>
                   <tr className={`border-t hover:bg-gray-50 ${selectedInvoiceIds.has(i.id) ? 'bg-blue-50' : ''}`}>
                     <td className={`px-4 py-2 w-12 sticky left-0 z-20 ${selectedInvoiceIds.has(i.id) ? 'bg-blue-50' : 'bg-white'}`}>
-                      {i.linkedStatements && i.linkedStatements.length > 0 && (
+                      {showLinkedExpand && (
                         <button
-                          onClick={() => setExpandedInvoiceId(expandedInvoiceId === i.id ? null : i.id)}
+                          type="button"
+                          onClick={() => toggleLinkedPayments(i)}
                           className="text-gray-600 hover:text-blue-600"
+                          title="Linked payments"
                         >
                           {expandedInvoiceId === i.id ? '▼' : '▶'}
                         </button>
@@ -609,9 +681,9 @@ export default function InvoiceTable({ onSummaryUpdate }) {
                       {!i.parent_id && invoices.some(inv => inv.parent_id === i.id) && (
                         <span className="text-xs bg-blue-100 text-blue-700 ml-2 px-2 py-0.5 rounded">Parent</span>
                       )}
-                      {i.linkedStatements && i.linkedStatements.length > 0 && (
+                      {linkedStatements.length > 0 && (
                         <span className="text-xs bg-green-100 text-green-700 ml-2 px-2 py-0.5 rounded">
-                          {i.linkedStatements.length} Linked Payment{i.linkedStatements.length > 1 ? 's' : ''}
+                          {linkedStatements.length} Linked Payment{linkedStatements.length > 1 ? 's' : ''}
                         </span>
                       )}
                     </td>
@@ -666,9 +738,9 @@ export default function InvoiceTable({ onSummaryUpdate }) {
                       <span className={Number(i.balance_amount) > 0 ? 'text-red-600' : 'text-green-600'}>
                         ₹{Number(i.balance_amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                       </span>
-                      {i.totalLinkedAmount > 0 && (
+                      {totalLinkedAmount > 0 && (
                         <div className="text-xs text-gray-500">
-                          (-₹{Number(i.totalLinkedAmount).toLocaleString("en-IN", { minimumFractionDigits: 2 })})
+                          (-₹{Number(totalLinkedAmount).toLocaleString("en-IN", { minimumFractionDigits: 2 })})
                         </div>
                       )}
                     </td>
@@ -718,15 +790,21 @@ export default function InvoiceTable({ onSummaryUpdate }) {
                       </div>
                     </td>
                   </tr>
-                  {expandedInvoiceId === i.id && i.linkedStatements && i.linkedStatements.length > 0 && (
+                  {expandedInvoiceId === i.id && (
                     <tr>
                       <td colSpan="16" className="px-8 py-4 bg-gray-50">
+                        {loadingLinkedId === i.id ? (
+                          <p className="text-sm text-gray-600">Loading linked payments…</p>
+                        ) : linkedStatements.length === 0 ? (
+                          <p className="text-sm text-gray-500">No linked payments found.</p>
+                        ) : (
+                        <>
                         <div className="flex justify-between items-center mb-3">
                           <h4 className="font-semibold text-gray-700">Linked Payments:</h4>
                           <div className="text-right">
                             <span className="text-sm text-gray-600">Total Linked: </span>
                             <span className="text-lg font-bold text-red-600">
-                              ₹{Number(i.totalLinkedAmount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                              ₹{Number(totalLinkedAmount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                             </span>
                           </div>
                         </div>
@@ -743,7 +821,7 @@ export default function InvoiceTable({ onSummaryUpdate }) {
                               </tr>
                             </thead>
                             <tbody>
-                              {i.linkedStatements.map((stmt) => (
+                              {linkedStatements.map((stmt) => (
                                 <tr key={stmt.id} className="border-t">
                                   <td className="px-4 py-2">{stmt.id}</td>
                                   <td className="px-4 py-2 font-mono">{stmt.trans_id || "-"}</td>
@@ -772,11 +850,14 @@ export default function InvoiceTable({ onSummaryUpdate }) {
                             </tbody>
                           </table>
                         </div>
+                        </>
+                        )}
                       </td>
                     </tr>
                   )}
                 </React.Fragment>
-              ))
+              );
+              })
             ) : (
               <tr>
                 <td colSpan="16" className="text-center py-6 text-gray-500">
@@ -790,7 +871,8 @@ export default function InvoiceTable({ onSummaryUpdate }) {
       {!loading && invoices.length > 0 && (
         <div className="mt-3 flex items-center justify-between text-xs text-gray-600">
           <span>
-            Loaded {invoices.length}{meta.total != null ? ` of ${meta.total}` : ""} invoices
+            Loaded {invoices.length}
+            {meta.total != null && meta.total > 0 ? ` of ${meta.total}` : ""} invoices
           </span>
           {loadingMore ? (
             <span className="font-medium text-blue-600">Loading more...</span>
