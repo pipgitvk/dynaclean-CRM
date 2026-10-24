@@ -15,12 +15,13 @@ async function main() {
     database: process.env.DB_NAME,
   });
 
+  // Production uses invoices.type (not invoice_type).
   const [result] = await conn.execute(`
     UPDATE neworder no
     INNER JOIN invoices inv
       ON CAST(no.order_id AS CHAR) = TRIM(inv.buyers_order_no)
       AND inv.invoice_number IS NOT NULL AND TRIM(inv.invoice_number) <> ''
-      AND (inv.invoice_type IS NULL OR LOWER(TRIM(inv.invoice_type)) <> 'performa')
+      AND (inv.type IS NULL OR LOWER(TRIM(inv.type)) <> 'performa')
       AND (inv.status IS NULL OR UPPER(TRIM(inv.status)) <> 'CANCELLED')
     SET no.invoice_number = inv.invoice_number
     WHERE no.invoice_number IS NULL OR TRIM(no.invoice_number) = ''

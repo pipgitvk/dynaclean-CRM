@@ -166,21 +166,58 @@ export async function lookupInvoiceLinkedPayment(conn, invoiceNumberRaw) {
 
     const linked = await fetchStatementCandidatesForInvoice(conn, inv);
 
-    let payment_amount = Number(inv.amount_paid || 0);
+    const amountPaidOnInvoice = Number(inv.amount_paid || 0);
+    let payment_amount = amountPaidOnInvoice;
     let payments = [];
     if (linked.length > 0) {
       const allocated = allocateStatementPaymentsForInvoice(linked, grandTotal);
-      payment_amount = allocated.total;
+      // Never drop invoice.amount_paid when statement alloc is lower/empty.
+      payment_amount = Math.max(amountPaidOnInvoice, allocated.total || 0);
       payments = allocated.payments;
-    } else if (payment_amount > 0) {
-      payments = [
-        {
+      if (
+        amountPaidOnInvoice > 0 &&
+        allocated.total > 0 &&
+        amountPaidOnInvoice > allocated.total
+      ) {
+        // Keep statement lines; amount_received on order uses payment_amount (max).
+      }
+    }
+
+    const transIds = parseLinkedTransIds(inv.linked_trans_ids);
+    if (!payments.length && payment_amount > 0) {
+      if (transIds.length) {
+        const each =
+          transIds.length === 1
+            ? payment_amount
+            : payment_amount / transIds.length;
+        payments = transIds.map((tid) => ({
           statement_id: null,
-          trans_id: "",
+          trans_id: tid,
           date: null,
-          amount: payment_amount,
-        },
-      ];
+          amount: each,
+        }));
+      } else {
+        payments = [
+          {
+            statement_id: null,
+            trans_id: "",
+            date: null,
+            amount: payment_amount,
+          },
+        ];
+      }
+    } else if (payments.length && transIds.length) {
+      // Fill missing trans_id from invoice.linked_trans_ids when needed.
+      const used = new Set(
+        payments.map((p) => String(p.trans_id || "").trim()).filter(Boolean),
+      );
+      for (const tid of transIds) {
+        if (used.has(tid)) continue;
+        if (payments.length === 1 && !String(payments[0].trans_id || "").trim()) {
+          payments[0] = { ...payments[0], trans_id: tid };
+          used.add(tid);
+        }
+      }
     }
 
     const latest = pickLatestStatement(linked);
@@ -191,7 +228,8 @@ export async function lookupInvoiceLinkedPayment(conn, invoiceNumberRaw) {
       payments,
       payment_id:
         orderCsv.payment_id ||
-        (latest?.trans_id ? String(latest.trans_id).trim() : null),
+        (latest?.trans_id ? String(latest.trans_id).trim() : null) ||
+        (transIds[0] || null),
       payment_date:
         orderCsv.payment_date || formatStatementDate(latest?.date),
       payment_amount_csv: orderCsv.payment_amount,

@@ -4,9 +4,11 @@ import {
   syncOrderLinkedPaymentFromInvoice,
   syncOrdersForInvoiceNumbers,
 } from "@/lib/syncOrderLinkedPaymentFromInvoice";
+import { sumPaymentAmountCsv } from "@/lib/orderPaymentHistory";
 
 /**
- * Keep invoice payment link and order linked-payment snapshot aligned (merge only).
+ * Keep invoice payment link and order linked-payment snapshot aligned.
+ * Always sync invoice → order first; only push order → invoice when order has paid > 0.
  */
 export async function syncInvoiceAndOrderPaymentLink(
   conn,
@@ -29,16 +31,25 @@ export async function syncInvoiceAndOrderPaymentLink(
     ),
   ];
   for (const orderId of orders) {
-    await syncInvoicePaymentFromOrder(conn, orderId);
     const [rows] = await conn.execute(
       `SELECT order_id, quote_number, invoice_number, totalamt, amount_received,
               payment_received_date, linked_payments_json, payment_id, payment_date,
-              payment_amount, payment_status
+              payment_amount, payment_status, transaction_id
        FROM neworder WHERE order_id = ? LIMIT 1`,
       [orderId],
     );
-    if (rows?.[0]) {
-      await syncOrderLinkedPaymentFromInvoice(conn, rows[0]);
+    if (!rows?.[0]) continue;
+
+    // Invoice → order first (so Link Payment amount lands on neworder).
+    const synced = await syncOrderLinkedPaymentFromInvoice(conn, rows[0]);
+
+    const paid =
+      sumPaymentAmountCsv(synced?.payment_amount) ||
+      Number(synced?.amount_received) ||
+      0;
+    // Only push order → invoice when order actually has money (avoid wiping invoice).
+    if (paid > 0) {
+      await syncInvoicePaymentFromOrder(conn, orderId);
     }
   }
 }

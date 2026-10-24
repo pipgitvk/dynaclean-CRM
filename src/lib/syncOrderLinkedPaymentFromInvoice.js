@@ -142,18 +142,19 @@ export async function syncOrderLinkedPaymentFromInvoice(conn, order) {
   );
   const invMeta = invMetaRows?.[0];
   const invAmountPaid = Number(invMeta?.amount_paid) || 0;
-  if (!(amount > 0) && invAmountPaid > 0) {
-    amount = invAmountPaid;
+  const tids = parseLinkedTransIds(invMeta?.linked_trans_ids);
+  // Always trust invoices.amount_paid when present (Link Payment source of truth).
+  if (invAmountPaid > 0) {
+    amount = Math.max(amount || 0, invAmountPaid);
   }
 
   if (!payments.length && amount > 0) {
-    const tids = parseLinkedTransIds(invMeta?.linked_trans_ids);
     if (tids.length) {
       payments = tids.map((tid) => ({
         statement_id: null,
         trans_id: tid,
         date: pDate,
-        amount,
+        amount: tids.length === 1 ? amount : amount / tids.length,
       }));
     } else {
       payments = [
@@ -165,6 +166,8 @@ export async function syncOrderLinkedPaymentFromInvoice(conn, order) {
         },
       ];
     }
+  } else if (payments.length === 1 && !String(payments[0].trans_id || "").trim() && tids[0]) {
+    payments = [{ ...payments[0], trans_id: tids[0], amount: amount || payments[0].amount }];
   }
 
   const amountVal = Number.isFinite(amount) && amount > 0 ? amount : null;
@@ -190,7 +193,17 @@ export async function syncOrderLinkedPaymentFromInvoice(conn, order) {
     };
   }
 
-  const mergedCsv = mergeOrderPaymentWithLinkedCsv(order, invoiceCsv);
+  // Treat payment_amount "0" as empty so merge does not keep a zero booking row.
+  const orderForMerge = {
+    ...order,
+    payment_amount:
+      Number(order.payment_amount) === 0 &&
+      !String(order.payment_amount || "").includes(",")
+        ? ""
+        : order.payment_amount,
+  };
+
+  const mergedCsv = mergeOrderPaymentWithLinkedCsv(orderForMerge, invoiceCsv);
   let paymentIdVal = mergedCsv.payment_id || null;
   let paymentDateVal = mergedCsv.payment_date || null;
   let paymentAmountVal = mergedCsv.payment_amount || null;
@@ -199,7 +212,8 @@ export async function syncOrderLinkedPaymentFromInvoice(conn, order) {
     const fallbackCsv = linkedPaymentsToOrderPaymentCsv(payments);
     paymentAmountVal =
       fallbackCsv.payment_amount || String(incomingPaid);
-    paymentIdVal = paymentIdVal || fallbackCsv.payment_id || order.payment_id;
+    paymentIdVal =
+      paymentIdVal || fallbackCsv.payment_id || tids[0] || order.payment_id;
     paymentDateVal =
       paymentDateVal ||
       fallbackCsv.payment_date ||
@@ -207,9 +221,17 @@ export async function syncOrderLinkedPaymentFromInvoice(conn, order) {
       order.payment_date;
   }
 
-  const paymentsJson = mergeLinkedPaymentsJson(order, payments);
+  if (!paymentIdVal && tids[0]) paymentIdVal = tids[0];
 
-  const paidSum = sumPaymentAmountCsv(paymentAmountVal);
+  const paymentsJson = mergeLinkedPaymentsJson(orderForMerge, payments);
+
+  const paidSum = Math.max(
+    sumPaymentAmountCsv(paymentAmountVal),
+    amountVal || 0,
+  );
+  if (paidSum > 0 && !paymentAmountVal) {
+    paymentAmountVal = String(paidSum);
+  }
   const existingReceived = Number(order.amount_received);
   const amountReceivedVal =
     paidSum > 0

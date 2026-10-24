@@ -404,17 +404,35 @@ export async function PATCH(req) {
         const { syncInvoiceAndOrderPaymentLink } = await import(
           "@/lib/syncInvoiceOrderPaymentLink"
         );
-        const orderIds = [
+        const invoiceNumbers = sortedInvoices
+          .map((i) => i.invoice_number)
+          .filter(Boolean);
+        // Re-read buyers_order_no after commit (fresh amount_paid / links).
+        let orderIds = [
           ...new Set(
             sortedInvoices
               .map((i) => String(i.buyers_order_no || "").trim())
               .filter(Boolean),
           ),
         ];
+        if (!orderIds.length && invoiceNumbers.length) {
+          const [bonRows] = await conn.query(
+            "SELECT buyers_order_no FROM invoices WHERE invoice_number IN (?)",
+            [invoiceNumbers],
+          );
+          orderIds = [
+            ...new Set(
+              (bonRows || [])
+                .map((r) => String(r.buyers_order_no || "").trim())
+                .filter(Boolean),
+            ),
+          ];
+        }
+        console.log(
+          `[invoices-bulk-link] sync → orders: ${JSON.stringify(orderIds)} invoices: ${JSON.stringify(invoiceNumbers)}`,
+        );
         await syncInvoiceAndOrderPaymentLink(conn, {
-          invoiceNumbers: sortedInvoices
-            .map((i) => i.invoice_number)
-            .filter(Boolean),
+          invoiceNumbers,
           orderIds,
         });
       } catch (syncErr) {
