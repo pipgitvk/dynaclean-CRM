@@ -4,7 +4,33 @@ import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import { Loader2 } from "lucide-react";
 import MultiInvoiceLinkModal from "./MultiInvoiceLinkModal";
+
+function InvoiceTableLoadingState({ label = "Loading invoices…" }) {
+  return (
+    <tr>
+      <td colSpan={13} className="py-16">
+        <div className="flex flex-col items-center justify-center gap-4 text-center">
+          <div className="relative flex h-14 w-14 items-center justify-center">
+            <div
+              className="absolute inset-0 rounded-full border-4 border-blue-100"
+              aria-hidden
+            />
+            <Loader2
+              className="h-10 w-10 animate-spin text-blue-600"
+              aria-hidden
+            />
+          </div>
+          <p className="text-sm font-medium text-gray-700">{label}</p>
+          <p className="text-xs text-gray-400 max-w-xs">
+            Please wait while we fetch your invoice list
+          </p>
+        </div>
+      </td>
+    </tr>
+  );
+}
 
 const InvoiceEditModal = dynamic(() => import("@/app/admin-dashboard/invoices/InvoiceEditModal"), { ssr: false });
 
@@ -101,6 +127,7 @@ export default function InvoiceTable({ onSummaryUpdate }) {
     } else {
       setLoading(true);
       setFetchError(null);
+      setInvoices([]);
     }
 
     const params = new URLSearchParams();
@@ -208,7 +235,7 @@ export default function InvoiceTable({ onSummaryUpdate }) {
   }, [search]);
 
   useEffect(() => {
-    if (!onSummaryUpdate) return;
+    if (!onSummaryUpdate || loading) return;
     const filteredForSummary = invoices.filter(
       (inv) => inv.type !== "performa" && inv.status !== "CANCELLED",
     );
@@ -227,7 +254,7 @@ export default function InvoiceTable({ onSummaryUpdate }) {
       ),
       totalInvoices: filteredForSummary.length,
     });
-  }, [invoices, onSummaryUpdate]);
+  }, [invoices, loading, onSummaryUpdate]);
 
   const handleReset = () => {
     setSearch("");
@@ -516,11 +543,7 @@ export default function InvoiceTable({ onSummaryUpdate }) {
           </thead>
           <tbody>
             {loading ? (
-              <tr>
-                <td colSpan="13" className="text-center py-4">
-                  Loading...
-                </td>
-              </tr>
+              <InvoiceTableLoadingState />
             ) : fetchError ? (
               <tr>
                 <td colSpan="13" className="text-center py-6 text-red-600">
