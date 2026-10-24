@@ -53,6 +53,7 @@ import OrderDeliveryMenuLinks from "@/components/orders/OrderDeliveryMenuLinks";
 import {
   OrderListSearchInput,
   OrderListSearchApplyButton,
+  OrderListSearchResetButton,
 } from "@/components/orders/OrderListSearchFilterControls";
 import {
   canManageAnyOrderDeliveryRole,
@@ -76,6 +77,7 @@ const PAGE_SIZE = 40;
 const SCROLL_LOAD_OFFSET_PX = 200;
 
 export default function OrderTable({ userRole }) {
+  const router = useRouter();
   const [orders, setOrders] = useState([]);
   const [listLoading, setListLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -292,6 +294,44 @@ export default function OrderTable({ userRole }) {
     createdByFilter,
     fetchOrdersPage,
   ]);
+
+  const handleResetFilters = useCallback(() => {
+    setSearchQuery("");
+    setAppliedSearchQuery("");
+    setStatusFilter("");
+    setAppliedStatusFilter("");
+    setPaymentTermsFilter("");
+    setAppliedPaymentTermsFilter("");
+    setDateFrom("");
+    setAppliedDateFrom("");
+    setDateTo("");
+    setAppliedDateTo("");
+    setCreatedByFilter("");
+    setAppliedCreatedByFilter("");
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("accountsOrderTable_searchQuery");
+      localStorage.removeItem("accountsOrderTable_statusFilter");
+      localStorage.removeItem("accountsOrderTable_paymentTermsFilter");
+      localStorage.removeItem("accountsOrderTable_dateFrom");
+      localStorage.removeItem("accountsOrderTable_dateTo");
+      localStorage.removeItem("accountsOrderTable_createdByFilter");
+    }
+    router.replace("/accounts-dashboard/order", { scroll: false });
+    pageRef.current = 1;
+    setHasMore(true);
+    setScrollLoadEnabled(false);
+    fetchOrdersPage({
+      page: 1,
+      append: false,
+      filters: {
+        search: "",
+        dateFrom: "",
+        dateTo: "",
+        createdBy: "",
+        paymentTerms: "",
+      },
+    });
+  }, [router, fetchOrdersPage]);
 
   useEffect(() => {
     fetchOrdersPage({ page: 1, append: false });
@@ -676,7 +716,10 @@ export default function OrderTable({ userRole }) {
               ))}
           </select>
         </div>
-        <OrderListSearchApplyButton onApply={handleApplySearch} />
+        <div className="flex items-end gap-2 shrink-0 order-last">
+          <OrderListSearchResetButton onReset={handleResetFilters} />
+          <OrderListSearchApplyButton onApply={handleApplySearch} embedded />
+        </div>
       </div>
       <p className="text-xs text-gray-500">Set filters, then click Search to update the list.</p>
 
