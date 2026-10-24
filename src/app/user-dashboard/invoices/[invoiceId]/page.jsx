@@ -4,6 +4,7 @@ import NewInvoice from "@/components/invoice/DesignInvoice";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { canAccessPerformaInvoice } from "@/lib/performaInvoiceAccess";
+import { attachInvoiceCancelledDisplay } from "@/lib/resolveInvoiceCancelledDisplay";
 
 export const dynamic = "force-dynamic";
 
@@ -152,7 +153,7 @@ async function getInvoiceWithItems(invoiceNumber) {
   }
   // --- End recalculation ---
 
-  return {
+  const withMeta = {
     ...invoice,
     balance_amount: computedBalance,
     payment_status: computedPaymentStatus,
@@ -161,6 +162,7 @@ async function getInvoiceWithItems(invoiceNumber) {
     reference_quote_sno: resolvedQuoteSno,
     items,
   };
+  return attachInvoiceCancelledDisplay(conn, withMeta);
 }
 
 export default async function InvoicePage({ params }) {

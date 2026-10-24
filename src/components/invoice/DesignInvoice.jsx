@@ -1732,6 +1732,7 @@ import InvoicePDFPreview from "../Preview";
 import { numberToWords } from "@/utils/NumbertoWord";
 import { INVOICE_LETTERHEAD } from "@/lib/invoiceLetterhead";
 import { filterTermsWhenNotesHasCamc } from "@/lib/performaInvoiceTerms";
+import { isInvoiceCancelledDisplay } from "@/lib/resolveInvoiceCancelledDisplay";
 
 const INVOICE_SIGNATURE_CANDIDATES = [
   "/s.png",
@@ -1751,6 +1752,7 @@ const INVOICE_SIGNATURE_FOR_PX = "8px";
 const INVOICE_SIGNATURE_FOR_PT = 8;
 
 const NewInvoice = ({ invoice }) => {
+  const showCancelledWatermark = isInvoiceCancelledDisplay(invoice);
   // Determine invoice type label
   const invoiceTypeLabel = invoice.type === "performa" ? "Performa Invoice" : "Tax Invoice";
   
@@ -2700,6 +2702,7 @@ const NewInvoice = ({ invoice }) => {
         <div
           data-invoice-border-root="true"
           style={{
+            position: "relative",
             padding: "6mm",
             background: "#fff",
             backgroundColor: "#fff",
@@ -2707,6 +2710,41 @@ const NewInvoice = ({ invoice }) => {
             boxSizing: "border-box",
           }}
         >
+        {showCancelledWatermark ? (
+          <div
+            aria-hidden
+            data-invoice-cancelled-watermark="true"
+            style={{
+              position: "absolute",
+              inset: 0,
+              pointerEvents: "none",
+              zIndex: 50,
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                position: "absolute",
+                left: "50%",
+                top: "42%",
+                transform: "translate(-50%, -50%) rotate(-35deg)",
+                fontSize: "64px",
+                fontWeight: 800,
+                color: "rgba(220, 38, 38, 0.45)",
+                letterSpacing: "0.25em",
+                textTransform: "uppercase",
+                userSelect: "none",
+                whiteSpace: "nowrap",
+                textShadow: "0 0 2px rgba(255,255,255,0.8)",
+                border: "5px solid rgba(220, 38, 38, 0.4)",
+                padding: "12px 32px",
+                background: "rgba(254, 226, 226, 0.15)",
+              }}
+            >
+              CANCELLED
+            </div>
+          </div>
+        ) : null}
         {/* Logo flush left; company block left of row but lines centre-aligned within block */}
         <table
           style={{
