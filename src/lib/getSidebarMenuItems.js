@@ -138,6 +138,7 @@ function transformMenuItemPaths(item, roleKey) {
 
   if (roleUpper === "ACCOUNTANT" || roleUpper.includes("ACCOUNTANT")) {
     const accountantModulePaths = {
+      invoices: "/user-dashboard/invoices",
       "client-expenses": "/accounts-dashboard/client-expenses/cards",
       "delivery-challan": "/accounts-dashboard/delivery-challan",
       "purchase-products": "/accounts-dashboard/purchase-products",

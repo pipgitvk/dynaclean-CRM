@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
+import { FileText, LayoutGrid } from "lucide-react";
 import InvoiceTable from "./InvoiceTable";
 
 export const dynamic = "force-dynamic";
@@ -22,14 +24,24 @@ export default function InvoicePage() {
 
   return (
     <div className="max-w-8xl mx-auto p-6">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <h1 className="text-2xl font-bold text-gray-800">Invoice Management</h1>
-        {/* <a
-          href="/user-dashboard/invoices/new"
-          className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-        >
-          Add Invoice
-        </a> */}
+        <div className="flex gap-2 flex-wrap">
+          <Link
+            href="/accounts-dashboard/invoices"
+            className="inline-flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-purple-700"
+          >
+            <LayoutGrid size={16} />
+            Cards
+          </Link>
+          <Link
+            href="/accounts-dashboard/invoices/new"
+            className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-green-700"
+          >
+            <FileText size={16} />
+            Add Invoice
+          </Link>
+        </div>
       </div>
 
       {/* Summary Cards */}
