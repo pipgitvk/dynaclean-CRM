@@ -3,6 +3,7 @@ import { getDbConnection } from "@/lib/db";
 import { jwtVerify } from "jose";
 import { cloneClientExpenseFromTemplate } from "@/lib/statementClientExpenseLink";
 import { revalidateClientExpensePages } from "@/lib/revalidateClientExpensePages";
+import { sqlUtf8TrimExpr } from "@/lib/sqlUtf8Compare";
 
 export async function GET(req) {
   try {
@@ -350,7 +351,14 @@ export async function PATCH(req) {
     }
     await jwtVerify(token, new TextEncoder().encode(process.env.JWT_SECRET));
 
-    const { trans_ids, invoice_number, invoice_status, failed_transaction_id, cancelled_transaction_id } = await req.json();
+    const {
+      trans_ids,
+      invoice_number,
+      invoice_status,
+      invoice_id,
+      failed_transaction_id,
+      cancelled_transaction_id,
+    } = await req.json();
 
     if (!trans_ids || !Array.isArray(trans_ids) || trans_ids.length === 0) {
       return NextResponse.json(
@@ -432,10 +440,56 @@ export async function PATCH(req) {
       );
     }
 
-    updateQuery += ` WHERE id IN (${placeholders})`;
-    updateParams.push(...trans_ids);
+    const ids = trans_ids.map((x) => String(x).trim()).filter(Boolean);
+    const allNumericIds = ids.length > 0 && ids.every((x) => /^\d+$/.test(x));
+    if (allNumericIds) {
+      updateQuery += ` WHERE id IN (${placeholders})`;
+      updateParams.push(...ids);
+    } else {
+      updateQuery += ` WHERE ${sqlUtf8TrimExpr("trans_id")} IN (${placeholders})`;
+      updateParams.push(...ids);
+    }
 
     await conn.execute(updateQuery, updateParams);
+
+    const invId = Number(invoice_id);
+    if (
+      Number.isFinite(invId) &&
+      invId > 0 &&
+      invoice_number &&
+      String(invoice_number).trim()
+    ) {
+      try {
+        const { settleStatementsForInvoicePayment } = await import(
+          "@/lib/settleStatementsForInvoicePayment"
+        );
+        await settleStatementsForInvoicePayment(conn, {
+          invoiceId: invId,
+          invoiceNumber: String(invoice_number).trim(),
+          transIds: ids,
+        });
+      } catch (settleErr) {
+        console.error("[statements-api] invoice settle:", settleErr);
+      }
+    }
+
+    if (invoice_number !== undefined) {
+      const invNum = invoice_number && String(invoice_number).trim() !== ""
+        ? String(invoice_number).trim()
+        : "";
+      if (invNum) {
+        try {
+          const { syncInvoiceAndOrderPaymentLink } = await import(
+            "@/lib/syncInvoiceOrderPaymentLink"
+          );
+          await syncInvoiceAndOrderPaymentLink(conn, {
+            invoiceNumbers: [invNum],
+          });
+        } catch (syncErr) {
+          console.error("[statements-api] order payment sync:", syncErr);
+        }
+      }
+    }
 
     return NextResponse.json({ success: true, updated: trans_ids.length });
   } catch (err) {

@@ -8,6 +8,8 @@ import {
 } from "@/lib/performaInvoiceAccess";
 import { ensureInvoiceItemsInsertReady } from "@/lib/ensureInvoiceItemsAutoIncrement";
 import { findActiveInvoiceForOrder } from "@/lib/activeInvoiceForOrder";
+import { syncInvoiceAndOrderPaymentLink } from "@/lib/syncInvoiceOrderPaymentLink";
+import { settleStatementsForInvoicePayment } from "@/lib/settleStatementsForInvoicePayment";
 
 /** Parse linked_trans_ids JSON or plain string → array of strings */
 function parseTransIds(raw) {
@@ -1304,6 +1306,32 @@ export async function POST(req) {
     }
 
     await conn.commit();
+
+    try {
+      const transIdsForSettle = parseTransIds(linkedTransIdsJson);
+      if (invoiceId && transIdsForSettle.length) {
+        await settleStatementsForInvoicePayment(conn, {
+          invoiceId,
+          invoiceNumber: finalInvoiceNumber,
+          transIds: transIdsForSettle,
+        });
+      }
+    } catch (settleErr) {
+      console.error("Invoice POST statement settle:", settleErr);
+    }
+
+    try {
+      const orderId = buyers_order_no
+        ? String(buyers_order_no).trim()
+        : "";
+      await syncInvoiceAndOrderPaymentLink(conn, {
+        invoiceNumbers: [finalInvoiceNumber],
+        orderIds: orderId ? [orderId] : [],
+      });
+    } catch (syncErr) {
+      console.error("Invoice POST order payment sync:", syncErr);
+    }
+
     return NextResponse.json({
       success: true,
       invoiceNumber: finalInvoiceNumber,

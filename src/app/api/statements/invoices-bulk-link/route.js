@@ -401,17 +401,14 @@ export async function PATCH(req) {
       await conn.commit();
 
       try {
-        const { syncOrdersForInvoiceNumbers } = await import(
-          "@/lib/syncOrderLinkedPaymentFromInvoice"
+        const { syncInvoiceAndOrderPaymentLink } = await import(
+          "@/lib/syncInvoiceOrderPaymentLink"
         );
-        const { ensureOrderLinkedPaymentColumns } = await import(
-          "@/lib/ensureOrderLinkedPaymentColumns"
-        );
-        await ensureOrderLinkedPaymentColumns(conn);
-        await syncOrdersForInvoiceNumbers(
-          conn,
-          sortedInvoices.map((i) => i.invoice_number),
-        );
+        await syncInvoiceAndOrderPaymentLink(conn, {
+          invoiceNumbers: sortedInvoices
+            .map((i) => i.invoice_number)
+            .filter(Boolean),
+        });
       } catch (syncErr) {
         console.error("[invoices-bulk-link] order linked-payment sync:", syncErr);
       }

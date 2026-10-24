@@ -9,6 +9,7 @@ import {
 } from "@/lib/invoiceCustomerEmailNotice";
 import { ensureInvoiceItemsInsertReady } from "@/lib/ensureInvoiceItemsAutoIncrement";
 import { refreshOrdersAfterInvoiceRemoved } from "@/lib/orderInvoicePaymentClear";
+import { syncInvoiceAndOrderPaymentLink } from "@/lib/syncInvoiceOrderPaymentLink";
 
 export async function GET(_req, context) {
   try {
@@ -487,6 +488,18 @@ export async function PATCH(req, context) {
         });
       } catch (syncErr) {
         console.error("Invoice PATCH order payment clear:", syncErr);
+      }
+    } else {
+      try {
+        const orderId = buyers_order_no
+          ? String(buyers_order_no).trim()
+          : "";
+        await syncInvoiceAndOrderPaymentLink(pool, {
+          invoiceNumbers: invoice_number ? [invoice_number] : [],
+          orderIds: orderId ? [orderId] : [],
+        });
+      } catch (syncErr) {
+        console.error("Invoice PATCH order payment sync:", syncErr);
       }
     }
 

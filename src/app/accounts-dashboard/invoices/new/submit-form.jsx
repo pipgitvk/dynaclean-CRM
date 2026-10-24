@@ -292,11 +292,13 @@ Thanks for doing business with us!`,
           try {
             await fetch("/api/statements", {
               method: "PATCH",
+              credentials: "include",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 trans_ids: linkedTransIds,
                 invoice_number: data.invoiceNumber,
-                invoice_status: invoicePaymentStatus,
+                invoice_id: data.invoiceId,
+                invoice_status: "Settled",
               }),
             });
           } catch (patchErr) {

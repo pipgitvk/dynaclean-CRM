@@ -14,6 +14,7 @@ import {
   resolveAccountUploadPaymentCsv,
   sumPaymentAmountCsv,
 } from "@/lib/orderPaymentHistory";
+import { syncInvoiceAndOrderPaymentLink } from "@/lib/syncInvoiceOrderPaymentLink";
 
 const MAX_FILES_PER_FIELD = 5;
 
@@ -226,8 +227,8 @@ export async function POST(req) {
       challanPath || existingOrder.deliverchallan || "";
 
     await conn.execute(
-      `UPDATE neworder SET 
-        baseAmount = ?, 
+      `UPDATE neworder SET
+        baseAmount = ?,
         ewaybill_file = ?, 
         report_file = ?, 
         einvoice_file = ?, 
@@ -271,7 +272,17 @@ export async function POST(req) {
       ]
     );
 
-    // await conn.end();
+    try {
+      await syncInvoiceAndOrderPaymentLink(conn, {
+        invoiceNumbers:
+          invoiceNumber && String(invoiceNumber).trim()
+            ? [String(invoiceNumber).trim()]
+            : [],
+        orderIds: [orderId],
+      });
+    } catch (syncErr) {
+      console.error("Order upload invoice/order payment sync:", syncErr);
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {
