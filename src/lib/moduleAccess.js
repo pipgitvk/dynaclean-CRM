@@ -150,6 +150,7 @@ export const MODULE_TREE = [
     label: "Accounting",
     children: [
       { key: "payment-pending", label: "Payment Pending" },
+      { key: "payment-deductions", label: "Deductions" },
       { key: "manual-payments", label: "Manual Payments" },
       { key: "expenses", label: "Expense" },
       { key: "view-expenses", label: "View Expenses" },
@@ -399,6 +400,7 @@ export const SUPERADMIN_MODULE_UI_NODES = [
     label: "Accounting",
     children: [
       { kind: "leaf", key: "payment-pending", label: "Payment Pending" },
+      { kind: "leaf", key: "payment-deductions", label: "Deductions" },
       { kind: "leaf", key: "manual-payments", label: "Manual Payments" },
       { kind: "leaf", key: "expenses", label: "Expense" },
       { kind: "leaf", key: "view-expenses", label: "View Expenses" },

@@ -628,6 +628,13 @@ const allMenuItems = [
         icon: "DollarSign",
       },
       {
+        path: "/admin-dashboard/reports/deductions",
+        name: "Deductions",
+        moduleKey: "payment-deductions",
+        roles: ["SUPERADMIN"],
+        icon: "List",
+      },
+      {
         path: "/admin-dashboard/manual-payments",
         name: "Manual Payments",
         roles: ["SUPERADMIN", "ADMIN", "ACCOUNTANT"],

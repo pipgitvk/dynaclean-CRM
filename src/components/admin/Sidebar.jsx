@@ -49,6 +49,7 @@ import {
   FileSpreadsheet,
   Fingerprint,
   AlertTriangle,
+  List,
 } from "lucide-react";
 
 // Icon map
@@ -95,6 +96,7 @@ const iconMap = {
   FileSpreadsheet,
   Fingerprint,
   AlertTriangle,
+  List,
 };
 
 export default function Sidebar({

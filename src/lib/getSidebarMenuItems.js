@@ -774,6 +774,13 @@ const allMenuItems = [
         icon: "DollarSign",
       },
       {
+        path: "/user-dashboard/reports/deductions",
+        name: "Deductions",
+        moduleKey: "payment-deductions",
+        roles: ["SUPERADMIN", "ACCOUNTANT"],
+        icon: "List",
+      },
+      {
         path: "/user-dashboard/expenses",
         name: "Expense",
         moduleKey: "expenses",
@@ -1266,7 +1273,12 @@ export default async function getSidebarMenuItems() {
       roleKey,
     ) ?? [];
     if (roleKey === "ACCOUNTANT" && Array.isArray(allowedModules)) {
-      for (const key of ["salary-management", "salary-sheet", "attendance-sheet"]) {
+      for (const key of [
+        "salary-management",
+        "salary-sheet",
+        "attendance-sheet",
+        "payment-deductions",
+      ]) {
         if (!allowedModules.includes(key)) allowedModules.push(key);
       }
     }

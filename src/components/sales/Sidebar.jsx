@@ -49,6 +49,7 @@ import {
   TrendingUp,
   Gavel,
   BarChart3,
+  List,
 } from "lucide-react";
 
 const iconMap = {
@@ -94,6 +95,7 @@ const iconMap = {
   TrendingUp,
   Gavel,
   BarChart3,
+  List,
 };
 
 function isDashboardRootPath(path) {

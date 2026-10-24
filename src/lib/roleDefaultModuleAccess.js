@@ -144,6 +144,7 @@ export const ROLE_DEFAULT_MODULE_KEYS = {
     "spare-warehouse-in",
     "spare-purchases",
     "payment-pending",
+    "payment-deductions",
     "manual-payments",
     "expenses",
     "view-expenses",
