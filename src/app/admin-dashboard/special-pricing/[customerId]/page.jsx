@@ -8,8 +8,10 @@ import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
-export default async function CustomerSpecialPrice({ params }) {
+export default async function CustomerSpecialPrice({ params, searchParams }) {
   const { customerId } = await params;
+  const resolvedSearchParams = await searchParams;
+  const initialStatusFilter = resolvedSearchParams?.status?.trim() || "";
 
   const payload = await getSessionPayload();
   if (!payload) return null;
@@ -150,6 +152,7 @@ export default async function CustomerSpecialPrice({ params }) {
       <CustomerSpecialPriceTable
         customerId={customerId}
         customerName={customerInfo?.name || ""}
+        initialStatusFilter={initialStatusFilter}
         rows={rows.map((row) => ({
           ...row,
           set_date: row.set_date ? String(row.set_date) : null,

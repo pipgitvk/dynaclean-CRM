@@ -3,27 +3,74 @@
 import { formatCrmDateOnly } from "@/lib/crmDateFormat";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import ApprovedPriceListPdfButton from "@/components/specialPrice/ApprovedPriceListPdfButton";
+
+const STATUS_FILTER_OPTIONS = [
+  { value: "", label: "All status" },
+  { value: "approved", label: "Approved" },
+  { value: "pending", label: "Pending" },
+  { value: "rejected", label: "Rejected" },
+];
 
 function rowKey(row) {
   return String(row.product_id);
+}
+
+function normalizeRowStatus(row) {
+  const s = String(row?.status ?? "").trim().toLowerCase();
+  if (s === "approved") return "approved";
+  if (s === "rejected") return "rejected";
+  return "pending";
 }
 
 export default function CustomerSpecialPriceTable({
   customerId,
   customerName,
   rows = [],
+  initialStatusFilter = "",
 }) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [statusFilter, setStatusFilter] = useState(
+    () => searchParams.get("status") || initialStatusFilter || "",
+  );
   const [selected, setSelected] = useState(() => new Set());
 
+  useEffect(() => {
+    const fromUrl = searchParams.get("status") || "";
+    setStatusFilter(fromUrl);
+  }, [searchParams]);
+
+  const filteredRows = useMemo(() => {
+    if (!statusFilter) return rows;
+    return rows.filter((r) => normalizeRowStatus(r) === statusFilter);
+  }, [rows, statusFilter]);
+
   const allSelected =
-    rows.length > 0 && rows.every((r) => selected.has(rowKey(r)));
+    filteredRows.length > 0 &&
+    filteredRows.every((r) => selected.has(rowKey(r)));
 
   const selectedRows = useMemo(
-    () => rows.filter((r) => selected.has(rowKey(r))),
-    [rows, selected],
+    () => filteredRows.filter((r) => selected.has(rowKey(r))),
+    [filteredRows, selected],
   );
+
+  const handleStatusFilterChange = (value) => {
+    setStatusFilter(value);
+    setSelected(new Set());
+    const params = new URLSearchParams(searchParams?.toString() || "");
+    if (value) params.set("status", value);
+    else params.delete("status");
+    const query = params.toString();
+    router.replace(
+      query
+        ? `/admin-dashboard/special-pricing/${customerId}?${query}`
+        : `/admin-dashboard/special-pricing/${customerId}`,
+      { scroll: false },
+    );
+  };
 
   const toggleRow = (row) => {
     const key = rowKey(row);
@@ -40,7 +87,7 @@ export default function CustomerSpecialPriceTable({
       setSelected(new Set());
       return;
     }
-    setSelected(new Set(rows.map((r) => rowKey(r))));
+    setSelected(new Set(filteredRows.map((r) => rowKey(r))));
   };
 
   if (rows.length === 0) {
@@ -51,15 +98,40 @@ export default function CustomerSpecialPriceTable({
 
   return (
     <div className="space-y-3">
+      <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-end gap-3">
+        <div className="min-w-[140px]">
+          <label className="block text-xs text-gray-600 mb-1">Status</label>
+          <select
+            value={statusFilter}
+            onChange={(e) => handleStatusFilterChange(e.target.value)}
+            className="w-full sm:w-44 border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"
+          >
+            {STATUS_FILTER_OPTIONS.map((opt) => (
+              <option key={opt.value || "all"} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <p className="text-xs text-gray-500 sm:pb-2">
+          Showing {filteredRows.length} of {rows.length}
+        </p>
+      </div>
+
       <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3">
-        <label className="inline-flex items-center gap-2 text-sm cursor-pointer">
+        <label
+          className={`inline-flex items-center gap-2 text-sm ${
+            filteredRows.length === 0 ? "opacity-50" : "cursor-pointer"
+          }`}
+        >
           <input
             type="checkbox"
             className="h-4 w-4 rounded border-gray-400 text-blue-600 accent-blue-600"
             checked={allSelected}
             onChange={toggleSelectAll}
+            disabled={filteredRows.length === 0}
           />
-          Select all
+          {statusFilter ? "Select all shown" : "Select all"}
         </label>
         <span className="text-sm text-gray-500">
           {selectedRows.length} selected
@@ -77,6 +149,11 @@ export default function CustomerSpecialPriceTable({
         />
       </div>
 
+      {filteredRows.length === 0 ? (
+        <div className="bg-gray-100 p-4 rounded text-sm text-gray-600">
+          No special prices match this status filter.
+        </div>
+      ) : (
       <div className="overflow-x-auto">
         <table className="w-full border border-gray-200 rounded-lg">
           <thead className="bg-gray-100">
@@ -98,10 +175,10 @@ export default function CustomerSpecialPriceTable({
           </thead>
 
           <tbody>
-            {rows.map((row) => {
+            {filteredRows.map((row) => {
               const imageUrl = row.image_path || row.product_image || null;
               const key = rowKey(row);
-              const status = (row.status || "").toLowerCase();
+              const status = normalizeRowStatus(row);
               const isApproved = status === "approved";
               const isRejected = status === "rejected";
               const badgeClass = isApproved
@@ -178,6 +255,7 @@ export default function CustomerSpecialPriceTable({
           </tbody>
         </table>
       </div>
+      )}
     </div>
   );
 }
