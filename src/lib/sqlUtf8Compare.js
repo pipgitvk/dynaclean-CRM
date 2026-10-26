@@ -26,6 +26,8 @@ export function sqlTrimUtf8EqColumns(leftExpr, rightExpr) {
 
 /** SQL: column contains bound parameter (LIKE %?%) */
 export function sqlLikeUtf8Contains(columnExpr) {
-  const needle = "TRIM(?)";
-  return `${utf8Trim(columnExpr)} LIKE CONCAT('%', ${needle}, '%')`;
+  // CONVERT(...) uses server default (e.g. uca1400); bound params may be utf8mb4_bin — align both sides.
+  const haystack = `${utf8Trim(columnExpr)} COLLATE ${UTF8_COLLATE}`;
+  const needle = `TRIM(CONVERT(? USING utf8mb4)) COLLATE ${UTF8_COLLATE}`;
+  return `${haystack} LIKE CONCAT('%', ${needle}, '%')`;
 }
