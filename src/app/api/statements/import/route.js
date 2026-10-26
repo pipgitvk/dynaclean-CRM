@@ -68,7 +68,7 @@ function parseDate(val) {
       return `${y}-${m}-${day}`;
     }
   }
-  // DD/MMM/YYYY or DD-MM-YYYY (e.g. 15/Apr/2026)
+  // DD/MMM/YYYY or DD-MMM-YYYY (e.g. 15/Apr/2026)
   const dmyText = s.match(/^(\d{1,2})[\/\-]([A-Za-z]{3,9})[\/\-](\d{4})$/i);
   if (dmyText) {
     const [, dayStr, monStr, yearStr] = dmyText;
@@ -84,18 +84,18 @@ function parseDate(val) {
       }
     }
   }
-  // DD-MM-YYYY or DD-MM-YYYY (numeric month) - Handle time part too
+  // DD/MM/YYYY or DD-MM-YYYY (numeric month) - Handle time part too
   const dmyWithTime = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})(\s+.*)?$/);
   if (dmyWithTime) {
     const [, day, month, year] = dmyWithTime;
-    console.log("[DEBUG] DD-MM-YYYY with time:", { day, month, year, original: s });
+    console.log("[DEBUG] DD/MM/YYYY with time:", { day, month, year, original: s });
     const d = new Date(Number(year), Number(month) - 1, Number(day));
     if (!isNaN(d.getTime())) {
       const y = d.getFullYear();
       const m = String(d.getMonth() + 1).padStart(2, "0");
       const dd = String(d.getDate()).padStart(2, "0");
       const result = `${y}-${m}-${dd}`;
-      console.log("[DEBUG] DD-MM-YYYY result:", result);
+      console.log("[DEBUG] DD/MM/YYYY result:", result);
       return result;
     }
   }
@@ -146,41 +146,6 @@ export async function POST(req) {
     const file = formData.get("file");
     if (!file || !(file instanceof Blob)) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
-    }
-
-    // --- Resolve bank_id and account_number ---
-    const bankIdRaw = formData.get("bank_id");
-    const bankId = bankIdRaw ? Number(bankIdRaw) : null;
-    let bankAccountNumber = null;
-
-    const conn = await getDbConnection();
-
-    if (bankId && Number.isFinite(bankId) && bankId > 0) {
-      // Ensure bank_masters table exists
-      try {
-        await conn.execute("SELECT id FROM bank_masters LIMIT 1");
-      } catch (_) {
-        try {
-          await conn.execute(`
-            CREATE TABLE IF NOT EXISTS bank_masters (
-              id INT UNSIGNED NOT NULL AUTO_INCREMENT,
-              bank_name VARCHAR(150) NOT NULL,
-              ifsc VARCHAR(20) NULL,
-              account_number VARCHAR(50) NULL,
-              branch_address TEXT NULL,
-              account_holder_name VARCHAR(200) NULL,
-              created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-              updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-              PRIMARY KEY (id)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-          `);
-        } catch (__) {}
-      }
-      const [bankRows] = await conn.execute(
-        "SELECT account_number FROM bank_masters WHERE id = ?",
-        [bankId]
-      );
-      bankAccountNumber = bankRows?.[0]?.account_number || null;
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
@@ -386,7 +351,7 @@ export async function POST(req) {
       return NextResponse.json({ error: "No valid rows to import" }, { status: 400 });
     }
 
-    // conn is already declared above (after bank lookup)
+    const conn = await getDbConnection();
 
     try {
       await conn.execute("SELECT closing_balance FROM statements LIMIT 1");
@@ -395,22 +360,6 @@ export async function POST(req) {
         await conn.execute(
           "ALTER TABLE statements ADD COLUMN closing_balance DECIMAL(18,2) NULL"
         );
-      } catch (__) {}
-    }
-
-    // Ensure bank_id and account_number columns exist on statements
-    try {
-      await conn.execute("SELECT bank_id FROM statements LIMIT 1");
-    } catch (_) {
-      try {
-        await conn.execute("ALTER TABLE statements ADD COLUMN bank_id INT UNSIGNED NULL");
-      } catch (__) {}
-    }
-    try {
-      await conn.execute("SELECT account_number FROM statements LIMIT 1");
-    } catch (_) {
-      try {
-        await conn.execute("ALTER TABLE statements ADD COLUMN account_number VARCHAR(50) NULL");
       } catch (__) {}
     }
 
@@ -488,8 +437,8 @@ export async function POST(req) {
           continue;
         }
         await conn.execute(
-          `INSERT INTO statements (trans_id, date, txn_dated_deb, txn_posted_date, cheq_no, description, type, amount, closing_balance, bank_id, account_number)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO statements (trans_id, date, txn_dated_deb, txn_posted_date, cheq_no, description, type, amount, closing_balance)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             r.trans_id,
             r.date,
@@ -500,8 +449,6 @@ export async function POST(req) {
             r.type || "Credit",
             r.amount || 0,
             r.closing_balance != null ? Number(r.closing_balance) : null,
-            bankId || null,
-            bankAccountNumber || null,
           ]
         );
         inserted++;
