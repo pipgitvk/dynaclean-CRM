@@ -9,7 +9,7 @@ import {
   normalizePartyPaymentAmounts,
   partyPaymentStatusLabel,
 } from "@/lib/partyPaymentsCompute";
-import CustomerIdSearchField from "@/components/customers/CustomerIdSearchField";
+import CustomerIdSearchField from "@/components/Customers/CustomerIdSearchField";
 import PartyPaymentStatementLinkModal from "@/components/party-payments/PartyPaymentStatementLinkModal";
 
 const EMPTY_FORM = {
