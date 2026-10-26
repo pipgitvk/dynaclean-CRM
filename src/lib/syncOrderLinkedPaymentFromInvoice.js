@@ -1,4 +1,7 @@
-import { lookupInvoiceLinkedPayment } from "@/lib/invoiceLinkedPaymentLookup";
+import {
+  allocateStatementPaymentsForInvoice,
+  lookupInvoiceLinkedPayment,
+} from "@/lib/invoiceLinkedPaymentLookup";
 import { resolveInvoiceNumberForOrder } from "@/lib/resolveInvoiceNumberForOrder";
 import { parseOrderLinkedPayments } from "@/lib/orderLinkedPaymentsDisplay";
 import {
@@ -13,6 +16,7 @@ import {
 import { EXCLUDE_PROFORMA_INVOICE_SQL } from "@/lib/ledgerInvoiceFilters";
 import { parseLinkedTransIds } from "@/lib/statementLinkedPurchases";
 import { sqlTrimUtf8Eq } from "@/lib/sqlUtf8Compare";
+import { syncPartyPaymentOutFromOrder } from "@/lib/partyPaymentOrderLink";
 
 async function activeInvoiceExists(conn, invoiceNumber) {
   const num = String(invoiceNumber || "").trim();
@@ -132,6 +136,7 @@ export async function syncOrderLinkedPaymentFromInvoice(conn, order) {
   let payments = Array.isArray(linked.payments) ? linked.payments : [];
   let amount = Number(linked.payment_amount);
   let pDate = linked.payment_date || null;
+  const orderTotal = Number(order.totalamt) || 0;
 
   const [invMetaRows] = await conn.execute(
     `SELECT amount_paid, linked_trans_ids, invoice_date
@@ -143,9 +148,25 @@ export async function syncOrderLinkedPaymentFromInvoice(conn, order) {
   const invMeta = invMetaRows?.[0];
   const invAmountPaid = Number(invMeta?.amount_paid) || 0;
   const tids = parseLinkedTransIds(invMeta?.linked_trans_ids);
-  // Always trust invoices.amount_paid when present (Link Payment source of truth).
   if (invAmountPaid > 0) {
     amount = Math.max(amount || 0, invAmountPaid);
+  }
+  if (orderTotal > 0 && amount > orderTotal) {
+    amount = orderTotal;
+  }
+
+  if (payments.length && orderTotal > 0) {
+    const stmtLike = payments.map((p, idx) => ({
+      id: Number(p.statement_id) || idx + 1,
+      trans_id: p.trans_id,
+      date: p.date,
+      amount: p.amount,
+    }));
+    const allocated = allocateStatementPaymentsForInvoice(stmtLike, orderTotal);
+    payments = allocated.payments;
+    if (allocated.total > 0) {
+      amount = allocated.total;
+    }
   }
 
   if (!payments.length && amount > 0) {
@@ -225,10 +246,14 @@ export async function syncOrderLinkedPaymentFromInvoice(conn, order) {
 
   const paymentsJson = mergeLinkedPaymentsJson(orderForMerge, payments);
 
-  const paidSum = Math.max(
+  let paidSum = Math.max(
     sumPaymentAmountCsv(paymentAmountVal),
     amountVal || 0,
   );
+  if (orderTotal > 0 && paidSum > orderTotal) {
+    paidSum = orderTotal;
+    paymentAmountVal = String(Number(orderTotal.toFixed(2)));
+  }
   if (paidSum > 0 && !paymentAmountVal) {
     paymentAmountVal = String(paidSum);
   }
@@ -272,6 +297,20 @@ export async function syncOrderLinkedPaymentFromInvoice(conn, order) {
       orderId,
     ],
   );
+
+  const paidForParty =
+    paidSum > 0
+      ? paidSum
+      : Number(amountReceivedVal) > 0
+        ? Number(amountReceivedVal)
+        : 0;
+  if (paidForParty > 0) {
+    try {
+      await syncPartyPaymentOutFromOrder(conn, orderId);
+    } catch (partyErr) {
+      console.error("syncPartyPaymentOutFromOrder:", partyErr);
+    }
+  }
 
   return {
     ...order,

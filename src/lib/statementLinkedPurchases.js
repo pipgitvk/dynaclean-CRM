@@ -19,7 +19,7 @@ export function parseLinkedPurchaseTokens(rawVal) {
     if (v == null) continue;
     const s = String(v).trim().toUpperCase();
     if (!s) continue;
-    if (/^(IP|PP|PS|SP)\d+$/.test(s)) {
+    if (/^(IP|PP|PS|SP|PTY)\d+$/.test(s)) {
       out.push(s.startsWith("SP") ? `PS${s.slice(2)}` : s);
     } else if (/^\d+$/.test(s)) {
       out.push(`PP${s}`);

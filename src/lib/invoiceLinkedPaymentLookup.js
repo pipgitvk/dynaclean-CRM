@@ -171,9 +171,11 @@ export async function lookupInvoiceLinkedPayment(conn, invoiceNumberRaw) {
     let payments = [];
     if (linked.length > 0) {
       const allocated = allocateStatementPaymentsForInvoice(linked, grandTotal);
-      // Never drop invoice.amount_paid when statement alloc is lower/empty.
       payment_amount = Math.max(amountPaidOnInvoice, allocated.total || 0);
       payments = allocated.payments;
+      if (grandTotal > 0) {
+        payment_amount = Math.min(payment_amount, grandTotal);
+      }
       if (
         amountPaidOnInvoice > 0 &&
         allocated.total > 0 &&

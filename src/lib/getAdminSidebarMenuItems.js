@@ -443,6 +443,13 @@ const allMenuItems = [
         roles: ["SUPERADMIN"],
         icon: "Truck",
       },
+      {
+        path: "/admin-dashboard/party-payments",
+        name: "Party Payments",
+        accessKey: "party-payments",
+        roles: ["ALL"],
+        icon: "Receipt",
+      },
     ],
   },
   {

@@ -152,6 +152,7 @@ function transformMenuItemPaths(item, roleKey) {
       "salary-sheet": "/accounts-dashboard/salary-sheet",
       "attendance-sheet": "/accounts-dashboard/attendance-sheet",
       "add-paid-leaves": "/accounts-dashboard/add-paid-leave",
+      "party-payments": "/accounts-dashboard/party-payments",
     };
     if (item.moduleKey && accountantModulePaths[item.moduleKey]) {
       return { ...item, path: accountantModulePaths[item.moduleKey] };
@@ -527,6 +528,13 @@ const allMenuItems = [
         roles: ["ALL"],
         icon: "Truck",
       },
+      {
+        path: "/user-dashboard/party-payments",
+        name: "Party Payments",
+        moduleKey: "party-payments",
+        roles: ["ALL"],
+        icon: "Receipt",
+      },
     ],
   },
   {
@@ -815,6 +823,13 @@ const allMenuItems = [
         moduleKey: "other-income",
         roles: ["ACCOUNTANT", "ADMIN", "SUPERADMIN"],
         icon: "TrendingUp",
+      },
+      {
+        path: "/user-dashboard/party-payments",
+        name: "Party Payments",
+        moduleKey: "party-payments",
+        roles: ["ALL"],
+        icon: "Receipt",
       },
       {
         path: "/admin-dashboard/import-crm/billing",

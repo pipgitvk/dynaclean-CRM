@@ -1,0 +1,22 @@
+CREATE TABLE IF NOT EXISTS `party_payment_history` (
+  `id`                 BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `party_payment_id`   BIGINT UNSIGNED NOT NULL,
+  `customer_id`        VARCHAR(32)     NULL,
+  `customer_name`      VARCHAR(255)    NULL,
+  `company_name`       VARCHAR(255)    NULL,
+  `entry_type`         VARCHAR(8)      NOT NULL COMMENT 'in | out',
+  `amount`             DECIMAL(18,2)   NOT NULL DEFAULT 0.00,
+  `order_id`           VARCHAR(32)     NULL,
+  `invoice_number`     VARCHAR(128)    NULL,
+  `statement_id`       BIGINT UNSIGNED NULL,
+  `trans_id`           VARCHAR(64)     NULL,
+  `entry_date`         DATE            NULL,
+  `created_by`         VARCHAR(100)    NULL,
+  `created_at`         TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_pph_party` (`party_payment_id`),
+  KEY `idx_pph_order` (`order_id`),
+  KEY `idx_pph_invoice` (`invoice_number`),
+  UNIQUE KEY `uniq_pph_in_stmt` (`party_payment_id`, `entry_type`, `statement_id`),
+  UNIQUE KEY `uniq_pph_out_order` (`party_payment_id`, `entry_type`, `order_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

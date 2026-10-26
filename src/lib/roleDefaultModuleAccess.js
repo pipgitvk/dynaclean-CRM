@@ -24,6 +24,7 @@ export const ROLE_DEFAULT_MODULE_KEYS = {
     "prospects-add",
     "installation-videos",
     "manual-payments",
+    "party-payments",
   ],
   "SALES HEAD": [
     "dashboard-home",
@@ -51,6 +52,7 @@ export const ROLE_DEFAULT_MODULE_KEYS = {
     "sales-target",
     "installation-videos",
     "denied-leads",
+    "party-payments",
   ],
   ADMIN: [
     "dashboard-home",
@@ -379,6 +381,7 @@ export const ROLE_DEFAULT_MODULE_KEYS = {
     "spare-parts",
     "payment-pending",
     "manual-payments",
+    "party-payments",
     "employee-crm",
     "prospects-add",
     "prospects-ne",

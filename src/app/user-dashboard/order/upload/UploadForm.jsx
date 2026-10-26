@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useInvoiceLinkedPaymentAutofill } from "@/hooks/useInvoiceLinkedPaymentAutofill";
 import { useOrderUploadInvoicePrefill } from "@/hooks/useOrderUploadInvoicePrefill";
 import InvoiceNumberSearchField from "@/components/orders/InvoiceNumberSearchField";
+import PartyPaymentOrderLinkModal from "@/components/party-payments/PartyPaymentOrderLinkModal";
 
 const MAX_FILES_PER_FIELD = 5;
 const FILE_FIELD_NAMES = new Set([
@@ -111,6 +112,31 @@ export default function UploadForm({
   const [invoicePrefillLoaded, setInvoicePrefillLoaded] = useState(false);
   const [paymentTermDays, setPaymentTermDays] = useState(null);
   const [computedPaymentStatus, setComputedPaymentStatus] = useState("pending");
+  const [partyPaymentPrompt, setPartyPaymentPrompt] = useState(null);
+  const [partyPaymentModalOpen, setPartyPaymentModalOpen] = useState(false);
+  const [partyPaymentPromptAfterUpload, setPartyPaymentPromptAfterUpload] =
+    useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const pr = await fetch(
+          `/api/party-payments/order-link-prompt?order_id=${encodeURIComponent(orderDetails.order_id)}`,
+          { credentials: "include" },
+        );
+        const pd = await pr.json();
+        if (cancelled || !pd?.partyPaymentPrompt?.party_payment_id) return;
+        setPartyPaymentPrompt(pd.partyPaymentPrompt);
+        setPartyPaymentModalOpen(true);
+      } catch {
+        /* no pending party payment */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [orderDetails.order_id]);
 
   const orderHasSavedInvoiceNumber = Boolean(
     String(orderDetails?.invoice_number ?? "").trim(),
@@ -313,7 +339,28 @@ export default function UploadForm({
       const result = await res.json();
       if (res.ok) {
         setMessage("✅ Files uploaded successfully.");
-        router.push(redirectPath);
+        let prompt = result.partyPaymentPrompt;
+        if (!prompt?.party_payment_id) {
+          try {
+            const pr = await fetch(
+              `/api/party-payments/order-link-prompt?order_id=${encodeURIComponent(orderDetails.order_id)}`,
+              { credentials: "include" },
+            );
+            const pd = await pr.json();
+            if (pd?.partyPaymentPrompt?.party_payment_id) {
+              prompt = pd.partyPaymentPrompt;
+            }
+          } catch {
+            /* optional fallback */
+          }
+        }
+        if (prompt?.party_payment_id) {
+          setPartyPaymentPrompt(prompt);
+          setPartyPaymentPromptAfterUpload(true);
+          setPartyPaymentModalOpen(true);
+        } else {
+          router.push(redirectPath);
+        }
       } else {
         setMessage("❌ " + result.error);
       }
@@ -324,7 +371,17 @@ export default function UploadForm({
     }
   };
 
+  const finishAfterPartyPaymentPrompt = () => {
+    setPartyPaymentModalOpen(false);
+    setPartyPaymentPrompt(null);
+    if (partyPaymentPromptAfterUpload) {
+      router.push(redirectPath);
+    }
+    setPartyPaymentPromptAfterUpload(false);
+  };
+
   return (
+    <>
     <form
       onSubmit={handleSubmit}
       className="space-y-6 max-w-6xl mx-auto p-6 bg-white rounded-lg"
@@ -505,6 +562,13 @@ export default function UploadForm({
         </a>
       </div>
     </form>
+    <PartyPaymentOrderLinkModal
+      open={partyPaymentModalOpen}
+      prompt={partyPaymentPrompt}
+      orderId={orderDetails.order_id}
+      onDone={finishAfterPartyPaymentPrompt}
+    />
+    </>
   );
 }
 

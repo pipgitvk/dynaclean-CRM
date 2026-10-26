@@ -15,6 +15,7 @@ import {
   sumPaymentAmountCsv,
 } from "@/lib/orderPaymentHistory";
 import { syncInvoiceAndOrderPaymentLink } from "@/lib/syncInvoiceOrderPaymentLink";
+import { findPartyPaymentPromptForOrder } from "@/lib/partyPaymentOrderLink";
 
 const MAX_FILES_PER_FIELD = 5;
 
@@ -284,7 +285,14 @@ export async function POST(req) {
       console.error("Order upload invoice/order payment sync:", syncErr);
     }
 
-    return NextResponse.json({ success: true });
+    let partyPaymentPrompt = null;
+    try {
+      partyPaymentPrompt = await findPartyPaymentPromptForOrder(conn, orderId);
+    } catch (promptErr) {
+      console.error("Order upload party payment prompt:", promptErr);
+    }
+
+    return NextResponse.json({ success: true, partyPaymentPrompt });
   } catch (error) {
     console.error("❌ Upload Error:", error);
     return NextResponse.json(

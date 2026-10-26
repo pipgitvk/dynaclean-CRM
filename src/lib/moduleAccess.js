@@ -159,6 +159,7 @@ export const MODULE_TREE = [
       { key: "import-billing", label: "Billing" },
       { key: "ledger", label: "Ledger" },
       { key: "bank-management", label: "Bank Management" },
+      { key: "party-payments", label: "Party Payments" },
     ],
   },
   {
@@ -323,6 +324,7 @@ export const SUPERADMIN_MODULE_UI_NODES = [
       { kind: "leaf", key: "orders-process", label: "Order Process" },
       { kind: "leaf", key: "orders-delay", label: "Delay Delivery" },
       { kind: "leaf", key: "estimate-delivery", label: "Estimate Delivery" },
+      { kind: "leaf", key: "party-payments", label: "Party Payments" },
     ],
   },
   {
@@ -409,6 +411,7 @@ export const SUPERADMIN_MODULE_UI_NODES = [
       { kind: "leaf", key: "import-billing", label: "Billing" },
       { kind: "leaf", key: "ledger", label: "Ledger" },
       { kind: "leaf", key: "bank-management", label: "Bank Management" },
+      { kind: "leaf", key: "party-payments", label: "Party Payments" },
     ],
   },
   {
@@ -759,7 +762,10 @@ function finalizeResolvedModuleAccess(normalized, role) {
     if (leafKeys.length > 0 && leafKeys.length <= 24 && !isFullModuleGrant(leafKeys)) {
       return leafKeys;
     }
-    return resolveUnsetModuleAccess(role);
+    const defaults = resolveUnsetModuleAccess(role);
+    const defaultSet = new Set(defaults);
+    const extras = leafKeys.filter((k) => !defaultSet.has(k));
+    return [...defaults, ...extras];
   }
   return leafKeys;
 }
