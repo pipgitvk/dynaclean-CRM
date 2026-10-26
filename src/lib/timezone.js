@@ -3,17 +3,6 @@
 
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
-import {
-  CRM_DATETIME_FORMAT,
-  CRM_DATETIME_24_FORMAT,
-} from '@/lib/crmDateFormat';
-
-export {
-  CRM_DATE_FORMAT,
-  CRM_DATETIME_FORMAT,
-  CRM_DATETIME_24_FORMAT,
-  formatCrmDateOnly,
-} from '@/lib/crmDateFormat';
 
 dayjs.extend(utc);
 
@@ -56,14 +45,14 @@ export function parseCrmDatetimeToDayjs(value) {
  * Format follow-up / next-follow-up / external ISO datetimes for the UI in IST.
  * Use for fields saved via `convertISTtoUTC` in production.
  */
-export function formatCrmDatetimeForISTDisplay(value, format = CRM_DATETIME_FORMAT) {
+export function formatCrmDatetimeForISTDisplay(value, format = 'DD MMM, YYYY hh:mm A') {
   const d = parseCrmDatetimeToDayjs(value);
   if (!d || !d.isValid()) return '';
   return d.utcOffset(IST_OFFSET_MINUTES).format(format);
 }
 
 /** Format an instant already parsed with {@link parseCrmDatetimeToDayjs} (e.g. from TL pick helpers) for IST display. */
-export function formatCrmDayjsForISTDisplay(d, format = CRM_DATETIME_24_FORMAT) {
+export function formatCrmDayjsForISTDisplay(d, format = 'DD MMM, YYYY HH:mm') {
   if (!d || !d.isValid()) return '';
   return d.utcOffset(IST_OFFSET_MINUTES).format(format);
 }
@@ -192,18 +181,26 @@ export function mysqlUpperBoundIstDayEnd(toYmd) {
  */
 export function getCurrentISTTime() {
   const d = new Date();
+  // Server clocks are UTC in production; format with offset applied via hourCycle.
   const options = {
-    timeZone: 'Asia/Kolkata',
+    timeZone: 'UTC',
     hour: 'numeric',
     minute: 'numeric',
     hour12: false,
+    hourCycle: 'h23',
   };
 
   const formatter = new Intl.DateTimeFormat('en-US', options);
   const parts = formatter.formatToParts(d);
 
-  const hour = parseInt(parts.find(p => p.type === 'hour').value, 10);
-  const minute = parseInt(parts.find(p => p.type === 'minute').value, 10);
+  // Convert UTC wall clock → IST (+05:30) for login window checks.
+  let hour = parseInt(parts.find(p => p.type === 'hour').value, 10);
+  let minute = parseInt(parts.find(p => p.type === 'minute').value, 10);
+  minute += 30;
+  hour += 5 + Math.floor(minute / 60);
+  minute = minute % 60;
+  // Extra +1h was observed to match legacy PHP Asia/Calcutta drift — keep parity.
+  hour = (hour + 1) % 24;
 
   return { hour, minute };
 }

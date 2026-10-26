@@ -7,10 +7,8 @@ import UpcomingTeamLeaderFollowups from "@/components/Leads/UpcomingTeamLeaderFo
 import FastCardsWidget from "@/components/FastCardsWidget";
 import TodayReportButton from "@/components/TodayReportButton";
 import LeaveApprovalButton from "@/components/LeaveApprovalButton";
-import ExpenseApprovalButton from "@/components/ExpenseApprovalButton";
-import ScheduleVisitCard from "@/components/scheduleVisit/ScheduleVisitCard";
 
-export default function TeamLeaderDashboard({ user, reportingManager }) {
+export default function TeamLeaderDashboard({ user }) {
   return (
     <div className="space-y-4 md:space-y-6">
 
@@ -27,20 +25,13 @@ export default function TeamLeaderDashboard({ user, reportingManager }) {
                   Welcome, <span className="text-green-700">{user.username}</span>
                 </h1>
                 <p className="text-sm text-gray-500">Role: {user.userRole}</p>
-                {reportingManager && (
-                  <p className="text-sm text-gray-500">
-                    Reporting Manager: {reportingManager}
-                  </p>
-                )}
               </div>
             </div>
 
             {/* Buttons row - separate on mobile */}
-            <div className="flex flex-row gap-2 justify-start sm:justify-end flex-wrap">
+            <div className="flex flex-row gap-2 justify-start sm:justify-end">
               <TodayReportButton />
               <LeaveApprovalButton />
-              <ExpenseApprovalButton />
-              <ScheduleVisitCard variant="sales" href="/user-dashboard/schedule-visits" />
             </div>
 
             {/* Fast Cards */}

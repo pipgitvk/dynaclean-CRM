@@ -1,9 +1,8 @@
 import dayjs from "dayjs";
-import { CRM_DATE_FORMAT } from "@/lib/crmDateFormat";
 
 /**
  * Stable calendar YYYY-MM-DD for task datetimes passed from server → client.
- * RSC serializes Date as UTC ISO; `dayjs(iso).format("DD-MM-YYYY")` in IST can
+ * RSC serializes Date as UTC ISO; `dayjs(iso).format("DD/MM/YYYY")` in IST can
  * show the next day vs server-rendered detail pages (often UTC). Using the UTC
  * date prefix matches the instant's calendar day in ISO and fixes list vs view.
  */
@@ -22,9 +21,9 @@ export function taskCalendarDateKey(value) {
 
 export function formatTaskDateOnly(value) {
   const key = taskCalendarDateKey(value);
-  if (key) return dayjs(key, "YYYY-MM-DD").format(CRM_DATE_FORMAT);
+  if (key) return dayjs(key, "YYYY-MM-DD").format("DD/MM/YYYY");
   const d = dayjs(value);
-  return d.isValid() ? d.format(CRM_DATE_FORMAT) : "-";
+  return d.isValid() ? d.format("DD/MM/YYYY") : "-";
 }
 
 export function dayjsTaskCalendarStart(value) {

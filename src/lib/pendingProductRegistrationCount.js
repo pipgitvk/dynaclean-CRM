@@ -1,12 +1,10 @@
-import { sqlTrimUtf8EqColumns } from "@/lib/sqlUtf8Compare";
-
 /**
  * Item is a product (exists in products_list).
  */
 export const IS_PRODUCT_DISPATCH_ITEM_SQL = (dispatchAlias = "d") => `
   EXISTS (
     SELECT 1 FROM products_list pl
-    WHERE ${sqlTrimUtf8EqColumns("pl.item_code", `${dispatchAlias}.item_code`)}
+    WHERE pl.item_code = ${dispatchAlias}.item_code
   )
 `;
 
@@ -17,13 +15,14 @@ export const UNREGISTERED_PRODUCT_ORDER_SQL = `
   EXISTS (
     SELECT 1
     FROM dispatch d_unreg
-    WHERE ${sqlTrimUtf8EqColumns("d_unreg.quote_number", "no.quote_number")}
+    WHERE d_unreg.quote_number COLLATE utf8mb4_unicode_ci = no.quote_number COLLATE utf8mb4_unicode_ci
       AND d_unreg.serial_no IS NOT NULL
       AND d_unreg.serial_no <> ''
       AND ${IS_PRODUCT_DISPATCH_ITEM_SQL("d_unreg")}
       AND NOT EXISTS (
         SELECT 1 FROM warranty_products wp
-        WHERE ${sqlTrimUtf8EqColumns("wp.serial_number", "d_unreg.serial_no")}
+        WHERE TRIM(wp.serial_number) COLLATE utf8mb4_unicode_ci
+          = TRIM(d_unreg.serial_no) COLLATE utf8mb4_unicode_ci
       )
   )
 `;

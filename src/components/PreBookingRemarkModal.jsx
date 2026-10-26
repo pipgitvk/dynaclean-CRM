@@ -1,6 +1,5 @@
 "use client";
 
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect } from "react";
 import { X, Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
@@ -159,9 +158,14 @@ export default function PreBookingRemarkModal({
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 New Expected Date <span className="text-red-500">*</span>
               </label>
-              <TypeableDateFilterInput value={postponedDate} onChange={setPostponedDate} min={new Date().toISOString().split("T")[0]}
+              <input
+                type="date"
+                value={postponedDate}
+                onChange={(e) => setPostponedDate(e.target.value)}
+                min={new Date().toISOString().split("T")[0]}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required/>
+                required
+              />
             </div>
           )}
 

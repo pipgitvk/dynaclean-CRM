@@ -1,7 +1,5 @@
 "use client";
 
-import { formatCrmDateOnly } from "@/lib/crmDateFormat";
-
 import { useState } from "react";
 
 function AssignmentsTable({ assignments }) {
@@ -175,7 +173,7 @@ function AssignmentsTable({ assignments }) {
                   </td>
                   <td className="py-3 px-6 whitespace-nowrap">
                     {assignment.Assigned_Date
-                      ? formatCrmDateOnly(assignment.Assigned_Date)
+                      ? new Date(assignment.Assigned_Date).toLocaleDateString()
                       : "N/A"}
                   </td>
                   <td className="py-3 px-6 whitespace-nowrap">
@@ -191,7 +189,7 @@ function AssignmentsTable({ assignments }) {
                   </td>
                   <td className="py-3 px-6 whitespace-nowrap">
                     {assignment.submit_date
-                      ? formatCrmDateOnly(assignment.submit_date)
+                      ? new Date(assignment.submit_date).toLocaleDateString()
                       : "N/A"}
                   </td>
                   <td className="py-3 px-6 whitespace-nowrap">
@@ -268,13 +266,13 @@ function AssignmentsTable({ assignments }) {
                 <p className="text-sm text-gray-600">
                   <strong>Assigned Date:</strong>{" "}
                   {assignment.Assigned_Date
-                    ? formatCrmDateOnly(assignment.Assigned_Date)
+                    ? new Date(assignment.Assigned_Date).toLocaleDateString()
                     : "N/A"}
                 </p>
                 <p className="text-sm text-gray-600">
                   <strong>Submitted Date:</strong>{" "}
                   {assignment.submit_date
-                    ? formatCrmDateOnly(assignment.submit_date)
+                    ? new Date(assignment.submit_date).toLocaleDateString()
                     : "N/A"}
                 </p>
                 <p className="text-sm text-gray-600">

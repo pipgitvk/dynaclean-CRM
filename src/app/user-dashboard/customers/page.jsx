@@ -3,12 +3,6 @@ import CustomerTable from "./CustomerTable";
 import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 import { getSessionPayload } from "@/lib/auth";
-import { buildGemCustomerScopeWhere } from "@/lib/dataScope";
-import { sqlServiceSupportCustomerScope } from "@/lib/serviceSupportTeamScope";
-import {
-  appendLatestFollowedDateIstFilter,
-  latestFollowedDateSelectSql,
-} from "@/lib/customerFollowupNotesLanguage";
 
 export const dynamic = "force-dynamic";
 
@@ -40,7 +34,6 @@ export default async function CustomersPage({ searchParams }) {
     date_to,
     sort,
     next_follow_date,
-    followed_date,
     employee,
     page = '1'
   } = searchParamsResolved;
@@ -92,11 +85,17 @@ export default async function CustomersPage({ searchParams }) {
 
   // Only filter by assigned fields based on role
   if (userRole === "SERVICE SUPPORT") {
-    customerConditions.push(sqlServiceSupportCustomerScope("c"));
+    // SERVICE SUPPORT: customers assigned to them OR customers they have followed up
+    customerConditions.push(`(c.service_lead_source = ? OR c.customer_id IN (
+      SELECT DISTINCT cf.customer_id FROM customers_followup cf WHERE cf.followed_by = ?
+    ))`);
+    customerParams.push(username, username);
   } else if (userRole === "GEM") {
-    const gemScope = buildGemCustomerScopeWhere({ username, tableAlias: "c" });
-    customerConditions.push(gemScope.sql);
-    customerParams.push(...gemScope.params);
+    // GEM: customers assigned to them OR customers they have followed up
+    customerConditions.push(`(c.gem_lead_source = ? OR c.customer_id IN (
+      SELECT DISTINCT cf.customer_id FROM customers_followup cf WHERE cf.followed_by = ?
+    ))`);
+    customerParams.push(username, username);
   } else if (userRole !== "ADMIN" && userRole !== "SUPERADMIN" && userRole !== "SERVICE HEAD" && userRole !== "TEAM LEADER" && userRole !== "EA") {
     customerConditions.push("(c.lead_source = ? OR c.sales_representative = ? OR c.assigned_to = ?)");
     customerParams.push(username, username, username);
@@ -182,14 +181,6 @@ export default async function CustomersPage({ searchParams }) {
     customerParams.push(date_from, date_to);
   }
 
-  if (followed_date) {
-    appendLatestFollowedDateIstFilter({
-      conditions: customerConditions,
-      params: customerParams,
-      followedDateYmd: followed_date,
-    });
-  }
-
   // Combine all WHERE clauses
   let allWhereConditions = [...customerConditions];
   if (followupConditions.length > 0) {
@@ -213,8 +204,7 @@ export default async function CustomersPage({ searchParams }) {
       c.lead_campaign,
       c.products_interest,
       c.service_lead_source,
-      IFNULL(GROUP_CONCAT(b.bid_number), '') as bid_numbers,
-      ${latestFollowedDateSelectSql}
+      IFNULL(GROUP_CONCAT(b.bid_number), '') as bid_numbers
       ${followupSelectFields} -- This inserts the conditional select statement
     FROM customers c
     LEFT JOIN bids b ON c.customer_id = b.customer_id

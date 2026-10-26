@@ -32,8 +32,8 @@ export default function OrderDocumentFileCard({
   onUploaded,
 }) {
   const [uploading, setUploading] = useState(false);
-  const canEdit = canEditOrderDocumentField(order, fieldKey, file);
-  const blockReason = getOrderDocumentEditBlockReason(order, fieldKey, file);
+  const canEdit = canEditOrderDocumentField(order, fieldKey);
+  const blockReason = getOrderDocumentEditBlockReason(order, fieldKey);
   const maxFiles = getMaxFilesForField(fieldKey);
 
   const fileUrls = useMemo(

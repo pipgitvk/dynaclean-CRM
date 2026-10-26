@@ -1,14 +1,9 @@
 "use client";
 
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import dayjs from "dayjs";
-import {
-  getOrderTableDefaultDateFrom,
-  getOrderTableDefaultDateTo,
-} from "@/lib/orderTableDateDefaults";
 import {
   Search,
   Download,
@@ -17,13 +12,13 @@ import {
   MinusCircle,
   ArrowLeft,
   CheckCircle2,
-  Pencil,
 } from "lucide-react";
 
 const DEDUCTION_TYPES = ["TDS", "LD", "SD", "Others"];
 
 function defaultClaimable(type) {
-  if (type === "TDS" || type === "LD" || type === "SD") return true;
+  if (type === "TDS") return false;
+  if (type === "LD" || type === "SD") return true;
   return false;
 }
 
@@ -39,11 +34,10 @@ export default function PaymentDeductionsReport({ paymentPendingPath }) {
   const [deductionTypeFilter, setDeductionTypeFilter] = useState("all");
   const [claimableFilter, setClaimableFilter] = useState("all");
   const [claimStatusFilter, setClaimStatusFilter] = useState("all");
-  const [dateFrom, setDateFrom] = useState(() => getOrderTableDefaultDateFrom());
-  const [dateTo, setDateTo] = useState(() => getOrderTableDefaultDateTo());
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [orderIdFilter, setOrderIdFilter] = useState(initialOrderId);
   const [addModalOpen, setAddModalOpen] = useState(false);
-  const [claimEditDeduction, setClaimEditDeduction] = useState(null);
   const [updatingId, setUpdatingId] = useState(null);
 
   const canManage = ["ACCOUNTANT", "PRODUCTION ACCOUNTANT", "ADMIN", "SUPERADMIN"].includes(userRole);
@@ -101,8 +95,7 @@ export default function PaymentDeductionsReport({ paymentPendingPath }) {
       "Claimable",
       "Claim Status",
       "Claim Received Date",
-      "Created By",
-      "Claim Received By",
+      "Recorded By",
       "Recorded Date",
     ];
     const rows = deductions.map((d) => [
@@ -115,10 +108,9 @@ export default function PaymentDeductionsReport({ paymentPendingPath }) {
       d.remarks,
       d.claimable ? "Yes" : "No",
       d.claim_status,
-      d.claim_received_date ? dayjs(d.claim_received_date).format("DD-MM-YYYY") : "",
-      d.recorded_by || "",
-      d.claim_received_by || "",
-      d.recorded_date ? dayjs(d.recorded_date).format("DD-MM-YYYY hh:mm A") : "",
+      d.claim_received_date ? dayjs(d.claim_received_date).format("DD/MM/YYYY") : "",
+      d.recorded_by,
+      d.recorded_date ? dayjs(d.recorded_date).format("DD/MM/YYYY hh:mm A") : "",
     ]);
 
     const csvContent = [
@@ -133,31 +125,23 @@ export default function PaymentDeductionsReport({ paymentPendingPath }) {
     link.click();
   };
 
-  const handleClaimStatusChange = async (deduction, nextStatus, receivedDateYmd) => {
+  const handleClaimStatusChange = async (deduction, nextStatus) => {
     if (!canManage) return;
-    if (nextStatus === "received" && !receivedDateYmd) {
-      alert("Please select claim received date");
-      return;
-    }
     try {
       setUpdatingId(deduction.id);
-      const claimReceivedDate =
-        nextStatus === "received"
-          ? dayjs(receivedDateYmd).format("YYYY-MM-DD HH:mm:ss")
-          : null;
       const res = await fetch(`/api/payment-deduction/record/${deduction.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           claim_status: nextStatus,
-          claim_received_date: claimReceivedDate,
+          claim_received_date:
+            nextStatus === "received" ? dayjs().format("YYYY-MM-DD HH:mm:ss") : null,
         }),
       });
       const data = await res.json();
       if (!res.ok || !data?.success) {
         throw new Error(data?.error || "Failed to update claim status");
       }
-      setClaimEditDeduction(null);
       fetchDeductions();
     } catch (error) {
       alert(error.message || "Failed to update claim status");
@@ -171,8 +155,8 @@ export default function PaymentDeductionsReport({ paymentPendingPath }) {
     setDeductionTypeFilter("all");
     setClaimableFilter("all");
     setClaimStatusFilter("all");
-    setDateFrom(getOrderTableDefaultDateFrom());
-    setDateTo(getOrderTableDefaultDateTo());
+    setDateFrom("");
+    setDateTo("");
     setOrderIdFilter("");
   };
 
@@ -260,11 +244,21 @@ export default function PaymentDeductionsReport({ paymentPendingPath }) {
             <option value="received">Received</option>
             <option value="not received">Not Received</option>
           </select>
-          <TypeableDateFilterInput value={dateFrom} onChange={setDateFrom} className="rounded border border-gray-300 px-2 py-1.5 text-xs"
-            title="From Date"/>
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+            className="rounded border border-gray-300 px-2 py-1.5 text-xs"
+            title="From Date"
+          />
           <div className="flex gap-1">
-            <TypeableDateFilterInput value={dateTo} onChange={setDateTo} className="w-full rounded border border-gray-300 px-2 py-1.5 text-xs"
-              title="To Date"/>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="w-full rounded border border-gray-300 px-2 py-1.5 text-xs"
+              title="To Date"
+            />
             {(searchQuery ||
               deductionTypeFilter !== "all" ||
               claimableFilter !== "all" ||
@@ -308,21 +302,19 @@ export default function PaymentDeductionsReport({ paymentPendingPath }) {
                 <th className="px-3 py-3 text-center font-semibold">Claimable</th>
                 <th className="px-3 py-3 text-center font-semibold">Claim Status</th>
                 <th className="px-3 py-3 text-center font-semibold">Claim Date</th>
-                <th className="px-3 py-3 text-left font-semibold">Created By</th>
-                <th className="px-3 py-3 text-left font-semibold">Claim Received By</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
               {loading ? (
                 <tr>
-                  <td colSpan={12} className="px-6 py-10 text-center text-gray-500">
+                  <td colSpan={10} className="px-6 py-10 text-center text-gray-500">
                     <Loader2 className="mx-auto mb-2 animate-spin" size={20} />
                     Loading deductions...
                   </td>
                 </tr>
               ) : deductions.length === 0 ? (
                 <tr>
-                  <td colSpan={12} className="px-6 py-10 text-center text-gray-500">
+                  <td colSpan={10} className="px-6 py-10 text-center text-gray-500">
                     No deductions found
                   </td>
                 </tr>
@@ -357,36 +349,32 @@ export default function PaymentDeductionsReport({ paymentPendingPath }) {
                       </span>
                     </td>
                     <td className="px-3 py-3 text-center">
-                      <div className="inline-flex items-center justify-center gap-1.5">
-                        <ClaimStatusBadge status={item.claim_status} />
-                        {canManage && item.claimable && (
-                          <button
-                            type="button"
-                            disabled={updatingId === item.id}
-                            onClick={() => setClaimEditDeduction(item)}
-                            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-gray-300 bg-white text-gray-600 hover:bg-gray-50 hover:text-blue-600 disabled:opacity-50"
-                            title="Edit claim status"
-                            aria-label="Edit claim status"
-                          >
-                            {updatingId === item.id ? (
-                              <Loader2 size={14} className="animate-spin" />
-                            ) : (
-                              <Pencil size={14} />
-                            )}
-                          </button>
-                        )}
-                      </div>
+                      {canManage && item.claimable ? (
+                        <select
+                          value={item.claim_status || "not received"}
+                          disabled={updatingId === item.id}
+                          onChange={(e) => handleClaimStatusChange(item, e.target.value)}
+                          className="rounded border border-gray-300 px-2 py-1 text-xs"
+                        >
+                          <option value="not received">Not Received</option>
+                          <option value="received">Received</option>
+                        </select>
+                      ) : (
+                        <span
+                          className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${
+                            String(item.claim_status).toLowerCase() === "received"
+                              ? "bg-green-100 text-green-700"
+                              : "bg-yellow-100 text-yellow-700"
+                          }`}
+                        >
+                          {item.claim_status || "not received"}
+                        </span>
+                      )}
                     </td>
                     <td className="px-3 py-3 text-center text-xs text-gray-700">
                       {item.claim_received_date
-                        ? dayjs(item.claim_received_date).format("DD-MM-YYYY")
+                        ? dayjs(item.claim_received_date).format("DD/MM/YYYY")
                         : "-"}
-                    </td>
-                    <td className="px-3 py-3 text-xs text-gray-700">
-                      {item.recorded_by || "-"}
-                    </td>
-                    <td className="px-3 py-3 text-xs text-gray-700">
-                      {item.claim_received_by || "-"}
                     </td>
                   </tr>
                 ))
@@ -405,17 +393,6 @@ export default function PaymentDeductionsReport({ paymentPendingPath }) {
           fetchDeductions();
         }}
       />
-
-      <ClaimStatusEditModal
-        deduction={claimEditDeduction}
-        saving={claimEditDeduction != null && updatingId === claimEditDeduction.id}
-        onClose={() => setClaimEditDeduction(null)}
-        onSave={(nextStatus, receivedDateYmd) => {
-          if (claimEditDeduction) {
-            handleClaimStatusChange(claimEditDeduction, nextStatus, receivedDateYmd);
-          }
-        }}
-      />
     </div>
   );
 }
@@ -425,116 +402,6 @@ function SummaryCard({ label, value, color }) {
     <div className="rounded-lg border bg-gradient-to-r from-gray-50 to-white p-3 shadow-sm">
       <p className="text-xs font-semibold text-gray-500">{label}</p>
       <p className={`text-lg font-bold ${color}`}>₹{Number(value || 0).toLocaleString("en-IN")}</p>
-    </div>
-  );
-}
-
-function ClaimStatusBadge({ status }) {
-  const normalized = String(status || "not received").toLowerCase();
-  const isReceived = normalized === "received";
-  return (
-    <span
-      className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold capitalize ${
-        isReceived ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"
-      }`}
-    >
-      {status || "not received"}
-    </span>
-  );
-}
-
-function ClaimStatusEditModal({ deduction, onClose, onSave, saving }) {
-  const [claimStatus, setClaimStatus] = useState("not received");
-  const [receivedDate, setReceivedDate] = useState("");
-
-  useEffect(() => {
-    if (!deduction) return;
-    const current = String(deduction.claim_status || "not received").toLowerCase();
-    setClaimStatus(current === "received" ? "received" : "not received");
-    if (deduction.claim_received_date) {
-      const d = dayjs(deduction.claim_received_date);
-      setReceivedDate(d.isValid() ? d.format("YYYY-MM-DD") : dayjs().format("YYYY-MM-DD"));
-    } else {
-      setReceivedDate(dayjs().format("YYYY-MM-DD"));
-    }
-  }, [deduction]);
-
-  if (!deduction) return null;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="w-full max-w-md rounded-lg bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b px-5 py-4">
-          <div>
-            <div className="text-lg font-bold text-gray-900">Claim status</div>
-            <p className="text-xs text-gray-500 mt-0.5">
-              Order {deduction.order_id} · ₹{Number(deduction.amount || 0).toFixed(2)}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={saving}
-            className="rounded-md p-2 text-gray-500 hover:bg-gray-100 disabled:opacity-50"
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        <div className="space-y-4 px-5 py-4">
-          <div>
-            <label className="mb-1 block text-xs font-semibold text-gray-700">Status</label>
-            <select
-              value={claimStatus}
-              onChange={(e) => setClaimStatus(e.target.value)}
-              disabled={saving}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="not received">Not Received</option>
-              <option value="received">Received</option>
-            </select>
-          </div>
-
-          {claimStatus === "received" && (
-            <div>
-              <label className="mb-1 block text-xs font-semibold text-gray-700">
-                Claim received date
-              </label>
-              <TypeableDateFilterInput
-                value={receivedDate}
-                onChange={setReceivedDate}
-                placeholder="dd/mm/yyyy"
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-          )}
-        </div>
-
-        <div className="flex items-center justify-end gap-2 border-t px-5 py-4">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={saving}
-            className="rounded-md bg-gray-200 px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-300 disabled:opacity-50"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            disabled={saving}
-            onClick={() => {
-              onSave(
-                claimStatus,
-                claimStatus === "received" ? receivedDate : null,
-              );
-            }}
-            className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {saving ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
-            Save
-          </button>
-        </div>
-      </div>
     </div>
   );
 }

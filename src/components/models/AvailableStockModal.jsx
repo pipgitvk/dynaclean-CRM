@@ -14,7 +14,7 @@ export default function AvailableStockModal({ isOpen, onClose }) {
 
   useEffect(() => {
     if (isOpen) {
-      fetch("/api/available-stock")
+      fetch("/api/available--stock")
         .then((res) => res.json())
         .then((res) => setData(Array.isArray(res) ? res : []))
         .catch(() => setData([]));

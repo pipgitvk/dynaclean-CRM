@@ -1,7 +1,6 @@
 // components/Modal.jsx
 "use client";
 import React, { useEffect, useState } from "react";
-import { formatCrmDateOnly } from "@/lib/crmDateFormat";
 import ServiceAttachmentLink from "./ServiceAttachmentLink";
 
 
@@ -11,7 +10,6 @@ export default function Modal({
   title,
   selectedService,
   baseUrl,
-  dashboardPath = "user-dashboard",
 }) {
   const [customerId, setCustomerId] = useState(null);
   const [loadingCustomerId, setLoadingCustomerId] = useState(false);
@@ -88,7 +86,7 @@ export default function Modal({
       onClick={onClose}
     >
       <div 
-        className="relative w-full max-w-2xl bg-white rounded-lg shadow-xl"
+        className="relative w-full max-w-md bg-white rounded-lg shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 rounded-t-lg">
@@ -102,7 +100,7 @@ export default function Modal({
             </button>
           </div>
         </div>
-        <div className="px-6 py-4 max-h-[75vh] overflow-y-auto">
+        <div className="px-6 py-4 max-h-96 overflow-y-auto">
           <div className="space-y-3 text-gray-700 text-sm">
             <p>
               <strong>Service Type:</strong> {selectedService.service_type}
@@ -146,7 +144,7 @@ export default function Modal({
             </p>
             <p>
               <strong>Invoice Date:</strong>{" "}
-              {formatCrmDateOnly(selectedService.invoice_date)}
+              {new Date(selectedService.invoice_date).toLocaleDateString()}
             </p>
 
             <p>
@@ -181,40 +179,17 @@ export default function Modal({
                 {selectedService.status}
               </span>
             </p>
-            {/* Service Report Links */}
+            {/* Service Report Link */}
             <p>
               <strong>Service Report:</strong>{" "}
-              {String(selectedService.report_ids || "")
-                .split(",")
-                .map((id) => id.trim())
-                .filter(Boolean).length > 0 ? (
-                String(selectedService.report_ids)
-                  .split(",")
-                  .map((id) => id.trim())
-                  .filter(Boolean)
-                  .map((id, index, arr) => (
-                    <span key={id}>
-                      <a
-                        href={`/${dashboardPath}/view-service-report/${selectedService.service_id}?reportId=${id}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-purple-600 hover:underline"
-                      >
-                        {id}
-                      </a>
-                      {index < arr.length - 1 ? ", " : ""}
-                    </span>
-                  ))
-              ) : (
-                <a
-                  href={`/${dashboardPath}/view-service-report/${selectedService.service_id}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-purple-600 hover:underline"
-                >
-                  View Service Report
-                </a>
-              )}
+              <a
+                href={`/user-dashboard/view-service-report/${selectedService.service_id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-purple-600 hover:underline"
+              >
+                View Service Report
+              </a>
             </p>
             <p>
               <strong>Completed Date:</strong>{" "}

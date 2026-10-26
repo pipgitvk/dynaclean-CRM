@@ -21,8 +21,8 @@ export async function GET(request) {
 
     const conn = await getDbConnection();
     const [items] = await conn.execute(
-      `SELECT id, item_name, item_code, quantity, unit,
-              price_per_unit, taxable_price, total_price, total_taxable_amt
+      `SELECT id, item_name, item_code, quantity, 
+              total_price, taxable_price, total_taxable_amt
        FROM quotation_items 
        WHERE quote_number = ?
        ORDER BY id ASC`,

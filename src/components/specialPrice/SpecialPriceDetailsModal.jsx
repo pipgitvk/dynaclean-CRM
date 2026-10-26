@@ -1,39 +1,14 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
-import {
-  resolveSpecialPriceTerm,
-  displayPriceTypeLabel,
-} from "@/lib/specialPriceDefaults";
+import { useState } from "react";
 
 export default function SpecialPriceDetailsModal({
   details,
   triggerLabel = "Details",
   onUpdate,
   onDelete,
-  onRowChange,
-  onRowDeleted,
 }) {
   const [open, setOpen] = useState(false);
-  const [updateState, updateAction, updatePending] = useActionState(
-    onUpdate ?? (async () => ({ error: "Not available." })),
-    null,
-  );
-  const [deleteState, deleteAction, deletePending] = useActionState(
-    onDelete ?? (async () => ({ error: "Not available." })),
-    null,
-  );
-
-  useEffect(() => {
-    if (!updateState?.success) return;
-    onRowChange?.(updateState);
-  }, [updateState, onRowChange]);
-
-  useEffect(() => {
-    if (!deleteState?.success) return;
-    onRowDeleted?.(deleteState.id);
-    setOpen(false);
-  }, [deleteState, onRowDeleted]);
 
   if (!details) return null;
 
@@ -46,8 +21,6 @@ export default function SpecialPriceDetailsModal({
     productCode,
     originalPrice,
     specialPrice,
-    priceType,
-    priceTerm,
     status,
     setBy,
     setDate,
@@ -88,7 +61,7 @@ export default function SpecialPriceDetailsModal({
           <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col my-auto">
             <div className="flex items-center justify-between border-b px-3 sm:px-4 py-3 flex-shrink-0">
               <h2 className="text-sm font-semibold">
-                Requested Price Details
+                Special Price Details
               </h2>
               <button
                 type="button"
@@ -138,22 +111,10 @@ export default function SpecialPriceDetailsModal({
                 </div>
                 <div>
                   <div className="font-semibold text-gray-600">
-                    Requested Price
+                    Special Price
                   </div>
                   <div className="text-green-700 font-semibold">
                     ₹ {specialPrice ?? 0}
-                  </div>
-                </div>
-                <div>
-                  <div className="font-semibold text-gray-600">Price Type</div>
-                  <div className="text-gray-800 capitalize">
-                    {displayPriceTypeLabel(priceType)}
-                  </div>
-                </div>
-                <div>
-                  <div className="font-semibold text-gray-600">Price Term</div>
-                  <div className="text-gray-800 capitalize">
-                    {resolveSpecialPriceTerm(priceTerm)}
                   </div>
                 </div>
               </div>
@@ -206,10 +167,9 @@ export default function SpecialPriceDetailsModal({
                 <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
                   {onUpdate && (
                     <form
-                      action={updateAction}
+                      action={onUpdate}
                       className="flex flex-col sm:flex-row sm:items-center gap-2 text-xs"
                     >
-                      <input type="hidden" name="stay_on_page" value="1" />
                       <input type="hidden" name="id" value={id} />
                       <label className="text-gray-600 font-medium">
                         Update Price
@@ -225,21 +185,17 @@ export default function SpecialPriceDetailsModal({
                         />
                         <button
                           type="submit"
-                          disabled={updatePending}
-                          className="px-3 py-1.5 sm:py-1 rounded bg-blue-600 text-white hover:bg-blue-700 whitespace-nowrap disabled:opacity-50"
+                          className="px-3 py-1.5 sm:py-1 rounded bg-blue-600 text-white hover:bg-blue-700 whitespace-nowrap"
                         >
-                          {updatePending ? "Saving…" : "Save"}
+                          Save
                         </button>
                       </div>
-                      {updateState?.error && (
-                        <p className="text-red-600 text-xs">{updateState.error}</p>
-                      )}
                     </form>
                   )}
 
                   {onDelete && (
                     <form
-                      action={deleteAction}
+                      action={onDelete}
                       className="text-xs"
                       onSubmit={(e) => {
                         if (
@@ -251,18 +207,13 @@ export default function SpecialPriceDetailsModal({
                         }
                       }}
                     >
-                      <input type="hidden" name="stay_on_page" value="1" />
                       <input type="hidden" name="id" value={id} />
                       <button
                         type="submit"
-                        disabled={deletePending}
-                        className="w-full sm:w-auto px-3 py-1.5 rounded bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
+                        className="w-full sm:w-auto px-3 py-1.5 rounded bg-red-600 text-white hover:bg-red-700"
                       >
-                        {deletePending ? "Deleting…" : "Delete"}
+                        Delete
                       </button>
-                      {deleteState?.error && (
-                        <p className="text-red-600 text-xs mt-1">{deleteState.error}</p>
-                      )}
                     </form>
                   )}
                 </div>

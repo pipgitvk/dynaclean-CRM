@@ -2,8 +2,6 @@
 import { getDbConnection } from "@/lib/db";
 import { NextResponse } from "next/server";
 import { jwtVerify } from "jose";
-import { syncPreBookingsForOrder } from "@/lib/syncPreBookingsForOrder";
-import { cancelActiveInvoiceForOrder } from "@/lib/cancelInvoiceForOrder";
 
 export async function POST(req) {
     try {
@@ -44,48 +42,11 @@ export async function POST(req) {
                 "UPDATE neworder SET approval_status = 'approved', sales_status = 1, approval_remark = ?, approval_date = NOW() WHERE order_id = ?",
                 [remarkVal, orderId]
             );
-
-            const [orderRows] = await conn.execute(
-                `SELECT quote_number, customer_id, client_delivery_date, duedate
-                 FROM neworder WHERE order_id = ? LIMIT 1`,
-                [orderId],
-            );
-            const order = orderRows[0];
-            if (order?.quote_number) {
-                const deliveryDate =
-                    order.client_delivery_date ||
-                    (order.duedate
-                        ? new Date(order.duedate).toISOString().slice(0, 10)
-                        : new Date().toISOString().slice(0, 10));
-                try {
-                    await syncPreBookingsForOrder(conn, {
-                        orderId,
-                        quoteNumber: order.quote_number,
-                        customerId: order.customer_id,
-                        deliveryDate,
-                    });
-                } catch (syncErr) {
-                    console.error("⚠️ Pre-booking sync on approve failed:", syncErr);
-                }
-            }
         } else if (action === 'reject') {
-            const [rejectOrderRows] = await conn.execute(
-                `SELECT order_id, quote_number, invoice_number, report_file
-                 FROM neworder WHERE order_id = ? LIMIT 1`,
-                [orderId],
-            );
             await conn.execute(
                 "UPDATE neworder SET approval_status = 'rejected', is_cancelled = 1, approval_remark = ?, approval_date = NOW() WHERE order_id = ?",
                 [remarkVal, orderId]
             );
-            const rejectOrder = rejectOrderRows?.[0];
-            if (rejectOrder) {
-                try {
-                    await cancelActiveInvoiceForOrder(conn, rejectOrder);
-                } catch (invErr) {
-                    console.error("[orders/approve reject] invoice cancel:", invErr);
-                }
-            }
         } else {
             // Reset to pending (undo approve/reject) - only if not dispatched
             const [orderRows] = await conn.execute(
@@ -93,8 +54,10 @@ export async function POST(req) {
                 [orderId]
             );
             const order = orderRows[0];
-            const dispatchStatus = Number(order?.dispatch_status);
-            if (dispatchStatus === 1 || dispatchStatus === 2) {
+            const dispatchStatus = order?.dispatch_status;
+
+            // Check if order is dispatched
+            if (dispatchStatus) {
                 return NextResponse.json(
                     { success: false, error: "Cannot revert: Order is already dispatched." },
                     { status: 400 }

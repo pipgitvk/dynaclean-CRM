@@ -72,23 +72,9 @@ export function buildProspectsRowsApiUrl(
     if (cb) params.set("created_by", cb.slice(0, 128));
     const aq = String(adminFilters.adminSearch ?? "").trim();
     if (aq) params.set("admin_search", aq.slice(0, 200));
-    if (adminFilters.tlFollowupOnly) {
-      params.set("tl_followup", "1");
-    }
   }
   const q = params.toString();
   return q ? `/api/prospects/rows?${q}` : "/api/prospects/rows";
-}
-
-/** Admin prospects: only rows whose customer has at least one TL_followups entry. */
-export function parseProspectTlFollowupOnlyFromSearchParams(resolved) {
-  const raw = firstSearchParam(resolved?.tl_followup).toLowerCase();
-  return raw === "1" || raw === "true";
-}
-
-export function parseProspectTlFollowupOnlyFromUrlSearchParams(sp) {
-  const raw = String(sp?.get?.("tl_followup") ?? "").trim().toLowerCase();
-  return raw === "1" || raw === "true";
 }
 
 function parseYear(raw) {
@@ -137,7 +123,6 @@ function mergeProspectAdminCalendarDefaultsWithGetter(get, basePartial) {
         commitmentDay: null,
         createdBy: null,
         adminSearch: null,
-        tlFollowupOnly: false,
       };
   const cyRaw = String(get("commitment_year") ?? "").trim();
   const cmRaw = String(get("commitment_month") ?? "").trim();
@@ -191,15 +176,12 @@ function buildAdminFiltersFromGetter(get) {
   const adminSearchRaw = String(get("admin_search") ?? "").trim();
   const adminSearch =
     adminSearchRaw.length > 0 ? adminSearchRaw.slice(0, 200) : null;
-  const tlRaw = String(get("tl_followup") ?? "").trim().toLowerCase();
-  const tlFollowupOnly = tlRaw === "1" || tlRaw === "true";
   if (
     year == null &&
     month == null &&
     day == null &&
     !createdBy &&
-    !adminSearch &&
-    !tlFollowupOnly
+    !adminSearch
   ) {
     return null;
   }
@@ -209,7 +191,6 @@ function buildAdminFiltersFromGetter(get) {
     commitmentDay: day,
     createdBy,
     adminSearch,
-    tlFollowupOnly,
   };
 }
 

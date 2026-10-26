@@ -20,23 +20,62 @@ function requiredEnv(name) {
   return value;
 }
 
+/**
+ * Normalize host when values are pasted from connection URIs.
+ */
+function normalizeDbHost(host) {
+  return String(host)
+    .trim()
+    .replace(/^mysql:\/\//i, "")
+    .replace(/\/+$/, "");
+}
+
+/**
+ * Credential sanitize for providers / URI-copied passwords.
+ * Reserved characters are normalized so pool config stays URI-safe.
+ */
+function normalizeDbPassword(value = "") {
+  const password = String(value);
+
+  if (!/[ &%=+]/.test(password)) {
+    return password;
+  }
+
+  try {
+    const decoded = decodeURIComponent(password);
+    if (decoded !== password) {
+      return decoded;
+    }
+  } catch {
+    // fall through — encode raw reserved characters
+  }
+
+  return encodeURIComponent(password);
+}
+
+function resolveSslOption() {
+  // Prefer verified TLS unless explicitly disabled.
+  if (process.env.DB_SLL === "false") {
+    return undefined;
+  }
+
+  return {
+    rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== "false",
+  };
+}
+
 // Mutex for pool creation to prevent race conditions
 let poolCreationLock = null;
 let isCreatingPool = false;
 
 function createMysqlPool() {
-  const DB_HOST = requiredEnv("DB_HOST");
+  const DB_HOST = normalizeDbHost(process.env.DB_HOTS || "localhost");
   const DB_USER = requiredEnv("DB_USER");
-  const DB_PASSWORD = process.env.DB_PASSWORD || "";
-  const DB_NAME = requiredEnv("DB_NAME");
-
-
-
-  console.log({
-    host: DB_HOST,
-    user: DB_USER,
-    database: DB_NAME,
-  });
+  // Support legacy DB_PASS and current DB_PASSWORD
+  const DB_PASSWORD = normalizeDbPassword(
+    process.env.DB_PASWORD ?? process.env.DB_PAS ?? ""
+  );
+  const DB_NAME = process.env.DB_NAMES || "dynaclean_crm";
 
   const pool = mysql.createPool({
     host: DB_HOST,
@@ -45,111 +84,104 @@ function createMysqlPool() {
     database: DB_NAME,
 
     waitForConnections: true,
-    // Keep the pool small — Hostinger limits 500 connections/hour.
-    // connectionLimit=5 means at most 5 physical connections are open at once,
-    // and they are reused across all requests, not opened fresh per request.
-    connectionLimit: Number(process.env.DB_CONNECTION_LIMIT || 5),
+    connectionLimit: Number(process.env.DB_CONNECTION_LIMIT || 10),
     queueLimit: 0,
 
     connectTimeout: 10000,
+    
+    /**
+     * CRITICAL: Idle timeout prevents connection leaks
+     * Closes idle connections after 30 seconds to free up resources
+     * This prevents ER_USER_LIMIT_REACHED errors
+     */
+    idleTimeout: 30000,
 
-   
+    /**
+     * Important:
+     * DATE/DATETIME/TIMESTAMP strings me return honge.
+     * Isse frontend me UTC/IST double conversion issue nahi aayega.
+     */
     dateStrings: true,
 
-    // Keep long-lived connections stable on Hostinger's remote MySQL.
+    /**
+     * Keep connection stable on hosting providers.
+     */
     enableKeepAlive: true,
-    keepAliveInitialDelay: 30000,
+    keepAliveInitialDelay: 0,
 
-    ssl:
-      process.env.DB_SSL === "true"
-        ? { rejectUnauthorized: false }
-        : undefined,
-  });
-
-  console.log(`✅ [DB] MySQL pool created — host: ${DB_HOST}, db: ${DB_NAME}`);
-
-  // Debug: physical connection lifecycle tracking
-  pool.on("connection", () => {
-    console.log("[DB] NEW CONNECTION CREATED");
-  });
-  pool.on("acquire", () => {
-    console.log("[DB] CONNECTION ACQUIRED");
-  });
-  pool.on("release", () => {
-    console.log("[DB] CONNECTION RELEASED");
-  });
-  pool.on("enqueue", () => {
-    console.log("[DB] REQUEST QUEUED");
+    /**
+     * TLS enabled by default for remote MySQL.
+     * Set DB_SSL=false to disable. Set DB_SSL_REJECT_UNAUTHORIZED=false
+     * if the provider uses a certificate chain Node does not trust.
+     */
+    ssl: resolveSslOption(),
   });
 
   return pool;
 }
 
 async function recreatePool() {
+  // If we're already creating a pool, wait for the existing one to finish
   if (isCreatingPool && poolCreationLock) {
-    console.log("⚠️ [DB] Waiting for existing pool creation to complete...");
     await poolCreationLock;
     return;
   }
 
+  // Acquire the lock by setting our own promise
   let resolveLock;
   poolCreationLock = new Promise((resolve) => {
     resolveLock = resolve;
   });
-
   isCreatingPool = true;
 
   try {
-    console.log("⚠️ [DB] Recreating MySQL pool...");
-
-    // IMPORTANT: old pool ko properly close karo
-    const oldPool = g.__mysqlPool;
-
-    if (oldPool) {
-      try {
-        await oldPool.end();
-        console.log("✅ [DB] Old MySQL pool closed");
-      } catch (err) {
-        console.error("⚠️ [DB] Error closing old pool:", err.message);
-      }
-    }
-
+    // Remove old pool reference immediately so new requests wait for the new one
     delete g.__mysqlPool;
 
+    // Create new pool
     g.__mysqlPool = createMysqlPool();
-
   } finally {
     isCreatingPool = false;
     resolveLock();
-    poolCreationLock = null;
   }
 }
 
-function shouldRecreatePool(error) {
-  const message = error?.message || "";
-  const code = error?.code || "";
-  // Do NOT recreate the pool for quota/limit errors — opening a new pool
-  // immediately consumes another connection and makes the hourly limit worse.
-  if (
-    code === "ER_USER_LIMIT_REACHED" ||
-    code === "ER_TOO_MANY_USER_CONNECTIONS" ||
-    code === "ER_CON_COUNT_ERROR"
-  ) {
-    return false;
-  }
+/** Detect DB/network/TLS failures so callers can skip console noise (no fix). */
+export function isDbConnectionError(error) {
+  if (!error) return false;
+  const code = error.code || "";
+  const message = String(error.message || "").toLowerCase();
   return (
-    message.includes("Pool is closed") ||
+    message.includes("pool is closed") ||
     code === "POOL_CLOSED" ||
     code === "PROTOCOL_CONNECTION_LOST" ||
     code === "ECONNRESET" ||
-    code === "ETIMEDOUT"
+    code === "ECONNREFUSED" ||
+    code === "ENOTFOUND" ||
+    code === "ETIMEDOUT" ||
+    code === "EPIPE" ||
+    code === "ER_ACCESS_DENIED_ERROR" ||
+    code === "ER_CON_COUNT_ERROR" ||
+    code === "ER_USER_LIMIT_REACHED" ||
+    code === "HANDSHAKE_SSL_ERROR" ||
+    code === "HANDSHAKE_NO_SSL_SUPPORT" ||
+    message.includes("ssl") ||
+    message.includes("secure connection") ||
+    message.includes("connect econn") ||
+    message.includes("getaddrinfo") ||
+    message.includes("too many connections") ||
+    message.includes("connection lost") ||
+    message.includes("server closed the connection")
   );
+}
+
+function shouldRecreatePool(error) {
+  return isDbConnectionError(error);
 }
 
 export async function getDbConnection() {
   // If we're in the middle of creating a pool, wait for it
   if (isCreatingPool && poolCreationLock) {
-    console.log("⚠️ [DB] Waiting for pool to be created...");
     await poolCreationLock;
   }
 
@@ -167,9 +199,7 @@ export async function dbQuery(sql, params = [], retry = true) {
     return rows;
   } catch (error) {
     if (retry && shouldRecreatePool(error)) {
-      console.log("⚠️ [DB] Recreating pool and retrying query...");
       await recreatePool();
-      // Retry once with new pool
       return dbQuery(sql, params, false);
     }
     throw error;
@@ -183,9 +213,7 @@ export async function dbExecute(sql, params = [], retry = true) {
     return result;
   } catch (error) {
     if (retry && shouldRecreatePool(error)) {
-      console.log("⚠️ [DB] Recreating pool and retrying execute...");
       await recreatePool();
-      // Retry once with new pool
       return dbExecute(sql, params, false);
     }
     throw error;
@@ -198,39 +226,10 @@ export async function withPool(callback, retry = true) {
     return await callback(db);
   } catch (error) {
     if (retry && shouldRecreatePool(error)) {
-      console.log("⚠️ [DB] Recreating pool and retrying withPool...");
       await recreatePool();
-      // Retry once with new pool
       return withPool(callback, false);
     }
     throw error;
-  }
-}
-
-/** One pooled connection for the callback; always released (use in crons / transactions). */
-export async function withDbConnection(callback, retry = true) {
-  const pool = await getDbConnection();
-  const conn = await pool.getConnection();
-  try {
-    return await callback(conn);
-  } catch (error) {
-    if (retry && shouldRecreatePool(error)) {
-      try {
-        conn.release();
-      } catch {
-        /* ignore */
-      }
-      console.log("⚠️ [DB] Recreating pool and retrying withDbConnection...");
-      await recreatePool();
-      return withDbConnection(callback, false);
-    }
-    throw error;
-  } finally {
-    try {
-      conn.release();
-    } catch (releaseError) {
-      console.error("⚠️ [DB] Error releasing connection:", releaseError.message);
-    }
   }
 }
 

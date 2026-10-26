@@ -1,7 +1,5 @@
 "use client";
 
-import { formatCrmDateOnly } from "@/lib/crmDateFormat";
-
 import { useCallback, useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import {
@@ -14,7 +12,11 @@ function formatDate(value) {
   if (!value) return "—";
   const d = new Date(`${value}T12:00:00`);
   if (Number.isNaN(d.getTime())) return value;
-  return formatCrmDateOnly(d);
+  return d.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
 }
 
 export default function PublicShipmentViewClient({ token }) {

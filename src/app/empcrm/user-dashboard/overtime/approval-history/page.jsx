@@ -1,18 +1,15 @@
 "use client";
 
-import { formatCrmDateOnly } from "@/lib/crmDateFormat";
-
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import toast from "react-hot-toast";
 import { formatAttendanceTimeForDisplay as formatTime } from "@/lib/istDateTime";
-import { getAttendanceRegularizationAttachmentHref } from "@/lib/attendanceRegularizationAttachmentHref";
 
 function formatLogDate(v) {
   if (v == null) return "";
   const s = String(v);
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-  return formatCrmDateOnly(v);
+  return new Date(v).toLocaleDateString();
 }
 
 export default function OvertimeApprovalHistoryPage() {
@@ -185,10 +182,7 @@ export default function OvertimeApprovalHistoryPage() {
                       {request.attachment_url && (
                         <div className="mt-3">
                           <a
-                            href={getAttendanceRegularizationAttachmentHref(
-                              request.attachment_url,
-                              request.id,
-                            )}
+                            href={request.attachment_url}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-blue-600 hover:text-blue-800 text-sm"

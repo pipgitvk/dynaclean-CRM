@@ -4,7 +4,6 @@ import nodemailer from "nodemailer";
 import path from "path";
 import { readFile } from "fs/promises";
 import { buildEmploymentConfirmationEmail } from "@/lib/emailTemplates/employmentConfirmationBuilder";
-import { formatCrmDateOnly } from "@/lib/crmDateFormat";
 
 /**
  * Send employment confirmation letter email to both personal and professional email
@@ -13,7 +12,7 @@ import { formatCrmDateOnly } from "@/lib/crmDateFormat";
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { username, email, professional_email, full_name, confirmationLetterPath, confirmation_letter_link, confirmation_letter_download_link } = body;
+    const { username, email, professional_email, full_name, confirmationLetterPath, confirmation_letter_link } = body;
 
     if (!username || (!email && !professional_email)) {
       return NextResponse.json(
@@ -69,7 +68,15 @@ export async function POST(request) {
     const employee = employeeData?.[0] || {};
     
     // Format dates
-    const formatDate = (dateStr) => formatCrmDateOnly(dateStr, "N/A");
+    const formatDate = (dateStr) => {
+      if (!dateStr) return 'N/A';
+      const date = new Date(dateStr);
+      return date.toLocaleDateString('en-IN', { 
+        year: 'numeric', 
+        month: '2-digit', 
+        day: '2-digit' 
+      }).split('/').reverse().join('-');
+    };
 
     // Build confirmation email using template
     const confirmationData = {
@@ -80,7 +87,6 @@ export async function POST(request) {
       joining_date: formatDate(employee.date_of_joining),
       confirmation_date: formatDate(new Date()),
       confirmation_letter_link: confirmation_letter_link || '#',
-      confirmation_letter_download_link: confirmation_letter_download_link || confirmation_letter_link || '#',
       current_year: new Date().getFullYear(),
     };
 

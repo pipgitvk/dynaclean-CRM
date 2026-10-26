@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Head from "next/head";
 
@@ -41,22 +41,6 @@ export default function AddProductPage() {
   const [codeError, setCodeError] = useState("");
   const [productIndex, setProductIndex] = useState([]);
   const [loadedIndex, setLoadedIndex] = useState(false);
-
-  useEffect(() => {
-    const html = document.documentElement;
-    const body = document.body;
-    const prevHtmlBg = html.style.backgroundColor;
-    const prevBodyBg = body.style.backgroundColor;
-    const prevScheme = html.style.colorScheme;
-    html.style.colorScheme = "light";
-    html.style.backgroundColor = "transparent";
-    body.style.backgroundColor = "transparent";
-    return () => {
-      html.style.backgroundColor = prevHtmlBg;
-      body.style.backgroundColor = prevBodyBg;
-      html.style.colorScheme = prevScheme;
-    };
-  }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -299,14 +283,14 @@ export default function AddProductPage() {
   }
 
   return (
-    <div className="w-full min-h-0 flex flex-col items-center justify-center p-4 md:p-10 bg-transparent">
+    <div className=" bg-gray-50 flex flex-col items-center justify-center p-4 md:p-10">
       <Head>
         <title>Add New Product</title>
       </Head>
 
       {/* Product Code Modal */}
       {showCodeModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/20 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
           <div className="bg-white w-full max-w-2xl rounded-xl shadow-2xl p-6">
             <h2 className="text-xl font-bold text-gray-800 mb-2">Enter Product Model</h2>
             <p className="text-sm text-gray-600 mb-4">We will check availability and show similar products.</p>

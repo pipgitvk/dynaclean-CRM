@@ -86,13 +86,13 @@ const TaskTable = ({ tasks = [] }) => {
                   <td className="px-4 py-3">
                     {task.next_followup_date
                       ? dayjs(task.next_followup_date).format(
-                          "DD-MM-YYYY hh:mm A"
+                          "DD MMM, YYYY hh:mm A"
                         )
                       : "Not set"}
                   </td>
                   <td className="px-4 py-3">
                     {task.followed_date
-                      ? dayjs(task.followed_date).format("DD-MM-YYYY hh:mm A")
+                      ? dayjs(task.followed_date).format("DD MMM, YYYY hh:mm A")
                       : "-"}
                   </td>
                   <td className="px-4 py-3">{task.notes || "-"}</td>
@@ -157,14 +157,14 @@ const TaskTable = ({ tasks = [] }) => {
                 <strong>Next Follow-up:</strong>{" "}
                 {task.next_followup_date
                   ? dayjs(task.next_followup_date).format(
-                      "DD-MM-YYYY hh:mm A"
+                      "DD MMM, YYYY hh:mm A"
                     )
                   : "Not set"}
               </div>
               <div className="text-sm text-gray-600">
                 <strong>Followed Date:</strong>{" "}
                 {task.followed_date
-                  ? dayjs(task.followed_date).format("DD-MM-YYYY hh:mm A")
+                  ? dayjs(task.followed_date).format("DD MMM, YYYY hh:mm A")
                   : "-"}
               </div>
               <div className="text-sm text-gray-600">

@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
-import { ensureServiceRecordsThirdPartyAssignColumns } from "@/lib/ensureServiceRecordsThirdPartyAssignColumns";
 
 export async function POST(req) {
   try {
-    const { service_id, assigned_to, third_party_engineer_id } = await req.json();
+    const { service_id, assigned_to } = await req.json();
 
     if (!service_id || !assigned_to) {
       return NextResponse.json(
@@ -14,46 +13,9 @@ export async function POST(req) {
     }
 
     const conn = await getDbConnection();
-    await ensureServiceRecordsThirdPartyAssignColumns(conn);
-
-    const tpIdRaw = third_party_engineer_id;
-    const tpId =
-      tpIdRaw === "" || tpIdRaw === null || tpIdRaw === undefined
-        ? null
-        : Number(tpIdRaw);
-    const hasThirdParty = Number.isFinite(tpId) && tpId > 0;
-
-    let assignedToType = hasThirdParty ? "third_party" : "internal";
-    let assignedToId = hasThirdParty ? tpId : null;
-
-    if (hasThirdParty) {
-      const [engRows] = await conn.execute(
-        `SELECT engineer_id, name FROM third_party_service_engineers
-         WHERE engineer_id = ? AND status = 'active' LIMIT 1`,
-        [tpId]
-      );
-      if (!engRows.length) {
-        return NextResponse.json(
-          { success: false, message: "Third-party engineer not found or inactive" },
-          { status: 400 }
-        );
-      }
-    }
-
     const [result] = await conn.execute(
-      `UPDATE service_records
-       SET assigned_to = ?,
-           assigned_to_type = ?,
-           assigned_to_id = ?,
-           third_party_engineer_id = ?
-       WHERE service_id = ?`,
-      [
-        String(assigned_to).trim(),
-        assignedToType,
-        assignedToId,
-        hasThirdParty ? tpId : null,
-        service_id,
-      ]
+      "UPDATE service_records SET assigned_to = ? WHERE service_id = ?",
+      [assigned_to.trim(), service_id]
     );
 
     if (result.affectedRows === 0) {

@@ -1,5 +1,3 @@
-import { mkdir, writeFile } from "fs/promises";
-import path from "path";
 import { NextResponse } from "next/server";
 import { getSessionPayload } from "@/lib/auth";
 import { ensureServiceReportStepsTable } from "@/lib/ensureServiceReportStepsTable";
@@ -13,8 +11,6 @@ export const maxDuration = 120;
 
 const VIDEO_STEPS = ["video_360", "video_problem", "video_damaged", "video_completion"];
 const MAX_VIDEO_BYTES = 200 * 1024 * 1024;
-const MAX_MANUAL_REPORT_BYTES = 25 * 1024 * 1024;
-const MANUAL_REPORT_EXT = new Set([".pdf", ".jpg", ".jpeg", ".png", ".webp"]);
 
 const EXT_BY_MIME = {
   "video/mp4": ".mp4",
@@ -36,17 +32,6 @@ function videoExtension(file) {
   return null;
 }
 
-function manualReportExtension(file) {
-  const fromName = String(file?.name || "").match(/\.[a-z0-9]+$/i)?.[0]?.toLowerCase();
-  if (fromName && MANUAL_REPORT_EXT.has(fromName)) return fromName;
-  const mime = String(file?.type || "").toLowerCase();
-  if (mime === "application/pdf") return ".pdf";
-  if (mime === "image/jpeg") return ".jpg";
-  if (mime === "image/png") return ".png";
-  if (mime === "image/webp") return ".webp";
-  return null;
-}
-
 async function loadService(conn, serviceId) {
   const [[row]] = await conn.execute(
     `SELECT
@@ -56,7 +41,6 @@ async function loadService(conn, serviceId) {
         sr.serial_number,
         sr.service_type,
         sr.assigned_to,
-        sr.installation_report,
         s.video_360,
         s.video_problem,
         s.video_damaged,
@@ -71,22 +55,7 @@ async function loadService(conn, serviceId) {
   return row || null;
 }
 
-async function loadWarrantyProductForSerial(conn, serialNumber) {
-  const serial = String(serialNumber || "").trim();
-  if (!serial) return null;
-  const [[row]] = await conn.execute(
-    `SELECT product_name, model, customer_name, email, contact,
-            customer_address, installed_address, installation_date,
-            invoice_number, invoice_date, contact_person, site_person
-     FROM warranty_products
-     WHERE serial_number = ?
-     LIMIT 1`,
-    [serial],
-  );
-  return row || null;
-}
-
-function payloadFromRow(row, product = null) {
+function payloadFromRow(row) {
   return {
     service: {
       service_id: row.service_id,
@@ -95,24 +64,7 @@ function payloadFromRow(row, product = null) {
       serial_number: row.serial_number,
       service_type: row.service_type,
       assigned_to: row.assigned_to,
-      installation_report: row.installation_report || null,
     },
-    product: product
-      ? {
-          product_name: product.product_name || "",
-          model: product.model || "",
-          customer_name: product.customer_name || "",
-          email: product.email || "",
-          contact: product.contact || "",
-          customer_address: product.customer_address || "",
-          installed_address: product.installed_address || "",
-          installation_date: product.installation_date || "",
-          invoice_number: product.invoice_number || "",
-          invoice_date: product.invoice_date || "",
-          contact_person: product.contact_person || "",
-          site_person: product.site_person || "",
-        }
-      : null,
     steps: {
       video_360: row.video_360 || null,
       video_problem: row.video_problem || null,
@@ -150,8 +102,7 @@ export async function GET(_request, context) {
     if (!row) {
       return NextResponse.json({ message: "Service not found" }, { status: 404 });
     }
-    const product = await loadWarrantyProductForSerial(conn, row.serial_number);
-    return NextResponse.json(payloadFromRow(row, product));
+    return NextResponse.json(payloadFromRow(row));
   } catch (error) {
     console.error("[service-report-steps GET]", error);
     return NextResponse.json({ message: "Failed to load service steps" }, { status: 500 });
@@ -175,35 +126,19 @@ export async function POST(request, context) {
     if (!existing) {
       return NextResponse.json({ message: "Service not found" }, { status: 404 });
     }
-
-    const formData = await request.formData();
-    const action = String(formData.get("action") || "");
-    
-    const isComplaintService = String(existing.service_type || "").trim().toUpperCase() === "COMPLAINT";
-    const isInstallationService = String(existing.service_type || "").trim().toUpperCase() === "INSTALLATION";
-    const isInstallationVideoAction = action === "installation_completion_video";
-    const isManualInstallationReport = action === "manual_installation_report";
-
-    if ((isInstallationVideoAction || isManualInstallationReport) && !isInstallationService) {
-      return NextResponse.json(
-        { message: "This action is only for installation services." },
-        { status: 400 },
-      );
-    }
-
-    if (!isInstallationVideoAction && !isManualInstallationReport && !isComplaintService) {
+    if (String(existing.service_type || "").trim().toUpperCase() !== "COMPLAINT") {
       return NextResponse.json(
         { message: "Video steps are only for complaint services." },
         { status: 400 },
       );
     }
 
-    if (!isInstallationVideoAction && !isManualInstallationReport) {
-      const current = payloadFromRow(existing).steps;
-      const blocked = missingBefore(current, action);
-      if (blocked) {
-        return NextResponse.json({ message: blocked }, { status: 400 });
-      }
+    const formData = await request.formData();
+    const action = String(formData.get("action") || "");
+    const current = payloadFromRow(existing).steps;
+    const blocked = missingBefore(current, action);
+    if (blocked) {
+      return NextResponse.json({ message: blocked }, { status: 400 });
     }
 
     if (VIDEO_STEPS.includes(action)) {
@@ -234,66 +169,6 @@ export async function POST(request, context) {
          ON DUPLICATE KEY UPDATE ${action} = ?`,
         [serviceId, videoUrl, videoUrl],
       );
-    } else if (isInstallationVideoAction) {
-      const file = formData.get("file");
-      if (!file || typeof file === "string" || file.size <= 0) {
-        return NextResponse.json({ message: "Choose a video to upload." }, { status: 400 });
-      }
-      if (file.size > MAX_VIDEO_BYTES) {
-        return NextResponse.json({ message: "Video is too large. Maximum size is 200 MB." }, { status: 400 });
-      }
-      const ext = videoExtension(file);
-      if (!ext) {
-        return NextResponse.json({ message: "Upload a video file (mp4, mov, webm, or 3gp)." }, { status: 400 });
-      }
-      if (!isServiceVideoCloudinaryEnabled()) {
-        return NextResponse.json({ message: "Cloudinary is not configured." }, { status: 500 });
-      }
-
-      const videoUrl = await uploadServiceReportVideo(
-        Buffer.from(await file.arrayBuffer()),
-        serviceId,
-        "installation_completion_video",
-      );
-
-      // Store in video_completion field (reusing existing column for consistency)
-      await conn.execute(
-        `INSERT INTO service_report_steps (service_id, video_completion)
-         VALUES (?, ?)
-         ON DUPLICATE KEY UPDATE video_completion = ?`,
-        [serviceId, videoUrl, videoUrl],
-      );
-    } else if (isManualInstallationReport) {
-      const file = formData.get("file");
-      if (!file || typeof file === "string" || file.size <= 0) {
-        return NextResponse.json({ message: "Choose a report file to upload." }, { status: 400 });
-      }
-      if (file.size > MAX_MANUAL_REPORT_BYTES) {
-        return NextResponse.json({ message: "File is too large. Maximum size is 25 MB." }, { status: 400 });
-      }
-      const ext = manualReportExtension(file);
-      if (!ext) {
-        return NextResponse.json(
-          { message: "Upload a PDF or image (jpg, png, webp)." },
-          { status: 400 },
-        );
-      }
-
-      const buffer = Buffer.from(await file.arrayBuffer());
-      const fileName = `manual-install-${serviceId}-${Date.now()}${ext}`;
-      const uploadDir = path.join(process.cwd(), "public", "attachments");
-      await mkdir(uploadDir, { recursive: true });
-      await writeFile(path.join(uploadDir, fileName), buffer);
-
-      await conn.execute(
-        `UPDATE service_records
-         SET installation_report = ?,
-             status = 'COMPLETED',
-             completed_date = COALESCE(completed_date, CURDATE())
-         WHERE service_id = ?`,
-        [fileName, serviceId],
-      );
-      await conn.execute(`INSERT IGNORE INTO service_reports (service_id) VALUES (?)`, [serviceId]);
     } else if (action === "work_start") {
       await conn.execute(
         `INSERT INTO service_report_steps (service_id, work_started_at)
@@ -319,8 +194,7 @@ export async function POST(request, context) {
     }
 
     const row = await loadService(conn, serviceId);
-    const product = await loadWarrantyProductForSerial(conn, row?.serial_number);
-    return NextResponse.json(payloadFromRow(row, product));
+    return NextResponse.json(payloadFromRow(row));
   } catch (error) {
     console.error("[service-report-steps POST]", error);
     return NextResponse.json({ message: "Could not save this step." }, { status: 500 });

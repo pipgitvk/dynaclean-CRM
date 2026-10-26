@@ -45,7 +45,7 @@ function PaymentFollowupCard({ row, dashboardPrefix, onFollowClick, onHistoryCli
       ? `₹${Number(row.amount).toLocaleString("en-IN")}`
       : "Amount not set";
   const dueLabel = row.next_followup_date
-    ? dayjs(row.next_followup_date).format("DD-MM-YYYY hh:mm A")
+    ? dayjs(row.next_followup_date).format("DD MMM, YYYY hh:mm A")
     : "Not set";
   const editHref = `${dashboardPrefix}/manual-payments/edit/${row.payment_id}`;
 

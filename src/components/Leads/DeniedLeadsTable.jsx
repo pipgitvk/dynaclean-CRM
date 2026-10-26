@@ -1,5 +1,4 @@
 "use client";
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useTransition } from "react";
 import { format } from "date-fns";
 import { useRouter } from "next/navigation";
@@ -69,14 +68,17 @@ export default function DeniedLeadsTable({
   return (
     <div className="space-y-4">
       <form onSubmit={handleSearch}>
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full mb-4">
           <input
             type="text"
             value={search}
             placeholder="Search denied leads (customer ID, name, contact, followed by)..."
             onChange={(e) => setSearch(e.target.value)}
-            className="border border-gray-300 p-2.5 sm:p-2 rounded-lg min-w-[12rem] flex-1 text-sm basis-full sm:basis-auto sm:min-w-[240px] sm:max-w-md"
+            className="border border-gray-300 p-2.5 sm:p-2 rounded-lg flex-1 min-w-0 text-sm"
           />
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <select
             value={filters.followed_by}
             onChange={(e) => setFilters({ ...filters, followed_by: e.target.value })}
@@ -89,15 +91,35 @@ export default function DeniedLeadsTable({
           </select>
           <div className="flex items-center gap-1 bg-red-50 border border-red-200 rounded-lg px-2 py-1">
             <span className="text-xs font-semibold text-red-700 whitespace-nowrap">Denied From</span>
-            <TypeableDateFilterInput value={filters.denied_from} onChange={(v) => setFilters({ ...filters, denied_from: v })} className="border-0 bg-transparent text-sm min-w-[120px] sm:min-w-0 focus:outline-none focus:ring-0"/>
+            <input
+              type="date"
+              value={filters.denied_from}
+              onChange={(e) => setFilters({ ...filters, denied_from: e.target.value })}
+              className="border-0 bg-transparent text-sm min-w-[120px] sm:min-w-0 focus:outline-none focus:ring-0"
+            />
           </div>
           <div className="flex items-center gap-1 bg-red-50 border border-red-200 rounded-lg px-2 py-1">
             <span className="text-xs font-semibold text-red-700 whitespace-nowrap">Denied To</span>
-            <TypeableDateFilterInput value={filters.denied_to} onChange={(v) => setFilters({ ...filters, denied_to: v })} className="border-0 bg-transparent text-sm min-w-[120px] sm:min-w-0 focus:outline-none focus:ring-0"/>
+            <input
+              type="date"
+              value={filters.denied_to}
+              onChange={(e) => setFilters({ ...filters, denied_to: e.target.value })}
+              className="border-0 bg-transparent text-sm min-w-[120px] sm:min-w-0 focus:outline-none focus:ring-0"
+            />
           </div>
           <span className="text-xs text-gray-400 font-medium hidden sm:inline">│</span>
-          <TypeableDateFilterInput value={filters.from} onChange={(v) => setFilters({ ...filters, from: v })} className="border border-gray-300 rounded-lg px-3 py-2 text-sm min-w-[120px] sm:min-w-0"/>
-          <TypeableDateFilterInput value={filters.to} onChange={(v) => setFilters({ ...filters, to: v })} className="border border-gray-300 rounded-lg px-3 py-2 text-sm min-w-[120px] sm:min-w-0"/>
+          <input
+            type="date"
+            value={filters.from}
+            onChange={(e) => setFilters({ ...filters, from: e.target.value })}
+            className="border border-gray-300 rounded-lg px-3 py-2 text-sm min-w-[120px] sm:min-w-0"
+          />
+          <input
+            type="date"
+            value={filters.to}
+            onChange={(e) => setFilters({ ...filters, to: e.target.value })}
+            className="border border-gray-300 rounded-lg px-3 py-2 text-sm min-w-[120px] sm:min-w-0"
+          />
 
           <button
             type="submit"

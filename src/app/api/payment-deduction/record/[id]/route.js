@@ -53,14 +53,12 @@ export async function PATCH(request, { params }) {
       claimStatus === "received"
         ? claimReceivedDate || new Date().toISOString().slice(0, 19).replace("T", " ")
         : null;
-    const receivedBy =
-      claimStatus === "received" ? payload.username || null : null;
 
     await conn.execute(
       `UPDATE payment_deductions
-       SET claim_status = ?, claim_received_date = ?, claim_received_by = ?
+       SET claim_status = ?, claim_received_date = ?
        WHERE id = ?`,
-      [claimStatus, receivedDate, receivedBy, deductionId]
+      [claimStatus, receivedDate, deductionId]
     );
 
     return NextResponse.json({ success: true });

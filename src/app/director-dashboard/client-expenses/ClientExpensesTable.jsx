@@ -1,6 +1,5 @@
 "use client";
 
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import React from "react";
 import Link from "next/link";
 import dayjs from "dayjs";
@@ -125,7 +124,7 @@ export default function ClientExpensesTable({ rows, client, group, initialSearch
       <td className="p-3 text-gray-600">{row.supply || "-"}</td>
       <td className="p-3 text-gray-600 font-mono text-xs max-w-[140px] truncate" title={row.transaction_id || ""}>{row.transaction_id || "-"}</td>
       <td className="p-3 font-semibold text-emerald-700 tabular-nums">{row.amount != null ? `₹${Number(row.amount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}` : "-"}</td>
-      <td className="p-3 text-gray-600">{row.created_at ? dayjs(row.created_at).format("DD-MM-YYYY") : "-"}</td>
+      <td className="p-3 text-gray-600">{row.created_at ? dayjs(row.created_at).format("DD MMM YYYY") : "-"}</td>
       <td className="p-3">
         <div className="flex gap-1.5 items-center">
           <Link href={`/director-dashboard/client-expenses/${row.id}`} className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 transition-colors" title="View">
@@ -187,10 +186,20 @@ export default function ClientExpensesTable({ rows, client, group, initialSearch
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-1 min-w-0">
                 <Calendar className="w-4 h-4 text-gray-400 shrink-0" />
-                <TypeableDateFilterInput value={fromDate} onChange={setFromDate} className="flex-1 min-w-0 w-full sm:w-28 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"/>
+                <input
+                  type="date"
+                  value={fromDate}
+                  onChange={(e) => setFromDate(e.target.value)}
+                  className="flex-1 min-w-0 w-full sm:w-28 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                />
               </div>
               <span className="text-gray-400 shrink-0">to</span>
-              <TypeableDateFilterInput value={toDate} onChange={setToDate} className="flex-1 min-w-0 w-full sm:w-28 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"/>
+              <input
+                type="date"
+                value={toDate}
+                onChange={(e) => setToDate(e.target.value)}
+                className="flex-1 min-w-0 w-full sm:w-28 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+              />
             </div>
             <button
               onClick={handleReset}
@@ -263,7 +272,7 @@ export default function ClientExpensesTable({ rows, client, group, initialSearch
               <div><span className="text-gray-500">Sub-head:</span> {row.sub_head || "-"}</div>
               <div><span className="text-gray-500">Supply:</span> {row.supply || "-"}</div>
               <div className="col-span-2"><span className="text-gray-500">Trans. ID:</span> <span className="font-mono text-xs break-all">{row.transaction_id || "-"}</span></div>
-              <div><span className="text-gray-500">Created:</span> {row.created_at ? dayjs(row.created_at).format("DD-MM-YYYY") : "-"}</div>
+              <div><span className="text-gray-500">Created:</span> {row.created_at ? dayjs(row.created_at).format("DD MMM YYYY") : "-"}</div>
             </div>
             <div className="pt-3 border-t border-gray-100 flex justify-between items-center">
               <span className="font-semibold text-emerald-700">₹{row.amount != null ? Number(row.amount).toLocaleString("en-IN", { minimumFractionDigits: 2 }) : "-"}</span>

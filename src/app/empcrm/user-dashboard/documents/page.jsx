@@ -1,7 +1,5 @@
 "use client";
 
-import { formatCrmDateOnly } from "@/lib/crmDateFormat";
-
 import { useState, useEffect } from "react";
 import { 
   FileText, 
@@ -241,7 +239,7 @@ export default function UserDocuments() {
                     <p className="font-medium text-gray-800 truncate mb-1">{getFileName(doc)}</p>
                     {typeof doc === 'object' && doc.uploadedAt && (
                       <p className="text-xs text-gray-500 mb-2">
-                        Uploaded: {formatCrmDateOnly(doc.uploadedAt)}
+                        Uploaded: {new Date(doc.uploadedAt).toLocaleDateString()}
                         {doc.uploadedBy && ` by ${doc.uploadedBy}`}
                       </p>
                     )}

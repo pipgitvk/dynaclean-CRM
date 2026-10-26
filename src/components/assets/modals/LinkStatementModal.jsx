@@ -1,46 +1,21 @@
 "use client";
 
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect, useMemo } from "react";
 import { X, Loader, CheckCircle, Unlink, Search } from "lucide-react";
 import { toast } from "react-hot-toast";
-
-function getCurrentMonthRange() {
-  const now = new Date();
-  const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-  const format = (date) => {
-    const y = date.getFullYear();
-    const m = String(date.getMonth() + 1).padStart(2, "0");
-    const d = String(date.getDate()).padStart(2, "0");
-    return `${y}-${m}-${d}`;
-  };
-  return { fromDate: format(firstDay), toDate: format(lastDay) };
-}
-
-function getStatementDate(stmt) {
-  const raw = stmt?.date || stmt?.txn_posted_date || stmt?.txn_dated_deb;
-  if (!raw) return null;
-  return String(raw).slice(0, 10);
-}
 
 export default function LinkStatementModal({ isOpen, onClose, asset, onLinked }) {
   const [statements, setStatements] = useState([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
-  const [fromDate, setFromDate] = useState(() => getCurrentMonthRange().fromDate);
-  const [toDate, setToDate] = useState(() => getCurrentMonthRange().toDate);
   const [linkingId, setLinkingId] = useState(null);
   const [selectedStatementIds, setSelectedStatementIds] = useState(new Set());
 
   useEffect(() => {
     if (!isOpen) return;
 
-    const { fromDate: monthStart, toDate: monthEnd } = getCurrentMonthRange();
     setStatements([]);
     setSearch("");
-    setFromDate(monthStart);
-    setToDate(monthEnd);
     setSelectedStatementIds(new Set());
     setLoading(true);
 
@@ -56,54 +31,45 @@ export default function LinkStatementModal({ isOpen, onClose, asset, onLinked })
 
         const rows = Array.isArray(data?.statements) ? data.statements : [];
 
-        const isUnsettled = (s) =>
-          String(s.status || "").toLowerCase() !== "settled" &&
-          String(s.invoice_status || "").toLowerCase() !== "settled";
-        const isDebit = (s) => String(s.type || "").trim() === "Debit";
+        // Filter statements by price range (with 10% tolerance) and unsettled status
+        const assetPrice = Number(asset?.purchase_price || 0);
+        const tolerance = assetPrice * 0.1;
+        const minPrice = assetPrice - tolerance;
+        const maxPrice = assetPrice + tolerance;
 
-        const filtered = rows
-          .filter((s) => {
-            const linkedAssetIds = s.linked_asset_ids
-              ? String(s.linked_asset_ids)
-                  .split(",")
-                  .map((id) => id.trim())
-                  .filter(Boolean)
-              : [];
-            const isLinkedToThisAsset = linkedAssetIds.includes(
-              String(asset?.asset_id)
-            );
-
-            if (isLinkedToThisAsset) return true;
-
-            const isUnlinked = linkedAssetIds.length === 0;
-
+        const filtered = rows.filter(
+          (s) => {
+            // Check if already linked to this asset via junction table
+            const isLinkedToThisAsset = s.linked_module_type === 'Assets' && 
+              s.linked_asset_ids && 
+              s.linked_asset_ids.split(',').map(id => id.trim()).includes(String(asset?.asset_id));
+            
+            // Allow if already linked to this asset
+            if (isLinkedToThisAsset) {
+              return true;
+            }
+            
+            // Otherwise, only show unsettled unlinked statements in price range
             return (
-              isDebit(s) &&
-              isUnsettled(s) &&
-              isUnlinked &&
+              String(s.status || "").toLowerCase() !== "settled" &&
+              String(s.invoice_status || "").toLowerCase() !== "settled" &&
               !s.client_expense_id &&
               !s.dd_id &&
-              (!s.linked_module_type || s.linked_module_type === "Assets")
+              (!s.linked_module_type || s.linked_module_type === 'Assets') &&
+              String(s.type || "").trim() === "Debit" &&
+              Number(s.amount || 0) >= minPrice &&
+              Number(s.amount || 0) <= maxPrice
             );
-          })
-          .sort((a, b) => {
-            const dateA = a.date ? new Date(a.date).getTime() : 0;
-            const dateB = b.date ? new Date(b.date).getTime() : 0;
-            if (dateB !== dateA) return dateB - dateA;
-            return Number(b.id || 0) - Number(a.id || 0);
-          });
+          }
+        );
 
         setStatements(filtered);
 
         // Check for already linked statements
         const linked = filtered.filter((s) => {
-          const linkedAssetIds = s.linked_asset_ids
-            ? String(s.linked_asset_ids)
-                .split(",")
-                .map((id) => id.trim())
-                .filter(Boolean)
-            : [];
-          return linkedAssetIds.includes(String(asset?.asset_id));
+          return s.linked_module_type === 'Assets' && 
+            s.linked_asset_ids && 
+            s.linked_asset_ids.split(',').map(id => id.trim()).includes(String(asset?.asset_id));
         });
 
         setSelectedStatementIds(new Set(linked.map((s) => s.id)));
@@ -118,38 +84,16 @@ export default function LinkStatementModal({ isOpen, onClose, asset, onLinked })
     fetchStatements();
   }, [isOpen, asset]);
 
-  const filteredStatements = useMemo(() => {
+  // Filter statements based on search
+  const filteredStatements = statements.filter((s) => {
     const query = search.toLowerCase();
-    const assetId = String(asset?.asset_id);
-
-    return statements.filter((s) => {
-      const linkedAssetIds = s.linked_asset_ids
-        ? String(s.linked_asset_ids)
-            .split(",")
-            .map((id) => id.trim())
-            .filter(Boolean)
-        : [];
-      const isLinkedToThisAsset = linkedAssetIds.includes(assetId);
-
-      if (!isLinkedToThisAsset) {
-        const stmtDate = getStatementDate(s);
-        if (stmtDate) {
-          if (fromDate && stmtDate < fromDate) return false;
-          if (toDate && stmtDate > toDate) return false;
-        } else if (fromDate || toDate) {
-          return false;
-        }
-      }
-
-      if (!query) return true;
-
-      return (
-        String(s.trans_id || "").toLowerCase().includes(query) ||
-        String(s.description || "").toLowerCase().includes(query) ||
-        String(s.amount || "").includes(query)
-      );
-    });
-  }, [statements, search, fromDate, toDate, asset?.asset_id]);
+    return (
+      String(s.trans_id || "").toLowerCase().includes(query) ||
+      String(s.remark || "").toLowerCase().includes(query) ||
+      String(s.particulars || "").toLowerCase().includes(query) ||
+      String(s.amount || "").includes(query)
+    );
+  });
 
   // Calculate totals
   const { totalLinked, remaining } = useMemo(() => {
@@ -272,43 +216,20 @@ export default function LinkStatementModal({ isOpen, onClose, asset, onLinked })
           </button>
         </div>
 
-        {/* Search & Date Filters */}
-        <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 space-y-3">
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2">
-              <label className="text-sm text-gray-600 whitespace-nowrap">From</label>
-              <TypeableDateFilterInput value={fromDate} onChange={setFromDate} className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"/>
-            </div>
-            <div className="flex items-center gap-2">
-              <label className="text-sm text-gray-600 whitespace-nowrap">To</label>
-              <TypeableDateFilterInput value={toDate} onChange={setToDate} className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"/>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                const { fromDate: monthStart, toDate: monthEnd } = getCurrentMonthRange();
-                setFromDate(monthStart);
-                setToDate(monthEnd);
-              }}
-              className="px-3 py-2 text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition"
-            >
-              This Month
-            </button>
+        {/* Search Bar */}
+        <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between gap-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-500" />
+            <input
+              type="text"
+              placeholder="Search statement..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
           </div>
-          <div className="flex items-center justify-between gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-500" />
-              <input
-                type="text"
-                placeholder="Search statement..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div className="text-sm text-gray-600 font-medium whitespace-nowrap">
-              {loading ? "Loading..." : `${filteredStatements.length} statement(s)`}
-            </div>
+          <div className="text-sm text-gray-600 font-medium whitespace-nowrap">
+            {loading ? "Loading..." : `${filteredStatements.length} statement(s)`}
           </div>
         </div>
 
@@ -324,7 +245,7 @@ export default function LinkStatementModal({ isOpen, onClose, asset, onLinked })
               <p className="text-gray-500 text-lg">
                 {search
                   ? "No matching statements found"
-                  : "No unsettled debit statements found for selected date range"}
+                  : "No unsettled statements available in this price range"}
               </p>
             </div>
           ) : (
@@ -335,7 +256,8 @@ export default function LinkStatementModal({ isOpen, onClose, asset, onLinked })
                     <th className="px-4 py-3 font-semibold text-gray-700">ID</th>
                     <th className="px-4 py-3 font-semibold text-gray-700">Trans ID</th>
                     <th className="px-4 py-3 font-semibold text-gray-700">Date</th>
-                    <th className="px-4 py-3 font-semibold text-gray-700">Description</th>
+                    <th className="px-4 py-3 font-semibold text-gray-700">Particulars</th>
+                    <th className="px-4 py-3 font-semibold text-gray-700">Remark</th>
                     <th className="px-4 py-3 font-semibold text-gray-700 text-right">Amount</th>
                     <th className="px-4 py-3 font-semibold text-gray-700 text-center">Action</th>
                   </tr>
@@ -363,8 +285,11 @@ export default function LinkStatementModal({ isOpen, onClose, asset, onLinked })
                             ? new Date(stmt.date).toLocaleDateString("en-IN")
                             : "—"}
                         </td>
-                        <td className="px-4 py-3 text-gray-700 max-w-sm truncate">
-                          {stmt.description || "—"}
+                        <td className="px-4 py-3 text-gray-700 max-w-xs truncate">
+                          {stmt.particulars || "—"}
+                        </td>
+                        <td className="px-4 py-3 text-gray-700 text-sm max-w-xs truncate">
+                          {stmt.remark || "—"}
                         </td>
                         <td className="px-4 py-3 text-right font-bold text-red-600">
                           ₹{Number(stmt.amount || 0).toLocaleString("en-IN")}

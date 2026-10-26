@@ -1,56 +1,43 @@
 import { NextResponse } from "next/server";
-import { parseFormData } from "@/lib/parseForm";
+import { parseFormData } from "@/lib/parseFormData";
+import fs from "fs";
+import path from "path";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
-import { uploadOrderAccountFile } from "@/lib/uploadOrderAccountFile";
-import {
-  hasOrderInvoiceReport,
-  isBeforeDispatch,
-} from "@/lib/orderDocumentEditRules";
-import { ensureOrderLinkedPaymentColumns } from "@/lib/ensureOrderLinkedPaymentColumns";
-import { lookupInvoiceLinkedPayment } from "@/lib/invoiceLinkedPaymentLookup";
-import {
-  linkedPaymentsToOrderPaymentCsv,
-  resolveAccountUploadPaymentCsv,
-  sumPaymentAmountCsv,
-} from "@/lib/orderPaymentHistory";
-import { syncInvoiceAndOrderPaymentLink } from "@/lib/syncInvoiceOrderPaymentLink";
-import { findPartyPaymentPromptForOrder } from "@/lib/partyPaymentOrderLink";
 
-const MAX_FILES_PER_FIELD = 5;
+// Ensure the target folder exists
+const ensureDir = (dirPath) => {
+  if (!fs.existsSync(dirPath)) {
+    fs.mkdirSync(dirPath, { recursive: true });
+  }
+};
 
-/** mysql2 rejects `undefined` bind values; use SQL NULL instead. */
-function sqlBind(value) {
-  if (value === undefined) return null;
-  if (typeof value === "number" && Number.isNaN(value)) return null;
-  return value;
-}
+// Save file to public/Order/accounts/
+async function saveFileLocally(file) {
+  if (!file || !file.filepath) throw new Error("Missing file");
 
-function firstField(value) {
-  if (value == null) return null;
-  return Array.isArray(value) ? value[0] : value;
+  const uploadDir = path.join(process.cwd(), "public", "Order", "accounts");
+  ensureDir(uploadDir);
+
+  const ext = path.extname(file.originalFilename || "") || ".bin";
+  const uniqueName = `${Date.now()}_${Math.random()
+    .toString(36)
+    .substring(2, 8)}${ext}`;
+  const destPath = path.join(uploadDir, uniqueName);
+
+  await fs.promises.copyFile(file.filepath, destPath);
+
+  // Return relative URL (for database usage)
+  return `/Order/accounts/${uniqueName}`;
 }
 
 // Normalize file input
 const getFile = (f) => (Array.isArray(f) ? f[0] : f);
 
-async function saveFilesField(fileField) {
-  if (!fileField) return "";
-  const list = Array.isArray(fileField) ? fileField : [fileField];
-  const paths = [];
-  for (const item of list.slice(0, MAX_FILES_PER_FIELD)) {
-    const file = getFile(item);
-    if (file?.filepath) {
-      paths.push(await uploadOrderAccountFile(file));
-    }
-  }
-  return paths.filter(Boolean).join(",");
-}
-
 // POST handler
 export async function POST(req) {
   try {
-    const { fields, files } = await parseFormData(req, { multiples: true });
+    const { fields, files } = await parseFormData(req);
 
     const orderId = parseInt(fields.order_id);
     if (!orderId) throw new Error("Missing or invalid order_id");
@@ -59,9 +46,15 @@ export async function POST(req) {
     const taxAmt = parseFloat(fields.taxamt);
     const totalAmt = parseFloat(fields.totalamt);
 
-    const invoiceNumber = firstField(fields.invoice_number);
-    const dueDate = firstField(fields.duedate); // invoice date from UI
-    const remark = firstField(fields.remark) || "";
+    const invoiceNumber = Array.isArray(fields.invoice_number)
+      ? fields.invoice_number[0]
+      : fields.invoice_number;
+    const dueDate = Array.isArray(fields.duedate)
+      ? fields.duedate[0]
+      : fields.duedate; // this is invoice date from UI
+    const remark = Array.isArray(fields.remark)
+      ? fields.remark[0]
+      : fields.remark || "";
 
     // Validate mandatory remark field
     if (!remark || remark.trim() === "") {
@@ -72,55 +65,47 @@ export async function POST(req) {
     }
 
     // New payment fields
-    const paymentId = firstField(fields.payment_id);
-    const paymentDate = firstField(fields.payment_date);
+    const paymentId = Array.isArray(fields.payment_id)
+      ? fields.payment_id[0]
+      : fields.payment_id || null;
+    const paymentDate = Array.isArray(fields.payment_date)
+      ? fields.payment_date[0]
+      : fields.payment_date || null;
     const paymentAmount =
-      fields.payment_amount !== undefined && fields.payment_amount !== ""
-        ? parseFloat(firstField(fields.payment_amount))
+      fields.payment_amount !== undefined
+        ? parseFloat(
+            Array.isArray(fields.payment_amount)
+              ? fields.payment_amount[0]
+              : fields.payment_amount
+          )
         : null;
+
+    // Save files locally (if present)
+    const ewaybillPath = files.ewaybill_file
+      ? await saveFileLocally(getFile(files.ewaybill_file))
+      : "";
+    const einvoicePath = files.einvoice_file
+      ? await saveFileLocally(getFile(files.einvoice_file))
+      : "";
+    const reportPath = files.report_file
+      ? await saveFileLocally(getFile(files.report_file))
+      : "";
+    const challanPath = files.deliverchallan
+      ? await saveFileLocally(getFile(files.deliverchallan))
+      : "";
 
     // DB connection
     const conn = await getDbConnection();
     const payload = await getSessionPayload();
     const accountBy = payload?.username || payload?.name || null;
 
-    // Find quote_number and order state
+    // Find quote_number and, if needed, existing invoice date for this order
     const [orderRows] = await conn.execute(
-      `SELECT quote_number, duedate, invoice_date, dispatch_status,
-              ewaybill_file, einvoice_file, report_file, deliverchallan,
-              payment_id, payment_date, payment_amount, payment_status,
-              amount_received, payment_received_date, linked_payments_json
-       FROM neworder WHERE order_id = ?`,
+      `SELECT quote_number, duedate FROM neworder WHERE order_id = ?`,
       [orderId]
     );
     const existingOrder =
       Array.isArray(orderRows) && orderRows.length ? orderRows[0] : {};
-
-    if (
-      !isBeforeDispatch(existingOrder) &&
-      hasOrderInvoiceReport(existingOrder)
-    ) {
-      return NextResponse.json(
-        { error: "Invoice and tax documents cannot be edited after dispatch." },
-        { status: 403 },
-      );
-    }
-
-    const reportPath = await saveFilesField(files.report_file);
-    const mergedReportPathEarly =
-      reportPath || existingOrder.report_file || "";
-    if (!mergedReportPathEarly) {
-      return NextResponse.json(
-        { error: "Invoice PDF is required" },
-        { status: 400 },
-      );
-    }
-
-    // PDF → local, images → Cloudinary — up to 5 per field, comma-separated paths/URLs
-    const ewaybillPath = await saveFilesField(files.ewaybill_file);
-    const einvoicePath = await saveFilesField(files.einvoice_file);
-    const challanPath = await saveFilesField(files.deliverchallan);
-
     const quoteNumber = existingOrder.quote_number;
 
     // Get payment_term_days from quotation (if available)
@@ -135,101 +120,31 @@ export async function POST(req) {
       }
     }
 
-    await ensureOrderLinkedPaymentColumns(conn);
-
-    const formPaymentAmount =
-      fields.payment_amount !== undefined && fields.payment_amount !== ""
-        ? String(firstField(fields.payment_amount) ?? "")
-        : "";
-
-    let linkedCsv = null;
-    let amountReceived = null;
-    let paymentReceivedDate = null;
-    let linkedPaymentsJson = null;
-    if (invoiceNumber && String(invoiceNumber).trim()) {
-      const linked = await lookupInvoiceLinkedPayment(
-        conn,
-        String(invoiceNumber).trim(),
-      );
-      if (linked?.found) {
-        const amt = Number(linked.payment_amount);
-        if (Number.isFinite(amt) && amt > 0) amountReceived = amt;
-        paymentReceivedDate = linked.payment_date || null;
-        if (Array.isArray(linked.payments) && linked.payments.length) {
-          linkedPaymentsJson = JSON.stringify(linked.payments);
-        }
-        const fromPayments = linkedPaymentsToOrderPaymentCsv(
-          linked.payments || [],
-        );
-        if (linked.payment_amount_csv) {
-          linkedCsv = {
-            payment_id: linked.payment_id || fromPayments.payment_id,
-            payment_date: linked.payment_date || fromPayments.payment_date,
-            payment_amount: linked.payment_amount_csv,
-          };
-        } else if (fromPayments.payment_amount) {
-          linkedCsv = fromPayments;
-        } else if (amountReceived != null) {
-          linkedCsv = {
-            payment_id: linked.payment_id || null,
-            payment_date: linked.payment_date || null,
-            payment_amount: String(amountReceived),
-          };
-        }
-      }
-    }
-
-    const resolvedPayment = resolveAccountUploadPaymentCsv(
-      {
-        payment_id: paymentId,
-        payment_date: paymentDate,
-        payment_amount: formPaymentAmount,
-      },
-      linkedCsv,
-    );
-    let paymentIdSave = resolvedPayment.payment_id || paymentId || null;
-    let paymentDateSave = resolvedPayment.payment_date || paymentDate || null;
-    let paymentAmountSave = resolvedPayment.payment_amount || null;
-    if (amountReceived == null && existingOrder.amount_received != null) {
-      amountReceived = existingOrder.amount_received;
-      paymentReceivedDate =
-        paymentReceivedDate ?? existingOrder.payment_received_date ?? null;
-      linkedPaymentsJson =
-        linkedPaymentsJson ?? existingOrder.linked_payments_json ?? null;
-    }
-
-    // Compute payment_status server-side (supports comma-separated payment_amount)
+    // Compute payment_status server-side
     let paymentStatus = "pending";
-    const paid = sumPaymentAmountCsv(paymentAmountSave);
+    const paid = Number(paymentAmount) || 0;
     const total = Number(totalAmt) || 0;
 
+    // Determine overdue: invoice date + paymentTermDays < today
     let isOverdue = false;
+    // const invoiceDateIso = dueDate || existingOrder.duedate; // field named duedate but UI uses as invoice date
+    // if (invoiceDateIso && paymentTermDays > 0) {
+    //   const inv = new Date(invoiceDateIso);
+    //   const due = new Date(inv);
+    //   due.setDate(due.getDate() + paymentTermDays);
+    //   const today = new Date();
+    //   isOverdue = today.setHours(0,0,0,0) > due.setHours(0,0,0,0);
+    // }
 
     if (paid >= total && total > 0) paymentStatus = "paid";
     else if (paid > 0 && paid < total) paymentStatus = "partially paid";
     else if (paid === 0 && isOverdue) paymentStatus = "over due";
-    else if (paid === 0 && existingOrder.payment_status) {
-      paymentStatus = existingOrder.payment_status;
-    } else paymentStatus = "pending";
+    else paymentStatus = "pending";
 
-    const invoiceDateSave =
-      dueDate ||
-      existingOrder.duedate ||
-      existingOrder.invoice_date ||
-      null;
-
-    // Save to DB (merge file fields when not re-uploaded)
-    const mergedReportPath = mergedReportPathEarly;
-    const mergedEwaybillPath =
-      ewaybillPath || existingOrder.ewaybill_file || "";
-    const mergedEinvoicePath =
-      einvoicePath || existingOrder.einvoice_file || "";
-    const mergedChallanPath =
-      challanPath || existingOrder.deliverchallan || "";
-
+    // Save to DB (include baseAmount and new payment fields)
     await conn.execute(
-      `UPDATE neworder SET
-        baseAmount = ?,
+      `UPDATE neworder SET 
+        baseAmount = ?, 
         ewaybill_file = ?, 
         report_file = ?, 
         einvoice_file = ?, 
@@ -241,58 +156,35 @@ export async function POST(req) {
         payment_id = ?,
         payment_date = ?,
         payment_amount = ?,
-        amount_received = ?,
-        payment_received_date = ?,
-        linked_payments_json = ?,
         payment_status = ?,
         account_status = ?, 
         account_by = ?,
         account_remark = ? 
       WHERE order_id = ?`,
       [
-        sqlBind(baseAmount),
-        sqlBind(mergedEwaybillPath),
-        sqlBind(mergedReportPath),
-        sqlBind(mergedEinvoicePath),
-        sqlBind(mergedChallanPath),
-        sqlBind(invoiceNumber),
-        sqlBind(invoiceDateSave),
-        sqlBind(taxAmt),
-        sqlBind(totalAmt),
-        sqlBind(paymentIdSave),
-        sqlBind(paymentDateSave),
-        sqlBind(paymentAmountSave),
-        sqlBind(amountReceived),
-        sqlBind(paymentReceivedDate),
-        sqlBind(linkedPaymentsJson),
-        sqlBind(paymentStatus),
+        baseAmount,
+        ewaybillPath,
+        reportPath,
+        einvoicePath,
+        challanPath,
+        invoiceNumber,
+        dueDate,
+        taxAmt,
+        totalAmt,
+        paymentId,
+        paymentDate,
+        isNaN(paid) ? null : paid,
+        paymentStatus,
         1, // account_status
-        sqlBind(accountBy),
-        sqlBind(remark),
+        accountBy,
+        remark,
         orderId,
       ]
     );
 
-    try {
-      await syncInvoiceAndOrderPaymentLink(conn, {
-        invoiceNumbers:
-          invoiceNumber && String(invoiceNumber).trim()
-            ? [String(invoiceNumber).trim()]
-            : [],
-        orderIds: [orderId],
-      });
-    } catch (syncErr) {
-      console.error("Order upload invoice/order payment sync:", syncErr);
-    }
+    // await conn.end();
 
-    let partyPaymentPrompt = null;
-    try {
-      partyPaymentPrompt = await findPartyPaymentPromptForOrder(conn, orderId);
-    } catch (promptErr) {
-      console.error("Order upload party payment prompt:", promptErr);
-    }
-
-    return NextResponse.json({ success: true, partyPaymentPrompt });
+    return NextResponse.json({ success: true });
   } catch (error) {
     console.error("❌ Upload Error:", error);
     return NextResponse.json(

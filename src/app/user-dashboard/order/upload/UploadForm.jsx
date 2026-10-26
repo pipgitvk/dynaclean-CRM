@@ -3,155 +3,30 @@
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
-import { useInvoiceLinkedPaymentAutofill } from "@/hooks/useInvoiceLinkedPaymentAutofill";
-import { useOrderUploadInvoicePrefill } from "@/hooks/useOrderUploadInvoicePrefill";
-import InvoiceNumberSearchField from "@/components/orders/InvoiceNumberSearchField";
-import PartyPaymentOrderLinkModal from "@/components/party-payments/PartyPaymentOrderLinkModal";
 
-const MAX_FILES_PER_FIELD = 5;
-const FILE_FIELD_NAMES = new Set([
-  "ewaybill_file",
-  "einvoice_file",
-  "report_file",
-  "deliverchallan",
-]);
-
-function orderDateInputValue(orderDetails) {
-  if (orderDetails?.invoice_date) {
-    return String(orderDetails.invoice_date).slice(0, 10);
-  }
-  if (orderDetails?.duedate) {
-    return String(orderDetails.duedate).slice(0, 10);
-  }
-  return "";
-}
-
-function buildFormStateFromOrder(orderDetails, { lockNonFileFields }) {
-  const emptyFiles = {
-    ewaybill_file: [],
-    einvoice_file: [],
-    report_file: [],
-    deliverchallan: [],
-  };
-  if (!lockNonFileFields) {
-    return {
-      invoice_number: "",
-      duedate: "",
-      baseAmount: "",
-      taxamt: "",
-      totalamt: "",
-      remark: "",
-      ...emptyFiles,
-      payment_id: "",
-      payment_date: "",
-      payment_amount: "",
-    };
-  }
-  const paymentDate = orderDetails?.payment_date
-    ? String(orderDetails.payment_date).slice(0, 10)
-    : "";
-
-  let baseAmount =
-    orderDetails?.baseAmount != null && orderDetails.baseAmount !== ""
-      ? String(orderDetails.baseAmount)
-      : "";
-  let taxamt =
-    orderDetails?.taxamt != null && orderDetails.taxamt !== ""
-      ? String(orderDetails.taxamt)
-      : "";
-  let totalamt =
-    orderDetails?.totalamt != null && orderDetails.totalamt !== ""
-      ? String(orderDetails.totalamt)
-      : "";
-
-  const qTotal = Number(orderDetails?.quotation_grand_total);
-  const qSub = Number(orderDetails?.quotation_subtotal);
-  const qGst = Number(orderDetails?.quotation_gst);
-  if (!Number(totalamt) && qTotal > 0) {
-    totalamt = String(qTotal);
-    if (!Number(baseAmount) && qSub > 0) baseAmount = String(qSub);
-    if (!Number(taxamt) && qGst > 0) taxamt = String(qGst);
-    if (!Number(taxamt) && Number(baseAmount) > 0) {
-      taxamt = String(qTotal - Number(baseAmount));
-    }
-  }
-
-  return {
-    invoice_number: orderDetails?.invoice_number || "",
-    duedate: orderDateInputValue(orderDetails),
-    baseAmount,
-    taxamt,
-    totalamt,
-    remark: orderDetails?.account_remark || "",
-    ...emptyFiles,
-    payment_id: orderDetails?.payment_id || "",
-    payment_date: paymentDate,
-    payment_amount:
-      orderDetails?.payment_amount != null
-        ? String(orderDetails.payment_amount)
-        : "",
-  };
-}
-
-export default function UploadForm({
-  orderDetails,
-  redirectPath = "/user-dashboard/order",
-  isEditMode = false,
-  nonFileFieldsReadOnly = false,
-}) {
-  const [form, setForm] = useState(() =>
-    buildFormStateFromOrder(orderDetails, {
-      lockNonFileFields: nonFileFieldsReadOnly,
-    }),
-  );
+export default function UploadForm({ orderDetails }) {
+  const [form, setForm] = useState({
+    invoice_number: "",
+    duedate: "",
+    baseAmount: "",
+    taxamt: "",
+    totalamt: "",
+    remark: "",
+    ewaybill_file: null,
+    einvoice_file: null,
+    report_file: null,
+    deliverchallan: null,
+    payment_id: "",
+    payment_date: "",
+    payment_amount: "",
+  });
   const router = useRouter();
 
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [quoteTotalsLoaded, setQuoteTotalsLoaded] = useState(false);
-  const [invoicePrefillLoaded, setInvoicePrefillLoaded] = useState(false);
   const [paymentTermDays, setPaymentTermDays] = useState(null);
   const [computedPaymentStatus, setComputedPaymentStatus] = useState("pending");
-  const [partyPaymentPrompt, setPartyPaymentPrompt] = useState(null);
-  const [partyPaymentModalOpen, setPartyPaymentModalOpen] = useState(false);
-  const [partyPaymentPromptAfterUpload, setPartyPaymentPromptAfterUpload] =
-    useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const pr = await fetch(
-          `/api/party-payments/order-link-prompt?order_id=${encodeURIComponent(orderDetails.order_id)}`,
-          { credentials: "include" },
-        );
-        const pd = await pr.json();
-        if (cancelled || !pd?.partyPaymentPrompt?.party_payment_id) return;
-        setPartyPaymentPrompt(pd.partyPaymentPrompt);
-        setPartyPaymentModalOpen(true);
-      } catch {
-        /* no pending party payment */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [orderDetails.order_id]);
-
-  const orderHasSavedInvoiceNumber = Boolean(
-    String(orderDetails?.invoice_number ?? "").trim(),
-  );
-  const canSearchInvoiceNumber =
-    !orderHasSavedInvoiceNumber;
-
-  useOrderUploadInvoicePrefill(orderDetails?.order_id, setForm, {
-    onPrefilled: () => {
-      setInvoicePrefillLoaded(true);
-      setQuoteTotalsLoaded(true);
-    },
-  });
-
-  useInvoiceLinkedPaymentAutofill(form.invoice_number, setForm);
 
   useEffect(() => {
     // Clear alert message once base amount is entered
@@ -163,7 +38,7 @@ export default function UploadForm({
   // Fetch amounts from quotation items using quote_number
   useEffect(() => {
     const quoteNumber = orderDetails?.quote_number;
-    if (!quoteNumber || quoteTotalsLoaded || invoicePrefillLoaded) return;
+    if (!quoteNumber || quoteTotalsLoaded) return;
 
     (async () => {
       try {
@@ -198,7 +73,7 @@ export default function UploadForm({
         // silent fail; user can still enter manually
       }
     })();
-  }, [orderDetails?.quote_number, quoteTotalsLoaded, invoicePrefillLoaded]);
+  }, [orderDetails?.quote_number, quoteTotalsLoaded]);
 
   // Compute payment status automatically
   useEffect(() => {
@@ -226,41 +101,9 @@ export default function UploadForm({
     setComputedPaymentStatus(status);
   }, [form.payment_amount, form.duedate, paymentTermDays, form.totalamt]);
 
-  const fileKey = (file) => `${file.name}-${file.size}-${file.lastModified}`;
-
-  const handleRemoveFile = (fieldName, index) => {
-    setForm((prev) => ({
-      ...prev,
-      [fieldName]: prev[fieldName].filter((_, i) => i !== index),
-    }));
-  };
-
   const handleChange = (e) => {
     const { name, value, files } = e.target;
-    if (
-      nonFileFieldsReadOnly &&
-      !FILE_FIELD_NAMES.has(name) &&
-      name !== "remark" &&
-      !(name === "invoice_number" && canSearchInvoiceNumber)
-    ) {
-      return;
-    }
-    if (files && FILE_FIELD_NAMES.has(name)) {
-      const selected = Array.from(files);
-      setForm((prev) => {
-        const existing = prev[name] || [];
-        const seen = new Set(existing.map(fileKey));
-        const newFiles = selected.filter((f) => !seen.has(fileKey(f)));
-        const combined = [...existing, ...newFiles];
-
-        if (combined.length > MAX_FILES_PER_FIELD) {
-          toast.error(`Maximum ${MAX_FILES_PER_FIELD} files allowed per field`);
-          return { ...prev, [name]: combined.slice(0, MAX_FILES_PER_FIELD) };
-        }
-        return { ...prev, [name]: combined };
-      });
-      e.target.value = "";
-    } else if (files) {
+    if (files) {
       setForm((prev) => ({ ...prev, [name]: files[0] }));
     } else {
       setForm((prev) => ({ ...prev, [name]: value }));
@@ -296,38 +139,13 @@ export default function UploadForm({
       setLoading(false);
       return;
     }
-    if (!form.report_file?.length && !isEditMode) {
-      setMessage("❌ Please upload at least one Invoice PDF.");
-      setLoading(false);
-      return;
-    }
-
-    if (!form.remark?.trim()) {
-      setMessage("❌ Please enter remark.");
-      setLoading(false);
-      return;
-    }
 
     const formData = new FormData();
     formData.append("order_id", orderDetails.order_id);
-    const alwaysSendKeys = new Set([
-      "invoice_number",
-      "duedate",
-      "payment_id",
-      "payment_date",
-      "payment_amount",
-    ]);
     for (const key in form) {
-      const value = form[key];
-      if (Array.isArray(value)) {
-        if (value.length) {
-          value.forEach((file) => formData.append(key, file));
-        }
-        continue;
+      if (form[key]) {
+        formData.append(key, form[key]);
       }
-      if (value === "" && !alwaysSendKeys.has(key)) continue;
-      if (value == null && !alwaysSendKeys.has(key)) continue;
-      formData.append(key, value ?? "");
     }
 
     try {
@@ -339,28 +157,7 @@ export default function UploadForm({
       const result = await res.json();
       if (res.ok) {
         setMessage("✅ Files uploaded successfully.");
-        let prompt = result.partyPaymentPrompt;
-        if (!prompt?.party_payment_id) {
-          try {
-            const pr = await fetch(
-              `/api/party-payments/order-link-prompt?order_id=${encodeURIComponent(orderDetails.order_id)}`,
-              { credentials: "include" },
-            );
-            const pd = await pr.json();
-            if (pd?.partyPaymentPrompt?.party_payment_id) {
-              prompt = pd.partyPaymentPrompt;
-            }
-          } catch {
-            /* optional fallback */
-          }
-        }
-        if (prompt?.party_payment_id) {
-          setPartyPaymentPrompt(prompt);
-          setPartyPaymentPromptAfterUpload(true);
-          setPartyPaymentModalOpen(true);
-        } else {
-          router.push(redirectPath);
-        }
+        router.push("/user-dashboard/order");
       } else {
         setMessage("❌ " + result.error);
       }
@@ -371,17 +168,7 @@ export default function UploadForm({
     }
   };
 
-  const finishAfterPartyPaymentPrompt = () => {
-    setPartyPaymentModalOpen(false);
-    setPartyPaymentPrompt(null);
-    if (partyPaymentPromptAfterUpload) {
-      router.push(redirectPath);
-    }
-    setPartyPaymentPromptAfterUpload(false);
-  };
-
   return (
-    <>
     <form
       onSubmit={handleSubmit}
       className="space-y-6 max-w-6xl mx-auto p-6 bg-white rounded-lg"
@@ -409,30 +196,16 @@ export default function UploadForm({
         />
       </div>
 
-      {/* Invoice / payment / amounts */}
+      {/* Editable Inputs */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {canSearchInvoiceNumber ? (
-          <InvoiceNumberSearchField
-            name="invoice_number"
-            label="Invoice Number"
-            value={form.invoice_number}
-            onChange={(num) =>
-              setForm((prev) => ({ ...prev, invoice_number: num }))
-            }
-            required
-          />
-        ) : (
-          <FormField
-            locked={nonFileFieldsReadOnly}
-            name="invoice_number"
-            label="Invoice Number"
-            value={form.invoice_number}
-            onChange={handleChange}
-            required
-          />
-        )}
-        <FormField
-          locked={nonFileFieldsReadOnly}
+        <TextInput
+          name="invoice_number"
+          label="Invoice Number"
+          value={form.invoice_number}
+          onChange={handleChange}
+          required
+        />
+        <TextInput
           name="duedate"
           label="Invoice Date"
           type="date"
@@ -440,40 +213,29 @@ export default function UploadForm({
           onChange={handleChange}
           required
         />
-        <FormField
-          locked={nonFileFieldsReadOnly}
+        <TextInput
           name="payment_id"
           label="Payment ID (UTR No)"
           value={form.payment_id}
           onChange={handleChange}
           placeholder="Enter UTR No"
         />
-        <FormField
-          locked={nonFileFieldsReadOnly}
+        <TextInput
           name="payment_date"
           label="Payment Date"
           type="date"
           value={form.payment_date}
           onChange={handleChange}
         />
-        <FormField
-          locked={nonFileFieldsReadOnly}
+        <TextInput
           name="payment_amount"
           label="Payment Amount"
-          type="text"
+          type="number"
           value={form.payment_amount}
           onChange={handleChange}
         />
-        <ReadOnlyInput
-          label="Payment Status"
-          value={
-            nonFileFieldsReadOnly && orderDetails?.payment_status
-              ? orderDetails.payment_status
-              : computedPaymentStatus
-          }
-        />
-        <FormField
-          locked={nonFileFieldsReadOnly}
+        <ReadOnlyInput label="Payment Status" value={computedPaymentStatus} />
+        <TextInput
           name="baseAmount"
           label="Taxable Amount"
           type="number"
@@ -481,8 +243,7 @@ export default function UploadForm({
           onChange={handleChange}
           required
         />
-        <FormField
-          locked={nonFileFieldsReadOnly}
+        <TextInput
           name="taxamt"
           label="Tax Amount"
           type="number"
@@ -490,8 +251,7 @@ export default function UploadForm({
           onChange={handleChange}
           required={form.baseAmount !== ""}
         />
-        <FormField
-          locked={nonFileFieldsReadOnly}
+        <TextInput
           name="totalamt"
           label="Total Amount"
           type="number"
@@ -513,31 +273,23 @@ export default function UploadForm({
         <FileInput
           name="ewaybill_file"
           label="E-way Bill (Optional)"
-          files={form.ewaybill_file}
           onChange={handleChange}
-          onRemove={handleRemoveFile}
         />
         <FileInput
           name="einvoice_file"
           label="E-invoice (Optional)"
-          files={form.einvoice_file}
           onChange={handleChange}
-          onRemove={handleRemoveFile}
         />
         <FileInput
           name="report_file"
           label="Invoice PDF (Required)"
-          files={form.report_file}
-          required={!isEditMode}
+          required
           onChange={handleChange}
-          onRemove={handleRemoveFile}
         />
         <FileInput
           name="deliverchallan"
           label="Delivery Challan (Optional)"
-          files={form.deliverchallan}
           onChange={handleChange}
-          onRemove={handleRemoveFile}
         />
       </div>
 
@@ -548,71 +300,21 @@ export default function UploadForm({
           className="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700 transition"
           disabled={loading}
         >
-          {loading
-            ? "Uploading..."
-            : isEditMode
-              ? "Save Changes"
-              : "Upload Files"}
+          {loading ? "Uploading..." : "Upload Files"}
         </button>
         <a
-          href={redirectPath}
+          href="/user-dashboard/order"
           className="text-sm text-gray-600 hover:text-gray-800 underline"
         >
           ← Back to Order List
         </a>
       </div>
     </form>
-    <PartyPaymentOrderLinkModal
-      open={partyPaymentModalOpen}
-      prompt={partyPaymentPrompt}
-      orderId={orderDetails.order_id}
-      onDone={finishAfterPartyPaymentPrompt}
-    />
-    </>
-  );
-}
-
-function FormField({
-  locked,
-  label,
-  name,
-  value,
-  onChange,
-  type = "text",
-  required,
-  placeholder,
-}) {
-  if (locked) {
-    return (
-      <ReadOnlyInput
-        label={label}
-        value={value || "—"}
-      />
-    );
-  }
-  return (
-    <TextInput
-      label={label}
-      name={name}
-      value={value}
-      onChange={onChange}
-      type={type}
-      required={required}
-      placeholder={placeholder}
-    />
   );
 }
 
 // Reusable Components
-function TextInput({
-  label,
-  name,
-  value,
-  onChange,
-  type = "text",
-  required,
-  placeholder,
-}) {
+function TextInput({ label, name, value, onChange, type = "text", required }) {
   return (
     <div>
       <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -623,7 +325,6 @@ function TextInput({
         name={name}
         required={required}
         value={value}
-        placeholder={placeholder}
         onChange={onChange}
         className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
       />
@@ -631,16 +332,7 @@ function TextInput({
   );
 }
 
-function FileInput({
-  label,
-  name,
-  onChange,
-  onRemove,
-  required = false,
-  files = [],
-}) {
-  const atMax = files.length >= MAX_FILES_PER_FIELD;
-
+function FileInput({ label, name, onChange, required = false }) {
   return (
     <div>
       <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -649,35 +341,11 @@ function FileInput({
       <input
         type="file"
         name={name}
-        accept=".pdf,.jpg,.jpeg,.png"
-        multiple
+        accept=".pdf"
         onChange={onChange}
-        disabled={atMax}
-        required={required && files.length === 0}
-        className="w-full border border-gray-300 rounded file:mr-4 file:py-1 file:px-3 file:border-0 file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+        required={required}
+        className="w-full border border-gray-300 rounded file:mr-4 file:py-1 file:px-3 file:border-0 file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200"
       />
-      {files.length > 0 && (
-        <ul className="mt-1 space-y-1 text-xs text-gray-600">
-          {files.map((file, index) => (
-            <li
-              key={`${file.name}-${file.size}-${index}`}
-              className="flex items-center justify-between gap-2 rounded bg-gray-50 px-2 py-1"
-            >
-              <span className="truncate">
-                {index + 1}. {file.name}
-              </span>
-              <button
-                type="button"
-                onClick={() => onRemove(name, index)}
-                className="shrink-0 text-red-600 hover:text-red-800"
-                title="Remove file"
-              >
-                ✕
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
     </div>
   );
 }

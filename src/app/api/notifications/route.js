@@ -1,21 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSessionPayload } from "@/lib/auth";
-import NotificationService, { ensureTableOnce } from "@/lib/services/NotificationService";
+import NotificationService from "@/lib/services/NotificationService";
 import { resolveGemCrmEmployeeId } from "@/lib/gemCrmAuth";
-
-// Startup block — एक बार चलता है, हर request पर नहीं
-let cronStarted = false;
-if (!cronStarted) {
-  cronStarted = true;
-  // Notification table एक बार बनाएं — table पहले से है तो no-op होगा
-  ensureTableOnce();
-  import("@/lib/cron/recurringTaskCron").then((mod) => {
-    mod.startRecurringTaskCron();
-  });
-  import("@/lib/cron/paymentDueNotificationCron").then((mod) => {
-    mod.startPaymentDueNotificationCron();
-  });
-}
 
 export async function GET(req) {
   try {

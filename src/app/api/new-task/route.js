@@ -88,20 +88,7 @@ import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import RecurrenceService from "@/lib/services/RecurrenceService";
-import {
-  allocateNextTaskFollowupId,
-  allocateNextTaskRowIds,
-} from "@/lib/allocateTaskIds";
 import { resolveGemCrmEmployeeId } from "@/lib/gemCrmAuth";
-
-// Import and start the recurring task cron job
-let cronStarted = false;
-if (!cronStarted) {
-  cronStarted = true;
-  import("@/lib/cron/recurringTaskCron").then((mod) => {
-    mod.startRecurringTaskCron();
-  });
-}
 
 export async function POST(req) {
   try {
@@ -294,17 +281,19 @@ export async function POST(req) {
     }
 
     // ✅ Insert into DB
-    const { id: taskRowId, task_id } = await allocateNextTaskRowIds(conn);
+    const [[{ max_id }]] = await conn.execute(
+      "SELECT MAX(task_id) AS max_id FROM task"
+    );
+    const task_id = (max_id || 999) + 1;
 
     if (is_recurring) {
       await conn.execute(
         `INSERT INTO task (
-          id, task_id, taskname, createdby, taskassignto, status, next_followup_date,
+          task_id, taskname, createdby, taskassignto, status, next_followup_date,
           followed_date, notes, visiting_card, task_video, task_prior, task_catg,
           parent_recurring_task_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
-          taskRowId,
           task_id,
           taskname,
           createdby,
@@ -321,9 +310,8 @@ export async function POST(req) {
         ]
       );
     } else {
-      const taskInsertFields = ['id', 'task_id', 'taskname', 'createdby', 'taskassignto', 'status', 'next_followup_date', 'followed_date', 'notes', 'visiting_card', 'task_video', 'task_prior', 'task_catg'];
+      const taskInsertFields = ['task_id', 'taskname', 'createdby', 'taskassignto', 'status', 'next_followup_date', 'followed_date', 'notes', 'visiting_card', 'task_video', 'task_prior', 'task_catg'];
       const taskInsertValues = [
-        taskRowId,
         task_id,
         taskname,
         createdby,
@@ -344,14 +332,13 @@ export async function POST(req) {
       );
     }
 
-    const followupRowId = await allocateNextTaskFollowupId(conn);
     await conn.execute(
       `INSERT INTO task_followup (
-        id, task_id, createdby, taskassignto, followed_date, notes, taskname, status, task_deadline, reassign
+        task_id, createdby, taskassignto, followed_date, notes, taskname, status, task_deadline
       )
-      SELECT ?, task_id, createdby, taskassignto, followed_date, notes, taskname, status, next_followup_date, ''
+      SELECT task_id, createdby, taskassignto, followed_date, notes, taskname, status, next_followup_date
       FROM task WHERE task_id = ?`,
-      [followupRowId, task_id]
+      [task_id]
     );
 
     console.log(`✅ Task created: Task ID ${task_id}, Name: "${taskname}", Assigned to: ${taskassignto}`);

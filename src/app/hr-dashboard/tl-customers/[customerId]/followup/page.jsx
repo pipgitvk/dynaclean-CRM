@@ -113,7 +113,7 @@ export default async function TLFollowupPage({ params }) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-600">
               <p>
                 <strong>Last Called:</strong>{" "}
-                {dayjs(customer.latest_followed_date).format("DD-MM-YYYY hh:mm A")}
+                {dayjs(customer.latest_followed_date).format("DD MMM YYYY, hh:mm A")}
               </p>
               <p>
                 <strong>By:</strong> {customer.latest_followed_by}
@@ -132,7 +132,7 @@ export default async function TLFollowupPage({ params }) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-600">
               <p>
                 <strong>Date:</strong>{" "}
-                {dayjs(latestTLFollowup.followed_date).format("DD-MM-YYYY hh:mm A")}
+                {dayjs(latestTLFollowup.followed_date).format("DD MMM YYYY, hh:mm A")}
               </p>
               <p>
                 <strong>Quality Score:</strong>{" "}

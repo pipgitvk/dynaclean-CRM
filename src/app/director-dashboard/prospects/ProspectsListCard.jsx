@@ -1,7 +1,5 @@
 "use client";
 
-import { formatCrmDateOnly } from "@/lib/crmDateFormat";
-
 import {
   useEffect,
   useState,
@@ -33,7 +31,11 @@ function formatDate(value) {
   if (!value) return "—";
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return "—";
-  return formatCrmDateOnly(d);
+  return d.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
 }
 
 function formatNotesPreview(text, maxLen = 72) {

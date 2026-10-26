@@ -2,13 +2,16 @@
 
 import { useMemo } from "react";
 import dayjs from "dayjs";
-import { resolveStoredFileUrl } from "@/lib/resolveStoredFileUrl";
-import {
-  ORDER_PIPELINE_STAGES,
-  deriveOrderPipelineProgress,
-} from "@/lib/orderPipelineStage";
 
-const stages = ORDER_PIPELINE_STAGES;
+const stages = [
+  "Sales",
+  "Account",
+  "Admin",
+  "Dispatch",
+  "Delivered",
+  "Installation Report",
+  "Complete",
+];
 
 export default function OrderDetailsClient({
   orderDetails,
@@ -42,10 +45,31 @@ export default function OrderDetailsClient({
     return { totalQty, totalTaxable, totalGst, totalAmount };
   }, [items]);
 
-  const { progressPercent, stepCompleted } = useMemo(
-    () => deriveOrderPipelineProgress(orderDetails, statuses),
-    [orderDetails, statuses],
-  );
+  const currentStage = useMemo(() => {
+    const statusList = [
+      statuses?.sales_status,
+      statuses?.account_status,
+      statuses?.admin_status,
+      statuses?.dispatch_status,
+      statuses?.delivery_status,
+      statuses?.installation_status,
+    ];
+
+    // If all statuses are complete (no 0s), show Complete
+    if (!statusList.includes(0)) return "Complete";
+
+    // Find the first incomplete status (0)
+    const firstIncompleteIndex = statusList.findIndex((s) => s === 0);
+
+    // Show the stage BEFORE the first incomplete one (the last completed stage)
+    // If first incomplete is 0, we're still at Sales
+    if (firstIncompleteIndex === 0) return "Sales";
+
+    return stages[firstIncompleteIndex - 1] || "Sales";
+  }, [statuses]);
+
+  const currentIndex = stages.indexOf(currentStage);
+  const progressPercent = (currentIndex / (stages.length - 1)) * 100;
 
   return (
     <div className="p-4 space-y-6">
@@ -61,7 +85,7 @@ export default function OrderDetailsClient({
           {stages.map((stage, i) => (
             <div key={i} className="text-center flex-1">
               <div
-                className={`w-6 h-6 mx-auto mb-1 rounded-full text-white text-xs flex items-center justify-center ${stepCompleted[i] ? "bg-blue-600" : "bg-gray-400"
+                className={`w-6 h-6 mx-auto mb-1 rounded-full text-white text-xs flex items-center justify-center ${i <= currentIndex ? "bg-blue-600" : "bg-gray-400"
                   }`}
               >
                 {i + 1}
@@ -275,7 +299,7 @@ export default function OrderDetailsClient({
       {/* Back Link */}
       <div className="text-center mt-6">
         <a
-          href="/sales-dashboard/order"
+          href="/user-dashboard/order"
           className="inline-block bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded"
         >
           ← Back to Order List
@@ -336,86 +360,28 @@ function FileSection({ label, file }) {
 }
 
 function DocCell({ label, file, optional, required }) {
-  if (!file) {
-    return (
-      <div>
-        <p className="font-medium">{label}</p>
-        <p className={`italic ${required ? "text-red-600" : "text-gray-500"}`}>
-          {required ? "Required but not uploaded" : "Not uploaded"}
-        </p>
-      </div>
-    );
-  }
-
-  // Handle multiple files (comma-separated)
-  const fileUrls = file
-    .split(",")
-    .map((url) => url.trim())
-    .filter((url) => url.length > 0);
-
-  // If there's only one file, show simple view
-  if (fileUrls.length === 1) {
-    const displayUrl = resolveStoredFileUrl(fileUrls[0]);
-    return (
-      <div>
-        <p className="font-medium">{label}</p>
-        <div className="space-x-3">
-          <a
-            href={displayUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-blue-600 underline hover:text-blue-800"
-          >
-            View
-          </a>
-          <a href={displayUrl} download className="text-blue-600 underline hover:text-blue-800">
-            Download
-          </a>
-        </div>
-      </div>
-    );
-  }
-
-  // Multiple files - show dropdown/expandable list
   return (
     <div>
       <p className="font-medium">{label}</p>
-      <details className="cursor-pointer">
-        <summary className="text-blue-600 underline hover:text-blue-800">
-          📁 {fileUrls.length} Files
-        </summary>
-        <div className="mt-2 space-y-2 bg-gray-50 p-2 rounded border border-gray-200">
-          {fileUrls.map((fileUrl, idx) => {
-            const displayUrl = resolveStoredFileUrl(fileUrl);
-
-            // Extract filename from URL
-            const filename = fileUrl.split('/').pop() || `File ${idx + 1}`;
-            
-            return (
-              <div key={idx} className="flex items-center justify-between text-sm p-2 bg-white rounded">
-                <span className="truncate flex-1">{idx + 1}. {filename}</span>
-                <div className="space-x-2 flex-shrink-0">
-                  <a
-                    href={displayUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 underline hover:text-blue-800 text-xs"
-                  >
-                    View
-                  </a>
-                  <a
-                    href={displayUrl}
-                    download
-                    className="text-blue-600 underline hover:text-blue-800 text-xs"
-                  >
-                    Download
-                  </a>
-                </div>
-              </div>
-            );
-          })}
+      {file ? (
+        <div className="space-x-3">
+          <a
+            href={file}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-600 underline"
+          >
+            View
+          </a>
+          <a href={file} download className="text-blue-600 underline">
+            Download
+          </a>
         </div>
-      </details>
+      ) : (
+        <p className={`italic ${required ? "text-red-600" : "text-gray-500"}`}>
+          {required ? "Required but not uploaded" : "Not uploaded"}
+        </p>
+      )}
     </div>
   );
 }

@@ -47,7 +47,7 @@ export default async function UpcomingTasks({ leadSource }) {
               : "rgb(255, 165, 0)"; // orange if no deadline
 
             const formattedDueDate = nextDate
-              ? dayjs(nextDate).format("DD-MM-YYYY hh:mm A")
+              ? dayjs(nextDate).format("DD MMM, YYYY hh:mm A")
               : "Not set";
 
             return (
@@ -59,13 +59,13 @@ export default async function UpcomingTasks({ leadSource }) {
                 dueDate={
                   task.next_followup_date
                     ? dayjs(task.next_followup_date).format(
-                        "DD-MM-YYYY hh:mm A",
+                        "DD MMM, YYYY hh:mm A",
                       )
                     : "Not set"
                 }
                 assignDate={
                   task.followed_date
-                    ? dayjs(task.followed_date).format("DD-MM-YYYY hh:mm A")
+                    ? dayjs(task.followed_date).format("DD MMM, YYYY hh:mm A")
                     : "Unknown"
                 }
                 assignedBy={task.createdby || "Unknown"}

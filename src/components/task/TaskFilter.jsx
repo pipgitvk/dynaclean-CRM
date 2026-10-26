@@ -1,6 +1,5 @@
 "use client";
 
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Search, Calendar, Filter } from "lucide-react";
@@ -45,14 +44,24 @@ export default function TaskFilterForm() {
 
       <div className="flex flex-col w-full md:w-1/4">
         <label className="text-sm font-medium text-gray-600">Assign Date</label>
-        <TypeableDateFilterInput value={assignDate} onChange={setAssignDate} className="border rounded-md px-3 py-2"/>
+        <input
+          type="date"
+          value={assignDate}
+          onChange={(e) => setAssignDate(e.target.value)}
+          className="border rounded-md px-3 py-2"
+        />
       </div>
 
       <div className="flex flex-col w-full md:w-1/4">
         <label className="text-sm font-medium text-gray-600">
           Deadline Date
         </label>
-        <TypeableDateFilterInput value={deadlineDate} onChange={setDeadlineDate} className="border rounded-md px-3 py-2"/>
+        <input
+          type="date"
+          value={deadlineDate}
+          onChange={(e) => setDeadlineDate(e.target.value)}
+          className="border rounded-md px-3 py-2"
+        />
       </div>
 
       <div className="flex flex-col w-full md:w-1/4">

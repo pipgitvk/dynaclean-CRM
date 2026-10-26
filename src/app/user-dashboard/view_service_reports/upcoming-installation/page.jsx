@@ -1,34 +1,17 @@
 "use client";
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 import { Eye } from "lucide-react";
-import UpcomingInstallationStatusFilter from "@/components/installation/UpcomingInstallationStatusFilter";
-import UpcomingInstallationReferenceIds from "@/components/installation/UpcomingInstallationReferenceIds";
-import {
-  getUpcomingInstallationDeliveryDisplay,
-  getUpcomingInstallationRowClass,
-  installationStatusDateColor,
-  matchesUpcomingInstallationStatusFilter,
-  formatUpcomingInstallationDays,
-} from "@/lib/upcomingInstallationDeliveryDisplay";
 
 export default function UpcomingInstallationsPage() {
-  const searchParams = useSearchParams();
-  const registrationFilter = searchParams.get("registration");
-  const showUnregisteredOnly = registrationFilter === "unregistered";
-
   const [searchQuery, setSearchQuery] = useState("");
-  const [typeFilter, setTypeFilter] = useState(
-    () => searchParams.get("type") || "products"
-  );
+  const [typeFilter, setTypeFilter] = useState("products"); // Default to "products"
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [pageSize] = useState(50);
-  const [statusFilter, setStatusFilter] = useState("all");
 
   // ========= ACTIONS ==========
   const handleAction = async (orderId, action) => {
@@ -59,14 +42,7 @@ export default function UpcomingInstallationsPage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({
-        type: showUnregisteredOnly ? "products" : typeFilter,
-      });
-      if (showUnregisteredOnly) {
-        params.set("registration", "unregistered");
-      }
-
-      const res = await fetch(`/api/installation/upcoming?${params.toString()}`);
+      const res = await fetch(`/api/installation/upcoming?type=${typeFilter}`);
       const data = await res.json();
 
       setRecords(data.installations || []);
@@ -79,56 +55,41 @@ export default function UpcomingInstallationsPage() {
     } finally {
       setLoading(false);
     }
-  }, [typeFilter, showUnregisteredOnly]);
+  }, [typeFilter]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
   // ========= UI HELPERS ==========
-  const dateColor = installationStatusDateColor;
-  const deliveryDisplay = getUpcomingInstallationDeliveryDisplay;
+  const getRowClass = (status) => {
+    if (status === "overdue") return "bg-red-100";
+    if (status === "upcoming") return "bg-yellow-100";
+    return "bg-white";
+  };
 
-  // ========= FILTERED RECORDS ==========
-  const filteredRecords = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    return records.filter((r) => {
-      if (!matchesUpcomingInstallationStatusFilter(r, statusFilter)) return false;
-      if (!q) return true;
-      return (
-        String(r.model ?? "").toLowerCase().includes(q) ||
-        String(r.company_name ?? "").toLowerCase().includes(q) ||
-        String(r.emp_name ?? "").toLowerCase().includes(q) ||
-        String(r.name ?? "").toLowerCase().includes(q) ||
-        String(r.contact ?? "").toLowerCase().includes(q) ||
-        String(r.invoice_number ?? "").toLowerCase().includes(q) ||
-        String(r.order_id ?? "").toLowerCase().includes(q) ||
-        String(r.serial_number ?? "").toLowerCase().includes(q) ||
-        String(r.service_id ?? "").toLowerCase().includes(q) ||
-        String(r.delivery_address ?? "").toLowerCase().includes(q)
-      );
-    });
-  }, [records, searchQuery, statusFilter]);
+  const dateColor = (status) => {
+    return status === "overdue"
+      ? "text-red-600 font-bold"
+      : status === "upcoming"
+      ? "text-orange-600 font-bold"
+      : "text-gray-800";
+  };
+
+  const formatDays = (days) =>
+    days < 0
+      ? `${Math.abs(days)} days overdue`
+      : days === 0
+      ? "Today"
+      : `In ${days} days`;
 
   // ================= UI START ===================
   return (
     <div className="w-full max-w-full p-6">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <div>
-          <h2 className="text-3xl font-bold">
-            {showUnregisteredOnly ? "Pending Product Registration" : "Upcoming Installations"}
-          </h2>
-          {showUnregisteredOnly && (
-            <p className="text-sm text-amber-600 mt-1">
-              Showing only unregistered products
-            </p>
-          )}
-        </div>
-        <p className="text-sm text-gray-600">
-          Total: {filteredRecords.length}
-          {searchQuery || statusFilter !== "all" ? ` (filtered from ${total})` : ` records`}
-        </p>
+        <h2 className="text-3xl font-bold">Upcoming Installations</h2>
+        <p className="text-sm text-gray-600">Total: {total} records</p>
       </div>
 
       {/* Search + Legend */}
@@ -142,47 +103,40 @@ export default function UpcomingInstallationsPage() {
         />
 
         {/* Type Filter */}
-        {!showUnregisteredOnly && (
-          <div className="flex gap-3">
-            <button
-              onClick={() => setTypeFilter("all")}
-              className={`px-4 py-2 rounded font-medium transition ${
-                typeFilter === "all"
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-200 text-gray-800 hover:bg-gray-300"
-              }`}
-            >
-              All
-            </button>
-            <button
-              onClick={() => setTypeFilter("products")}
-              className={`px-4 py-2 rounded font-medium transition ${
-                typeFilter === "products"
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-200 text-gray-800 hover:bg-gray-300"
-              }`}
-            >
-              Products
-            </button>
-            <button
-              onClick={() => setTypeFilter("spares")}
-              className={`px-4 py-2 rounded font-medium transition ${
-                typeFilter === "spares"
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-200 text-gray-800 hover:bg-gray-300"
-              }`}
-            >
-              Spares
-            </button>
-          </div>
-        )}
+        <div className="flex gap-3">
+          <button
+            onClick={() => setTypeFilter("all")}
+            className={`px-4 py-2 rounded font-medium transition ${
+              typeFilter === "all"
+                ? "bg-blue-600 text-white"
+                : "bg-gray-200 text-gray-800 hover:bg-gray-300"
+            }`}
+          >
+            All
+          </button>
+          <button
+            onClick={() => setTypeFilter("products")}
+            className={`px-4 py-2 rounded font-medium transition ${
+              typeFilter === "products"
+                ? "bg-blue-600 text-white"
+                : "bg-gray-200 text-gray-800 hover:bg-gray-300"
+            }`}
+          >
+            Products
+          </button>
+          <button
+            onClick={() => setTypeFilter("spares")}
+            className={`px-4 py-2 rounded font-medium transition ${
+              typeFilter === "spares"
+                ? "bg-blue-600 text-white"
+                : "bg-gray-200 text-gray-800 hover:bg-gray-300"
+            }`}
+          >
+            Spares
+          </button>
+        </div>
 
-        <UpcomingInstallationStatusFilter
-          value={statusFilter}
-          onChange={setStatusFilter}
-        />
-
-        <div className="flex flex-wrap gap-6">
+        <div className="flex gap-6">
           <div className="flex items-center">
             <div className="w-4 h-4 bg-red-100 mr-2" />
             Overdue
@@ -190,10 +144,6 @@ export default function UpcomingInstallationsPage() {
           <div className="flex items-center">
             <div className="w-4 h-4 bg-yellow-100 mr-2" />
             Within 10 Days
-          </div>
-          <div className="flex items-center">
-            <div className="w-4 h-4 bg-green-100 mr-2" />
-            Actual Delivery Done
           </div>
           <div className="flex items-center">
             <div className="w-4 h-4 bg-white border mr-2" />
@@ -204,20 +154,22 @@ export default function UpcomingInstallationsPage() {
 
       {/** ================= MOBILE VIEW (CARDS) ================= */}
       <div className="md:hidden space-y-4">
-        {filteredRecords.map((r, i) => {
-          const delivery = deliveryDisplay(r);
-          return (
+        {records.map((r, i) => (
           <div
             key={i}
-            className={`rounded-xl shadow p-4 border ${getUpcomingInstallationRowClass(
-              r
+            className={`rounded-xl shadow p-4 border ${getRowClass(
+              r.installation_status
             )}`}
           >
-            <div className="mb-2">
-              <UpcomingInstallationReferenceIds record={r} className="text-sm" />
-            </div>
+            <div className="text-lg font-bold mb-2">Order #{r.order_id}</div>
 
             <div className="space-y-1 text-sm">
+              <p>
+                <b>Invoice #:</b> {r.invoice_number || "N/A"}
+              </p>
+              <p>
+                <b>Order #:</b> {r.order_id}
+              </p>
               <p>
                 <b>Serial #:</b> {r.serial_number || "N/A"}
               </p>
@@ -239,19 +191,11 @@ export default function UpcomingInstallationsPage() {
               <p>
                 <b>Address:</b> {r.delivery_address}
               </p>
-              <p className={`${delivery.className} mt-1`}>
-                <b>Delivery:</b> {delivery.text}
+              <p className={`${dateColor(r.installation_status)} mt-1`}>
+                <b>Delivery:</b> {r.delivery_date}
               </p>
               <p className={`${dateColor(r.installation_status)}`}>
-                <b>Days:</b> {formatUpcomingInstallationDays(r)}
-              </p>
-              <p className="mt-1">
-                <b>Warranty:</b>{" "}
-                {Number(r.warranty_registered) === 1 ? (
-                  <span className="text-green-600 font-semibold">✔ Registered</span>
-                ) : (
-                  <span className="text-gray-400">Not Registered</span>
-                )}
+                <b>Days:</b> {formatDays(r.days_until_installation)}
               </p>
             </div>
 
@@ -264,16 +208,15 @@ export default function UpcomingInstallationsPage() {
               >
                 <Eye size={14} className="mr-1" /> View
               </Link>
-              {/* <button
+              <button
                 onClick={() => handleAction(r.order_id, "INSTALLED")}
                 className="w-full px-3 py-2 bg-green-600 text-white text-xs rounded hover:bg-green-700"
               >
                 Installed
-              </button> */}
+              </button>
             </div>
           </div>
-        );
-        })}
+        ))}
       </div>
 
       {/** ================= DESKTOP TABLE VIEW ================= */}
@@ -281,7 +224,7 @@ export default function UpcomingInstallationsPage() {
         <table className="w-full text-sm table-auto border-collapse">
           <thead className="bg-gray-800 text-white">
             <tr>
-              <th className="p-3">Inv | Ord | Ser</th>
+              <th className="p-3">Invoice # | Order ID | Serial #</th>
               <th className="p-3">Model</th>
               <th className="p-3">Name</th>
               <th className="p-3">Delivery Address</th>
@@ -291,17 +234,18 @@ export default function UpcomingInstallationsPage() {
               <th className="p-3">Delivery</th>
               <th className="p-3">Delivery</th>
               <th className="p-3">Days</th>
-              <th className="p-3">Warranty</th>
               <th className="p-3">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {filteredRecords.map((r, i) => {
-              const delivery = deliveryDisplay(r);
-              return (
-              <tr key={i} className={getUpcomingInstallationRowClass(r)}>
+            {records.map((r, i) => (
+              <tr key={i} className={getRowClass(r.installation_status)}>
                 <td className="p-3 font-semibold">
-                  <UpcomingInstallationReferenceIds record={r} />
+                  <div className="space-y-1 text-xs">
+                    <div><span className="text-blue-600 font-bold">Inv:</span> {r.invoice_number || "N/A"}</div>
+                    <div><span className="text-green-600 font-bold">Ord:</span> {r.order_id}</div>
+                    <div><span className="text-purple-600 font-bold">Ser:</span> {r.serial_number || "N/A"}</div>
+                  </div>
                 </td>
                 <td className="p-3">{r.model}</td>
                 <td className="p-3">{r.name}</td>
@@ -309,23 +253,11 @@ export default function UpcomingInstallationsPage() {
                 <td className="p-3">{r.company_name}</td>
                 <td className="p-3">{r.contact}</td>
                 <td className="p-3">{r.emp_name}</td>
-                <td className={`p-3 ${delivery.className}`}>
-                  {delivery.text}
+                <td className={`p-3 ${dateColor(r.installation_status)}`}>
+                  {r.delivery_date}
                 </td>
                 <td className={`p-3 ${dateColor(r.installation_status)}`}>
-                  {formatUpcomingInstallationDays(r)}
-                </td>
-                <td className="p-3 text-center">
-                  {Number(r.warranty_registered) === 1 ? (
-                    <span title="Registered in Warranty" className="inline-flex items-center gap-1 text-green-600 font-semibold text-xs">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
-                      Registered
-                    </span>
-                  ) : (
-                    <span className="text-gray-400 text-xs">—</span>
-                  )}
+                  {formatDays(r.days_until_installation)}
                 </td>
                 <td className="p-3">
                   <div className="flex flex-col gap-2 items-stretch">
@@ -336,17 +268,16 @@ export default function UpcomingInstallationsPage() {
                     >
                       <Eye size={14} className="mr-1" /> View
                     </Link>
-                    {/* <button
+                    <button
                       onClick={() => handleAction(r.order_id, "INSTALLED")}
                       className="px-3 py-1.5 bg-green-600 text-white rounded text-xs hover:bg-green-700"
                     >
                       Installed
-                    </button> */}
+                    </button>
                   </div>
                 </td>
               </tr>
-            );
-            })}
+            ))}
           </tbody>
         </table>
       </div>

@@ -45,11 +45,6 @@ import {
   Briefcase,
   Globe,
   Truck,
-  Landmark,
-  FileSpreadsheet,
-  Fingerprint,
-  AlertTriangle,
-  List,
 } from "lucide-react";
 
 // Icon map
@@ -92,11 +87,6 @@ const iconMap = {
   Briefcase,
   Globe,
   Truck,
-  Landmark,
-  FileSpreadsheet,
-  Fingerprint,
-  AlertTriangle,
-  List,
 };
 
 export default function Sidebar({

@@ -176,7 +176,7 @@ function CompanyCard({ company, onClick }) {
   const initials = getInitials(company.company_name);
   const bgColor = avatarColor(company.company_name);
   const lastDate = company.last_purchase_date
-    ? dayjs(company.last_purchase_date).format("DD-MM-YYYY")
+    ? dayjs(company.last_purchase_date).format("DD MMM YYYY")
     : "—";
 
   return (

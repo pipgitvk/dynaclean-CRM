@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSessionPayload } from "@/lib/auth";
 import { buildLedgerForParty } from "@/lib/partyLedger";
-import { savePartyLedgerEntriesToDatabase } from "@/lib/partyLedgerSync";
 
 export const dynamic = "force-dynamic";
 
@@ -35,20 +34,10 @@ export async function GET(req, { params }) {
   }
 
   try {
-    const customerIdParam = searchParams.get("customer_id") ?? null;
     const { entries, customerId } = await buildLedgerForParty(
       decoded,
-      customerIdParam,
+      searchParams.get("customer_id") ?? null
     );
-
-    void savePartyLedgerEntriesToDatabase(
-      decoded,
-      customerIdParam || customerId,
-      entries,
-    ).catch((e) => {
-      console.warn("[party ledger snapshot]", e?.message);
-    });
-
     return NextResponse.json({
       success: true,
       party: { name: decoded, customer_id: customerId || null },

@@ -65,12 +65,11 @@ export async function POST(request, { params }) {
     }
 
     const order = rows[0];
-    const currentFileValue = order.file_value || "";
-    if (!canEditOrderDocumentField(order, field, currentFileValue)) {
+    if (!canEditOrderDocumentField(order, field)) {
       return NextResponse.json(
         {
           error:
-            getOrderDocumentEditBlockReason(order, field, currentFileValue) ||
+            getOrderDocumentEditBlockReason(order, field) ||
             "Editing is not allowed for this document.",
         },
         { status: 403 },

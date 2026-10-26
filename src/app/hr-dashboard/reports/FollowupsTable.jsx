@@ -1,6 +1,5 @@
 "use client";
 
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useEffect, useState } from "react";
 import dayjs from "dayjs";
 
@@ -63,14 +62,24 @@ export default function FollowupsClient({ leadSource }) {
           <label className="text-sm block mb-1 text-gray-700">
             Followed Date
           </label>
-          <TypeableDateFilterInput value={from} onChange={setFrom} className="w-full px-3 py-2 border rounded-md text-sm"/>
+          <input
+            type="date"
+            value={from}
+            onChange={(e) => setFrom(e.target.value)}
+            className="w-full px-3 py-2 border rounded-md text-sm"
+          />
         </div>
 
         <div>
           <label className="text-sm block mb-1 text-gray-700">
             Next Follow-up Date
           </label>
-          <TypeableDateFilterInput value={to} onChange={setTo} className="w-full px-3 py-2 border rounded-md text-sm"/>
+          <input
+            type="date"
+            value={to}
+            onChange={(e) => setTo(e.target.value)}
+            className="w-full px-3 py-2 border rounded-md text-sm"
+          />
         </div>
 
         <div>
@@ -148,10 +157,10 @@ export default function FollowupsClient({ leadSource }) {
                       )}
                     </td>
                     <td className="px-4 py-3 text-gray-700">
-                      {dayjs(r.followed_date).format("DD-MM-YYYY")}
+                      {dayjs(r.followed_date).format("DD-MMM-YYYY")}
                     </td>
                     <td className="px-4 py-3 text-gray-700">
-                      {dayjs(r.next_followup_date).format("DD-MM-YYYY")}
+                      {dayjs(r.next_followup_date).format("DD-MMM-YYYY")}
                     </td>
                     <td className="px-4 py-3 text-gray-700">{r.comm_mode}</td>
                     <td className="px-4 py-3">
@@ -195,11 +204,11 @@ export default function FollowupsClient({ leadSource }) {
                 </div>
                 <div className="text-sm text-gray-600">
                   <strong>Followed:</strong>{" "}
-                  {dayjs(r.followed_date).format("DD-MM-YYYY")}
+                  {dayjs(r.followed_date).format("DD-MMM-YYYY")}
                 </div>
                 <div className="text-sm text-gray-600">
                   <strong>Next:</strong>{" "}
-                  {dayjs(r.next_followup_date).format("DD-MM-YYYY")}
+                  {dayjs(r.next_followup_date).format("DD-MMM-YYYY")}
                 </div>
                 <div className="text-sm text-gray-600">
                   <strong>Mode:</strong> {r.comm_mode}

@@ -5,7 +5,7 @@ import { ArrowRight, FileText, X } from "lucide-react";
 import dayjs from "dayjs";
 
 const formatDT = (val) =>
-  val ? dayjs(val).format("DD-MM-YYYY hh:mm A") : "—";
+  val ? dayjs(val).format("DD MMM YYYY, hh:mm A") : "—";
 
 const formatAmt = (val) => {
   if (val == null || val === "") return "—";

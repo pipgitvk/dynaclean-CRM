@@ -1,7 +1,5 @@
 "use client";
 
-import { formatCrmDateOnly } from "@/lib/crmDateFormat";
-
 import { useEffect, useState } from "react";
 import { Printer } from "lucide-react";
 import ServiceReportPrintModal from "./ServiceReportPrintModal";
@@ -18,7 +16,11 @@ const formatReportDate = (value) => {
   if (!value) return "";
   const parsed = new Date(value);
   if (!Number.isNaN(parsed.getTime())) {
-    return formatCrmDateOnly(parsed);
+    return parsed.toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
   }
   return String(value);
 };

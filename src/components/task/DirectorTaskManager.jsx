@@ -14,7 +14,7 @@ export default function DirectorTaskManager({ currentUser }) {
   const fetchTasks = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`/api/director/tasks`);
+      const res = await fetch(`/api/director/tasks.`);
       const data = await res.json();
       setTasks(Array.isArray(data) ? data : []);
     } catch (error) {

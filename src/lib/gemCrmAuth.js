@@ -1,15 +1,7 @@
 import { dbExecute } from "@/lib/db";
 
 export function isGemCrmRoleAllowed(role) {
-  return ["SUPERADMIN", "GEM", "DIRECTOR"].includes(
-    String(role || "").trim().toUpperCase()
-  );
-}
-
-export function isGemCrmAdmin(role) {
-  return ["SUPERADMIN", "DIRECTOR"].includes(
-    String(role || "").trim().toUpperCase()
-  );
+  return ["SUPERADMIN", "GEM"].includes(String(role || "").trim().toUpperCase());
 }
 
 export async function resolveGemCrmEmployeeId(payload) {

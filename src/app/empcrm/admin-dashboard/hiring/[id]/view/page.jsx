@@ -1,10 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-
-const HISTORY_PAGE_SIZE = 15;
 import Link from "next/link";
-import { useParams, usePathname } from "next/navigation";
+import { useParams } from "next/navigation";
 import { ArrowLeft, CalendarClock, Loader2 } from "lucide-react";
 import {
   formatDt,
@@ -12,7 +10,6 @@ import {
   formatInterviewAt,
   StatusChip,
 } from "@/app/admin-dashboard/hiring-process/shared";
-import { getDirectorHrHiringBase } from "@/lib/directorHrPaths";
 
 /** Table-friendly datetime for status history table */
 function formatHistoryWhen(v) {
@@ -39,9 +36,6 @@ function formatHistoryWhen(v) {
 
 export default function EmpcrmHiringViewPage() {
   const params = useParams();
-  const pathname = usePathname();
-  const hiringBase = getDirectorHrHiringBase(pathname);
-  const paginateHistory = hiringBase === "/director-dashboard/hiring";
   const idRaw = params?.id;
   const entryId = idRaw != null ? parseInt(String(idRaw), 10) : NaN;
 
@@ -49,7 +43,6 @@ export default function EmpcrmHiringViewPage() {
   const [error, setError] = useState(null);
   const [historyEntry, setHistoryEntry] = useState(null);
   const [historyRows, setHistoryRows] = useState([]);
-  const [historyPage, setHistoryPage] = useState(1);
 
   const load = useCallback(async () => {
     if (!Number.isFinite(entryId) || entryId < 1) {
@@ -83,8 +76,8 @@ export default function EmpcrmHiringViewPage() {
     load();
   }, [load]);
 
-  const backHref = hiringBase;
-  const editHref = `${hiringBase}/${entryId}/edit`;
+  const backHref = "/empcrm/admin-dashboard/hiring";
+  const editHref = `/empcrm/admin-dashboard/hiring/${entryId}/edit`;
 
   const statusRows = useMemo(() => {
     const rows = historyRows.filter((h) => {
@@ -97,27 +90,6 @@ export default function EmpcrmHiringViewPage() {
       return tb - ta;
     });
   }, [historyRows]);
-
-  const historyTotalPages = Math.max(
-    1,
-    Math.ceil(statusRows.length / HISTORY_PAGE_SIZE) || 1,
-  );
-
-  const pagedStatusRows = useMemo(() => {
-    if (!paginateHistory) return statusRows;
-    const start = (historyPage - 1) * HISTORY_PAGE_SIZE;
-    return statusRows.slice(start, start + HISTORY_PAGE_SIZE);
-  }, [statusRows, historyPage, paginateHistory]);
-
-  useEffect(() => {
-    setHistoryPage(1);
-  }, [historyRows.length, entryId]);
-
-  useEffect(() => {
-    if (historyPage > historyTotalPages) {
-      setHistoryPage(historyTotalPages);
-    }
-  }, [historyPage, historyTotalPages]);
 
   const displayName =
     historyEntry?.candidate_name != null && String(historyEntry.candidate_name).trim() !== ""
@@ -328,7 +300,7 @@ export default function EmpcrmHiringViewPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 bg-white">
-                    {(paginateHistory ? pagedStatusRows : statusRows).map((h) => {
+                    {statusRows.map((h) => {
                       const sa = h.status != null ? String(h.status).trim() : "";
                       const noteText =
                         h.note != null && String(h.note).trim() !== "" ? String(h.note).trim() : null;
@@ -363,36 +335,6 @@ export default function EmpcrmHiringViewPage() {
                     })}
                   </tbody>
                 </table>
-              </div>
-            )}
-            {paginateHistory && statusRows.length > HISTORY_PAGE_SIZE && (
-              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 pt-4">
-                <p className="text-sm text-gray-600">
-                  Showing {(historyPage - 1) * HISTORY_PAGE_SIZE + 1}–
-                  {Math.min(historyPage * HISTORY_PAGE_SIZE, statusRows.length)} of{" "}
-                  {statusRows.length}
-                </p>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    disabled={historyPage <= 1}
-                    onClick={() => setHistoryPage((p) => Math.max(1, p - 1))}
-                    className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-50"
-                  >
-                    Previous
-                  </button>
-                  <span className="text-sm text-gray-700 tabular-nums">
-                    Page {historyPage} of {historyTotalPages}
-                  </span>
-                  <button
-                    type="button"
-                    disabled={historyPage >= historyTotalPages}
-                    onClick={() => setHistoryPage((p) => Math.min(historyTotalPages, p + 1))}
-                    className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-gray-50"
-                  >
-                    Next
-                  </button>
-                </div>
               </div>
             )}
           </div>

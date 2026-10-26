@@ -1,14 +1,5 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
-import {
-  normalizeStoredPaymentFields,
-  resolveNextPaymentCsv,
-  sumOrderPaymentAmounts,
-} from "@/lib/orderPaymentHistory";
-import {
-  derivePaymentStatus,
-  getOrderTotalForPayment,
-} from "@/lib/paymentOrderStatus";
 
 export async function POST(req) {
   let conn;
@@ -29,31 +20,13 @@ export async function POST(req) {
 
     // Fetch order info (including previous payment fields)
     const [orderRows] = await conn.execute(
-      `SELECT o.quote_number, o.duedate, o.totalamt, o.baseAmount, o.taxamt,
-              o.payment_id, o.payment_date, o.payment_amount, o.transaction_id,
-              qr.grand_total AS quotation_grand_total
-       FROM neworder o
-       LEFT JOIN quotations_records qr ON qr.quote_number = o.quote_number
-       WHERE o.order_id = ?`,
+      `SELECT quote_number, duedate, totalamt, payment_id, payment_date, payment_amount FROM neworder WHERE order_id = ?`,
       [orderId]
     );
     if (!Array.isArray(orderRows) || orderRows.length === 0) {
       return NextResponse.json({ success: false, error: "Order not found" }, { status: 404 });
     }
     const order = orderRows[0];
-    const repaired = normalizeStoredPaymentFields(order);
-    if (repaired) {
-      Object.assign(order, repaired);
-      await conn.execute(
-        `UPDATE neworder SET payment_id = ?, payment_date = ?, payment_amount = ? WHERE order_id = ?`,
-        [
-          repaired.payment_id,
-          repaired.payment_date,
-          repaired.payment_amount,
-          orderId,
-        ],
-      );
-    }
 
     // Fetch term days
     let paymentTermDays = 0;
@@ -67,22 +40,35 @@ export async function POST(req) {
       }
     }
 
-    const { nextIds, nextDates, nextAmounts } = resolveNextPaymentCsv(order, {
-      paymentId: newPaymentId,
-      paymentDate: newPaymentDate,
-      paymentAmount: newPaymentAmount,
-    });
+    // Compute payment status
+    let paymentStatus = "pending";
+    // Build comma-separated histories
+    const prevIds = (order.payment_id || "").toString().trim();
+    const prevDates = (order.payment_date || "").toString().trim();
+    const prevAmounts = (order.payment_amount || "").toString().trim();
 
-    const orderAfterPayment = {
-      ...order,
-      payment_id: nextIds,
-      payment_amount: nextAmounts,
-    };
-    const totalPaid = sumOrderPaymentAmounts(orderAfterPayment);
-    const total = getOrderTotalForPayment(order);
+    const nextIds = newPaymentId
+      ? (prevIds ? `${prevIds},${newPaymentId}` : newPaymentId)
+      : prevIds || null;
+    const nextDates = newPaymentDate
+      ? (prevDates ? `${prevDates},${newPaymentDate}` : newPaymentDate)
+      : prevDates || null;
+    const nextAmounts = (newPaymentAmount !== null && !isNaN(newPaymentAmount))
+      ? (prevAmounts ? `${prevAmounts},${newPaymentAmount}` : String(newPaymentAmount))
+      : prevAmounts || null;
+
+    // Compute totals from nextAmounts CSV
+    const totalPaid = (nextAmounts || "")
+      .toString()
+      .split(",")
+      .map((x) => Number(x.trim()))
+      .filter((n) => !isNaN(n))
+      .reduce((sum, n) => sum + n, 0);
+
+    const total = Number(order.totalamt) || 0;
 
     let isOverdue = false;
-    const invoiceDateIso = order.duedate;
+    const invoiceDateIso = order.duedate; // field used as invoice date
     if (invoiceDateIso && paymentTermDays > 0) {
       const inv = new Date(invoiceDateIso);
       const due = new Date(inv);
@@ -91,12 +77,10 @@ export async function POST(req) {
       isOverdue = today.setHours(0, 0, 0, 0) > due.setHours(0, 0, 0, 0);
     }
 
-    const paymentStatus = derivePaymentStatus({
-      total,
-      paidAmount: totalPaid,
-      deductionAmount: 0,
-      isOverdue,
-    });
+    if (totalPaid >= total && total >= 0) paymentStatus = "paid";
+    else if (totalPaid > 0 && totalPaid < total) paymentStatus = "partially paid";
+    else if (totalPaid === 0 && isOverdue) paymentStatus = "over due";
+    else paymentStatus = "pending";
 
     await conn.execute(
       `UPDATE neworder SET payment_id = ?, payment_date = ?, payment_amount = ?, payment_status = ? WHERE order_id = ?`,

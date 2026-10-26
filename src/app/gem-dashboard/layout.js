@@ -1,13 +1,13 @@
 import "../globals.css";
 import getSidebarMenuItems from "@/lib/getSidebarMenuItems";
-import SalesLayoutShell from "@/components/layouts/SalesLayoutShell";
+import UserLayoutShell from "@/components/layouts/UserAdminLayoutShell";
 import IpGuard from "@/components/IpGuard";
 
 export default async function GemLayout({ children }) {
   const menuItems = await getSidebarMenuItems();
 
   return (
-    <SalesLayoutShell
+    <UserLayoutShell
       menuItems={menuItems}
       showBackButton={false}
       backButtonPath="/"
@@ -15,6 +15,6 @@ export default async function GemLayout({ children }) {
     >
       <IpGuard />
       {children}
-    </SalesLayoutShell>
+    </UserLayoutShell>
   );
 }

@@ -1,16 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
-import { FileText, LayoutGrid } from "lucide-react";
 import InvoiceTable from "./InvoiceTable";
-import ViewAllInvoicesModal from "./ViewAllInvoicesModal";
 
 export const dynamic = "force-dynamic";
 
 export default function InvoicePage() {
-  const [viewAllOpen, setViewAllOpen] = useState(false);
-
   // State to hold summary data passed from InvoiceTable
   const [summaryData, setSummaryData] = useState({
     grandTotal: 0,
@@ -27,32 +22,14 @@ export default function InvoicePage() {
 
   return (
     <div className="max-w-8xl mx-auto p-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+      <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-800">Invoice Management</h1>
-        <div className="flex gap-2 flex-wrap">
-          <button
-            type="button"
-            onClick={() => setViewAllOpen(true)}
-            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700"
-          >
-            <FileText size={16} />
-            View All
-          </button>
-          <Link
-            href="/accounts-dashboard/invoices"
-            className="inline-flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-purple-700"
-          >
-            <LayoutGrid size={16} />
-            Cards
-          </Link>
-          <Link
-            href="/accounts-dashboard/invoices/new"
-            className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-green-700"
-          >
-            <FileText size={16} />
-            Add Invoice
-          </Link>
-        </div>
+        {/* <a
+          href="/user-dashboard/invoices/new"
+          className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+        >
+          Add Invoice
+        </a> */}
       </div>
 
       {/* Summary Cards */}
@@ -98,11 +75,6 @@ export default function InvoicePage() {
       </div>
 
       <InvoiceTable onSummaryUpdate={setSummaryData} />
-
-      <ViewAllInvoicesModal
-        open={viewAllOpen}
-        onClose={() => setViewAllOpen(false)}
-      />
     </div>
   );
 }

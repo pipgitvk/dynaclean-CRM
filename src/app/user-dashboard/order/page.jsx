@@ -1,24 +1,6 @@
 import { getDbConnection } from "@/lib/db";
 import OrderTable from "./OrderTable";
 import { getSessionPayload } from "@/lib/auth";
-import { sqlColumnInActiveServiceSupportUsers } from "@/lib/serviceSupportTeamScope";
-import { appendSqlWhereClause, orderListApprovalWhereSql } from "@/lib/orderApprovalVisibility";
-import {
-  isPostAccountPipelineRole,
-  orderListReportWhereSql,
-  passesReportVisibilityGate,
-} from "@/lib/orderReportVisibility";
-import { canViewAllOrders } from "@/lib/dataScope";
-import { normalizeRoleKey } from "@/lib/roleKeyUtils";
-import {
-  ORDER_LIST_DISPATCHED_STOCK_COUNT_SELECT,
-  ORDER_LIST_PENDING_DISPATCH_UNITS_SELECT,
-} from "@/lib/orderDeliveryEligibility";
-import {
-  attachBookingBatchesToOrders,
-  attachDispatchPendingToOrders,
-} from "@/lib/orderBookingBatches";
-import { attachDeliveryBatchesToOrders } from "@/lib/orderDeliveryBatches";
 
 // Secret for verifying JWT
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -65,11 +47,9 @@ export default async function OrdersPage() {
   let sql = `SELECT
                 no.order_id, no.report_file, no.po_file, no.payment_proof, no.booking_url,
                 no.client_name, no.contact, no.is_cancelled, no.dispatch_status,
-                ${ORDER_LIST_DISPATCHED_STOCK_COUNT_SELECT},
-                ${ORDER_LIST_PENDING_DISPATCH_UNITS_SELECT},
                 no.created_at, no.created_by , no.einvoice_file, no.booking_id, no.quote_number, no.duedate,
                 no.invoice_date , no.account_by ,no.booking_by , no.dispatch_person,
-                no.payment_id, no.payment_date, no.payment_amount, no.payment_status,no.totalamt, no.baseAmount, no.taxamt, no.transaction_id,
+                no.payment_id, no.payment_date, no.payment_amount, no.payment_status,no.totalamt,
                 no.delivery_date, no.delivered_on, no.delivery_status,no.delivery_proof,
                 COALESCE(no.delivery_remark, '') as delivery_remark,
                 no.installation_status, no.is_returned, no.approval_status, no.approval_remark, no.approval_date,
@@ -93,7 +73,7 @@ export default async function OrdersPage() {
                   WHEN qr.payment_term_days = 60 THEN '60 Days'
                   ELSE CONCAT(qr.payment_term_days, ' Days')
                 END as payment_terms,
-                qr.company_name, qr.emp_name, qr.state, qr.grand_total AS quotation_grand_total,
+                qr.company_name, qr.emp_name, qr.state,
                 MAX(cn.id) as credit_note_id,
                 MAX(cn.credit_note_number) as credit_note_number,
                 GROUP_CONCAT(DISTINCT qi.item_name SEPARATOR ', ') as item_name,
@@ -108,9 +88,8 @@ export default async function OrdersPage() {
                 credit_notes cn ON CAST(cn.order_id AS CHAR) COLLATE utf8mb4_unicode_ci = CAST(no.order_id AS CHAR) COLLATE utf8mb4_unicode_ci AND cn.is_saved = 1`;
 
   const params = [];
-  const roleKey = normalizeRoleKey(userRole);
 
-  if (roleKey === "SERVICE HEAD") {
+  if (userRole === "SERVICE HEAD") {
     sql += `
     WHERE 
       no.created_by COLLATE utf8mb4_unicode_ci = ?
@@ -120,51 +99,20 @@ export default async function OrdersPage() {
         WHERE userRole LIKE '%SALES%'
       )`;
     params.push(username);
-  } else if (roleKey === "SERVICE SUPPORT") {
-    sql += ` WHERE ${sqlColumnInActiveServiceSupportUsers("no.created_by")}`;
   } else if (
-    ![
-      "ACCOUNTANT",
-      "ADMIN",
-      "WAREHOUSE INCHARGE",
-      "TEAM LEADER",
-      "DIRECTOR",
-      "SUPERADMIN",
-    ].includes(roleKey) &&
-    !canViewAllOrders(userRole)
+    !["ACCOUNTANT", "ADMIN", "WAREHOUSE INCHARGE", "TEAM LEADER", "DIRECTOR"].includes(String(userRole).toUpperCase())
   ) {
     sql += " WHERE no.created_by = ?";
     params.push(username);
   }
 
-  sql = appendSqlWhereClause(sql, orderListApprovalWhereSql(userRole));
-  sql = appendSqlWhereClause(
-    sql,
-    orderListReportWhereSql(userRole, { seesAllOrders: canViewAllOrders(userRole) }),
-  );
-
   sql += " GROUP BY no.order_id ORDER BY no.created_at DESC";
 
   const [orders] = await conn.execute(sql, params);
-  // Belt-and-suspenders: ADMIN/WH/TL never see pending invoice / incomplete report
-  const visibleOrders = isPostAccountPipelineRole(userRole)
-    ? orders.filter((o) =>
-        passesReportVisibilityGate(o, userRole, { username }),
-      )
-    : orders;
-  let ordersWithBatches = await attachBookingBatchesToOrders(conn, visibleOrders);
-  ordersWithBatches = await attachDispatchPendingToOrders(
-    conn,
-    ordersWithBatches,
-  );
-  ordersWithBatches = await attachDeliveryBatchesToOrders(
-    conn,
-    ordersWithBatches,
-  );
 
   // await conn.end();
 
-  console.log("fetched orders:", ordersWithBatches);
+  console.log("fetched orders:", orders);
 
   return (
     <div className=" mx-auto p-6">
@@ -196,7 +144,7 @@ export default async function OrdersPage() {
       </div>
 
 
-      <OrderTable orders={ordersWithBatches} userRole={userRole} />
+      <OrderTable orders={orders} userRole={userRole} />
     </div>
   );
 }

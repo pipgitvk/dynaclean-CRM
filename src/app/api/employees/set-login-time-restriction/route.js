@@ -73,7 +73,7 @@ export async function PATCH(request) {
     return NextResponse.json({
       success: true,
       message: enabled === 1
-        ? "Login time restriction enabled (07:00–20:30 IST)"
+        ? "Login time restriction enabled (09:00–19:15 IST)"
         : "Login time restriction disabled",
       login_time_restriction_enabled: enabled,
     });

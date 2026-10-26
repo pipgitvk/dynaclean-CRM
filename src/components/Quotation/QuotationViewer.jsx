@@ -1,15 +1,10 @@
 "use client";
 
-import { useRef, useState, useMemo, forwardRef, useImperativeHandle } from "react";
+import { useRef, useState, useMemo } from "react";
 import Link from "next/link";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import Image from "next/image";
-import {
-  LetterheadViewerInfo,
-  LetterheadBankLine,
-  LetterheadSignatoryLine,
-} from "@/components/invoice/InvoiceLetterheadSection";
 
 // Mask PII for PDF download
 function maskName(name) {
@@ -35,14 +30,14 @@ function maskMobile(phone) {
   return digits.slice(0, -4) + "****";
 }
 
-export default forwardRef(function QuotationViewer({
+export default function QuotationViewer({
   header,
   items,
   customerEmail = "",
   customerPhone = "",
   customerFirstName = "",
   showAddProspectLink = true,
-}, ref) {
+}) {
   const containerRef = useRef();
   const totalQty = items.reduce((sum, i) => sum + Number(i.quantity), 0);
 
@@ -64,19 +59,11 @@ export default forwardRef(function QuotationViewer({
     return map[header.payment_term_days] || header.payment_term_days || "";
   }, [header.payment_term_days]);
 
-  const [isDownloading, setIsDownloading] = useState(false);
   const [isInvoice, setIsInvoice] = useState(false);
-
-  // Expose downloadPDF so parent components can trigger it via ref
-  useImperativeHandle(ref, () => ({ downloadPDF }));
 
   const downloadPDF = async () => {
     const el = containerRef.current;
-    if (!el) {
-      alert("Content not ready. Please try again.");
-      return;
-    }
-    setIsDownloading(true);
+    if (!el) return;
 
     // Temporarily force the large screen view for the PDF generation
     const lgViewElements = el.querySelectorAll(".lg-view");
@@ -147,6 +134,31 @@ export default forwardRef(function QuotationViewer({
       }),
     );
 
+    // Fix modern color function errors (oklch, lab, lch, etc.) for html2canvas compatibility
+    el.querySelectorAll("*").forEach((e) => {
+      const style = window.getComputedStyle(e);
+      const color = style.color || "";
+      const bg = style.backgroundColor || "";
+
+      if (
+        color.includes("oklch") ||
+        color.includes("oklab") ||
+        color.includes("lab(") ||
+        color.includes("lch(")
+      ) {
+        e.style.color = "#000";
+      }
+
+      if (
+        bg.includes("oklch") ||
+        bg.includes("oklab") ||
+        bg.includes("lab(") ||
+        bg.includes("lch(")
+      ) {
+        e.style.backgroundColor = "#fff";
+      }
+    });
+
     // Generate PDF
     try {
       const canvas = await html2canvas(el, {
@@ -156,41 +168,9 @@ export default forwardRef(function QuotationViewer({
         scrollY: 0,
         windowWidth: el.scrollWidth,
         windowHeight: el.scrollHeight,
-        // Fix modern color functions (oklch, oklab, lab, lch, color-mix, etc.)
-        // that html2canvas cannot parse. We do this inside onclone so the fix
-        // is applied to the *copy* html2canvas renders from — not the live DOM.
-        onclone: (_doc, clonedEl) => {
-          const MODERN_COLOR_RE = /\b(oklch|oklab|lab|lch|color-mix|color)\s*\(/i;
-          const PROPS = [
-            "color",
-            "backgroundColor",
-            "borderColor",
-            "borderTopColor",
-            "borderRightColor",
-            "borderBottomColor",
-            "borderLeftColor",
-            "outlineColor",
-            "textDecorationColor",
-            "caretColor",
-            "fill",
-            "stroke",
-          ];
-
-          clonedEl.querySelectorAll("*").forEach((node) => {
-            const computed = window.getComputedStyle(node);
-            PROPS.forEach((prop) => {
-              const val = computed[prop] || "";
-              if (MODERN_COLOR_RE.test(val)) {
-                // Choose a sensible fallback: white for backgrounds, black for everything else
-                node.style[prop] =
-                  prop === "backgroundColor" ? "#ffffff" : "#000000";
-              }
-            });
-          });
-        },
       });
 
-      const imgData = canvas.toDataURL("image/jpeg", 0.85);
+      const imgData = canvas.toDataURL("image/jpeg", 0.7);
 
       const pdf = new jsPDF("p", "mm", "a4");
       const pdfWidth = pdf.internal.pageSize.getWidth();
@@ -198,37 +178,26 @@ export default forwardRef(function QuotationViewer({
 
       // Image dimensions in jsPDF units
       const imgProps = pdf.getImageProperties(imgData);
-      const naturalImgHeight = (imgProps.height * pdfWidth) / imgProps.width;
+      const imgWidth = pdfWidth;
+      const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
 
-      // If content fits within one page, render as-is.
-      // Otherwise scale it down to fit exactly one A4 page.
-      const fitsOnOnePage = naturalImgHeight <= pdfHeight;
+      // Calculate total number of pages
+      let heightLeft = imgHeight;
+      let position = 0;
 
-      if (fitsOnOnePage) {
-        // Normal single-page render
-        pdf.addImage(imgData, "JPEG", 0, 0, pdfWidth, naturalImgHeight);
-      } else {
-        // Scale down uniformly so everything fits on one page
-        const scaleFactor = pdfHeight / naturalImgHeight;
-        const scaledWidth = pdfWidth * scaleFactor;
-        const scaledHeight = pdfHeight;
-        // Centre horizontally on the page
-        const xOffset = (pdfWidth - scaledWidth) / 2;
-        pdf.addImage(imgData, "JPEG", xOffset, 0, scaledWidth, scaledHeight);
+      pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight);
+      heightLeft -= pdfHeight;
+
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight; // shift canvas for next page
+        pdf.addPage();
+        pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight);
+        heightLeft -= pdfHeight;
       }
 
-      // Build filename: QUOTE-DYNACLEAN-{ClientName}.pdf
-      const clientName = (header?.company || customerFirstName || "Client")
-        .trim()
-        .replace(/[^a-zA-Z0-9\s]/g, "")   // remove special chars
-        .replace(/\s+/g, "_")               // spaces → underscores
-        .toUpperCase();
-      const pdfFileName = `QUOTE-DYNACLEAN-${clientName}.pdf`;
-
-      pdf.save(pdfFileName);
+      pdf.save("quotation.pdf");
     } catch (error) {
       console.error("Error during PDF generation:", error);
-      alert("PDF generation failed: " + (error?.message || "Unknown error"));
     } finally {
       // Restore masked PII
       originalTexts.forEach(({ node, original }) => {
@@ -250,7 +219,6 @@ export default forwardRef(function QuotationViewer({
       // Revert width so on-screen layout goes back to normal
       el.style.width = originalWidth;
       el.style.maxWidth = originalMaxWidth;
-      setIsDownloading(false);
     }
   };
 
@@ -416,7 +384,21 @@ export default forwardRef(function QuotationViewer({
               className="object-contain"
               unoptimized
             />
-            <LetterheadViewerInfo />
+            <div className="text-sm text-gray-700 break-words">
+              <h2 className="text-lg font-bold text-red-600">
+                Dynaclean Industries Pvt Ltd
+              </h2>
+              <p>
+                1st Floor, 13-B, Kattabomman Street, Gandhi Nagar Main Road,
+                Gandhi Nagar, Ganapathy, Coimbatore, Coimbatore, Tamil Nadu,
+                641006
+              </p>
+              <p>
+                Email: sales@dynacleanindustries.com | Conatact: +91 7982456944,
+                011-45143666
+              </p>
+              <p>GSTIN: 07AAKCD6495M1ZV </p>
+            </div>
           </div>
         </div>
         <div className="text-center">
@@ -536,13 +518,14 @@ export default forwardRef(function QuotationViewer({
               ))}
             </tbody>
             <tfoot className="bg-gray-100 font-semibold">
-              <tr className="text-center border-t-2 border-gray-400">
-                <td colSpan={8} className="p-2 text-left"></td>
-                <td className="p-2">₹{Number(items.reduce((sum, it) => sum + Number(it.price_per_unit || 0), 0)).toFixed(2)}</td>
-                <td className="p-2">₹{Number(items.reduce((sum, it) => sum + Number(it.total_taxable_amt || 0), 0)).toFixed(2)}</td>
-                <td className="p-2">{(items.reduce((sum, it) => sum + Number(it.gst || 0), 0) / Math.max(items.length, 1)).toFixed(2)}%</td>
-                <td className="p-2">₹{Number(items.reduce((sum, it) => sum + Number(it.igsttamt || 0), 0)).toFixed(2)}</td>
-                <td className="p-2">₹{Number(items.reduce((sum, it) => sum + Number(it.total_price || 0), 0)).toFixed(2)}</td>
+              <tr className="text-center">
+                <td colSpan={6} className="p-2 text-left sm:text-center">
+                  Total
+                </td>
+                <td className="p-2">{totalQty}</td>
+                <td colSpan={5} className="p-2 text-right sm:text-center">
+                  ₹{displayGrandTotal}
+                </td>
               </tr>
             </tfoot>
           </table>
@@ -646,7 +629,7 @@ export default forwardRef(function QuotationViewer({
           {/* Bank */}
           <div className="border p-4 rounded bg-gray-50">
             <h4 className="font-semibold mb-1">Bank Details</h4>
-            <LetterheadBankLine label="A/C Holder Name" />
+            <p>A/C Holder Name: Dynaclean Industries Private Limited</p>
             <p>ICICI Bank</p>
             <p>Account: 343405500379</p>
             <p>IFSC: ICIC0003434</p>
@@ -655,7 +638,7 @@ export default forwardRef(function QuotationViewer({
           {/* Signatory */}
           <div className="border p-4 rounded bg-gray-50 text-center flex flex-col justify-between">
             <div>
-              <LetterheadSignatoryLine />
+              <p>For Dynaclean Industries Pvt Ltd</p>
               <Image
                 src="/images/sign.png"
                 alt="Sign"
@@ -683,10 +666,9 @@ export default forwardRef(function QuotationViewer({
         <div className="text-right">
           <button
             onClick={downloadPDF}
-            disabled={isDownloading}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
           >
-            {isDownloading ? "Generating PDF..." : "Download PDF"}
+            Download PDF
           </button>
         </div>
         {/* <div className="text-right">
@@ -700,4 +682,4 @@ export default forwardRef(function QuotationViewer({
       </div>
     </div>
   );
-});
+}
