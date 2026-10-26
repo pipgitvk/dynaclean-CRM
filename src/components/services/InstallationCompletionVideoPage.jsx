@@ -25,6 +25,26 @@ const EMPTY_PRODUCT = {
   site_person: "",
 };
 
+/** Prefill PDF header from warranty product; leave installation date blank for on-site entry. */
+function productDataForBlankPdf(service, product) {
+  if (!product) return { ...EMPTY_PRODUCT };
+  return {
+    product_name: product.product_name || "",
+    model: product.model || "",
+    customer_name: product.customer_name || "",
+    email: product.email || "",
+    contact: product.contact || "",
+    customer_address: product.customer_address || "",
+    installed_address: product.installed_address || "",
+    installation_date: "",
+    invoice_number: product.invoice_number || "",
+    invoice_date: product.invoice_date || "",
+    contact_person:
+      product.contact_person || product.site_person || "",
+    site_person: product.site_person || "",
+  };
+}
+
 function uploadWithProgress(url, formData, onProgress) {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
@@ -131,7 +151,11 @@ export default function InstallationCompletionVideoPage() {
       const pdfInstallationLayout =
         isInstallationReportLayout(data.service.complaint_summary) ||
         String(data.service.service_type || "").toUpperCase() === "INSTALLATION";
-      const reportData = { service_id: data.service.service_id };
+      const reportData = {
+        service_id: data.service.service_id,
+        serial_number: data.service.serial_number || "",
+      };
+      const productData = productDataForBlankPdf(data.service, data.product);
       const installData = pdfInstallationLayout
         ? {
             installation_date: "",
@@ -143,7 +167,7 @@ export default function InstallationCompletionVideoPage() {
         : null;
       const pdf = await generateServiceReportPDF(
         reportData,
-        EMPTY_PRODUCT,
+        productData,
         installData,
         [],
         { isInstallationLayout: pdfInstallationLayout },

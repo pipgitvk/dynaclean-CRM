@@ -71,7 +71,22 @@ async function loadService(conn, serviceId) {
   return row || null;
 }
 
-function payloadFromRow(row) {
+async function loadWarrantyProductForSerial(conn, serialNumber) {
+  const serial = String(serialNumber || "").trim();
+  if (!serial) return null;
+  const [[row]] = await conn.execute(
+    `SELECT product_name, model, customer_name, email, contact,
+            customer_address, installed_address, installation_date,
+            invoice_number, invoice_date, contact_person, site_person
+     FROM warranty_products
+     WHERE serial_number = ?
+     LIMIT 1`,
+    [serial],
+  );
+  return row || null;
+}
+
+function payloadFromRow(row, product = null) {
   return {
     service: {
       service_id: row.service_id,
@@ -82,6 +97,22 @@ function payloadFromRow(row) {
       assigned_to: row.assigned_to,
       installation_report: row.installation_report || null,
     },
+    product: product
+      ? {
+          product_name: product.product_name || "",
+          model: product.model || "",
+          customer_name: product.customer_name || "",
+          email: product.email || "",
+          contact: product.contact || "",
+          customer_address: product.customer_address || "",
+          installed_address: product.installed_address || "",
+          installation_date: product.installation_date || "",
+          invoice_number: product.invoice_number || "",
+          invoice_date: product.invoice_date || "",
+          contact_person: product.contact_person || "",
+          site_person: product.site_person || "",
+        }
+      : null,
     steps: {
       video_360: row.video_360 || null,
       video_problem: row.video_problem || null,
@@ -119,7 +150,8 @@ export async function GET(_request, context) {
     if (!row) {
       return NextResponse.json({ message: "Service not found" }, { status: 404 });
     }
-    return NextResponse.json(payloadFromRow(row));
+    const product = await loadWarrantyProductForSerial(conn, row.serial_number);
+    return NextResponse.json(payloadFromRow(row, product));
   } catch (error) {
     console.error("[service-report-steps GET]", error);
     return NextResponse.json({ message: "Failed to load service steps" }, { status: 500 });
@@ -287,7 +319,8 @@ export async function POST(request, context) {
     }
 
     const row = await loadService(conn, serviceId);
-    return NextResponse.json(payloadFromRow(row));
+    const product = await loadWarrantyProductForSerial(conn, row?.serial_number);
+    return NextResponse.json(payloadFromRow(row, product));
   } catch (error) {
     console.error("[service-report-steps POST]", error);
     return NextResponse.json({ message: "Could not save this step." }, { status: 500 });
