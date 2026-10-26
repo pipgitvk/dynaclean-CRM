@@ -1,6 +1,5 @@
 "use client";
 
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import Link from "next/link";
 import dayjs from "dayjs";
 import { useState, useEffect } from "react";
@@ -53,7 +52,7 @@ export default function ExpenseTable({ rows, role }) {
 
   // Filter rows based on the search query, employee, date range, and status
   const filteredRows = rows.filter((row) => {
-    const formattedDate = dayjs(row.TravelDate).format("DD-MM-YYYY");
+    const formattedDate = dayjs(row.TravelDate).format("DD MMM YYYY");
 
     // Check if any field matches the search query
     const matchesSearch =
@@ -192,7 +191,7 @@ export default function ExpenseTable({ rows, role }) {
     const doc = new jsPDF();
     const tableData = filteredRows.map((row) => [
       row.ID,
-      dayjs(row.TravelDate).format("DD-MM-YYYY"),
+      dayjs(row.TravelDate).format("DD MMM YYYY"),
       row.username,
       row.FromLocation,
       row.Tolocation,
@@ -206,7 +205,7 @@ export default function ExpenseTable({ rows, role }) {
         ? "-"
         : `₹${Number(row.approved_amount).toFixed(2)}`,
       row.payment_date && row.payment_date !== "0000-00-00"
-        ? dayjs(row.payment_date).format("DD-MM-YYYY")
+        ? dayjs(row.payment_date).format("DD MMM YYYY")
         : "-",
       row.approval_status,
     ]);
@@ -252,7 +251,7 @@ export default function ExpenseTable({ rows, role }) {
         Number(row.OtherExpenses || 0);
       worksheet.addRow({
         ID: row.ID,
-        TravelDate: dayjs(row.TravelDate).format("DD-MM-YYYY"),
+        TravelDate: dayjs(row.TravelDate).format("DD MMM YYYY"),
         username: row.username,
         FromLocation: row.FromLocation,
         Tolocation: row.Tolocation,
@@ -263,7 +262,7 @@ export default function ExpenseTable({ rows, role }) {
             : `₹${Number(row.approved_amount).toFixed(2)}`,
         payment_date:
           row.payment_date && row.payment_date !== "0000-00-00"
-            ? dayjs(row.payment_date).format("DD-MM-YYYY")
+            ? dayjs(row.payment_date).format("DD MMM YYYY")
             : "-",
         approval_status: row.approval_status,
       });
@@ -343,11 +342,21 @@ export default function ExpenseTable({ rows, role }) {
         </select>
         <div className="flex items-center gap-2 w-full sm:w-auto">
           <span className="text-sm text-gray-500 hidden sm:inline">From:</span>
-          <TypeableDateFilterInput value={fromDate} onChange={setFromDate} className="px-4 py-2 border rounded-lg w-full sm:w-auto focus:ring-blue-500 focus:border-blue-500"/>
+          <input
+            type="date"
+            value={fromDate}
+            onChange={(e) => setFromDate(e.target.value)}
+            className="px-4 py-2 border rounded-lg w-full sm:w-auto focus:ring-blue-500 focus:border-blue-500"
+          />
         </div>
         <div className="flex items-center gap-2 w-full sm:w-auto">
           <span className="text-sm text-gray-500 hidden sm:inline">To:</span>
-          <TypeableDateFilterInput value={toDate} onChange={setToDate} className="px-4 py-2 border rounded-lg w-full sm:w-auto focus:ring-blue-500 focus:border-blue-500"/>
+          <input
+            type="date"
+            value={toDate}
+            onChange={(e) => setToDate(e.target.value)}
+            className="px-4 py-2 border rounded-lg w-full sm:w-auto focus:ring-blue-500 focus:border-blue-500"
+          />
         </div>
         <button
           onClick={handleReset}
@@ -417,7 +426,7 @@ export default function ExpenseTable({ rows, role }) {
                       <td className="p-3">{row.ID}</td>
                       <td className="p-3">
                         {row.TravelDate
-                          ? dayjs(row.TravelDate).format("DD-MM-YYYY")
+                          ? dayjs(row.TravelDate).format("DD MMM YYYY")
                           : "-"}
                       </td>
                       <td className="p-3">{row.username}</td>
@@ -432,7 +441,7 @@ export default function ExpenseTable({ rows, role }) {
                       </td>
                       <td className="p-3">
                         {row.payment_date && row.payment_date !== "0000-00-00"
-                          ? dayjs(row.payment_date).format("DD-MM-YYYY")
+                          ? dayjs(row.payment_date).format("DD MMM YYYY")
                           : "-"}
                       </td>
                       <td className="p-3">{row.approval_status}</td>
@@ -554,13 +563,13 @@ export default function ExpenseTable({ rows, role }) {
                     <div>
                       <span className="font-semibold">Date:</span>{" "}
                       {row.TravelDate
-                        ? dayjs(row.TravelDate).format("DD-MM-YYYY")
+                        ? dayjs(row.TravelDate).format("DD MMM YYYY")
                         : "-"}
                     </div>
                     <div>
                       <span className="font-semibold">Payment Date:</span>{" "}
                       {row.payment_date && row.payment_date !== "0000-00-00"
-                        ? dayjs(row.payment_date).format("DD-MM-YYYY")
+                        ? dayjs(row.payment_date).format("DD MMM YYYY")
                         : "-"}
                     </div>
                     <div className="col-span-2">
