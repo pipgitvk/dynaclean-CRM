@@ -1,6 +1,7 @@
 import { appendSqlWhereClause, orderListApprovalWhereSql } from "@/lib/orderApprovalVisibility";
 import { orderListReportWhereSql } from "@/lib/orderReportVisibility";
 import { canViewAllOrders } from "@/lib/dataScope";
+import { isJwtAccountingRole, normalizeRoleKey } from "@/lib/roleKeyUtils";
 import { ensureOrderLinkedPaymentColumns } from "@/lib/ensureOrderLinkedPaymentColumns";
 import { attachActiveInvoiceFields } from "@/lib/activeInvoiceForOrder";
 import {
@@ -22,7 +23,10 @@ const PAYMENT_TERM_LABEL_TO_DAYS = {
   "60 Days": 60,
 };
 
+let accountsOrderListSchemaReady = false;
+
 export async function ensureAccountsOrderListSchema(conn) {
+  if (accountsOrderListSchemaReady) return;
   await ensureOrderLinkedPaymentColumns(conn);
   const safeAlters = [
     "ALTER TABLE neworder ADD COLUMN IF NOT EXISTS warehouse_in_done TINYINT(1) DEFAULT 0",
@@ -35,22 +39,57 @@ export async function ensureAccountsOrderListSchema(conn) {
   for (const alter of safeAlters) {
     await conn.execute(alter).catch(() => {});
   }
+  accountsOrderListSchemaReady = true;
 }
 
-export async function getAccountsOrderListUserRole(conn, username) {
+export async function getAccountsOrderListUserRole(
+  conn,
+  username,
+  sessionRole = "",
+) {
+  const u = String(username || "").trim();
+  if (!u) return String(sessionRole || "").trim();
+
   const [roleRows] = await conn.execute(
-    "SELECT userRole FROM rep_list WHERE username = ?",
-    [username],
+    "SELECT userRole FROM rep_list WHERE username = ? LIMIT 1",
+    [u],
   );
-  return roleRows[0]?.userRole || "";
+  const repRole = String(roleRows[0]?.userRole ?? "").trim();
+  const [empRows] = await conn.execute(
+    "SELECT userRole FROM emplist WHERE username = ? LIMIT 1",
+    [u],
+  );
+  const empRole = String(empRows[0]?.userRole ?? "").trim();
+  const session = String(sessionRole || "").trim();
+  const candidates = [session, empRole, repRole].filter(Boolean);
+  const privileged = candidates.find(
+    (r) => canViewAllOrders(r) || isJwtAccountingRole(r),
+  );
+  if (privileged) return privileged;
+  return repRole || empRole || session;
 }
 
-function buildAccountsOrderListBaseSql(userRole, username) {
+function buildAccountsOrderListBaseSql(
+  userRole,
+  username,
+  { lightSelect = false, seesAllOrders = false } = {},
+) {
+  const dispatchedSelect = lightSelect
+    ? "0 AS dispatched_stock_count"
+    : ORDER_LIST_DISPATCHED_STOCK_COUNT_SELECT;
+  const pendingSelect = lightSelect
+    ? "0 AS pending_dispatch_units"
+    : ORDER_LIST_PENDING_DISPATCH_UNITS_SELECT;
+
+  const canSeeAll =
+    seesAllOrders || canViewAllOrders(userRole) || isJwtAccountingRole(userRole);
+  const roleKey = normalizeRoleKey(userRole);
+
   let sql = `SELECT 
                 no.order_id, no.report_file, no.po_file, no.payment_proof, no.booking_url,
                 no.client_name, no.contact, no.is_cancelled, no.dispatch_status,
-                ${ORDER_LIST_DISPATCHED_STOCK_COUNT_SELECT},
-                ${ORDER_LIST_PENDING_DISPATCH_UNITS_SELECT},
+                ${dispatchedSelect},
+                ${pendingSelect},
                 no.created_at, no.created_by , no.einvoice_file, no.booking_id, no.quote_number, no.duedate,
                 no.invoice_date , no.account_by ,no.booking_by , no.dispatch_person,
                 no.payment_id, no.payment_date, no.payment_amount, no.payment_status,no.totalamt, no.baseAmount, no.taxamt, no.transaction_id,
@@ -95,7 +134,7 @@ function buildAccountsOrderListBaseSql(userRole, username) {
 
   const params = [];
 
-  if (userRole === "SERVICE HEAD") {
+  if (roleKey === "SERVICE HEAD") {
     sql += `
     WHERE 
       no.created_by COLLATE utf8mb4_unicode_ci = ?
@@ -105,11 +144,7 @@ function buildAccountsOrderListBaseSql(userRole, username) {
         WHERE userRole LIKE '%SALES%'
       )`;
     params.push(username);
-  } else if (
-    !["ACCOUNTANT", "ADMIN", "WAREHOUSE INCHARGE", "TEAM LEADER"].includes(
-      userRole,
-    )
-  ) {
+  } else if (!canSeeAll) {
     sql += " WHERE no.created_by = ?";
     params.push(username);
   }
@@ -117,7 +152,7 @@ function buildAccountsOrderListBaseSql(userRole, username) {
   sql = appendSqlWhereClause(sql, orderListApprovalWhereSql(userRole));
   sql = appendSqlWhereClause(
     sql,
-    orderListReportWhereSql(userRole, { seesAllOrders: canViewAllOrders(userRole) }),
+    orderListReportWhereSql(userRole, { seesAllOrders: canSeeAll }),
   );
 
   sql = appendSqlWhereClause(
@@ -140,18 +175,25 @@ export async function fetchAccountsOrderListPage(
     dateTo = "",
     createdBy = "",
     paymentTerms = "",
+    lightList = true,
+    seesAllOrders = false,
   } = {},
 ) {
   const offset = (Math.max(1, page) - 1) * limit;
   const fetchLimit = limit + 1;
+  const trimmedSearch = String(search ?? "").trim();
+  const orderIdSearch = /^\d+$/.test(trimmedSearch);
 
-  let { sql, params } = buildAccountsOrderListBaseSql(userRole, username);
+  let { sql, params } = buildAccountsOrderListBaseSql(userRole, username, {
+    lightSelect: lightList,
+    seesAllOrders,
+  });
 
-  if (dateFrom) {
+  if (dateFrom && !orderIdSearch) {
     sql = appendSqlWhereClause(sql, "no.created_at >= ?");
     params.push(`${dateFrom} 00:00:00`);
   }
-  if (dateTo) {
+  if (dateTo && !orderIdSearch) {
     sql = appendSqlWhereClause(sql, "no.created_at <= ?");
     params.push(`${dateTo} 23:59:59`);
   }
@@ -176,8 +218,11 @@ export async function fetchAccountsOrderListPage(
     const term = `%${search}%`;
     const trimmed = search.trim();
     if (/^\d+$/.test(trimmed)) {
-      sql = appendSqlWhereClause(sql, "no.order_id LIKE ?");
-      params.push(term);
+      sql = appendSqlWhereClause(
+        sql,
+        "(CAST(no.order_id AS CHAR) = ? OR CAST(no.order_id AS CHAR) LIKE ?)",
+      );
+      params.push(trimmed, term);
     } else if (/^quote/i.test(trimmed.replace(/\s/g, ""))) {
       sql = appendSqlWhereClause(sql, "no.quote_number LIKE ?");
       params.push(term);
@@ -200,7 +245,9 @@ export async function fetchAccountsOrderListPage(
   let enrichedOrders = [...pageRows];
   enrichedOrders = await attachActiveInvoiceFields(conn, enrichedOrders);
   enrichedOrders = await attachBookingBatchesToOrders(conn, enrichedOrders);
-  enrichedOrders = await attachDispatchPendingToOrders(conn, enrichedOrders);
+  if (!lightList) {
+    enrichedOrders = await attachDispatchPendingToOrders(conn, enrichedOrders);
+  }
   enrichedOrders = await attachDeliveryBatchesToOrders(conn, enrichedOrders);
 
   return {

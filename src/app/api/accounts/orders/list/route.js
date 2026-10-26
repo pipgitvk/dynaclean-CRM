@@ -25,7 +25,12 @@ export async function GET(req) {
 
     const conn = await getDbConnection();
     await ensureAccountsOrderListSchema(conn);
-    const userRole = await getAccountsOrderListUserRole(conn, payload.username);
+    const sessionRole = payload.role ?? payload.userRole ?? "";
+    const userRole = await getAccountsOrderListUserRole(
+      conn,
+      payload.username,
+      sessionRole,
+    );
 
     const result = await fetchAccountsOrderListPage(conn, {
       username: payload.username,
@@ -37,6 +42,8 @@ export async function GET(req) {
       dateTo,
       createdBy,
       paymentTerms,
+      lightList: true,
+      seesAllOrders: true,
     });
 
     return NextResponse.json({

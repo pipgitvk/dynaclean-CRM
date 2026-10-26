@@ -23,7 +23,11 @@ export default async function OrdersPage() {
 
   const conn = await getDbConnection();
   await ensureAccountsOrderListSchema(conn);
-  const userRole = await getAccountsOrderListUserRole(conn, username);
+  const userRole = await getAccountsOrderListUserRole(
+    conn,
+    username,
+    payload.role ?? payload.userRole,
+  );
 
   return (
     <div className=" mx-auto p-6">

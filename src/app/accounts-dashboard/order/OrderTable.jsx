@@ -74,8 +74,30 @@ import AccountantReturnViewMenuItems from "@/components/orders/AccountantReturnV
 import LinkedStatementPaymentCell from "@/components/orders/LinkedStatementPaymentCell";
 import { orderMatchesSearchQuery } from "@/lib/orderListClientSearch";
 
-/** Single fetch — no infinite scroll (matches accounts invoice list). */
-const LIST_FETCH_LIMIT = 10000;
+/** Single fetch for filtered range (default: current month). */
+const LIST_FETCH_LIMIT = 5000;
+
+function getDefaultOrderListMonthRange() {
+  const now = new Date();
+  const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  const format = (date) => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const d = String(date.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  };
+  return { from: format(firstDay), to: format(lastDay) };
+}
+
+function readDateFilterFromStorage(key) {
+  const { from, to } = getDefaultOrderListMonthRange();
+  const fallback = key.endsWith("From") ? from : to;
+  if (typeof window === "undefined") return fallback;
+  const stored = localStorage.getItem(key);
+  if (stored === null || stored === "") return fallback;
+  return stored;
+}
 
 export default function OrderTable({ userRole }) {
   const router = useRouter();
@@ -122,30 +144,18 @@ export default function OrderTable({ userRole }) {
     }
     return "";
   });
-  const [dateFrom, setDateFrom] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("accountsOrderTable_dateFrom") ?? "";
-    }
-    return "";
-  });
-  const [appliedDateFrom, setAppliedDateFrom] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("accountsOrderTable_dateFrom") ?? "";
-    }
-    return "";
-  });
-  const [dateTo, setDateTo] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("accountsOrderTable_dateTo") ?? "";
-    }
-    return "";
-  });
-  const [appliedDateTo, setAppliedDateTo] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("accountsOrderTable_dateTo") ?? "";
-    }
-    return "";
-  });
+  const [dateFrom, setDateFrom] = useState(() =>
+    readDateFilterFromStorage("accountsOrderTable_dateFrom"),
+  );
+  const [appliedDateFrom, setAppliedDateFrom] = useState(() =>
+    readDateFilterFromStorage("accountsOrderTable_dateFrom"),
+  );
+  const [dateTo, setDateTo] = useState(() =>
+    readDateFilterFromStorage("accountsOrderTable_dateTo"),
+  );
+  const [appliedDateTo, setAppliedDateTo] = useState(() =>
+    readDateFilterFromStorage("accountsOrderTable_dateTo"),
+  );
   const [createdByFilter, setCreatedByFilter] = useState(() => {
     if (typeof window !== "undefined") {
       return localStorage.getItem("accountsOrderTable_createdByFilter") || "";
@@ -257,32 +267,33 @@ export default function OrderTable({ userRole }) {
   ]);
 
   const handleResetFilters = useCallback(() => {
+    const { from, to } = getDefaultOrderListMonthRange();
     setSearchQuery("");
     setAppliedSearchQuery("");
     setStatusFilter("");
     setAppliedStatusFilter("");
     setPaymentTermsFilter("");
     setAppliedPaymentTermsFilter("");
-    setDateFrom("");
-    setAppliedDateFrom("");
-    setDateTo("");
-    setAppliedDateTo("");
+    setDateFrom(from);
+    setAppliedDateFrom(from);
+    setDateTo(to);
+    setAppliedDateTo(to);
     setCreatedByFilter("");
     setAppliedCreatedByFilter("");
     if (typeof window !== "undefined") {
       localStorage.removeItem("accountsOrderTable_searchQuery");
       localStorage.removeItem("accountsOrderTable_statusFilter");
       localStorage.removeItem("accountsOrderTable_paymentTermsFilter");
-      localStorage.removeItem("accountsOrderTable_dateFrom");
-      localStorage.removeItem("accountsOrderTable_dateTo");
+      localStorage.setItem("accountsOrderTable_dateFrom", from);
+      localStorage.setItem("accountsOrderTable_dateTo", to);
       localStorage.removeItem("accountsOrderTable_createdByFilter");
     }
     router.replace("/accounts-dashboard/order", { scroll: false });
     fetchOrders({
       filters: {
         search: "",
-        dateFrom: "",
-        dateTo: "",
+        dateFrom: from,
+        dateTo: to,
         createdBy: "",
         paymentTerms: "",
       },

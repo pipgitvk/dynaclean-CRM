@@ -46,18 +46,66 @@ export async function findActiveInvoiceForOrder(conn, orderLike) {
 
 export async function attachActiveInvoiceFields(conn, orders) {
   if (!Array.isArray(orders) || !orders.length) return orders;
-  const out = [];
+
+  const invoiceByOrderId = new Map();
+  const invoiceByNumber = new Map();
+
+  const orderIds = [];
+  const invNums = new Set();
   for (const order of orders) {
-    const inv = await findActiveInvoiceForOrder(conn, {
-      order_id: order.order_id,
-      quote_number: order.quote_number,
-      invoice_number: order.invoice_number,
-    });
-    out.push({
+    const oid = String(order?.order_id ?? "").trim();
+    if (oid) orderIds.push(oid);
+    const inv = String(order?.invoice_number ?? "").trim();
+    if (inv) invNums.add(inv);
+  }
+
+  if (invNums.size > 0) {
+    const nums = [...invNums];
+    const ph = nums.map(() => "?").join(",");
+    const [rows] = await conn.execute(
+      `SELECT id, TRIM(invoice_number) AS invoice_number
+       FROM invoices
+       WHERE TRIM(invoice_number) IN (${ph})
+         AND ${ACTIVE_INVOICE_SQL}
+       ORDER BY id DESC`,
+      nums,
+    );
+    for (const row of rows || []) {
+      const key = String(row.invoice_number || "").trim();
+      if (key && !invoiceByNumber.has(key)) {
+        invoiceByNumber.set(key, row);
+      }
+    }
+  }
+
+  if (orderIds.length > 0) {
+    const ph = orderIds.map(() => "?").join(",");
+    const [rows] = await conn.execute(
+      `SELECT id, TRIM(invoice_number) AS invoice_number,
+              TRIM(COALESCE(buyers_order_no, '')) AS buyers_order_no
+       FROM invoices
+       WHERE TRIM(COALESCE(buyers_order_no, '')) IN (${ph})
+         AND ${ACTIVE_INVOICE_SQL}
+       ORDER BY id DESC`,
+      orderIds,
+    );
+    for (const row of rows || []) {
+      const oid = String(row.buyers_order_no || "").trim();
+      if (oid && !invoiceByOrderId.has(oid)) {
+        invoiceByOrderId.set(oid, row);
+      }
+    }
+  }
+
+  return orders.map((order) => {
+    const oid = String(order?.order_id ?? "").trim();
+    const invOnOrder = String(order?.invoice_number ?? "").trim();
+    let inv = invOnOrder ? invoiceByNumber.get(invOnOrder) : null;
+    if (!inv && oid) inv = invoiceByOrderId.get(oid) || null;
+    return {
       ...order,
       active_invoice_number: inv?.invoice_number || null,
       active_invoice_id: inv?.id || null,
-    });
-  }
-  return out;
+    };
+  });
 }
