@@ -1,6 +1,10 @@
 import { getDbConnection } from "@/lib/db";
 import { ensurePartyPaymentsTable } from "@/lib/ensurePartyPaymentsTable";
 import { parsePartyPaymentLinkedStatementIds } from "@/lib/partyPaymentStatementLink";
+import {
+  isCreditStatement,
+  isDebitStatement,
+} from "@/lib/isStatementSettled";
 import { normalizePartyPaymentAmounts } from "@/lib/partyPaymentsCompute";
 const CREATE_HISTORY = `
 CREATE TABLE IF NOT EXISTS party_payment_history (
@@ -248,6 +252,12 @@ export async function reconcilePartyPaymentTotalsFromHistory(conn, partyPaymentI
   return amounts;
 }
 
+export function partyPaymentStatementOutOrderId(statementId) {
+  const sid = Number(statementId);
+  if (!Number.isFinite(sid) || sid <= 0) return "";
+  return `STMT-${sid}`;
+}
+
 export async function syncPartyPaymentInHistoryFromStatements(
   conn,
   partyPaymentId,
@@ -263,26 +273,93 @@ export async function syncPartyPaymentInHistoryFromStatements(
   const ids = parsePartyPaymentLinkedStatementIds(
     ppRows?.[0]?.linked_statement_ids,
   );
-  if (!ids.length) return;
+
+  if (!ids.length) {
+    await conn.execute(
+      `DELETE FROM party_payment_history
+       WHERE party_payment_id = ? AND entry_type = 'in' AND statement_id IS NOT NULL`,
+      [ppId],
+    );
+    await conn.execute(
+      `DELETE FROM party_payment_history
+       WHERE party_payment_id = ? AND entry_type = 'out' AND order_id LIKE 'STMT-%'`,
+      [ppId],
+    );
+    await reconcilePartyPaymentTotalsFromHistory(conn, ppId);
+    return;
+  }
 
   const placeholders = ids.map(() => "?").join(", ");
   const [stmts] = await conn.execute(
-    `SELECT id, trans_id, date, amount, invoice_number FROM statements WHERE id IN (${placeholders})`,
+    `SELECT id, type, trans_id, date, amount, invoice_number FROM statements WHERE id IN (${placeholders})`,
     ids,
   );
+
+  const creditIds = new Set();
+  const debitStmtOrderIds = new Set();
+
   for (const st of stmts || []) {
     const amt = Math.abs(Number(st.amount) || 0);
     if (amt <= 0) continue;
     const invRaw = st.invoice_number ? String(st.invoice_number).trim() : "";
-    await recordPartyPaymentInEntry(conn, ppId, {
-      statementId: st.id,
-      transId: st.trans_id,
-      amount: amt,
-      entryDate: st.date,
-      invoiceNumber: invRaw || null,
-      createdBy,
-    });
+    if (isCreditStatement(st)) {
+      creditIds.add(Number(st.id));
+      await recordPartyPaymentInEntry(conn, ppId, {
+        statementId: st.id,
+        transId: st.trans_id,
+        amount: amt,
+        entryDate: st.date,
+        invoiceNumber: invRaw || null,
+        createdBy,
+      });
+    } else if (isDebitStatement(st)) {
+      const oid = partyPaymentStatementOutOrderId(st.id);
+      debitStmtOrderIds.add(oid);
+      await recordPartyPaymentOutEntry(conn, ppId, {
+        orderId: oid,
+        invoiceNumber: invRaw || null,
+        amount: amt,
+        entryDate: st.date,
+        createdBy,
+      });
+    }
   }
+
+  const creditIdList = [...creditIds];
+  if (creditIdList.length) {
+    const ph = creditIdList.map(() => "?").join(", ");
+    await conn.execute(
+      `DELETE FROM party_payment_history
+       WHERE party_payment_id = ? AND entry_type = 'in' AND statement_id IS NOT NULL
+         AND statement_id NOT IN (${ph})`,
+      [ppId, ...creditIdList],
+    );
+  } else {
+    await conn.execute(
+      `DELETE FROM party_payment_history
+       WHERE party_payment_id = ? AND entry_type = 'in' AND statement_id IS NOT NULL`,
+      [ppId],
+    );
+  }
+
+  const debitOrders = [...debitStmtOrderIds];
+  if (debitOrders.length) {
+    const ph = debitOrders.map(() => "?").join(", ");
+    await conn.execute(
+      `DELETE FROM party_payment_history
+       WHERE party_payment_id = ? AND entry_type = 'out' AND order_id LIKE 'STMT-%'
+         AND order_id NOT IN (${ph})`,
+      [ppId, ...debitOrders],
+    );
+  } else {
+    await conn.execute(
+      `DELETE FROM party_payment_history
+       WHERE party_payment_id = ? AND entry_type = 'out' AND order_id LIKE 'STMT-%'`,
+      [ppId],
+    );
+  }
+
+  await reconcilePartyPaymentTotalsFromHistory(conn, ppId);
 }
 
 export async function backfillPartyPaymentHistory(conn, partyPaymentId) {

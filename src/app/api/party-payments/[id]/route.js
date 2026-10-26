@@ -5,7 +5,7 @@ import { ensurePartyPaymentsTable } from "@/lib/ensurePartyPaymentsTable";
 import { normalizePartyPaymentAmounts } from "@/lib/partyPaymentsCompute";
 import {
   parsePartyPaymentLinkedStatementIds,
-  sumStatementCreditAmounts,
+  sumLinkedPartyPaymentStatementAmounts,
   syncPartyPaymentStatementLinks,
   unlinkAllStatementsForPartyPayment,
 } from "@/lib/partyPaymentStatementLink";
@@ -66,11 +66,14 @@ export async function PUT(req, { params }) {
     );
 
     if (linkedStatementIds.length) {
-      const summed = await sumStatementCreditAmounts(conn, linkedStatementIds);
+      const summed = await sumLinkedPartyPaymentStatementAmounts(
+        conn,
+        linkedStatementIds,
+      );
       amounts = normalizePartyPaymentAmounts({
         ...body,
-        amount_in: summed.total,
-        amount_out: amounts.amount_out,
+        amount_in: summed.creditTotal,
+        amount_out: summed.debitTotal || amounts.amount_out,
       });
       if (!paymentDate && summed.latestDate) paymentDate = summed.latestDate;
     }
@@ -103,7 +106,7 @@ export async function PUT(req, { params }) {
       previousLinked,
     );
 
-    if (linkedStatementIds.length) {
+    if (linkedStatementIds.length || previousLinked.length) {
       try {
         await syncPartyPaymentInHistoryFromStatements(conn, id, {
           createdBy: payload.username,

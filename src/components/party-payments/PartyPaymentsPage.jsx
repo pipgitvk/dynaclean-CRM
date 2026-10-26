@@ -130,11 +130,13 @@ export default function PartyPaymentsPage() {
     setLinkModalOpen(false);
   };
 
-  const applyStatementLink = ({ statementIds, amountIn, paymentDate }) => {
+  const applyStatementLink = ({ statementIds, amountIn, amountOut, paymentDate }) => {
     setForm((prev) => ({
       ...prev,
       linked_statement_ids: statementIds,
-      amount_in: amountIn > 0 ? String(amountIn) : prev.amount_in,
+      amount_in: amountIn > 0 ? String(amountIn) : "",
+      amount_out:
+        amountOut > 0 ? String(amountOut) : amountIn > 0 ? prev.amount_out : "",
       payment_date: paymentDate || prev.payment_date,
     }));
   };
@@ -431,7 +433,7 @@ export default function PartyPaymentsPage() {
                         name="amount_in"
                         value={form.amount_in}
                         placeholder="Use Payment link"
-                        hint="Only via Payment link (unsettled statements)"
+                        hint="Credit statements via Payment link (In)"
                       />
                     </div>
                     <button

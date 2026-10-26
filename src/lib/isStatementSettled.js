@@ -30,3 +30,7 @@ export function isStatementSettled(row) {
 export function isCreditStatement(row) {
   return String(row?.type || "").trim() === "Credit";
 }
+
+export function isDebitStatement(row) {
+  return String(row?.type || "").trim() === "Debit";
+}

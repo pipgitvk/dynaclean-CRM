@@ -8,7 +8,7 @@ import {
 } from "@/lib/partyPaymentsCompute";
 import {
   parsePartyPaymentLinkedStatementIds,
-  sumStatementCreditAmounts,
+  sumLinkedPartyPaymentStatementAmounts,
   syncPartyPaymentStatementLinks,
 } from "@/lib/partyPaymentStatementLink";
 import {
@@ -144,11 +144,14 @@ export async function POST(req) {
     await ensurePartyPaymentsTable(conn);
 
     if (linkedStatementIds.length) {
-      const summed = await sumStatementCreditAmounts(conn, linkedStatementIds);
+      const summed = await sumLinkedPartyPaymentStatementAmounts(
+        conn,
+        linkedStatementIds,
+      );
       amounts = normalizePartyPaymentAmounts({
         ...body,
-        amount_in: summed.total,
-        amount_out: amounts.amount_out,
+        amount_in: summed.creditTotal,
+        amount_out: summed.debitTotal || amounts.amount_out,
       });
       if (!paymentDate && summed.latestDate) paymentDate = summed.latestDate;
     }

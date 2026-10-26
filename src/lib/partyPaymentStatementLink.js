@@ -3,6 +3,10 @@ import {
   parseLinkedPurchaseTokens,
   parseLinkedStatementIds,
 } from "@/lib/statementLinkedPurchases";
+import {
+  isCreditStatement,
+  isDebitStatement,
+} from "@/lib/isStatementSettled";
 
 export function partyPaymentToken(partyPaymentId) {
   const id = Number(partyPaymentId);
@@ -107,22 +111,38 @@ export async function unlinkAllStatementsForPartyPayment(conn, partyPaymentId) {
   }
 }
 
-export async function sumStatementCreditAmounts(conn, statementIds) {
+export async function sumLinkedPartyPaymentStatementAmounts(conn, statementIds) {
   const ids = (statementIds || [])
     .map((id) => Number(id))
     .filter((id) => Number.isFinite(id) && id > 0);
-  if (!ids.length) return { total: 0, latestDate: null };
+  if (!ids.length) {
+    return { creditTotal: 0, debitTotal: 0, total: 0, latestDate: null };
+  }
   const placeholders = ids.map(() => "?").join(", ");
   const [rows] = await conn.execute(
-    `SELECT id, amount, date FROM statements WHERE id IN (${placeholders})`,
+    `SELECT id, type, amount, date FROM statements WHERE id IN (${placeholders})`,
     ids,
   );
-  let total = 0;
+  let creditTotal = 0;
+  let debitTotal = 0;
   let latestDate = null;
   for (const row of rows || []) {
-    total += Math.abs(Number(row.amount) || 0);
+    const amt = Math.abs(Number(row.amount) || 0);
+    if (isCreditStatement(row)) creditTotal += amt;
+    else if (isDebitStatement(row)) debitTotal += amt;
     const d = row.date ? String(row.date).slice(0, 10) : null;
     if (d && (!latestDate || d > latestDate)) latestDate = d;
   }
-  return { total: Number(total.toFixed(2)), latestDate };
+  return {
+    creditTotal: Number(creditTotal.toFixed(2)),
+    debitTotal: Number(debitTotal.toFixed(2)),
+    total: Number(creditTotal.toFixed(2)),
+    latestDate,
+  };
+}
+
+/** @deprecated use sumLinkedPartyPaymentStatementAmounts */
+export async function sumStatementCreditAmounts(conn, statementIds) {
+  const summed = await sumLinkedPartyPaymentStatementAmounts(conn, statementIds);
+  return { total: summed.creditTotal, latestDate: summed.latestDate };
 }

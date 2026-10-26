@@ -73,11 +73,21 @@ export default function PartyPaymentStatementLinkModal({
     });
   }, [statements, search]);
 
-  const selectedTotal = useMemo(() => {
+  const selectedTotals = useMemo(() => {
     const idSet = new Set(picked.map(Number));
-    return statements
-      .filter((s) => idSet.has(Number(s.id)))
-      .reduce((sum, s) => sum + Math.abs(Number(s.amount) || 0), 0);
+    let credit = 0;
+    let debit = 0;
+    for (const s of statements) {
+      if (!idSet.has(Number(s.id))) continue;
+      const amt = Math.abs(Number(s.amount) || 0);
+      const type = String(s.type || "").trim();
+      if (type === "Credit") credit += amt;
+      else if (type === "Debit") debit += amt;
+    }
+    return {
+      credit: Number(credit.toFixed(2)),
+      debit: Number(debit.toFixed(2)),
+    };
   }, [picked, statements]);
 
   const toggle = (id) => {
@@ -101,7 +111,8 @@ export default function PartyPaymentStatementLinkModal({
     }
     onConfirm?.({
       statementIds: picked.map(Number),
-      amountIn: Number(selectedTotal.toFixed(2)),
+      amountIn: selectedTotals.credit,
+      amountOut: selectedTotals.debit,
       paymentDate: latestDate,
     });
     onClose?.();
@@ -114,13 +125,23 @@ export default function PartyPaymentStatementLinkModal({
       <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between border-b px-5 py-4">
           <div>
-            <h3 className="text-lg font-semibold text-gray-900">Link In — unsettled statements</h3>
+            <h3 className="text-lg font-semibold text-gray-900">Payment link — unsettled statements</h3>
             <p className="text-sm text-gray-500">
-              Only <strong>Credit</strong> statements that are still <strong>unsettled</strong> are listed.
+              Unsettled <strong>Credit</strong> → In amount; unsettled <strong>Debit</strong> → Out amount.
             </p>
-            <p className="text-sm mt-1">
-              Selected total:{" "}
-              <span className="font-semibold text-green-700">{formatInr(selectedTotal)}</span>
+            <p className="text-sm mt-1 flex flex-wrap gap-x-4 gap-y-1">
+              <span>
+                Credit (In):{" "}
+                <span className="font-semibold text-green-700">
+                  {formatInr(selectedTotals.credit)}
+                </span>
+              </span>
+              <span>
+                Debit (Out):{" "}
+                <span className="font-semibold text-red-700">
+                  {formatInr(selectedTotals.debit)}
+                </span>
+              </span>
             </p>
           </div>
           <button type="button" onClick={onClose} className="text-gray-500 hover:text-gray-800">
@@ -145,7 +166,9 @@ export default function PartyPaymentStatementLinkModal({
           {loading ? (
             <p className="text-sm text-gray-500 py-6 text-center">Loading statements…</p>
           ) : filtered.length === 0 ? (
-            <p className="text-sm text-gray-500 py-6 text-center">No unsettled credit statements found.</p>
+            <p className="text-sm text-gray-500 py-6 text-center">
+              No unsettled credit or debit statements found.
+            </p>
           ) : (
             <ul className="divide-y divide-gray-100">
               {filtered.map((s) => {
@@ -162,7 +185,17 @@ export default function PartyPaymentStatementLinkModal({
                       />
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-wrap gap-x-3 text-sm font-medium text-gray-900">
-                          <span>{formatInr(Math.abs(Number(s.amount) || 0))}</span>
+                          <span
+                            className={
+                              String(s.type || "").trim() === "Debit"
+                                ? "text-red-700"
+                                : "text-green-700"
+                            }
+                          >
+                            {String(s.type || "—").trim()}
+                            {": "}
+                            {formatInr(Math.abs(Number(s.amount) || 0))}
+                          </span>
                           <span className="text-gray-500">{s.date ? String(s.date).slice(0, 10) : "—"}</span>
                           <span className="text-gray-500 font-mono text-xs">UTR: {s.trans_id || "—"}</span>
                         </div>
@@ -189,7 +222,7 @@ export default function PartyPaymentStatementLinkModal({
             onClick={handleConfirm}
             className="px-5 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700"
           >
-            Apply to In amount
+            Apply to In / Out
           </button>
         </div>
       </div>

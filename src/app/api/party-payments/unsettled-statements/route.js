@@ -3,6 +3,7 @@ import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import {
   isCreditStatement,
+  isDebitStatement,
   isStatementSettled,
 } from "@/lib/isStatementSettled";
 import { parseLinkedPurchaseTokens } from "@/lib/statementLinkedPurchases";
@@ -36,7 +37,9 @@ export async function GET(req) {
     );
 
     const eligible = (rows || []).filter((row) => {
-      if (!isCreditStatement(row)) return false;
+      const isCredit = isCreditStatement(row);
+      const isDebit = isDebitStatement(row);
+      if (!isCredit && !isDebit) return false;
       const tokens = parseLinkedPurchaseTokens(row.linked_purchase_ids);
       const linkedToThis = myToken && tokens.includes(myToken);
       if (linkedToThis) return true;
