@@ -5,6 +5,7 @@ import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
 import { useInvoiceLinkedPaymentAutofill } from "@/hooks/useInvoiceLinkedPaymentAutofill";
 import { useOrderUploadInvoicePrefill } from "@/hooks/useOrderUploadInvoicePrefill";
+import InvoiceNumberSearchField from "@/components/orders/InvoiceNumberSearchField";
 
 const MAX_FILES_PER_FIELD = 5;
 const FILE_FIELD_NAMES = new Set([
@@ -111,6 +112,12 @@ export default function UploadForm({
   const [paymentTermDays, setPaymentTermDays] = useState(null);
   const [computedPaymentStatus, setComputedPaymentStatus] = useState("pending");
 
+  const orderHasSavedInvoiceNumber = Boolean(
+    String(orderDetails?.invoice_number ?? "").trim(),
+  );
+  const canSearchInvoiceNumber =
+    !orderHasSavedInvoiceNumber;
+
   useOrderUploadInvoicePrefill(orderDetails?.order_id, setForm, {
     onPrefilled: () => {
       setInvoicePrefillLoaded(true);
@@ -207,7 +214,8 @@ export default function UploadForm({
     if (
       nonFileFieldsReadOnly &&
       !FILE_FIELD_NAMES.has(name) &&
-      name !== "remark"
+      name !== "remark" &&
+      !(name === "invoice_number" && canSearchInvoiceNumber)
     ) {
       return;
     }
@@ -346,14 +354,26 @@ export default function UploadForm({
 
       {/* Invoice / payment / amounts */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <FormField
-          locked={nonFileFieldsReadOnly}
-          name="invoice_number"
-          label="Invoice Number"
-          value={form.invoice_number}
-          onChange={handleChange}
-          required
-        />
+        {canSearchInvoiceNumber ? (
+          <InvoiceNumberSearchField
+            name="invoice_number"
+            label="Invoice Number"
+            value={form.invoice_number}
+            onChange={(num) =>
+              setForm((prev) => ({ ...prev, invoice_number: num }))
+            }
+            required
+          />
+        ) : (
+          <FormField
+            locked={nonFileFieldsReadOnly}
+            name="invoice_number"
+            label="Invoice Number"
+            value={form.invoice_number}
+            onChange={handleChange}
+            required
+          />
+        )}
         <FormField
           locked={nonFileFieldsReadOnly}
           name="duedate"

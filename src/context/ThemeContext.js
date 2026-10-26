@@ -18,6 +18,10 @@ export function ThemeProvider({ children }) {
     user = null;
   }
 
+
+
+
+  
   // Load theme from localStorage on mount
   useEffect(() => {
     const savedTheme = localStorage.getItem("appTheme");
