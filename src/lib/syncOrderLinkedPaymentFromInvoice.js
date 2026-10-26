@@ -17,6 +17,7 @@ import { EXCLUDE_PROFORMA_INVOICE_SQL } from "@/lib/ledgerInvoiceFilters";
 import { parseLinkedTransIds } from "@/lib/statementLinkedPurchases";
 import { sqlTrimUtf8Eq } from "@/lib/sqlUtf8Compare";
 import { syncPartyPaymentOutFromOrder } from "@/lib/partyPaymentOrderLink";
+import { getOrderTotalForPayment } from "@/lib/paymentOrderStatus";
 
 async function activeInvoiceExists(conn, invoiceNumber) {
   const num = String(invoiceNumber || "").trim();
@@ -136,10 +137,17 @@ export async function syncOrderLinkedPaymentFromInvoice(conn, order) {
   let payments = Array.isArray(linked.payments) ? linked.payments : [];
   let amount = Number(linked.payment_amount);
   let pDate = linked.payment_date || null;
-  const orderTotal = Number(order.totalamt) || 0;
+  let orderTotal = getOrderTotalForPayment(order);
+  if (orderTotal <= 0 && order.quote_number) {
+    const [qRows] = await conn.execute(
+      `SELECT grand_total FROM quotations_records WHERE quote_number = ? LIMIT 1`,
+      [order.quote_number],
+    );
+    orderTotal = Number(qRows?.[0]?.grand_total) || orderTotal;
+  }
 
   const [invMetaRows] = await conn.execute(
-    `SELECT amount_paid, linked_trans_ids, invoice_date
+    `SELECT amount_paid, grand_total, payment_status, linked_trans_ids, invoice_date
      FROM invoices
      WHERE ${sqlTrimUtf8Eq("invoice_number")}
      ORDER BY id DESC LIMIT 1`,
@@ -147,6 +155,8 @@ export async function syncOrderLinkedPaymentFromInvoice(conn, order) {
   );
   const invMeta = invMetaRows?.[0];
   const invAmountPaid = Number(invMeta?.amount_paid) || 0;
+  const invGrandTotal = Number(invMeta?.grand_total) || 0;
+  const invStatus = String(invMeta?.payment_status || "").trim().toUpperCase();
   const tids = parseLinkedTransIds(invMeta?.linked_trans_ids);
   if (invAmountPaid > 0) {
     amount = Math.max(amount || 0, invAmountPaid);
@@ -155,17 +165,26 @@ export async function syncOrderLinkedPaymentFromInvoice(conn, order) {
     amount = orderTotal;
   }
 
-  if (payments.length && orderTotal > 0) {
+  const invoiceSettlesOrder =
+    invAmountPaid > 0 &&
+    orderTotal > 0 &&
+    (invStatus === "PAID" ||
+      invAmountPaid >= orderTotal - 0.01 ||
+      (invGrandTotal > 0 && invAmountPaid >= invGrandTotal - 0.01));
+
+  if (payments.length && orderTotal > 0 && !invoiceSettlesOrder) {
     const stmtLike = payments.map((p, idx) => ({
       id: Number(p.statement_id) || idx + 1,
       trans_id: p.trans_id,
       date: p.date,
       amount: p.amount,
     }));
-    const allocated = allocateStatementPaymentsForInvoice(stmtLike, orderTotal);
+    const allocCap = invGrandTotal > 0 ? invGrandTotal : orderTotal;
+    const allocated = allocateStatementPaymentsForInvoice(stmtLike, allocCap);
     payments = allocated.payments;
     if (allocated.total > 0) {
-      amount = allocated.total;
+      amount = Math.max(allocated.total, invAmountPaid);
+      if (orderTotal > 0) amount = Math.min(amount, orderTotal);
     }
   }
 
@@ -194,8 +213,12 @@ export async function syncOrderLinkedPaymentFromInvoice(conn, order) {
   const amountVal = Number.isFinite(amount) && amount > 0 ? amount : null;
 
   const invoiceCsv = invoicePaymentCsvFromLinked(payments, amountVal, pDate);
-  const incomingPaid =
-    sumPaymentAmountCsv(invoiceCsv.payment_amount) || amountVal || 0;
+  let incomingPaid = Math.max(
+    sumPaymentAmountCsv(invoiceCsv.payment_amount) || 0,
+    amountVal || 0,
+    invAmountPaid,
+  );
+  if (orderTotal > 0) incomingPaid = Math.min(incomingPaid, orderTotal);
 
   if (incomingPaid <= 0 && payments.length === 0) {
     const sameInvoice =
@@ -224,7 +247,21 @@ export async function syncOrderLinkedPaymentFromInvoice(conn, order) {
         : order.payment_amount,
   };
 
-  const mergedCsv = mergeOrderPaymentWithLinkedCsv(orderForMerge, invoiceCsv);
+  const settledCsv = {
+    payment_id: invoiceCsv.payment_id || tids.join(",") || order.payment_id,
+    payment_date:
+      invoiceCsv.payment_date ||
+      pDate ||
+      invMeta?.invoice_date ||
+      order.payment_date,
+    payment_amount:
+      invoiceCsv.payment_amount ||
+      (incomingPaid > 0 ? String(Number(incomingPaid.toFixed(2))) : ""),
+  };
+
+  const mergedCsv = invoiceSettlesOrder
+    ? settledCsv
+    : mergeOrderPaymentWithLinkedCsv(orderForMerge, invoiceCsv);
   let paymentIdVal = mergedCsv.payment_id || null;
   let paymentDateVal = mergedCsv.payment_date || null;
   let paymentAmountVal = mergedCsv.payment_amount || null;
@@ -249,6 +286,8 @@ export async function syncOrderLinkedPaymentFromInvoice(conn, order) {
   let paidSum = Math.max(
     sumPaymentAmountCsv(paymentAmountVal),
     amountVal || 0,
+    invAmountPaid,
+    incomingPaid,
   );
   if (orderTotal > 0 && paidSum > orderTotal) {
     paidSum = orderTotal;
@@ -271,7 +310,7 @@ export async function syncOrderLinkedPaymentFromInvoice(conn, order) {
     null;
   const paymentStatus = derivePaymentStatus(
     paidSum || amountReceivedVal || 0,
-    order.totalamt,
+    orderTotal || order.totalamt,
   );
 
   await conn.execute(
@@ -352,12 +391,15 @@ export async function syncOrdersForInvoiceNumbers(conn, invoiceNumbers) {
     const buyersOrder = String(invRows?.[0]?.buyers_order_no ?? "").trim();
 
     const params = [num];
-    let sql = `SELECT order_id, quote_number, invoice_number, totalamt, amount_received, payment_received_date,
-              linked_payments_json, payment_id, payment_date, payment_amount, payment_status, transaction_id
-       FROM neworder
-       WHERE ${sqlTrimUtf8Eq("invoice_number")}`;
+    let sql = `SELECT no.order_id, no.quote_number, no.invoice_number, no.totalamt, no.amount_received,
+              no.payment_received_date, no.linked_payments_json, no.payment_id, no.payment_date,
+              no.payment_amount, no.payment_status, no.transaction_id,
+              qr.grand_total AS quotation_grand_total
+       FROM neworder no
+       LEFT JOIN quotations_records qr ON qr.quote_number = no.quote_number
+       WHERE ${sqlTrimUtf8Eq("no.invoice_number")}`;
     if (buyersOrder) {
-      sql += ` OR CAST(order_id AS CHAR) = ?`;
+      sql += ` OR CAST(no.order_id AS CHAR) = ?`;
       params.push(buyersOrder);
     }
 

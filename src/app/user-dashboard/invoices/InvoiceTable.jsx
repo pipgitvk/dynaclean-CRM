@@ -74,6 +74,7 @@ export default function InvoiceTable({ onSummaryUpdate }) {
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState(new Set());
   const [selectedInvoices, setSelectedInvoices] = useState([]);
+  const [reconciling, setReconciling] = useState(false);
 
   const processInvoicesForView = (data) => {
     const grouped = {};
@@ -366,6 +367,63 @@ export default function InvoiceTable({ onSummaryUpdate }) {
     setShowLinkModal(true);
   };
 
+  const handleReconcileLinkedPayments = async (scope) => {
+    const runAll = scope === "all";
+    if (
+      !window.confirm(
+        runAll
+          ? "Purani linked payments ko invoice + order + statements par sync karega. Continue?"
+          : "Selected invoice(s) ki linked payment dubara sync hogi. Continue?",
+      )
+    ) {
+      return;
+    }
+    setReconciling(true);
+    try {
+      if (runAll) {
+        const res = await fetch("/api/invoices/reconcile-linked-payments", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ all: true }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Reconcile failed");
+        window.alert(data.message || "Done");
+      } else {
+        const nums = [
+          ...new Set(
+            selectedInvoices
+              .map((i) => String(i.invoice_number || "").trim())
+              .filter(Boolean),
+          ),
+        ];
+        if (!nums.length) {
+          window.alert("Select at least one invoice with invoice number.");
+          return;
+        }
+        const messages = [];
+        for (const invoice_number of nums) {
+          const res = await fetch("/api/invoices/reconcile-linked-payments", {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ invoice_number }),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || invoice_number);
+          messages.push(data.message || invoice_number);
+        }
+        window.alert(messages.join("\n"));
+      }
+      resetAndFetch();
+    } catch (err) {
+      window.alert(err.message || "Reconcile failed");
+    } finally {
+      setReconciling(false);
+    }
+  };
+
   const SortIcon = ({ column }) =>
     sortBy !== column ? (
       <span className="ml-1 text-gray-400">↕</span>
@@ -503,18 +561,28 @@ export default function InvoiceTable({ onSummaryUpdate }) {
             className="border px-3 py-1 rounded w-full md:w-64"
           />
           {selectedInvoiceIds.size > 0 && (
-            <button
-              onClick={handleLinkPaymentClick}
-              disabled={selectedInvoices.some(inv => inv.type === 'performa')}
-              className={`px-4 py-1 rounded whitespace-nowrap font-semibold ${
-                selectedInvoices.some(inv => inv.type === 'performa')
-                  ? 'bg-gray-400 text-white cursor-not-allowed opacity-50'
-                  : 'bg-blue-600 text-white hover:bg-blue-700'
-              }`}
-              title={selectedInvoices.some(inv => inv.type === 'performa') ? 'Cannot link payments to Performa Invoices' : ''}
-            >
-              Link Payment ({selectedInvoiceIds.size})
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={() => handleReconcileLinkedPayments("selected")}
+                disabled={reconciling}
+                className="px-3 py-1 rounded whitespace-nowrap text-sm bg-amber-100 text-amber-900 border border-amber-400 hover:bg-amber-200 disabled:opacity-50"
+              >
+                Sync selected ({selectedInvoiceIds.size})
+              </button>
+              <button
+                onClick={handleLinkPaymentClick}
+                disabled={selectedInvoices.some(inv => inv.type === 'performa')}
+                className={`px-4 py-1 rounded whitespace-nowrap font-semibold ${
+                  selectedInvoices.some(inv => inv.type === 'performa')
+                    ? 'bg-gray-400 text-white cursor-not-allowed opacity-50'
+                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                }`}
+                title={selectedInvoices.some(inv => inv.type === 'performa') ? 'Cannot link payments to Performa Invoices' : ''}
+              >
+                Link Payment ({selectedInvoiceIds.size})
+              </button>
+            </>
           )}
         </div>
       </div>

@@ -66,8 +66,28 @@ export async function pushInvoicePaymentToNeworder(conn, invoice) {
         ],
   );
 
-  const paymentStatus =
-    amountPaid > 0 ? "partially paid" : "pending";
+  let orderTotal = 0;
+  if (buyersOrder) {
+    const [ordRows] = await conn.execute(
+      `SELECT no.totalamt, qr.grand_total AS quotation_grand_total
+       FROM neworder no
+       LEFT JOIN quotations_records qr ON qr.quote_number = no.quote_number
+       WHERE CAST(no.order_id AS CHAR) = ?
+       LIMIT 1`,
+      [buyersOrder],
+    );
+    const o = ordRows?.[0];
+    const q = Number(o?.quotation_grand_total) || 0;
+    orderTotal = q > 0 ? q : Number(o?.totalamt) || 0;
+  }
+
+  let paymentStatus = "pending";
+  if (amountPaid > 0) {
+    paymentStatus =
+      orderTotal > 0 && amountPaid >= orderTotal - 0.01
+        ? "paid"
+        : "partially paid";
+  }
 
   const params = [
     invoiceNumber || null,
@@ -118,8 +138,26 @@ export async function pushInvoiceIdsPaymentToNeworder(conn, invoiceIds) {
     [ids],
   );
 
-  const results = [];
+  /** Same order can appear on multiple invoices in one bulk link — keep highest amount_paid. */
+  const bestByOrderKey = new Map();
   for (const inv of rows || []) {
+    const orderKey =
+      String(inv.buyers_order_no || "").trim() ||
+      String(inv.invoice_number || "").trim();
+    if (!orderKey) {
+      bestByOrderKey.set(`inv:${inv.id}`, inv);
+      continue;
+    }
+    const prev = bestByOrderKey.get(orderKey);
+    const paid = Number(inv.amount_paid) || 0;
+    const prevPaid = Number(prev?.amount_paid) || 0;
+    if (!prev || paid >= prevPaid) {
+      bestByOrderKey.set(orderKey, inv);
+    }
+  }
+
+  const results = [];
+  for (const inv of bestByOrderKey.values()) {
     results.push({
       invoice_id: inv.id,
       ...(await pushInvoicePaymentToNeworder(conn, inv)),

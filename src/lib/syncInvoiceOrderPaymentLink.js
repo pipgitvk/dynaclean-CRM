@@ -32,10 +32,13 @@ export async function syncInvoiceAndOrderPaymentLink(
   ];
   for (const orderId of orders) {
     const [rows] = await conn.execute(
-      `SELECT order_id, quote_number, invoice_number, totalamt, amount_received,
-              payment_received_date, linked_payments_json, payment_id, payment_date,
-              payment_amount, payment_status, transaction_id
-       FROM neworder WHERE order_id = ? LIMIT 1`,
+      `SELECT no.order_id, no.quote_number, no.invoice_number, no.totalamt, no.amount_received,
+              no.payment_received_date, no.linked_payments_json, no.payment_id, no.payment_date,
+              no.payment_amount, no.payment_status, no.transaction_id,
+              qr.grand_total AS quotation_grand_total
+       FROM neworder no
+       LEFT JOIN quotations_records qr ON qr.quote_number = no.quote_number
+       WHERE no.order_id = ? LIMIT 1`,
       [orderId],
     );
     if (!rows?.[0]) continue;
