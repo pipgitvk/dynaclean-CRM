@@ -21,11 +21,12 @@ import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import dayjs from "dayjs";
 import {
   buildOrderPaymentRows,
+  getOrderPaidAmountForDisplay,
   sumOrderPaymentAmounts,
 } from "@/lib/orderPaymentHistory";
 import {
   deriveOrderListPaymentStatus,
-  getOrderListRemainingPayment,
+  getOrderTotalForPayment,
 } from "@/lib/paymentOrderStatus";
 import { isBookingAllowedForOrder } from "@/lib/orderBookingEligibility";
 import {
@@ -73,7 +74,6 @@ import ViewCreditNoteMenuLink from "@/components/orders/ViewCreditNoteMenuLink";
 import AccountantReturnViewMenuItems from "@/components/orders/AccountantReturnViewMenuItems";
 import LinkedStatementPaymentCell from "@/components/orders/LinkedStatementPaymentCell";
 import { orderMatchesSearchQuery } from "@/lib/orderListClientSearch";
-
 /** Single fetch for filtered range (default: current month). */
 const LIST_FETCH_LIMIT = 5000;
 
@@ -88,6 +88,28 @@ function getDefaultOrderListMonthRange() {
     return `${y}-${m}-${d}`;
   };
   return { from: format(firstDay), to: format(lastDay) };
+}
+
+function orderListPaymentStatusKey(order) {
+  return (deriveOrderListPaymentStatus(order) || "")
+    .toString()
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "");
+}
+
+function getOrderTotalAmount(order) {
+  return getOrderTotalForPayment(order);
+}
+
+function getOrderPaidAmount(order) {
+  return getOrderPaidAmountForDisplay(order);
+}
+
+function getOrderBalanceAmount(order) {
+  const total = getOrderTotalAmount(order);
+  const paid = getOrderPaidAmount(order);
+  return Math.max(0, total - paid);
 }
 
 function readDateFilterFromStorage(key) {
@@ -144,6 +166,20 @@ export default function OrderTable({ userRole }) {
     }
     return "";
   });
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("accountsOrderTable_paymentStatusFilter") || "";
+    }
+    return "";
+  });
+  const [appliedPaymentStatusFilter, setAppliedPaymentStatusFilter] = useState(
+    () => {
+      if (typeof window !== "undefined") {
+        return localStorage.getItem("accountsOrderTable_paymentStatusFilter") || "";
+      }
+      return "";
+    },
+  );
   const [dateFrom, setDateFrom] = useState(() =>
     readDateFilterFromStorage("accountsOrderTable_dateFrom"),
   );
@@ -236,6 +272,7 @@ export default function OrderTable({ userRole }) {
     setAppliedSearchQuery(searchQuery);
     setAppliedStatusFilter(statusFilter);
     setAppliedPaymentTermsFilter(paymentTermsFilter);
+    setAppliedPaymentStatusFilter(paymentStatusFilter);
     setAppliedDateFrom(dateFrom);
     setAppliedDateTo(dateTo);
     setAppliedCreatedByFilter(createdByFilter);
@@ -243,6 +280,10 @@ export default function OrderTable({ userRole }) {
       localStorage.setItem("accountsOrderTable_searchQuery", searchQuery);
       localStorage.setItem("accountsOrderTable_statusFilter", statusFilter);
       localStorage.setItem("accountsOrderTable_paymentTermsFilter", paymentTermsFilter);
+      localStorage.setItem(
+        "accountsOrderTable_paymentStatusFilter",
+        paymentStatusFilter,
+      );
       localStorage.setItem("accountsOrderTable_dateFrom", dateFrom);
       localStorage.setItem("accountsOrderTable_dateTo", dateTo);
       localStorage.setItem("accountsOrderTable_createdByFilter", createdByFilter);
@@ -260,6 +301,7 @@ export default function OrderTable({ userRole }) {
     searchQuery,
     statusFilter,
     paymentTermsFilter,
+    paymentStatusFilter,
     dateFrom,
     dateTo,
     createdByFilter,
@@ -274,6 +316,8 @@ export default function OrderTable({ userRole }) {
     setAppliedStatusFilter("");
     setPaymentTermsFilter("");
     setAppliedPaymentTermsFilter("");
+    setPaymentStatusFilter("");
+    setAppliedPaymentStatusFilter("");
     setDateFrom(from);
     setAppliedDateFrom(from);
     setDateTo(to);
@@ -284,6 +328,7 @@ export default function OrderTable({ userRole }) {
       localStorage.removeItem("accountsOrderTable_searchQuery");
       localStorage.removeItem("accountsOrderTable_statusFilter");
       localStorage.removeItem("accountsOrderTable_paymentTermsFilter");
+      localStorage.removeItem("accountsOrderTable_paymentStatusFilter");
       localStorage.setItem("accountsOrderTable_dateFrom", from);
       localStorage.setItem("accountsOrderTable_dateTo", to);
       localStorage.removeItem("accountsOrderTable_createdByFilter");
@@ -504,6 +549,14 @@ export default function OrderTable({ userRole }) {
         return false;
       }
 
+      if (appliedPaymentStatusFilter) {
+        const payKey = orderListPaymentStatusKey(order);
+        const want = appliedPaymentStatusFilter.toLowerCase().replace(/\s+/g, "");
+        if (want === "partiallypaid" && payKey !== "partiallypaid") return false;
+        if (want === "paid" && payKey !== "paid") return false;
+        if (want === "pending" && payKey !== "pending") return false;
+      }
+
       if (!orderMatchesSearchQuery(order, searchQuery)) return false;
 
       return true;
@@ -514,6 +567,7 @@ export default function OrderTable({ userRole }) {
       appliedStatusFilter,
       appliedCreatedByFilter,
       appliedPaymentTermsFilter,
+      appliedPaymentStatusFilter,
     ],
   );
 
@@ -667,6 +721,19 @@ export default function OrderTable({ userRole }) {
               ))}
           </select>
         </div>
+        <div className="min-w-[140px] flex-1 sm:max-w-[200px]">
+          <label className="block text-xs text-gray-600 mb-1">Payment Status</label>
+          <select
+            value={paymentStatusFilter}
+            onChange={(e) => setPaymentStatusFilter(e.target.value)}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+          >
+            <option value="">All</option>
+            <option value="pending">Pending</option>
+            <option value="partiallypaid">Partially Paid</option>
+            <option value="paid">Paid</option>
+          </select>
+        </div>
         <div className="flex items-end gap-2 shrink-0 order-last">
           <OrderListSearchResetButton onReset={handleResetFilters} />
           <OrderListSearchApplyButton onApply={handleApplySearch} embedded />
@@ -694,8 +761,8 @@ export default function OrderTable({ userRole }) {
               <th className="px-3 py-3 font-semibold text-left">Item</th>
               <th className="px-3 py-3 font-semibold text-left">Payment Terms</th>
               <th className="px-3 py-3 font-semibold text-center">Status</th>
-              <th className="px-3 py-3 font-semibold text-center">Payment</th>
-              <th className="px-3 py-3 font-semibold text-center">Payment Pending</th>
+              <th className="px-3 py-3 font-semibold text-center">Payment Status</th>
+              <th className="px-3 py-3 font-semibold text-center">Balance</th>
               <th className="px-3 py-3 font-semibold text-center">Linked Payment</th>
               <th className="px-3 py-3 font-semibold text-center">Due Date</th>
               {/* {canShowInstall && (
@@ -709,7 +776,7 @@ export default function OrderTable({ userRole }) {
               filteredOrders.map((r, i) => {
                 const status = getStatusText(r);
                 const pay = getPaymentBadge(deriveOrderListPaymentStatus(r));
-                const paymentPending = getOrderListRemainingPayment(r);
+                const orderBalance = getOrderBalanceAmount(r);
                 // const inst = getInstallationLabel(r.installation_status);
                 return (
                   <tr
@@ -790,17 +857,13 @@ export default function OrderTable({ userRole }) {
                         {pay.text}
                       </span>
                     </td>
-                    <td className="px-3 py-3 text-center">
-                      {paymentPending == null ? (
-                        <span className="text-gray-400 text-xs">—</span>
-                      ) : (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                          ₹{paymentPending.toLocaleString("en-IN", {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          })}
-                        </span>
-                      )}
+                    <td className="px-3 py-3">
+                      <span className="font-bold text-orange-600">
+                        ₹{orderBalance.toLocaleString("en-IN", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </span>
                     </td>
                     <td className="px-3 py-3">
                       <LinkedStatementPaymentCell order={r} />
@@ -857,7 +920,8 @@ export default function OrderTable({ userRole }) {
         {filteredOrders.length > 0 ? (
           filteredOrders.map((r, i) => {
             const status = getStatusText(r);
-            const paymentPending = getOrderListRemainingPayment(r);
+            const pay = getPaymentBadge(deriveOrderListPaymentStatus(r));
+            const orderBalance = getOrderBalanceAmount(r);
             return (
               <div
                 key={r.order_id}
@@ -910,18 +974,19 @@ export default function OrderTable({ userRole }) {
                   <strong>Location:</strong> {r.state}
                 </div>
                 <div>
-                  <strong>Payment Pending:</strong>{" "}
-                  {paymentPending == null ? (
-                    <span className="text-gray-400">—</span>
-                  ) : (
-                    <span className="font-semibold text-red-600">
-                      ₹
-                      {paymentPending.toLocaleString("en-IN", {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
-                    </span>
-                  )}
+                  <strong>Payment Status:</strong>{" "}
+                  <span
+                    className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${pay.cls}`}
+                  >
+                    {pay.text}
+                  </span>
+                </div>
+                <div className="text-xs text-orange-600">
+                  <strong>Balance:</strong> ₹
+                  {orderBalance.toLocaleString("en-IN", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
                 </div>
                 <div className="pt-1">
                   <strong>Linked Payment:</strong>
