@@ -3,7 +3,6 @@ export const TL_POSTPONDING_DECLINED_TAG = "Postponding/Declined";
 
 export const BASE_TL_TAG_OPTIONS = [
   "Demo",
-  "Physical-Demo",
   "Prime",
   "Repeat order",
   "Mail",
@@ -11,7 +10,7 @@ export const BASE_TL_TAG_OPTIONS = [
   "Payment Collection",
   "Strong FollowUp",
   "Service Issue",
-  "Running Orders", 
+  "Running Orders",
   TL_POSTPONDING_DECLINED_TAG,
   "Clear",
   "order-recieved",
@@ -19,8 +18,6 @@ export const BASE_TL_TAG_OPTIONS = [
   "Delhi-Visiting",
   "Tamilnadu-Visiting",
   "Municipal",
-  "Dealer/Reseller",
-  "Contractor",
 ];
 
 export function getTlTagOptions() {
@@ -30,7 +27,6 @@ export function getTlTagOptions() {
 /** Tag filter order on TL customers list (`TLCustomersTable`) */
 export const TL_CUSTOMERS_TABLE_BASE_TAGS = [
   "Demo",
-  "Physical-Demo",
   "Payment Collection",
   "Truck FollowUp",
   "Strong FollowUp",
@@ -46,8 +42,6 @@ export const TL_CUSTOMERS_TABLE_BASE_TAGS = [
   "Delhi-Visiting",
   "Tamilnadu-Visiting",
   "Municipal",
-  "Dealer/Reseller",
-  "Contractor",
 ];
 
 export function getTlCustomersTableTagOptions() {
@@ -82,9 +76,6 @@ export function getTlMultiTagChipClass(rawTag, variant = "table") {
 
   if (norm.includes("payment") && norm.includes("collection")) {
     return `${base} bg-purple-600 text-white`;
-  }
-  if (norm.includes("physical") && norm.includes("demo")) {
-    return `${base} bg-indigo-600 text-white border border-indigo-700/90 font-semibold`;
   }
   if (norm.includes("service") && norm.includes("issue")) {
     return `${base} bg-pink-500 text-white`;
@@ -124,12 +115,6 @@ export function getTlMultiTagChipClass(rawTag, variant = "table") {
   }
   if (norm === "municipal") {
     return `${base} bg-gradient-to-r from-teal-500 to-cyan-600 text-white font-bold shadow-lg`;
-  }
-  if (norm === "dealer/reseller") {
-    return `${base} bg-violet-100 text-violet-800 border border-violet-300`;
-  }
-  if (norm === "contractor") {
-    return `${base} bg-amber-100 text-amber-800 border border-amber-300`;
   }
 
   return `${base} bg-slate-500 text-white`;
