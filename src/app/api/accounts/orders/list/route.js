@@ -16,7 +16,7 @@ export async function GET(req) {
 
     const { searchParams } = new URL(req.url);
     const page = Number(searchParams.get("page")) || 1;
-    const limit = Math.min(Number(searchParams.get("limit")) || 40, 100);
+    const limit = Math.min(Number(searchParams.get("limit")) || 10000, 100000);
     const search = searchParams.get("search")?.trim() || "";
     const dateFrom = searchParams.get("dateFrom")?.trim() || "";
     const dateTo = searchParams.get("dateTo")?.trim() || "";

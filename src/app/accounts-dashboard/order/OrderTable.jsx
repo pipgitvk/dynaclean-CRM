@@ -74,18 +74,14 @@ import AccountantReturnViewMenuItems from "@/components/orders/AccountantReturnV
 import LinkedStatementPaymentCell from "@/components/orders/LinkedStatementPaymentCell";
 import { orderMatchesSearchQuery } from "@/lib/orderListClientSearch";
 
-const PAGE_SIZE = 40;
-const SCROLL_LOAD_OFFSET_PX = 200;
+/** Single fetch — no infinite scroll (matches accounts invoice list). */
+const LIST_FETCH_LIMIT = 10000;
 
 export default function OrderTable({ userRole }) {
   const router = useRouter();
   const [orders, setOrders] = useState([]);
   const [listLoading, setListLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
-  const [scrollLoadEnabled, setScrollLoadEnabled] = useState(false);
   const [fetchError, setFetchError] = useState(null);
-  const pageRef = useRef(1);
   const fetchAbortRef = useRef(null);
   const tableScrollRef = useRef(null);
   const searchParams = useSearchParams();
@@ -164,8 +160,8 @@ export default function OrderTable({ userRole }) {
   });
   const [openMenuId, setOpenMenuId] = useState(null); // State to track which menu is open
 
-  const fetchOrdersPage = useCallback(
-    async ({ page = 1, append = false, filters } = {}) => {
+  const fetchOrders = useCallback(
+    async ({ filters } = {}) => {
       const f = filters || {
         search: appliedSearchQuery,
         dateFrom: appliedDateFrom,
@@ -175,17 +171,13 @@ export default function OrderTable({ userRole }) {
       };
       const controller = new AbortController();
 
-      if (append) {
-        setLoadingMore(true);
-      } else {
-        setListLoading(true);
-        setFetchError(null);
-        setOrders([]);
-      }
+      setListLoading(true);
+      setFetchError(null);
+      setOrders([]);
 
       const params = new URLSearchParams();
-      params.set("page", String(page));
-      params.set("limit", String(PAGE_SIZE));
+      params.set("page", "1");
+      params.set("limit", String(LIST_FETCH_LIMIT));
       if (f.search) params.set("search", f.search);
       if (f.dateFrom) params.set("dateFrom", f.dateFrom);
       if (f.dateTo) params.set("dateTo", f.dateTo);
@@ -193,12 +185,10 @@ export default function OrderTable({ userRole }) {
       if (f.paymentTerms) params.set("paymentTerms", f.paymentTerms);
 
       try {
-        if (!append) {
-          if (fetchAbortRef.current) {
-            fetchAbortRef.current.abort();
-          }
-          fetchAbortRef.current = controller;
+        if (fetchAbortRef.current) {
+          fetchAbortRef.current.abort();
         }
+        fetchAbortRef.current = controller;
 
         const res = await fetch(`/api/accounts/orders/list?${params.toString()}`, {
           signal: controller.signal,
@@ -208,36 +198,15 @@ export default function OrderTable({ userRole }) {
           throw new Error(json.detail || json.error || "Failed to load orders");
         }
 
-        const rows = json.data || [];
-        setOrders((prev) => {
-          if (!append) return rows;
-          const seen = new Set(prev.map((o) => o.order_id));
-          const merged = [...prev];
-          for (const row of rows) {
-            if (!seen.has(row.order_id)) {
-              seen.add(row.order_id);
-              merged.push(row);
-            }
-          }
-          return merged;
-        });
-        pageRef.current = page;
-        setHasMore(Boolean(json.meta?.hasMore));
+        setOrders(json.data || []);
       } catch (err) {
         if (err?.name === "AbortError") return;
         console.error("Order list fetch failed:", err);
-        if (!append) {
-          setOrders([]);
-          setFetchError(err?.message || "Failed to load orders");
-        }
+        setOrders([]);
+        setFetchError(err?.message || "Failed to load orders");
       } finally {
-        if (!append && fetchAbortRef.current !== controller) return;
-        if (append) {
-          setLoadingMore(false);
-        } else {
-          setListLoading(false);
-          setScrollLoadEnabled(true);
-        }
+        if (fetchAbortRef.current !== controller) return;
+        setListLoading(false);
       }
     },
     [
@@ -250,16 +219,8 @@ export default function OrderTable({ userRole }) {
   );
 
   const resetAndFetchOrders = useCallback(() => {
-    pageRef.current = 1;
-    setHasMore(true);
-    setScrollLoadEnabled(false);
-    fetchOrdersPage({ page: 1, append: false });
-  }, [fetchOrdersPage]);
-
-  const loadMoreOrders = useCallback(() => {
-    if (listLoading || loadingMore || !hasMore) return;
-    fetchOrdersPage({ page: pageRef.current + 1, append: true });
-  }, [listLoading, loadingMore, hasMore, fetchOrdersPage]);
+    fetchOrders();
+  }, [fetchOrders]);
 
   const handleApplySearch = useCallback(() => {
     setAppliedSearchQuery(searchQuery);
@@ -276,12 +237,7 @@ export default function OrderTable({ userRole }) {
       localStorage.setItem("accountsOrderTable_dateTo", dateTo);
       localStorage.setItem("accountsOrderTable_createdByFilter", createdByFilter);
     }
-    pageRef.current = 1;
-    setHasMore(true);
-    setScrollLoadEnabled(false);
-    fetchOrdersPage({
-      page: 1,
-      append: false,
+    fetchOrders({
       filters: {
         search: searchQuery,
         dateFrom,
@@ -297,7 +253,7 @@ export default function OrderTable({ userRole }) {
     dateFrom,
     dateTo,
     createdByFilter,
-    fetchOrdersPage,
+    fetchOrders,
   ]);
 
   const handleResetFilters = useCallback(() => {
@@ -322,12 +278,7 @@ export default function OrderTable({ userRole }) {
       localStorage.removeItem("accountsOrderTable_createdByFilter");
     }
     router.replace("/accounts-dashboard/order", { scroll: false });
-    pageRef.current = 1;
-    setHasMore(true);
-    setScrollLoadEnabled(false);
-    fetchOrdersPage({
-      page: 1,
-      append: false,
+    fetchOrders({
       filters: {
         search: "",
         dateFrom: "",
@@ -336,37 +287,12 @@ export default function OrderTable({ userRole }) {
         paymentTerms: "",
       },
     });
-  }, [router, fetchOrdersPage]);
+  }, [router, fetchOrders]);
 
   useEffect(() => {
-    fetchOrdersPage({ page: 1, append: false });
+    fetchOrders();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  useEffect(() => {
-    if (!scrollLoadEnabled) return;
-
-    const onScroll = (el) => {
-      if (listLoading || loadingMore || !hasMore) return;
-      const nearBottom =
-        el.scrollTop + el.clientHeight >= el.scrollHeight - SCROLL_LOAD_OFFSET_PX;
-      if (nearBottom) loadMoreOrders();
-    };
-
-    const tableEl = tableScrollRef.current;
-    const mainEl = document.querySelector("main.overflow-auto");
-
-    const onTableScroll = () => tableEl && onScroll(tableEl);
-    const onMainScroll = () => mainEl && onScroll(mainEl);
-
-    tableEl?.addEventListener("scroll", onTableScroll, { passive: true });
-    mainEl?.addEventListener("scroll", onMainScroll, { passive: true });
-
-    return () => {
-      tableEl?.removeEventListener("scroll", onTableScroll);
-      mainEl?.removeEventListener("scroll", onMainScroll);
-    };
-  }, [scrollLoadEnabled, loadMoreOrders, hasMore, listLoading, loadingMore]);
 
   useEffect(() => {
     const statusFromCard = searchParams.get("status");
@@ -907,14 +833,11 @@ export default function OrderTable({ userRole }) {
       </div>
 
       {!listLoading && orders.length > 0 && (
-        <div className="flex items-center justify-between text-xs text-gray-600 px-1">
-          <span>
-            Showing {filteredOrders.length} of {orders.length} loaded
-            {hasMore ? " — scroll for more" : " — all loaded"}
-          </span>
-          {loadingMore && (
-            <span className="font-medium text-blue-600">Loading more…</span>
-          )}
+        <div className="text-xs text-gray-600 px-1">
+          Showing {filteredOrders.length}
+          {filteredOrders.length !== orders.length
+            ? ` of ${orders.length} orders`
+            : ` order${filteredOrders.length === 1 ? "" : "s"}`}
         </div>
       )}
 
