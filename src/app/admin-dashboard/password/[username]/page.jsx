@@ -3,11 +3,9 @@ import RepUpdateForm from "@/components/rep-update-form";
 
 export const dynamic = "force-dynamic";
 
-export default async function RepPage({ params, searchParams }) {
+export default async function RepPage({ params }) {
   let { username } = await params;
    username = decodeURIComponent(username);
-  const sp = await searchParams;
-  const embed = sp?.embed === "1";
 
   
 
@@ -44,24 +42,12 @@ export default async function RepPage({ params, searchParams }) {
     
 
     return (
-      <div
-        className={
-          embed
-            ? "bg-white"
-            : "flex flex-col items-center justify-center bg-gray-100 p-4"
-        }
-      >
-        <div
-          className={
-            embed ? "w-full" : "w-full max-w-md p-8 bg-white rounded-lg shadow-md"
-          }
-        >
-          {!embed && (
-            <h1 className="text-2xl font-bold mb-6 text-center text-gray-800">
-              Edit Password for {username}
-            </h1>
-          )}
-          <RepUpdateForm initialPassword={password} username={username} compact={embed} />
+      <div className="flex flex-col items-center justify-center  bg-gray-100 p-4">
+        <div className="w-full max-w-md p-8 bg-white rounded-lg shadow-md">
+          <h1 className="text-2xl font-bold mb-6 text-center text-gray-800">
+            Edit Password for **{username}**
+          </h1>
+          <RepUpdateForm initialPassword={password} username={username} />
         </div>
       </div>
     );

@@ -1,21 +1,39 @@
 "use client";
 
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
-import { useEmployeeRoleOptions } from "@/hooks/useEmployeeRoleOptions";
-import { BASE_EMPLOYEE_ROLES } from "@/lib/employeeRoles";
 
-const EMPLOYEE_TYPE_OPTIONS = [
-  "Select Type",
-  "Company Person",
-  "Third Party",
+const USER_ROLE_OPTIONS = [
+  "DIRECTOR",
+  "ACCOUNTANT",
+  "TEAM LEADER",
+  "SALES",
+  "SALES CUM BACKOFFICE",
+  "SALES HEAD",
+  "DIGITAL MARKETER",
+  "ADMIN",
+  "HR",
+  "HR HEAD",
+  "JUNIOR HR EXECUTIVE",
+  "HR EXECUTIVE",
+  "HR RECRUITER",
+  "GEM",
+  "GRAPHIC DESIGNER",
+  "DESIGN ENGINEER",
+  "DEVELOPER",
+  "SERVICE ENGINEER",
+  "SERVICE TECHNICIAN",
+  "SERVICE HEAD",
+  "SERVICE SUPPORT",
+  "WELDER",
+  "WELDER HELPER",
+  "WAREHOUSE INCHARGE",
+  "EA",
 ];
 
 export default function CreateEmployeeForm() {
   const router = useRouter();
-  const { roles: userRoleOptions } = useEmployeeRoleOptions();
   const [formData, setFormData] = useState({
     username: "",
     email: "",
@@ -24,9 +42,7 @@ export default function CreateEmployeeForm() {
     password: "",
     number: "",
     profile_pic: "default.png",
-    userRole: BASE_EMPLOYEE_ROLES[0] ?? "",
-    employeeType: EMPLOYEE_TYPE_OPTIONS[0] ?? "",
-    machineCode: "",
+    userRole: USER_ROLE_OPTIONS[0] ?? "",
   });
   const [isCreating, setIsCreating] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
@@ -36,14 +52,6 @@ export default function CreateEmployeeForm() {
     phone: "",
     dob: "",
   });
-
-  useEffect(() => {
-    if (!userRoleOptions.length) return;
-    setFormData((prev) => {
-      if (userRoleOptions.includes(prev.userRole)) return prev;
-      return { ...prev, userRole: userRoleOptions[0] };
-    });
-  }, [userRoleOptions]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -77,13 +85,6 @@ export default function CreateEmployeeForm() {
     setIsCreating(true);
     setStatusMessage("");
 
-    // Validate employee type selection
-    if (formData.employeeType === "Select Type") {
-      setStatusMessage("❌ Please select a valid employee type.");
-      setIsCreating(false);
-      return;
-    }
-
     try {
       const response = await fetch("/api/create-employee", {
         method: "POST",
@@ -103,9 +104,7 @@ export default function CreateEmployeeForm() {
           password: "",
           number: "",
           profile_pic: "default.png",
-          userRole: userRoleOptions[0] || "",
-          employeeType: "Select Type",
-          machineCode: "",
+          userRole: USER_ROLE_OPTIONS[0] || "",
         });
         setTimeout(() => {
           router.push("/admin-dashboard/employees");
@@ -276,9 +275,16 @@ export default function CreateEmployeeForm() {
           >
             Date of Birth
           </label>
-          <TypeableDateFilterInput value={formData.dob} onChange={(v) => handleChange({ target: { name: "dob", value: v } })} id="dob" required
+          <input
+            type="date"
+            id="dob"
+            name="dob"
+            value={formData.dob}
+            onChange={handleChange}
+            required
             max={new Date().toISOString().split("T")[0]}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"/>
+            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+          />
           {errors.dob && (
             <p className="text-red-600 text-sm mt-1">{errors.dob}</p>
           )}
@@ -298,51 +304,12 @@ export default function CreateEmployeeForm() {
             required
             className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
           >
-            {userRoleOptions.map((role) => (
+            {USER_ROLE_OPTIONS.map((role) => (
               <option key={role} value={role}>
                 {role}
               </option>
             ))}
           </select>
-        </div>
-        <div>
-          <label
-            htmlFor="employeeType"
-            className="block text-sm font-medium text-gray-700"
-          >
-            Employee Type
-          </label>
-          <select
-            id="employeeType"
-            name="employeeType"
-            value={formData.employeeType}
-            onChange={handleChange}
-            required
-            className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
-          >
-            {EMPLOYEE_TYPE_OPTIONS.map((type) => (
-              <option key={type} value={type} disabled={type === "Select Type"}>
-                {type}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label
-            htmlFor="machineCode"
-            className="block text-sm font-medium text-gray-700"
-          >
-            Machine Employee ID
-          </label>
-          <input
-            type="text"
-            id="machineCode"
-            name="machineCode"
-            value={formData.machineCode}
-            onChange={handleChange}
-            placeholder="e.g. 102"
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-          />
         </div>
         <div className="col-span-2">
           <button

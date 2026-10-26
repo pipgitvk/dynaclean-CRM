@@ -59,18 +59,18 @@ export default function AdminServiceMapPage() {
   return (
     <div className="flex flex-col h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-white shadow-sm border-b border-gray-200 px-3 py-3 sm:px-6 sm:py-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="bg-white shadow-sm border-b border-gray-200 px-6 py-4">
+        <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-800">
+            <h1 className="text-2xl font-bold text-gray-800">
               Service Records Map
             </h1>
-            <p className="text-xs sm:text-sm text-gray-600 mt-0.5 sm:mt-1">
+            <p className="text-sm text-gray-600 mt-1">
               Visualize all service records by location
             </p>
           </div>
           
-          <div className="flex flex-wrap items-center gap-2 sm:gap-4">
+          <div className="flex items-center gap-4">
             {/* View Toggle */}
             <div className="flex bg-gray-100 rounded-lg p-1">
               <button
@@ -111,7 +111,7 @@ export default function AdminServiceMapPage() {
       {/* Content */}
       <div className="flex-1 overflow-hidden">
         {viewMode === "map" ? (
-          <div className="h-full p-1 sm:p-4 min-h-0">
+          <div className="h-full p-4">
             <ServiceMapView services={services} />
           </div>
         ) : (

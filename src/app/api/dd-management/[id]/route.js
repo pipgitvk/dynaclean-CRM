@@ -9,21 +9,6 @@ async function ensureDDRecordsColumns(pool) {
             console.warn("Could not add bid_document column:", error.message);
         }
     }
-    try {
-        await pool.execute("ALTER TABLE dd_records ADD COLUMN overdue_date DATE NULL AFTER security_type");
-    } catch (error) {
-        if (error.code !== "ER_DUP_FIELDNAME") {
-            console.warn("Could not add overdue_date column:", error.message);
-        }
-    }
-    // Add claim_date column
-    try {
-        await pool.execute("ALTER TABLE dd_records ADD COLUMN claim_date DATE NULL AFTER claim_from_bank");
-    } catch (error) {
-        if (error.code !== "ER_DUP_FIELDNAME") {
-            console.warn("Could not add claim_date column:", error.message);
-        }
-    }
     const ddColumns = [
         ["dd_no", "VARCHAR(255) NULL"],
         ["dd_date", "DATE NULL"],
@@ -31,9 +16,7 @@ async function ensureDDRecordsColumns(pool) {
         ["expiry_bank", "DATE NULL"],
         ["issuing_branch", "VARCHAR(255) NULL"],
         ["dd_scan_copy", "VARCHAR(500) NULL"],
-        ["dd_receipt", "VARCHAR(500) NULL"],
-        ["other_deduction_amount", "DECIMAL(10, 2) NULL DEFAULT 0"],
-        ["other_deduction_remark", "TEXT NULL"]
+        ["dd_receipt", "VARCHAR(500) NULL"]
     ];
     for (const [column, definition] of ddColumns) {
         try {
@@ -72,7 +55,6 @@ export async function PUT(req, { params }) {
             remark,
             contract_no,
             security_type,
-            overdue_date,
 
             // Step 2 (DD & BG shared/specific)
             cheque_no,
@@ -116,16 +98,11 @@ export async function PUT(req, { params }) {
             receipt,
             from_bank_account_no,
 
-            // Other Deduction
-            other_deduction_amount,
-            other_deduction_remark,
-
             // Metadata
             status,
             original_dd_location,
             sent_to_client_date,
-            claim_from_bank,
-            claim_date
+            claim_from_bank
         } = body;
 
         const pool = await getDbConnection();
@@ -148,7 +125,6 @@ export async function PUT(req, { params }) {
         if (remark !== undefined) { fields.push("remark = ?"); updateParams.push(remark || null); }
         if (contract_no !== undefined) { fields.push("contract_no = ?"); updateParams.push(contract_no || null); }
         if (security_type !== undefined) { fields.push("security_type = ?"); updateParams.push(security_type || null); }
-        if (overdue_date !== undefined) { fields.push("overdue_date = ?"); updateParams.push(overdue_date || null); }
 
         // Step 2 fields (DD & shared)
         if (cheque_no !== undefined) { fields.push("cheque_no = ?"); updateParams.push(cheque_no); }
@@ -193,7 +169,6 @@ export async function PUT(req, { params }) {
         if (original_dd_location !== undefined) { fields.push("original_dd_location = ?"); updateParams.push(original_dd_location); }
         if (sent_to_client_date !== undefined) { fields.push("sent_to_client_date = ?"); updateParams.push(sent_to_client_date); }
         if (claim_from_bank !== undefined) { fields.push("claim_from_bank = ?"); updateParams.push(claim_from_bank ? 1 : 0); }
-        if (claim_date !== undefined) { fields.push("claim_date = ?"); updateParams.push(claim_date); }
 
         // NEFT/RTGS/IMPS Payment Details
         if (reference_no !== undefined) { fields.push("reference_no = ?"); updateParams.push(reference_no); }
@@ -202,10 +177,6 @@ export async function PUT(req, { params }) {
         if (payment_proof !== undefined) { fields.push("payment_proof = ?"); updateParams.push(payment_proof); }
         if (receipt !== undefined) { fields.push("receipt = ?"); updateParams.push(receipt); }
         if (from_bank_account_no !== undefined) { fields.push("from_bank_account_no = ?"); updateParams.push(from_bank_account_no); }
-
-        // Other Deduction
-        if (other_deduction_amount !== undefined) { fields.push("other_deduction_amount = ?"); updateParams.push(other_deduction_amount || 0); }
-        if (other_deduction_remark !== undefined) { fields.push("other_deduction_remark = ?"); updateParams.push(other_deduction_remark || null); }
 
         if (fields.length === 0) {
             return NextResponse.json({ error: "No fields to update" }, { status: 400 });

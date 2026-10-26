@@ -1,6 +1,5 @@
 import { getDbConnection } from "@/lib/db";
 import { getISTDateString } from "@/lib/istDateTime";
-import { applyAutomaticCheckouts } from "@/lib/attendanceAutoCheckout";
 import { jwtVerify } from "jose";
 import { cookies } from "next/headers";
 
@@ -24,7 +23,6 @@ export async function GET(req) {
     const username = searchParams.get("username") || payload.username;
 
     const connection = await getDbConnection();
-    await applyAutomaticCheckouts(connection, { username });
 
     // Get today's attendance record from attendance_logs
     const todayDate = getISTDateString();

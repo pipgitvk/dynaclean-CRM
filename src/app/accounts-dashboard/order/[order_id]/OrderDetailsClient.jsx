@@ -1,24 +1,17 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import dayjs from "dayjs";
-import OrderDocumentFileCard from "@/components/orders/OrderDocumentFileCard";
-import {
-  ORDER_PIPELINE_STAGES,
-  deriveOrderPipelineProgress,
-} from "@/lib/orderPipelineStage";
 
-const DOCUMENT_FIELDS = [
-  { label: "E-way Bill", key: "ewaybill_file" },
-  { label: "E-invoice", key: "einvoice_file" },
-  { label: "Invoice PDF", key: "report_file" },
-  { label: "Delivery Challan", key: "deliverchallan" },
-  { label: "Purchase Order", key: "po_file" },
-  { label: "Payment Proof", key: "payment_proof" },
-  { label: "Delivery Proof", key: "delivery_proof" },
+const stages = [
+  "Sales",
+  "Account",
+  "Admin",
+  "Dispatch",
+  "Delivered",
+  "Installation Report",
+  "Complete",
 ];
-
-const stages = ORDER_PIPELINE_STAGES;
 
 export default function OrderDetailsClient({
   orderDetails,
@@ -63,35 +56,31 @@ export default function OrderDetailsClient({
     return amounts.reduce((sum, n) => sum + n, 0);
   }, [orderDetails.payment_amount]);
 
-  const { progressPercent, stepCompleted } = useMemo(
-    () => deriveOrderPipelineProgress(orderDetails, statuses),
-    [orderDetails, statuses],
-  );
+  const currentStage = useMemo(() => {
+    const statusList = [
+      statuses?.sales_status,
+      statuses?.account_status,
+      statuses?.admin_status,
+      statuses?.dispatch_status,
+      statuses?.delivery_status,
+      statuses?.installation_status,
+    ];
 
-  const [fileValues, setFileValues] = useState(() => {
-    const initial = {};
-    DOCUMENT_FIELDS.forEach(({ key }) => {
-      initial[key] = orderDetails[key] || "";
-    });
-    return initial;
-  });
+    // If all statuses are complete (no 0s), show Complete
+    if (!statusList.includes(0)) return "Complete";
 
-  const handleFilesUploaded = (fieldKey, newValue) => {
-    setFileValues((prev) => ({ ...prev, [fieldKey]: newValue }));
-  };
+    // Find the first incomplete status (0)
+    const firstIncompleteIndex = statusList.findIndex((s) => s === 0);
 
-  const orderForDocRules = useMemo(
-    () => ({
-      dispatch_status: orderDetails.dispatch_status,
-      delivery_status: orderDetails.delivery_status,
-      delivered_on: orderDetails.delivered_on,
-    }),
-    [
-      orderDetails.dispatch_status,
-      orderDetails.delivery_status,
-      orderDetails.delivered_on,
-    ],
-  );
+    // Show the stage BEFORE the first incomplete one (the last completed stage)
+    // If first incomplete is 0, we're still at Sales
+    if (firstIncompleteIndex === 0) return "Sales";
+
+    return stages[firstIncompleteIndex - 1] || "Sales";
+  }, [statuses]);
+
+  const currentIndex = stages.indexOf(currentStage);
+  const progressPercent = (currentIndex / (stages.length - 1)) * 100;
 
   return (
     <div className="p-4 space-y-6">
@@ -107,7 +96,7 @@ export default function OrderDetailsClient({
           {stages.map((stage, i) => (
             <div key={i} className="text-center flex-1">
               <div
-                className={`w-6 h-6 mx-auto mb-1 rounded-full text-white text-xs flex items-center justify-center ${stepCompleted[i] ? "bg-blue-600" : "bg-gray-400"
+                className={`w-6 h-6 mx-auto mb-1 rounded-full text-white text-xs flex items-center justify-center ${i <= currentIndex ? "bg-blue-600" : "bg-gray-400"
                   }`}
               >
                 {i + 1}
@@ -134,7 +123,7 @@ export default function OrderDetailsClient({
           value={orderDetails.delivery_location}
         />
         <Input label="PO Number / Gem Order Number" value={orderDetails.po_number} />
-        <Input label="Total Amount" value={`₹${Number(orderDetails.totalamt || totalAmount || 0).toFixed(2)}`} />
+        <Input label="Total Amount" value={`₹${(orderDetails.totalamt || totalAmount || 0).toFixed(2)}`} />
         <Input label="Total Paid Amount" value={`₹${totalPaid.toFixed(2)}`} />
         <Input label="Payment Date" value={formatDate(orderDetails.payment_date)} />
         <Input label="Transaction ID" value={orderDetails.transaction_id} />
@@ -255,25 +244,22 @@ export default function OrderDetailsClient({
         </div>
       </div>
 
-      {/* Documents */}
+      {/* Files */}
+      {/* <FileSection label="Purchase Order" file={orderDetails.po_file} />
+      <FileSection label="Payment Proof" file={orderDetails.payment_proof} />
+      <FileSection label="Invoice" file={orderDetails.report_file} /> */}
+
+      {/* Consolidated Documents Row */}
       <div className="border rounded p-4 bg-white">
-        <h3 className="font-semibold mb-1">Documents</h3>
-        <p className="text-xs text-gray-500 mb-3">
-          Invoice, e-way bill & e-invoice: up to 5 files each — add more anytime until limit.
-          Delivery challan before delivered. Delivery proof within 24 hours of delivery.
-        </p>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {DOCUMENT_FIELDS.map(({ label, key }) => (
-            <OrderDocumentFileCard
-              key={key}
-              label={label}
-              fieldKey={key}
-              file={fileValues[key]}
-              orderId={orderDetails.order_id}
-              order={orderForDocRules}
-              onUploaded={handleFilesUploaded}
-            />
-          ))}
+        <h3 className="font-semibold mb-3">Documents</h3>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
+          <DocCell label="E-way Bill" file={orderDetails.ewaybill_file} optional />
+          <DocCell label="E-invoice (Optional)" file={orderDetails.einvoice_file} optional />
+          <DocCell label="Invoice PDF (Required)" file={orderDetails.report_file} required />
+          <DocCell label="Delivery Challan (Optional)" file={orderDetails.deliverchallan} optional />
+          <DocCell label="Purchase Order (Optional)" file={orderDetails.po_file} optional />
+          <DocCell label="Payment Proof (Optional)" file={orderDetails.payment_proof} optional />
+          <DocCell label="Delivery Proof (Optional)" file={orderDetails.delivery_proof} optional />
         </div>
       </div>
 
@@ -326,7 +312,7 @@ export default function OrderDetailsClient({
       {/* Back Link */}
       <div className="text-center mt-6">
         <a
-          href="/accounts-dashboard/order"
+          href="/user-dashboard/order"
           className="inline-block bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded"
         >
           ← Back to Order List
@@ -360,6 +346,55 @@ function TextArea({ label, value }) {
         className="w-full border px-3 py-2 rounded"
         rows="3"
       />
+    </div>
+  );
+}
+
+function FileSection({ label, file }) {
+  if (!file)
+    return <p className="text-gray-500 mb-2 italic">No {label} uploaded.</p>;
+
+  return (
+    <div className="mb-4">
+      <p className="font-semibold">{label}:</p>
+      <a
+        href={file}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-blue-500 underline mr-4"
+      >
+        🔍 View
+      </a>
+      <a href={file} download className="text-blue-500 underline">
+        ⬇ Download
+      </a>
+    </div>
+  );
+}
+
+function DocCell({ label, file, optional, required }) {
+  return (
+    <div>
+      <p className="font-medium">{label}</p>
+      {file ? (
+        <div className="space-x-3">
+          <a
+            href={file}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-600 underline"
+          >
+            View
+          </a>
+          <a href={file} download className="text-blue-600 underline">
+            Download
+          </a>
+        </div>
+      ) : (
+        <p className={`italic ${required ? "text-red-600" : "text-gray-500"}`}>
+          {required ? "Required but not uploaded" : "Not uploaded"}
+        </p>
+      )}
     </div>
   );
 }

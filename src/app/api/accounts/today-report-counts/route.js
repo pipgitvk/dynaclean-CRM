@@ -2,11 +2,6 @@ import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { PAYMENT_PENDING_ORDER_SQL_WHERE } from "@/lib/paymentPendingFilters";
-import {
-  calculateAdjustedOrderTotal,
-  computeOrderPaymentRemaining,
-} from "@/lib/paymentOrderStatus";
-import { sumOrderPaymentAmounts } from "@/lib/orderPaymentHistory";
 
 async function columnExists(conn, tableName, columnName) {
   const [rows] = await conn.query(`SHOW COLUMNS FROM \`${tableName}\` LIKE ?`, [columnName]);
@@ -24,14 +19,9 @@ async function getPaymentPendingCountLikeReport(conn) {
       o.order_id,
       o.quote_number,
       o.totalamt,
-      o.baseAmount,
-      o.taxamt,
       o.payment_amount,
-      o.transaction_id,
-      o.is_returned,
-      qr.grand_total AS quotation_grand_total
+      o.is_returned
      FROM neworder AS o
-     LEFT JOIN quotations_records qr ON qr.quote_number = o.quote_number
      WHERE ${PAYMENT_PENDING_ORDER_SQL_WHERE}`
   );
 
@@ -58,14 +48,52 @@ async function getPaymentPendingCountLikeReport(conn) {
   let pendingCount = 0;
 
   for (const order of rows) {
-    const totalAmt = await calculateAdjustedOrderTotal(conn, order);
-    const paidAmount = sumOrderPaymentAmounts(order);
+    let totalAmt = parseFloat(order.totalamt || 0);
+
+    // Keep return-adjustment logic in sync with payment-pending report.
+    if (Number(order.is_returned) === 2 && order.quote_number) {
+      try {
+        const [returnedItems] = await conn.query(
+          `SELECT item_code, quantity_returned FROM order_return_items WHERE order_id = ?`,
+          [order.order_id]
+        );
+
+        if (returnedItems.length > 0) {
+          const itemCodes = returnedItems.map((item) => item.item_code);
+          const placeholders = itemCodes.map(() => "?").join(",");
+          const [quotationItems] = await conn.query(
+            `SELECT item_code, total_price, quantity FROM quotation_items
+             WHERE quote_number = ? AND item_code IN (${placeholders})`,
+            [order.quote_number, ...itemCodes]
+          );
+
+          let returnedValue = 0;
+          returnedItems.forEach((returnedItem) => {
+            const quotItem = quotationItems.find((q) => q.item_code === returnedItem.item_code);
+            if (quotItem) {
+              const qty = parseInt(quotItem.quantity, 10);
+              if (qty > 0) {
+                const pricePerUnit = parseFloat(quotItem.total_price) / qty;
+                returnedValue += pricePerUnit * Number(returnedItem.quantity_returned || 0);
+              }
+            }
+          });
+
+          totalAmt -= returnedValue;
+        }
+      } catch {
+        // Ignore per-order calc failure and keep original totalAmt.
+      }
+    }
+
+    const paidAmount = (order.payment_amount || "")
+      .toString()
+      .split(",")
+      .map((s) => parseFloat(s.trim()) || 0)
+      .reduce((sum, amt) => sum + amt, 0);
+
     const deductionAmount = deductionByOrder.get(order.order_id) || 0;
-    const { remaining } = computeOrderPaymentRemaining(
-      totalAmt,
-      paidAmount,
-      deductionAmount,
-    );
+    const remaining = totalAmt - paidAmount - deductionAmount;
     if (remaining > 0) pendingCount += 1;
   }
 

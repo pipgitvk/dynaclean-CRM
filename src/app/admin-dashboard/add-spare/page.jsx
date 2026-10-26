@@ -18,8 +18,6 @@ export default function AddSparePage() {
     sale_price: "",
     last_negotiation_price: "",
     tax: "",
-    hsn_sac: "",
-    covered_in_warranty: "",
   });
   const [imageFile, setImageFile] = useState(null);
   const [catalogFile, setCatalogFile] = useState(null);
@@ -112,8 +110,6 @@ export default function AddSparePage() {
     data.append("sale_price", formData.sale_price);
     data.append("last_negotiation_price", formData.last_negotiation_price);
     data.append("tax", formData.tax);
-    data.append("hsn_sac", formData.hsn_sac);
-    data.append("covered_in_warranty", formData.covered_in_warranty || "");
     if (imageFile) {
       data.append("image", imageFile);
     }
@@ -140,8 +136,6 @@ export default function AddSparePage() {
           sale_price: "",
           last_negotiation_price: "",
           tax: "",
-          hsn_sac: "",
-          covered_in_warranty: "",
         });
         setImageFile(null);
         setCatalogFile(null);
@@ -321,26 +315,6 @@ export default function AddSparePage() {
 
             <div className="flex flex-col">
               <label
-                htmlFor="covered_in_warranty"
-                className="text-sm font-semibold text-gray-700 mb-2"
-              >
-                Covered in Warranty
-              </label>
-              <select
-                id="covered_in_warranty"
-                name="covered_in_warranty"
-                value={formData.covered_in_warranty}
-                onChange={handleChange}
-                className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-              >
-                <option value="">Select</option>
-                <option value="Y">Y</option>
-                <option value="N">N</option>
-              </select>
-            </div>
-
-            <div className="flex flex-col">
-              <label
                 htmlFor="specification"
                 className="text-sm font-semibold text-gray-700 mb-2"
               >
@@ -481,24 +455,6 @@ export default function AddSparePage() {
                 placeholder="e.g., 18"
                 className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                 required
-              />
-            </div>
-
-            <div className="flex flex-col">
-              <label
-                htmlFor="hsn_sac"
-                className="text-sm font-semibold text-gray-700 mb-2"
-              >
-                HSN Code
-              </label>
-              <input
-                id="hsn_sac"
-                name="hsn_sac"
-                type="text"
-                value={formData.hsn_sac}
-                onChange={handleChange}
-                placeholder="e.g., 85171200"
-                className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
               />
             </div>
 

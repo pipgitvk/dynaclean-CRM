@@ -18,19 +18,9 @@ export default function DailyFollowUpsPage() {
   // Fetch lead sources from the database on page load (for the dropdown)
   useEffect(() => {
     const fetchLeadSources = async () => {
-      try {
-        const res = await fetch("/api/lead-sources");
-        const json = await res.json();
-        if (json?.success && Array.isArray(json.employees)) {
-          setLeadSources(json.employees.map((emp) => emp.username).filter(Boolean));
-        } else if (Array.isArray(json)) {
-          setLeadSources(json);
-        } else {
-          setLeadSources([]);
-        }
-      } catch {
-        setLeadSources([]);
-      }
+      const res = await fetch("/api/lead-sources"); // API to fetch lead sources
+      const json = await res.json();
+      setLeadSources(json);
     };
     fetchLeadSources();
   }, []);
@@ -41,7 +31,7 @@ export default function DailyFollowUpsPage() {
     const query = new URLSearchParams(filters).toString();
     const res = await fetch(`/api/daily-followups?${query}`);
     const json = await res.json();
-    setData(Array.isArray(json?.records) ? json.records : []);
+    setData(json.records);
     setLoading(false);
   };
 

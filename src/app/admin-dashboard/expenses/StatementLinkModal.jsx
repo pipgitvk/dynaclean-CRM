@@ -181,7 +181,7 @@ const StatementLinkModal = ({ isOpen, closeModal, row, onLinkSuccess }) => {
                 {filteredStatements.map((s) => (
                   <tr key={s.id} className={`hover:bg-blue-50 transition-colors ${selectedIds.includes(s.id) ? 'bg-blue-50' : ''}`}>
                     <td className="p-3 whitespace-nowrap text-gray-700">
-                      {dayjs(s.date).format("DD-MM-YYYY")}
+                      {dayjs(s.date).format("DD MMM YYYY")}
                     </td>
                     <td className="p-3 text-gray-700">
                       <div className="font-medium">{s.description}</div>

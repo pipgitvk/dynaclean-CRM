@@ -12,7 +12,7 @@ export async function GET(request) {
     let query = `
       SELECT username 
       FROM rep_list 
-      WHERE userRole = 'DIGITAL MARKETER' AND status = 1
+      WHERE userRole = 'DIGITAL MARKETER'
     `;
     
     const params = [];

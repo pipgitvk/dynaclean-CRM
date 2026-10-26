@@ -6,11 +6,9 @@ import jwt from "jsonwebtoken";
 export async function POST(req) {
   const { query } = await req.json();
 
-  // ✅ Extract username and role from JWT in cookies (check impersonation token first)
+  // ✅ Extract username and role from JWT in cookies
   const cookieStore = await cookies();
-  const token =
-    cookieStore.get("impersonation_token")?.value ||
-    cookieStore.get("token")?.value;
+  const token = cookieStore.get("token")?.value;
   let username = "Unknown";
   let role = null;
 
@@ -23,8 +21,6 @@ export async function POST(req) {
       console.error("JWT decode failed", error);
       return NextResponse.json({ success: false, error: "Invalid token" }, { status: 401 });
     }
-  } else {
-    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
   }
 
 
@@ -40,38 +36,34 @@ export async function POST(req) {
     // Check if user can access all customers
     const canAccessAll = role === "SUPERADMIN" || role === "ADMIN" || role === "SERVICE HEAD" || role === "SALES CUM BACKOFFICE";
 
-    const searchTerm = `%${query.trim()}%`;
-
     if (/^\d+$/.test(query.trim())) {
-      // Pure numeric input → search by customer_id (LIKE for partial match) OR company name
+      // Pure numeric input → likely customer ID
       if (canAccessAll) {
         [rows] = await conn.execute(
           `SELECT customer_id, company, address AS location, gstin, state
            FROM customers
-           WHERE CAST(customer_id AS CHAR) LIKE ? OR company LIKE ?
-           ORDER BY customer_id ASC
-           LIMIT 10`,
-          [searchTerm, searchTerm]
+           WHERE customer_id = ?
+           LIMIT 1`,
+          [query.trim()]
         );
       } else {
         [rows] = await conn.execute(
           `SELECT customer_id, company, address AS location, gstin, state
            FROM customers
-           WHERE (CAST(customer_id AS CHAR) LIKE ? OR company LIKE ?)
-             AND lead_source = ?
-           ORDER BY customer_id ASC
-           LIMIT 10`,
-          [searchTerm, searchTerm, username]
+           WHERE customer_id = ? AND lead_source = ?
+           LIMIT 1`,
+          [query.trim(), username]
         );
       }
     } else {
-      // Partial search by company/name/address/gstin/state
+      // Partial search by company/gstin/state/etc
+      const searchTerm = `%${query.trim()}%`;
+      
       if (canAccessAll) {
         [rows] = await conn.execute(
           `SELECT customer_id, company, address AS location, gstin, state
            FROM customers
-           WHERE (company LIKE ? OR first_name LIKE ? OR last_name LIKE ? OR address LIKE ? OR gstin LIKE ?)
-           ORDER BY customer_id DESC
+           WHERE (company LIKE ? OR first_name LIKE ? OR address LIKE ? OR gstin LIKE ? OR state LIKE ?)
            LIMIT 10`,
           [searchTerm, searchTerm, searchTerm, searchTerm, searchTerm]
         );
@@ -79,9 +71,8 @@ export async function POST(req) {
         [rows] = await conn.execute(
           `SELECT customer_id, company, address AS location, gstin, state
            FROM customers
-           WHERE (company LIKE ? OR first_name LIKE ? OR last_name LIKE ? OR address LIKE ? OR gstin LIKE ?)
+           WHERE (company LIKE ? OR first_name LIKE ? OR address LIKE ? OR gstin LIKE ? OR state LIKE ?)
              AND lead_source = ?
-           ORDER BY customer_id DESC
            LIMIT 10`,
           [searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, username]
         );

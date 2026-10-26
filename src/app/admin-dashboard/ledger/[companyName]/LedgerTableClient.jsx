@@ -1,6 +1,5 @@
 "use client";
 
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useMemo, useEffect } from "react";
 import { ArrowUp, ArrowDown, Download, FileText } from "lucide-react";
 import dayjs from "dayjs";
@@ -44,6 +43,18 @@ export default function LedgerTableClient({
   const [sortCol, setSortCol] = useState("entry_date");
   const [sortDir, setSortDir] = useState("asc");
 
+  const minDate = useMemo(() => {
+    if (!initialRows || initialRows.length === 0) return dayjs().startOf("year").format("YYYY-MM-DD");
+    const dates = initialRows.map((r) => String(r.entry_date).slice(0, 10)).sort();
+    return dates[0];
+  }, [initialRows]);
+
+  const maxDate = useMemo(() => {
+    if (!initialRows || initialRows.length === 0) return dayjs().format("YYYY-MM-DD");
+    const dates = initialRows.map((r) => String(r.entry_date).slice(0, 10)).sort();
+    return dates[dates.length - 1];
+  }, [initialRows]);
+
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
 
@@ -53,6 +64,11 @@ export default function LedgerTableClient({
     company_address_line2: "Gandhi Nagar, Ganapathy, Coimbatore, Tamil Nadu - 641006",
     company_email: "sales@dynacleanindustries.com",
   });
+
+  useEffect(() => {
+    if (!dateFrom && minDate) setDateFrom(minDate);
+    if (!dateTo && maxDate) setDateTo(maxDate);
+  }, [minDate, maxDate]);
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -134,13 +150,13 @@ export default function LedgerTableClient({
     csvLines.push(`"${companyName}"`);
     if (customerId) csvLines.push(`"Customer ID: ${customerId}"`);
     csvLines.push("");
-    csvLines.push(`"Period: ${dayjs(dateFrom).format("DD-MM-YYYY")} to ${dayjs(dateTo).format("DD-MM-YYYY")}"`);
+    csvLines.push(`"Period: ${dayjs(dateFrom).format("DD-MMM-YY")} to ${dayjs(dateTo).format("DD-MMM-YY")}"`);
     csvLines.push("");
     csvLines.push(["Date", "Particulars", "Vch Type", "Vch No", "Debit (₹)", "Credit (₹)"].map((h) => `"${h}"`).join(","));
 
     filtered.forEach((r) => {
       csvLines.push([
-        `"${dayjs(r.entry_date).format("DD-MM-YYYY")}"`,
+        `"${dayjs(r.entry_date).format("DD/MM/YYYY")}"`,
         `"${(r.particulars || "").replace(/"/g, '""')}"`,
         `"${r.vch_type || ""}"`,
         `"${r.vch_no || ""}"`,
@@ -354,21 +370,27 @@ export default function LedgerTableClient({
         <div className="flex items-end gap-4 flex-wrap">
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">From Date</label>
-            <TypeableDateFilterInput value={dateFrom} onChange={setDateFrom} className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">To Date</label>
-            <TypeableDateFilterInput value={dateTo} onChange={setDateTo} className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
           </div>
           <button
-            type="button"
-            onClick={() => {
-              setDateFrom("");
-              setDateTo("");
-            }}
+            onClick={() => { setDateFrom(minDate); setDateTo(maxDate); }}
             className="px-4 py-2 text-sm font-semibold text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
           >
-            Clear dates
+            Reset
           </button>
         </div>
       </div>
@@ -407,7 +429,7 @@ export default function LedgerTableClient({
               filtered.map((row) => (
                 <tr key={row.id} className="bg-white hover:bg-blue-50 transition-colors">
                   <td className="px-4 py-3 whitespace-nowrap text-gray-700">
-                    {dayjs(row.entry_date).format("DD-MM-YYYY")}
+                    {dayjs(row.entry_date).format("DD MMM YYYY")}
                   </td>
                   <td className="px-4 py-3 text-gray-800 max-w-xs break-all">{row.particulars}</td>
                   <td className="px-4 py-3 whitespace-nowrap"><VchBadge type={row.vch_type} /></td>
@@ -464,7 +486,7 @@ export default function LedgerTableClient({
                 <div>
                   <p className="font-semibold text-gray-800">{row.particulars}</p>
                   <p className="text-xs text-gray-500 mt-0.5">
-                    {dayjs(row.entry_date).format("DD-MM-YYYY")}
+                    {dayjs(row.entry_date).format("DD MMM YYYY")}
                   </p>
                 </div>
               </div>

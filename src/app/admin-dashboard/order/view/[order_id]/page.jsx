@@ -22,10 +22,7 @@ export default async function ViewOrderPage({ params }) {
     userRole = roleRows[0]?.userRole || "";
   }
 
-  const data = await getOrderData(
-    orderId,
-    userRole || payload?.role || payload?.userRole || "",
-  );
+  const data = await getOrderData(orderId);
   if (!data?.orderDetails) return notFound();
 
   return <OrderDetails data={data} userRole={userRole} />;

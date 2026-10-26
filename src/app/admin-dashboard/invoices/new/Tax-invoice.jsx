@@ -21,8 +21,9 @@ export default function TaxAndSummary({
 }) {
   const [amountInWords, setAmountInWords] = useState("Zero");
 
+  // Recalculate tax amounts using cgstRate/sgstRate/igstRate (from quotation DB)
+  // instead of per-item percent which may be stale from state useEffect
   const computedTax = useMemo(() => {
-    let computedSubtotal = 0;
     let computedCgst = 0;
     let computedSgst = 0;
     let computedIgst = 0;
@@ -32,31 +33,21 @@ export default function TaxAndSummary({
       const rate = item.rate || 0;
       const discountAmount = item.discount_amount || 0;
       const itemSubtotal = qty * rate - discountAmount;
-      computedSubtotal += itemSubtotal;
 
-      computedCgst += (itemSubtotal * (item.cgst_percent || 0)) / 100;
-      computedSgst += (itemSubtotal * (item.sgst_percent || 0)) / 100;
-      computedIgst += (itemSubtotal * (item.igst_percent || 0)) / 100;
+      computedCgst += (itemSubtotal * cgstRate) / 100;
+      computedSgst += (itemSubtotal * sgstRate) / 100;
+      computedIgst += (itemSubtotal * igstRate) / 100;
     });
 
     const totalTax = computedCgst + computedSgst + computedIgst;
-    const taxableSubtotal = computedSubtotal || subtotal;
-    const totalBeforeRound = taxableSubtotal + totalTax;
+    const totalBeforeRound = subtotal + totalTax;
     const finalRoundOff = isAutoRoundOff
       ? Math.round(totalBeforeRound) - totalBeforeRound
       : parseFloat(roundOff) || 0;
     const computedGrandTotal = totalBeforeRound + finalRoundOff;
 
-    return {
-      computedCgst,
-      computedSgst,
-      computedIgst,
-      totalTax,
-      computedGrandTotal,
-      finalRoundOff,
-      taxableSubtotal,
-    };
-  }, [items, subtotal, roundOff, isAutoRoundOff]);
+    return { computedCgst, computedSgst, computedIgst, totalTax, computedGrandTotal, finalRoundOff };
+  }, [items, cgstRate, sgstRate, igstRate, subtotal, roundOff, isAutoRoundOff]);
 
   // Sync roundOff when auto
   useEffect(() => {
@@ -92,7 +83,7 @@ export default function TaxAndSummary({
             {cgstRate > 0 && (
               <tr className="border">
                 <td className="px-3 py-2 border">CGST</td>
-                <td className="px-3 py-2 border">₹ {computedTax.taxableSubtotal.toFixed(2)}</td>
+                <td className="px-3 py-2 border">₹ {subtotal.toFixed(2)}</td>
                 <td className="px-3 py-2 border text-center">{cgstRate}%</td>
                 <td className="px-3 py-2 border">₹ {computedTax.computedCgst.toFixed(2)}</td>
               </tr>
@@ -100,7 +91,7 @@ export default function TaxAndSummary({
             {sgstRate > 0 && (
               <tr className="border">
                 <td className="px-3 py-2 border">SGST</td>
-                <td className="px-3 py-2 border">₹ {computedTax.taxableSubtotal.toFixed(2)}</td>
+                <td className="px-3 py-2 border">₹ {subtotal.toFixed(2)}</td>
                 <td className="px-3 py-2 border text-center">{sgstRate}%</td>
                 <td className="px-3 py-2 border">₹ {computedTax.computedSgst.toFixed(2)}</td>
               </tr>
@@ -108,7 +99,7 @@ export default function TaxAndSummary({
             {igstRate > 0 && (
               <tr className="border">
                 <td className="px-3 py-2 border">IGST</td>
-                <td className="px-3 py-2 border">₹ {computedTax.taxableSubtotal.toFixed(2)}</td>
+                <td className="px-3 py-2 border">₹ {subtotal.toFixed(2)}</td>
                 <td className="px-3 py-2 border text-center">{igstRate}%</td>
                 <td className="px-3 py-2 border">₹ {computedTax.computedIgst.toFixed(2)}</td>
               </tr>
@@ -123,7 +114,7 @@ export default function TaxAndSummary({
           <h3 className="text-lg font-semibold mb-4 text-center">Invoice Summary</h3>
           <div className="flex justify-between py-1 border-b">
             <span className="font-medium">Subtotal:</span>
-            <span>₹ {computedTax.taxableSubtotal.toFixed(2)}</span>
+            <span>₹ {subtotal.toFixed(2)}</span>
           </div>
           {igstRate > 0 ? (
             <>

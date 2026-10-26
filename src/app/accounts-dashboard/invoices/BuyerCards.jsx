@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Search, Users, FileText, IndianRupee } from "lucide-react";
+import { Search, Users, FileText, IndianRupee, X } from "lucide-react";
 import dayjs from "dayjs";
 
 function getInitials(name = "") {
@@ -41,65 +41,114 @@ export default function BuyerCards() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState("");
-  const [buyerPage, setBuyerPage] = useState(1);
-  const buyerPageSize = 20;
-  const [buyerMeta, setBuyerMeta] = useState({ page: 1, total: 0, totalPages: 1 });
-  const [summary, setSummary] = useState({ buyers: 0, invoices: 0, amount: 0 });
-  const searchDebounceRef = useRef(null);
-
-  const fetchBuyers = useCallback(async (page, searchQuery) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const params = new URLSearchParams({
-        page: String(page),
-        limit: String(buyerPageSize),
-      });
-      if (searchQuery.trim()) params.set("search", searchQuery.trim());
-
-      const res = await fetch(`/api/invoice-buyers?${params}`, { credentials: "include" });
-      const data = await res.json();
-      if (!data.success) {
-        setError(data.error || "Failed to load buyers");
-        setBuyers([]);
-        return;
-      }
-      setBuyers(data.buyers ?? []);
-      setBuyerMeta(data.meta ?? { page: 1, total: 0, totalPages: 1 });
-      setSummary(data.summary ?? { buyers: 0, invoices: 0, amount: 0 });
-      setBuyerPage(data.meta?.page ?? page);
-    } catch (e) {
-      setError(e.message);
-      setBuyers([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [buyerPageSize]);
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [allInvoices, setAllInvoices] = useState([]);
+  const [loadingInvoices, setLoadingInvoices] = useState(false);
+  const [invoicePage, setInvoicePage] = useState(1);
+  const [invoiceTotal, setInvoiceTotal] = useState(0);
+  const invoicePageSize = 50;
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const [invoiceSearch, setInvoiceSearch] = useState("");
 
   useEffect(() => {
-    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
-    const delay = search.trim() ? 350 : 0;
-    searchDebounceRef.current = setTimeout(() => {
-      fetchBuyers(1, search);
-    }, delay);
-    return () => {
-      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
-    };
-  }, [search, fetchBuyers]);
+    fetch("/api/invoice-buyers", { credentials: "include" })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.success) setBuyers(data.buyers ?? []);
+        else setError(data.error || "Failed to load buyers");
+      })
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false));
+  }, []);
 
-  const goToBuyerPage = (page) => {
-    if (page < 1 || page > buyerMeta.totalPages || page === buyerPage) return;
-    fetchBuyers(page, search);
-  };
+  const filtered = useMemo(() => {
+    if (!search.trim()) return buyers;
+    const q = search.trim().toLowerCase();
+    return buyers.filter((b) => b.buyer_name?.toLowerCase().includes(q));
+  }, [buyers, search]);
 
-  const totalBuyerPages = buyerMeta.totalPages || 1;
-  const buyerTotal = buyerMeta.total || 0;
+  const totals = useMemo(() => ({
+    buyers: buyers.length,
+    invoices: buyers.reduce((s, b) => s + Number(b.invoice_count || 0), 0),
+    amount: buyers.reduce((s, b) => s + Number(b.total_amount || 0), 0),
+  }), [buyers]);
 
   const handleCardClick = (buyerName) => {
     router.push(`/accounts-dashboard/invoices/buyer/${encodeURIComponent(buyerName)}`);
   };
 
-  if (loading && buyers.length === 0 && !error) {
+  const fetchAllInvoices = async (page = 1) => {
+    try {
+      setLoadingInvoices(true);
+      const params = new URLSearchParams({
+        page,
+        limit: invoicePageSize,
+        fromDate: fromDate || "",
+        toDate: toDate || "",
+        search: invoiceSearch || "",
+      });
+      const res = await fetch(`/api/invoice-list?${params}`, { credentials: "include" });
+      const data = await res.json();
+      if (data.success) {
+        setAllInvoices(data.data ?? []);
+        setInvoiceTotal(data.meta?.total || 0);
+        setInvoicePage(page);
+      } else {
+        setAllInvoices([]);
+        setInvoiceTotal(0);
+      }
+    } catch (e) {
+      console.error("Failed to fetch invoices:", e);
+      setAllInvoices([]);
+      setInvoiceTotal(0);
+    } finally {
+      setLoadingInvoices(false);
+    }
+  };
+
+  const handleViewClick = () => {
+    setShowViewModal(true);
+    setInvoicePage(1);
+    fetchAllInvoices(1);
+  };
+
+  const handleFilterChange = () => {
+    setInvoicePage(1);
+    fetchAllInvoices(1);
+  };
+
+  const handleSearchChange = (value) => {
+    setInvoiceSearch(value);
+    setInvoicePage(1);
+  };
+
+  const downloadExcel = async () => {
+    try {
+      const params = new URLSearchParams({
+        fromDate: fromDate || "",
+        toDate: toDate || "",
+      });
+      const res = await fetch(`/api/invoices-export?${params}`, { credentials: "include" });
+      if (!res.ok) {
+        alert("Failed to export invoices");
+        return;
+      }
+
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Invoices_${new Date().toISOString().split("T")[0]}.xlsx`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error("Export failed:", e);
+      alert("Failed to export invoices");
+    }
+  };
+
+  if (loading) {
     return (
       <div className="space-y-6">
         <div className="h-8 w-48 bg-gray-200 rounded animate-pulse" />
@@ -112,7 +161,7 @@ export default function BuyerCards() {
     );
   }
 
-  if (error && buyers.length === 0) {
+  if (error) {
     return (
       <div className="text-center py-20 text-red-500">
         <p className="text-lg font-semibold">Failed to load buyers</p>
@@ -128,10 +177,17 @@ export default function BuyerCards() {
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Invoice Management</h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            {summary.buyers} buyers · {summary.invoices} invoices total
+            {totals.buyers} buyers · {totals.invoices} invoices total
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
+          <button
+            onClick={handleViewClick}
+            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700 self-start sm:self-auto"
+          >
+            <FileText size={16} />
+            View All
+          </button>
           <a
             href="/accounts-dashboard/invoices/new"
             className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-green-700 self-start sm:self-auto"
@@ -152,9 +208,9 @@ export default function BuyerCards() {
       {/* Summary strip */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {[
-          { icon: Users,        label: "Total Buyers",   value: summary.buyers,              color: "text-blue-600",   bg: "bg-blue-50"   },
-          { icon: FileText,     label: "Total Invoices", value: summary.invoices,             color: "text-purple-600", bg: "bg-purple-50" },
-          { icon: IndianRupee,  label: "Total Amount",   value: `₹${fmt(summary.amount)}`,   color: "text-green-600",  bg: "bg-green-50"  },
+          { icon: Users,        label: "Total Buyers",   value: totals.buyers,              color: "text-blue-600",   bg: "bg-blue-50"   },
+          { icon: FileText,     label: "Total Invoices", value: totals.invoices,             color: "text-purple-600", bg: "bg-purple-50" },
+          { icon: IndianRupee,  label: "Total Amount",   value: `₹${fmt(totals.amount)}`,   color: "text-green-600",  bg: "bg-green-50"  },
         ].map(({ icon: Icon, label, value, color, bg }) => (
           <div key={label} className={`flex items-center gap-3 rounded-xl border border-gray-200 ${bg} p-4`}>
             <div className={`rounded-full p-2 ${bg}`}>
@@ -175,10 +231,7 @@ export default function BuyerCards() {
           type="text"
           placeholder="Search buyer name…"
           value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setBuyerPage(1);
-          }}
+          onChange={(e) => setSearch(e.target.value)}
           className="w-full rounded-xl border border-gray-300 bg-white text-gray-800 pl-9 pr-9 py-2.5 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
         />
         {search && (
@@ -192,19 +245,15 @@ export default function BuyerCards() {
       </div>
 
       {/* Buyer Cards Grid */}
-      {loading && buyers.length > 0 && (
-        <p className="text-sm text-gray-500 text-center">Loading buyers…</p>
-      )}
-
-      {buyers.length === 0 ? (
+      {filtered.length === 0 ? (
         <div className="py-20 text-center text-gray-400">
           {search ? `No buyers matching "${search}"` : "No buyers found."}
         </div>
       ) : (
-        <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 ${loading ? "opacity-60 pointer-events-none" : ""}`}>
-          {buyers.map((buyer) => (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {filtered.map((buyer) => (
             <BuyerCard
-              key={`${buyer.customer_id}-${buyer.buyer_name}`}
+              key={buyer.buyer_name}
               buyer={buyer}
               onClick={() => handleCardClick(buyer.buyer_name)}
             />
@@ -212,69 +261,181 @@ export default function BuyerCards() {
         </div>
       )}
 
-      {/* Buyer Cards Pagination */}
-      {totalBuyerPages > 1 && (
-        <div className="flex items-center justify-between pt-2 border-t border-gray-200">
-          <p className="text-sm text-gray-500">
-            Showing {(buyerPage - 1) * buyerPageSize + 1}–{Math.min(buyerPage * buyerPageSize, buyerTotal)} of {buyerTotal} buyers
-          </p>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => goToBuyerPage(1)}
-              disabled={buyerPage === 1 || loading}
-              className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              «
-            </button>
-            <button
-              onClick={() => goToBuyerPage(buyerPage - 1)}
-              disabled={buyerPage === 1 || loading}
-              className="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              Prev
-            </button>
-            {Array.from({ length: totalBuyerPages }, (_, i) => i + 1)
-              .filter((p) => p === 1 || p === totalBuyerPages || Math.abs(p - buyerPage) <= 2)
-              .reduce((acc, p, idx, arr) => {
-                if (idx > 0 && p - arr[idx - 1] > 1) acc.push("...");
-                acc.push(p);
-                return acc;
-              }, [])
-              .map((item, idx) =>
-                item === "..." ? (
-                  <span key={`ellipsis-${idx}`} className="px-2 py-1 text-xs text-gray-400">…</span>
-                ) : (
-                  <button
-                    key={item}
-                    onClick={() => goToBuyerPage(item)}
-                    className={`px-3 py-1 text-xs border rounded ${
-                      buyerPage === item
-                        ? "bg-blue-600 text-white border-blue-600 font-semibold"
-                        : "border-gray-300 hover:bg-gray-50"
-                    }`}
-                  >
-                    {item}
-                  </button>
-                )
+      {/* View All Invoices Modal */}
+      {showViewModal && (
+        <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-50 p-2">
+          <div className="bg-white rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] overflow-auto">
+            <div className="flex items-center justify-between p-4 border-b sticky top-0 bg-white">
+              <h2 className="text-xl font-bold text-gray-800">All Invoices</h2>
+              <div className="flex gap-2">
+                <button
+                  onClick={downloadExcel}
+                  disabled={invoiceTotal === 0 || loadingInvoices}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 text-sm font-semibold"
+                >
+                  📥 Download Excel
+                </button>
+                <button
+                  onClick={() => setShowViewModal(false)}
+                  className="p-1 hover:bg-gray-100 rounded"
+                >
+                  <X size={24} className="text-gray-600" />
+                </button>
+              </div>
+            </div>
+
+            {/* Date & Search Filter */}
+            <div className="p-4 border-b bg-gray-50 space-y-3">
+              <div className="flex gap-4 flex-wrap items-end">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">From Date</label>
+                  <input
+                    type="date"
+                    value={fromDate}
+                    onChange={(e) => setFromDate(e.target.value)}
+                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">To Date</label>
+                  <input
+                    type="date"
+                    value={toDate}
+                    onChange={(e) => setToDate(e.target.value)}
+                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  />
+                </div>
+                <button
+                  onClick={handleFilterChange}
+                  disabled={loadingInvoices}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-semibold"
+                >
+                  Apply Filter
+                </button>
+              </div>
+              <div>
+                <input
+                  type="text"
+                  placeholder="Search by Invoice #, GSTIN, Employee, HSN, Item Code, or any field..."
+                  value={invoiceSearch}
+                  onChange={(e) => {
+                    handleSearchChange(e.target.value);
+                    setInvoicePage(1);
+                    fetchAllInvoices(1);
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                />
+              </div>
+            </div>
+
+            <div className="p-4">
+              {loadingInvoices ? (
+                <div className="flex justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+                </div>
+              ) : invoiceTotal === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <p>No invoices found</p>
+                </div>
+              ) : (
+                <>
+                  <div className="overflow-x-auto mb-4">
+                    <table className="w-full text-xs border-collapse">
+                      <thead className="bg-gray-100">
+                        <tr>
+                          <th className="border p-2 text-left">ID</th>
+                          <th className="border p-2 text-left">Invoice #</th>
+                          <th className="border p-2 text-left">Buyer Name</th>
+                          <th className="border p-2 text-left">GSTIN</th>
+                          <th className="border p-2 text-left">Employee</th>
+                          <th className="border p-2 text-left">Date</th>
+                          <th className="border p-2 text-left">Tax Amount</th>
+                          <th className="border p-2 text-left">Taxable Amt</th>
+                          <th className="border p-2 text-left">Grand Total</th>
+                          <th className="border p-2 text-left">HSN</th>
+                          <th className="border p-2 text-left">Qty</th>
+                          <th className="border p-2 text-left">Taxable Value</th>
+                          <th className="border p-2 text-left">CGST</th>
+                          <th className="border p-2 text-left">SGST</th>
+                          <th className="border p-2 text-left">IGST</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {allInvoices.map((inv, idx) => (
+                          inv.items && inv.items.length > 0 ? (
+                            inv.items.map((item, itemIdx) => (
+                              <tr key={`${idx}-${itemIdx}`} className="border-t hover:bg-blue-50">
+                                {itemIdx === 0 && (
+                                  <>
+                                    <td className="border p-2 text-blue-600 font-semibold" rowSpan={inv.items.length}>{inv.id}</td>
+                                    <td className="border p-2 text-blue-600 font-semibold" rowSpan={inv.items.length}>{inv.invoice_number}</td>
+                                    <td className="border p-2" rowSpan={inv.items.length}>{inv.buyer_name || "-"}</td>
+                                    <td className="border p-2" rowSpan={inv.items.length}>{inv.gst_number || "-"}</td>
+                                    <td className="border p-2" rowSpan={inv.items.length}>{inv.employee_name || "-"}</td>
+                                    <td className="border p-2" rowSpan={inv.items.length}>{inv.created_at ? new Date(inv.created_at).toLocaleDateString("en-IN") : "-"}</td>
+                                    <td className="border p-2 text-right font-semibold" rowSpan={inv.items.length}>₹{Number(inv.tax_amount || 0).toLocaleString('en-IN')}</td>
+                                    <td className="border p-2 text-right" rowSpan={inv.items.length}>₹{Number(item.taxable_value || 0).toLocaleString('en-IN')}</td>
+                                    <td className="border p-2 text-right font-semibold text-green-600" rowSpan={inv.items.length}>₹{Number(inv.grand_total || 0).toLocaleString('en-IN')}</td>
+                                  </>
+                                )}
+                                <td className="border p-2">{item.hsn_code || "-"}</td>
+                                <td className="border p-2 text-center">{item.quantity || "-"}</td>
+                                <td className="border p-2 text-right">₹{Number(item.taxable_value || 0).toLocaleString('en-IN')}</td>
+                                <td className="border p-2 text-right">₹{Number(item.cgst_amount || 0).toLocaleString('en-IN')}</td>
+                                <td className="border p-2 text-right">₹{Number(item.sgst_amount || 0).toLocaleString('en-IN')}</td>
+                                <td className="border p-2 text-right">₹{Number(item.igst_amount || 0).toLocaleString('en-IN')}</td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr key={idx} className="border-t hover:bg-blue-50">
+                              <td className="border p-2 text-blue-600 font-semibold">{inv.id}</td>
+                              <td className="border p-2 text-blue-600 font-semibold">{inv.invoice_number}</td>
+                              <td className="border p-2">{inv.buyer_name || "-"}</td>
+                              <td className="border p-2">{inv.gst_number || "-"}</td>
+                              <td className="border p-2">{inv.employee_name || "-"}</td>
+                              <td className="border p-2">{inv.created_at ? new Date(inv.created_at).toLocaleDateString("en-IN") : "-"}</td>
+                              <td className="border p-2 text-right font-semibold">₹{Number(inv.tax_amount || 0).toLocaleString('en-IN')}</td>
+                              <td className="border p-2 text-right">₹{Number(0).toLocaleString('en-IN')}</td>
+                              <td className="border p-2 text-right font-semibold text-green-600">₹{Number(inv.grand_total || 0).toLocaleString('en-IN')}</td>
+                              <td className="border p-2" colSpan="6" className="text-center text-gray-500">No items</td>
+                            </tr>
+                          )
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Pagination */}
+                  {invoiceTotal > invoicePageSize && (
+                    <div className="flex justify-between items-center mt-4 pt-4 border-t">
+                      <div className="text-sm text-gray-600">
+                        Showing {(invoicePage - 1) * invoicePageSize + 1} - {Math.min(invoicePage * invoicePageSize, invoiceTotal)} of {invoiceTotal} invoices
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => fetchAllInvoices(invoicePage - 1)}
+                          disabled={invoicePage === 1 || loadingInvoices}
+                          className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50 disabled:opacity-50"
+                        >
+                          Previous
+                        </button>
+                        <span className="px-3 py-1 text-sm font-semibold text-gray-700">Page {invoicePage}</span>
+                        <button
+                          onClick={() => fetchAllInvoices(invoicePage + 1)}
+                          disabled={invoicePage * invoicePageSize >= invoiceTotal || loadingInvoices}
+                          className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50 disabled:opacity-50"
+                        >
+                          Next
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
-            <button
-              onClick={() => goToBuyerPage(buyerPage + 1)}
-              disabled={buyerPage === totalBuyerPages || loading}
-              className="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              Next
-            </button>
-            <button
-              onClick={() => goToBuyerPage(totalBuyerPages)}
-              disabled={buyerPage === totalBuyerPages || loading}
-              className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              »
-            </button>
+            </div>
           </div>
         </div>
       )}
-
     </div>
   );
 }
@@ -283,7 +444,7 @@ function BuyerCard({ buyer, onClick }) {
   const initials = getInitials(buyer.buyer_name);
   const bgColor = avatarColor(buyer.buyer_name);
   const lastDate = buyer.last_invoice_date
-    ? dayjs(buyer.last_invoice_date).format("DD-MM-YYYY")
+    ? dayjs(buyer.last_invoice_date).format("DD MMM YYYY")
     : "—";
 
   return (

@@ -2,89 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
-import {
-  attachmentHrefForUi,
-  attachmentServeHref,
-  splitAttachmentList,
-} from "@/lib/attachmentPathUtils";
-
-function attachmentItemsFromRow(row) {
-  const list = splitAttachmentList(row?.attachments);
-  if (list.length > 0) return list;
-  if (row?.attachments == null) return [];
-  const fallback = String(row.attachments).trim();
-  return fallback ? [fallback] : [];
-}
-
-const downloadFile = (filename) => {
-  const href = attachmentServeHref(filename) || attachmentHrefForUi(filename);
-  if (!href) return;
-  const link = document.createElement("a");
-  link.href = href;
-  link.target = "_blank";
-  link.rel = "noopener noreferrer";
-  link.download = String(filename || "download").split("/").pop() || "download";
-  link.style.display = "none";
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-};
-
-// Icon SVG Components
-const DownloadIcon = ({ available }) => (
-  <svg
-    className={`w-6 h-6 ${available ? "text-blue-600 hover:text-blue-800 cursor-pointer" : "text-gray-300 opacity-50"}`}
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-  </svg>
-);
-
-const PrintIcon = ({ available }) => (
-  <svg
-    className={`w-6 h-6 ${available ? "text-orange-600 hover:text-orange-800 cursor-pointer" : "text-gray-300 opacity-50"}`}
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm0 0H9m0 0V9m0 8v2" />
-  </svg>
-);
-
-const EditIcon = ({ available }) => (
-  <svg
-    className={`w-6 h-6 ${available ? "text-blue-700 hover:text-blue-900 cursor-pointer" : "text-gray-300 opacity-50"}`}
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-  </svg>
-);
-
-const FileIcon = ({ available }) => (
-  <svg
-    className={`w-6 h-6 ${available ? "text-green-600 hover:text-green-800 cursor-pointer" : "text-gray-300 opacity-50"}`}
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-  </svg>
-);
-
-const CostIcon = ({ available }) => (
-  <svg
-    className={`w-6 h-6 ${available ? "text-red-600 hover:text-red-800 cursor-pointer" : "text-gray-300 opacity-50"}`}
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-  </svg>
-);
 
 export default function ServiceRecordsPage() {
   const { serial_number } = useParams(); // ✅ from dynamic route
@@ -160,7 +77,7 @@ export default function ServiceRecordsPage() {
                       ? "bg-gray-100"
                       : "bg-white";
 
-                const attachments = attachmentItemsFromRow(row);
+                const attachments = row.attachments?.split(",") || [];
 
                 return (
                   <tr key={row.service_id} className={bgColorClass}>
@@ -202,105 +119,42 @@ export default function ServiceRecordsPage() {
                       {row.company_cost}
                     </td>
                     <td className="p-2 border border-gray-300 space-y-1">
-                      {attachments.length === 0 ? (
-                        <span className="text-gray-400">—</span>
-                      ) : (
-                        attachments.map((att, idx) => {
-                          const href = attachmentHrefForUi(att);
-                          return (
-                            <a
-                              key={`${row.service_id}-${idx}-${att}`}
-                              href={href || "#"}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-blue-600 hover:underline block"
-                              onClick={(e) => {
-                                if (!href) e.preventDefault();
-                              }}
-                            >
-                              doc{idx + 1}
-                            </a>
-                          );
-                        })
-                      )}
-                    </td>
-                    <td className="p-2 border border-gray-300">
-                      <div className="flex gap-3 flex-wrap items-center justify-center">
-                        {/* Update Icon */}
-                        {row.status !== "COMPLETED" ? (
-                          <a
-                            href={`/update_service?service_id=${row.service_id}`}
-                            title="Update Service"
-                          >
-                            <EditIcon available={true} />
-                          </a>
-                        ) : (
-                          <div title="Service Completed - Cannot Update">
-                            <EditIcon available={false} />
-                          </div>
-                        )}
-
-                        {/* View Report Icon */}
+                      {attachments.map((att, idx) => (
                         <a
-                          href={`/admin-dashboard/warranty/completion-report/${row.service_id}`}
-                          title="View Report"
+                          key={idx}
+                          href={`/attachments/${att}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:underline block"
                         >
-                          <FileIcon available={true} />
+                          doc{idx + 1}
                         </a>
-
-                        {/* Download File Icon */}
-                        {row.attachments ? (
-                          <div
-                            onClick={() => {
-                              const first = attachmentItemsFromRow(row)[0];
-                              if (first) downloadFile(first);
-                            }}
-                            title="Download File"
-                            className="cursor-pointer"
-                          >
-                            <DownloadIcon available={true} />
-                          </div>
-                        ) : (
-                          <div title="No File Attached">
-                            <DownloadIcon available={false} />
-                          </div>
-                        )}
-
-                        {/* Print Report Icon */}
-                        {row.status === "COMPLETED" ? (
-                          <div
-                            onClick={() => {
-                              window.open(
-                                `/admin-dashboard/warranty/completion-report/${row.service_id}`,
-                                "_blank"
-                              );
-                              setTimeout(() => window.print(), 500);
-                            }}
-                            title="Print Report"
-                            className="cursor-pointer"
-                          >
-                            <PrintIcon available={true} />
-                          </div>
-                        ) : (
-                          <div title="Service Not Completed">
-                            <PrintIcon available={false} />
-                          </div>
-                        )}
-
-                        {/* Update Cost Icon */}
-                        {row.status === "COMPLETED" && Number(row.company_cost) === 0 ? (
+                      ))}
+                    </td>
+                    <td className="p-2 border border-gray-300 space-y-1">
+                      {row.status !== "COMPLETED" && (
+                        <a
+                          href={`/update_service?service_id=${row.service_id}`}
+                          className="text-blue-700 hover:underline block"
+                        >
+                          Update
+                        </a>
+                      )}
+                      <a
+                        href={`/admin-dashboard/warranty/completion_report/${row.service_id}`}
+                        className="text-green-700 hover:underline block"
+                      >
+                        View Report
+                      </a>
+                      {row.status === "COMPLETED" &&
+                        Number(row.company_cost) === 0 && (
                           <a
                             href={`/service_cost_update?service_id=${row.service_id}`}
-                            title="Update Cost"
+                            className="text-red-700 hover:underline block"
                           >
-                            <CostIcon available={true} />
+                            Update Cost
                           </a>
-                        ) : (
-                          <div title="Cost Already Updated">
-                            <CostIcon available={false} />
-                          </div>
                         )}
-                      </div>
                     </td>
                   </tr>
                 );

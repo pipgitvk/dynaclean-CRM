@@ -58,7 +58,7 @@ export async function GET(req) {
         company LIKE ? OR
         phone LIKE ? OR 
         email LIKE ? OR
-        CAST(customer_id AS CHAR) LIKE ?
+        customer_id LIKE ?
       )`;
       const searchTerm = `%${query.trim()}%`;
       params.push(

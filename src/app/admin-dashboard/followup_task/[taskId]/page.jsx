@@ -52,7 +52,7 @@ export default async function FollowupTaskPage({ params }) {
         </p>
         <p>
           <strong>Deadline:</strong>{" "}
-          {dayjs(taskRow.next_followup_date).format("DD-MM-YYYY hh:mm A")}
+          {dayjs(taskRow.next_followup_date).format("DD MMM YYYY, hh:mm A")}
         </p>
         <p className="flex items-center gap-2">
           <strong>Status:</strong>
@@ -81,7 +81,7 @@ export default async function FollowupTaskPage({ params }) {
             {followups.map((f, i) => (
               <li key={i} className="border-b pb-2 last:border-none">
                 <p className="text-xs text-gray-500">
-                  {dayjs(f.followed_date).format("DD-MM-YYYY hh:mm A")}
+                  {dayjs(f.followed_date).format("DD MMM YYYY, hh:mm A")}
                 </p>
                 <p>{f.notes}</p>
                 {f.image_path && (

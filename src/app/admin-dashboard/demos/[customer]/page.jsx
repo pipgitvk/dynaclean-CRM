@@ -54,7 +54,7 @@ export default function DemoDetailsPage({ params }) {
     { label: "Company", value: company, icon: Building },
     {
       label: "Demo Date",
-      value: dayjs(demoDate).format("DD-MM-YYYY hh:mm A"),
+      value: dayjs(demoDate).format("DD MMM, YYYY hh:mm A"),
       icon: CalendarDays,
     },
     { label: "Address", value: address, icon: MapPin },

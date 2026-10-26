@@ -1,7 +1,6 @@
 "use client";
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import {
   FileText,
   UploadCloud,
@@ -16,321 +15,13 @@ import {
   ArrowUp,
   ArrowDown,
   PackageCheck,
-  CreditCard,
-  Clock,
-  Package,
-  Pencil,
-  AlertCircle,
 } from "lucide-react";
-import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import dayjs from "dayjs";
-import {
-  buildOrderPaymentRows,
-  getOrderPaidAmountForDisplay,
-  sumOrderPaymentAmounts,
-} from "@/lib/orderPaymentHistory";
-import { OrderPaymentHistoryTrigger } from "@/components/orders/OrderPaymentHistoryModal";
-import {
-  deriveOrderPaymentStatus,
-  deriveOrderListPaymentStatus,
-} from "@/lib/paymentOrderStatus";
 import ExcelJS from "exceljs";
-import {
-  OrderListSearchInput,
-  OrderListSearchApplyButton,
-  OrderListSearchResetButton,
-} from "@/components/orders/OrderListSearchFilterControls";
-import { orderMatchesSearchQuery } from "@/lib/orderListClientSearch";
-import { Pie } from "react-chartjs-2";
-import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
-import {
-  canEditDeliveryProof,
-  hasOrderInvoiceReport,
-} from "@/lib/orderDocumentEditRules";
-import { isBookingAllowedForOrder } from "@/lib/orderBookingEligibility";
-import {
-  canCreateFollowUpBooking,
-  canOpenDispatchForOrder,
-  canViewDispatchPanelForOrder,
-  canShowOrderDeliveryActions,
-  isRemainDispatchRound,
-  orderHasDispatchedStock,
-  orderHasOpenDispatchBatch,
-} from "@/lib/orderDeliveryEligibility";
-import {
-  isOrderFullyDelivered,
-  isOrderPartialDelivery,
-  orderHasDeliveryRecord,
-} from "@/lib/orderDeliveryStatus";
-import {
-  getDeliveryBatchForView,
-  orderHasSecondDeliveryBatch,
-} from "@/lib/orderDeliveryBatches";
-import AccountantReportActionLinks from "@/components/orders/AccountantReportActionLinks";
-import OrderInvoiceMenuLinks from "@/components/orders/OrderInvoiceMenuLinks";
-import ViewCreditNoteMenuLink from "@/components/orders/ViewCreditNoteMenuLink";
-import { ViewReturnBookingMenuItem } from "@/components/orders/ReturnBookingWarehouseMenuItems";
-import AccountantReturnViewMenuItems from "@/components/orders/AccountantReturnViewMenuItems";
-import {
-  canManageAnyOrderDeliveryRole,
-  canViewOrderDeliveryDetailsRole,
-  isAccountantOnlyMenuRole,
-  isSuperAdminRole,
-} from "@/lib/roleKeyUtils";
+
 import DeleteButton from "@/components/accounts/DeleteButton";
-import DispatchProductSelectModal from "@/components/orders/DispatchProductSelectModal";
-import OrderBookingViewMenuLinks from "@/components/orders/OrderBookingViewMenuLinks";
-import OrderDeliveryMenuLinks from "@/components/orders/OrderDeliveryMenuLinks";
 import toast from "react-hot-toast";
-import LinkedStatementPaymentCell from "@/components/orders/LinkedStatementPaymentCell";
-
-ChartJS.register(ArcElement, Tooltip, Legend);
-
-const LEAD_CAMPAIGN_OPTIONS = [
-  { value: "india_mart", label: "India Mart", color: "rgba(16, 185, 129, 0.85)" },
-  { value: "social_media", label: "Social Media", color: "rgba(236, 72, 153, 0.85)" },
-  { value: "google_ads", label: "Google Ads", color: "rgba(168, 85, 247, 0.85)" },
-  { value: "visit", label: "Visit", color: "rgba(249, 115, 22, 0.85)" },
-  { value: "website_visit", label: "Website Visit", color: "rgba(34, 211, 238, 0.85)" },
-  { value: "reference", label: "Reference", color: "rgba(59, 130, 246, 0.85)" },
-];
-
-function normalizeLeadCampaignKey(value) {
-  return String(value || "").trim().toLowerCase();
-}
-
-function formatLeadCampaignLabel(value) {
-  const key = normalizeLeadCampaignKey(value);
-  if (!key) return "—";
-  const found = LEAD_CAMPAIGN_OPTIONS.find((o) => o.value === key);
-  if (found) return found.label;
-  return key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
-function leadCampaignColor(value) {
-  const key = normalizeLeadCampaignKey(value);
-  if (!key) return "rgba(148, 163, 184, 0.85)";
-  return (
-    LEAD_CAMPAIGN_OPTIONS.find((o) => o.value === key)?.color ||
-    "rgba(100, 116, 139, 0.85)"
-  );
-}
-
-// import {
-//   DispatchPhotosMenuButton,
-//   DispatchPhotosModal,
-// } from "@/components/orders/DispatchPhotosModal";
-
-function parseOrderLineItems(order) {
-  if (Array.isArray(order?.line_items)) return order.line_items;
-  return [];
-}
-
-function normalizeModelCode(code) {
-  return String(code || "").trim().toUpperCase();
-}
-
-function lineItemMatchesModelFilter(item, filterKey) {
-  if (!filterKey) return false;
-  const code = normalizeModelCode(item.item_code);
-  const filterCode = normalizeModelCode(filterKey);
-  if (code && filterCode && code === filterCode) return true;
-  return String(item.item_name || "").trim() === String(filterKey).trim();
-}
-
-function orderMatchesModelFilter(order, filterKey) {
-  if (!filterKey) return true;
-  return parseOrderLineItems(order).some((item) => lineItemMatchesModelFilter(item, filterKey));
-}
-
-function orderMatchesModelFilters(order, filterKeys) {
-  if (!filterKeys?.length) return true;
-  return filterKeys.some((filterKey) =>
-    parseOrderLineItems(order).some((item) => lineItemMatchesModelFilter(item, filterKey)),
-  );
-}
-
-function modelQuantityInOrder(order, filterKey) {
-  if (!filterKey) return 0;
-  return parseOrderLineItems(order)
-    .filter((item) => lineItemMatchesModelFilter(item, filterKey))
-    .reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
-}
-
-function modelQuantityInOrders(order, filterKeys) {
-  if (!filterKeys?.length) return 0;
-  return filterKeys.reduce((sum, filterKey) => sum + modelQuantityInOrder(order, filterKey), 0);
-}
-
-function parseModelFiltersFromStorage(raw) {
-  if (!raw) return [];
-  try {
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) return parsed.map((item) => String(item || "").trim()).filter(Boolean);
-  } catch {
-    const legacy = String(raw).trim();
-    if (legacy) return [legacy];
-  }
-  return [];
-}
-
-function readOrderTableFilterState() {
-  if (typeof window === "undefined") {
-    return {
-      searchQuery: "",
-      statusFilter: "",
-      dateFrom: "",
-      dateTo: "",
-      createdByFilter: "",
-      leadCampaignFilter: "",
-      modelNameFilters: [],
-      approvalStatusFilter: "",
-      paymentStatusFilter: "",
-    };
-  }
-  const savedModel =
-    localStorage.getItem("orderTable_modelNameFilters") ||
-    localStorage.getItem("orderTable_modelNameFilter");
-  return {
-    searchQuery: localStorage.getItem("orderTable_searchQuery") || "",
-    statusFilter: localStorage.getItem("orderTable_statusFilter") || "",
-    dateFrom: localStorage.getItem("orderTable_dateFrom") ?? "",
-    dateTo: localStorage.getItem("orderTable_dateTo") ?? "",
-    createdByFilter: localStorage.getItem("orderTable_createdByFilter") || "",
-    leadCampaignFilter: localStorage.getItem("orderTable_leadCampaignFilter") || "",
-    modelNameFilters: parseModelFiltersFromStorage(savedModel),
-    approvalStatusFilter: localStorage.getItem("orderTable_approvalStatusFilter") || "",
-    paymentStatusFilter: localStorage.getItem("orderTable_paymentStatusFilter") || "",
-  };
-}
-
-function defaultOrderTableFilterState() {
-  return {
-    searchQuery: "",
-    statusFilter: "",
-    dateFrom: "",
-    dateTo: "",
-    createdByFilter: "",
-    leadCampaignFilter: "",
-    modelNameFilters: [],
-    approvalStatusFilter: "",
-    paymentStatusFilter: "",
-  };
-}
-
-function persistOrderTableFilterState(state) {
-  if (typeof window === "undefined") return;
-  localStorage.setItem("orderTable_searchQuery", state.searchQuery);
-  localStorage.setItem("orderTable_statusFilter", state.statusFilter);
-  localStorage.setItem("orderTable_dateFrom", state.dateFrom);
-  localStorage.setItem("orderTable_dateTo", state.dateTo);
-  localStorage.setItem("orderTable_createdByFilter", state.createdByFilter);
-  localStorage.setItem("orderTable_leadCampaignFilter", state.leadCampaignFilter);
-  localStorage.setItem("orderTable_modelNameFilters", JSON.stringify(state.modelNameFilters));
-  localStorage.setItem("orderTable_approvalStatusFilter", state.approvalStatusFilter);
-  localStorage.setItem("orderTable_paymentStatusFilter", state.paymentStatusFilter);
-}
-
-function formatModelOptionLabel(item) {
-  const code = String(item?.item_code || "").trim();
-  const name = String(item?.item_name || "").trim();
-  if (code && name) return `${code} (${name})`;
-  return name || code || "";
-}
-
-function resolveItemType(codeKey, catalogByCode, spareCatalogByCode) {
-  if (catalogByCode.has(codeKey)) return "product";
-  if (spareCatalogByCode.has(codeKey)) return "spare";
-  return /[a-zA-Z]/.test(codeKey) ? "product" : "spare";
-}
-
-function sortModelOptions(options) {
-  return [...options].sort((a, b) => {
-    const typeOrder = (type) => (type === "product" ? 0 : 1);
-    const typeDiff = typeOrder(a.itemType) - typeOrder(b.itemType);
-    if (typeDiff !== 0) return typeDiff;
-    return a.label.localeCompare(b.label, undefined, { sensitivity: "base" });
-  });
-}
-
-function buildModelOptions(orders, catalogByCode, spareCatalogByCode) {
-  const map = new Map();
-
-  orders?.forEach((order) => {
-    parseOrderLineItems(order).forEach((item) => {
-      const code = String(item.item_code || "").trim();
-      const codeKey = normalizeModelCode(code);
-      const orderName = String(item.item_name || "").trim();
-
-      if (codeKey) {
-        const catalogName = String(catalogByCode.get(codeKey)?.item_name || "").trim();
-        const spareName = String(spareCatalogByCode.get(codeKey)?.item_name || "").trim();
-        const name = catalogName || spareName || orderName;
-        if (!name) return;
-        map.set(codeKey, {
-          filterKey: codeKey,
-          item_code: code,
-          item_name: name,
-          itemType: resolveItemType(codeKey, catalogByCode, spareCatalogByCode),
-          label: formatModelOptionLabel({ item_code: code, item_name: name }),
-        });
-        return;
-      }
-
-      if (!orderName) return;
-      const nameKey = `name:${orderName.toLowerCase()}`;
-      if (!map.has(nameKey)) {
-        map.set(nameKey, {
-          filterKey: orderName,
-          item_code: "",
-          item_name: orderName,
-          itemType: /[a-zA-Z]/.test(orderName) ? "product" : "spare",
-          label: orderName,
-        });
-      }
-    });
-  });
-
-  return sortModelOptions([...map.values()]);
-}
-
-function findModelOption(filterKey, modelOptions) {
-  if (!filterKey) return null;
-  const codeKey = normalizeModelCode(filterKey);
-  return (
-    modelOptions.find((opt) => opt.filterKey === filterKey) ||
-    modelOptions.find((opt) => normalizeModelCode(opt.filterKey) === codeKey) ||
-    modelOptions.find((opt) => opt.item_name === filterKey) ||
-    modelOptions.find((opt) => normalizeModelCode(opt.item_code) === codeKey) ||
-    null
-  );
-}
-
-function getModelLabel(filterKey, modelOptions) {
-  if (!filterKey) return "";
-  return findModelOption(filterKey, modelOptions)?.label || filterKey;
-}
-
-function isSameModelFilter(filterKey, opt) {
-  if (!filterKey || !opt) return false;
-  return (
-    filterKey === opt.filterKey ||
-    normalizeModelCode(filterKey) === normalizeModelCode(opt.filterKey) ||
-    filterKey === opt.item_name
-  );
-}
-
-function isModelFilterSelected(filterKeys, opt) {
-  if (!filterKeys?.length || !opt) return false;
-  return filterKeys.some((filterKey) => isSameModelFilter(filterKey, opt));
-}
-
-function normalizeModelFilterKeys(filterKeys, modelOptions) {
-  if (!filterKeys?.length || !modelOptions?.length) return filterKeys || [];
-  return [...new Set(
-    filterKeys.map((filterKey) => findModelOption(filterKey, modelOptions)?.filterKey || filterKey),
-  )];
-}
 
 // 👻 A sleek skeleton loader for a modern feel
 const SkeletonLoader = () => (
@@ -364,57 +55,6 @@ const SkeletonLoader = () => (
   </div>
 );
 
-function isOrderPaid(order) {
-  return (
-    (order.payment_status || "")
-      .toString()
-      .trim()
-      .toLowerCase()
-      .replace(/\s+/g, "") === "paid"
-  );
-}
-
-function normalizeApprovalStatus(status) {
-  const s = (status ?? "").toString().trim().toLowerCase();
-  if (!s || s === "null" || s === "undefined") return "pending";
-  return s;
-}
-
-function getApprovalRemarkText(order) {
-  const raw = order?.approval_remark;
-  if (raw == null) return "";
-  return String(raw).trim();
-}
-
-function ApprovalRemarkHover({ remark }) {
-  const text = String(remark || "").trim();
-  if (!text) return null;
-  return (
-    <span
-      className="inline-flex items-center justify-center text-amber-600 cursor-help shrink-0"
-      title={text}
-      aria-label={`Approval remark: ${text}`}
-    >
-      <AlertCircle size={14} />
-    </span>
-  );
-}
-
-/** Cancelled and rejected orders are excluded from dashboard stat cards. */
-function isOrderExcludedFromStatCards(order) {
-  if (order.is_cancelled) return true;
-  return (order.approval_status || "").toString().trim().toLowerCase() === "rejected";
-}
-
-/** neworder.dispatch_status: 1 = dispatched, anything else = not dispatched. */
-function isOrderDispatchedForStats(order) {
-  return Number(order.dispatch_status) === 1;
-}
-
-function isOrderPendingDispatchForStats(order) {
-  return Number(order.dispatch_status) !== 1;
-}
-
 /** Matches UI status "Dispatch Done" (same rules as getStatusText). */
 function isDisplayedDispatchDone(order) {
   if (order.approval_status === "pending") return false;
@@ -425,7 +65,7 @@ function isDisplayedDispatchDone(order) {
   if (order.is_cancelled || order.approval_status === "rejected") return false;
   if (order.installation_status) return false;
   if (order.delivery_status) return false;
-  return Number(order.dispatch_status) === 1;
+  return Boolean(order.dispatch_status);
 }
 
 function amountWithoutGst(order) {
@@ -439,32 +79,16 @@ function amountWithoutGst(order) {
   return Math.max(0, total - tax);
 }
 
-/** Calculate total paid amount (booking CSV + invoice-linked snapshot). */
+/** Calculate total paid amount from comma-separated payment amounts */
 function getTotalPaidAmount(order) {
-  return getOrderPaidAmountForDisplay(order);
-}
-
-/** Stat cards / totals: only accountant order-report payment (not grey booking advance). */
-function getAccountantReportPaidAmount(order) {
-  if (!hasOrderInvoiceReport(order)) return 0;
-  return sumOrderPaymentAmounts(order);
-}
-
-/** Booking advance before accountant invoice report — grey; after report — green. */
-function getOrderPaidAmountUiClasses(order) {
-  const advanceOnly = !hasOrderInvoiceReport(order);
-  if (advanceOnly) {
-    return {
-      label: "font-semibold text-gray-500",
-      value:
-        "font-bold text-gray-500 underline decoration-gray-400 underline-offset-2 hover:text-gray-700",
-    };
-  }
-  return {
-    label: "font-semibold text-green-700",
-    value:
-      "font-bold text-green-600 underline decoration-green-400 underline-offset-2 hover:text-green-800",
-  };
+  const paymentAmount = (order.payment_amount || "")
+    .toString()
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((x) => Number(x))
+    .filter((n) => !isNaN(n));
+  return paymentAmount.reduce((sum, n) => sum + n, 0);
 }
 
 /** Calculate total amount - use quotation grand_total as primary source */
@@ -526,329 +150,56 @@ function orderCreatedInDateRange(order, dateFrom, dateTo) {
   return true;
 }
 
-function getStatusText(order) {
-  if (order.approval_status === "pending") {
-    return {
-      text: "Pending Approval",
-      bg: "bg-orange-100",
-      textCol: "text-orange-800",
-      icon: <MoreVertical size={14} className="mr-1" />,
-    };
-  }
-  if (order.approval_status === "rejected") {
-    return {
-      text: "Rejected",
-      bg: "bg-red-100",
-      textCol: "text-red-800",
-      icon: <XCircle size={14} className="mr-1" />,
-    };
-  }
-  if (Number(order.is_returned) === 3) {
-    if (Number(order.return_booking_done) === 1) {
-      return {
-        text: "Return Booking Done",
-        bg: "bg-indigo-100",
-        textCol: "text-indigo-800",
-        icon: <ArrowUp size={14} className="mr-1" />,
-      };
+export default function OrderTable({ orders, userRole }) {
+  // Initialize from localStorage with defaults
+  const [searchQuery, setSearchQuery] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("orderTable_searchQuery") || "";
     }
-    return {
-      text: "Return Initiated",
-      bg: "bg-purple-100",
-      textCol: "text-purple-800",
-      icon: <ArrowUp size={14} className="mr-1" />,
-    };
-  }
-  if (Number(order.is_returned) === 1) {
-    if (Number(order.warehouse_in_done) === 1) {
-      return {
-        text: "Return Completed",
-        bg: "bg-orange-100",
-        textCol: "text-orange-800",
-        icon: <CheckCircle size={14} className="mr-1" />,
-      };
+    return "";
+  });
+  const [filteredOrders, setFilteredOrders] = useState([]);
+  const [statusFilter, setStatusFilter] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("orderTable_statusFilter") || "";
     }
-    return {
-      text: "Fully Returned",
-      bg: "bg-red-100",
-      textCol: "text-red-800",
-      icon: <XCircle size={14} className="mr-1" />,
-    };
-  }
-  if (Number(order.is_returned) === 2) {
-    return {
-      text: "Partially Returned",
-      bg: "bg-orange-100",
-      textCol: "text-orange-800",
-      icon: <XCircle size={14} className="mr-1" />,
-    };
-  }
-  if (order.is_cancelled || order.approval_status === "rejected") {
-    return {
-      text: "Canceled",
-      bg: "bg-red-100",
-      textCol: "text-red-800",
-      icon: <XCircle size={14} className="mr-1" />,
-    };
-  }
-  if (order.installation_status) {
-    return {
-      text: "Installed",
-      bg: "bg-green-100",
-      textCol: "text-green-800",
-      icon: <CheckCircle size={14} className="mr-1" />,
-    };
-  }
-  if (isOrderFullyDelivered(order)) {
-    return {
-      text: "Delivered",
-      bg: "bg-orange-100",
-      textCol: "text-orange-800",
-      icon: <Truck size={14} className="mr-1" />,
-    };
-  }
-  if (isOrderPartialDelivery(order)) {
-    return {
-      text: "Partial Delivery",
-      bg: "bg-sky-100",
-      textCol: "text-sky-900",
-      icon: <Truck size={14} className="mr-1" />,
-    };
-  }
-  if (Number(order.dispatch_status) === 2) {
-    return {
-      text: "Partial Dispatch",
-      bg: "bg-amber-100",
-      textCol: "text-amber-900",
-      icon: <Truck size={14} className="mr-1" />,
-    };
-  }
-  if (Number(order.dispatch_status) === 1) {
-    return {
-      text: "Dispatch Done",
-      bg: "bg-violet-100",
-      textCol: "text-violet-800",
-      icon: <FileText size={14} className="mr-1" />,
-    };
-  }
-  if (order.booking_id) {
-    return {
-      text: "Booking Done",
-      bg: "bg-green-100",
-      textCol: "text-green-800",
-      icon: <FileCheck size={14} className="mr-1" />,
-    };
-  }
-  if (order.report_file) {
-    return {
-      text: "Invoice Uploaded",
-      bg: "bg-blue-100",
-      textCol: "text-blue-800",
-      icon: <FileText size={14} className="mr-1" />,
-    };
-  }
-  return {
-    text: "Pending Invoice",
-    bg: "bg-yellow-100",
-    textCol: "text-yellow-800",
-    icon: <UploadCloud size={14} className="mr-1" />,
-  };
-}
-
-function orderMatchesListFilters(order, filters, options = {}) {
-  const {
-    appliedSearchQuery = "",
-    appliedStatusFilter = "",
-    appliedDateFrom = "",
-    appliedDateTo = "",
-    appliedCreatedByFilter = "",
-    appliedLeadCampaignFilter = "",
-    appliedApprovalStatusFilter = "",
-    appliedPaymentStatusFilter = "",
-    appliedModelNameFilters = [],
-  } = filters;
-  const { omitCreatedBy = false } = options;
-
-  const approval = normalizeApprovalStatus(order.approval_status);
-  const approvalFilter = appliedApprovalStatusFilter
-    .toString()
-    .trim()
-    .toLowerCase();
-
-  if (approvalFilter) {
-    if (approval !== approvalFilter) return false;
-  } else if (approval === "rejected") {
-    return false;
-  }
-
-  if (appliedStatusFilter) {
-    const orderStatus = getStatusText(order)
-      .text.toLowerCase()
-      .replace(/\s+/g, "");
-    if (appliedStatusFilter === "pendingdispatched") {
-      if (Number(order.dispatch_status) === 1) return false;
-    } else if (appliedStatusFilter === "dispatchdone") {
-      if (Number(order.dispatch_status) !== 1) return false;
-    } else if (orderStatus !== appliedStatusFilter.toLowerCase()) {
-      return false;
+    return "";
+  });
+  const [dateFrom, setDateFrom] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("orderTable_dateFrom");
+      return saved || dayjs().startOf('month').format('YYYY-MM-DD');
     }
-  }
-
-  if (!orderCreatedInDateRange(order, appliedDateFrom, appliedDateTo)) return false;
-
-  if (
-    !omitCreatedBy &&
-    appliedCreatedByFilter &&
-    order.created_by !== appliedCreatedByFilter
-  ) {
-    return false;
-  }
-
-  if (appliedLeadCampaignFilter) {
-    const campaignKey = normalizeLeadCampaignKey(order.lead_campaign);
-    if (appliedLeadCampaignFilter === "__none__") {
-      if (campaignKey) return false;
-    } else if (campaignKey !== appliedLeadCampaignFilter) {
-      return false;
+    return dayjs().startOf('month').format('YYYY-MM-DD');
+  });
+  const [dateTo, setDateTo] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("orderTable_dateTo");
+      return saved || dayjs().endOf('month').format('YYYY-MM-DD');
     }
-  }
-
-  if (appliedPaymentStatusFilter === "paid" && !isOrderPaid(order)) {
-    return false;
-  }
-  if (appliedPaymentStatusFilter === "unpaid" && isOrderPaid(order)) {
-    return false;
-  }
-  if (appliedPaymentStatusFilter === "unpaid" && order.is_cancelled) {
-    return false;
-  }
-
-  if (!orderMatchesModelFilters(order, appliedModelNameFilters)) {
-    return false;
-  }
-
-  const lowercasedQuery = appliedSearchQuery.toLowerCase();
-  if (lowercasedQuery) {
-    const matchesSearch =
-      order.order_id?.toLowerCase().includes(lowercasedQuery) ||
-      order.client_name?.toLowerCase().includes(lowercasedQuery) ||
-      order.company_name?.toLowerCase().includes(lowercasedQuery) ||
-      order.contact?.toLowerCase().includes(lowercasedQuery) ||
-      order.state?.toLowerCase().includes(lowercasedQuery) ||
-      formatLeadCampaignLabel(order.lead_campaign)
-        .toLowerCase()
-        .includes(lowercasedQuery) ||
-      normalizeLeadCampaignKey(order.lead_campaign).includes(lowercasedQuery);
-    if (!matchesSearch) return false;
-  }
-
-  return true;
-}
-
-const PAGE_SIZE = 40;
-const SCROLL_LOAD_OFFSET_PX = 200;
-
-export default function OrderTable({
-  userRole,
-  serviceSupportOnly = false,
-  orders: ordersProp,
-}) {
-  const clientFetch = ordersProp === undefined;
-  const [orders, setOrders] = useState(ordersProp ?? []);
-  const [listLoading, setListLoading] = useState(clientFetch);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
-  const [scrollLoadEnabled, setScrollLoadEnabled] = useState(false);
-  const [fetchError, setFetchError] = useState(null);
-  const pageRef = useRef(1);
-  const fetchAbortRef = useRef(null);
-  const tableScrollRef = useRef(null);
-
-  const [productCatalog, setProductCatalog] = useState([]);
-  const [spareCatalog, setSpareCatalog] = useState([]);
-  const searchParams = useSearchParams();
-  const router = useRouter();
-
-  const [searchQuery, setSearchQuery] = useState(
-    () => readOrderTableFilterState().searchQuery,
-  );
-  const [appliedSearchQuery, setAppliedSearchQuery] = useState(
-    () => readOrderTableFilterState().searchQuery,
-  );
-  const [statusFilter, setStatusFilter] = useState(
-    () => readOrderTableFilterState().statusFilter,
-  );
-  const [appliedStatusFilter, setAppliedStatusFilter] = useState(
-    () => readOrderTableFilterState().statusFilter,
-  );
-  const [dateFrom, setDateFrom] = useState(() => readOrderTableFilterState().dateFrom);
-  const [appliedDateFrom, setAppliedDateFrom] = useState(
-    () => readOrderTableFilterState().dateFrom,
-  );
-  const [dateTo, setDateTo] = useState(() => readOrderTableFilterState().dateTo);
-  const [appliedDateTo, setAppliedDateTo] = useState(
-    () => readOrderTableFilterState().dateTo,
-  );
-  const [createdByFilter, setCreatedByFilter] = useState(
-    () => readOrderTableFilterState().createdByFilter,
-  );
-  const [appliedCreatedByFilter, setAppliedCreatedByFilter] = useState(
-    () => readOrderTableFilterState().createdByFilter,
-  );
-  const [leadCampaignFilter, setLeadCampaignFilter] = useState(
-    () => readOrderTableFilterState().leadCampaignFilter,
-  );
-  const [appliedLeadCampaignFilter, setAppliedLeadCampaignFilter] = useState(
-    () => readOrderTableFilterState().leadCampaignFilter,
-  );
-  const [modelNameFilters, setModelNameFilters] = useState(
-    () => readOrderTableFilterState().modelNameFilters,
-  );
-  const [appliedModelNameFilters, setAppliedModelNameFilters] = useState(
-    () => readOrderTableFilterState().modelNameFilters,
-  );
-  const [modelSearchText, setModelSearchText] = useState("");
-  const [showModelDropdown, setShowModelDropdown] = useState(false);
-  const modelSearchRef = useRef(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const [productsRes, sparesRes] = await Promise.all([
-          fetch("/api/products/list", { cache: "no-store" }),
-          fetch("/api/spare/list", { cache: "no-store" }),
-        ]);
-        if (!cancelled && productsRes.ok) {
-          const data = await productsRes.json();
-          if (Array.isArray(data)) setProductCatalog(data);
-        }
-        if (!cancelled && sparesRes.ok) {
-          const data = await sparesRes.json();
-          if (Array.isArray(data)) setSpareCatalog(data);
-        }
-      } catch {
-        /* non-fatal */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    return dayjs().endOf('month').format('YYYY-MM-DD');
+  });
+  const [createdByFilter, setCreatedByFilter] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("orderTable_createdByFilter") || "";
+    }
+    return "";
+  });
   const [openMenuId, setOpenMenuId] = useState(null); // State to track which menu is open
   // const canShowInstall = ["SUPERADMIN"].includes(userRole);
-  const [approvalStatusFilter, setApprovalStatusFilter] = useState(
-    () => readOrderTableFilterState().approvalStatusFilter,
-  );
-  const [appliedApprovalStatusFilter, setAppliedApprovalStatusFilter] = useState(
-    () => readOrderTableFilterState().approvalStatusFilter,
-  );
-  const [paymentStatusFilter, setPaymentStatusFilter] = useState(
-    () => readOrderTableFilterState().paymentStatusFilter,
-  );
-  const [appliedPaymentStatusFilter, setAppliedPaymentStatusFilter] = useState(
-    () => readOrderTableFilterState().paymentStatusFilter,
-  );
+  const [approvalStatusFilter, setApprovalStatusFilter] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("orderTable_approvalStatusFilter") || "";
+    }
+    return "";
+  });
+  const [showRejected, setShowRejected] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("orderTable_showRejected");
+      return saved ? JSON.parse(saved) : false;
+    }
+    return false;
+  });
   const [showNukePanel, setShowNukePanel] = useState(false);
   const [nukeConfirmText, setNukeConfirmText] = useState("");
   const [nukeLoading, setNukeLoading] = useState(false);
@@ -859,239 +210,48 @@ export default function OrderTable({
   const [sortColumn, setSortColumn] = useState("created_at");
   const [sortDirection, setSortDirection] = useState("desc");
 
+  // Save filter states to localStorage whenever they change
   useEffect(() => {
-    const status = searchParams.get("status");
-    const from = searchParams.get("dateFrom");
-    const to = searchParams.get("dateTo");
-    if (!status && !from && !to) return;
-    if (status) {
-      setStatusFilter(status);
-      setAppliedStatusFilter(status);
-    }
-    if (from) {
-      setDateFrom(from);
-      setAppliedDateFrom(from);
-    }
-    if (to) {
-      setDateTo(to);
-      setAppliedDateTo(to);
-    }
-  }, [searchParams]);
-
-  const fetchOrdersPage = useCallback(
-    async ({ page = 1, append = false, filters } = {}) => {
-      const f = filters || {
-        search: appliedSearchQuery,
-        dateFrom: appliedDateFrom,
-        dateTo: appliedDateTo,
-        createdBy: appliedCreatedByFilter,
-        leadCampaign: appliedLeadCampaignFilter,
-        approvalStatus: appliedApprovalStatusFilter,
-      };
-
-      if (append) {
-        setLoadingMore(true);
-      } else {
-        setListLoading(true);
-        setFetchError(null);
-      }
-
-      const params = new URLSearchParams();
-      params.set("page", String(page));
-      params.set("limit", String(PAGE_SIZE));
-      if (serviceSupportOnly) params.set("serviceSupport", "1");
-      if (f.search) params.set("search", f.search);
-      if (f.dateFrom) params.set("dateFrom", f.dateFrom);
-      if (f.dateTo) params.set("dateTo", f.dateTo);
-      if (f.createdBy) params.set("createdBy", f.createdBy);
-      if (f.leadCampaign) params.set("leadCampaign", f.leadCampaign);
-      if (f.approvalStatus) params.set("approvalStatus", f.approvalStatus);
-
-      try {
-        if (!append && fetchAbortRef.current) {
-          fetchAbortRef.current.abort();
-        }
-        const controller = new AbortController();
-        if (!append) fetchAbortRef.current = controller;
-
-        const res = await fetch(`/api/admin/orders/list?${params.toString()}`, {
-          signal: controller.signal,
-        });
-        const json = await res.json();
-        if (!res.ok || !json.success) {
-          throw new Error(json.detail || json.error || "Failed to load orders");
-        }
-
-        const rows = json.data || [];
-        setOrders((prev) => {
-          if (!append) return rows;
-          const seen = new Set(prev.map((o) => o.order_id));
-          const merged = [...prev];
-          for (const row of rows) {
-            if (!seen.has(row.order_id)) {
-              seen.add(row.order_id);
-              merged.push(row);
-            }
-          }
-          return merged;
-        });
-        pageRef.current = page;
-        setHasMore(Boolean(json.meta?.hasMore));
-      } catch (err) {
-        if (err?.name === "AbortError") return;
-        console.error("Admin order list fetch failed:", err);
-        if (!append) {
-          setOrders([]);
-          setFetchError(err?.message || "Failed to load orders");
-        }
-      } finally {
-        if (fetchAbortRef.current?.signal.aborted && !append) return;
-        if (append) {
-          setLoadingMore(false);
-        } else {
-          setListLoading(false);
-          setScrollLoadEnabled(true);
-        }
-      }
-    },
-    [
-      appliedSearchQuery,
-      appliedDateFrom,
-      appliedDateTo,
-      appliedCreatedByFilter,
-      appliedLeadCampaignFilter,
-      appliedApprovalStatusFilter,
-      serviceSupportOnly,
-    ],
-  );
-
-  const loadMoreOrders = useCallback(() => {
-    if (listLoading || loadingMore || !hasMore) return;
-    fetchOrdersPage({ page: pageRef.current + 1, append: true });
-  }, [listLoading, loadingMore, hasMore, fetchOrdersPage]);
-
-  const handleApplySearch = useCallback(() => {
-    setAppliedSearchQuery(searchQuery);
-    setAppliedStatusFilter(statusFilter);
-    setAppliedDateFrom(dateFrom);
-    setAppliedDateTo(dateTo);
-    setAppliedCreatedByFilter(createdByFilter);
-    setAppliedLeadCampaignFilter(leadCampaignFilter);
-    setAppliedModelNameFilters(modelNameFilters);
-    setAppliedApprovalStatusFilter(approvalStatusFilter);
-    setAppliedPaymentStatusFilter(paymentStatusFilter);
-    persistOrderTableFilterState({
-      searchQuery,
-      statusFilter,
-      dateFrom,
-      dateTo,
-      createdByFilter,
-      leadCampaignFilter,
-      modelNameFilters,
-      approvalStatusFilter,
-      paymentStatusFilter,
-    });
-    pageRef.current = 1;
-    setHasMore(true);
-    setScrollLoadEnabled(false);
-    if (clientFetch) {
-      fetchOrdersPage({
-        page: 1,
-        append: false,
-        filters: {
-          search: searchQuery,
-          dateFrom,
-          dateTo,
-          createdBy: createdByFilter,
-          leadCampaign: leadCampaignFilter,
-          approvalStatus: approvalStatusFilter,
-        },
-      });
-    }
-  }, [
-    searchQuery,
-    statusFilter,
-    dateFrom,
-    dateTo,
-    createdByFilter,
-    leadCampaignFilter,
-    modelNameFilters,
-    approvalStatusFilter,
-    paymentStatusFilter,
-    fetchOrdersPage,
-    clientFetch,
-  ]);
-
-  useEffect(() => {
-    if (!clientFetch) return;
-    fetchOrdersPage({ page: 1, append: false });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [serviceSupportOnly, clientFetch]);
-
-  useEffect(() => {
-    if (!clientFetch || !scrollLoadEnabled) return;
-
-    const onScroll = (el) => {
-      if (listLoading || loadingMore || !hasMore) return;
-      const nearBottom =
-        el.scrollTop + el.clientHeight >= el.scrollHeight - SCROLL_LOAD_OFFSET_PX;
-      if (nearBottom) loadMoreOrders();
-    };
-
-    const tableEl = tableScrollRef.current;
-    const mainEl = document.querySelector("main.overflow-auto");
-    const onTableScroll = () => tableEl && onScroll(tableEl);
-    const onMainScroll = () => mainEl && onScroll(mainEl);
-
-    tableEl?.addEventListener("scroll", onTableScroll, { passive: true });
-    mainEl?.addEventListener("scroll", onMainScroll, { passive: true });
-
-    return () => {
-      tableEl?.removeEventListener("scroll", onTableScroll);
-      mainEl?.removeEventListener("scroll", onMainScroll);
-    };
-  }, [clientFetch, scrollLoadEnabled, loadMoreOrders, hasMore, listLoading, loadingMore]);
-
-  useEffect(() => {
-    if (!clientFetch && ordersProp) {
-      setOrders(ordersProp);
-    }
-  }, [clientFetch, ordersProp]);
-
-  const handleResetFilters = useCallback(() => {
-    const defaults = defaultOrderTableFilterState();
-    setSearchQuery(defaults.searchQuery);
-    setAppliedSearchQuery(defaults.searchQuery);
-    setStatusFilter(defaults.statusFilter);
-    setAppliedStatusFilter(defaults.statusFilter);
-    setDateFrom(defaults.dateFrom);
-    setAppliedDateFrom(defaults.dateFrom);
-    setDateTo(defaults.dateTo);
-    setAppliedDateTo(defaults.dateTo);
-    setCreatedByFilter(defaults.createdByFilter);
-    setAppliedCreatedByFilter(defaults.createdByFilter);
-    setLeadCampaignFilter(defaults.leadCampaignFilter);
-    setAppliedLeadCampaignFilter(defaults.leadCampaignFilter);
-    setModelNameFilters(defaults.modelNameFilters);
-    setAppliedModelNameFilters(defaults.modelNameFilters);
-    setApprovalStatusFilter(defaults.approvalStatusFilter);
-    setAppliedApprovalStatusFilter(defaults.approvalStatusFilter);
-    setPaymentStatusFilter(defaults.paymentStatusFilter);
-    setAppliedPaymentStatusFilter(defaults.paymentStatusFilter);
-    setModelSearchText("");
-    setShowModelDropdown(false);
-    persistOrderTableFilterState(defaults);
     if (typeof window !== "undefined") {
-      localStorage.removeItem("orderTable_modelNameFilter");
+      localStorage.setItem("orderTable_searchQuery", searchQuery);
     }
-    router.replace("/admin-dashboard/order", { scroll: false });
-    pageRef.current = 1;
-    setHasMore(true);
-    setScrollLoadEnabled(false);
-    if (clientFetch) {
-      fetchOrdersPage({ page: 1, append: false, filters: defaults });
+  }, [searchQuery]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("orderTable_statusFilter", statusFilter);
     }
-  }, [router, fetchOrdersPage, clientFetch]);
+  }, [statusFilter]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("orderTable_dateFrom", dateFrom);
+    }
+  }, [dateFrom]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("orderTable_dateTo", dateTo);
+    }
+  }, [dateTo]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("orderTable_createdByFilter", createdByFilter);
+    }
+  }, [createdByFilter]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("orderTable_approvalStatusFilter", approvalStatusFilter);
+    }
+  }, [approvalStatusFilter]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("orderTable_showRejected", JSON.stringify(showRejected));
+    }
+  }, [showRejected]);
 
   const toggleMenu = (id) => {
     setOpenMenuId(openMenuId === id ? null : id);
@@ -1122,8 +282,6 @@ export default function OrderTable({
         return order.client_name?.toString().toLowerCase() || "";
       case "company_name":
         return order.company_name?.toString().toLowerCase() || "";
-      case "lead_campaign":
-        return normalizeLeadCampaignKey(order.lead_campaign);
       case "state":
         return order.state?.toString().toLowerCase() || "";
       case "item_name":
@@ -1132,8 +290,6 @@ export default function OrderTable({
         return getStatusText(order).text.toLowerCase();
       case "payment_status":
         return order.payment_status?.toString().toLowerCase() || "";
-      case "taxable_amount":
-        return getPaymentColumnAmount(order);
       case "totalamt":
         return Number(order.totalamt) || 0;
       case "paid_amount":
@@ -1149,102 +305,26 @@ export default function OrderTable({
     }
   };
 
-  const toggleModelFilter = useCallback((opt) => {
-    setModelNameFilters((prev) => {
-      if (isModelFilterSelected(prev, opt)) {
-        return prev.filter((filterKey) => !isSameModelFilter(filterKey, opt));
-      }
-      return [...prev, opt.filterKey];
-    });
-  }, []);
-
-  const removeModelFilter = useCallback((filterKey) => {
-    setModelNameFilters((prev) =>
-      prev.filter((selectedKey) => !isSameModelFilter(selectedKey, { filterKey, item_name: filterKey })),
-    );
-  }, []);
-
-  const handleStatCardClick = useCallback(
-    (type) => {
-      let nextStatus = statusFilter;
-      let nextApproval = approvalStatusFilter;
-      let nextPayment = paymentStatusFilter;
-
-      switch (type) {
-        case "total":
-          nextStatus = "";
-          nextApproval = "";
-          nextPayment = "";
-          break;
-        case "approved":
-          nextStatus = "";
-          nextApproval = "approved";
-          nextPayment = "";
-          break;
-        case "pending":
-          nextStatus = "";
-          nextApproval = "pending";
-          nextPayment = "";
-          break;
-        case "rejected":
-          nextStatus = "";
-          nextApproval = "rejected";
-          nextPayment = "";
-          break;
-        case "dispatched":
-          nextStatus = "dispatchdone";
-          nextApproval = "approved";
-          nextPayment = "";
-          break;
-        case "pendingDispatch":
-          nextStatus = "pendingdispatched";
-          nextApproval = "approved";
-          nextPayment = "";
-          break;
-        case "paid":
-          nextStatus = "";
-          nextApproval = "";
-          nextPayment = "paid";
-          break;
-        case "unpaid":
-          nextStatus = "";
-          nextApproval = "";
-          nextPayment = "unpaid";
-          break;
-        default:
-          return;
-      }
-
-      setStatusFilter(nextStatus);
-      setApprovalStatusFilter(nextApproval);
-      setPaymentStatusFilter(nextPayment);
-      setAppliedStatusFilter(nextStatus);
-      setAppliedApprovalStatusFilter(nextApproval);
-      setAppliedPaymentStatusFilter(nextPayment);
-      persistOrderTableFilterState({
-        searchQuery,
-        statusFilter: nextStatus,
-        dateFrom,
-        dateTo,
-        createdByFilter,
-        leadCampaignFilter,
-        modelNameFilters,
-        approvalStatusFilter: nextApproval,
-        paymentStatusFilter: nextPayment,
-      });
-    },
-    [
-      statusFilter,
-      approvalStatusFilter,
-      paymentStatusFilter,
-      searchQuery,
-      dateFrom,
-      dateTo,
-      createdByFilter,
-      leadCampaignFilter,
-      modelNameFilters,
-    ],
-  );
+  const handleResetFilters = () => {
+    setSearchQuery("");
+    setStatusFilter("");
+    setDateFrom(dayjs().startOf('month').format('YYYY-MM-DD'));
+    setDateTo(dayjs().endOf('month').format('YYYY-MM-DD'));
+    setCreatedByFilter("");
+    setApprovalStatusFilter("");
+    setShowRejected(false);
+    
+    // Clear localStorage
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("orderTable_searchQuery");
+      localStorage.removeItem("orderTable_statusFilter");
+      localStorage.removeItem("orderTable_dateFrom");
+      localStorage.removeItem("orderTable_dateTo");
+      localStorage.removeItem("orderTable_createdByFilter");
+      localStorage.removeItem("orderTable_approvalStatusFilter");
+      localStorage.removeItem("orderTable_showRejected");
+    }
+  };
 
   const handleExportToExcel = async () => {
     setIsExporting(true);
@@ -1262,8 +342,6 @@ export default function OrderTable({
         { header: "Order ID", key: "order_id", width: 15 },
         { header: "Quotation Number", key: "quote_number", width: 20 },
         { header: "Invoice Number", key: "invoice_number", width: 20 },
-        { header: "Linked Payment Date", key: "payment_received_date", width: 18 },
-        { header: "Amount Received (Linked)", key: "amount_received", width: 20 },
         { header: "Client Name", key: "client_name", width: 25 },
         { header: "Company Name", key: "company_name", width: 30 },
         { header: "Contact", key: "contact", width: 15 },
@@ -1271,16 +349,13 @@ export default function OrderTable({
         { header: "Item Name", key: "item_name", width: 30 },
         { header: "Item Code", key: "item_code", width: 20 },
         { header: "Created By", key: "created_by", width: 15 },
-        { header: "Lead Campaign", key: "lead_campaign", width: 18 },
         { header: "Created At", key: "created_at", width: 20 },
         { header: "Due Date", key: "duedate", width: 15 },
         { header: "Payment Status", key: "payment_status", width: 15 },
         { header: "Approval Status", key: "approval_status", width: 15 },
         { header: "Taxable Amount", key: "baseAmount", width: 15 },
         { header: "Tax Amount", key: "taxamt", width: 15 },
-        { header: "Total Amount", key: "total_amount", width: 16 },
-        { header: "Paid Amount", key: "paid_amount", width: 16 },
-        { header: "Balance Amount", key: "balance_amount", width: 16 },
+        { header: "Amount Details", key: "amount_details", width: 35 },
       ];
 
       // Style the header row
@@ -1296,15 +371,12 @@ export default function OrderTable({
         const totalAmt = getTotalAmount(order);
         const paidAmt = getTotalPaidAmount(order);
         const balanceAmt = getBalanceAmount(order);
-
+        const amountDetails = `Total: ₹${totalAmt.toFixed(2)}\nPaid: ₹${paidAmt.toFixed(2)}\nBalance: ₹${balanceAmt.toFixed(2)}`;
+        
         worksheet.addRow({
           order_id: order.order_id,
           quote_number: order.quote_number || "",
           invoice_number: order.invoice_number || "",
-          payment_received_date: order.payment_received_date
-            ? dayjs(order.payment_received_date).format("DD-MM-YYYY")
-            : "",
-          amount_received: Number(order.amount_received || 0),
           client_name: order.client_name || "",
           company_name: order.company_name || "",
           contact: order.contact || "",
@@ -1312,16 +384,13 @@ export default function OrderTable({
           item_name: order.item_name || "",
           item_code: order.item_code || "",
           created_by: order.created_by || "",
-          lead_campaign: formatLeadCampaignLabel(order.lead_campaign),
-          created_at: order.created_at ? dayjs(order.created_at).format("DD-MM-YYYY HH:mm:ss") : "",
-          duedate: order.duedate ? dayjs(order.duedate).format("DD-MM-YYYY") : "",
+          created_at: order.created_at ? dayjs(order.created_at).format("DD/MM/YYYY HH:mm:ss") : "",
+          duedate: order.duedate ? dayjs(order.duedate).format("DD/MM/YYYY") : "",
           payment_status: order.payment_status || "",
           approval_status: order.approval_status || "",
           baseAmount: Number(order.baseAmount || 0),
           taxamt: Number(order.taxamt || 0),
-          total_amount: Number(totalAmt) || 0,
-          paid_amount: Number(paidAmt) || 0,
-          balance_amount: Number(balanceAmt) || 0,
+          amount_details: amountDetails,
         });
       });
 
@@ -1346,54 +415,52 @@ export default function OrderTable({
     }
   };
 
-  const listFilterState = useMemo(
-    () => ({
-      appliedSearchQuery,
-      appliedStatusFilter,
-      appliedDateFrom,
-      appliedDateTo,
-      appliedCreatedByFilter,
-      appliedLeadCampaignFilter,
-      appliedApprovalStatusFilter,
-      appliedPaymentStatusFilter,
-      appliedModelNameFilters,
-    }),
-    [
-      appliedSearchQuery,
-      appliedStatusFilter,
-      appliedDateFrom,
-      appliedDateTo,
-      appliedCreatedByFilter,
-      appliedLeadCampaignFilter,
-      appliedApprovalStatusFilter,
-      appliedPaymentStatusFilter,
-      appliedModelNameFilters,
-    ],
-  );
+  // Filter orders based on search query, status filter, and date range
+  useEffect(() => {
+    if (!orders) return;
 
-  const createdByFilterOptions = useMemo(() => {
-    if (!orders?.length) return [];
-    const users = new Set();
-    orders.forEach((order) => {
-      if (
-        orderMatchesListFilters(order, listFilterState, { omitCreatedBy: true }) &&
-        order.created_by
-      ) {
-        users.add(String(order.created_by).trim());
+    const lowercasedQuery = searchQuery.toLowerCase();
+    let result = orders.filter((order) => {
+      // Step 0.5: Filter rejected orders based on toggle
+      if (!showRejected && order.approval_status === 'rejected') {
+        return false;
       }
+
+      // Step 1: Filter by status
+      if (statusFilter) {
+        const orderStatus = getStatusText(order)
+          .text.toLowerCase()
+          .replace(/\s+/g, "");
+        if (orderStatus !== statusFilter.toLowerCase()) return false; 
+      }
+
+      // Step 2: Date range filter (created_at)
+      if (!orderCreatedInDateRange(order, dateFrom, dateTo)) return false;
+
+      // Step 2.5: Filter by created_by
+      if (createdByFilter && order.created_by !== createdByFilter) {
+        return false;
+      }
+
+      if (
+        approvalStatusFilter &&
+        order.approval_status !== approvalStatusFilter
+      ) {
+        return false;
+      }
+
+      // Step 3: Search across multiple fields
+      return (
+        order.order_id?.toLowerCase().includes(lowercasedQuery) ||
+        order.client_name?.toLowerCase().includes(lowercasedQuery) ||
+        order.company_name?.toLowerCase().includes(lowercasedQuery) ||
+        order.contact?.toLowerCase().includes(lowercasedQuery) ||
+        order.state?.toLowerCase().includes(lowercasedQuery)
+      );
     });
-    return [...users].sort((a, b) => a.localeCompare(b));
-  }, [orders, listFilterState]);
 
-  // Filter + sort orders (shared by table, stat cards, and amount summary)
-  const filteredOrders = useMemo(() => {
-    if (!orders) return [];
-
-    let result = orders.filter((order) =>
-      orderMatchesListFilters(order, listFilterState),
-    );
-
-    return [...result].sort((a, b) => {
+    // Step 4: Sort the filtered results
+    result = [...result].sort((a, b) => {
       const valA = getSortValue(a, sortColumn);
       const valB = getSortValue(b, sortColumn);
 
@@ -1405,392 +472,20 @@ export default function OrderTable({
       if (valA > valB) return sortDirection === "asc" ? 1 : -1;
       return 0;
     });
-  }, [orders, listFilterState, sortColumn, sortDirection]);
 
-  const catalogByCode = useMemo(() => {
-    const map = new Map();
-    productCatalog.forEach((product) => {
-      const key = normalizeModelCode(product.item_code);
-      if (key) map.set(key, product);
-    });
-    return map;
-  }, [productCatalog]);
-
-  const spareCatalogByCode = useMemo(() => {
-    const map = new Map();
-    spareCatalog.forEach((spare) => {
-      const numberKey = normalizeModelCode(spare.spare_number);
-      const idKey = normalizeModelCode(spare.id);
-      if (numberKey) map.set(numberKey, spare);
-      if (idKey) map.set(idKey, spare);
-    });
-    return map;
-  }, [spareCatalog]);
-
-  const modelOptions = useMemo(
-    () => buildModelOptions(orders, catalogByCode, spareCatalogByCode),
-    [orders, catalogByCode, spareCatalogByCode],
-  );
-
-  const filteredModelQuantity = useMemo(() => {
-    if (!appliedModelNameFilters.length) return 0;
-    return filteredOrders.reduce(
-      (sum, order) => sum + modelQuantityInOrders(order, appliedModelNameFilters),
-      0,
-    );
-  }, [filteredOrders, appliedModelNameFilters]);
-
-  const filteredModelOptions = useMemo(() => {
-    const query = modelSearchText.trim().toLowerCase();
-    const list = !query
-      ? modelOptions
-      : modelOptions.filter((opt) => {
-          const code = String(opt.item_code || "").toLowerCase();
-          const name = String(opt.item_name || "").toLowerCase();
-          const label = String(opt.label || "").toLowerCase();
-          return code.includes(query) || name.includes(query) || label.includes(query);
-        });
-    return sortModelOptions(list).slice(0, 50);
-  }, [modelOptions, modelSearchText]);
-
-  useEffect(() => {
-    if (!modelNameFilters.length || !modelOptions.length) return;
-    const normalized = normalizeModelFilterKeys(modelNameFilters, modelOptions);
-    const changed =
-      normalized.length !== modelNameFilters.length ||
-      normalized.some((key, index) => key !== modelNameFilters[index]);
-    if (changed) setModelNameFilters(normalized);
-  }, [modelNameFilters, modelOptions]);
-
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (
-        modelSearchRef.current &&
-        !modelSearchRef.current.contains(event.target)
-      ) {
-        setShowModelDropdown(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  const ordersForStatCards = useMemo(
-    () => filteredOrders.filter((order) => !isOrderExcludedFromStatCards(order)),
-    [filteredOrders],
-  );
-
-  const leadCampaignFilterOptions = useMemo(() => {
-    const keys = new Set(LEAD_CAMPAIGN_OPTIONS.map((o) => o.value));
-    orders?.forEach((o) => {
-      const k = normalizeLeadCampaignKey(o.lead_campaign);
-      if (k) keys.add(k);
-    });
-    return [...keys].sort((a, b) =>
-      formatLeadCampaignLabel(a).localeCompare(formatLeadCampaignLabel(b)),
-    );
-  }, [orders]);
-
-  const orderStats = useMemo(() => {
-    const stats = ordersForStatCards.reduce(
-      (acc, order) => {
-        const taxable = getPaymentColumnAmount(order);
-        const paidOrder = getAccountantReportPaidAmount(order);
-        const approval = (order.approval_status || "")
-          .toString()
-          .trim()
-          .toLowerCase();
-        const isPendingApproval = approval === "pending";
-        const isApproved = approval === "approved";
-
-        if (isPendingApproval) {
-          acc.pending += 1;
-          acc.pendingAmount += taxable;
-        }
-
-        if (isApproved) {
-          acc.total += 1;
-          acc.totalAmount += taxable;
-          acc.approved += 1;
-          acc.approvedAmount += taxable;
-
-          if (isOrderDispatchedForStats(order)) {
-            acc.dispatched += 1;
-            acc.dispatchedAmount += taxable;
-          }
-          if (isOrderPendingDispatchForStats(order)) {
-            acc.pendingDispatch += 1;
-            acc.pendingDispatchAmount += taxable;
-          }
-
-          const pmtStatus = deriveOrderListPaymentStatus(order)
-            .toString()
-            .trim()
-            .toLowerCase()
-            .replace(/\s+/g, "");
-
-          if (pmtStatus === "paid") {
-            acc.paid += 1;
-          } else {
-            acc.unpaid += 1;
-          }
-
-          acc.paidAmount += paidOrder;
-        }
-
-        return acc;
-      },
-      {
-        total: 0,
-        pending: 0,
-        approved: 0,
-        dispatched: 0,
-        pendingDispatch: 0,
-        paid: 0,
-        unpaid: 0,
-        totalAmount: 0,
-        pendingAmount: 0,
-        approvedAmount: 0,
-        dispatchedAmount: 0,
-        pendingDispatchAmount: 0,
-        paidAmount: 0,
-        unpaidAmount: 0,
-      },
-    );
-
-    return {
-      ...stats,
-      unpaidAmount: Math.max(0, stats.totalAmount - stats.paidAmount),
-    };
-  }, [ordersForStatCards]);
-
-  const rejectedOrderStats = useMemo(() => {
-    return (orders || []).reduce(
-      (acc, order) => {
-        if (!orderCreatedInDateRange(order, appliedDateFrom, appliedDateTo)) {
-          return acc;
-        }
-        if (order.is_cancelled) return acc;
-        if (normalizeApprovalStatus(order.approval_status) !== "rejected") {
-          return acc;
-        }
-        acc.rejected += 1;
-        acc.rejectedAmount += getPaymentColumnAmount(order);
-        return acc;
-      },
-      { rejected: 0, rejectedAmount: 0 },
-    );
-  }, [orders, appliedDateFrom, appliedDateTo]);
-
-  const activeStatCard = useMemo(() => {
-    if (appliedPaymentStatusFilter === "paid") return "paid";
-    if (appliedPaymentStatusFilter === "unpaid") return "unpaid";
-    if (appliedStatusFilter === "dispatchdone") return "dispatched";
-    if (appliedStatusFilter === "pendingdispatched") return "pendingDispatch";
-    if (appliedApprovalStatusFilter === "approved") return "approved";
-    if (appliedApprovalStatusFilter === "pending") return "pending";
-    if (appliedApprovalStatusFilter === "rejected") return "rejected";
-    if (
-      !appliedStatusFilter &&
-      !appliedApprovalStatusFilter &&
-      !appliedPaymentStatusFilter
-    ) {
-      return "total";
-    }
-    return "";
-  }, [appliedStatusFilter, appliedApprovalStatusFilter, appliedPaymentStatusFilter]);
-
-  const orderPieChartData = useMemo(() => {
-    const entries = [
-      {
-        key: "pending",
-        label: "Pending",
-        value: orderStats.pending,
-        color: "rgba(249, 115, 22, 0.85)",
-      },
-      {
-        key: "approved",
-        label: "Approved",
-        value: orderStats.approved,
-        color: "rgba(34, 197, 94, 0.85)",
-      },
-      {
-        key: "dispatched",
-        label: "Dispatched",
-        value: orderStats.dispatched,
-        color: "rgba(139, 92, 246, 0.85)",
-      },
-      {
-        key: "pendingDispatch",
-        label: "Pending Dispatch",
-        value: orderStats.pendingDispatch,
-        color: "rgba(245, 158, 11, 0.85)",
-      },
-      {
-        key: "paid",
-        label: "Paid",
-        value: orderStats.paid,
-        color: "rgba(16, 185, 129, 0.85)",
-      },
-      {
-        key: "unpaid",
-        label: "Unpaid",
-        value: orderStats.unpaid,
-        color: "rgba(249, 115, 22, 0.85)",
-      },
-    ].filter((entry) => entry.value > 0);
-
-    return {
-      labels: entries.map((entry) => entry.label),
-      keys: entries.map((entry) => entry.key),
-      datasets: [
-        {
-          data: entries.map((entry) => entry.value),
-          backgroundColor: entries.map((entry) => entry.color),
-          borderWidth: 2,
-          borderColor: "#ffffff",
-          hoverOffset: 8,
-        },
-      ],
-    };
-  }, [orderStats]);
-
-  const orderPieChartOptions = useMemo(
-    () => ({
-      responsive: true,
-      maintainAspectRatio: false,
-      onClick: (_event, elements, chart) => {
-        if (!elements?.length) return;
-        const key = chart.data.keys?.[elements[0].index];
-        if (key) handleStatCardClick(key);
-      },
-      plugins: {
-        legend: {
-          position: "bottom",
-          labels: {
-            boxWidth: 12,
-            padding: 14,
-            font: { size: 11 },
-          },
-        },
-        title: {
-          display: true,
-          text: "Order Statistics Overview",
-          font: { size: 15, weight: "bold" },
-          padding: { bottom: 12 },
-        },
-        tooltip: {
-          callbacks: {
-            label: (ctx) => {
-              const val = ctx.parsed || 0;
-              const total = orderStats.total || 1;
-              const pct = ((val / total) * 100).toFixed(1);
-              return ` ${ctx.label}: ${val.toLocaleString("en-IN")} (${pct}% of total orders)`;
-            },
-          },
-        },
-      },
-    }),
-    [handleStatCardClick, orderStats.total],
-  );
-
-  const leadCampaignPieChartData = useMemo(() => {
-    const counts = {};
-    ordersForStatCards.forEach((order) => {
-      const key = normalizeLeadCampaignKey(order.lead_campaign) || "__none__";
-      counts[key] = (counts[key] || 0) + 1;
-    });
-    const entries = Object.entries(counts)
-      .map(([key, value]) => ({
-        key,
-        label: key === "__none__" ? "No campaign" : formatLeadCampaignLabel(key),
-        value,
-        color:
-          key === "__none__"
-            ? "rgba(148, 163, 184, 0.85)"
-            : leadCampaignColor(key),
-      }))
-      .filter((entry) => entry.value > 0)
-      .sort((a, b) => b.value - a.value);
-
-    return {
-      labels: entries.map((entry) => entry.label),
-      keys: entries.map((entry) => entry.key),
-      datasets: [
-        {
-          data: entries.map((entry) => entry.value),
-          backgroundColor: entries.map((entry) => entry.color),
-          borderWidth: 2,
-          borderColor: "#ffffff",
-          hoverOffset: 8,
-        },
-      ],
-    };
-  }, [ordersForStatCards]);
-
-  const leadCampaignPieTotal = useMemo(() => {
-    const data = leadCampaignPieChartData.datasets[0]?.data || [];
-    return data.reduce((sum, n) => sum + Number(n || 0), 0);
-  }, [leadCampaignPieChartData]);
-
-  const leadCampaignPieChartOptions = useMemo(
-    () => ({
-      responsive: true,
-      maintainAspectRatio: false,
-      onClick: (_event, elements, chart) => {
-        if (!elements?.length) return;
-        const key = chart.data.keys?.[elements[0].index];
-        if (!key) return;
-        const filterVal = key === "__none__" ? "__none__" : key;
-        setLeadCampaignFilter(filterVal);
-        setAppliedLeadCampaignFilter(filterVal);
-        persistOrderTableFilterState({
-          searchQuery: appliedSearchQuery,
-          statusFilter: appliedStatusFilter,
-          dateFrom: appliedDateFrom,
-          dateTo: appliedDateTo,
-          createdByFilter: appliedCreatedByFilter,
-          leadCampaignFilter: filterVal,
-          modelNameFilters: appliedModelNameFilters,
-          approvalStatusFilter: appliedApprovalStatusFilter,
-          paymentStatusFilter: appliedPaymentStatusFilter,
-        });
-      },
-      plugins: {
-        legend: {
-          position: "bottom",
-          labels: { boxWidth: 12, padding: 10, font: { size: 10 } },
-        },
-        title: {
-          display: true,
-          text: "Orders by Lead Campaign",
-          font: { size: 14, weight: "bold" },
-          padding: { bottom: 8 },
-        },
-        tooltip: {
-          callbacks: {
-            label: (ctx) => {
-              const val = ctx.parsed || 0;
-              const total = leadCampaignPieTotal || 1;
-              const pct = ((val / total) * 100).toFixed(1);
-              return ` ${ctx.label}: ${val.toLocaleString("en-IN")} (${pct}%)`;
-            },
-          },
-        },
-      },
-    }),
-    [
-      leadCampaignPieTotal,
-      appliedSearchQuery,
-      appliedStatusFilter,
-      appliedDateFrom,
-      appliedDateTo,
-      appliedCreatedByFilter,
-      appliedModelNameFilters,
-      appliedApprovalStatusFilter,
-      appliedPaymentStatusFilter,
-    ],
-  );
+    setFilteredOrders(result);
+  }, [
+    searchQuery,
+    orders,
+    statusFilter,
+    dateFrom,
+    dateTo,
+    createdByFilter,
+    approvalStatusFilter,
+    sortColumn,
+    sortDirection,
+    showRejected,
+  ]);
 
   const dispatchDoneTotals = useMemo(() => {
     if (!orders?.length) return { gstTotal: 0, taxableTotal: 0 };
@@ -1811,8 +506,7 @@ export default function OrderTable({
     return filteredOrders.reduce(
       (acc, o) => {
         if (o.approval_status !== "approved") return acc;
-        if (isOrderExcludedFromStatCards(o)) return acc;
-        acc.taxableTotal += getPaymentColumnAmount(o);
+        acc.taxableTotal += orderTaxableTotal(o);
         return acc;
       },
       { taxableTotal: 0 }
@@ -1823,10 +517,8 @@ export default function OrderTable({
     if (!filteredOrders?.length) return { totalAmount: 0, paidAmount: 0, taxableAmount: 0, balanceAmount: 0 };
     return filteredOrders.reduce(
       (acc, o) => {
-        if (o.approval_status !== "approved") return acc;
-        if (isOrderExcludedFromStatCards(o)) return acc;
         acc.totalAmount += getTotalAmount(o);
-        acc.paidAmount += getAccountantReportPaidAmount(o);
+        acc.paidAmount += getTotalPaidAmount(o);
         acc.taxableAmount += getPaymentColumnAmount(o);
         acc.balanceAmount += getBalanceAmount(o);
         return acc;
@@ -1834,6 +526,121 @@ export default function OrderTable({
       { totalAmount: 0, paidAmount: 0, taxableAmount: 0, balanceAmount: 0 }
     );
   }, [filteredOrders]);
+
+  const getStatusText = (order) => {
+    if (order.approval_status === "pending") {
+      return {
+        text: "Pending Approval",
+        bg: "bg-orange-100",
+        textCol: "text-orange-800",
+        icon: <MoreVertical size={14} className="mr-1" />,
+      };
+    }
+    if (order.approval_status === "rejected") {
+      return {
+        text: "Rejected",
+        bg: "bg-red-100",
+        textCol: "text-red-800",
+        icon: <XCircle size={14} className="mr-1" />,
+      };
+    }
+    // Check for return status first (highest priority)
+    if (Number(order.is_returned) === 3) {
+      if (Number(order.return_booking_done) === 1) {
+        return {
+          text: "Return Booking Done",
+          bg: "bg-indigo-100",
+          textCol: "text-indigo-800",
+          icon: <ArrowUp size={14} className="mr-1" />,
+        };
+      }
+      return {
+        text: "Return Initiated",
+        bg: "bg-purple-100",
+        textCol: "text-purple-800",
+        icon: <ArrowUp size={14} className="mr-1" />,
+      };
+    }
+    if (Number(order.is_returned) === 1) {
+      // Check if warehouse-in is also done for "Return Completed" status
+      if (Number(order.warehouse_in_done) === 1) {
+        return {
+          text: "Return Completed",
+          bg: "bg-green-100",
+          textCol: "text-green-800",
+          icon: <CheckCircle size={14} className="mr-1" />,
+        };
+      }
+      return {
+        text: "Fully Returned",
+        bg: "bg-red-100",
+        textCol: "text-red-800",
+        icon: <XCircle size={14} className="mr-1" />,
+      };
+    }
+    if (Number(order.is_returned) === 2) {
+      return {
+        text: "Partially Returned",
+        bg: "bg-orange-100",
+        textCol: "text-orange-800",
+        icon: <XCircle size={14} className="mr-1" />,
+      };
+    }
+    if (order.is_cancelled || order.approval_status === "rejected") {
+      return {
+        text: "Canceled",
+        bg: "bg-red-100",
+        textCol: "text-red-800",
+        icon: <XCircle size={14} className="mr-1" />,
+      };
+    }
+    if (order.installation_status) {
+      return {
+        text: "Installed",
+        bg: "bg-green-100",
+        textCol: "text-green-800",
+        icon: <CheckCircle size={14} className="mr-1" />,
+      };
+    }
+    if (order.delivery_status) {
+      return {
+        text: "Delivered",
+        bg: "bg-orange-100",
+        textCol: "text-orange-800",
+        icon: <Truck size={14} className="mr-1" />,
+      };
+    }
+    if (order.dispatch_status) {
+      return {
+        text: "Dispatch Done",
+        bg: "bg-violet-100",
+        textCol: "text-violet-800",
+        icon: <FileText size={14} className="mr-1" />,
+      };
+    }
+    if (order.booking_id) {
+      return {
+        text: "Booking Done",
+        bg: "bg-green-100",
+        textCol: "text-green-800",
+        icon: <FileCheck size={14} className="mr-1" />,
+      };
+    }
+    if (order.report_file) {
+      return {
+        text: "Invoice Uploaded",
+        bg: "bg-blue-100",
+        textCol: "text-blue-800",
+        icon: <FileText size={14} className="mr-1" />,
+      };
+    }
+    return {
+      text: "Pending Invoice",
+      bg: "bg-yellow-100",
+      textCol: "text-yellow-800",
+      icon: <UploadCloud size={14} className="mr-1" />,
+    };
+  };
 
   const getPaymentBadge = (paymentStatusRaw) => {
     const s = (paymentStatusRaw || "").toString().trim().toLowerCase();
@@ -1878,231 +685,15 @@ export default function OrderTable({
     );
   };
 
-  const showListLoadingEmpty =
-    clientFetch && listLoading && filteredOrders.length === 0;
-  const showNoOrdersEmpty =
-    !listLoading && filteredOrders.length === 0;
+  if (!orders) {
+    return <SkeletonLoader />;
+  }
 
-  const statCards = [
-    {
-      key: "total",
-      label: "Total-(Taxable)",
-      value: orderStats.total,
-      amount: orderStats.totalAmount,
-      icon: Package,
-      border: "border-slate-200",
-      bg: "bg-gradient-to-br from-slate-50 to-white",
-      labelColor: "text-slate-600",
-      valueColor: "text-slate-900",
-      iconBg: "bg-slate-200",
-      iconColor: "text-slate-700",
-    },
-    {
-      key: "approved",
-      label: "Approved",
-      value: orderStats.approved,
-      amount: orderStats.approvedAmount,
-      icon: CheckCircle,
-      border: "border-green-200",
-      bg: "bg-gradient-to-br from-green-50 to-white",
-      labelColor: "text-green-700",
-      valueColor: "text-green-800",
-      iconBg: "bg-green-200",
-      iconColor: "text-green-700",
-    },
-    {
-      key: "pending",
-      label: "Pending approval",
-      value: orderStats.pending,
-      amount: orderStats.pendingAmount,
-      icon: AlertCircle,
-      border: "border-orange-200",
-      bg: "bg-gradient-to-br from-orange-50 to-white",
-      labelColor: "text-orange-700",
-      valueColor: "text-orange-800",
-      iconBg: "bg-orange-200",
-      iconColor: "text-orange-700",
-    },
-    {
-      key: "dispatched",
-      label: "Dispatched",
-      value: orderStats.dispatched,
-      amount: orderStats.dispatchedAmount,
-      icon: Truck,
-      border: "border-violet-200",
-      bg: "bg-gradient-to-br from-violet-50 to-white",
-      labelColor: "text-violet-700",
-      valueColor: "text-violet-800",
-      iconBg: "bg-violet-200",
-      iconColor: "text-violet-700",
-    },
-    {
-      key: "pendingDispatch",
-      label: "Pending Dispatch",
-      value: orderStats.pendingDispatch,
-      amount: orderStats.pendingDispatchAmount,
-      icon: Clock,
-      border: "border-amber-200",
-      bg: "bg-gradient-to-br from-amber-50 to-white",
-      labelColor: "text-amber-700",
-      valueColor: "text-amber-800",
-      iconBg: "bg-amber-200",
-      iconColor: "text-amber-700",
-    },
-    {
-      key: "paid",
-      label: "Paid",
-      value: orderStats.paid,
-      amount: orderStats.paidAmount,
-      icon: CheckCircle,
-      border: "border-emerald-200",
-      bg: "bg-gradient-to-br from-emerald-50 to-white",
-      labelColor: "text-emerald-700",
-      valueColor: "text-emerald-800",
-      iconBg: "bg-emerald-200",
-      iconColor: "text-emerald-700",
-    },
-    {
-      key: "unpaid",
-      label: "Unpaid",
-      value: orderStats.unpaid,
-      amount: orderStats.unpaidAmount,
-      icon: CreditCard,
-      border: "border-orange-200",
-      bg: "bg-gradient-to-br from-orange-50 to-white",
-      labelColor: "text-orange-700",
-      valueColor: "text-orange-800",
-      iconBg: "bg-orange-200",
-      iconColor: "text-orange-700",
-    },
-    {
-      key: "rejected",
-      label: "Rejected",
-      value: rejectedOrderStats.rejected,
-      amount: rejectedOrderStats.rejectedAmount,
-      icon: XCircle,
-      border: "border-red-200",
-      bg: "bg-gradient-to-br from-red-50 to-white",
-      labelColor: "text-red-700",
-      valueColor: "text-red-800",
-      iconBg: "bg-red-200",
-      iconColor: "text-red-700",
-    },
-  ];
-
-  const renderStatCard = (card) => {
-    const Icon = card.icon;
-    const isActive = activeStatCard === card.key;
-    return (
-      <button
-        key={card.key}
-        type="button"
-        onClick={() => handleStatCardClick(card.key)}
-        className={`w-full rounded-lg border ${card.border} ${card.bg} shadow-sm p-2 text-left transition-all hover:shadow-md ${
-          isActive ? "ring-2 ring-blue-500 ring-offset-1 shadow-md" : ""
-        }`}
-      >
-        <div className="flex items-start justify-between gap-1.5">
-          <div className="min-w-0">
-            <p className={`text-[10px] font-semibold uppercase tracking-wide leading-tight ${card.labelColor}`}>
-              {card.label}
-            </p>
-            <p className={`text-lg font-bold tabular-nums mt-0.5 ${card.valueColor}`}>
-              ₹{(Number(card.amount) || 0).toLocaleString("en-IN", {
-                minimumFractionDigits: 0,
-                maximumFractionDigits: 0,
-              })}
-            </p>
-          
-          </div>
-          <div className={`${card.iconBg} p-1.5 rounded-md shrink-0`}>
-            <Icon size={14} className={card.iconColor} />
-          </div>
-        </div>
-      </button>
-    );
-  };
-
-  const renderPieChart = (compact = false) => (
-    <div
-      className={`rounded-xl border border-slate-200 bg-white shadow-sm h-full flex flex-col min-w-0 ${
-        compact ? "p-2" : "p-4"
-      }`}
-    >
-      <div className={compact ? "mb-1" : "mb-3"}>
-        <p
-          className={`font-semibold text-gray-800 ${
-            compact ? "text-xs" : "text-sm"
-          }`}
-        >
-          Order Distribution
-        </p>
-      </div>
-      <div
-        className={`flex-1 lg:min-h-0 ${
-          compact ? "min-h-[160px]" : "min-h-[220px]"
-        }`}
-      >
-        {orderStats.total > 0 && orderPieChartData.labels.length > 0 ? (
-          <Pie data={orderPieChartData} options={orderPieChartOptions} />
-        ) : (
-          <div
-            className={`flex h-full items-center justify-center rounded-lg border border-dashed border-gray-200 bg-gray-50 text-gray-500 ${
-              compact ? "min-h-[160px] text-xs px-1" : "min-h-[220px] text-sm"
-            }`}
-          >
-            No order data for the selected date range
-          </div>
-        )}
-      </div>
-    </div>
-  );
-
-  const renderLeadCampaignPieChart = () => (
-    <div className="rounded-xl border border-slate-200 bg-white shadow-sm p-4 h-full flex flex-col">
-      <div className="flex-1 min-h-[220px] lg:min-h-0">
-        {leadCampaignPieTotal > 0 && leadCampaignPieChartData.labels.length > 0 ? (
-          <Pie
-            data={leadCampaignPieChartData}
-            options={leadCampaignPieChartOptions}
-          />
-        ) : (
-          <div className="flex h-full min-h-[220px] items-center justify-center rounded-lg border border-dashed border-gray-200 bg-gray-50 text-sm text-gray-500 text-center px-3">
-            No lead campaign data for current filters
-          </div>
-        )}
-      </div>
-      <p className="text-[10px] text-gray-500 mt-2 text-center">
-        Click a slice to filter by campaign
-      </p>
-    </div>
-  );
+  if (orders.length === 0)
+    return <p className="text-gray-600">No orders submitted yet.</p>;
 
   return (
     <div className="space-y-6">
-      {/* Mobile / tablet: all cards in grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 lg:hidden">
-        {statCards.map((card) => renderStatCard(card))}
-      </div>
-
-      {/* Large screen: 3 cards per row | pie chart */}
-      <div className="hidden lg:grid lg:grid-cols-[minmax(0,2fr)_minmax(0,1.35fr)] gap-3 items-stretch">
-        <div className="grid grid-cols-3 gap-2 content-start">
-          {statCards.map((card) => renderStatCard(card))}
-        </div>
-
-        <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-2 min-h-0 items-stretch">
-          {renderPieChart(true)}
-          {renderLeadCampaignPieChart()}
-        </div>
-      </div>
-
-      {/* Mobile / tablet: pie charts below cards */}
-      <div className="lg:hidden space-y-3">
-        {renderPieChart()}
-        {renderLeadCampaignPieChart()}
-      </div>
-
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
         {/* Combined Amount Summary Card */}
         <div className={`w-full rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white shadow-sm p-3 sm:p-4 cursor-default hover:shadow-md transition-shadow`}>
@@ -2112,7 +703,7 @@ export default function OrderTable({
                 Amount Summary
               </p>
               <p className="text-[10px] text-emerald-600/90 mb-2 leading-tight">
-                Approved orders only
+                All orders overview
               </p>
               
               {/* Total Amount */}
@@ -2148,7 +739,7 @@ export default function OrderTable({
                 Balance & Taxable
               </p>
               <p className="text-[10px] text-purple-600/90 mb-2 leading-tight">
-                Approved orders only
+                Summary details
               </p>
 
               {/* Balance Amount */}
@@ -2172,154 +763,6 @@ export default function OrderTable({
                   })}
                 </p>
               </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="w-full rounded-xl border border-blue-200 bg-gradient-to-br from-blue-50 to-white shadow-sm p-3 sm:p-4 cursor-default hover:shadow-md transition-shadow">
-          <div className="flex items-start justify-between">
-            <div className="w-full">
-              <p className="text-xs text-blue-700 mb-0.5 font-semibold uppercase tracking-wide">
-                Model Summary
-              </p>
-              <p className="text-[10px] text-blue-600/90 mb-2 leading-tight">
-                Select one or more models
-              </p>
-
-              <div ref={modelSearchRef} className="relative mb-2">
-                <div className="relative">
-                  <Search
-                    size={14}
-                    className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-blue-400"
-                  />
-                  <input
-                    type="text"
-                    value={modelSearchText}
-                    onChange={(e) => {
-                      setModelSearchText(e.target.value);
-                      setShowModelDropdown(true);
-                    }}
-                    onFocus={() => setShowModelDropdown(true)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Escape") {
-                        setShowModelDropdown(false);
-                      } else if (e.key === "Enter" && filteredModelOptions.length > 0) {
-                        e.preventDefault();
-                        toggleModelFilter(filteredModelOptions[0]);
-                      }
-                    }}
-                    placeholder="Search model code or name..."
-                    autoComplete="off"
-                    className="w-full border border-blue-200 rounded-lg py-1.5 pl-7 pr-7 text-xs bg-white"
-                  />
-                  {(modelSearchText || modelNameFilters.length > 0) && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setModelNameFilters([]);
-                        setModelSearchText("");
-                        setShowModelDropdown(false);
-                      }}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-blue-400 hover:text-blue-600"
-                      aria-label="Clear model filters"
-                    >
-                      <XCircle size={14} />
-                    </button>
-                  )}
-                </div>
-
-                {modelNameFilters.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-1">
-                    {modelNameFilters.map((filterKey) => (
-                      <span
-                        key={filterKey}
-                        className="inline-flex max-w-full items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-800"
-                      >
-                        <span className="truncate">{getModelLabel(filterKey, modelOptions)}</span>
-                        <button
-                          type="button"
-                          onClick={() => removeModelFilter(filterKey)}
-                          className="shrink-0 text-blue-500 hover:text-blue-700"
-                          aria-label={`Remove ${getModelLabel(filterKey, modelOptions)}`}
-                        >
-                          <XCircle size={12} />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
-
-                {showModelDropdown && (
-                  <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-48 overflow-y-auto rounded-lg border border-blue-200 bg-white shadow-lg">
-                    {!modelSearchText.trim() && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setModelNameFilters([]);
-                          setShowModelDropdown(false);
-                        }}
-                        className="w-full border-b border-blue-50 px-3 py-2 text-left text-xs text-blue-700 hover:bg-blue-50"
-                      >
-                        All Models
-                      </button>
-                    )}
-                    {filteredModelOptions.length > 0 ? (
-                      filteredModelOptions.map((opt) => {
-                        const selected = isModelFilterSelected(modelNameFilters, opt);
-                        return (
-                          <button
-                            key={opt.filterKey}
-                            type="button"
-                            onClick={() => toggleModelFilter(opt)}
-                            className={`flex w-full items-center gap-2 border-b border-blue-50 px-3 py-2 text-left text-xs hover:bg-blue-50 ${
-                              selected ? "bg-blue-50 font-medium text-blue-900" : "text-gray-700"
-                            }`}
-                          >
-                            <span
-                              className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
-                                selected
-                                  ? "border-blue-600 bg-blue-600 text-white"
-                                  : "border-gray-300 bg-white"
-                              }`}
-                            >
-                              {selected ? <CheckCircle size={10} /> : null}
-                            </span>
-                            <span className="truncate">{opt.label}</span>
-                          </button>
-                        );
-                      })
-                    ) : (
-                      <div className="px-3 py-2 text-xs text-gray-500">
-                        No models found
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {modelNameFilters.length > 0 ? (
-                <>
-                  <div className="mb-2 pb-2 border-b border-blue-100">
-                    <p className="text-[10px] text-blue-600 font-medium">
-                      Total Quantity ({modelNameFilters.length} model
-                      {modelNameFilters.length === 1 ? "" : "s"})
-                    </p>
-                    <p className="text-lg font-bold text-blue-950 tabular-nums">
-                      {filteredModelQuantity.toLocaleString("en-IN")}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] text-sky-600 font-medium">Orders</p>
-                    <p className="text-lg font-bold text-sky-700 tabular-nums">
-                      {filteredOrders.length.toLocaleString("en-IN")}
-                    </p>
-                  </div>
-                </>
-              ) : (
-                <p className="text-xs text-blue-600/80">
-                  Select one or more models to view quantity
-                </p>
-              )}
             </div>
           </div>
         </div>
@@ -2380,25 +823,40 @@ export default function OrderTable({
         </div> */}
       </div>
 
-      <div className="flex justify-end">
-        <button
-          type="button"
-          onClick={handleExportToExcel}
-          disabled={isExporting}
-          className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
-        >
-          {isExporting ? "Exporting..." : "Export Excel"}
-        </button>
+      {/* 🔍 Search and Quick Status Filter */}
+      <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div className="relative w-full sm:w-2/3">
+          <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+            <Search size={20} className="text-gray-400" />
+          </div>
+          <input
+            type="text"
+            placeholder="Search by ID, client, company, etc."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200 ease-in-out"
+          />
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={handleResetFilters}
+            className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm font-medium rounded-lg transition-colors w-full sm:w-auto"
+          >
+            Reset Filters
+          </button>
+          <button
+            onClick={handleExportToExcel}
+            disabled={isExporting}
+            className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors w-full sm:w-auto"
+          >
+            {isExporting ? "Exporting..." : "Export Excel"}
+          </button>
+        </div>
       </div>
 
       {/* 🧰 Filters */}
-      <div className="flex flex-wrap items-end gap-3">
-        <OrderListSearchInput
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
-          onApply={handleApplySearch}
-        />
-        <div className="min-w-[140px] flex-1 sm:max-w-[200px]">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div>
           <label className="block text-xs text-gray-600 mb-1">Status</label>
           <select
             value={statusFilter}
@@ -2421,17 +879,27 @@ export default function OrderTable({
           </select>
         </div>
 
-        <div className="min-w-[140px] flex-1 sm:max-w-[200px]">
+        <div>
           <label className="block text-xs text-gray-600 mb-1">From Date</label>
-          <TypeableDateFilterInput value={dateFrom} onChange={setDateFrom} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"/>
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+          />
         </div>
 
-        <div className="min-w-[140px] flex-1 sm:max-w-[200px]">
+        <div>
           <label className="block text-xs text-gray-600 mb-1">To Date</label>
-          <TypeableDateFilterInput value={dateTo} onChange={setDateTo} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"/>
+          <input
+            type="date"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+          />
         </div>
 
-        <div className="min-w-[140px] flex-1 sm:max-w-[200px]">
+        <div>
           <label className="block text-xs text-gray-600 mb-1">Created By</label>
           <select
             value={createdByFilter}
@@ -2439,32 +907,17 @@ export default function OrderTable({
             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
           >
             <option value="">All Users</option>
-            {createdByFilterOptions.map((user) => (
-              <option key={user} value={user}>
-                {user}
-              </option>
-            ))}
+            {[...new Set(orders?.map((o) => o.created_by).filter(Boolean))]
+              .sort()
+              .map((user) => (
+                <option key={user} value={user}>
+                  {user}
+                </option>
+              ))}
           </select>
         </div>
 
-        <div className="min-w-[140px] flex-1 sm:max-w-[200px]">
-          <label className="block text-xs text-gray-600 mb-1">Lead Campaign</label>
-          <select
-            value={leadCampaignFilter}
-            onChange={(e) => setLeadCampaignFilter(e.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-          >
-            <option value="">All Campaigns</option>
-            <option value="__none__">No campaign</option>
-            {leadCampaignFilterOptions.map((key) => (
-              <option key={key} value={key}>
-                {formatLeadCampaignLabel(key)}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="min-w-[140px] flex-1 sm:max-w-[200px]">
+        <div>
           <label className="block text-xs text-gray-600 mb-1">
             Approval Status
           </label>
@@ -2479,26 +932,23 @@ export default function OrderTable({
             <option value="rejected">Rejected</option>
           </select>
         </div>
-
-        <div className="flex items-end shrink-0 order-last gap-2">
-          <OrderListSearchResetButton onReset={handleResetFilters} />
-          <OrderListSearchApplyButton onApply={handleApplySearch} embedded />
-        </div>
       </div>
 
-      <p className="mt-2 text-xs text-gray-500">
-        Rejected orders are hidden by default — use Approval Status &quot;Rejected&quot;, then Search.
-      </p>
+      {/* Show Rejected Orders Toggle */}
+      <div className="mt-3 flex items-center">
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={showRejected}
+            onChange={(e) => setShowRejected(e.target.checked)}
+            className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+          />
+          <span className="text-sm font-medium text-gray-700">Show Rejected Orders</span>
+        </label>
+      </div>
 
       {/* 👨‍💼 TABLE VIEW for large screens */}
-      {fetchError && (
-        <p className="text-sm text-red-600 mb-2">{fetchError}</p>
-      )}
-
-      <div
-        ref={tableScrollRef}
-        className="hidden lg:block overflow-x-auto overflow-y-auto max-h-[calc(100vh-160px)] min-h-[calc(100vh-240px)] bg-white rounded-xl shadow-lg"
-      >
+      <div className="hidden lg:block overflow-x-auto overflow-y-auto max-h-[calc(100vh-300px)] bg-white rounded-xl shadow-lg">
         <table className="w-full min-w-[1100px] text-sm">
           <thead className="bg-gray-800 text-white sticky top-0 z-10">
             <tr>
@@ -2532,17 +982,6 @@ export default function OrderTable({
                 <div className="flex items-center gap-1">
                   Order Date
                   {sortColumn === "created_at" && (
-                    sortDirection === "asc" ? <ArrowUp size={14} /> : <ArrowDown size={14} />
-                  )}
-                </div>
-              </th>
-              <th
-                className="px-3 py-3 font-semibold text-left cursor-pointer hover:bg-gray-700 transition-colors"
-                onClick={() => handleSort("lead_campaign")}
-              >
-                <div className="flex items-center gap-1">
-                  Lead Campaign
-                  {sortColumn === "lead_campaign" && (
                     sortDirection === "asc" ? <ArrowUp size={14} /> : <ArrowDown size={14} />
                   )}
                 </div>
@@ -2582,11 +1021,11 @@ export default function OrderTable({
               </th>
               <th 
                 className="px-3 py-3 font-semibold text-center cursor-pointer hover:bg-gray-700 transition-colors"
-                onClick={() => handleSort("taxable_amount")}
+                onClick={() => handleSort("payment_status")}
               >
                 <div className="flex items-center gap-1 justify-center">
                   Taxable
-                  {sortColumn === "taxable_amount" && (
+                  {sortColumn === "payment_status" && (
                     sortDirection === "asc" ? <ArrowUp size={14} /> : <ArrowDown size={14} />
                   )}
                 </div>
@@ -2613,9 +1052,6 @@ export default function OrderTable({
                   )}
                 </div>
               </th>
-              <th className="px-3 py-3 font-semibold text-center">
-                Linked Payment
-              </th>
               <th 
                 className="px-3 py-3 font-semibold text-center cursor-pointer hover:bg-gray-700 transition-colors"
                 onClick={() => handleSort("duedate")}
@@ -2634,8 +1070,7 @@ export default function OrderTable({
             {filteredOrders.length > 0 ? (
               filteredOrders.map((r, i) => {
                 const status = getStatusText(r);
-                const pay = getPaymentBadge(deriveOrderListPaymentStatus(r));
-                const paidUi = getOrderPaidAmountUiClasses(r);
+                const pay = getPaymentBadge(r.payment_status);
                 return (
                   <tr
                     key={r.order_id}
@@ -2664,10 +1099,7 @@ export default function OrderTable({
                       {r.created_by}
                     </td>
                     <td className="px-3 py-3 text-left">
-                      {dayjs(r.created_at).format("DD-MM-YYYY")}
-                    </td>
-                    <td className="px-3 py-3 text-left text-xs font-medium text-indigo-800">
-                      {formatLeadCampaignLabel(r.lead_campaign)}
+                      {dayjs(r.created_at).format("DD/MM/YYYY")}
                     </td>
                     <td className="px-3 py-3 text-left">
                       <div className="space-y-1 text-xs">
@@ -2716,14 +1148,11 @@ export default function OrderTable({
                             maximumFractionDigits: 2,
                           })}
                         </div>
-                        <OrderPaymentHistoryTrigger
-                          order={r}
-                          paymentStatusRaw={deriveOrderListPaymentStatus(r)}
-                          totalAmount={getTotalAmount(r)}
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border underline decoration-current underline-offset-2 hover:opacity-90 ${pay.cls}`}
+                        <span
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${pay.cls}`}
                         >
                           {pay.text}
-                        </OrderPaymentHistoryTrigger>
+                        </span>
                       </div>
                     </td>
                     <td className="px-3 py-3">
@@ -2738,19 +1167,13 @@ export default function OrderTable({
                           </span>
                         </div>
                         <div className="flex justify-between gap-4">
-                          <span className={paidUi.label}>Paid:</span>
-                          <OrderPaymentHistoryTrigger
-                            order={r}
-                            paymentStatusRaw={deriveOrderListPaymentStatus(r)}
-                            totalAmount={getTotalAmount(r)}
-                            className={paidUi.value}
-                          >
-                            ₹
-                            {getTotalPaidAmount(r).toLocaleString("en-IN", {
+                          <span className="font-semibold text-green-700">Paid:</span>
+                          <span className="font-bold text-green-600">
+                            ₹{getTotalPaidAmount(r).toLocaleString("en-IN", {
                               minimumFractionDigits: 2,
                               maximumFractionDigits: 2,
                             })}
-                          </OrderPaymentHistoryTrigger>
+                          </span>
                         </div>
                         <div className="flex justify-between gap-4">
                           <span className="font-semibold text-orange-700">Balance:</span>
@@ -2764,13 +1187,20 @@ export default function OrderTable({
                       </div>
                     </td>
                     <td className="px-3 py-3">
-                      <ApprovalActions r={r} userRole={userRole} />
-                    </td>
-                    <td className="px-3 py-3">
-                      <LinkedStatementPaymentCell order={r} />
+                      <div className="flex flex-col items-center gap-1">
+                        <ApprovalActions r={r} userRole={userRole} />
+                        {r.approval_remark && (
+                          <span
+                            className="text-xs text-gray-600 max-w-[180px] line-clamp-2 block text-left"
+                            title={r.approval_remark}
+                          >
+                            {r.approval_remark}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-3 py-3 text-center">
-                      {dayjs(r.duedate).format("DD-MM-YYYY")}
+                      {dayjs(r.duedate).format("DD/MM/YYYY")}
                     </td>
                     <td className="px-3 py-3 space-x-2 flex items-center justify-center relative">
                       <ActionButtons
@@ -2783,42 +1213,23 @@ export default function OrderTable({
                   </tr>
                 );
               })
-            ) : showListLoadingEmpty ? (
+            ) : (
               <tr>
-                <td colSpan={15} className="px-6 py-8 text-center text-gray-600">
-                  Loading…
-                </td>
-              </tr>
-            ) : showNoOrdersEmpty ? (
-              <tr>
-                <td colSpan={15} className="px-6 py-4 text-center text-gray-500">
+                <td colSpan={13} className="px-6 py-4 text-center text-gray-500">
                   No orders found.
                 </td>
               </tr>
-            ) : null}
+            )}
           </tbody>
         </table>
       </div>
-
-      {clientFetch && !listLoading && orders.length > 0 && (
-        <div className="hidden lg:flex items-center justify-between text-xs text-gray-600 px-1">
-          <span>
-            Showing {filteredOrders.length} of {orders.length} loaded
-            {hasMore ? " — scroll for more" : " — all loaded"}
-          </span>
-          {loadingMore && (
-            <span className="font-medium text-blue-600">Loading more…</span>
-          )}
-        </div>
-      )}
 
       {/* 📱 CARD VIEW for mobile */}
       <div className="lg:hidden space-y-4">
         {filteredOrders.length > 0 ? (
           filteredOrders.map((r, i) => {
             const status = getStatusText(r);
-            const pay = getPaymentBadge(deriveOrderListPaymentStatus(r));
-            const paidUi = getOrderPaidAmountUiClasses(r);
+            const pay = getPaymentBadge(r.payment_status);
             return (
               <div
                 key={r.order_id}
@@ -2828,7 +1239,7 @@ export default function OrderTable({
                   <span className="text-xs text-gray-500">#{i + 1}</span>
                   <div className="flex items-center gap-2 flex-wrap justify-end min-w-0">
                     <span className="font-medium text-gray-800 text-xs shrink-0">
-                      {dayjs(r.created_at).format("DD-MM-YYYY")}
+                      {dayjs(r.created_at).format("DD/MM/YYYY")}
                     </span>
                     <span
                       className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium shrink-0 ${status.bg} ${status.textCol}`}
@@ -2844,14 +1255,11 @@ export default function OrderTable({
                           })}
                         </div>
                       )}
-                      <OrderPaymentHistoryTrigger
-                        order={r}
-                        paymentStatusRaw={deriveOrderListPaymentStatus(r)}
-                        totalAmount={getTotalAmount(r)}
-                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border underline decoration-current underline-offset-2 hover:opacity-90 ${pay.cls}`}
+                      <span
+                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${pay.cls}`}
                       >
                         {pay.text}
-                      </OrderPaymentHistoryTrigger>
+                      </span>
                     </div>
                     <span className="shrink-0">
                       <ActionButtons
@@ -2884,10 +1292,6 @@ export default function OrderTable({
                 <div>
                   <strong>Created By:</strong> {r.created_by || "-"}
                 </div>
-                <div>
-                  <strong>Lead Campaign:</strong>{" "}
-                  {formatLeadCampaignLabel(r.lead_campaign)}
-                </div>
 
                 <div>
                   <strong>Client:</strong> {r.client_name}
@@ -2902,13 +1306,7 @@ export default function OrderTable({
                   <strong>Location:</strong> {r.state}
                 </div>
                 <div>
-                  <strong>Due Date:</strong> {dayjs(r.duedate).format("DD-MM-YYYY")}
-                </div>
-                <div className="pt-1">
-                  <strong>Linked Payment:</strong>
-                  <div className="mt-1 pl-1">
-                    <LinkedStatementPaymentCell order={r} />
-                  </div>
+                  <strong>Due Date:</strong> {dayjs(r.duedate).format("DD/MM/YYYY")}
                 </div>
                 <div>
                   <strong>Total Amount:</strong> ₹{getTotalAmount(r).toLocaleString("en-IN", {
@@ -2917,19 +1315,10 @@ export default function OrderTable({
                   })}
                 </div>
                 <div>
-                  <strong>Paid Amount:</strong>{" "}
-                  <OrderPaymentHistoryTrigger
-                    order={r}
-                    paymentStatusRaw={deriveOrderListPaymentStatus(r)}
-                    totalAmount={getTotalAmount(r)}
-                    className={paidUi.value}
-                  >
-                    ₹
-                    {getTotalPaidAmount(r).toLocaleString("en-IN", {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
-                  </OrderPaymentHistoryTrigger>
+                  <strong>Paid Amount:</strong> <span className="text-green-600">₹{getTotalPaidAmount(r).toLocaleString("en-IN", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}</span>
                 </div>
                 <div>
                   <strong>Balance Amount:</strong> <span className="text-orange-600">₹{getBalanceAmount(r).toLocaleString("en-IN", {
@@ -2940,17 +1329,25 @@ export default function OrderTable({
 
                 {/* Approval Actions - Approve/Reject/Revert - visible on mobile */}
                 <div className="pt-2 border-t border-gray-100">
-                  <ApprovalActions r={r} userRole={userRole} />
+                  <div className="flex flex-col gap-2">
+                    <ApprovalActions r={r} userRole={userRole} />
+                    {r.approval_remark && (
+                      <span
+                        className="text-xs text-gray-600 block"
+                        title={r.approval_remark}
+                      >
+                        Remark: {r.approval_remark}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
               </div>
             );
           })
-        ) : showListLoadingEmpty ? (
-          <p className="text-center text-gray-600 py-8">Loading…</p>
-        ) : showNoOrdersEmpty ? (
+        ) : (
           <p className="text-center text-gray-500">No orders found.</p>
-        ) : null}
+        )}
       </div>
     </div>
   );
@@ -3192,14 +1589,15 @@ function ReturnInitiateMenuItem({ order }) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
+  if (r.is_cancelled) {
+    return null;
+  }
+
   const popRef = useRef(null);
-  const [bookingProductSelectOpen, setBookingProductSelectOpen] = useState(false);
-  // const [photosOpen, setPhotosOpen] = useState(false);
   const role = (userRole || "").toString().trim().toLowerCase();
   const canViewSales = [
     "back office",
     "accountant",
-    "admin",
     "superadmin",
     "sales",
     "sales head",
@@ -3207,42 +1605,16 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
     "gem portal",
     "warehouse incharge",
   ].includes(role);
-  const isSuperAdmin = isSuperAdminRole(userRole);
-  const isAdmin = role === "admin";
+  const isSuperAdmin = role === "superadmin";
   const isAccountant = role.includes("accountant");
-  const canManageReturns = isSuperAdmin;
-  const accountantOnlyMenu = isAccountantOnlyMenuRole(userRole);
-  const canEditBooking = isSuperAdmin || isAdmin;
-  const reportUploaded = isBookingAllowedForOrder(r);
-  const canAdminAfterReport = (isAdmin || isSuperAdmin) && reportUploaded;
-  const canManageInvoiceDocs = isSuperAdmin || isAccountant;
+  const canManageReturns = isSuperAdmin || isAccountant;
   const isWarehouse = role === "warehouse incharge";
-  const isDirector = role === "director";
-  const isTeamLeader = role === "team leader";
-  const canManageBookingActions =
-    isSuperAdmin ||
-    isAdmin ||
-    canManageReturns ||
-    canAdminAfterReport ||
-    ((isDirector || isTeamLeader || isWarehouse) && reportUploaded);
   const hasBooking =
     r.booking_id !== undefined &&
     r.booking_id !== null &&
     String(r.booking_id).trim() !== "" &&
     String(r.booking_id) !== "0";
   const dispatchStatus = Number(r.dispatch_status);
-  const hasDispatchedStock = orderHasDispatchedStock(r);
-  const canOpenDispatch = canOpenDispatchForOrder(r);
-  const remainDispatchRound = isRemainDispatchRound(r);
-  const canViewDispatchPanel = canViewDispatchPanelForOrder(r);
-  // const canViewDispatchPhotos = [
-  //   "warehouse incharge",
-  //   "superadmin",
-  //   "team leader",
-  //   "admin",
-  //   "director",
-  //   "accountant",
-  // ].includes(role) || role.includes("accountant");
 
   useEffect(() => {
     if (!isOpen) return;
@@ -3268,20 +1640,8 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
     };
   }, [isOpen, toggleMenu]);
 
-  if (r.is_cancelled) {
-    return null;
-  }
-
   return (
     <div className="relative inline-block text-left">
-      {/* View Dispatch Photos — hidden on admin order list
-      {photosOpen && (
-        <DispatchPhotosModal
-          orderId={r.order_id}
-          onClose={() => setPhotosOpen(false)}
-        />
-      )}
-      */}
       <button
         onClick={toggleMenu}
         className="p-2 rounded-full hover:bg-gray-200 transition-colors duration-150"
@@ -3289,88 +1649,12 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
       >
         <MoreVertical size={18} />
       </button>
-      <DispatchProductSelectModal
-        open={bookingProductSelectOpen}
-        orderId={r.order_id}
-        nextHref={`/admin-dashboard/order/upload-booking/${r.order_id}`}
-        onClose={() => setBookingProductSelectOpen(false)}
-        title={
-          canCreateFollowUpBooking(r)
-            ? "Select remaining products for booking"
-            : "Select products for booking"
-        }
-        confirmLabel="Continue to booking"
-        partialHint="Partial Dispatch"
-      />
       {isOpen && (
         <div
           ref={popRef}
           className="absolute right-0 mt-2 w-56 max-w-[calc(100vw-2rem)] origin-top-right rounded-lg bg-white shadow-lg ring-1 ring-black/5 z-20 border"
         >
           <div className="py-1 text-sm">
-            {accountantOnlyMenu ? (
-              <>
-                <AccountantReportActionLinks
-                  order={r}
-                  viewSalesHref={`/admin-dashboard/order/${r.order_id}`}
-                  uploadHref={`/admin-dashboard/order/upload/${r.order_id}`}
-                  viewHref={`/admin-dashboard/order/view/${r.order_id}`}
-                  onClick={(e) => e.stopPropagation()}
-                />
-                <OrderBookingViewMenuLinks
-                  order={r}
-                  basePath="/admin-dashboard/order"
-                  canSee={hasBooking}
-                  onClick={(e) => e.stopPropagation()}
-                />
-                <OrderInvoiceMenuLinks
-                  order={r}
-                  invoicesBasePath="/admin-dashboard/invoices"
-                  onClick={(e) => e.stopPropagation()}
-                />
-                {r.report_file && (
-                  <div className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
-                    <EditPaymentButton order={r} />
-                  </div>
-                )}
-                {canViewDispatchPanel && (
-                  <Link
-                    href={`/admin-dashboard/order/dispatch/view/${r.order_id}`}
-                    className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
-                    title="View Dispatch"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <Search size={16} />
-                    <span>View Dispatch</span>
-                  </Link>
-                )}
-                <OrderDeliveryMenuLinks
-                  order={r}
-                  userRole={userRole}
-                  DeliveryMenuItem={UpdateDeliveryMenuItem}
-                />
-                {dispatchStatus === 1 &&
-                  ![1, 2, 3].includes(Number(r.is_returned || 0)) && (
-                    <div
-                      className="border-t border-gray-100 mt-1 pt-1"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <ReturnInitiateMenuItem order={r} />
-                    </div>
-                  )}
-                <ViewCreditNoteMenuLink
-                  order={r}
-                  userRole={userRole}
-                  hrefBase="/admin-dashboard"
-                  onClick={(e) => e.stopPropagation()}
-                />
-                <AccountantReturnViewMenuItems
-                  order={r}
-                  onClick={(e) => e.stopPropagation()}
-                />
-              </>
-            ) : (
-              <>
             {canViewSales && (
               <Link
                 href={`/admin-dashboard/order/${r.order_id}`}
@@ -3382,45 +1666,17 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                 <span>View Sales</span>
               </Link>
             )}
-            {canManageInvoiceDocs && (
-              <OrderInvoiceMenuLinks
-                order={r}
-                invoicesBasePath="/admin-dashboard/invoices"
-                onClick={(e) => e.stopPropagation()}
-              />
-            )}
-            {canManageInvoiceDocs &&
+            {["superadmin"].includes(role) &&
               (r.report_file ? (
-                <>
-                  <Link
-                    href={`/admin-dashboard/order/view/${r.order_id}`}
-                    className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
-                    title="View Report"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <FileText size={16} />
-                    <span>View Report</span>
-                  </Link>
-                  {isSuperAdmin && dispatchStatus === 0 && (
-                    <Link
-                      href={`/admin-dashboard/order/upload/${r.order_id}`}
-                      className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-blue-700"
-                      title="Edit Report"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <Pencil size={16} />
-                      <span>Edit Report</span>
-                    </Link>
-                  )}
-                  {isSuperAdmin && canShowOrderCancelMenu(r) && (
-                    <div
-                      className="border-t border-gray-100 mt-1 pt-1"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <DeleteButton orderId={r.order_id} />
-                    </div>
-                  )}
-                </>
+                <Link
+                  href={`/admin-dashboard/order/view/${r.order_id}`}
+                  className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
+                  title="View Report"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <FileText size={16} />
+                  <span>View Report</span>
+                </Link>
               ) : (
                 <>
                   <Link
@@ -3433,95 +1689,50 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                     <span>Upload Report</span>
                   </Link>
                   <div onClick={(e) => e.stopPropagation()}>
-                    {isSuperAdmin && canShowOrderCancelMenu(r) && (
-                      <DeleteButton orderId={r.order_id} />
-                    )}
+                    <DeleteButton orderId={r.order_id} />
                   </div>
                 </>
               ))}
-            {canManageBookingActions &&
-              (!hasBooking || canCreateFollowUpBooking(r)) && (
-                <button
-                  type="button"
-                  className="flex w-full items-center gap-2 px-3 py-2 hover:bg-gray-50 text-green-700 text-left"
-                  title={
-                    canCreateFollowUpBooking(r)
-                      ? "Create booking for remaining products"
-                      : "Create Booking"
-                  }
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setBookingProductSelectOpen(true);
-                    toggleMenu();
-                  }}
-                >
-                  <UploadCloud size={16} />
-                  <span>
-                    {canCreateFollowUpBooking(r)
-                      ? "Create Booking (Remaining)"
-                      : "Create Booking"}
-                  </span>
-                </button>
-              )}
-            {canEditBooking &&
-              hasBooking &&
-              !canCreateFollowUpBooking(r) &&
-              !orderHasDispatchedStock(r) &&
-              dispatchStatus !== 1 && (
+            {canManageReturns &&
+              (hasBooking ? (
                 <Link
-                  href={`/admin-dashboard/order/upload-booking/${r.order_id}`}
-                  className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-blue-700"
-                  title="Edit Booking"
+                  href={`/admin-dashboard/order/view-booking/${r.order_id}`}
+                  className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
+                  title="View Booking"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <Pencil size={16} />
-                  <span>Edit Booking</span>
+                  <FileCheck size={16} />
+                  <span>View Booking</span>
                 </Link>
-              )}
-            <OrderBookingViewMenuLinks
-              order={r}
-              basePath="/admin-dashboard/order"
-              canSee={hasBooking && (canManageReturns || canEditBooking)}
-              onClick={(e) => e.stopPropagation()}
-            />
-            {(isWarehouse ||
-              isSuperAdmin ||
-              isAdmin ||
-              canManageReturns ||
-              canAdminAfterReport) &&
-              canOpenDispatch && (
+              ) : (
+                <Link
+                  href={`/admin-dashboard/order/upload-booking/${r.order_id}`}
+                  className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-green-700"
+                  title="Create Booking"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <UploadCloud size={16} />
+                  <span>Create Booking</span>
+                </Link>
+              ))}
+            {(isWarehouse || canManageReturns) &&
+              hasBooking &&
+              dispatchStatus === 0 && (
                 <>
                   <Link
                     href={`/admin-dashboard/order/dispatch/${r.order_id}`}
                     className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
-                    title={
-                      remainDispatchRound
-                        ? "Dispatch remaining products"
-                        : "Dispatch"
-                    }
+                    title="Dispatch"
                     onClick={(e) => e.stopPropagation()}
                   >
                     <CheckCircle size={16} />
-                    <span>
-                      {remainDispatchRound ? "Dispatch (Remain)" : "Dispatch"}
-                    </span>
+                    <span>Dispatch</span>
                   </Link>
                 </>
               )}
-            {/* View Dispatch Photos — hidden on admin order list
-            {dispatchStatus === 1 && canViewDispatchPhotos && (
-              <DispatchPhotosMenuButton
-                orderId={r.order_id}
-                onOpen={() => setPhotosOpen(true)}
-              />
-            )}
-            */}
-            {(isWarehouse ||
-              isSuperAdmin ||
-              isAdmin ||
-              canManageReturns ||
-              canViewSales) &&
-              canViewDispatchPanel && (
+            {(isWarehouse || canManageReturns) &&
+              hasBooking &&
+              dispatchStatus === 1 && (
                 <>
                   <Link
                     href={`/admin-dashboard/order/dispatch/view/${r.order_id}`}
@@ -3534,11 +1745,12 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                   </Link>
                 </>
               )}
-            <OrderDeliveryMenuLinks
-              order={r}
-              userRole={userRole}
-              DeliveryMenuItem={UpdateDeliveryMenuItem}
-            />
+            {["accountant", "superadmin"].includes(role) && r.report_file && (
+              <div className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                <EditPaymentButton order={r} />
+              </div>
+            )}
+            <UpdateDeliveryMenuItem order={r} />
             {canManageReturns &&
               dispatchStatus === 1 &&
               ![1, 2, 3].includes(Number(r.is_returned || 0)) && (
@@ -3546,24 +1758,26 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                 <ReturnInitiateMenuItem order={r} />
               </div>
             )}
-            <ViewCreditNoteMenuLink
-              order={r}
-              userRole={userRole}
-              hrefBase="/admin-dashboard"
-              onClick={(e) => e.stopPropagation()}
-            />
-            {(canManageReturns || isAdmin) && Number(r.is_returned) === 3 && (
+            {[3, 1, 2].includes(Number(r.is_returned)) && r.credit_note_id && (
+              <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>
+                <Link
+                  href={`/admin-dashboard/credit-notes/${r.credit_note_id}`}
+                  className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-teal-700"
+                  title="View Credit Note"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <FileText size={16} />
+                  <span>View Credit Note</span>
+                </Link>
+              </div>
+            )}
+            {canManageReturns &&
+              (Number(r.is_returned) === 3 || Number(r.return_booking_done) === 1) && (
               <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>
                 <ReturnBookingMenuItem order={r} />
               </div>
             )}
-            {(canManageReturns || isAdmin || isAccountant) &&
-              Number(r.return_booking_done) === 1 && (
-              <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>
-                <ViewReturnBookingMenuItem order={r} />
-              </div>
-            )}
-            {(canManageReturns || isAdmin) &&
+            {canManageReturns &&
               Number(r.is_returned) === 3 &&
               Number(r.return_booking_done) === 1 &&
               Number(r.warehouse_in_done) !== 1 && (
@@ -3571,8 +1785,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                 <WarehouseInMenuItem order={r} />
               </div>
             )}
-            {(canManageReturns || isAdmin || isAccountant) &&
-              Number(r.warehouse_in_done) === 1 && (
+            {canManageReturns && Number(r.warehouse_in_done) === 1 && (
               <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>
                 <WarehouseInMenuItem order={r} />
               </div>
@@ -3581,8 +1794,6 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
               <div className="border-t border-gray-100 mt-1 pt-1">
                 <DeletePermanentlyButton orderId={r.order_id} onDeleted={toggleMenu} />
               </div>
-            )}
-              </>
             )}
           </div>
         </div>
@@ -3679,17 +1890,42 @@ function EditPaymentButton({ order }) {
     payment_status: order.payment_status || "",
   });
   const [status, setStatus] = useState(order.payment_status || "");
-  const totalamt = getTotalAmount(order);
+  const totalamt = order.totalamt || 0;
 
-  const rows = buildOrderPaymentRows(order);
+  const prevIds = (order.payment_id || "")
+    .toString()
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const prevDates = (order.payment_date || "")
+    .toString()
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const prevAmounts = (order.payment_amount || "")
+    .toString()
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const rows = Array.from({
+    length: Math.max(prevIds.length, prevDates.length, prevAmounts.length),
+  }).map((_, i) => ({
+    id: prevIds[i] || "",
+    date: prevDates[i] || "",
+    amount: prevAmounts[i] || "",
+  }));
 
   const formatPrevDate = (d) => {
     if (!d) return "-";
     const v = dayjs(d);
-    return v.isValid() ? v.format("DD-MM-YYYY") : d;
+    return v.isValid() ? v.format("DD/MM/YYYY") : d;
   };
 
-  const totalPaid = sumOrderPaymentAmounts(order);
+  const totalPaid = prevAmounts
+    .map((x) => Number(x))
+    .filter((n) => !isNaN(n))
+    .reduce((sum, n) => sum + n, 0);
 
   const onChange = (e) => {
     const { name, value } = e.target;
@@ -3853,7 +2089,7 @@ function Input({ label, name, value, onChange, type = "text" }) {
   );
 }
 
-function UpdateDeliveryMenuItem({ order, userRole, variant = "auto" }) {
+function UpdateDeliveryMenuItem({ order }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -3862,9 +2098,6 @@ function UpdateDeliveryMenuItem({ order, userRole, variant = "auto" }) {
   const [deliveryProof, setDeliveryProof] = useState(null);
   const [deliveryRemark, setDeliveryRemark] = useState("");
   const [uploading, setUploading] = useState(false);
-  const canViewDeliveryDetails = canViewOrderDeliveryDetailsRole(userRole);
-  const superAdmin = isSuperAdminRole(userRole);
-  const canManageAnyDelivery = canManageAnyOrderDeliveryRole(userRole);
 
   // Fetch current user
   useEffect(() => {
@@ -3882,46 +2115,14 @@ function UpdateDeliveryMenuItem({ order, userRole, variant = "auto" }) {
     fetchUser();
   }, []);
 
-  const isFullyDelivered = isOrderFullyDelivered(order);
-  const hasDeliveryRecord = orderHasDeliveryRecord(order);
-  const canUpdateDeliveryProof = canEditDeliveryProof(order);
-
   // Check if menu item should be shown
   const shouldShow = () => {
-    if (!canShowOrderDeliveryActions(order)) return false;
-
-    if (superAdmin || canManageAnyDelivery) return true;
-
-    if (canViewDeliveryDetails) {
-      return hasDeliveryRecord;
-    }
-
+    if (Number(order.dispatch_status) !== 1) return false;
     if (!currentUser || order.booking_by !== currentUser) return false;
     return true;
   };
 
-  const viewOnly =
-    !superAdmin &&
-    !canManageAnyDelivery &&
-    canViewDeliveryDetails &&
-    hasDeliveryRecord;
-
-  const uploadDeliveryProofFile = async () => {
-    if (!deliveryProof) return null;
-    setUploading(true);
-    const formData = new FormData();
-    formData.append("file", deliveryProof);
-    const uploadRes = await fetch("/api/upload-delivery-proof", {
-      method: "POST",
-      body: formData,
-    });
-    setUploading(false);
-    if (!uploadRes.ok) {
-      throw new Error("Failed to upload delivery proof");
-    }
-    const uploadJson = await uploadRes.json();
-    return uploadJson.url;
-  };
+  const isDelivered = Number(order.delivery_status) === 1;
 
   const handleSave = async () => {
     if (!deliveredOn) {
@@ -3931,7 +2132,27 @@ function UpdateDeliveryMenuItem({ order, userRole, variant = "auto" }) {
 
     try {
       setSaving(true);
-      const deliveryProofUrl = await uploadDeliveryProofFile();
+      let deliveryProofUrl = null;
+
+      // Upload delivery proof if file is selected
+      if (deliveryProof) {
+        setUploading(true);
+        const formData = new FormData();
+        formData.append("file", deliveryProof);
+
+        const uploadRes = await fetch("/api/upload-delivery-proof", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!uploadRes.ok) {
+          throw new Error("Failed to upload delivery proof");
+        }
+
+        const uploadJson = await uploadRes.json();
+        deliveryProofUrl = uploadJson.url;
+        setUploading(false);
+      }
 
       const res = await fetch("/api/orders/delivery", {
         method: "POST",
@@ -3961,102 +2182,7 @@ function UpdateDeliveryMenuItem({ order, userRole, variant = "auto" }) {
     }
   };
 
-  const handleUpdateProof = async () => {
-    if (!deliveryProof) {
-      alert("Please select a delivery proof file");
-      return;
-    }
-
-    try {
-      setSaving(true);
-      const deliveryProofUrl = await uploadDeliveryProofFile();
-
-      const res = await fetch("/api/orders/delivery", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          order_id: order.order_id,
-          delivery_proof: deliveryProofUrl,
-          update_proof_only: true,
-        }),
-      });
-
-      const json = await res.json();
-      if (!res.ok || !json.success) {
-        throw new Error(json.error || "Failed to update delivery proof");
-      }
-
-      alert("Delivery proof updated successfully!");
-      setOpen(false);
-      setDeliveryProof(null);
-      router.refresh();
-    } catch (error) {
-      console.error(error);
-      alert(error.message || "Failed to update delivery proof");
-    } finally {
-      setSaving(false);
-      setUploading(false);
-    }
-  };
-
-  if (variant === "view_first") {
-    if (!canShowOrderDeliveryActions(order) || !hasDeliveryRecord) return null;
-  } else if (variant === "view_remain") {
-    if (
-      !canShowOrderDeliveryActions(order) ||
-      !orderHasSecondDeliveryBatch(order)
-    ) {
-      return null;
-    }
-  } else if (variant === "update_remain") {
-    if (
-      !canShowOrderDeliveryActions(order) ||
-      isFullyDelivered ||
-      !hasDeliveryRecord
-    ) {
-      return null;
-    }
-  } else if (variant === "view") {
-    if (!canShowOrderDeliveryActions(order) || !hasDeliveryRecord) return null;
-  } else if (variant === "update") {
-    if (!canShowOrderDeliveryActions(order) || isFullyDelivered) return null;
-  } else if (!shouldShow()) {
-    return null;
-  }
-
-  const batchForModal =
-    variant === "view_first"
-      ? getDeliveryBatchForView(order, "first")
-      : variant === "view_remain"
-        ? getDeliveryBatchForView(order, "remain")
-        : null;
-  const displayOrder = batchForModal
-    ? {
-        ...order,
-        delivered_on: batchForModal.delivered_on,
-        delivery_proof: batchForModal.delivery_proof,
-        delivery_remark: batchForModal.delivery_remark,
-      }
-    : order;
-
-  const readOnlyDeliveryModal =
-    variant === "view_first" ||
-    variant === "view_remain" ||
-    variant === "view" ||
-    (variant === "auto" && (viewOnly || isFullyDelivered));
-
-  const menuLabel =
-    variant === "view_first"
-      ? "View Delivery"
-      : variant === "view_remain"
-        ? "View Delivery (Remain)"
-        : variant === "update_remain"
-          ? "Update Delivery (Remain)"
-          : variant === "update"
-            ? "Update Delivery"
-            : readOnlyDeliveryModal
-              ? "View Delivery"
-              : "Update Delivery";
+  if (!shouldShow()) return null;
 
   const formatDate = (d) => {
     if (!d) return "-";
@@ -4072,10 +2198,10 @@ function UpdateDeliveryMenuItem({ order, userRole, variant = "auto" }) {
           setOpen(true);
         }}
         className="w-full flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-blue-700 text-left"
-        title={readOnlyDeliveryModal ? "View Delivery" : "Update Delivery Status"}
+        title={isDelivered ? "View Delivery" : "Update Delivery Status"}
       >
         <Truck size={16} />
-        <span>{menuLabel}</span>
+        <span>{isDelivered ? "View Delivery" : "Update Delivery"}</span>
       </button>
       {open && (
         <div
@@ -4087,13 +2213,7 @@ function UpdateDeliveryMenuItem({ order, userRole, variant = "auto" }) {
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="text-lg font-semibold mb-4">
-              {readOnlyDeliveryModal
-                ? variant === "view_remain"
-                  ? "Delivery Details (Remain)"
-                  : "Delivery Details"
-                : variant === "update_remain"
-                  ? "Update Delivery (Remain)"
-                  : "Update Delivery Status"}
+              {isDelivered ? "Delivery Details" : "Update Delivery Status"}
             </h3>
 
             <div className="space-y-4">
@@ -4121,14 +2241,14 @@ function UpdateDeliveryMenuItem({ order, userRole, variant = "auto" }) {
                 </p>
               </div>
 
-              {readOnlyDeliveryModal ? (
+              {isDelivered ? (
                 <>
                   <div>
                     <label className="block text-sm text-gray-700 font-medium mb-1">
                       Actual Delivery Date:
                     </label>
                     <p className="text-sm font-medium text-gray-800">
-                      {formatDate(displayOrder.delivered_on)}
+                      {formatDate(order.delivered_on)}
                     </p>
                   </div>
 
@@ -4136,10 +2256,10 @@ function UpdateDeliveryMenuItem({ order, userRole, variant = "auto" }) {
                     <label className="block text-sm text-gray-700 font-medium mb-1">
                       Delivery Proof:
                     </label>
-                    {displayOrder.delivery_proof ? (
+                    {order.delivery_proof ? (
                       <div className="flex gap-3">
                         <a
-                          href={displayOrder.delivery_proof}
+                          href={order.delivery_proof}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 text-sm font-medium transition"
@@ -4166,7 +2286,7 @@ function UpdateDeliveryMenuItem({ order, userRole, variant = "auto" }) {
                           View
                         </a>
                         <a
-                          href={displayOrder.delivery_proof}
+                          href={order.delivery_proof}
                           download
                           className="inline-flex items-center gap-1 px-3 py-1.5 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 text-sm font-medium transition"
                         >
@@ -4191,40 +2311,15 @@ function UpdateDeliveryMenuItem({ order, userRole, variant = "auto" }) {
                         No delivery proof uploaded
                       </p>
                     )}
-                    {canUpdateDeliveryProof && !viewOnly && (
-                      <div className="mt-3">
-                        <label className="block text-sm text-gray-700 font-medium mb-1">
-                          {displayOrder.delivery_proof
-                            ? "Replace Delivery Proof"
-                            : "Upload Delivery Proof"}
-                        </label>
-                        <input
-                          type="file"
-                          accept="image/*,application/pdf"
-                          onChange={(e) =>
-                            setDeliveryProof(e.target.files?.[0] || null)
-                          }
-                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                        />
-                        {deliveryProof && (
-                          <p className="text-xs text-gray-600 mt-1">
-                            Selected: {deliveryProof.name}
-                          </p>
-                        )}
-                        <p className="text-xs text-amber-700 mt-1">
-                          Editable within 24 hours of delivery
-                        </p>
-                      </div>
-                    )}
                   </div>
 
                   <div>
                     <label className="block text-sm text-gray-700 font-medium mb-1">
                       Delivery Remark:
                     </label>
-                    {displayOrder.delivery_remark ? (
+                    {order.delivery_remark ? (
                       <p className="text-sm text-gray-800 bg-gray-50 p-2 rounded">
-                        {displayOrder.delivery_remark}
+                        {order.delivery_remark}
                       </p>
                     ) : (
                       <p className="text-sm text-gray-500 italic">
@@ -4239,8 +2334,13 @@ function UpdateDeliveryMenuItem({ order, userRole, variant = "auto" }) {
                     <label className="block text-sm text-gray-700 font-medium mb-1">
                       Actual Delivery Date *
                     </label>
-                    <TypeableDateFilterInput value={deliveredOn} onChange={setDeliveredOn} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      required/>
+                    <input
+                      type="date"
+                      value={deliveredOn}
+                      onChange={(e) => setDeliveredOn(e.target.value)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      required
+                    />
                   </div>
 
                   <div>
@@ -4285,9 +2385,9 @@ function UpdateDeliveryMenuItem({ order, userRole, variant = "auto" }) {
                 onClick={() => setOpen(false)}
                 className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm font-medium"
               >
-                {readOnlyDeliveryModal ? "Close" : "Cancel"}
+                {isDelivered ? "Close" : "Cancel"}
               </button>
-              {!readOnlyDeliveryModal && (
+              {!isDelivered && (
                 <button
                   onClick={handleSave}
                   disabled={saving || uploading}
@@ -4300,19 +2400,6 @@ function UpdateDeliveryMenuItem({ order, userRole, variant = "auto" }) {
                     : "Mark as Delivered"}
                 </button>
               )}
-              {readOnlyDeliveryModal && canUpdateDeliveryProof && !viewOnly && (
-                <button
-                  onClick={handleUpdateProof}
-                  disabled={saving || uploading || !deliveryProof}
-                  className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
-                >
-                  {uploading
-                    ? "Uploading..."
-                    : saving
-                    ? "Saving..."
-                    : "Update Proof"}
-                </button>
-              )}
             </div>
           </div>
         </div>
@@ -4322,20 +2409,8 @@ function UpdateDeliveryMenuItem({ order, userRole, variant = "auto" }) {
 }
 
 function canRevertOrder(dispatchStatus) {
-  const s = Number(dispatchStatus);
-  return s !== 1 && s !== 2;
-}
-
-/** Order Cancel: allowed through booking done; hidden once dispatch starts or later. */
-function canShowOrderCancelMenu(order) {
-  if (!order || order.is_cancelled) return false;
-  const dispatch = Number(order.dispatch_status);
-  if (dispatch === 1 || dispatch === 2) return false;
-  if (order.installation_status) return false;
-  if (Number(order.is_returned || 0) !== 0) return false;
-  if (isOrderFullyDelivered(order) || isOrderPartialDelivery(order)) return false;
-  if (orderHasDispatchedStock(order)) return false;
-  return true;
+  // Cannot revert if order is dispatched
+  return !dispatchStatus;
 }
 
 function WarehouseInMenuItem({ order }) {
@@ -4460,8 +2535,13 @@ function WarehouseInMenuItem({ order }) {
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Warehouse In Date</label>
-                    <TypeableDateFilterInput value={date} onChange={setDate} required
-                      className="w-full border px-3 py-2 rounded-md"/>
+                    <input
+                      type="date"
+                      value={date}
+                      onChange={(e) => setDate(e.target.value)}
+                      required
+                      className="w-full border px-3 py-2 rounded-md"
+                    />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Upload Image <span className="text-red-500">*</span></label>
@@ -4660,14 +2740,26 @@ function ReturnBookingMenuItem({ order }) {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Return Booking Date</label>
-                  <TypeableDateFilterInput value={formData.return_booking_date} onChange={(v) => handleChange({ target: { name: "return_booking_date", value: v } })} required
-                    className="mt-1 w-full border px-3 py-2 rounded-md"/>
+                  <input
+                    type="date"
+                    name="return_booking_date"
+                    value={formData.return_booking_date}
+                    onChange={handleChange}
+                    required
+                    className="mt-1 w-full border px-3 py-2 rounded-md"
+                  />
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Expected Pickup Date</label>
-                  <TypeableDateFilterInput value={formData.expected_pickup_date} onChange={(v) => handleChange({ target: { name: "expected_pickup_date", value: v } })} required
-                    className="mt-1 w-full border px-3 py-2 rounded-md"/>
+                  <input
+                    type="date"
+                    name="expected_pickup_date"
+                    value={formData.expected_pickup_date}
+                    onChange={handleChange}
+                    required
+                    className="mt-1 w-full border px-3 py-2 rounded-md"
+                  />
                 </div>
 
                 <input
@@ -4729,7 +2821,6 @@ function ApprovalActions({ r, userRole }) {
   const isSuperAdmin =
     (userRole || "").toString().trim().toUpperCase() === "SUPERADMIN";
   const revertAllowed = canRevertOrder(r.dispatch_status);
-  const savedRemark = getApprovalRemarkText(r);
 
   const submitAction = async (action, remarkVal) => {
     setLoading(true);
@@ -4762,7 +2853,7 @@ function ApprovalActions({ r, userRole }) {
 
   const handleAction = async (action) => {
     if (action === "pending") {
-      if (!revertAllowed) {
+      if (r.dispatch_status) {
         toast.error("Cannot revert: Order is already dispatched.");
         return;
       }
@@ -4778,23 +2869,23 @@ function ApprovalActions({ r, userRole }) {
     submitAction(modalAction, remark);
   };
 
-  if (normalizeApprovalStatus(r.approval_status) === "approved") {
+  if (r.approval_status === "approved") {
     return (
       <div className="flex flex-col items-center gap-1">
-        <div
-          className="flex items-center gap-1 text-green-600 font-semibold px-2 py-1 bg-green-50 rounded-lg border border-green-100"
-          title={savedRemark || undefined}
-        >
+        <div className="flex items-center gap-1 text-green-600 font-semibold px-2 py-1 bg-green-50 rounded-lg border border-green-100">
           <CheckCircle size={14} />
           <span>Approved</span>
-          <ApprovalRemarkHover remark={savedRemark} />
         </div>
-        {isSuperAdmin && revertAllowed && (
+        {isSuperAdmin && (
           <button
             onClick={() => handleAction("pending")}
-            disabled={loading}
-            className="text-xs text-gray-500 hover:text-orange-600 underline"
-            title="Reset to Pending"
+            disabled={loading || !revertAllowed}
+            className={`text-xs ${revertAllowed ? "text-gray-500 hover:text-orange-600 underline" : "text-gray-400 cursor-not-allowed"}`}
+            title={
+              r.dispatch_status 
+                ? "Cannot revert: Order is already dispatched" 
+                : "Reset to Pending"
+            }
           >
             Revert
           </button>
@@ -4802,23 +2893,23 @@ function ApprovalActions({ r, userRole }) {
       </div>
     );
   }
-  if (normalizeApprovalStatus(r.approval_status) === "rejected") {
+  if (r.approval_status === "rejected") {
     return (
       <div className="flex flex-col items-center gap-1">
-        <div
-          className="flex items-center gap-1 text-red-600 font-semibold px-2 py-1 bg-red-50 rounded-lg border border-red-100"
-          title={savedRemark || undefined}
-        >
+        <div className="flex items-center gap-1 text-red-600 font-semibold px-2 py-1 bg-red-50 rounded-lg border border-red-100">
           <XCircle size={14} />
           <span>Rejected</span>
-          <ApprovalRemarkHover remark={savedRemark} />
         </div>
-        {isSuperAdmin && revertAllowed && (
+        {isSuperAdmin && (
           <button
             onClick={() => handleAction("pending")}
-            disabled={loading}
-            className="text-xs text-gray-500 hover:text-orange-600 underline"
-            title="Reset to Pending"
+            disabled={loading || !revertAllowed}
+            className={`text-xs ${revertAllowed ? "text-gray-500 hover:text-orange-600 underline" : "text-gray-400 cursor-not-allowed"}`}
+            title={
+              r.dispatch_status 
+                ? "Cannot revert: Order is already dispatched" 
+                : "Reset to Pending"
+            }
           >
             Revert
           </button>

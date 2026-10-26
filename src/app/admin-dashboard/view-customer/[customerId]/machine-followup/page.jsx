@@ -203,7 +203,7 @@ export default async function MachineFollowupPage({ params }) {
                       <span className="text-gray-500">Followed At:</span>{" "}
                       <span className="font-medium">
                         {rec.followed_at
-                          ? dayjs(rec.followed_at).tz(IST).format("DD-MM-YYYY, HH:mm")
+                          ? dayjs(rec.followed_at).tz(IST).format("DD MMM YYYY, HH:mm")
                           : "—"}
                       </span>
                     </div>
@@ -211,7 +211,7 @@ export default async function MachineFollowupPage({ params }) {
                       <span className="text-gray-500">Next Follow-up:</span>{" "}
                       <span className="font-medium">
                         {rec.next_followup_date
-                          ? dayjs(rec.next_followup_date).tz(IST).format("DD-MM-YYYY, HH:mm")
+                          ? dayjs(rec.next_followup_date).tz(IST).format("DD MMM YYYY, HH:mm")
                           : "—"}
                       </span>
                     </div>

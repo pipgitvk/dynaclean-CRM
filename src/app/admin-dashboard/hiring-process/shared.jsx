@@ -24,9 +24,6 @@ export const STATUS_CHIP_STYLES = {
   Backup: "bg-slate-100 text-slate-700 border-slate-300 ring-1 ring-slate-400/20",
   Hired: "bg-emerald-50 text-emerald-900 border-emerald-200 ring-1 ring-emerald-500/20",
   Joined: "bg-teal-50 text-teal-900 border-teal-200 ring-1 ring-teal-500/20",
-  Backout: "bg-rose-50 text-rose-900 border-rose-200 ring-1 ring-rose-500/15",
-  "After joining backout":
-    "bg-fuchsia-50 text-fuchsia-900 border-fuchsia-200 ring-1 ring-fuchsia-500/15",
   Rejected: "bg-red-50 text-red-900 border-red-200 ring-1 ring-red-500/15",
   "Shortlisted for interview": "bg-sky-50 text-sky-900 border-sky-200 ring-1 ring-sky-500/15",
   Rescheduled: "bg-amber-50 text-amber-900 border-amber-200 ring-1 ring-amber-500/15",
@@ -60,8 +57,6 @@ export const STATUS_OPTIONS = [
   "Backup",
   "Hired",
   "Joined",
-  "Backout",
-  "After joining backout",
   "Rejected",
 ];
 
