@@ -13,6 +13,8 @@ import { isSalesRole } from "@/lib/isSalesRole";
 import {
   collectHierarchyCustomerIds,
   fetchCustomerFollowupHistory,
+  fetchCustomerTLFollowupHistory,
+  mergeFollowupHistories,
 } from "@/lib/customerHierarchyFollowups";
 import { isGemRole } from "@/lib/isGemRole";
 import { isServiceSupportRole, sqlColumnInActiveServiceSupportUsers } from "@/lib/serviceSupportTeamScope";
@@ -214,11 +216,15 @@ export default async function CustomerPage({ params }) {
     siblingContacts,
     childContacts,
   });
-  const fups = await fetchCustomerFollowupHistory(conn, {
+  const employeeFups = await fetchCustomerFollowupHistory(conn, {
     customerIds: hierarchyCustomerIds,
     userRole,
     username,
   });
+  const tlFups = await fetchCustomerTLFollowupHistory(conn, {
+    customerIds: hierarchyCustomerIds,
+  });
+  const fups = mergeFollowupHistories(employeeFups, tlFups);
 
   // await conn.end();
 

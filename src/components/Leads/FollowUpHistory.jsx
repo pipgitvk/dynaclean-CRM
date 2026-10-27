@@ -272,6 +272,7 @@ import {
 import { isGemRole } from "@/lib/isGemRole";
 
 function pickNextFollowupField(entry, userRole) {
+  if (entry.followup_source === "TL") return entry.next_followup_date;
   if (userRole === "SERVICE SUPPORT") return entry.service_next_followup;
   if (isGemRole(userRole)) return entry.gem_next_followup;
   return entry.next_followup_date;
@@ -494,7 +495,16 @@ export default function FollowUpHistory({
                         ? formatCrmDatetimeForISTDisplay(nextFollowup)
                         : "-"}
                     </td>
-                    <td className="px-3 py-2 align-top">{entry.followed_by || "-"}</td>
+                    <td className="px-3 py-2 align-top">
+                      <div className="flex flex-wrap items-center gap-1">
+                        <span>{entry.followed_by || "-"}</span>
+                        {entry.followup_source === "TL" ? (
+                          <span className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-100 text-amber-900">
+                            TL
+                          </span>
+                        ) : null}
+                      </div>
+                    </td>
                     <td className="px-3 py-2 align-top">
                       {entry.followed_date
                         ? formatCrmDatetimeForISTDisplay(entry.followed_date)

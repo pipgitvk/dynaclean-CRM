@@ -80,3 +80,60 @@ export async function fetchCustomerFollowupHistory(
     };
   });
 }
+
+/** TL_followups rows shaped like customers_followup for FollowUpHistory. */
+export async function fetchCustomerTLFollowupHistory(conn, { customerIds }) {
+  const ids = [...new Set(customerIds.map(Number).filter((id) => Number.isFinite(id) && id > 0))];
+  if (!ids.length) return [];
+
+  const placeholders = ids.map(() => "?").join(", ");
+  const includeContactLabel = ids.length > 1;
+  const selectFields = includeContactLabel
+    ? `tlf.next_followup_date, tlf.followed_date, tlf.followed_by, tlf.notes,
+       tlf.multi_tag, tlf.created_at, tlf.customer_id,
+       TRIM(CONCAT(COALESCE(c.first_name, ''), ' ', COALESCE(c.last_name, ''))) AS contact_name`
+    : `tlf.next_followup_date, tlf.followed_date, tlf.followed_by, tlf.notes,
+       tlf.multi_tag, tlf.created_at, tlf.customer_id`;
+
+  let sql = `SELECT ${selectFields}
+     FROM TL_followups tlf`;
+  if (includeContactLabel) {
+    sql += " LEFT JOIN customers c ON c.customer_id = tlf.customer_id";
+  }
+  sql += ` WHERE tlf.customer_id IN (${placeholders})
+     ORDER BY tlf.created_at DESC`;
+
+  const [rows] = await conn.execute(sql, ids);
+
+  return (rows || []).map((row) => {
+    const base = {
+      next_followup_date: row.next_followup_date,
+      service_next_followup: null,
+      gem_next_followup: null,
+      followed_date: row.followed_date,
+      followed_by: row.followed_by,
+      notes: row.notes,
+      comm_mode: "TL",
+      time_stamp: row.created_at || row.followed_date,
+      multi_tag: row.multi_tag,
+      customer_id: row.customer_id,
+      followup_source: "TL",
+    };
+    if (!includeContactLabel) return base;
+    const contactName = String(row.contact_name || "").trim();
+    return {
+      ...base,
+      contact_name: contactName || `Customer ${row.customer_id}`,
+    };
+  });
+}
+
+export function mergeFollowupHistories(employeeRows = [], tlRows = []) {
+  const merged = [...(employeeRows || []), ...(tlRows || [])];
+  merged.sort(
+    (a, b) =>
+      new Date(b.time_stamp || b.followed_date || 0).getTime() -
+      new Date(a.time_stamp || a.followed_date || 0).getTime(),
+  );
+  return merged;
+}
