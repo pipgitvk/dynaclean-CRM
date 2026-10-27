@@ -27,7 +27,12 @@ export function shouldShowSplitDeliveryMenus(order) {
  * After saving delivery: full delivered only when entire order is dispatched
  * and no quotation units remain pending dispatch.
  */
-export async function resolveDeliveryStatusAfterUpdate(conn, orderId, dispatchStatus) {
+export async function resolveDeliveryStatusAfterUpdate(
+  conn,
+  orderId,
+  _dispatchStatus,
+  { requiresSecondDeliveryProof = false, deliveryBatchCountBeforeSave = 0 } = {},
+) {
   const { fetchOrderDispatchLineOptions } = await import(
     "@/lib/dispatchPartialSelection"
   );
@@ -36,7 +41,21 @@ export async function resolveDeliveryStatusAfterUpdate(conn, orderId, dispatchSt
     (s, l) => s + (Number(l.pending_qty) || 0),
     0,
   );
-  const fullyDispatched =
-    Number(dispatchStatus) === 1 && pendingDispatch === 0;
+  const { orderHasDispatchedStockForOrderId } = await import(
+    "@/lib/orderDeliveryEligibility"
+  );
+  const hasDispatchedStock = await orderHasDispatchedStockForOrderId(
+    conn,
+    orderId,
+  );
+  const fullyDispatched = pendingDispatch === 0 && hasDispatchedStock;
+
+  if (
+    requiresSecondDeliveryProof &&
+    deliveryBatchCountBeforeSave + 1 < 2
+  ) {
+    return DELIVERY_STATUS_PARTIAL;
+  }
+
   return fullyDispatched ? DELIVERY_STATUS_FULL : DELIVERY_STATUS_PARTIAL;
 }

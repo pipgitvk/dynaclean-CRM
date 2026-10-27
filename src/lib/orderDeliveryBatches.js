@@ -1,8 +1,13 @@
+import { orderRemainBookingBatchDone } from "@/lib/orderDeliveryEligibility";
+
 /** @param {import("mysql2/promise").PoolConnection} conn */
 
 const TABLE = "order_delivery_batches";
 
+let orderDeliveryBatchesTableReady = false;
+
 export async function ensureOrderDeliveryBatchesTable(conn) {
+  if (orderDeliveryBatchesTableReady) return;
   await conn.execute(`
     CREATE TABLE IF NOT EXISTS ${TABLE} (
       id INT AUTO_INCREMENT PRIMARY KEY,
@@ -16,6 +21,7 @@ export async function ensureOrderDeliveryBatchesTable(conn) {
       KEY idx_order_delivery_order (order_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `);
+  orderDeliveryBatchesTableReady = true;
 }
 
 function mapRow(row) {
@@ -120,4 +126,10 @@ export function getDeliveryBatchForView(order, which) {
 export function orderHasSecondDeliveryBatch(order) {
   const batches = order?.delivery_batches || [];
   return batches.length >= 2 || batches.some((b) => Number(b.sequence_no) >= 2);
+}
+
+/** 2nd booking batch saved but fewer than 2 delivery proofs on file. */
+export function orderNeedsRemainDeliverySave(order) {
+  if (!orderRemainBookingBatchDone(order)) return false;
+  return !orderHasSecondDeliveryBatch(order);
 }

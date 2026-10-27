@@ -6,14 +6,18 @@ import { canManageAnyOrderDeliveryRole } from "@/lib/roleKeyUtils";
 import {
   dispatchStatusAllowsDeliveryUpdate,
   orderHasDispatchedStockForOrderId,
+  orderRemainBookingBatchDone,
 } from "@/lib/orderDeliveryEligibility";
 import {
   DELIVERY_STATUS_FULL,
   DELIVERY_STATUS_PARTIAL,
   resolveDeliveryStatusAfterUpdate,
 } from "@/lib/orderDeliveryStatus";
+import { attachBookingBatchesToOrders } from "@/lib/orderBookingBatches";
 import {
+  attachDeliveryBatchesToOrders,
   ensureOrderDeliveryBatchesTable,
+  orderHasSecondDeliveryBatch,
   persistOrderDeliveryBatch,
 } from "@/lib/orderDeliveryBatches";
 
@@ -41,7 +45,7 @@ export async function POST(request) {
     const conn = await getDbConnection();
 
     const [orderRows] = await conn.execute(
-      `SELECT booking_by, dispatch_status, delivery_status, delivered_on, delivery_proof, delivery_remark
+      `SELECT booking_by, booking_id, dispatch_status, delivery_status, delivered_on, delivery_proof, delivery_remark
        FROM neworder WHERE order_id = ?`,
       [order_id],
     );
@@ -87,6 +91,17 @@ export async function POST(request) {
       );
     }
 
+    let [orderMeta] = await attachBookingBatchesToOrders(conn, [
+      { order_id, booking_id: order.booking_id },
+    ]);
+    [orderMeta] = await attachDeliveryBatchesToOrders(conn, [orderMeta]);
+    const requiresSecondDeliveryProof = orderRemainBookingBatchDone(orderMeta);
+    const deliveryBatchCountBeforeSave = (orderMeta.delivery_batches || [])
+      .length;
+    const canSaveRemainWhileMarkedFull =
+      requiresSecondDeliveryProof &&
+      !orderHasSecondDeliveryBatch(orderMeta);
+
     const isFullyDelivered = Number(order.delivery_status) === DELIVERY_STATUS_FULL;
 
     if (isFullyDelivered && update_proof_only) {
@@ -115,7 +130,7 @@ export async function POST(request) {
       });
     }
 
-    if (isFullyDelivered) {
+    if (isFullyDelivered && !canSaveRemainWhileMarkedFull) {
       return NextResponse.json(
         { error: "Delivery is already marked as complete" },
         { status: 400 },
@@ -126,6 +141,10 @@ export async function POST(request) {
       conn,
       order_id,
       order.dispatch_status,
+      {
+        requiresSecondDeliveryProof,
+        deliveryBatchCountBeforeSave,
+      },
     );
 
     const deliveredOnVal = delivered_on || new Date();

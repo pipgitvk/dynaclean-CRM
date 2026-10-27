@@ -15,7 +15,10 @@ import {
 
 const TABLE = "order_booking_batches";
 
+let orderBookingBatchesTableReady = false;
+
 export async function ensureOrderBookingBatchesTable(conn) {
+  if (orderBookingBatchesTableReady) return;
   await conn.execute(`
     CREATE TABLE IF NOT EXISTS ${TABLE} (
       id INT AUTO_INCREMENT PRIMARY KEY,
@@ -33,6 +36,7 @@ export async function ensureOrderBookingBatchesTable(conn) {
       KEY idx_order_booking_order (order_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `);
+  orderBookingBatchesTableReady = true;
 }
 
 function parseItemsJson(raw) {
@@ -280,10 +284,16 @@ export async function attachBookingPendingToOrders(conn, orders) {
   });
 }
 
-/** Accurate pending / open-dispatch counts (quotation ↔ dispatch matching). */
-export async function attachDispatchPendingToOrders(conn, orders) {
+/**
+ * Accurate pending / open-dispatch counts (quotation ↔ dispatch matching).
+ * @param {{ skipDbSync?: boolean }} [options] — list pages: skip repair UPDATEs (read-only enrich).
+ */
+export async function attachDispatchPendingToOrders(conn, orders, options = {}) {
+  const { skipDbSync = false } = options;
   if (!orders?.length) return orders || [];
-  await ensureDispatchActiveColumn(conn);
+  if (!skipDbSync) {
+    await ensureDispatchActiveColumn(conn);
+  }
 
   const quoteNumbers = [
     ...new Set(
@@ -294,19 +304,20 @@ export async function attachDispatchPendingToOrders(conn, orders) {
 
   const inClause = quoteNumbers.map(() => "?").join(",");
 
-  // Permanent repair: serial filled ⇒ treat as shipped in DB (all orders)
-  try {
-    await conn.execute(
-      `UPDATE dispatch
-       SET stock_deducted = 1, dispatch_active = 0, updated_at = NOW()
-       WHERE ${sqlQuoteTrimIn("quote_number", inClause)}
-         AND COALESCE(stock_deducted, 0) = 0
-         AND serial_no IS NOT NULL
-         AND TRIM(serial_no) <> ''`,
-      quoteNumbers,
-    );
-  } catch (e) {
-    console.error("attachDispatchPending repair stock_deducted:", e);
+  if (!skipDbSync) {
+    try {
+      await conn.execute(
+        `UPDATE dispatch
+         SET stock_deducted = 1, dispatch_active = 0, updated_at = NOW()
+         WHERE ${sqlQuoteTrimIn("quote_number", inClause)}
+           AND COALESCE(stock_deducted, 0) = 0
+           AND serial_no IS NOT NULL
+           AND TRIM(serial_no) <> ''`,
+        quoteNumbers,
+      );
+    } catch (e) {
+      console.error("attachDispatchPending repair stock_deducted:", e);
+    }
   }
 
   const [qiRows] = await conn.execute(
@@ -412,18 +423,21 @@ export async function attachDispatchPendingToOrders(conn, orders) {
     return { ...withCounts, dispatch_status };
   });
 
-  for (const u of updates) {
-    try {
-      await conn.execute(
-        `UPDATE neworder SET dispatch_status = ? WHERE order_id = ?`,
-        [u.dispatch_status, u.orderId],
-      );
-    } catch (e) {
-      console.error("attachDispatchPending sync dispatch_status:", e);
+  if (!skipDbSync) {
+    for (const u of updates) {
+      try {
+        await conn.execute(
+          `UPDATE neworder SET dispatch_status = ? WHERE order_id = ?`,
+          [u.dispatch_status, u.orderId],
+        );
+      } catch (e) {
+        console.error("attachDispatchPending sync dispatch_status:", e);
+      }
     }
   }
 
   for (const order of enriched) {
+    if (skipDbSync) continue;
     const shipped = Number(order.dispatch_shipped_units) || 0;
     if (shipped <= 0) continue;
     const q = String(order.quote_number || "").trim();

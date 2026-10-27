@@ -11,18 +11,11 @@ import {
 import { canViewAllOrders } from "@/lib/dataScope";
 import { normalizeRoleKey } from "@/lib/roleKeyUtils";
 import {
-  ORDER_LIST_DISPATCHED_STOCK_COUNT_SELECT,
-  ORDER_LIST_PENDING_DISPATCH_UNITS_SELECT,
-} from "@/lib/orderDeliveryEligibility";
-import {
   attachBookingBatchesToOrders,
   attachBookingPendingToOrders,
   attachDispatchPendingToOrders,
 } from "@/lib/orderBookingBatches";
 import { attachDeliveryBatchesToOrders } from "@/lib/orderDeliveryBatches";
-
-// Secret for verifying JWT
-const JWT_SECRET = process.env.JWT_SECRET;
 
 export default async function OrdersPage() {
   const payload = await getSessionPayload();
@@ -42,19 +35,6 @@ export default async function OrdersPage() {
 
   const conn = await getDbConnection();
 
-  // Ensure new columns exist safely
-  const safeAlters = [
-    "ALTER TABLE neworder ADD COLUMN IF NOT EXISTS warehouse_in_done TINYINT(1) DEFAULT 0",
-    "ALTER TABLE neworder ADD COLUMN IF NOT EXISTS warehouse_in_date DATE NULL",
-    "ALTER TABLE neworder ADD COLUMN IF NOT EXISTS warehouse_in_image VARCHAR(500) NULL",
-    "ALTER TABLE neworder ADD COLUMN IF NOT EXISTS warehouse_in_by VARCHAR(100) NULL",
-    "ALTER TABLE credit_notes ADD COLUMN IF NOT EXISTS is_saved TINYINT(1) NOT NULL DEFAULT 0",
-    "ALTER TABLE credit_notes ADD COLUMN IF NOT EXISTS saved_at DATETIME NULL DEFAULT NULL",
-  ];
-  for (const alter of safeAlters) {
-    await conn.execute(alter).catch(() => {});
-  }
-
   // 1. Fetch the user role
   const [roleRows] = await conn.execute(
     "SELECT userRole FROM rep_list WHERE username = ?",
@@ -66,8 +46,8 @@ export default async function OrdersPage() {
   let sql = `SELECT
                 no.order_id, no.report_file, no.po_file, no.payment_proof, no.booking_url,
                 no.client_name, no.contact, no.is_cancelled, no.dispatch_status,
-                ${ORDER_LIST_DISPATCHED_STOCK_COUNT_SELECT},
-                ${ORDER_LIST_PENDING_DISPATCH_UNITS_SELECT},
+                0 AS dispatched_stock_count,
+                0 AS pending_dispatch_units,
                 no.created_at, no.created_by , no.einvoice_file, no.booking_id, no.quote_number, no.duedate,
                 no.invoice_date , no.account_by ,no.booking_by , no.dispatch_person,
                 no.payment_id, no.payment_date, no.payment_amount, no.payment_status,no.totalamt, no.baseAmount, no.taxamt, no.transaction_id,
@@ -158,15 +138,12 @@ export default async function OrdersPage() {
   ordersWithBatches = await attachDispatchPendingToOrders(
     conn,
     ordersWithBatches,
+    { skipDbSync: true },
   );
   ordersWithBatches = await attachDeliveryBatchesToOrders(
     conn,
     ordersWithBatches,
   );
-
-  // await conn.end();
-
-  console.log("fetched orders:", ordersWithBatches);
 
   return (
     <div className=" mx-auto p-6">

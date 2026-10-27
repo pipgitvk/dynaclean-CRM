@@ -53,6 +53,7 @@ import {
 import {
   getDeliveryBatchForView,
   orderHasSecondDeliveryBatch,
+  orderNeedsRemainDeliverySave,
 } from "@/lib/orderDeliveryBatches";
 import DispatchProductSelectModal from "@/components/orders/DispatchProductSelectModal";
 import OrderBookingViewMenuLinks from "@/components/orders/OrderBookingViewMenuLinks";
@@ -1482,8 +1483,8 @@ function UpdateDeliveryMenuItem({ order, userRole, variant = "auto" }) {
   } else if (variant === "update_remain") {
     if (
       !canShowOrderDeliveryActions(order) ||
-      isFullyDelivered ||
-      !hasDeliveryRecord
+      !hasDeliveryRecord ||
+      (isFullyDelivered && !orderNeedsRemainDeliverySave(order))
     ) {
       return null;
     }

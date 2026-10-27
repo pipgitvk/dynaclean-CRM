@@ -248,7 +248,9 @@ export async function fetchAccountsOrderListPage(
   enrichedOrders = await attachBookingBatchesToOrders(conn, enrichedOrders);
   enrichedOrders = await attachBookingPendingToOrders(conn, enrichedOrders);
   if (!lightList) {
-    enrichedOrders = await attachDispatchPendingToOrders(conn, enrichedOrders);
+    enrichedOrders = await attachDispatchPendingToOrders(conn, enrichedOrders, {
+      skipDbSync: true,
+    });
   }
   enrichedOrders = await attachDeliveryBatchesToOrders(conn, enrichedOrders);
 

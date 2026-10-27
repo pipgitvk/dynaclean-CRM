@@ -224,7 +224,9 @@ export async function fetchAdminOrderListPage(
   enrichedOrders = await attachActiveInvoiceFields(conn, enrichedOrders);
   enrichedOrders = await attachBookingBatchesToOrders(conn, enrichedOrders);
   enrichedOrders = await attachBookingPendingToOrders(conn, enrichedOrders);
-  enrichedOrders = await attachDispatchPendingToOrders(conn, enrichedOrders);
+  enrichedOrders = await attachDispatchPendingToOrders(conn, enrichedOrders, {
+    skipDbSync: true,
+  });
   enrichedOrders = await attachDeliveryBatchesToOrders(conn, enrichedOrders);
 
   return {

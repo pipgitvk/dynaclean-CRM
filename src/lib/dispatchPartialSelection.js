@@ -14,7 +14,10 @@ import { sqlQuoteTrimEqColumn } from "@/lib/sqlQuoteMatch";
 
 /** @param {import("mysql2/promise").PoolConnection} conn */
 
+let dispatchActiveColumnReady = false;
+
 export async function ensureDispatchActiveColumn(conn) {
+  if (dispatchActiveColumnReady) return;
   try {
     await conn.execute(
       `ALTER TABLE dispatch ADD COLUMN dispatch_active TINYINT(1) NOT NULL DEFAULT 1
@@ -23,6 +26,7 @@ export async function ensureDispatchActiveColumn(conn) {
   } catch (_) {
     /* column exists */
   }
+  dispatchActiveColumnReady = true;
 }
 
 function normCode(code) {
