@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { FileCheck } from "lucide-react";
 import {
-  canCreateFollowUpBooking,
+  canCreateAdditionalBooking,
   orderHasOpenDispatchBatch,
   orderHasPendingDispatchUnits,
 } from "@/lib/orderDeliveryEligibility";
@@ -15,7 +15,7 @@ export function shouldShowSplitBookingViews(order) {
   if (batches.length <= 1) return false;
   if (orderHasOpenDispatchBatch(order)) return false;
   return (
-    canCreateFollowUpBooking(order) || orderHasPendingDispatchUnits(order)
+    canCreateAdditionalBooking(order) || orderHasPendingDispatchUnits(order)
   );
 }
 

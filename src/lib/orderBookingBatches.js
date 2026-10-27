@@ -2,10 +2,7 @@ import {
   computeDispatchPendingFromRows,
   dispatchRowMatchesQuotationLine,
 } from "@/lib/dispatchQuotationMatch";
-import {
-  orderRemainBookingBatchDone,
-  reconcileDispatchStatusForOrder,
-} from "@/lib/orderDeliveryEligibility";
+import { reconcileDispatchStatusForOrder } from "@/lib/orderDeliveryEligibility";
 import { ensureDispatchActiveColumn } from "@/lib/dispatchPartialSelection";
 import {
   normalizeQuoteKey,
@@ -128,6 +125,161 @@ export async function attachBookingBatchesToOrders(conn, orders) {
   });
 }
 
+export function sumBookedQtyByCodeFromBatches(batches) {
+  const bookedByCode = new Map();
+  for (const batch of batches || []) {
+    for (const item of batch.items || []) {
+      const code = normBookingItemCode(item.item_code);
+      if (!code) continue;
+      const q = Math.max(1, Number(item.quantity) || 1);
+      bookedByCode.set(code, (bookedByCode.get(code) || 0) + q);
+    }
+  }
+  return bookedByCode;
+}
+
+/** Units in a booking batch not yet shipped (dispatch stock_deducted / serial). */
+export function computeBatchDispatchPending(batchItems, shippedByCode) {
+  let pending = 0;
+  for (const it of batchItems || []) {
+    const code = normBookingItemCode(it.item_code);
+    if (!code) continue;
+    const booked = Math.max(1, Number(it.quantity) || 1);
+    const shipped = shippedByCode.get(code) || 0;
+    pending += Math.max(0, booked - shipped);
+  }
+  return pending;
+}
+
+function quotationDispatchPending(lines, shippedByCode) {
+  let pending = 0;
+  for (const row of lines || []) {
+    const code = normBookingItemCode(row.item_code);
+    const orderQty = Math.max(1, Number(row.quantity) || 1);
+    pending += Math.max(0, orderQty - (shippedByCode.get(code) || 0));
+  }
+  return pending;
+}
+
+/** Quotation units not yet saved in any booking batch. */
+export function computePendingBookingUnits(batches, quotationLines) {
+  const bookedByCode = sumBookedQtyByCodeFromBatches(batches);
+  let pending = 0;
+  for (const row of quotationLines || []) {
+    const code = normBookingItemCode(row.item_code);
+    const orderQty = Math.max(1, Number(row.quantity) || 1);
+    const bookedQty = bookedByCode.get(code) || 0;
+    pending += Math.max(0, orderQty - bookedQty);
+  }
+  return pending;
+}
+
+/** @param {import("mysql2/promise").PoolConnection} conn */
+export async function attachBookingPendingToOrders(conn, orders) {
+  if (!orders?.length) return orders || [];
+
+  const withBatches = orders.some((o) => o.booking_batches === undefined)
+    ? await attachBookingBatchesToOrders(conn, orders)
+    : orders;
+
+  const quoteNumbers = [
+    ...new Set(
+      withBatches
+        .map((o) => String(o.quote_number || "").trim())
+        .filter(Boolean),
+    ),
+  ];
+  if (!quoteNumbers.length) {
+    return withBatches.map((o) => ({ ...o, pending_booking_units: 0 }));
+  }
+
+  const inClause = quoteNumbers.map(() => "?").join(",");
+  const [qiRows] = await conn.execute(
+    `SELECT TRIM(CONVERT(quote_number USING utf8mb4)) AS quote_number,
+            item_code, COALESCE(quantity, 1) AS quantity
+     FROM quotation_items
+     WHERE ${sqlQuoteTrimIn("quote_number", inClause)}`,
+    quoteNumbers,
+  );
+  const qiByQuote = new Map();
+  for (const row of qiRows || []) {
+    const q = normalizeQuoteKey(row.quote_number);
+    if (!qiByQuote.has(q)) qiByQuote.set(q, []);
+    qiByQuote.get(q).push(row);
+  }
+
+  const [shipRows] = await conn.execute(
+    `SELECT TRIM(CONVERT(quote_number USING utf8mb4)) AS quote_number,
+            TRIM(item_code) AS item_code,
+            SUM(
+              CASE
+                WHEN COALESCE(stock_deducted, 0) = 1 THEN 1
+                WHEN serial_no IS NOT NULL AND TRIM(serial_no) <> '' THEN 1
+                ELSE 0
+              END
+            ) AS shipped
+     FROM dispatch
+     WHERE ${sqlQuoteTrimIn("quote_number", inClause)}
+     GROUP BY TRIM(CONVERT(quote_number USING utf8mb4)), TRIM(item_code)`,
+    quoteNumbers,
+  );
+  const shippedByQuote = new Map();
+  for (const row of shipRows || []) {
+    const q = normalizeQuoteKey(row.quote_number);
+    if (!shippedByQuote.has(q)) shippedByQuote.set(q, new Map());
+    const code = normBookingItemCode(row.item_code);
+    if (!code) continue;
+    const prev = shippedByQuote.get(q).get(code) || 0;
+    shippedByQuote.get(q).set(code, prev + (Number(row.shipped) || 0));
+  }
+
+  return withBatches.map((order) => {
+    const batches = order.booking_batches || [];
+    const legacyFullBooking =
+      batches.length === 1 &&
+      !(batches[0]?.items?.length) &&
+      orderHasBookingIdOnRow(order);
+    const q = normalizeQuoteKey(order.quote_number);
+    const lines = qiByQuote.get(q) || [];
+    const shippedMap = shippedByQuote.get(q) || new Map();
+
+    const pending_booking_units = legacyFullBooking
+      ? 0
+      : computePendingBookingUnits(batches, lines);
+
+    const batch1 =
+      batches.find((b) => Number(b.sequence_no) === 1) || batches[0];
+    const remainBatches = batches.filter((b) => Number(b.sequence_no) >= 2);
+    const remainBatch = remainBatches[remainBatches.length - 1];
+
+    let batch1_dispatch_pending = batch1?.items?.length
+      ? computeBatchDispatchPending(batch1.items, shippedMap)
+      : 0;
+    let remain_batch_dispatch_pending = remainBatch?.items?.length
+      ? computeBatchDispatchPending(remainBatch.items, shippedMap)
+      : 0;
+
+    if (
+      legacyFullBooking ||
+      (orderHasBookingIdOnRow(order) && batch1 && !batch1.items?.length)
+    ) {
+      const quotePending = quotationDispatchPending(lines, shippedMap);
+      if (!remainBatch) {
+        batch1_dispatch_pending = quotePending;
+      } else if (!batch1_dispatch_pending) {
+        batch1_dispatch_pending = quotePending;
+      }
+    }
+
+    return {
+      ...order,
+      pending_booking_units,
+      batch1_dispatch_pending,
+      remain_batch_dispatch_pending,
+    };
+  });
+}
+
 /** Accurate pending / open-dispatch counts (quotation ↔ dispatch matching). */
 export async function attachDispatchPendingToOrders(conn, orders) {
   if (!orders?.length) return orders || [];
@@ -221,9 +373,11 @@ export async function attachDispatchPendingToOrders(conn, orders) {
     let { pending_units, open_dispatch_units, shipped_units } =
       computeDispatchPendingFromRows(qiByQuote.get(q) || [], disp);
 
-    const remainBooked = orderRemainBookingBatchDone(order);
-    // After partial ship, keep remain products inactive until remain booking
-    if (shipped_units > 0 && (!remainBooked || pending_units <= 0)) {
+    const unbookedBooking = Number(order.pending_booking_units);
+    const hasUnbookedProducts =
+      Number.isFinite(unbookedBooking) && unbookedBooking > 0;
+    // After partial ship, hide open batch until all products are booked
+    if (shipped_units > 0 && (hasUnbookedProducts || pending_units <= 0)) {
       open_dispatch_units = 0;
     }
 
@@ -275,9 +429,10 @@ export async function attachDispatchPendingToOrders(conn, orders) {
     const q = String(order.quote_number || "").trim();
     if (!q) continue;
     const pending = Number(order.pending_dispatch_units) || 0;
-    const remainBooked = orderRemainBookingBatchDone(order);
-    const shouldCloseOpen =
-      pending <= 0 || (pending > 0 && !remainBooked);
+    const pendingBooking = Number(order.pending_booking_units);
+    const hasUnbookedProducts =
+      Number.isFinite(pendingBooking) && pendingBooking > 0;
+    const shouldCloseOpen = pending <= 0 || (pending > 0 && hasUnbookedProducts);
     if (!shouldCloseOpen) continue;
     try {
       await conn.execute(
@@ -365,7 +520,15 @@ export async function activateDispatchRowsForBookingItems(
       item_name: item.item_name,
     };
     let need = Math.max(1, Number(item.quantity) || 1);
-    for (const row of rows) {
+    const targetCode = normBookingItemCode(qi.item_code);
+    const rowOrder = [...rows].sort((a, b) => {
+      const aExact =
+        targetCode && normBookingItemCode(a.item_code) === targetCode ? 0 : 1;
+      const bExact =
+        targetCode && normBookingItemCode(b.item_code) === targetCode ? 0 : 1;
+      return aExact - bExact;
+    });
+    for (const row of rowOrder) {
       if (need <= 0) break;
       if (!dispatchRowMatchesQuotationLine(row, qi)) continue;
       if (Number(row._activated)) continue;
@@ -374,6 +537,18 @@ export async function activateDispatchRowsForBookingItems(
         [row.id],
       );
       row._activated = 1;
+      need -= 1;
+    }
+    const itemName =
+      String(item.item_name || "").trim() ||
+      rows.find((r) => dispatchRowMatchesQuotationLine(r, qi))?.item_name ||
+      qi.item_code;
+    while (need > 0) {
+      await conn.execute(
+        `INSERT INTO dispatch (quote_number, item_name, item_code, serial_no, remarks, photos, dispatch_active, created_at, updated_at)
+         VALUES (?, ?, ?, NULL, NULL, NULL, 1, NOW(), NULL)`,
+        [quoteNumber, itemName, normBookingItemCode(qi.item_code)],
+      );
       need -= 1;
     }
   }
@@ -502,6 +677,169 @@ export async function persistOrderBookingBatch(
     );
   }
   return 1;
+}
+
+function normBookingItemCode(code) {
+  return String(code ?? "").trim();
+}
+
+/**
+ * Quotation lines still available to book (order qty minus prior booking batches).
+ * Unlike dispatch pending, does not depend on dispatch row allocation.
+ */
+export async function fetchOrderBookingLineOptions(conn, orderId) {
+  const [orderRows] = await conn.execute(
+    `SELECT order_id, quote_number FROM neworder WHERE order_id = ? LIMIT 1`,
+    [orderId],
+  );
+  if (!orderRows?.[0]?.quote_number) {
+    return { quoteNumber: null, lines: [] };
+  }
+  const quoteNumber = orderRows[0].quote_number;
+
+  const [qiRows] = await conn.execute(
+    `SELECT item_code, item_name, COALESCE(quantity, 1) AS quantity
+     FROM quotation_items
+     WHERE ${sqlQuoteTrimEqColumn("quote_number")}
+     ORDER BY item_code`,
+    [quoteNumber],
+  );
+
+  const batches = await fetchBookingBatchesForOrder(conn, orderId);
+  const bookedByCode = new Map();
+  for (const batch of batches) {
+    for (const item of batch.items || []) {
+      const code = normBookingItemCode(item.item_code);
+      if (!code) continue;
+      const q = Math.max(1, Number(item.quantity) || 1);
+      bookedByCode.set(code, (bookedByCode.get(code) || 0) + q);
+    }
+  }
+
+  const lines = (qiRows || [])
+    .map((row) => {
+      const code = normBookingItemCode(row.item_code);
+      const orderQty = Math.max(1, Number(row.quantity) || 1);
+      const bookedQty = bookedByCode.get(code) || 0;
+      const pendingQty = Math.max(0, orderQty - bookedQty);
+      return {
+        item_code: code,
+        item_name: String(row.item_name || "").trim(),
+        order_qty: orderQty,
+        booked_qty: bookedQty,
+        pending_qty: pendingQty,
+      };
+    })
+    .filter((l) => l.pending_qty > 0 && (l.item_code || l.item_name));
+
+  return { quoteNumber, lines };
+}
+
+/**
+ * Activate dispatch rows for the selected booking batch (does not change dispatch_status).
+ * @param {{ item_code: string, item_name?: string, quantity: number }[]} selectedItems
+ */
+export async function applyBookingItemSelection(conn, orderId, selectedItems) {
+  await ensureDispatchActiveColumn(conn);
+
+  const [orderRows] = await conn.execute(
+    `SELECT quote_number FROM neworder WHERE order_id = ? LIMIT 1`,
+    [orderId],
+  );
+  const quoteNumber = orderRows?.[0]?.quote_number;
+  if (!quoteNumber) {
+    throw new Error("Order or quotation not found");
+  }
+
+  const selectionMap = new Map();
+  for (const item of selectedItems || []) {
+    const code = normBookingItemCode(item.item_code);
+    const qty = Math.max(0, Number(item.quantity) || 0);
+    if (!code || qty <= 0) continue;
+    selectionMap.set(code, {
+      item_code: code,
+      item_name: String(item.item_name || "").trim(),
+      quantity: qty,
+    });
+  }
+  if (selectionMap.size === 0) {
+    throw new Error("Select at least one product to book");
+  }
+
+  const { lines: allLines } = await fetchOrderBookingLineOptions(conn, orderId);
+  const pendingByCode = new Map(
+    allLines.map((l) => [l.item_code, l.pending_qty]),
+  );
+
+  for (const [code, sel] of selectionMap) {
+    const maxPending = pendingByCode.get(code) || 0;
+    if (maxPending <= 0) {
+      throw new Error(`No pending quantity for ${code}`);
+    }
+    if (sel.quantity > maxPending) {
+      throw new Error(`Quantity for ${code} cannot exceed ${maxPending}`);
+    }
+  }
+
+  const [undispatchedRows] = await conn.execute(
+    `SELECT id, TRIM(item_code) AS item_code, item_name
+     FROM dispatch
+     WHERE TRIM(quote_number) = TRIM(?)
+       AND COALESCE(stock_deducted, 0) = 0
+     ORDER BY id ASC`,
+    [quoteNumber],
+  );
+
+  await conn.execute(
+    `UPDATE dispatch SET dispatch_active = 0, updated_at = NOW()
+     WHERE TRIM(quote_number) = TRIM(?)
+       AND COALESCE(stock_deducted, 0) = 0`,
+    [quoteNumber],
+  );
+
+  const rowsByCode = new Map();
+  for (const row of undispatchedRows || []) {
+    const code = normBookingItemCode(row.item_code);
+    if (!rowsByCode.has(code)) rowsByCode.set(code, []);
+    rowsByCode.get(code).push(row);
+  }
+
+  for (const [code, sel] of selectionMap) {
+    let need = sel.quantity;
+    const pool = rowsByCode.get(code) || [];
+    for (const row of pool) {
+      if (need <= 0) break;
+      await conn.execute(
+        `UPDATE dispatch SET dispatch_active = 1, updated_at = NOW() WHERE id = ?`,
+        [row.id],
+      );
+      need -= 1;
+    }
+    const itemName = sel.item_name || pool[0]?.item_name || code;
+    while (need > 0) {
+      await conn.execute(
+        `INSERT INTO dispatch (quote_number, item_name, item_code, serial_no, remarks, photos, dispatch_active, created_at, updated_at)
+         VALUES (?, ?, ?, NULL, NULL, NULL, 1, NOW(), NULL)`,
+        [quoteNumber, itemName, code],
+      );
+      need -= 1;
+    }
+  }
+
+  const totalPending = allLines.reduce((s, l) => s + l.pending_qty, 0);
+  const selectedTotal = [...selectionMap.values()].reduce(
+    (s, v) => s + v.quantity,
+    0,
+  );
+  const isPartial =
+    selectedTotal < totalPending ||
+    allLines.some((l) => {
+      const sel = selectionMap.get(l.item_code);
+      const take = sel ? sel.quantity : 0;
+      return take < l.pending_qty;
+    });
+
+  return { isPartial, quoteNumber };
 }
 
 /** @param {import("mysql2/promise").PoolConnection} conn */

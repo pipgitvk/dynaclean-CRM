@@ -37,11 +37,11 @@ import ReturnInitiateMenuItem from "@/components/orders/ReturnInitiateMenuItem";
 import { isSalesRole } from "@/lib/isSalesRole";
 import { isBookingAllowedForOrder } from "@/lib/orderBookingEligibility";
 import {
-  canCreateFollowUpBooking,
-  canOpenDispatchForOrder,
+  canCreateAdditionalBooking,
+  canOpenFirstDispatchForOrder,
+  canOpenRemainDispatchForOrder,
   canViewDispatchPanelForOrder,
   canShowOrderDeliveryActions,
-  isRemainDispatchRound,
   orderHasDispatchedStock,
   orderHasOpenDispatchBatch,
 } from "@/lib/orderDeliveryEligibility";
@@ -819,8 +819,8 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
     String(r.booking_id) !== "0";
   const dispatchStatus = Number(r.dispatch_status);
   const hasDispatchedStock = orderHasDispatchedStock(r);
-  const canOpenDispatch = canOpenDispatchForOrder(r);
-  const remainDispatchRound = isRemainDispatchRound(r);
+  const canOpenFirstDispatch = canOpenFirstDispatchForOrder(r);
+  const canOpenRemainDispatch = canOpenRemainDispatchForOrder(r);
   const canViewDispatchPanel = canViewDispatchPanelForOrder(r);
 
   useEffect(() => {
@@ -848,7 +848,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
     };
   }, [isOpen, toggleMenu]);
 
-  const followUpBooking = canCreateFollowUpBooking(r);
+  const followUpBooking = canCreateAdditionalBooking(r);
 
   return (
     <div className="relative inline-block text-left">
@@ -864,13 +864,14 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
         orderId={r.order_id}
         nextHref={`/user-dashboard/order/upload-booking/${r.order_id}`}
         onClose={() => setBookingProductSelectOpen(false)}
+        purpose="booking"
         title={
           followUpBooking
             ? "Select remaining products for booking"
             : "Select products for booking"
         }
         confirmLabel="Continue to booking"
-        partialHint="Partial Dispatch"
+        partialHint="Partial booking"
       />
       {isOpen && (
         <div
@@ -1064,23 +1065,30 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                   isSuperAdmin ||
                   isAdmin ||
                   canAdminAfterReport) &&
-                  canOpenDispatch && (
+                  canOpenFirstDispatch && (
                     <Link
                       href={`/user-dashboard/order/dispatch/${r.order_id}`}
                       className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700 w-full block"
-                      title={
-                        remainDispatchRound
-                          ? "Dispatch remaining products"
-                          : "Dispatch"
-                      }
+                      title="Dispatch — pehli booking ke products"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <CheckCircle size={16} />
-                      <span>
-                        {remainDispatchRound
-                          ? "Dispatch (Remain)"
-                          : "Dispatch"}
-                      </span>
+                      <span>Dispatch</span>
+                    </Link>
+                  )}
+                {(isWarehouse ||
+                  isSuperAdmin ||
+                  isAdmin ||
+                  canAdminAfterReport) &&
+                  canOpenRemainDispatch && (
+                    <Link
+                      href={`/user-dashboard/order/dispatch/${r.order_id}?round=remain`}
+                      className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700 w-full block"
+                      title="Dispatch (Remain) — doosri booking ke products"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <CheckCircle size={16} />
+                      <span>Dispatch (Remain)</span>
                     </Link>
                   )}
                 {(isWarehouse ||

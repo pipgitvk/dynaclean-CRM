@@ -16,6 +16,7 @@ import {
 } from "@/lib/orderDeliveryEligibility";
 import {
   attachBookingBatchesToOrders,
+  attachBookingPendingToOrders,
   attachDispatchPendingToOrders,
 } from "@/lib/orderBookingBatches";
 import { attachDeliveryBatchesToOrders } from "@/lib/orderDeliveryBatches";
@@ -153,6 +154,7 @@ export default async function OrdersPage() {
       )
     : orders;
   let ordersWithBatches = await attachBookingBatchesToOrders(conn, visibleOrders);
+  ordersWithBatches = await attachBookingPendingToOrders(conn, ordersWithBatches);
   ordersWithBatches = await attachDispatchPendingToOrders(
     conn,
     ordersWithBatches,

@@ -10,6 +10,7 @@ import {
 } from "@/lib/orderDeliveryEligibility";
 import {
   attachBookingBatchesToOrders,
+  attachBookingPendingToOrders,
   attachDispatchPendingToOrders,
 } from "@/lib/orderBookingBatches";
 import { attachDeliveryBatchesToOrders } from "@/lib/orderDeliveryBatches";
@@ -245,6 +246,7 @@ export async function fetchAccountsOrderListPage(
   let enrichedOrders = [...pageRows];
   enrichedOrders = await attachActiveInvoiceFields(conn, enrichedOrders);
   enrichedOrders = await attachBookingBatchesToOrders(conn, enrichedOrders);
+  enrichedOrders = await attachBookingPendingToOrders(conn, enrichedOrders);
   if (!lightList) {
     enrichedOrders = await attachDispatchPendingToOrders(conn, enrichedOrders);
   }

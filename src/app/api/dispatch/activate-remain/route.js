@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
-import { activateRemainDispatchBatch } from "@/lib/activateRemainDispatch";
+import { activateRemainDispatchBatch } from "@/lib/dispatchBookingActivate";
 import { canMutateDispatchRole } from "@/lib/roleKeyUtils";
 
 export async function POST(req) {

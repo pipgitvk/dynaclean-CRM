@@ -12,7 +12,16 @@ export default function DispatchProductSelectModal({
   title = "Select products to dispatch",
   confirmLabel = "Continue to dispatch",
   partialHint = "Partial Dispatch",
+  /** "booking" uses quotation minus booked batches; "dispatch" uses dispatch pending */
+  purpose = "dispatch",
 }) {
+  const isBooking = purpose === "booking";
+  const itemsApi = isBooking ? "/api/booking/order-items" : "/api/dispatch/order-items";
+  const prepareApi = isBooking ? "/api/booking/prepare" : "/api/dispatch/prepare";
+  const emptyMessage = isBooking
+    ? "No pending products to book for this order."
+    : "No pending products to dispatch for this order.";
+  const partialHintBooking = isBooking ? "Partial booking" : partialHint;
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -27,7 +36,7 @@ export default function DispatchProductSelectModal({
     setError("");
     try {
       const res = await fetch(
-        `/api/dispatch/order-items?order_id=${encodeURIComponent(orderId)}`,
+        `${itemsApi}?order_id=${encodeURIComponent(orderId)}`,
       );
       const data = await res.json();
       if (!res.ok || !data.success) {
@@ -49,7 +58,7 @@ export default function DispatchProductSelectModal({
     } finally {
       setLoading(false);
     }
-  }, [open, orderId]);
+  }, [open, orderId, itemsApi]);
 
   useEffect(() => {
     void load();
@@ -77,14 +86,17 @@ export default function DispatchProductSelectModal({
     setSaving(true);
     setError("");
     try {
-      const res = await fetch("/api/dispatch/prepare", {
+      const res = await fetch(prepareApi, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ order_id: orderId, items }),
       });
       const data = await res.json();
       if (!res.ok || !data.success) {
-        throw new Error(data.error || "Failed to prepare dispatch");
+        throw new Error(
+          data.error ||
+            (isBooking ? "Failed to prepare booking" : "Failed to prepare dispatch"),
+        );
       }
       onClose?.();
       router.push(nextHref);
@@ -132,9 +144,7 @@ export default function DispatchProductSelectModal({
               <Loader2 className="h-4 w-4 animate-spin" /> Loading…
             </p>
           ) : lines.length === 0 ? (
-            <p className="text-sm text-gray-600">
-              No pending products to dispatch for this order.
-            </p>
+            <p className="text-sm text-gray-600">{emptyMessage}</p>
           ) : (
             <ul className="space-y-3">
               {lines.map((l) => (
@@ -152,9 +162,11 @@ export default function DispatchProductSelectModal({
                     <p className="font-medium text-gray-900">{l.item_name || l.item_code}</p>
                     <p className="text-xs text-gray-500">
                       Code: {l.item_code} · Pending: {l.pending_qty}
-                      {l.dispatched_qty > 0
-                        ? ` (${l.dispatched_qty} already dispatched)`
-                        : ""}
+                      {l.booked_qty > 0
+                        ? ` (${l.booked_qty} already booked)`
+                        : l.dispatched_qty > 0
+                          ? ` (${l.dispatched_qty} already dispatched)`
+                          : ""}
                     </p>
                   </div>
                   {selected[l.item_code] && l.pending_qty > 1 && (
@@ -182,7 +194,7 @@ export default function DispatchProductSelectModal({
           {willBePartial && lines.length > 0 && (
             <p className="mt-3 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
               Not all products selected — order status will be{" "}
-              <strong>{partialHint}</strong>.
+              <strong>{partialHintBooking}</strong>.
             </p>
           )}
           {error && (

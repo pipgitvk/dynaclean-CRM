@@ -30,11 +30,11 @@ import {
 } from "@/lib/paymentOrderStatus";
 import { isBookingAllowedForOrder } from "@/lib/orderBookingEligibility";
 import {
-  canCreateFollowUpBooking,
-  canOpenDispatchForOrder,
+  canCreateAdditionalBooking,
+  canOpenFirstDispatchForOrder,
+  canOpenRemainDispatchForOrder,
   canViewDispatchPanelForOrder,
   canShowOrderDeliveryActions,
-  isRemainDispatchRound,
   orderHasDispatchedStock,
 } from "@/lib/orderDeliveryEligibility";
 import {
@@ -1051,9 +1051,9 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
     String(r.booking_id).trim() !== "" &&
     String(r.booking_id) !== "0";
   const dispatchStatus = Number(r.dispatch_status);
-  const followUpBooking = canCreateFollowUpBooking(r);
-  const canOpenDispatch = canOpenDispatchForOrder(r);
-  const remainDispatchRound = isRemainDispatchRound(r);
+  const followUpBooking = canCreateAdditionalBooking(r);
+  const canOpenFirstDispatch = canOpenFirstDispatchForOrder(r);
+  const canOpenRemainDispatch = canOpenRemainDispatchForOrder(r);
   const canViewDispatchPanel = canViewDispatchPanelForOrder(r);
 
   useEffect(() => {
@@ -1095,13 +1095,14 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
         orderId={r.order_id}
         nextHref={`/accounts-dashboard/order/upload-booking/${r.order_id}`}
         onClose={() => setBookingProductSelectOpen(false)}
+        purpose="booking"
         title={
           followUpBooking
             ? "Select remaining products for booking"
             : "Select products for booking"
         }
         confirmLabel="Continue to booking"
-        partialHint="Partial Dispatch"
+        partialHint="Partial booking"
       />
       {isOpen && (
         <div
@@ -1280,21 +1281,27 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
               onClick={(e) => e.stopPropagation()}
             />
             {(isWarehouse || isSuperAdmin || isAdmin || canAdminAfterReport) &&
-              canOpenDispatch && (
+              canOpenFirstDispatch && (
               <Link
                 href={`/accounts-dashboard/order/dispatch/${r.order_id}`}
                 className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
-                title={
-                  remainDispatchRound
-                    ? "Dispatch remaining products"
-                    : "Dispatch"
-                }
+                title="Dispatch — pehli booking ke products"
                 onClick={(e) => e.stopPropagation()}
               >
                 <CheckCircle size={16} />
-                <span>
-                  {remainDispatchRound ? "Dispatch (Remain)" : "Dispatch"}
-                </span>
+                <span>Dispatch</span>
+              </Link>
+            )}
+            {(isWarehouse || isSuperAdmin || isAdmin || canAdminAfterReport) &&
+              canOpenRemainDispatch && (
+              <Link
+                href={`/accounts-dashboard/order/dispatch/${r.order_id}?round=remain`}
+                className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
+                title="Dispatch (Remain) — doosri booking ke products"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <CheckCircle size={16} />
+                <span>Dispatch (Remain)</span>
               </Link>
             )}
             {(isWarehouse || canManageReturns || isAdmin || canViewSales) &&

@@ -17,15 +17,6 @@ export function orderRemainBookingBatchDone(order) {
   return batches.some((b) => Number(b.sequence_no) >= 2);
 }
 
-export function isRemainDispatchRound(order) {
-  return (
-    orderHasDispatchedStock(order) &&
-    orderRemainBookingBatchDone(order) &&
-    orderHasPendingDispatchUnits(order) &&
-    !orderIsFullyDispatched(order)
-  );
-}
-
 /**
  * Order list SQL fragment: count dispatch rows with stock already deducted.
  * Use in SELECT with alias `no` for neworder.
@@ -111,25 +102,38 @@ export function canViewDispatchPanelForOrder(order) {
   return orderHasDispatchedStock(order);
 }
 
-/**
- * Dispatch form menu:
- * - First round: nothing shipped yet
- * - Remain round: remain booking done + still pending
- * Never show after partial/full ship without remain booking.
- */
-export function canOpenDispatchForOrder(order) {
+/** Pehli booking complete + batch 1 ke products dispatch pending (doosri booking optional). */
+export function canOpenFirstDispatchForOrder(order) {
   if (!orderHasBookingId(order)) return false;
   if (orderIsFullyDispatched(order)) return false;
+  const batch1 = Number(order.batch1_dispatch_pending);
+  if (Number.isFinite(batch1)) return batch1 > 0;
+  if (orderHasDispatchedStock(order)) return false;
+  return (
+    orderHasPendingDispatchUnits(order) || Number(order?.dispatch_status) === 0
+  );
+}
 
-  // Real units already shipped → only after remain booking
-  if (orderHasDispatchedStock(order)) {
-    return (
-      orderRemainBookingBatchDone(order) && orderHasPendingDispatchUnits(order)
-    );
-  }
+/** Doosri booking (batch 2+) complete + us batch ke products dispatch pending. */
+export function canOpenRemainDispatchForOrder(order) {
+  if (!orderHasBookingId(order)) return false;
+  if (orderIsFullyDispatched(order)) return false;
+  if (canCreateRemainProductBooking(order)) return false;
+  if (!orderRemainBookingBatchDone(order)) return false;
+  const remain = Number(order.remain_batch_dispatch_pending);
+  if (Number.isFinite(remain)) return remain > 0;
+  return orderHasPendingDispatchUnits(order);
+}
 
-  // Nothing shipped yet — first Dispatch
-  return orderHasPendingDispatchUnits(order) || Number(order?.dispatch_status) === 0;
+export function isRemainDispatchRound(order) {
+  return canOpenRemainDispatchForOrder(order);
+}
+
+export function canOpenDispatchForOrder(order) {
+  return (
+    canOpenFirstDispatchForOrder(order) ||
+    canOpenRemainDispatchForOrder(order)
+  );
 }
 
 /** View / Update Delivery — after at least one unit shipped. */
@@ -186,4 +190,21 @@ export function canCreateFollowUpBooking(order) {
   if (!orderHasDispatchedStock(order)) return false;
   if (!orderHasPendingDispatchUnits(order)) return false;
   return true;
+}
+
+/** Partial booking: first batch saved but quotation lines still unbooked (no dispatch required). */
+export function canCreateRemainProductBooking(order) {
+  if (!orderHasBookingId(order)) return false;
+  if (Number(order.dispatch_status) === 1) return false;
+  if (orderIsFullyDispatched(order)) return false;
+  const pending = Number(order.pending_booking_units);
+  if (Number.isFinite(pending)) return pending > 0;
+  return false;
+}
+
+/** Show "Create Booking (Remaining)" — unbooked products or post-dispatch remain flow. */
+export function canCreateAdditionalBooking(order) {
+  return (
+    canCreateRemainProductBooking(order) || canCreateFollowUpBooking(order)
+  );
 }

@@ -5,6 +5,7 @@ import { ensureOrderLinkedPaymentColumns } from "@/lib/ensureOrderLinkedPaymentC
 import { attachActiveInvoiceFields } from "@/lib/activeInvoiceForOrder";
 import {
   attachBookingBatchesToOrders,
+  attachBookingPendingToOrders,
   attachDispatchPendingToOrders,
 } from "@/lib/orderBookingBatches";
 import { attachDeliveryBatchesToOrders } from "@/lib/orderDeliveryBatches";
@@ -222,6 +223,7 @@ export async function fetchAdminOrderListPage(
 
   enrichedOrders = await attachActiveInvoiceFields(conn, enrichedOrders);
   enrichedOrders = await attachBookingBatchesToOrders(conn, enrichedOrders);
+  enrichedOrders = await attachBookingPendingToOrders(conn, enrichedOrders);
   enrichedOrders = await attachDispatchPendingToOrders(conn, enrichedOrders);
   enrichedOrders = await attachDeliveryBatchesToOrders(conn, enrichedOrders);
 

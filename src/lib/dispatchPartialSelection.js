@@ -3,6 +3,7 @@ import {
   ORDER_LIST_DISPATCHED_STOCK_COUNT_SELECT,
   ORDER_LIST_PENDING_DISPATCH_UNITS_SELECT,
 } from "@/lib/orderDeliveryEligibility";
+import { fetchOrderBookingLineOptions } from "@/lib/orderBookingBatches";
 import {
   computeDispatchPendingFromRows,
   dispatchRowAllocatesUnit,
@@ -227,6 +228,19 @@ export async function isFollowUpBookingOrder(conn, orderId) {
   if (!order) return false;
 
   if (canCreateFollowUpBooking(order)) return true;
+
+  const hasBooking =
+    order.booking_id !== null &&
+    order.booking_id !== undefined &&
+    String(order.booking_id).trim() !== "" &&
+    String(order.booking_id) !== "0";
+  if (hasBooking) {
+    const { lines: bookingLines } = await fetchOrderBookingLineOptions(
+      conn,
+      orderId,
+    );
+    if (bookingLines.length > 0) return true;
+  }
 
   const { lines } = await fetchOrderDispatchLineOptions(conn, orderId);
   const pending = lines.reduce((s, l) => s + l.pending_qty, 0);

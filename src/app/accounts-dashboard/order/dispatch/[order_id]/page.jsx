@@ -2,11 +2,15 @@
 import { useEffect, useState } from "react";
 import { useAsyncClick } from "@/lib/useAsyncClick";
 import { buildChecklistAccessoriesUrl } from "@/lib/dispatchChecklistAccessories";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { loadDispatchFormRows } from "@/lib/loadDispatchFormRows";
 
 export default function DispatchFormPage({ params }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { order_id } = useParams();
+  const dispatchRound =
+    searchParams.get("round") === "remain" ? "remain" : "first";
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -20,13 +24,9 @@ export default function DispatchFormPage({ params }) {
   useEffect(() => {
     const load = async () => {
       try {
-        const res = await fetch(
-          `/api/dispatch?order_id=${order_id}&scope=active`,
-        );
-        const json = await res.json();
-        console.log("Dispatch data load:", json);
-        if (json.success) {
-          const data = json.data || [];
+        const data = await loadDispatchFormRows(order_id, dispatchRound);
+        console.log("Dispatch data load:", data);
+        if (data.length > 0) {
           setRows(data);
           // Track which rows already have serial numbers from database
           const idsWithSerialNo = new Set(
@@ -67,7 +67,7 @@ export default function DispatchFormPage({ params }) {
       }
     };
     load();
-  }, [order_id]);
+  }, [order_id, dispatchRound]);
 
   console.log("check data : ", rows);
 

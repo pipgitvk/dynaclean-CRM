@@ -3,11 +3,15 @@ import { hasOrderInvoiceReport } from "@/lib/orderDocumentEditRules";
 import { isBookingAllowedForOrder } from "@/lib/orderBookingEligibility";
 import { isOrderVisibleToViewer } from "@/lib/orderApprovalVisibility";
 import {
-  canCreateFollowUpBooking,
+  canCreateAdditionalBooking,
   ORDER_LIST_DISPATCHED_STOCK_COUNT_SELECT,
   ORDER_LIST_PENDING_DISPATCH_UNITS_SELECT,
   orderHasDispatchedStock,
 } from "@/lib/orderDeliveryEligibility";
+import {
+  attachBookingBatchesToOrders,
+  attachBookingPendingToOrders,
+} from "@/lib/orderBookingBatches";
 
 export { hasOrderInvoiceReport };
 
@@ -55,7 +59,7 @@ export function resolveBookingUploadPage(order, role) {
     };
   }
 
-  if (canCreateFollowUpBooking(order)) {
+  if (canCreateAdditionalBooking(order)) {
     return {
       redirectToView: false,
       redirectToUploadReport: false,
@@ -123,7 +127,7 @@ export async function getOrderForBookingUpload(
      WHERE no.order_id = ?`,
     [orderId],
   );
-  const order = rows[0] || null;
+  let order = rows[0] || null;
   if (
     order &&
     !isOrderVisibleToViewer(order.approval_status, viewerRole, {
@@ -132,6 +136,11 @@ export async function getOrderForBookingUpload(
     })
   ) {
     return null;
+  }
+  if (order) {
+    const [withBatches] = await attachBookingBatchesToOrders(conn, [order]);
+    const [enriched] = await attachBookingPendingToOrders(conn, [withBatches]);
+    order = enriched;
   }
   return order;
 }

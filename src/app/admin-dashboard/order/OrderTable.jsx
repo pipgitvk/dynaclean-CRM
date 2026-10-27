@@ -49,11 +49,11 @@ import {
 } from "@/lib/orderDocumentEditRules";
 import { isBookingAllowedForOrder } from "@/lib/orderBookingEligibility";
 import {
-  canCreateFollowUpBooking,
-  canOpenDispatchForOrder,
+  canCreateAdditionalBooking,
+  canOpenFirstDispatchForOrder,
+  canOpenRemainDispatchForOrder,
   canViewDispatchPanelForOrder,
   canShowOrderDeliveryActions,
-  isRemainDispatchRound,
   orderHasDispatchedStock,
   orderHasOpenDispatchBatch,
 } from "@/lib/orderDeliveryEligibility";
@@ -3264,8 +3264,8 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
     String(r.booking_id) !== "0";
   const dispatchStatus = Number(r.dispatch_status);
   const hasDispatchedStock = orderHasDispatchedStock(r);
-  const canOpenDispatch = canOpenDispatchForOrder(r);
-  const remainDispatchRound = isRemainDispatchRound(r);
+  const canOpenFirstDispatch = canOpenFirstDispatchForOrder(r);
+  const canOpenRemainDispatch = canOpenRemainDispatchForOrder(r);
   const canViewDispatchPanel = canViewDispatchPanelForOrder(r);
   // const canViewDispatchPhotos = [
   //   "warehouse incharge",
@@ -3326,13 +3326,14 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
         orderId={r.order_id}
         nextHref={`/admin-dashboard/order/upload-booking/${r.order_id}`}
         onClose={() => setBookingProductSelectOpen(false)}
+        purpose="booking"
         title={
-          canCreateFollowUpBooking(r)
+          canCreateAdditionalBooking(r)
             ? "Select remaining products for booking"
             : "Select products for booking"
         }
         confirmLabel="Continue to booking"
-        partialHint="Partial Dispatch"
+        partialHint="Partial booking"
       />
       {isOpen && (
         <div
@@ -3472,12 +3473,12 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                 </>
               ))}
             {canManageBookingActions &&
-              (!hasBooking || canCreateFollowUpBooking(r)) && (
+              (!hasBooking || canCreateAdditionalBooking(r)) && (
                 <button
                   type="button"
                   className="flex w-full items-center gap-2 px-3 py-2 hover:bg-gray-50 text-green-700 text-left"
                   title={
-                    canCreateFollowUpBooking(r)
+                    canCreateAdditionalBooking(r)
                       ? "Create booking for remaining products"
                       : "Create Booking"
                   }
@@ -3489,7 +3490,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                 >
                   <UploadCloud size={16} />
                   <span>
-                    {canCreateFollowUpBooking(r)
+                    {canCreateAdditionalBooking(r)
                       ? "Create Booking (Remaining)"
                       : "Create Booking"}
                   </span>
@@ -3497,7 +3498,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
               )}
             {canEditBooking &&
               hasBooking &&
-              !canCreateFollowUpBooking(r) &&
+              !canCreateAdditionalBooking(r) &&
               !orderHasDispatchedStock(r) &&
               dispatchStatus !== 1 && (
                 <Link
@@ -3521,24 +3522,32 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
               isAdmin ||
               canManageReturns ||
               canAdminAfterReport) &&
-              canOpenDispatch && (
-                <>
-                  <Link
-                    href={`/admin-dashboard/order/dispatch/${r.order_id}`}
-                    className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
-                    title={
-                      remainDispatchRound
-                        ? "Dispatch remaining products"
-                        : "Dispatch"
-                    }
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <CheckCircle size={16} />
-                    <span>
-                      {remainDispatchRound ? "Dispatch (Remain)" : "Dispatch"}
-                    </span>
-                  </Link>
-                </>
+              canOpenFirstDispatch && (
+                <Link
+                  href={`/admin-dashboard/order/dispatch/${r.order_id}`}
+                  className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
+                  title="Dispatch — pehli booking ke products"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <CheckCircle size={16} />
+                  <span>Dispatch</span>
+                </Link>
+              )}
+            {(isWarehouse ||
+              isSuperAdmin ||
+              isAdmin ||
+              canManageReturns ||
+              canAdminAfterReport) &&
+              canOpenRemainDispatch && (
+                <Link
+                  href={`/admin-dashboard/order/dispatch/${r.order_id}?round=remain`}
+                  className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
+                  title="Dispatch (Remain) — doosri booking ke products"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <CheckCircle size={16} />
+                  <span>Dispatch (Remain)</span>
+                </Link>
               )}
             {/* View Dispatch Photos — hidden on admin order list
             {dispatchStatus === 1 && canViewDispatchPhotos && (
