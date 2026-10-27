@@ -29,6 +29,24 @@ function invoicePaymentStatusFromAmounts(amountPaid, grandTotal) {
   return "UNPAID";
 }
 
+/** Booking UTR on neworder (order form) must not become invoice linked_trans_ids. */
+function isStatementLinkedOrderPayment(payment) {
+  const sid = payment?.statement_id;
+  return (
+    sid != null && String(sid).trim() !== "" && String(sid).trim() !== "0"
+  );
+}
+
+function statementLinkedTransIdsFromOrderPayments(payments) {
+  const ids = new Set();
+  for (const p of payments || []) {
+    if (!isStatementLinkedOrderPayment(p)) continue;
+    const tid = p.trans_id ? String(p.trans_id).trim() : "";
+    if (tid) ids.add(tid);
+  }
+  return ids;
+}
+
 const ORDER_PAYMENT_SELECT = `SELECT order_id, quote_number, invoice_number, totalamt, amount_received,
   payment_received_date, linked_payments_json, payment_id, payment_date, payment_amount, payment_status
   FROM neworder WHERE order_id = ? LIMIT 1`;
@@ -69,14 +87,7 @@ export async function syncInvoicePaymentFromOrder(conn, orderOrOrderId) {
 
   const payments = parseOrderLinkedPayments(order);
   const transIds = new Set(parseLinkedTransIds(inv.linked_trans_ids));
-  for (const p of payments) {
-    const tid = p.trans_id ? String(p.trans_id).trim() : "";
-    if (tid) transIds.add(tid);
-  }
-  for (const tid of String(order.payment_id || "")
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean)) {
+  for (const tid of statementLinkedTransIdsFromOrderPayments(payments)) {
     transIds.add(tid);
   }
 
