@@ -611,7 +611,17 @@ export default function EditDeliveryChallanPage() {
                           )}
                         </div>
                       </td>
-                      <td className="border px-2 py-2">{item.hsn || "-"}</td>
+                      <td className="border px-2 py-2">
+                        <input
+                          type="text"
+                          value={item.hsn || ""}
+                          onChange={(e) =>
+                            handleItemChange(idx, "hsn", e.target.value)
+                          }
+                          className="border p-1 w-20 text-xs rounded"
+                          placeholder="HSN"
+                        />
+                      </td>
                       <td className="border px-2 py-2 align-top">
                         <textarea
                           value={item.specification || ""}
