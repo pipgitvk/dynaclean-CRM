@@ -583,7 +583,7 @@ function getStatusText(order) {
       icon: <XCircle size={14} className="mr-1" />,
     };
   }
-  if (order.is_cancelled || order.approval_status === "rejected") {
+  if (order.is_cancelled) {
     return {
       text: "Canceled",
       bg: "bg-red-100",
@@ -675,9 +675,7 @@ function orderMatchesListFilters(order, filters, options = {}) {
     .trim()
     .toLowerCase();
 
-  if (approvalFilter) {
-    if (approval !== approvalFilter) return false;
-  } else if (approval === "rejected") {
+  if (approvalFilter && approval !== approvalFilter) {
     return false;
   }
 
@@ -2412,6 +2410,7 @@ export default function OrderTable({
             <option value="dispatchdone">Dispatch Done</option>
             <option value="delivered">Delivered</option>
             <option value="installed">Installed</option>
+            <option value="rejected">Rejected</option>
             <option value="canceled">Canceled</option>
             <option value="returninitiated">Return Initiated</option>
             <option value="returnbookingdone">Return Booking Done</option>
