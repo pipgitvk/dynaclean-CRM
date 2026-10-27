@@ -270,12 +270,19 @@ export default function OrderTable({ userRole }) {
   }, [fetchOrders]);
 
   const handleApplySearch = useCallback(() => {
+    let nextFrom = dateFrom;
+    let nextTo = dateTo;
+    if (nextFrom && nextTo && nextFrom > nextTo) {
+      [nextFrom, nextTo] = [nextTo, nextFrom];
+      setDateFrom(nextFrom);
+      setDateTo(nextTo);
+    }
     setAppliedSearchQuery(searchQuery);
     setAppliedStatusFilter(statusFilter);
     setAppliedPaymentTermsFilter(paymentTermsFilter);
     setAppliedPaymentStatusFilter(paymentStatusFilter);
-    setAppliedDateFrom(dateFrom);
-    setAppliedDateTo(dateTo);
+    setAppliedDateFrom(nextFrom);
+    setAppliedDateTo(nextTo);
     setAppliedCreatedByFilter(createdByFilter);
     if (typeof window !== "undefined") {
       localStorage.setItem("accountsOrderTable_searchQuery", searchQuery);
@@ -285,15 +292,15 @@ export default function OrderTable({ userRole }) {
         "accountsOrderTable_paymentStatusFilter",
         paymentStatusFilter,
       );
-      localStorage.setItem("accountsOrderTable_dateFrom", dateFrom);
-      localStorage.setItem("accountsOrderTable_dateTo", dateTo);
+      localStorage.setItem("accountsOrderTable_dateFrom", nextFrom);
+      localStorage.setItem("accountsOrderTable_dateTo", nextTo);
       localStorage.setItem("accountsOrderTable_createdByFilter", createdByFilter);
     }
     fetchOrders({
       filters: {
         search: searchQuery,
-        dateFrom,
-        dateTo,
+        dateFrom: nextFrom,
+        dateTo: nextTo,
         createdBy: createdByFilter,
         paymentTerms: paymentTermsFilter,
       },

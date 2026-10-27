@@ -9,6 +9,9 @@ import {
   attachDispatchPendingToOrders,
 } from "@/lib/orderBookingBatches";
 import { attachDeliveryBatchesToOrders } from "@/lib/orderDeliveryBatches";
+import { getAccountsOrderListUserRole } from "@/lib/accountsOrderListFetch";
+import { sqlOrderCreatedByEquals } from "@/lib/sqlCreatedByScope";
+import { normalizeOrderListDateRange } from "@/lib/orderTableDateDefaults";
 
 let orderListSchemaReady = false;
 
@@ -41,12 +44,12 @@ export async function ensureAdminOrderListSchema(conn) {
   orderListSchemaReady = true;
 }
 
-export async function getAdminOrderListUserRole(conn, username) {
-  const [roleRows] = await conn.execute(
-    "SELECT userRole FROM emplist WHERE username = ?",
-    [username],
-  );
-  return roleRows[0]?.userRole || "";
+export async function getAdminOrderListUserRole(
+  conn,
+  username,
+  sessionRole = "",
+) {
+  return getAccountsOrderListUserRole(conn, username, sessionRole);
 }
 
 function parseLineItemsFromRaw(raw) {
@@ -123,7 +126,7 @@ function buildAdminOrderListSql(userRole, username, serviceSupportOnly) {
   const where = [];
 
   if (!canViewAllOrders(userRole)) {
-    where.push("no.created_by = ?");
+    where.push(sqlOrderCreatedByEquals("no.created_by"));
     params.push(username);
   }
 
@@ -174,16 +177,17 @@ export async function fetchAdminOrderListPage(
     serviceSupportOnly,
   );
 
-  if (dateFrom) {
+  const range = normalizeOrderListDateRange(dateFrom, dateTo);
+  if (range.dateFrom) {
     where.push("no.created_at >= ?");
-    params.push(`${dateFrom} 00:00:00`);
+    params.push(`${range.dateFrom} 00:00:00`);
   }
-  if (dateTo) {
+  if (range.dateTo) {
     where.push("no.created_at <= ?");
-    params.push(`${dateTo} 23:59:59`);
+    params.push(`${range.dateTo} 23:59:59`);
   }
   if (createdBy) {
-    where.push("no.created_by = ?");
+    where.push(sqlOrderCreatedByEquals("no.created_by"));
     params.push(createdBy);
   }
   if (approvalStatus) {
@@ -199,9 +203,9 @@ export async function fetchAdminOrderListPage(
   if (search) {
     const term = `%${search}%`;
     where.push(
-      `(no.order_id LIKE ? OR no.client_name LIKE ? OR qr.company_name LIKE ? OR no.contact LIKE ? OR qr.state LIKE ? OR c.lead_campaign LIKE ?)`,
+      `(no.order_id LIKE ? OR no.quote_number LIKE ? OR no.client_name LIKE ? OR qr.company_name LIKE ? OR no.contact LIKE ? OR qr.state LIKE ? OR c.lead_campaign LIKE ? OR TRIM(no.created_by) LIKE ? OR TRIM(qr.emp_name) LIKE ?)`,
     );
-    params.push(term, term, term, term, term, term);
+    params.push(term, term, term, term, term, term, term, term, term);
   }
 
   let sql = baseSql;

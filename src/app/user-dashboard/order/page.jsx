@@ -16,6 +16,7 @@ import {
   attachDispatchPendingToOrders,
 } from "@/lib/orderBookingBatches";
 import { attachDeliveryBatchesToOrders } from "@/lib/orderDeliveryBatches";
+import { sqlOrderCreatedByEquals } from "@/lib/sqlCreatedByScope";
 
 export default async function OrdersPage() {
   const payload = await getSessionPayload();
@@ -114,7 +115,7 @@ export default async function OrdersPage() {
     ].includes(roleKey) &&
     !canViewAllOrders(userRole)
   ) {
-    sql += " WHERE no.created_by = ?";
+    sql += ` WHERE ${sqlOrderCreatedByEquals("no.created_by")}`;
     params.push(username);
   }
 

@@ -27,7 +27,11 @@ export async function GET(req) {
 
     const conn = await getDbConnection();
     await ensureAdminOrderListSchema(conn);
-    const userRole = await getAdminOrderListUserRole(conn, payload.username);
+    const userRole = await getAdminOrderListUserRole(
+      conn,
+      payload.username,
+      payload.role,
+    );
 
     const result = await fetchAdminOrderListPage(conn, {
       username: payload.username,

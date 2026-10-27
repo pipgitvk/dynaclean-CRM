@@ -344,7 +344,12 @@ export default function OrderTable({ orders, userRole }) {
         }
       }
 
-      if (!omitCreatedBy && createdByFilter && order.created_by !== createdByFilter) {
+      if (
+        !omitCreatedBy &&
+        createdByFilter &&
+        String(order.created_by ?? "").trim() !==
+          String(createdByFilter).trim()
+      ) {
         return false;
       }
 

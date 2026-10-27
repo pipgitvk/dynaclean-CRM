@@ -14,6 +14,8 @@ import {
   attachDispatchPendingToOrders,
 } from "@/lib/orderBookingBatches";
 import { attachDeliveryBatchesToOrders } from "@/lib/orderDeliveryBatches";
+import { sqlOrderCreatedByEquals } from "@/lib/sqlCreatedByScope";
+import { normalizeOrderListDateRange } from "@/lib/orderTableDateDefaults";
 
 const PAYMENT_TERM_LABEL_TO_DAYS = {
   Advance: 0,
@@ -146,7 +148,7 @@ function buildAccountsOrderListBaseSql(
       )`;
     params.push(username);
   } else if (!canSeeAll) {
-    sql += " WHERE no.created_by = ?";
+    sql += ` WHERE ${sqlOrderCreatedByEquals("no.created_by")}`;
     params.push(username);
   }
 
@@ -190,16 +192,20 @@ export async function fetchAccountsOrderListPage(
     seesAllOrders,
   });
 
-  if (dateFrom && !orderIdSearch) {
+  const range = normalizeOrderListDateRange(dateFrom, dateTo);
+  const rangeFrom = range.dateFrom;
+  const rangeTo = range.dateTo;
+
+  if (rangeFrom && !orderIdSearch) {
     sql = appendSqlWhereClause(sql, "no.created_at >= ?");
-    params.push(`${dateFrom} 00:00:00`);
+    params.push(`${rangeFrom} 00:00:00`);
   }
-  if (dateTo && !orderIdSearch) {
+  if (rangeTo && !orderIdSearch) {
     sql = appendSqlWhereClause(sql, "no.created_at <= ?");
-    params.push(`${dateTo} 23:59:59`);
+    params.push(`${rangeTo} 23:59:59`);
   }
   if (createdBy) {
-    sql = appendSqlWhereClause(sql, "no.created_by = ?");
+    sql = appendSqlWhereClause(sql, sqlOrderCreatedByEquals("no.created_by"));
     params.push(createdBy);
   }
   if (paymentTerms) {
@@ -230,9 +236,9 @@ export async function fetchAccountsOrderListPage(
     } else {
       sql = appendSqlWhereClause(
         sql,
-        `(no.order_id LIKE ? OR no.quote_number LIKE ? OR no.client_name LIKE ? OR qr.company_name LIKE ? OR no.contact LIKE ? OR qr.state LIKE ?)`,
+        `(no.order_id LIKE ? OR no.quote_number LIKE ? OR no.client_name LIKE ? OR qr.company_name LIKE ? OR no.contact LIKE ? OR qr.state LIKE ? OR TRIM(no.created_by) LIKE ? OR TRIM(qr.emp_name) LIKE ?)`,
       );
-      params.push(term, term, term, term, term, term);
+      params.push(term, term, term, term, term, term, term, term);
     }
   }
 

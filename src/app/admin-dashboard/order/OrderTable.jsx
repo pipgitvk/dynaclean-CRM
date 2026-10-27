@@ -84,6 +84,7 @@ import OrderBookingViewMenuLinks from "@/components/orders/OrderBookingViewMenuL
 import OrderDeliveryMenuLinks from "@/components/orders/OrderDeliveryMenuLinks";
 import toast from "react-hot-toast";
 import LinkedStatementPaymentCell from "@/components/orders/LinkedStatementPaymentCell";
+import { normalizeOrderListDateRange } from "@/lib/orderTableDateDefaults";
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
@@ -192,11 +193,17 @@ function readOrderTableFilterState() {
   const savedModel =
     localStorage.getItem("orderTable_modelNameFilters") ||
     localStorage.getItem("orderTable_modelNameFilter");
+  const rawFrom = localStorage.getItem("orderTable_dateFrom") ?? "";
+  const rawTo = localStorage.getItem("orderTable_dateTo") ?? "";
+  const { dateFrom: normFrom, dateTo: normTo } = normalizeOrderListDateRange(
+    rawFrom,
+    rawTo,
+  );
   return {
     searchQuery: localStorage.getItem("orderTable_searchQuery") || "",
     statusFilter: localStorage.getItem("orderTable_statusFilter") || "",
-    dateFrom: localStorage.getItem("orderTable_dateFrom") ?? "",
-    dateTo: localStorage.getItem("orderTable_dateTo") ?? "",
+    dateFrom: normFrom,
+    dateTo: normTo,
     createdByFilter: localStorage.getItem("orderTable_createdByFilter") || "",
     leadCampaignFilter: localStorage.getItem("orderTable_leadCampaignFilter") || "",
     modelNameFilters: parseModelFiltersFromStorage(savedModel),
@@ -704,7 +711,8 @@ function orderMatchesListFilters(order, filters, options = {}) {
   if (
     !omitCreatedBy &&
     appliedCreatedByFilter &&
-    order.created_by !== appliedCreatedByFilter
+    String(order.created_by ?? "").trim() !==
+      String(appliedCreatedByFilter).trim()
   ) {
     return false;
   }
@@ -740,6 +748,12 @@ function orderMatchesListFilters(order, filters, options = {}) {
       order.company_name?.toLowerCase().includes(lowercasedQuery) ||
       order.contact?.toLowerCase().includes(lowercasedQuery) ||
       order.state?.toLowerCase().includes(lowercasedQuery) ||
+      String(order.created_by ?? "")
+        .toLowerCase()
+        .includes(lowercasedQuery) ||
+      String(order.emp_name ?? "")
+        .toLowerCase()
+        .includes(lowercasedQuery) ||
       formatLeadCampaignLabel(order.lead_campaign)
         .toLowerCase()
         .includes(lowercasedQuery) ||
@@ -976,10 +990,17 @@ export default function OrderTable({
   }, [listLoading, loadingMore, hasMore, fetchOrdersPage]);
 
   const handleApplySearch = useCallback(() => {
+    let nextFrom = dateFrom;
+    let nextTo = dateTo;
+    if (nextFrom && nextTo && nextFrom > nextTo) {
+      [nextFrom, nextTo] = [nextTo, nextFrom];
+      setDateFrom(nextFrom);
+      setDateTo(nextTo);
+    }
     setAppliedSearchQuery(searchQuery);
     setAppliedStatusFilter(statusFilter);
-    setAppliedDateFrom(dateFrom);
-    setAppliedDateTo(dateTo);
+    setAppliedDateFrom(nextFrom);
+    setAppliedDateTo(nextTo);
     setAppliedCreatedByFilter(createdByFilter);
     setAppliedLeadCampaignFilter(leadCampaignFilter);
     setAppliedModelNameFilters(modelNameFilters);
@@ -988,8 +1009,8 @@ export default function OrderTable({
     persistOrderTableFilterState({
       searchQuery,
       statusFilter,
-      dateFrom,
-      dateTo,
+      dateFrom: nextFrom,
+      dateTo: nextTo,
       createdByFilter,
       leadCampaignFilter,
       modelNameFilters,
@@ -1005,8 +1026,8 @@ export default function OrderTable({
         append: false,
         filters: {
           search: searchQuery,
-          dateFrom,
-          dateTo,
+          dateFrom: nextFrom,
+          dateTo: nextTo,
           createdBy: createdByFilter,
           leadCampaign: leadCampaignFilter,
           approvalStatus: approvalStatusFilter,
