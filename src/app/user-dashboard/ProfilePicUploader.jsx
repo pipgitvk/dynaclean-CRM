@@ -70,8 +70,8 @@ const ProfilePicUploader = ({ user }) => {
   };
 
   return (
-    <div className="flex flex-col items-center space-y-4">
-      <div className="relative w-32 h-32 rounded-full overflow-hidden border-4 border-gray-200 group">
+    <div className="flex flex-col items-center space-y-2">
+      <div className="relative w-20 h-20 rounded-full overflow-hidden border-2 border-gray-200 group">
         <img
           src={profileImage}
           alt="Profile"
@@ -79,7 +79,7 @@ const ProfilePicUploader = ({ user }) => {
         />
         <label
           htmlFor="profile-upload"
-          className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center text-white text-sm opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+          className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center text-white text-[10px] opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
         >
           <span className="text-center">Change Photo</span>
         </label>
@@ -97,7 +97,7 @@ const ProfilePicUploader = ({ user }) => {
         <button
           onClick={handleImageUpload}
           disabled={isSaving}
-          className="w-full text-xs px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:bg-gray-400 font-medium"
+          className="w-full text-[10px] px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:bg-gray-400 font-medium"
         >
           {isSaving ? "Saving..." : "Save Photo"}
         </button>

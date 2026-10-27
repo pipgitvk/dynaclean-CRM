@@ -1,5 +1,7 @@
 "use client";
 
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
+
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 
@@ -103,7 +105,7 @@ export default function ProductionProcessPage() {
             <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-3">
               <div className="rounded border bg-white p-2">
                 <div className="text-[10px] uppercase text-gray-400">Expected Date</div>
-                <div className="text-sm">{data.header?.expected_date ? new Date(data.header.expected_date).toLocaleDateString() : '-'}</div>
+                <div className="text-sm">{data.header?.expected_date ? formatCrmDateOnly(data.header.expected_date) : '-'}</div>
               </div>
               <div className="rounded border bg-white p-2">
                 <div className="text-[10px] uppercase text-gray-400">Created By</div>

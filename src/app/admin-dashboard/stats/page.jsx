@@ -19,7 +19,7 @@ import {
     Calendar,
     BarChart2,
     X,
-    Eye
+    Eye,
 } from "lucide-react";
 import { Line, Bar, Doughnut } from "react-chartjs-2";
 import {
@@ -68,6 +68,7 @@ export default function AdminStatsDashboard() {
     const [activeTargetCount, setActiveTargetCount] = useState(0);
     const [ordersTotalAmount, setOrdersTotalAmount] = useState(0);
     const [ordersTaxableAmount, setOrdersTaxableAmount] = useState(0);
+    const [ordersTotalCount, setOrdersTotalCount] = useState(0);
 
     // Salesperson quotations modal
     const [quotationsModalOpen, setQuotationsModalOpen] = useState(false);
@@ -100,7 +101,7 @@ export default function AdminStatsDashboard() {
         } finally {
             setLoading(false);
         }
-    };
+    };  
 
     const fetchTotalAchievedAmount = async () => {
         try {
@@ -155,6 +156,7 @@ export default function AdminStatsDashboard() {
             if (data.success && data.data) {
                 setOrdersTotalAmount(data.data.total_amount);
                 setOrdersTaxableAmount(data.data.taxable_amount || 0);
+                setOrdersTotalCount(data.data.total_orders || 0);
             }
         } catch (error) {
             console.error("Error fetching orders total amount:", error);
@@ -218,6 +220,37 @@ export default function AdminStatsDashboard() {
             currency: "INR",
             maximumFractionDigits: 0,
         }).format(isNaN(val) ? 0 : val);
+    };
+
+    const getOrderPageUrl = (status) => {
+        const now = new Date();
+        let dateFrom;
+        let dateTo;
+
+        if (timeRange === "today") {
+            dateFrom = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            dateTo = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        } else if (timeRange === "thisWeek") {
+            const start = new Date(now);
+            start.setDate(now.getDate() - now.getDay());
+            dateFrom = start;
+            dateTo = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        } else if (timeRange === "lastMonth") {
+            dateFrom = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+            dateTo = new Date(now.getFullYear(), now.getMonth(), 0);
+        } else {
+            dateFrom = new Date(now.getFullYear(), now.getMonth(), 1);
+            dateTo = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        }
+
+        const pad = (n) => String(n).padStart(2, "0");
+        const fmt = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+        const params = new URLSearchParams({
+            status,
+            dateFrom: fmt(dateFrom),
+            dateTo: fmt(dateTo),
+        });
+        return `/admin-dashboard/order?${params.toString()}`;
     };
 
     // KPI Card Component
@@ -431,10 +464,10 @@ export default function AdminStatsDashboard() {
                     <div className="relative">
                         <KPICard
                             title="Total Orders"
-                            value={stats?.sales?.totalOrders || 0}
+                            value={ordersTotalCount || stats?.sales?.totalOrders || 0}
                             icon={ShoppingCart}
                             color="bg-gradient-to-br from-blue-500 to-blue-600"
-                            subtitle="New orders received"
+                            subtitle="Approved orders (excl. cancelled)"
                             onClick={() => router.push("/admin-dashboard/order")}
                         />
                         <button
@@ -447,14 +480,47 @@ export default function AdminStatsDashboard() {
                             <BarChart2 className="w-5 h-5" />
                         </button>
                     </div>
-                    <KPICard
-                        title="Total Revenue"
-                        value={formatCurrency(ordersTotalAmount)}
-                        icon={DollarSign}
-                        color="bg-gradient-to-br from-green-500 to-green-600"
-                        subtitle={ordersTaxableAmount > 0 ? `Base: ${formatCurrency(ordersTaxableAmount)} | Tax: ${formatCurrency(ordersTotalAmount - ordersTaxableAmount)}` : undefined}
-                        onClick={() => router.push("/admin-dashboard/order")}
-                    />
+                    <div className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 p-6">
+                        <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                                <p className="text-sm font-medium text-gray-600 mb-2">Total Revenue</p>
+                                <p className="text-3xl font-bold text-gray-900 mb-1">
+                                    {formatCurrency(ordersTotalAmount)}
+                                </p>
+                                {ordersTaxableAmount > 0 && (
+                                    <p className="text-xs text-gray-500">
+                                        Base: {formatCurrency(ordersTaxableAmount)} | Tax:{" "}
+                                        {formatCurrency(ordersTotalAmount - ordersTaxableAmount)}
+                                    </p>
+                                )}
+                                <div className="mt-3 flex flex-wrap items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => router.push(getOrderPageUrl("dispatchdone"))}
+                                        className="inline-flex cursor-pointer items-center rounded-md border border-teal-200 bg-teal-50 px-2 py-1 text-xs text-gray-700 hover:border-teal-300 hover:bg-teal-100"
+                                    >
+                                        Dispatched ={" "}
+                                        <span className="font-bold text-teal-800">
+                                            {stats?.sales?.dispatched || 0}
+                                        </span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => router.push(getOrderPageUrl("pendingdispatched"))}
+                                        className="inline-flex cursor-pointer items-center rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-gray-700 hover:border-amber-300 hover:bg-amber-100"
+                                    >
+                                        Non-dispatched ={" "}
+                                        <span className="font-bold text-amber-800">
+                                            {stats?.sales?.pendingDispatched || 0}
+                                        </span>
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="p-3 rounded-lg bg-gradient-to-br from-green-500 to-green-600">
+                                <DollarSign className="w-6 h-6 text-white" />
+                            </div>
+                        </div>
+                    </div>
                     <KPICard
                         title="Conversion Rate"
                         value={`${stats?.sales?.conversionRate || 0}%`}

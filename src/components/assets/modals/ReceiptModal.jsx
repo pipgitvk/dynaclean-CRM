@@ -1,5 +1,6 @@
 // src/app/components/assets/modals/ReceiptModal.jsx
 import { jsPDF } from "jspdf";
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
 import { useState } from "react";
 import { toast } from "react-hot-toast";
 
@@ -41,7 +42,7 @@ export default function ReceiptModal({ asset, onClose }) {
     doc.text(`Name: ${asset.Assigned_to}`, 20, 150);
     doc.text(`Assigned By: ${asset.Assigned_by}`, 20, 158);
     doc.text(
-      `Assignment Date: ${new Date(asset.Assigned_Date).toLocaleDateString()}`,
+      `Assignment Date: ${formatCrmDateOnly(asset.Assigned_Date)}`,
       20,
       166
     );

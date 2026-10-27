@@ -12,7 +12,6 @@ import {
 } from "lucide-react";
 import dayjs from "dayjs";
 import ReassignModal from "@/components/models/ReassignModal";
-import toast from "react-hot-toast";
 
 const TaskTable = ({ tasks = [], currentUser = "" }) => {
   const [isClient, setIsClient] = useState(false);
@@ -96,12 +95,12 @@ const TaskTable = ({ tasks = [], currentUser = "" }) => {
                   </td>
                   <td className="px-4 py-3 text-gray-700">{task.taskname}</td>
                   <td className="px-4 py-3 text-gray-600">
-                    {dayjs(task.followed_date).format("DD MMM, YYYY hh:mm A")}
+                    {dayjs(task.followed_date).format("DD-MM-YYYY hh:mm A")}
                   </td>
                   <td className="px-4 py-3 text-gray-600">
                     {task.next_followup_date
                       ? dayjs(task.next_followup_date).format(
-                          "DD MMM, YYYY hh:mm A"
+                          "DD-MM-YYYY hh:mm A"
                         )
                       : "Not set"}
                   </td>
@@ -184,7 +183,7 @@ const TaskTable = ({ tasks = [], currentUser = "" }) => {
                     <CalendarDays size={16} className="text-gray-500" />
                     <span>
                       <strong className="text-gray-700">Assigned:</strong>{" "}
-                      {dayjs(task.followed_date).format("DD MMM, YYYY hh:mm A")}
+                      {dayjs(task.followed_date).format("DD-MM-YYYY hh:mm A")}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
@@ -193,7 +192,7 @@ const TaskTable = ({ tasks = [], currentUser = "" }) => {
                       <strong className="text-gray-700">Deadline:</strong>{" "}
                       {task.next_followup_date
                         ? dayjs(task.next_followup_date).format(
-                            "DD MMM, YYYY hh:mm A"
+                            "DD-MM-YYYY hh:mm A"
                           )
                         : "Not set"}
                     </span>

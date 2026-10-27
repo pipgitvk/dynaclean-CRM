@@ -1,6 +1,7 @@
 // app/demo-registrations/page.jsx
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useMemo, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import dayjs from "dayjs";
@@ -244,7 +245,7 @@ export default function DemoRegistrationPage() {
       item.company,
       item.username,
       item.demo_address,
-      dayjs(item.demo_date_time).format("DD MMM YYYY hh:mm A"),
+      dayjs(item.demo_date_time).format("DD-MM-YYYY hh:mm A"),
       item.machine1,
       item.demo_status || "Pending",
       item.completion_description ||
@@ -252,10 +253,10 @@ export default function DemoRegistrationPage() {
       item.postponed_description ||
       "-",
       item.postponed_date
-        ? dayjs(item.postponed_date).format("DD MMM YYYY")
+        ? dayjs(item.postponed_date).format("DD-MM-YYYY")
         : "-",
       item.demo_completion_date
-        ? dayjs(item.demo_completion_date).format("DD MMM YYYY")
+        ? dayjs(item.demo_completion_date).format("DD-MM-YYYY")
         : "-",
     ]);
     autoTable(doc, {
@@ -312,23 +313,13 @@ export default function DemoRegistrationPage() {
             {/* Date From */}
             <div className="flex flex-col gap-1">
               <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">From</label>
-              <input
-                type="date"
-                value={filters.date_from}
-                onChange={(e) => handleFilterUpdate("date_from", e.target.value)}
-                className="p-2.5 border border-gray-300 rounded-lg text-sm"
-              />
+              <TypeableDateFilterInput value={filters.date_from} onChange={(v) => handleFilterUpdate("date_from", v)} className="p-2.5 border border-gray-300 rounded-lg text-sm"/>
             </div>
 
             {/* Date To */}
             <div className="flex flex-col gap-1">
               <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">To</label>
-              <input
-                type="date"
-                value={filters.date_to}
-                onChange={(e) => handleFilterUpdate("date_to", e.target.value)}
-                className="p-2.5 border border-gray-300 rounded-lg text-sm"
-              />
+              <TypeableDateFilterInput value={filters.date_to} onChange={(v) => handleFilterUpdate("date_to", v)} className="p-2.5 border border-gray-300 rounded-lg text-sm"/>
             </div>
 
             {/* Employee Filter */}
@@ -448,11 +439,11 @@ export default function DemoRegistrationPage() {
                         <td className="px-4 py-1 lg:py-4 block lg:table-cell">
                           <div className="text-sm font-semibold text-gray-700">
                             <span className="lg:hidden text-gray-400 font-normal mr-2 italic">Scheduled:</span>
-                            {dayjs(item.demo_date_time).format("DD MMM, hh:mm A")}
+                            {dayjs(item.demo_date_time).format("DD-MM-YYYY hh:mm A")}
                           </div>
                           {item.postponed_date && (
                             <div className="text-[10px] text-orange-700 font-bold mt-1 bg-orange-100 inline-block px-1 rounded">
-                              POSTPONED TO: {dayjs(item.postponed_date).format("DD MMM")}
+                              POSTPONED TO: {dayjs(item.postponed_date).format("DD-MM-YYYY")}
                             </div>
                           )}
                         </td>
@@ -552,13 +543,7 @@ export default function DemoRegistrationPage() {
                 >
                   Postpone Date
                 </label>
-                <input
-                  id="postpone-date"
-                  type="date"
-                  value={postponeDate}
-                  onChange={(e) => setPostponeDate(e.target.value)}
-                  className="p-2 border rounded w-full text-sm"
-                />
+                <TypeableDateFilterInput value={postponeDate} onChange={setPostponeDate} id="postpone-date" className="p-2 border rounded w-full text-sm"/>
               </div>
             )}
 

@@ -1,5 +1,6 @@
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -1310,21 +1311,11 @@ export default function MetaBackfillPage() {
         <div className="flex flex-wrap gap-3 items-end">
           <label className="flex flex-col text-sm">
             <span className="font-medium mb-1">From date</span>
-            <input
-              type="date"
-              value={since}
-              onChange={(e) => setSince(e.target.value)}
-              className="border px-2 py-1 rounded"
-            />
+            <TypeableDateFilterInput value={since} onChange={setSince} className="border px-2 py-1 rounded"/>
           </label>
           <label className="flex flex-col text-sm">
             <span className="font-medium mb-1">To date</span>
-            <input
-              type="date"
-              value={until}
-              onChange={(e) => setUntil(e.target.value)}
-              className="border px-2 py-1 rounded"
-            />
+            <TypeableDateFilterInput value={until} onChange={setUntil} className="border px-2 py-1 rounded"/>
           </label>
           {/* <button
             type="submit"

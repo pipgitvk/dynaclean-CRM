@@ -1,11 +1,12 @@
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import Link from "next/link";
 import dayjs from "dayjs";
 import { useState, useEffect } from "react";
 import { Eye, CreditCard, Download, ExternalLink, Pencil, Link2, Edit3 } from "lucide-react";
 import Modal from "../../user-dashboard/expenses/Model";
-import StatementLinkModal from "../../admin-dashboard/expenses/StatementLinkModal";
+import StatementLinkModal from "@/app/admin-dashboard/expenses/StatementLinkModal";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import ExcelJS from "exceljs";
@@ -49,7 +50,7 @@ export default function ExpenseTable({ rows, role }) {
 
   // Filter rows based on the search query, employee, date range, and status
   const filteredRows = rows.filter((row) => {
-    const formattedDate = dayjs(row.TravelDate).format("DD MMM YYYY");
+    const formattedDate = dayjs(row.TravelDate).format("DD-MM-YYYY");
 
     // Check if any field matches the search query
     const matchesSearch =
@@ -94,6 +95,13 @@ export default function ExpenseTable({ rows, role }) {
 
   const getApprovedValue = (row) =>
     row.approval_status === "Rejected" ? 0 : Number(row.approved_amount || 0);
+
+  const isBlankAmount = (value) =>
+    value == null || value === "" || Number.isNaN(Number(value)) || Number(value) <= 0;
+
+  const isBlankDate = (value) => !value || value === "0000-00-00";
+
+  const statusOf = (row) => (row.approval_status || "").toLowerCase();
 
   const handleSort = (key) => {
     setSortConfig((prev) =>
@@ -148,31 +156,73 @@ export default function ExpenseTable({ rows, role }) {
     return <span className="ml-1">{sortConfig.direction === "asc" ? "▲" : "▼"}</span>;
   };
 
-  // Calculate totals for Total and Approved Amt (exclude rejected from approved)
   const calculateTotals = (data) => {
-    let totalAmount = 0;
-    let approvedAmount = 0;
+    const summary = {
+      totalAmount: 0,
+      totalCount: 0,
+      rejectedAmount: 0,
+      rejectedCount: 0,
+      approvedAmount: 0,
+      approvedCount: 0,
+      pendingApprovalAmount: 0,
+      pendingApprovalCount: 0,
+      pendingPaymentAmount: 0,
+      pendingPaymentCount: 0,
+      paidAmount: 0,
+      paidCount: 0,
+    };
 
     data.forEach((row) => {
-      totalAmount +=
-        Number(row.TicketCost || 0) +
-        Number(row.HotelCost || 0) +
-        Number(row.MealsCost || 0) +
-        Number(row.OtherExpenses || 0);
-      const isRejected = row.approval_status === "Rejected";
-      const rowApproved = Number(row.approved_amount || 0);
-      if (!isRejected && rowApproved > 0) {
-        approvedAmount += rowApproved;
+      const uploaded = getRowTotal(row);
+      const approvedAmt = Number(row.approved_amount || 0);
+      const status = statusOf(row);
+
+      summary.totalAmount += uploaded;
+      summary.totalCount += 1;
+
+      if (status === "rejected") {
+        summary.rejectedAmount += uploaded;
+        summary.rejectedCount += 1;
+      }
+
+      if (status === "approved") {
+        summary.approvedAmount += approvedAmt > 0 ? approvedAmt : uploaded;
+        summary.approvedCount += 1;
+      }
+
+      if (status === "pending" && isBlankAmount(row.approved_amount)) {
+        summary.pendingApprovalAmount += uploaded;
+        summary.pendingApprovalCount += 1;
+      }
+
+      if (status === "approved" && isBlankDate(row.payment_date)) {
+        summary.pendingPaymentAmount += approvedAmt > 0 ? approvedAmt : uploaded;
+        summary.pendingPaymentCount += 1;
+      }
+
+      if (status === "approved" && !isBlankDate(row.payment_date)) {
+        summary.paidAmount += approvedAmt > 0 ? approvedAmt : uploaded;
+        summary.paidCount += 1;
       }
     });
 
-    return {
-      totalAmount,
-      approvedAmount,
-    };
+    return summary;
   };
 
-  const { totalAmount, approvedAmount } = calculateTotals(filteredRows);
+  const {
+    totalAmount,
+    totalCount,
+    rejectedAmount,
+    rejectedCount,
+    approvedAmount,
+    approvedCount,
+    pendingApprovalAmount,
+    pendingApprovalCount,
+    pendingPaymentAmount,
+    pendingPaymentCount,
+    paidAmount,
+    paidCount,
+  } = calculateTotals(filteredRows);
 
   // Reset all filters
   const handleReset = () => {
@@ -204,7 +254,7 @@ export default function ExpenseTable({ rows, role }) {
     const doc = new jsPDF();
     const tableData = filteredRows.map((row) => [
       row.ID,
-      dayjs(row.TravelDate).format("DD MMM YYYY"),
+      dayjs(row.TravelDate).format("DD-MM-YYYY"),
       row.username,
       row.FromLocation,
       row.Tolocation,
@@ -218,7 +268,7 @@ export default function ExpenseTable({ rows, role }) {
         ? "-"
         : `₹${Number(row.approved_amount).toFixed(2)}`,
       row.payment_date && row.payment_date !== "0000-00-00"
-        ? dayjs(row.payment_date).format("DD MMM YYYY")
+        ? dayjs(row.payment_date).format("DD-MM-YYYY")
         : "-",
       row.approval_status,
     ]);
@@ -264,7 +314,7 @@ export default function ExpenseTable({ rows, role }) {
         Number(row.OtherExpenses || 0);
       worksheet.addRow({
         ID: row.ID,
-        TravelDate: dayjs(row.TravelDate).format("DD MMM YYYY"),
+        TravelDate: dayjs(row.TravelDate).format("DD-MM-YYYY"),
         username: row.username,
         FromLocation: row.FromLocation,
         Tolocation: row.Tolocation,
@@ -275,7 +325,7 @@ export default function ExpenseTable({ rows, role }) {
             : `₹${Number(row.approved_amount).toFixed(2)}`,
         payment_date:
           row.payment_date && row.payment_date !== "0000-00-00"
-            ? dayjs(row.payment_date).format("DD MMM YYYY")
+            ? dayjs(row.payment_date).format("DD-MM-YYYY")
             : "-",
         approval_status: row.approval_status,
       });
@@ -307,18 +357,36 @@ export default function ExpenseTable({ rows, role }) {
   return (
     <div className="space-y-4">
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-4">
         <div className="bg-white p-4 rounded-lg shadow border-l-4 border-blue-600">
-          <div className="text-sm text-gray-500 font-medium uppercase tracking-wider">Total Amount</div>
+          <div className="text-sm text-gray-500 font-medium uppercase tracking-wider">Total</div>
           <div className="text-2xl font-bold text-gray-800">₹{totalAmount.toFixed(2)}</div>
+          <div className="text-xs text-gray-500 mt-1">{totalCount} uploaded by employees</div>
+        </div>
+        <div className="bg-white p-4 rounded-lg shadow border-l-4 border-red-600">
+          <div className="text-sm text-gray-500 font-medium uppercase tracking-wider">Rejected</div>
+          <div className="text-2xl font-bold text-gray-800">₹{rejectedAmount.toFixed(2)}</div>
+          <div className="text-xs text-gray-500 mt-1">{rejectedCount} rejected</div>
         </div>
         <div className="bg-white p-4 rounded-lg shadow border-l-4 border-green-600">
-          <div className="text-sm text-gray-500 font-medium uppercase tracking-wider">Approved Amount</div>
+          <div className="text-sm text-gray-500 font-medium uppercase tracking-wider">Approved</div>
           <div className="text-2xl font-bold text-gray-800">₹{approvedAmount.toFixed(2)}</div>
+          <div className="text-xs text-gray-500 mt-1">{approvedCount} approved</div>
         </div>
         <div className="bg-white p-4 rounded-lg shadow border-l-4 border-yellow-600">
-          <div className="text-sm text-gray-500 font-medium uppercase tracking-wider">Pending Amount</div>
-          <div className="text-2xl font-bold text-gray-800">₹{(totalAmount - approvedAmount).toFixed(2)}</div>
+          <div className="text-sm text-gray-500 font-medium uppercase tracking-wider">Pending approval</div>
+          <div className="text-2xl font-bold text-gray-800">₹{pendingApprovalAmount.toFixed(2)}</div>
+          <div className="text-xs text-gray-500 mt-1">{pendingApprovalCount} pending, amount blank</div>
+        </div>
+        <div className="bg-white p-4 rounded-lg shadow border-l-4 border-orange-600">
+          <div className="text-sm text-gray-500 font-medium uppercase tracking-wider">Pending to payment</div>
+          <div className="text-2xl font-bold text-gray-800">₹{pendingPaymentAmount.toFixed(2)}</div>
+          <div className="text-xs text-gray-500 mt-1">{pendingPaymentCount} approved, not paid</div>
+        </div>
+        <div className="bg-white p-4 rounded-lg shadow border-l-4 border-teal-600">
+          <div className="text-sm text-gray-500 font-medium uppercase tracking-wider">Paid</div>
+          <div className="text-2xl font-bold text-gray-800">₹{paidAmount.toFixed(2)}</div>
+          <div className="text-xs text-gray-500 mt-1">{paidCount} paid</div>
         </div>
       </div>
 
@@ -355,21 +423,11 @@ export default function ExpenseTable({ rows, role }) {
         </select>
         <div className="flex items-center gap-2 w-full sm:w-auto">
           <span className="text-sm text-gray-500 hidden sm:inline">From:</span>
-          <input
-            type="date"
-            value={fromDate}
-            onChange={(e) => setFromDate(e.target.value)}
-            className="px-4 py-2 border rounded-lg w-full sm:w-auto focus:ring-blue-500 focus:border-blue-500"
-          />
+          <TypeableDateFilterInput value={fromDate} onChange={setFromDate} className="px-4 py-2 border rounded-lg w-full sm:w-auto focus:ring-blue-500 focus:border-blue-500"/>
         </div>
         <div className="flex items-center gap-2 w-full sm:w-auto">
           <span className="text-sm text-gray-500 hidden sm:inline">To:</span>
-          <input
-            type="date"
-            value={toDate}
-            onChange={(e) => setToDate(e.target.value)}
-            className="px-4 py-2 border rounded-lg w-full sm:w-auto focus:ring-blue-500 focus:border-blue-500"
-          />
+          <TypeableDateFilterInput value={toDate} onChange={setToDate} className="px-4 py-2 border rounded-lg w-full sm:w-auto focus:ring-blue-500 focus:border-blue-500"/>
         </div>
         <button
           onClick={handleReset}
@@ -439,7 +497,7 @@ export default function ExpenseTable({ rows, role }) {
                       <td className="p-3">{row.ID}</td>
                       <td className="p-3">
                         {row.TravelDate
-                          ? dayjs(row.TravelDate).format("DD MMM YYYY")
+                          ? dayjs(row.TravelDate).format("DD-MM-YYYY")
                           : "-"}
                       </td>
                       <td className="p-3">{row.username}</td>
@@ -454,13 +512,13 @@ export default function ExpenseTable({ rows, role }) {
                       </td>
                       <td className="p-3">
                         {row.payment_date && row.payment_date !== "0000-00-00"
-                          ? dayjs(row.payment_date).format("DD MMM YYYY")
+                          ? dayjs(row.payment_date).format("DD-MM-YYYY")
                           : "-"}
                       </td>
                       <td className="p-3">{row.approval_status}</td>
                       <td className="p-3 flex gap-2 items-center">
                         <Link
-                          href={`/user-dashboard/expenses/${row.ID}`}
+                          href={`/director-dashboard/expenses/${row.ID}`}
                           className="text-blue-600 hover:text-blue-800"
                           title="View Details"
                         >
@@ -468,7 +526,7 @@ export default function ExpenseTable({ rows, role }) {
                         </Link>
                         {row.approval_status !== "Approved" && row.approval_status !== "Rejected" && (
                           <Link
-                            href={`/user-dashboard/expenses/edit/${row.ID}`}
+                            href={`/director-dashboard/expenses/edit/${row.ID}`}
                             className="text-yellow-600 hover:text-yellow-800"
                             title="Edit Expense"
                           >
@@ -576,13 +634,13 @@ export default function ExpenseTable({ rows, role }) {
                     <div>
                       <span className="font-semibold">Date:</span>{" "}
                       {row.TravelDate
-                        ? dayjs(row.TravelDate).format("DD MMM YYYY")
+                        ? dayjs(row.TravelDate).format("DD-MM-YYYY")
                         : "-"}
                     </div>
                     <div>
                       <span className="font-semibold">Payment Date:</span>{" "}
                       {row.payment_date && row.payment_date !== "0000-00-00"
-                        ? dayjs(row.payment_date).format("DD MMM YYYY")
+                        ? dayjs(row.payment_date).format("DD-MM-YYYY")
                         : "-"}
                     </div>
                     <div className="col-span-2">
@@ -603,14 +661,14 @@ export default function ExpenseTable({ rows, role }) {
                   </div>
                   <div className="mt-4 flex justify-between items-center border-t pt-3">
                     <Link
-                      href={`/user-dashboard/expenses/${row.ID}`}
+                      href={`/director-dashboard/expenses/${row.ID}`}
                       className="text-blue-600 hover:text-blue-800 flex items-center gap-1 text-sm font-semibold"
                     >
                       View Details <ExternalLink size={14} />
                     </Link>
                     {row.approval_status !== "Approved" && row.approval_status !== "Rejected" && (
                       <Link
-                        href={`/user-dashboard/expenses/edit/${row.ID}`}
+                        href={`/director-dashboard/expenses/edit/${row.ID}`}
                         className="text-yellow-600 hover:text-yellow-800 flex items-center gap-1 text-sm font-semibold"
                       >
                         Edit <Pencil size={14} />
@@ -657,12 +715,28 @@ export default function ExpenseTable({ rows, role }) {
             <div className="bg-blue-600 text-white p-4 rounded-lg shadow-md border-2 border-blue-700">
               <h3 className="text-lg font-bold mb-2">Summary</h3>
               <div className="flex justify-between items-center text-sm">
-                <span className="font-semibold">Total Amount:</span>
+                <span className="font-semibold">Total:</span>
                 <span>₹{totalAmount.toFixed(2)}</span>
               </div>
               <div className="flex justify-between items-center text-sm">
-                <span className="font-semibold">Approved Amount:</span>
+                <span className="font-semibold">Rejected:</span>
+                <span>₹{rejectedAmount.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between items-center text-sm">
+                <span className="font-semibold">Approved:</span>
                 <span>₹{approvedAmount.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between items-center text-sm">
+                <span className="font-semibold">Pending approval:</span>
+                <span>₹{pendingApprovalAmount.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between items-center text-sm">
+                <span className="font-semibold">Pending to payment:</span>
+                <span>₹{pendingPaymentAmount.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between items-center text-sm">
+                <span className="font-semibold">Paid:</span>
+                <span>₹{paidAmount.toFixed(2)}</span>
               </div>
             </div>
           </>

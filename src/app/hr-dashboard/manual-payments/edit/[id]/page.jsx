@@ -1,7 +1,9 @@
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
+import { manualPaymentInvoiceHref } from "@/lib/manualPaymentInvoiceHref";
 
 export default function EditPaymentPage() {
     const router = useRouter();
@@ -302,26 +304,14 @@ export default function EditPaymentPage() {
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
                                     Payment Date
                                 </label>
-                                <input
-                                    type="date"
-                                    name="payment_date"
-                                    value={formData.payment_date}
-                                    onChange={handleChange}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                />
+                                <TypeableDateFilterInput value={formData.payment_date} onChange={(v) => handleChange({ target: { name: "payment_date", value: v } })} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"/>
                             </div>
 
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
                                     Due Date
                                 </label>
-                                <input
-                                    type="date"
-                                    name="due_date"
-                                    value={formData.due_date}
-                                    onChange={handleChange}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                />
+                                <TypeableDateFilterInput value={formData.due_date} onChange={(v) => handleChange({ target: { name: "due_date", value: v } })} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"/>
                             </div>
 
                             <div>
@@ -347,7 +337,7 @@ export default function EditPaymentPage() {
                                 {currentInvoice && !removeInvoice && !newInvoiceFile && (
                                     <div className="mb-2 p-2 bg-gray-50 border border-gray-200 rounded flex items-center justify-between">
                                         <a
-                                            href={currentInvoice}
+                                            href={manualPaymentInvoiceHref(currentInvoice)}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className="text-blue-600 hover:text-blue-800 text-sm underline"

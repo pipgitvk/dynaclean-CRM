@@ -1,23 +1,57 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import InvoiceItemsTable from "./invoice-table";
 import TaxAndSummary from "./Tax-invoice";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import {
+  navigateAfterInvoiceCreate,
+  resolveOrderListRedirectAfterInvoiceCreate,
+} from "@/lib/invoiceCreateRedirect";
 import Image from "next/image";
 import toast from "react-hot-toast";
+import { Pencil } from "lucide-react";
 import AddSpecialPriceModal from "@/components/specialPrice/AddSpecialPriceModal";
 import dynacleanLogo from "@/components/logo1.jpg";
+import { LetterheadCompanyInfo, LetterheadBankLine, LetterheadSignatoryLine } from "@/components/invoice/InvoiceLetterheadSection";
+import { useUser } from "@/context/UserContext";
+import { canEditInvoiceHsn } from "@/lib/performaInvoiceAccess";
+import {
+  DEFAULT_TAX_INVOICE_TERMS,
+  getDefaultPerformaInvoiceTerms,
+} from "@/lib/performaInvoiceTerms";
+import {
+  applyTaxPercentsToInvoiceItems,
+  getStateCodeFromGstin,
+  invoiceHeaderTaxRates,
+  isInterstateInvoiceSupply,
+  totalGstPercentFromInvoiceItem,
+} from "@/lib/gstSupplyType";
 
-export default function InvoiceForm({ invoiceNumber, invoiceDate, invoiceType = "tax", onBack }) {
+
+export default function InvoiceForm({
+  invoiceNumber,
+  invoiceDate,
+  invoiceType = "tax",
+  onBack,
+  onSuccessRedirect,
+  initialQuotationNumber = "",
+  initialOrderId = "",
+}) {
   const router = useRouter();
+  const pathname = usePathname();
+  const { user } = useUser();
+  const canEditHsn = canEditInvoiceHsn(user?.userRole);
+  const autoFilledQuoteRef = useRef(false);
+  const termsTextareaRef = useRef(null);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
+
   // Determine the display label based on invoice type
   const invoiceTypeLabel = invoiceType === "performa" ? "Performa Invoice" : "Invoice";
   const [ showQuotationModal, setShowQuotationModal]= useState(false)
-  const [quotationNumber, setQuotationNumber] = useState("")
+  const [quotationNumber, setQuotationNumber] = useState(String(initialQuotationNumber || "").trim());
+  const [orderId, setOrderId] = useState(String(initialOrderId || "").trim());
   const [isFromQuotation, setIsFromQuotation] = useState(false);
 
 
@@ -50,6 +84,7 @@ export default function InvoiceForm({ invoiceNumber, invoiceDate, invoiceType = 
     state_code: "",
     customer_id: "",
     payment_status: "UNPAID",
+    status: "",
     due_date: "",
     amount_paid: 0,
     buyers_order_no: "",
@@ -62,10 +97,6 @@ export default function InvoiceForm({ invoiceNumber, invoiceDate, invoiceType = 
   const [sgstRate, setSgstRate] = useState(9);
   const [igstRate, setIgstRate] = useState(0);
   const [roundOff, setRoundOff] = useState(0);
-
-  // Supplier state is fixed
-  const SUPPLIER_STATE_CODE = "07";
-  const SUPPLIER_STATE_NAME = "Delhi";
 
   // State code to name map (GST state codes)
     const stateCodeToName = useMemo(
@@ -182,73 +213,77 @@ export default function InvoiceForm({ invoiceNumber, invoiceDate, invoiceType = 
 
   const [isGeneratingInvoice, setIsGeneratingInvoice] = useState(true);
 
-  // Auto-set state + state_code from GSTIN when valid.
-  // Skip when form is pre-filled from a quotation (quotation already has correct state + GST rates).
+  const interstateSupply = useMemo(
+    () =>
+      isInterstateInvoiceSupply({
+        buyerGstin: form.gst_number?.trim(),
+        buyerStateCode: form.state_code,
+        stateDisplay: form.state,
+        parseCodeFromDisplay,
+      }),
+    [form.gst_number, form.state, form.state_code],
+  );
+
+  const lineTaxSignature = useMemo(
+    () =>
+      items
+        .map(
+          (i) =>
+            `${i.item_code ?? ""}|${i.item_name ?? ""}|${i.description ?? ""}|${i.gst ?? ""}`,
+        )
+        .join("§"),
+    [items],
+  );
+
+  // Auto-set state from GSTIN (quotation load uses same rules, not stored quote tax type)
   useEffect(() => {
-    if (isFromQuotation) return;
-    const st = getStateFromGSTIN(form.gst_number?.trim());
-    if (!st) return;
-    setForm((prev) => ({
-      ...prev,
-      state: st.display,
-      state_code: st.code,
-    }));
-    setStateSearch(st.display);
-    setShowStateSuggestions(false);
-  }, [form.gst_number, isFromQuotation]);
+    const gstinValue = form.gst_number?.trim();
 
-  // State-based rate setting - only when NOT from quotation
+    if (gstinValue) {
+      const st = getStateFromGSTIN(gstinValue);
+      if (st) {
+        setForm((prev) => {
+          if (prev.state === st.display && prev.state_code === st.code) return prev;
+          return { ...prev, state: st.display, state_code: st.code };
+        });
+        setStateSearch(st.display);
+        setShowStateSuggestions(false);
+      }
+    }
+  }, [form.gst_number, form.state, form.state_code, stateCodeToName]);
+
+  // Re-apply line GST when products / place-of-supply change (not only on GSTIN blur)
   useEffect(() => {
-    console.log("[State Effect]", { isFromQuotation, state: form.state, state_code: form.state_code });
-    
-    if (isFromQuotation) {
-      console.log("[State Effect] Skipping because isFromQuotation=true");
-      return; // Skip entirely if from quotation
-    }
+    const interstate = interstateSupply;
+    const { cgstRate: cR, sgstRate: sR, igstRate: iR } = invoiceHeaderTaxRates(
+      items,
+      interstate,
+    );
+    setCgstRate(cR);
+    setSgstRate(sR);
+    setIgstRate(iR);
 
-    const code = form.state_code || parseCodeFromDisplay(form.state);
-    if (!code) return;
-
-    console.log("[State Effect] Setting rates based on state code:", code);
-
-    if (code === SUPPLIER_STATE_CODE) {
-      setCgstRate(9);
-      setSgstRate(9);
-      setIgstRate(0);
-
-      setItems((prev) =>
-        prev.map((item) => ({
-          ...item,
-          cgst_percent: 9,
-          sgst_percent: 9,
-          igst_percent: 0,
-        })),
-      );
-    } else {
-      console.log("[State Effect] State code", code, "!= SUPPLIER_STATE_CODE", SUPPLIER_STATE_CODE, "-> setting 18%");
-      setCgstRate(0);
-      setSgstRate(0);
-      setIgstRate(18);
-
-      setItems((prev) =>
-        prev.map((item) => ({
-          ...item,
-          cgst_percent: 0,
-          sgst_percent: 0,
-          igst_percent: 18,
-        })),
-      );
-    }
-  }, [form.state, form.state_code, isFromQuotation, SUPPLIER_STATE_CODE]);
+    setItems((prev) => {
+      const next = applyTaxPercentsToInvoiceItems(prev, interstate);
+      const same =
+        prev.length === next.length &&
+        prev.every(
+          (row, idx) =>
+            row.cgst_percent === next[idx].cgst_percent &&
+            row.sgst_percent === next[idx].sgst_percent &&
+            row.igst_percent === next[idx].igst_percent &&
+            row.gst === next[idx].gst,
+        );
+      return same ? prev : next;
+    });
+  }, [lineTaxSignature, interstateSupply]);
 
   const [editableTerms, setEditableTerms] = useState(
-    `1. Payment due within specified due date.
-2. Late payment charges: Interest charges at the rate of 1.5% per month or as per MSME act 2006, whichever is higher will be charged on overdue amounts from the invoice due date.
-3. All disputes subject to Delhi jurisdiction.
-4. Goods once sold will not be taken back.
-
-Thanks for doing business with us!`,
+    invoiceType === "performa"
+      ? getDefaultPerformaInvoiceTerms()
+      : DEFAULT_TAX_INVOICE_TERMS,
   );
+  const [termsEditing, setTermsEditing] = useState(invoiceType !== "performa");
 
   const [notes, setNotes] = useState("");
   const [formLogoSrc, setFormLogoSrc] = useState(dynacleanLogo.src);
@@ -317,8 +352,15 @@ Thanks for doing business with us!`,
         finalPaymentStatus = "UNPAID";
       }
 
+      const buyersOrderNo = String(
+        form.buyers_order_no || orderId || initialOrderId || "",
+      ).trim();
+
       const dataToSend = {
         ...form,
+        buyers_order_no: buyersOrderNo,
+        order_id: buyersOrderNo || undefined,
+        quotation_id: form.quotation_id || quotationNumber || undefined,
         invoice_number: invoiceNumber,
         invoice_date: invoiceDate,
         invoice_type: invoiceType,
@@ -333,11 +375,13 @@ Thanks for doing business with us!`,
         amount_paid: amountPaid,
         balance_amount: balanceAmount < 0 ? 0 : balanceAmount,
         payment_status: finalPaymentStatus,
+        status: form.status || null,
         notes: notes,
         terms_conditions: editableTerms,
         cgst_rate: cgstRate,
         sgst_rate: sgstRate,
         igst_rate: igstRate,
+        linked_trans_ids: null,
       };
 
       console.log("Data being sent to API:", dataToSend);
@@ -349,11 +393,27 @@ Thanks for doing business with us!`,
       });
 
       const data = await res.json();
-      if (data.success) {
+      const created = res.ok && (data.success || data.invoiceNumber);
+      if (created) {
         toast.success("Invoice created successfully");
-        router.push("/admin-dashboard/invoices");
+        const redirectAfterOrder = resolveOrderListRedirectAfterInvoiceCreate({
+          onSuccessRedirect,
+          orderId,
+          initialOrderId,
+          buyersOrderNo: form.buyers_order_no,
+          pathname,
+        });
+        if (redirectAfterOrder) {
+          navigateAfterInvoiceCreate(router, redirectAfterOrder);
+          return;
+        }
+        if (invoiceType === "performa") {
+          router.push("/admin-dashboard/performa-invoices");
+        } else {
+          router.push("/admin-dashboard/invoices");
+        }
       } else {
-        alert("Error: " + data.error);
+        alert("Error: " + (data.error || "Failed to create invoice"));
       }
     } catch (error) {
       console.error("Error submitting invoice:", error);
@@ -373,15 +433,20 @@ Thanks for doing business with us!`,
 
 
   // fetch data with quotation number 
-const fetchQuotationAndFill = async () => {
-  if (!quotationNumber) {
+const fetchQuotationAndFill = async (quoteNoArg) => {
+  const raw =
+    typeof quoteNoArg === "string" || typeof quoteNoArg === "number"
+      ? quoteNoArg
+      : quotationNumber;
+  const qn = String(raw ?? "").trim();
+  if (!qn) {
     toast.error("Enter quotation number");
     return;
   }
 
   try {
     const res = await fetch(
-      `/api/get-quotation?quotation_number=${quotationNumber}`
+      `/api/get-quotation?quotation_number=${encodeURIComponent(qn)}`
     );
     const data = await res.json();
     console.log("check what data :", data);
@@ -393,32 +458,15 @@ const fetchQuotationAndFill = async () => {
 
     const quotation = data.quotation;
 
-    // Set GST rates FIRST (before form updates that trigger state effect)
-    console.log("Setting rates from quotation:", {
-      cgstRate: quotation.cgstRate,
-      sgstRate: quotation.sgstRate,
-      igstRate: quotation.igstRate,
-    });
-
-    if (quotation.cgstRate !== undefined && quotation.cgstRate !== null) {
-      console.log("Setting CGST to", Number(quotation.cgstRate));
-      setCgstRate(Number(quotation.cgstRate));
-    }
-    if (quotation.sgstRate !== undefined && quotation.sgstRate !== null) {
-      console.log("Setting SGST to", Number(quotation.sgstRate));
-      setSgstRate(Number(quotation.sgstRate));
-    }
-    if (quotation.igstRate !== undefined && quotation.igstRate !== null) {
-      console.log("Setting IGST to", Number(quotation.igstRate));
-      setIgstRate(Number(quotation.igstRate));
-    }
-
-    // Set flag BEFORE form update (so state effect knows not to override)
     setIsFromQuotation(true);
 
     // Fill only available quotation fields
     setForm((prev) => ({
       ...prev,
+      buyers_order_no:
+        prev.buyers_order_no ||
+        String(orderId || initialOrderId || "").trim() ||
+        prev.buyers_order_no,
       customer_name: quotation.customer_name,
       customer_email: quotation.customer_email,
       customer_phone: quotation.customer_contact,
@@ -426,7 +474,10 @@ const fetchQuotationAndFill = async () => {
       shipping_address: quotation.shipping_address,
       gst_number: quotation.gst_number,
       state: quotation.state,
-      state_code: quotation.state_code,
+      state_code:
+        quotation.state_code ||
+        getStateCodeFromGstin(quotation.gst_number) ||
+        "",
       customer_id: quotation.customer_id,
       quotation_id: quotation.quotation_id,
       due_date: quotation.due_date
@@ -434,49 +485,81 @@ const fetchQuotationAndFill = async () => {
   : "",
     }));
 
-    // Fill items from quotation
-   setItems(
-  quotation.items.map((it) => ({
-    item_name: it.item_name || "",
-    item_code: it.item_code || "",        
-    description: it.specification || it.description || "",
-    hsn_code: it.hsn_sac || it.hsn_code || "",
-    quantity: it.quantity || 1,
-    unit: it.unit || "",                  
-    rate: it.rate || it.price_per_unit || 0,
-    discount_percent: it.discount_percent || 0,
-    discount_amount: it.discount_amount || 0,
+    const interstate = isInterstateInvoiceSupply({
+      buyerGstin: quotation.gst_number,
+      buyerStateCode:
+        quotation.state_code ||
+        getStateCodeFromGstin(quotation.gst_number),
+      stateDisplay: quotation.state,
+      parseCodeFromDisplay,
+    });
 
-    cgst_percent: it.cgst_percent || 0,
-    sgst_percent: it.sgst_percent || 0,
-    igst_percent: it.igst_percent || 0,
+    const mappedItems = quotation.items.map((it) => {
+      const cg = Number(it.cgst_percent) || 0;
+      const sg = Number(it.sgst_percent) || 0;
+      const ig = Number(it.igst_percent) || 0;
+      return {
+        item_name: it.item_name || "",
+        item_code: it.item_code || "",
+        description: it.specification || it.description || "",
+        hsn_code: it.hsn_sac || it.hsn_code || "",
+        quantity: it.quantity || 1,
+        unit: it.unit || "",
+        rate: it.rate || it.price_per_unit || 0,
+        discount_percent: it.discount_percent || 0,
+        discount_amount: it.discount_amount || 0,
+        cgst_percent: cg,
+        sgst_percent: sg,
+        igst_percent: ig,
+        gst: totalGstPercentFromInvoiceItem({
+          item_name: it.item_name || "",
+          cgst_percent: cg,
+          sgst_percent: sg,
+          igst_percent: ig,
+          gst: ig || cg + sg,
+        }),
+        imageUrl: it.img_url || "",
+      };
+    });
 
-    imageUrl: it.img_url || "",             
-  }))
-);
+    const taxedItems = applyTaxPercentsToInvoiceItems(mappedItems, interstate);
+    setItems(taxedItems);
+    const rates = invoiceHeaderTaxRates(taxedItems, interstate);
+    setCgstRate(rates.cgstRate);
+    setSgstRate(rates.sgstRate);
+    setIgstRate(rates.igstRate);
 
     if (quotation.round_off) {
       setRoundOff(Number(quotation.round_off) || 0);
       // setIsAutoRoundOff(false); // Keep true by default
     }
 
-    console.log("Quotation loaded with rates:", {
-      cgstRate: quotation.cgstRate,
-      sgstRate: quotation.sgstRate,
-      igstRate: quotation.igstRate,
-    });
-
     toast.success("Quotation loaded successfully");
     setShowQuotationModal(false);
-    // Clear the input field but keep isFromQuotation flag for rate logic
-    setTimeout(() => setQuotationNumber(""), 500);
+    setQuotationNumber(qn);
   } catch (err) {
     console.error(err);
     toast.error("Failed to load quotation");
   }
 };
 
+  useEffect(() => {
+    const qn = String(initialQuotationNumber || "").trim();
+    if (!qn || autoFilledQuoteRef.current) return;
+    autoFilledQuoteRef.current = true;
+    void fetchQuotationAndFill(qn);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-time autofill from URL/customer page
+  }, [initialQuotationNumber]);
 
+  useEffect(() => {
+    const oid = String(initialOrderId || "").trim();
+    if (!oid) return;
+    setOrderId(oid);
+    setForm((prev) => ({
+      ...prev,
+      buyers_order_no: prev.buyers_order_no || oid,
+    }));
+  }, [initialOrderId]);
 
   return (
     <>
@@ -493,8 +576,17 @@ const fetchQuotationAndFill = async () => {
       <h1 className="text-2xl font-bold text-gray-800 flex-1 text-center">
         Create {invoiceTypeLabel}
       </h1>
-      <button  className="bg-green-500 px-4 py-2 rounded text-white cursor-pointer"  onClick={() => setShowQuotationModal(true)}>Add with quotation number</button>
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          className="bg-green-500 px-4 py-2 rounded text-white cursor-pointer hover:bg-green-600"
+          onClick={() => setShowQuotationModal(true)}
+        >
+          Add with quotation number
+        </button>
+      </div>
     </div>
+
     <form
       onSubmit={handleSubmit}
       className="space-y-6 max-w-5xl mx-auto px-4 text-gray-800"
@@ -516,29 +608,8 @@ const fetchQuotationAndFill = async () => {
           </div>
         )}
 
-        <div className="flex-1 text-sm text-gray-700">
-          <h2 className="text-xl font-bold text-red-600 mb-1">
-            Dynaclean Industries Pvt Ltd
-          </h2>
-          <p className="leading-relaxed">
-            <span className="block">
-              1st Floor, 13-B, Kattabomman Street, Gandhi Nagar Main Road,
-            </span>
-            <span className="block">
-              Gandhi Nagar, Ganapathy, Coimbatore, Tamil Nadu, 641006
-            </span>
-            <span className="block mt-1">
-              <strong>Phone:</strong> 011-45143666, +91-7982456944
-            </span>
-            <span className="block">
-              <strong>Email:</strong> sales@dynacleanindustries.com
-            </span>
-            <span className="block mt-1">
-              <strong>GSTIN:</strong> 07AAKCD6495M1ZV | <strong>State:</strong>{" "}
-              Tamil Nadu (33)
-            </span>
-          </p>
-        </div>
+        <LetterheadCompanyInfo />
+        
       </div>
 
       {/* Invoice Info */}
@@ -587,6 +658,29 @@ const fetchQuotationAndFill = async () => {
 
         </div>
       </div>
+
+      {(quotationNumber || orderId) && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-emerald-50/80 p-4 rounded border border-emerald-100">
+          <div>
+            <label className="text-sm text-gray-600">Quotation Number</label>
+            <input
+              type="text"
+              value={quotationNumber}
+              readOnly
+              className="input w-full bg-gray-100"
+            />
+          </div>
+          <div>
+            <label className="text-sm text-gray-600">Order ID</label>
+            <input
+              type="text"
+              value={orderId}
+              readOnly
+              className="input w-full bg-gray-100"
+            />
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-gray-50 p-4 rounded">
         <div>
@@ -806,7 +900,7 @@ const fetchQuotationAndFill = async () => {
     value={form.amount_paid}
     readOnly
     tabIndex={-1}
-    title="Set via Payment Link or quotation load"
+    title="From quotation when applicable"
   />
 </div>
 
@@ -826,6 +920,22 @@ const fetchQuotationAndFill = async () => {
           </select>
         </div>
 
+        <div>
+          <label className="text-sm text-gray-600">Status</label>
+          <select
+            className="input w-full"
+            value={form.status}
+            onChange={(e) =>
+              setForm({ ...form, status: e.target.value })
+            }
+          >
+            <option value="">Select Status</option>
+            <option value="PAID">Paid</option>
+            <option value="PARTIAL PAID">Partial Paid</option>
+            <option value="CANCELLED">Cancelled</option>
+          </select>
+        </div>
+
       </div>
 
       {/* Set Special Price for this customer */}
@@ -837,7 +947,12 @@ const fetchQuotationAndFill = async () => {
       </div>
 
       {/* Invoice Items Table */}
-      <InvoiceItemsTable items={items} setItems={setItems} />
+      <InvoiceItemsTable
+        items={items}
+        setItems={setItems}
+        canEditHsn={canEditHsn}
+        interstate={interstateSupply}
+      />
 
       {/* Tax Summary */}
       <TaxAndSummary
@@ -875,14 +990,36 @@ const fetchQuotationAndFill = async () => {
 
         {/* Terms & Conditions */}
         <div className="lg:col-span-2 border p-4 rounded bg-gray-50">
-          <h4 className="font-semibold text-base mb-2 text-gray-800">
-            Terms & Conditions
-          </h4>
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <h4 className="font-semibold text-base text-gray-800">
+              Terms & Conditions
+            </h4>
+            {invoiceType === "performa" && !termsEditing && (
+              <button
+                type="button"
+                onClick={() => {
+                  setTermsEditing(true);
+                  requestAnimationFrame(() => termsTextareaRef.current?.focus());
+                }}
+                className="inline-flex items-center gap-1 rounded p-1.5 text-gray-600 hover:bg-gray-200 hover:text-gray-900"
+                title="Edit terms & conditions"
+                aria-label="Edit terms & conditions"
+              >
+                <Pencil className="h-4 w-4" />
+              </button>
+            )}
+          </div>
           <textarea
+            ref={termsTextareaRef}
             rows={8}
             value={editableTerms}
             onChange={(e) => setEditableTerms(e.target.value)}
-            className="w-full text-sm p-2 border rounded resize-y"
+            readOnly={invoiceType === "performa" && !termsEditing}
+            className={`w-full text-sm p-2 border rounded resize-y ${
+              invoiceType === "performa" && !termsEditing
+                ? "cursor-default bg-white"
+                : ""
+            }`}
           />
         </div>
 
@@ -890,7 +1027,7 @@ const fetchQuotationAndFill = async () => {
         <div className="lg:col-span-1 space-y-4">
           <div className="border p-4 rounded bg-gray-50 text-sm">
             <h4 className="font-semibold mb-2">Bank Details</h4>
-            <p>A/C Holder: Dynaclean Industries Private Limited</p>
+            <LetterheadBankLine />
             <p>ICICI Bank</p>
             <p>Account: 343405500379</p>
             <p>IFSC: ICIC0003434</p>
@@ -898,7 +1035,7 @@ const fetchQuotationAndFill = async () => {
 
           <div className="border p-4 rounded bg-gray-50 text-sm text-center flex flex-col justify-between">
             <div>
-              <p>For Dynaclean Industries Pvt Ltd</p>
+              <LetterheadSignatoryLine />
               <Image
                 src="/images/sign.png"
                 alt="Sign"
@@ -954,7 +1091,7 @@ const fetchQuotationAndFill = async () => {
 
         <button
           className="px-4 py-2 bg-emerald-600 text-white rounded"
-          onClick={fetchQuotationAndFill}
+          onClick={() => fetchQuotationAndFill()}
         >
           Load Quotation
         </button>

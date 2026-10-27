@@ -1,5 +1,6 @@
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import dayjs from "dayjs";
@@ -137,18 +138,8 @@ export default function CustomerTable({ rows, searchParams }) {
           placeholder="Search"
           className="p-2 border rounded w-full text-sm"
         />
-        <input
-          type="date"
-          value={filters.date_from}
-          onChange={(e) => update("date_from", e.target.value)}
-          className="p-2 border rounded w-full text-sm"
-        />
-        <input
-          type="date"
-          value={filters.date_to}
-          onChange={(e) => update("date_to", e.target.value)}
-          className="p-2 border rounded w-full text-sm"
-        />
+        <TypeableDateFilterInput value={filters.date_from} onChange={(v) => update("date_from", v)} className="p-2 border rounded w-full text-sm"/>
+        <TypeableDateFilterInput value={filters.date_to} onChange={(v) => update("date_to", v)} className="p-2 border rounded w-full text-sm"/>
         <select
           value={filters.sort}
           onChange={(e) => update("sort", e.target.value)}
@@ -197,14 +188,14 @@ export default function CustomerTable({ rows, searchParams }) {
                   <td className="p-3">{item.company}</td>
                   <td className="p-3">{item.demo_address}</td>
                   <td className="p-3">
-                    {dayjs(item.demo_date_time).format("DD MMM YYYY hh:mm A")}
+                    {dayjs(item.demo_date_time).format("DD-MM-YYYY hh:mm A")}
                   </td>
                   <td className="p-3">{item.machine1}</td>
                   <td className="p-3">{item.demo_status || "Pending"}</td>
                   <td className="p-3">{item.username}</td>
                   <td className="p-3">
                     {item.demo_completion_date
-                      ? dayjs(item.demo_completion_date).format("DD MMM YYYY")
+                      ? dayjs(item.demo_completion_date).format("DD-MM-YYYY")
                       : "-"}
                   </td>
                   <td className="p-3">
@@ -253,7 +244,7 @@ export default function CustomerTable({ rows, searchParams }) {
                   {item.customer_name}
                 </h3>
                 <span className="text-sm text-gray-50">
-                  {dayjs(item.demo_date_time).format("DD MMM YYYY")}
+                  {dayjs(item.demo_date_time).format("DD-MM-YYYY")}
                 </span>
               </div>
               <p className="text-gray-700">
@@ -268,7 +259,7 @@ export default function CustomerTable({ rows, searchParams }) {
               </p>
               <p className="text-gray-700">
                 <strong className="font-medium">Demo Date & Time:</strong>{" "}
-                {dayjs(item.demo_date_time).format("DD MMM YYYY hh:mm A")}
+                {dayjs(item.demo_date_time).format("DD-MM-YYYY hh:mm A")}
               </p>
               <p className="text-gray-700">
                 <strong className="font-medium">Machine:</strong>{" "}
@@ -285,7 +276,7 @@ export default function CustomerTable({ rows, searchParams }) {
               <p className="text-gray-700 mb-4">
                 <strong className="font-medium">Completed On:</strong>{" "}
                 {item.demo_completion_date
-                  ? dayjs(item.demo_completion_date).format("DD MMM YYYY")
+                  ? dayjs(item.demo_completion_date).format("DD-MM-YYYY")
                   : "-"}
               </p>
 

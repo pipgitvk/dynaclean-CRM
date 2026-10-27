@@ -3,7 +3,12 @@
 import { getDbConnection } from "@/lib/db";
 import UpcomingFollowupsClient from "./UpcomingFollowupsClient";
 
-export default async function UpcomingFollowupsWidget({ username, userRole }) {
+export default async function UpcomingFollowupsWidget({
+  username,
+  userRole,
+  variant = "default",
+  dashboardPrefix = "/user-dashboard",
+}) {
   const connection = await getDbConnection();
   const role = (userRole || "").toUpperCase();
   const canViewAll = role === "SERVICE HEAD" || role === "SUPERADMIN" || role === "DIRECTOR";
@@ -59,6 +64,8 @@ export default async function UpcomingFollowupsWidget({ username, userRole }) {
       initialRows={serializedRows}
       username={username}
       userRole={userRole}
+      variant={variant}
+      dashboardPrefix={dashboardPrefix}
     />
   );
 }

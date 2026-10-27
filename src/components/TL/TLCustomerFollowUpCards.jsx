@@ -74,7 +74,7 @@ function TLCustomerFollowUpCard({ customer, detailHref, followupHref, useLatestN
 
   const nextD = pickNextFollowupForDisplay(customer, useLatestNextFollowup);
   const nextLabel =
-    formatCrmDayjsForISTDisplay(nextD, "DD MMM, YYYY HH:mm") || "—";
+    formatCrmDayjsForISTDisplay(nextD, "DD-MM-YYYY HH:mm") || "—";
 
   const tagParts = customer.multi_tag
     ? customer.multi_tag

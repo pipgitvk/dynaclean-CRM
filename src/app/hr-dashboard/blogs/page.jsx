@@ -115,7 +115,7 @@ const BlogManagementPage = () => {
                   </p>
                   <p className="text-xs text-gray-400">
                     Last updated:{" "}
-                    {format(new Date(blog.updated_at), "MMM d, yyyy")}
+                    {format(new Date(blog.updated_at), "dd-MM-yyyy")}
                   </p>
                 </div>
               </div>

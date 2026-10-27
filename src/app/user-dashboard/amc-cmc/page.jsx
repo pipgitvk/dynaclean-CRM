@@ -1,5 +1,7 @@
 "use client";
 
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
+
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { Search, Edit, Eye, ClipboardList, History, X } from "lucide-react";
@@ -156,8 +158,8 @@ function HistoryModal({ serialNumber, onClose }) {
                   <div className={`p-4 rounded-lg border ${idx === 0 ? "bg-purple-50 border-purple-200" : "bg-gray-50 border-gray-200"}`}>
                     <div className="text-xs text-gray-500">#{rec.id} by <span className="font-semibold">{rec.added_by}</span></div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-sm mt-2">
-                      <div><span className="text-gray-500">Followed At:</span> <span className="font-medium">{dayjs(rec.followed_at).tz(IST).format("DD/MM/YYYY HH:mm")}</span></div>
-                      <div><span className="text-gray-500">Next Follow-up:</span> <span className="font-medium">{rec.next_followup_date ? dayjs(rec.next_followup_date).tz(IST).format("DD/MM/YYYY HH:mm") : "—"}</span></div>
+                      <div><span className="text-gray-500">Followed At:</span> <span className="font-medium">{dayjs(rec.followed_at).tz(IST).format("DD-MM-YYYY HH:mm")}</span></div>
+                      <div><span className="text-gray-500">Next Follow-up:</span> <span className="font-medium">{rec.next_followup_date ? dayjs(rec.next_followup_date).tz(IST).format("DD-MM-YYYY HH:mm") : "—"}</span></div>
                       {rec.notes && <div className="sm:col-span-2"><span className="text-gray-500">Notes:</span> <span className="font-medium">{rec.notes}</span></div>}
                     </div>
                   </div>
@@ -269,12 +271,14 @@ export default function UserAMCCMCPage() {
           <thead className="bg-gray-800 text-white">
             <tr>
               <th className="p-3 text-left">Serial #</th>
+              <th className="p-3 text-left">Type</th>
               <th className="p-3 text-left">Model</th>
               <th className="p-3 text-left">Company</th>
               <th className="p-3 text-left">Contact</th>
               <th className="p-3 text-left">AMC Period</th>
               <th className="p-3 text-left">Status</th>
               <th className="p-3 text-left">Created</th>
+              <th className="p-3 text-center">AMC/CMC Contract</th>
               <th className="p-3 text-center">Actions</th>
             </tr>
           </thead>
@@ -284,6 +288,12 @@ export default function UserAMCCMCPage() {
                 <tr key={i} className="border-b animate-pulse">
                   <td className="p-3">
                     <div className="h-4 bg-gray-300 rounded w-3/4"></div>
+                  </td>
+                  <td className="p-3">
+                    <div className="h-4 bg-gray-300 rounded w-1/2"></div>
+                  </td>
+                  <td className="p-3">
+                    <div className="h-4 bg-gray-300 rounded"></div>
                   </td>
                   <td className="p-3">
                     <div className="h-4 bg-gray-300 rounded"></div>
@@ -312,12 +322,23 @@ export default function UserAMCCMCPage() {
               records.map((record) => (
                 <tr key={record.id} className="border-b hover:bg-gray-50">
                   <td className="p-3 font-semibold">{record.serial_number}</td>
+                  <td className="p-3">
+                    <span
+                      className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                        record.contract_type === "CMC"
+                          ? "bg-purple-100 text-purple-800"
+                          : "bg-blue-100 text-blue-800"
+                      }`}
+                    >
+                      {record.contract_type || "AMC"}
+                    </span>
+                  </td>
                   <td className="p-3">{record.model || "—"}</td>
                   <td className="p-3">{record.company_name}</td>
                   <td className="p-3">{record.contact || "—"}</td>
                   <td className="p-3 text-sm">
-                    {new Date(record.amc_start_datetime).toLocaleDateString()} -{" "}
-                    {new Date(record.amc_end_datetime).toLocaleDateString()}
+                    {formatCrmDateOnly(record.amc_start_datetime)} -{" "}
+                    {formatCrmDateOnly(record.amc_end_datetime)}
                   </td>
                   <td className="p-3">
                     <span
@@ -329,7 +350,16 @@ export default function UserAMCCMCPage() {
                     </span>
                   </td>
                   <td className="p-3 text-sm">
-                    {new Date(record.created_time).toLocaleDateString()}
+                    {formatCrmDateOnly(record.created_time)}
+                  </td>
+                  <td className="p-3 text-center">
+                    <Link
+                      href={`/user-dashboard/amc-cmc/contract/${record.id}`}
+                      target="_blank"
+                      className="inline-flex items-center rounded-md bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-800 hover:bg-slate-200"
+                    >
+                      {record.contract_type === "CMC" ? "CMC Contract" : "AMC Contract"}
+                    </Link>
                   </td>
                   <td className="p-3">
                     <div className="flex gap-2 justify-center">
@@ -371,7 +401,7 @@ export default function UserAMCCMCPage() {
               ))
             ) : (
               <tr>
-                <td colSpan="8" className="p-6 text-center text-gray-500">
+                <td colSpan="10" className="p-6 text-center text-gray-500">
                   No AMC/CMC records found
                 </td>
               </tr>

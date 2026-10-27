@@ -4,7 +4,13 @@ import { readFile } from "fs/promises";
 import { join } from "path";
 import { existsSync } from "fs";
 
-const ALLOWED_PREFIXES = ["attachments/", "expense_attachments/", "completion_files/"];
+const ALLOWED_PREFIXES = [
+  "attachments/",
+  "expense_attachments/",
+  "completion_files/",
+  "attendance_regularization/",
+  "uploads/regularization/",
+];
 
 function isPathSafe(cleaned) {
   if (!cleaned || cleaned.includes("..")) return false;

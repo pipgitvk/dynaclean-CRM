@@ -1,5 +1,8 @@
 "use client";
 
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
+
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect } from "react";
 import ManualLeadModal from "@/components/models/ManualLeadModal";
 // Inline table for assigned customers (no external table component)
@@ -56,21 +59,11 @@ export default function LeadDistributionPage() {
         <div className="flex flex-col md:flex-row gap-3 items-start md:items-end">
           <div className="flex flex-col">
             <label className="text-xs text-gray-600 mb-1">From</label>
-            <input
-              type="date"
-              value={fromDate}
-              onChange={(e) => setFromDate(e.target.value)}
-              className="border border-gray-300 rounded px-3 py-2"
-            />
+            <TypeableDateFilterInput value={fromDate} onChange={setFromDate} className="border border-gray-300 rounded px-3 py-2"/>
           </div>
           <div className="flex flex-col">
             <label className="text-xs text-gray-600 mb-1">To</label>
-            <input
-              type="date"
-              value={toDate}
-              onChange={(e) => setToDate(e.target.value)}
-              className="border border-gray-300 rounded px-3 py-2"
-            />
+            <TypeableDateFilterInput value={toDate} onChange={setToDate} className="border border-gray-300 rounded px-3 py-2"/>
           </div>
           {/* <button
             onClick={() => {
@@ -114,7 +107,7 @@ export default function LeadDistributionPage() {
                   customers.map((c, i) => (
                     <tr key={c.customer_id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-3 py-3 text-center">{i + 1}</td>
-                      <td className="px-3 py-3">{new Date(c.date_created).toLocaleDateString()}</td>
+                      <td className="px-3 py-3">{formatCrmDateOnly(c.date_created)}</td>
                       <td className="px-3 py-3">{c.lead_campaign}</td>
                       <td className="px-3 py-3">{c.first_name}</td>
                       <td className="px-3 py-3 whitespace-normal break-words max-w-[240px]">{c.company}</td>

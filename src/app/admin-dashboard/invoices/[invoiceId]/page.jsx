@@ -2,6 +2,8 @@ import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 import NewInvoice from "@/components/invoice/DesignInvoice";
 import { getDbConnection } from "@/lib/db";
+import { getSessionPayload } from "@/lib/auth";
+import { canAccessPerformaInvoice } from "@/lib/performaInvoiceAccess";
 
 export const dynamic = "force-dynamic";
 
@@ -247,8 +249,9 @@ export default async function InvoicePage({ params }) {
 
   //  Fetch invoice + items
   const invoiceData = await getInvoiceWithItems(decodedInvoiceId);
+  const payload = await getSessionPayload();
 
-  if (!invoiceData) {
+  if (!invoiceData || !canAccessPerformaInvoice(payload, invoiceData)) {
     return <p className="p-6 text-red-600">Invoice not found</p>;
   }
 

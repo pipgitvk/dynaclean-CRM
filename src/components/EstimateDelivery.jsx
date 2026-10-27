@@ -74,11 +74,11 @@ export default function EstimateDelivery() {
       const res = await fetch("/api/estimate-delivery", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          item_code: selectedItem.item_code || selectedItem.spare_number,
-          type: selectedItem.type,
-          pincode,
-        }),
+          body: JSON.stringify({
+            item_code: selectedItem.item_code || selectedItem.spare_number,
+            type: selectedItem.type,
+            pincode,
+          }),
       });
 
       const data = await res.json();
@@ -112,14 +112,14 @@ export default function EstimateDelivery() {
               <div
                 key={idx}
                 onClick={() => handleSelect(item)}
-                className="px-4 py-2 border-b hover:bg-gray-100 cursor-pointer flex justify-between"
+                className="px-4 py-2 border-b hover:bg-gray-100 cursor-pointer flex justify-between items-center gap-2"
               >
                 <div>
                   <b>{item.item_code || item.spare_number}</b> —{" "}
                   {item.item_name}
                 </div>
                 <span
-                  className={`text-xs px-2 py-1 rounded text-white ${
+                  className={`text-xs px-2 py-1 rounded text-white shrink-0 ${
                     item.type === "product" ? "bg-green-600" : "bg-blue-600"
                   }`}
                 >

@@ -1,5 +1,8 @@
 "use client";
 
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
+
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import React, { useEffect, useState, useMemo } from "react";
 import { Search } from "lucide-react";
 import { toast } from "react-hot-toast";
@@ -438,19 +441,9 @@ const MultiPurchaseLinkModal = ({ isOpen, closeModal, selectedPurchaseIds, selec
                 className="pl-8 pr-3 py-1.5 border rounded-md text-sm w-72 focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
             </div>
-            <input
-              type="date"
-              value={stmtStartDate}
-              onChange={(e) => setStmtStartDate(e.target.value)}
-              className="px-3 py-1.5 border rounded-md text-sm"
-            />
+            <TypeableDateFilterInput value={stmtStartDate} onChange={setStmtStartDate} className="px-3 py-1.5 border rounded-md text-sm"/>
             <span className="text-gray-500">to</span>
-            <input
-              type="date"
-              value={stmtEndDate}
-              onChange={(e) => setStmtEndDate(e.target.value)}
-              className="px-3 py-1.5 border rounded-md text-sm"
-            />
+            <TypeableDateFilterInput value={stmtEndDate} onChange={setStmtEndDate} className="px-3 py-1.5 border rounded-md text-sm"/>
           </div>
           <div className="text-xs text-gray-600 font-medium">
             {loading ? "Loading..." : `Showing ${eligibleStatements.length} statement(s)`}
@@ -501,7 +494,7 @@ const MultiPurchaseLinkModal = ({ isOpen, closeModal, selectedPurchaseIds, selec
                       </td>
                       <td className="p-3 font-medium text-gray-600">#{s.id}</td>
                       <td className="p-3 font-mono text-xs text-gray-500">{s.trans_id || "—"}</td>
-                      <td className="p-3 text-gray-600">{s.date ? new Date(s.date).toLocaleDateString() : "—"}</td>
+                      <td className="p-3 text-gray-600">{s.date ? formatCrmDateOnly(s.date) : "—"}</td>
                       <td className="p-3 max-w-[400px] truncate text-gray-600" title={s.description || ""}>{s.description || "—"}</td>
                       <td className="p-3 font-bold text-red-600">₹{Number(s.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                       <td className="p-3 font-medium text-green-700">

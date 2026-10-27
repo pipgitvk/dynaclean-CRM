@@ -1,4 +1,5 @@
 "use client";
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -12,13 +13,60 @@ import {
   MoreVertical,
   Truck,
   ArrowUp,
+  Pencil,
 } from "lucide-react";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import dayjs from "dayjs";
+import {
+  buildOrderPaymentRows,
+  sumOrderPaymentAmounts,
+} from "@/lib/orderPaymentHistory";
+import { deriveOrderListPaymentStatus } from "@/lib/paymentOrderStatus";
+import {
+  OrderListSearchInput,
+  OrderListSearchApplyButton,
+} from "@/components/orders/OrderListSearchFilterControls";
+import {
+  getOrderTableDefaultDateFrom,
+  getOrderTableDefaultDateTo,
+} from "@/lib/orderTableDateDefaults";
 
 import DeleteButton from "@/components/accounts/DeleteButton";
 import toast from "react-hot-toast";
 import ReturnInitiateMenuItem from "@/components/orders/ReturnInitiateMenuItem";
+import { isSalesRole } from "@/lib/isSalesRole";
+import { isBookingAllowedForOrder } from "@/lib/orderBookingEligibility";
+import {
+  canCreateFollowUpBooking,
+  canOpenDispatchForOrder,
+  canViewDispatchPanelForOrder,
+  canShowOrderDeliveryActions,
+  isRemainDispatchRound,
+  orderHasDispatchedStock,
+  orderHasOpenDispatchBatch,
+} from "@/lib/orderDeliveryEligibility";
+import {
+  isOrderFullyDelivered,
+  isOrderPartialDelivery,
+  orderHasDeliveryRecord,
+} from "@/lib/orderDeliveryStatus";
+import {
+  getDeliveryBatchForView,
+  orderHasSecondDeliveryBatch,
+} from "@/lib/orderDeliveryBatches";
+import DispatchProductSelectModal from "@/components/orders/DispatchProductSelectModal";
+import OrderBookingViewMenuLinks from "@/components/orders/OrderBookingViewMenuLinks";
+import OrderDeliveryMenuLinks from "@/components/orders/OrderDeliveryMenuLinks";
+import AccountantReportActionLinks from "@/components/orders/AccountantReportActionLinks";
+import {
+  canManageAnyOrderDeliveryRole,
+  canViewOrderDeliveryDetailsRole,
+  isAccountantOnlyMenuRole,
+  isSuperAdminRole,
+} from "@/lib/roleKeyUtils";
+import { isPostAccountPipelineRole } from "@/lib/orderReportVisibility";
+import ViewCreditNoteMenuLink from "@/components/orders/ViewCreditNoteMenuLink";
+import AccountantReturnViewMenuItems from "@/components/orders/AccountantReturnViewMenuItems";
 
 // 👻 A sleek skeleton loader for a modern feel
 const SkeletonLoader = () => (
@@ -53,69 +101,41 @@ const SkeletonLoader = () => (
 );
 
 export default function OrderTable({ orders, userRole }) {
+  const hidePendingInvoiceFilter = isPostAccountPipelineRole(userRole);
   const [searchQuery, setSearchQuery] = useState("");
-  const [filteredOrders, setFilteredOrders] = useState([]);
-  const [statusFilter, setStatusFilter] = useState(""); // '', pendinginvoice, invoiceuploaded, bookingdone, dispatchdone, canceled
+  const [appliedSearchQuery, setAppliedSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [appliedStatusFilter, setAppliedStatusFilter] = useState("");
   const [paymentTermsFilter, setPaymentTermsFilter] = useState("");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const [appliedPaymentTermsFilter, setAppliedPaymentTermsFilter] = useState("");
+  const [dateFrom, setDateFrom] = useState(() => getOrderTableDefaultDateFrom());
+  const [appliedDateFrom, setAppliedDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState(() => getOrderTableDefaultDateTo());
+  const [appliedDateTo, setAppliedDateTo] = useState("");
   const [createdByFilter, setCreatedByFilter] = useState("");
+  const [appliedCreatedByFilter, setAppliedCreatedByFilter] = useState("");
+
+  const handleApplySearch = useCallback(() => {
+    setAppliedSearchQuery(searchQuery);
+    setAppliedStatusFilter(statusFilter);
+    setAppliedPaymentTermsFilter(paymentTermsFilter);
+    setAppliedDateFrom(dateFrom);
+    setAppliedDateTo(dateTo);
+    setAppliedCreatedByFilter(createdByFilter);
+  }, [
+    searchQuery,
+    statusFilter,
+    paymentTermsFilter,
+    dateFrom,
+    dateTo,
+    createdByFilter,
+  ]);
   const [openMenuId, setOpenMenuId] = useState(null); // State to track which menu is open
   // const canShowInstall = ["ADMIN", "SALES", "SERVICE"].includes(userRole);
 
   const toggleMenu = (id) => {
     setOpenMenuId(openMenuId === id ? null : id);
   };
-
-  // Filter orders based on search query, status filter, and date range
-  useEffect(() => {
-    if (!orders) return;
-
-    const lowercasedQuery = searchQuery.toLowerCase();
-    const result = orders.filter((order) => {
-      // Step 1: Filter by status
-      if (statusFilter) {
-        const orderStatus = getStatusText(order)
-          .text.toLowerCase()
-          .replace(/\s+/g, "");
-        if (orderStatus !== statusFilter.toLowerCase()) return false;
-      }
-
-      // Step 2: Date range filter (created_at)
-      if (dateFrom || dateTo) {
-        const created = order.created_at ? new Date(order.created_at) : null;
-        if (!created || isNaN(created)) return false;
-        if (dateFrom) {
-          const from = new Date(dateFrom + "T00:00:00");
-          if (created < from) return false;
-        }
-        if (dateTo) {
-          const to = new Date(dateTo + "T23:59:59");
-          if (created > to) return false;
-        }
-      }
-
-      // Step 2.5: Filter by created_by
-      if (createdByFilter && order.created_by !== createdByFilter) {
-        return false;
-      }
-
-      // Step 2.7: Filter by payment_terms
-      if (paymentTermsFilter && order.payment_terms !== paymentTermsFilter) {
-        return false;
-      }
-
-      // Step 3: Search across multiple fields
-      return (
-        order.order_id?.toLowerCase().includes(lowercasedQuery) ||
-        order.client_name?.toLowerCase().includes(lowercasedQuery) ||
-        order.company_name?.toLowerCase().includes(lowercasedQuery) ||
-        order.contact?.toLowerCase().includes(lowercasedQuery) ||
-        order.state?.toLowerCase().includes(lowercasedQuery)
-      );
-    });
-    setFilteredOrders(result);
-  }, [searchQuery, orders, statusFilter, paymentTermsFilter, dateFrom, dateTo, createdByFilter]);
 
   const getStatusText = (order) => {
     // Check for pending approval first
@@ -142,8 +162,8 @@ export default function OrderTable({ orders, userRole }) {
       if (Number(order.warehouse_in_done) === 1) {
         return {
           text: "Return Completed",
-          bg: "bg-teal-100",
-          textCol: "text-teal-800",
+          bg: "bg-orange-100",
+          textCol: "text-orange-800",
           icon: <CheckCircle size={14} className="mr-1" />,
         };
       }
@@ -194,7 +214,7 @@ export default function OrderTable({ orders, userRole }) {
         icon: <CheckCircle size={14} className="mr-1" />,
       };
     }
-    if (order.delivery_status) {
+    if (isOrderFullyDelivered(order)) {
       return {
         text: "Delivered",
         bg: "bg-orange-100",
@@ -202,7 +222,23 @@ export default function OrderTable({ orders, userRole }) {
         icon: <Truck size={14} className="mr-1" />,
       };
     }
-    if (order.dispatch_status) {
+    if (isOrderPartialDelivery(order)) {
+      return {
+        text: "Partial Delivery",
+        bg: "bg-sky-100",
+        textCol: "text-sky-900",
+        icon: <Truck size={14} className="mr-1" />,
+      };
+    }
+    if (Number(order.dispatch_status) === 2) {
+      return {
+        text: "Partial Dispatch",
+        bg: "bg-amber-100",
+        textCol: "text-amber-900",
+        icon: <Truck size={14} className="mr-1" />,
+      };
+    }
+    if (Number(order.dispatch_status) === 1) {
       return {
         text: "Dispatch Done",
         bg: "bg-violet-100",
@@ -285,6 +321,73 @@ export default function OrderTable({ orders, userRole }) {
     );
   };
 
+  const matchesListFilters = useCallback(
+    (order, { omitCreatedBy = false } = {}) => {
+      if (statusFilter) {
+        const orderStatus = getStatusText(order)
+          .text.toLowerCase()
+          .replace(/\s+/g, "");
+        if (orderStatus !== statusFilter.toLowerCase()) return false;
+      }
+
+      if (dateFrom || dateTo) {
+        const created = order.created_at ? new Date(order.created_at) : null;
+        if (!created || isNaN(created)) return false;
+        if (dateFrom) {
+          const from = new Date(dateFrom + "T00:00:00");
+          if (created < from) return false;
+        }
+        if (dateTo) {
+          const to = new Date(dateTo + "T23:59:59");
+          if (created > to) return false;
+        }
+      }
+
+      if (!omitCreatedBy && createdByFilter && order.created_by !== createdByFilter) {
+        return false;
+      }
+
+      if (paymentTermsFilter && order.payment_terms !== paymentTermsFilter) {
+        return false;
+      }
+
+      const lowercasedQuery = searchQuery.toLowerCase();
+      if (!lowercasedQuery) return true;
+
+      return (
+        order.order_id?.toLowerCase().includes(lowercasedQuery) ||
+        order.client_name?.toLowerCase().includes(lowercasedQuery) ||
+        order.company_name?.toLowerCase().includes(lowercasedQuery) ||
+        order.contact?.toLowerCase().includes(lowercasedQuery) ||
+        order.state?.toLowerCase().includes(lowercasedQuery)
+      );
+    },
+    [
+      searchQuery,
+      statusFilter,
+      paymentTermsFilter,
+      dateFrom,
+      dateTo,
+      createdByFilter,
+    ],
+  );
+
+  const createdByFilterOptions = useMemo(() => {
+    if (!orders?.length) return [];
+    const users = new Set();
+    orders.forEach((order) => {
+      if (matchesListFilters(order, { omitCreatedBy: true }) && order.created_by) {
+        users.add(String(order.created_by).trim());
+      }
+    });
+    return [...users].sort((a, b) => a.localeCompare(b));
+  }, [orders, matchesListFilters]);
+
+  const filteredOrders = useMemo(() => {
+    if (!orders) return [];
+    return orders.filter((order) => matchesListFilters(order));
+  }, [orders, matchesListFilters]);
+
   if (!orders) {
     return <SkeletonLoader />;
   }
@@ -294,25 +397,14 @@ export default function OrderTable({ orders, userRole }) {
 
   return (
     <div className="space-y-6">
-      {/* 🔍 Search and Quick Status Filter */}
-      <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-        <div className="relative w-full sm:w-2/3">
-          <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-            <Search size={20} className="text-gray-400" />
-          </div>
-          <input
-            type="text"
-            placeholder="Search by ID, client, company, etc."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200 ease-in-out"
-          />
-        </div>
-      </div>
-
       {/* 🧰 Filters */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-        <div>
+      <div className="flex flex-wrap items-end gap-3">
+        <OrderListSearchInput
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          onApply={handleApplySearch}
+        />
+        <div className="min-w-[140px] flex-1 sm:max-w-[200px]">
           <label className="block text-xs text-gray-600 mb-1">Status</label>
           <select
             value={statusFilter}
@@ -321,7 +413,9 @@ export default function OrderTable({ orders, userRole }) {
           >
             <option value="">All Status</option>
             <option value="orderinitialized">Order Initiated</option>
-            <option value="pendinginvoice">Pending Invoice</option>
+            {!hidePendingInvoiceFilter && (
+              <option value="pendinginvoice">Pending Invoice</option>
+            )}
             <option value="invoiceuploaded">Invoice Uploaded</option>
             <option value="bookingdone">Booking Done</option>
             <option value="dispatchdone">Dispatch Done</option>
@@ -335,25 +429,15 @@ export default function OrderTable({ orders, userRole }) {
             <option value="returncompleted">Return Completed</option>
           </select>
         </div>
-        <div>
+        <div className="min-w-[140px] flex-1 sm:max-w-[200px]">
           <label className="block text-xs text-gray-600 mb-1">From Date</label>
-          <input
-            type="date"
-            value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-          />
+          <TypeableDateFilterInput value={dateFrom} onChange={setDateFrom} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"/>
         </div>
-        <div>
+        <div className="min-w-[140px] flex-1 sm:max-w-[200px]">
           <label className="block text-xs text-gray-600 mb-1">To Date</label>
-          <input
-            type="date"
-            value={dateTo}
-            onChange={(e) => setDateTo(e.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-          />
+          <TypeableDateFilterInput value={dateTo} onChange={setDateTo} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"/>
         </div>
-        <div>
+        <div className="min-w-[140px] flex-1 sm:max-w-[200px]">
           <label className="block text-xs text-gray-600 mb-1">Created By</label>
           <select
             value={createdByFilter}
@@ -361,16 +445,14 @@ export default function OrderTable({ orders, userRole }) {
             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
           >
             <option value="">All Users</option>
-            {[...new Set(orders?.map((o) => o.created_by).filter(Boolean))]
-              .sort()
-              .map((user) => (
-                <option key={user} value={user}>
-                  {user}
-                </option>
-              ))}
+            {createdByFilterOptions.map((user) => (
+              <option key={user} value={user}>
+                {user}
+              </option>
+            ))}
           </select>
         </div>
-        <div>
+        <div className="min-w-[140px] flex-1 sm:max-w-[200px]">
           <label className="block text-xs text-gray-600 mb-1">Payment Terms</label>
           <select
             value={paymentTermsFilter}
@@ -387,10 +469,12 @@ export default function OrderTable({ orders, userRole }) {
               ))}
           </select>
         </div>
+        <OrderListSearchApplyButton onApply={handleApplySearch} />
       </div>
+      <p className="text-xs text-gray-500">Set filters, then click Search to update the list.</p>
 
       {/* 👨‍💼 TABLE VIEW for large screens */}
-      <div className="hidden lg:block overflow-x-auto overflow-y-auto max-h-[calc(100vh-300px)] bg-white rounded-xl shadow-lg">
+      <div className="hidden lg:block overflow-x-auto overflow-y-auto max-h-[calc(100vh-160px)] min-h-[calc(100vh-240px)] bg-white rounded-xl shadow-lg">
         <table className="w-full min-w-[1100px] text-sm">
           <thead className="bg-gray-800 text-white sticky top-0 z-10">
             <tr>
@@ -414,7 +498,7 @@ export default function OrderTable({ orders, userRole }) {
             {filteredOrders.length > 0 ? (
               filteredOrders.map((r, i) => {
                 const status = getStatusText(r);
-                const pay = getPaymentBadge(r.payment_status);
+                const pay = getPaymentBadge(deriveOrderListPaymentStatus(r));
                 // const inst = getInstallationLabel(r.installation_status);
                 return (
                   <tr
@@ -429,7 +513,7 @@ export default function OrderTable({ orders, userRole }) {
                       {r.created_by}
                     </td>
                     <td className="px-3 py-3 text-left">
-                      {dayjs(r.created_at).format("DD/MM/YYYY")}
+                      {dayjs(r.created_at).format("DD-MM-YYYY")}
                     </td>
                     <td className="px-3 py-3 text-left">
                       <div className="space-y-1 text-xs">
@@ -495,7 +579,7 @@ export default function OrderTable({ orders, userRole }) {
                       </span>
                     </td>
                     <td className="px-3 py-3 text-center">
-                      {dayjs(r.duedate).format("DD/MM/YYYY")}
+                      {dayjs(r.duedate).format("DD-MM-YYYY")}
                     </td>
                     {/* {canShowInstall && (
                       <td className="px-3 py-3">
@@ -540,7 +624,7 @@ export default function OrderTable({ orders, userRole }) {
                   <span className="text-xs">#{i + 1}</span>
                   <div className="flex items-center">
                     <span className="font-medium text-gray-800 mr-2">
-                      {dayjs(r.created_at).format("DD/MM/YYYY")}
+                      {dayjs(r.created_at).format("DD-MM-YYYY")}
                     </span>
                     <span
                       className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${status.bg} ${status.textCol}`}
@@ -692,30 +776,52 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
     return null;
   }
 
+  const [bookingProductSelectOpen, setBookingProductSelectOpen] = useState(false);
   const popRef = useRef(null);
   const role = (userRole || "").toString().trim().toLowerCase();
   const isGem = role.includes("gem");
-  const canViewSales = [
-    "back office",
-    "accountant",
-    "admin",
-    "sales",
-    "warehouse incharge",
-    "gem portal",
-    "team leader",
-    "service head",
-  ].includes(role) || isGem;
+  const canViewSales =
+    isSalesRole(userRole) ||
+    [
+      "back office",
+      "accountant",
+      "admin",
+      "warehouse incharge",
+      "gem portal",
+      "team leader",
+      "service head",
+      "superadmin",
+    ].includes(role) ||
+    isGem;
+  const isSuperAdmin = isSuperAdminRole(userRole);
   const isAdmin = role === "admin";
   const isAccountant = role.includes("accountant");
   const isTeamLeader = role === "team leader";
   const isWarehouse = role === "warehouse incharge";
-  const canManageReturns = isAdmin || isAccountant || isTeamLeader;
+  const canManageInvoiceDocs =
+    isSuperAdmin || isAdmin || isAccountant || isTeamLeader;
+  const canManageReturns = isSuperAdmin || isTeamLeader;
+  const accountantOnlyMenu = isAccountantOnlyMenuRole(userRole);
+  const canEditBooking = isSuperAdmin || isAdmin;
+  const reportUploaded = isBookingAllowedForOrder(r);
+  const canAdminAfterReport =
+    (isAdmin || isSuperAdmin) && reportUploaded;
+  const canManageBookingActions =
+    isSuperAdmin ||
+    isAdmin ||
+    canManageReturns ||
+    canAdminAfterReport ||
+    ((role === "director" || isTeamLeader || isWarehouse) && reportUploaded);
   const hasBooking =
     r.booking_id !== undefined &&
     r.booking_id !== null &&
     String(r.booking_id).trim() !== "" &&
     String(r.booking_id) !== "0";
   const dispatchStatus = Number(r.dispatch_status);
+  const hasDispatchedStock = orderHasDispatchedStock(r);
+  const canOpenDispatch = canOpenDispatchForOrder(r);
+  const remainDispatchRound = isRemainDispatchRound(r);
+  const canViewDispatchPanel = canViewDispatchPanelForOrder(r);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -742,6 +848,8 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
     };
   }, [isOpen, toggleMenu]);
 
+  const followUpBooking = canCreateFollowUpBooking(r);
+
   return (
     <div className="relative inline-block text-left">
       <button
@@ -751,12 +859,91 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
       >
         <MoreVertical size={18} />
       </button>
+      <DispatchProductSelectModal
+        open={bookingProductSelectOpen}
+        orderId={r.order_id}
+        nextHref={`/user-dashboard/order/upload-booking/${r.order_id}`}
+        onClose={() => setBookingProductSelectOpen(false)}
+        title={
+          followUpBooking
+            ? "Select remaining products for booking"
+            : "Select products for booking"
+        }
+        confirmLabel="Continue to booking"
+        partialHint="Partial Dispatch"
+      />
       {isOpen && (
         <div
           ref={popRef}
           className="absolute right-0 mt-2 w-56 origin-top-right rounded-lg bg-white shadow-lg ring-1 ring-black/5 z-20 border min-h-[40px]"
         >
           <div className="py-1 text-sm flex flex-col">
+            {accountantOnlyMenu ? (
+              <>
+                <AccountantReportActionLinks
+                  order={r}
+                  viewSalesHref={`/user-dashboard/order/${r.order_id}`}
+                  uploadHref={`/user-dashboard/order/upload/${r.order_id}`}
+                  viewHref={`/user-dashboard/order/view/${r.order_id}`}
+                  onClick={(e) => e.stopPropagation()}
+                />
+                <OrderBookingViewMenuLinks
+                  order={r}
+                  basePath="/user-dashboard/order"
+                  canSee={hasBooking}
+                  linkClassName="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700 w-full block"
+                  onClick={(e) => e.stopPropagation()}
+                />
+                {r.report_file && (
+                  <div
+                    className="px-3 py-2 w-full block"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <EditPaymentButton order={r} />
+                  </div>
+                )}
+                {hasBooking && dispatchStatus === 1 && (
+                  <Link
+                    href={`/user-dashboard/order/dispatch/view/${r.order_id}`}
+                    className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700 w-full block"
+                    title="View Dispatch"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Search size={16} />
+                    <span>View Dispatch</span>
+                  </Link>
+                )}
+                <OrderDeliveryMenuLinks
+                  order={r}
+                  userRole={userRole}
+                  DeliveryMenuItem={UpdateDeliveryMenuItem}
+                />
+                {dispatchStatus === 1 &&
+                  ![1, 2, 3].includes(Number(r.is_returned || 0)) && (
+                    <div
+                      className="border-t border-gray-100 mt-1 pt-1"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <ReturnInitiateMenuItem
+                        order={r}
+                        orderListPath="/user-dashboard/order"
+                      />
+                    </div>
+                  )}
+                <ViewCreditNoteMenuLink
+                  order={r}
+                  userRole={userRole}
+                  hrefBase="/user-dashboard"
+                  linkClassName="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-teal-700 w-full"
+                  onClick={(e) => e.stopPropagation()}
+                />
+                <AccountantReturnViewMenuItems
+                  order={r}
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </>
+            ) : (
+              <>
             <Link
               href={`/user-dashboard/order/${r.order_id}`}
               className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700 w-full block"
@@ -766,19 +953,51 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
               <ClipboardList size={16} />
               <span>View Sales</span>
             </Link>
+            {hasBooking && dispatchStatus === 1 && (
+              <Link
+                href={`/user-dashboard/order/dispatch/view/${r.order_id}`}
+                className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700 w-full block"
+                title="View Dispatch"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <Search size={16} />
+                <span>View Dispatch</span>
+              </Link>
+            )}
             {!isGem && (
               <>
-                {["accountant", "admin", "team leader"].includes(role) &&
+                {canManageInvoiceDocs &&
                   (r.report_file ? (
-                    <Link
-                      href={`/user-dashboard/order/view/${r.order_id}`}
-                      className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700 w-full block"
-                      title="View Report"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <FileText size={16} />
-                      <span>View Report</span>
-                    </Link>
+                    <>
+                      <Link
+                        href={`/user-dashboard/order/view/${r.order_id}`}
+                        className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700 w-full block"
+                        title="View Report"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <FileText size={16} />
+                        <span>View Report</span>
+                      </Link>
+                      {isSuperAdmin && dispatchStatus === 0 && (
+                        <Link
+                          href={`/user-dashboard/order/upload/${r.order_id}`}
+                          className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-blue-700 w-full block"
+                          title="Edit Report"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Pencil size={16} />
+                          <span>Edit Report</span>
+                        </Link>
+                      )}
+                      {isSuperAdmin && r.report_file && (
+                        <div
+                          className="px-3 py-2 w-full block"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <EditPaymentButton order={r} />
+                        </div>
+                      )}
+                    </>
                   ) : (
                     <div className="flex items-center">
                       <Link
@@ -795,42 +1014,81 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                       </div>
                     </div>
                   ))}
-                {(canManageReturns) &&
-                  (hasBooking ? (
-                    <Link
-                      href={`/user-dashboard/order/view-booking/${r.order_id}`}
-                      className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700 w-full block"
-                      title="View Booking"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <FileCheck size={16} />
-                      <span>View Booking</span>
-                    </Link>
-                  ) : (
-                    <Link
-                      href={`/user-dashboard/order/upload-booking/${r.order_id}`}
-                      className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-green-700 w-full block"
-                      title="Create Booking"
-                      onClick={(e) => e.stopPropagation()}
+                {canManageBookingActions &&
+                  (!hasBooking || followUpBooking) && (
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-2 px-3 py-2 hover:bg-gray-50 text-green-700 text-left"
+                      title={
+                        followUpBooking
+                          ? "Create booking for remaining products"
+                          : "Create Booking"
+                      }
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setBookingProductSelectOpen(true);
+                        toggleMenu();
+                      }}
                     >
                       <UploadCloud size={16} />
-                      <span>Create Booking</span>
-                    </Link>
-                  ))}
-                {isWarehouse && hasBooking && dispatchStatus === 0 && (
-                  <Link
-                    href={`/user-dashboard/order/dispatch/${r.order_id}`}
-                    className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700 w-full block"
-                    title="Dispatch"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <CheckCircle size={16} />
-                    <span>Dispatch</span>
-                  </Link>
-                )}
-                {(isWarehouse || canManageReturns) &&
+                      <span>
+                        {followUpBooking
+                          ? "Create Booking (Remaining)"
+                          : "Create Booking"}
+                      </span>
+                    </button>
+                  )}
+                {canEditBooking &&
                   hasBooking &&
-                  dispatchStatus === 1 && (
+                  !followUpBooking &&
+                  !orderHasDispatchedStock(r) &&
+                  dispatchStatus !== 1 && (
+                    <Link
+                      href={`/user-dashboard/order/upload-booking/${r.order_id}`}
+                      className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-blue-700 w-full block"
+                      title="Edit Booking"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Pencil size={16} />
+                      <span>Edit Booking</span>
+                    </Link>
+                  )}
+                <OrderBookingViewMenuLinks
+                  order={r}
+                  basePath="/user-dashboard/order"
+                  canSee={hasBooking && (canManageReturns || canEditBooking)}
+                  linkClassName="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700 w-full block"
+                  onClick={(e) => e.stopPropagation()}
+                />
+                {(isWarehouse ||
+                  isSuperAdmin ||
+                  isAdmin ||
+                  canAdminAfterReport) &&
+                  canOpenDispatch && (
+                    <Link
+                      href={`/user-dashboard/order/dispatch/${r.order_id}`}
+                      className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700 w-full block"
+                      title={
+                        remainDispatchRound
+                          ? "Dispatch remaining products"
+                          : "Dispatch"
+                      }
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <CheckCircle size={16} />
+                      <span>
+                        {remainDispatchRound
+                          ? "Dispatch (Remain)"
+                          : "Dispatch"}
+                      </span>
+                    </Link>
+                  )}
+                {(isWarehouse ||
+                  isSuperAdmin ||
+                  isAdmin ||
+                  canAdminAfterReport ||
+                  canViewSales) &&
+                  canViewDispatchPanel && (
                     <Link
                       href={`/user-dashboard/order/dispatch/view/${r.order_id}`}
                       className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700 w-full block"
@@ -841,12 +1099,11 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                       <span>View Dispatch</span>
                     </Link>
                   )}
-                {["accountant", "admin"].includes(role) && r.report_file && (
-                  <div className="px-3 py-2 w-full block" onClick={(e) => e.stopPropagation()}>
-                    <EditPaymentButton order={r} />
-                  </div>
-                )}
-                <UpdateDeliveryMenuItem order={r} />
+                <OrderDeliveryMenuLinks
+                  order={r}
+                  userRole={userRole}
+                  DeliveryMenuItem={UpdateDeliveryMenuItem}
+                />
                 {canManageReturns &&
                   dispatchStatus === 1 &&
                   ![1, 2, 3].includes(Number(r.is_returned || 0)) && (
@@ -857,35 +1114,32 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                     />
                   </div>
                 )}
-                {canManageReturns && Number(r.is_returned) === 3 && (
+                {(canManageReturns || isAdmin) && Number(r.is_returned) === 3 && (
                   <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>
                     <ReturnBookingMenuItem order={r} />
                   </div>
                 )}
-                {isWarehouse && Number(r.is_returned) === 3 && Number(r.return_booking_done) !== 1 && (
+                {(isWarehouse || isSuperAdmin) &&
+                  Number(r.is_returned) === 3 &&
+                  Number(r.return_booking_done) !== 1 && (
                   <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>
                     <MarkReturnBookingDoneMenuItem order={r} />
                   </div>
                 )}
-                {(canManageReturns || isWarehouse) && Number(r.return_booking_done) === 1 && (
+                {(canManageReturns || isAdmin || isAccountant || isWarehouse) &&
+                  Number(r.return_booking_done) === 1 && (
                   <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>
                     <ViewReturnBookingMenuItem order={r} />
                   </div>
                 )}
-                {(isAdmin || isAccountant) && [3, 1, 2].includes(Number(r.is_returned)) && r.credit_note_id && (
-                  <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>
-                    <Link
-                      href={`/user-dashboard/credit-notes/${r.credit_note_id}`}
-                      className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-teal-700 w-full"
-                      title="View Credit Note"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <FileText size={16} />
-                      <span>View Credit Note</span>
-                    </Link>
-                  </div>
-                )}
-                {isWarehouse &&
+                <ViewCreditNoteMenuLink
+                  order={r}
+                  userRole={userRole}
+                  hrefBase="/user-dashboard"
+                  linkClassName="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-teal-700 w-full"
+                  onClick={(e) => e.stopPropagation()}
+                />
+                {(isWarehouse || isAdmin || isSuperAdmin) &&
                   Number(r.is_returned) === 3 &&
                   Number(r.return_booking_done) === 1 &&
                   Number(r.warehouse_in_done) !== 1 && (
@@ -894,11 +1148,14 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                   </div>
                 )}
                 {/* After warehouse-in done, show view for admin + accountant + warehouse */}
-                {(isAdmin || isAccountant || isWarehouse) && Number(r.warehouse_in_done) === 1 && (
+                {(isSuperAdmin || isAdmin || isAccountant || isWarehouse) &&
+                  Number(r.warehouse_in_done) === 1 && (
                   <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>
                     <WarehouseInMenuItem order={r} />
                   </div>
                 )}
+              </>
+            )}
               </>
             )}
           </div>
@@ -921,40 +1178,15 @@ function EditPaymentButton({ order }) {
   const [status, setStatus] = useState(order.payment_status || "");
   const totalamt = order.totalamt || 0;
 
-  const prevIds = (order.payment_id || "")
-    .toString()
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  const prevDates = (order.payment_date || "")
-    .toString()
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  const prevAmounts = (order.payment_amount || "")
-    .toString()
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-
-  const rows = Array.from({
-    length: Math.max(prevIds.length, prevDates.length, prevAmounts.length),
-  }).map((_, i) => ({
-    id: prevIds[i] || "",
-    date: prevDates[i] || "",
-    amount: prevAmounts[i] || "",
-  }));
+  const rows = buildOrderPaymentRows(order);
 
   const formatPrevDate = (d) => {
     if (!d) return "-";
     const v = dayjs(d);
-    return v.isValid() ? v.format("DD/MM/YYYY") : d;
+    return v.isValid() ? v.format("DD-MM-YYYY") : d;
   };
 
-  const totalPaid = prevAmounts
-    .map((x) => Number(x))
-    .filter((n) => !isNaN(n))
-    .reduce((sum, n) => sum + n, 0);
+  const totalPaid = sumOrderPaymentAmounts(order);
 
   const onChange = (e) => {
     const { name, value } = e.target;
@@ -1119,7 +1351,7 @@ function Input({ label, name, value, onChange, type = "text" }) {
   );
 }
 
-function UpdateDeliveryMenuItem({ order }) {
+function UpdateDeliveryMenuItem({ order, userRole, variant = "auto" }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -1128,6 +1360,9 @@ function UpdateDeliveryMenuItem({ order }) {
   const [deliveryProof, setDeliveryProof] = useState(null);
   const [deliveryRemark, setDeliveryRemark] = useState("");
   const [uploading, setUploading] = useState(false);
+  const canViewDeliveryDetails = canViewOrderDeliveryDetailsRole(userRole);
+  const superAdmin = isSuperAdminRole(userRole);
+  const canManageAnyDelivery = canManageAnyOrderDeliveryRole(userRole);
 
   // Fetch current user
   useEffect(() => {
@@ -1145,18 +1380,29 @@ function UpdateDeliveryMenuItem({ order }) {
     fetchUser();
   }, []);
 
+  const isFullyDelivered = isOrderFullyDelivered(order);
+  const hasDeliveryRecord = orderHasDeliveryRecord(order);
+
   // Check if menu item should be shown
   const shouldShow = () => {
-    // Only show if dispatch_status is 1
-    if (Number(order.dispatch_status) !== 1) return false;
+    if (!canShowOrderDeliveryActions(order)) return false;
 
-    // Only show if current user is the booking_by person
+    if (superAdmin || canManageAnyDelivery) return true;
+
+    if (canViewDeliveryDetails) {
+      return hasDeliveryRecord;
+    }
+
     if (!currentUser || order.booking_by !== currentUser) return false;
 
     return true;
   };
 
-  const isDelivered = Number(order.delivery_status) === 1;
+  const viewOnly =
+    !superAdmin &&
+    !canManageAnyDelivery &&
+    canViewDeliveryDetails &&
+    hasDeliveryRecord;
 
   const handleSave = async () => {
     if (!deliveredOn) {
@@ -1216,7 +1462,64 @@ function UpdateDeliveryMenuItem({ order }) {
     }
   };
 
-  if (!shouldShow()) return null;
+  if (variant === "view_first") {
+    if (!canShowOrderDeliveryActions(order) || !hasDeliveryRecord) return null;
+  } else if (variant === "view_remain") {
+    if (
+      !canShowOrderDeliveryActions(order) ||
+      !orderHasSecondDeliveryBatch(order)
+    ) {
+      return null;
+    }
+  } else if (variant === "update_remain") {
+    if (
+      !canShowOrderDeliveryActions(order) ||
+      isFullyDelivered ||
+      !hasDeliveryRecord
+    ) {
+      return null;
+    }
+  } else if (variant === "view") {
+    if (!canShowOrderDeliveryActions(order) || !hasDeliveryRecord) return null;
+  } else if (variant === "update") {
+    if (!canShowOrderDeliveryActions(order) || isFullyDelivered) return null;
+  } else if (!shouldShow()) {
+    return null;
+  }
+
+  const batchForModal =
+    variant === "view_first"
+      ? getDeliveryBatchForView(order, "first")
+      : variant === "view_remain"
+        ? getDeliveryBatchForView(order, "remain")
+        : null;
+  const displayOrder = batchForModal
+    ? {
+        ...order,
+        delivered_on: batchForModal.delivered_on,
+        delivery_proof: batchForModal.delivery_proof,
+        delivery_remark: batchForModal.delivery_remark,
+      }
+    : order;
+
+  const readOnlyDeliveryModal =
+    variant === "view_first" ||
+    variant === "view_remain" ||
+    variant === "view" ||
+    (variant === "auto" && (viewOnly || isFullyDelivered));
+
+  const menuLabel =
+    variant === "view_first"
+      ? "View Delivery"
+      : variant === "view_remain"
+        ? "View Delivery (Remain)"
+        : variant === "update_remain"
+          ? "Update Delivery (Remain)"
+          : variant === "update"
+            ? "Update Delivery"
+            : readOnlyDeliveryModal
+              ? "View Delivery"
+              : "Update Delivery";
 
   const formatDate = (d) => {
     if (!d) return "-";
@@ -1232,10 +1535,10 @@ function UpdateDeliveryMenuItem({ order }) {
           setOpen(true);
         }}
         className="w-full flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-blue-700 text-left"
-        title={isDelivered ? "View Delivery" : "Update Delivery Status"}
+        title={readOnlyDeliveryModal ? "View Delivery" : "Update Delivery Status"}
       >
         <Truck size={16} />
-        <span>{isDelivered ? "View Delivery" : "Update Delivery"}</span>
+        <span>{menuLabel}</span>
       </button>
       {open && (
         <div
@@ -1247,7 +1550,13 @@ function UpdateDeliveryMenuItem({ order }) {
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="text-lg font-semibold mb-4">
-              {isDelivered ? "Delivery Details" : "Update Delivery Status"}
+              {readOnlyDeliveryModal
+                ? variant === "view_remain"
+                  ? "Delivery Details (Remain)"
+                  : "Delivery Details"
+                : variant === "update_remain"
+                  ? "Update Delivery (Remain)"
+                  : "Update Delivery Status"}
             </h3>
 
             <div className="space-y-4">
@@ -1275,14 +1584,14 @@ function UpdateDeliveryMenuItem({ order }) {
                 </p>
               </div>
 
-              {isDelivered ? (
+              {readOnlyDeliveryModal ? (
                 <>
                   <div>
                     <label className="block text-sm text-gray-700 font-medium mb-1">
                       Actual Delivery Date:
                     </label>
                     <p className="text-sm font-medium text-gray-800">
-                      {formatDate(order.delivered_on)}
+                      {formatDate(displayOrder.delivered_on)}
                     </p>
                   </div>
 
@@ -1290,10 +1599,10 @@ function UpdateDeliveryMenuItem({ order }) {
                     <label className="block text-sm text-gray-700 font-medium mb-1">
                       Delivery Proof:
                     </label>
-                    {order.delivery_proof ? (
+                    {displayOrder.delivery_proof ? (
                       <div className="flex gap-3">
                         <a
-                          href={order.delivery_proof}
+                          href={displayOrder.delivery_proof}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 text-sm font-medium transition"
@@ -1320,7 +1629,7 @@ function UpdateDeliveryMenuItem({ order }) {
                           View
                         </a>
                         <a
-                          href={order.delivery_proof}
+                          href={displayOrder.delivery_proof}
                           download
                           className="inline-flex items-center gap-1 px-3 py-1.5 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 text-sm font-medium transition"
                         >
@@ -1351,9 +1660,9 @@ function UpdateDeliveryMenuItem({ order }) {
                     <label className="block text-sm text-gray-700 font-medium mb-1">
                       Delivery Remark:
                     </label>
-                    {order.delivery_remark ? (
+                    {displayOrder.delivery_remark ? (
                       <p className="text-sm text-gray-800 bg-gray-50 p-2 rounded">
-                        {order.delivery_remark}
+                        {displayOrder.delivery_remark}
                       </p>
                     ) : (
                       <p className="text-sm text-gray-500 italic">
@@ -1368,13 +1677,8 @@ function UpdateDeliveryMenuItem({ order }) {
                     <label className="block text-sm text-gray-700 font-medium mb-1">
                       Actual Delivery Date *
                     </label>
-                    <input
-                      type="date"
-                      value={deliveredOn}
-                      onChange={(e) => setDeliveredOn(e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      required
-                    />
+                    <TypeableDateFilterInput value={deliveredOn} onChange={setDeliveredOn} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      required/>
                   </div>
 
                   <div>
@@ -1419,9 +1723,9 @@ function UpdateDeliveryMenuItem({ order }) {
                 onClick={() => setOpen(false)}
                 className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm font-medium"
               >
-                {isDelivered ? "Close" : "Cancel"}
+                {readOnlyDeliveryModal ? "Close" : "Cancel"}
               </button>
-              {!isDelivered && (
+              {!readOnlyDeliveryModal && (
                 <button
                   onClick={handleSave}
                   disabled={saving || uploading}
@@ -1801,28 +2105,16 @@ function ReturnBookingMenuItem({ order }) {
                   <label className="block text-sm font-medium text-gray-700">
                     Return Booking Date
                   </label>
-                  <input
-                    type="date"
-                    name="return_booking_date"
-                    value={formData.return_booking_date}
-                    onChange={handleChange}
-                    required
-                    className="mt-1 w-full border px-3 py-2 rounded-md"
-                  />
+                  <TypeableDateFilterInput value={formData.return_booking_date} onChange={(v) => handleChange({ target: { name: "return_booking_date", value: v } })} required
+                    className="mt-1 w-full border px-3 py-2 rounded-md"/>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
                     Expected Pickup Date
                   </label>
-                  <input
-                    type="date"
-                    name="expected_pickup_date"
-                    value={formData.expected_pickup_date}
-                    onChange={handleChange}
-                    required
-                    className="mt-1 w-full border px-3 py-2 rounded-md"
-                  />
+                  <TypeableDateFilterInput value={formData.expected_pickup_date} onChange={(v) => handleChange({ target: { name: "expected_pickup_date", value: v } })} required
+                    className="mt-1 w-full border px-3 py-2 rounded-md"/>
                 </div>
 
                 <input

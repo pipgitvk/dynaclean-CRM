@@ -1,8 +1,9 @@
 // app/admin-dashboard/quick-edit/[username]/page.jsx
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect, useRef } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import toast from "react-hot-toast";
 import {
@@ -12,6 +13,12 @@ import {
   applySuperadminOnlyModuleRestrictions,
   applyRoleDenyModuleRestrictions,
 } from "@/lib/moduleAccess";
+import { getRoleDefaultModuleKeys } from "@/lib/roleDefaultModuleAccess";
+import {
+  notifyEmployeesListReload,
+  reloadEmployeesAdminPage,
+} from "@/lib/employeesPageReload";
+import { useEmployeeRoleOptions } from "@/hooks/useEmployeeRoleOptions";
 
 function uniqueStrings(arr) {
   return [...new Set((arr || []).map((v) => String(v || "").trim()).filter(Boolean))];
@@ -147,6 +154,8 @@ function SectionBlock({ section, selected, canEdit, onToggleParent, onToggleChil
 const QuickEditPage = () => {
   const { username } = useParams();
   const router = useRouter();
+  const isEmbed = useSearchParams().get("embed") === "1";
+  const { roles: userRoleOptions } = useEmployeeRoleOptions();
   const [employee, setEmployee] = useState({
     username: "",
     email: "",
@@ -155,6 +164,7 @@ const QuickEditPage = () => {
     address: "",
     state: "",
     userRole: "",
+    machine_code: "",
     profile_pic: "",
     status: 0,
   });
@@ -592,26 +602,7 @@ const QuickEditPage = () => {
 
   const setServiceHeadDefaults = () => {
     userEditedModulesRef.current = true;
-    const defaults = [
-      "dashboard-home",
-      "task-manager",
-      "add-customer",
-      "view-customers",
-      "employee-crm",
-      "quotations",
-      "orders-process",
-      "orders-delay",
-      "warranty-console",
-      "registered-products",
-      "service-followups",
-      "warranty-map",
-      "service-records",
-      "upcoming-installations",
-      "service-map",
-      "product-stock",
-      "spare-parts",
-      "installation-videos",
-    ]
+    const defaults = getRoleDefaultModuleKeys("SERVICE HEAD")
       .filter((k) => ALL_MODULE_KEYS.includes(k))
       .filter((k) => k !== "dm-fresh-leads");
 
@@ -621,26 +612,7 @@ const QuickEditPage = () => {
 
   const setServiceSupportDefaults = () => {
     userEditedModulesRef.current = true;
-    const defaults = [
-      "dashboard-home",
-      "task-manager",
-      "add-customer",
-      "view-customers",
-      "employee-crm",
-      "quotations",
-      "orders-process",
-      "orders-delay",
-      "warranty-console",
-      "registered-products",
-      "service-followups",
-      "warranty-map",
-      "service-records",
-      "upcoming-installations",
-      "service-map",
-      "product-stock",
-      "spare-parts",
-      "installation-videos",
-    ]
+    const defaults = getRoleDefaultModuleKeys("SERVICE SUPPORT")
       .filter((k) => ALL_MODULE_KEYS.includes(k))
       .filter((k) => k !== "dm-fresh-leads");
 
@@ -675,6 +647,7 @@ const QuickEditPage = () => {
     formData.append("address", employee.address);
     formData.append("state", employee.state);
     formData.append("userRole", employee.userRole);
+    formData.append("machine_code", employee.machine_code ?? "");
     if (canEditEmployeeStatus)
       formData.append("status", String(employee.status === 1 ? 1 : 0));
     if (canEditModuleAccess) {
@@ -712,7 +685,9 @@ const QuickEditPage = () => {
       if (!response.ok)
         throw new Error(payload.message || "Failed to update employee data.");
       toast.success("Employee data updated successfully!");
-      router.push("/admin-dashboard/employees");
+      if (!notifyEmployeesListReload()) {
+        reloadEmployeesAdminPage();
+      }
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -742,9 +717,18 @@ const QuickEditPage = () => {
   const totalAll = ALL_MODULE_KEYS.length;
   const allSelected = totalSelected === totalAll;
 
+  const profileSize = isEmbed ? 80 : 150;
+
   return (
-    <div className="bg-white shadow-md rounded-lg p-8 max-w-2xl mx-auto my-10">
+    <div
+      className={
+        isEmbed
+          ? "bg-white p-4 sm:p-5 max-w-none mx-0 my-0"
+          : "bg-white shadow-md rounded-lg p-8 max-w-2xl mx-auto my-10"
+      }
+    >
       {/* Header */}
+      {!isEmbed ? (
       <div className="text-center mb-6">
         <h1 className="text-3xl font-bold text-gray-900 mb-3">
           Quick Edit: {employee.username}
@@ -759,20 +743,37 @@ const QuickEditPage = () => {
           {employee.status == 1 ? "Active" : "Inactive"}
         </span>
       </div>
+      ) : (
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <span className="text-sm font-semibold text-gray-800">{employee.username}</span>
+          <span
+            className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${
+              employee.status == 1
+                ? "bg-emerald-100 text-emerald-800"
+                : "bg-gray-200 text-gray-700"
+            }`}
+          >
+            {employee.status == 1 ? "Active" : "Inactive"}
+          </span>
+        </div>
+      )}
 
       {/* Profile picture preview */}
-      <div className="flex justify-center mb-6">
+      <div className={`flex justify-center ${isEmbed ? "mb-4" : "mb-6"}`}>
         {(profileImageSrc && profileImageSrc.startsWith("/employees")) || newProfilePic ? (
           <Image
             src={profileImageSrc}
             alt="Profile Picture"
-            width={150}
-            height={150}
+            width={profileSize}
+            height={profileSize}
             className="rounded-full border-4 border-blue-200 object-cover"
             unoptimized
           />
         ) : (
-          <div className="flex items-center justify-center w-[150px] h-[150px] rounded-full border-4 border-gray-300 bg-gray-100 text-gray-500">
+          <div
+            className="flex items-center justify-center rounded-full border-4 border-gray-300 bg-gray-100 text-gray-500 text-sm"
+            style={{ width: profileSize, height: profileSize }}
+          >
             Profile
           </div>
         )}
@@ -802,14 +803,8 @@ const QuickEditPage = () => {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700">Date of Birth</label>
-            <input
-              type="date"
-              name="dob"
-              value={employee.dob || ""}
-              onChange={handleInputChange}
-              max={today}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-            />
+            <TypeableDateFilterInput value={employee.dob || ""} onChange={(v) => handleInputChange({ target: { name: "dob", value: v } })} max={today}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"/>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700">Number</label>
@@ -845,11 +840,36 @@ const QuickEditPage = () => {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700">User Role</label>
+            <select
+              name="userRole"
+              value={(employee.userRole || "").trim()}
+              onChange={handleInputChange}
+              className="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+            >
+              <option value="">-- Select Role --</option>
+              {userRoleOptions.map((role) => (
+                <option key={role} value={role}>
+                  {role}
+                </option>
+              ))}
+              {(employee.userRole || "").trim() &&
+                !userRoleOptions.includes((employee.userRole || "").trim()) && (
+                  <option value={(employee.userRole || "").trim()}>
+                    {(employee.userRole || "").trim()}
+                  </option>
+                )}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              Machine Employee ID
+            </label>
             <input
               type="text"
-              name="userRole"
-              value={employee.userRole || ""}
+              name="machine_code"
+              value={employee.machine_code || ""}
               onChange={handleInputChange}
+              placeholder="e.g. 102"
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
             />
           </div>

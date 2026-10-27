@@ -2,12 +2,48 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { Eye } from "lucide-react";
+import UpcomingInstallationStatusFilter from "@/components/installation/UpcomingInstallationStatusFilter";
+import UpcomingInstallationReferenceIds from "@/components/installation/UpcomingInstallationReferenceIds";
+import UpcomingInstallationServiceStatusColumn from "@/components/installation/UpcomingInstallationServiceStatusColumn";
+import {
+  getUpcomingInstallationExpectedDateDisplay,
+  getUpcomingInstallationActualDeliveryDisplay,
+  getUpcomingInstallationRowClass,
+  installationStatusDateColor,
+  matchesUpcomingInstallationStatusFilter,
+  formatUpcomingInstallationDays,
+  getUpcomingInstallationEarlyDelayDisplay,
+} from "@/lib/upcomingInstallationDeliveryDisplay";
+
+function UpcomingInstallationDeliveryColumn({ record }) {
+  const expected = getUpcomingInstallationExpectedDateDisplay(record);
+  const actual = getUpcomingInstallationActualDeliveryDisplay(record);
+  const earlyDelay = getUpcomingInstallationEarlyDelayDisplay(record);
+  return (
+    <div className="space-y-0.5 text-xs sm:text-sm leading-snug min-w-[9rem]">
+      <div>
+        <span className="text-gray-500 font-medium">Exp:</span>{" "}
+        <span className={expected.className}>{expected.text}</span>
+      </div>
+      <div>
+        <span className="text-gray-500 font-medium">Act:</span>{" "}
+        <span className={actual.className}>{actual.text}</span>
+      </div>
+      <div>
+        <span className="text-gray-500 font-medium">Early/Delay:</span>{" "}
+        <span className={earlyDelay.className}>{earlyDelay.text}</span>
+      </div>
+    </div>
+  );
+}
 
 export default function UpcomingInstallationsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState("products"); // Default to "products"
+  const [statusFilter, setStatusFilter] = useState("all");
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
@@ -122,9 +158,28 @@ export default function UpcomingInstallationsPage() {
   // ========= FETCH DATA ==========
   const fetchData = useCallback(async (filter) => {
     setLoading(true);
+    setFetchError("");
     try {
-      const res = await fetch(`/api/installation/upcoming?type=${filter}`);
+      const res = await fetch(`/api/installation/upcoming?type=${filter}`, {
+        cache: "no-store",
+      });
+      const isJson = (res.headers.get("content-type") || "").includes("application/json");
+      if (!isJson) {
+        const msg =
+          res.status === 504
+            ? "Server timed out loading installations. Try again or ask admin to optimize."
+            : `Server error (${res.status}). Could not load installations.`;
+        setFetchError(msg);
+        setRecords([]);
+        return;
+      }
       const data = await res.json();
+      if (!res.ok) {
+        console.error("Upcoming installations API error:", data);
+        setFetchError(data.error || data.message || "Failed to load installations");
+        setRecords([]);
+        return;
+      }
 
       setRecords(data.installations || []);
       setTotalPages(data.totalPages || 1);
@@ -132,6 +187,7 @@ export default function UpcomingInstallationsPage() {
       setCurrentPage(data.currentPage || 1);
     } catch (err) {
       console.error("Fetch error", err);
+      setFetchError("Network error while loading installations");
       setRecords([]);
     } finally {
       setLoading(false);
@@ -145,36 +201,27 @@ export default function UpcomingInstallationsPage() {
 
   // ========= CLIENT-SIDE SEARCH FILTER ==========
   const filteredRecords = useMemo(() => {
-    if (!searchQuery.trim()) return records;
-    const q = searchQuery.toLowerCase();
-    return records.filter((r) =>
-      [r.model, r.name, r.company_name, r.emp_name, r.delivery_address, r.contact, String(r.order_id)]
-        .some((val) => val && String(val).toLowerCase().includes(q))
-    );
-  }, [records, searchQuery]);
+    const q = searchQuery.trim().toLowerCase();
+    return records.filter((r) => {
+      if (!matchesUpcomingInstallationStatusFilter(r, statusFilter)) return false;
+      if (!q) return true;
+      return [
+        r.model,
+        r.name,
+        r.company_name,
+        r.emp_name,
+        r.delivery_address,
+        r.contact,
+        String(r.order_id),
+        String(r.invoice_number ?? ""),
+        String(r.service_id ?? ""),
+      ]
+        .some((val) => val && String(val).toLowerCase().includes(q));
+    });
+  }, [records, searchQuery, statusFilter]);
 
   // ========= UI HELPERS ==========
-  const getRowClass = (status) => {
-    if (status === "overdue") return "bg-red-100";
-    if (status === "upcoming") return "bg-yellow-100";
-    return "bg-white";
-  };
-
-  const dateColor = (status) => {
-    return status === "overdue"
-      ? "text-red-600 font-bold"
-      : status === "upcoming"
-        ? "text-orange-600 font-bold"
-        : "text-gray-800";
-  };
-
-  const formatDays = (days) =>
-    days < 0
-      ? `${Math.abs(days)} days overdue`
-      : days === 0
-        ? "Today"
-        : `In ${days} days`;
-
+  const dateColor = installationStatusDateColor;
   // ================= UI START ===================
   return (
     <div className="w-full max-w-full p-6">
@@ -183,7 +230,10 @@ export default function UpcomingInstallationsPage() {
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-3xl font-bold">Upcoming Installations</h2>
         <p className="text-sm text-gray-600">
-          Total: {filteredRecords.length}{searchQuery ? ` (filtered from ${total})` : ` records`}
+          Total: {filteredRecords.length}
+          {searchQuery || statusFilter !== "all"
+            ? ` (filtered from ${total})`
+            : ` records`}
         </p>
       </div>
 
@@ -191,7 +241,7 @@ export default function UpcomingInstallationsPage() {
       <div className="flex flex-col gap-4 mb-6">
         <input
           type="text"
-          placeholder="Search by order ID, model, company, employee, contact..."
+          placeholder="Search by invoice, order, service ID, model, company, contact..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="px-4 py-2 border rounded shadow-sm"
@@ -231,9 +281,15 @@ export default function UpcomingInstallationsPage() {
           </button>
         </div>
 
-        <div className="flex gap-6">
+        <UpcomingInstallationStatusFilter
+          value={statusFilter}
+          onChange={setStatusFilter}
+        />
+
+        <div className="flex flex-wrap gap-6">
           <div className="flex items-center"><div className="w-4 h-4 bg-red-100 mr-2" />Overdue</div>
           <div className="flex items-center"><div className="w-4 h-4 bg-yellow-100 mr-2" />Within 10 Days</div>
+          <div className="flex items-center"><div className="w-4 h-4 bg-green-100 mr-2" />Actual Delivery Done</div>
           <div className="flex items-center"><div className="w-4 h-4 bg-white border mr-2" />Scheduled</div>
         </div>
       </div>
@@ -243,21 +299,31 @@ export default function UpcomingInstallationsPage() {
         <div className="text-center py-10 text-gray-500">Loading...</div>
       )}
 
-      {!loading && filteredRecords.length === 0 && (
+      {!loading && fetchError && (
+        <div className="text-center py-10 text-red-600">{fetchError}</div>
+      )}
+
+      {!loading && !fetchError && filteredRecords.length === 0 && (
         <div className="text-center py-10 text-gray-500">No records found.</div>
       )}
 
       {/** ================= MOBILE VIEW (CARDS) ================= */}
       {!loading && (
         <div className="md:hidden space-y-4">
-          {filteredRecords.map((r, i) => (
+          {filteredRecords.map((r, i) => {
+            return (
             <div
               key={i}
-              className={`rounded-xl shadow p-4 border ${getRowClass(
-                r.installation_status
+              className={`rounded-xl shadow p-4 border ${getUpcomingInstallationRowClass(
+                r
               )}`}
             >
-              <div className="text-lg font-bold mb-2">Order #{r.order_id}</div>
+              <div className="mb-2">
+                <UpcomingInstallationReferenceIds
+                  record={r}
+                  className="text-sm"
+                />
+              </div>
 
               <div className="space-y-1 text-sm">
                 <p><b>Model:</b> {r.model}</p>
@@ -266,11 +332,24 @@ export default function UpcomingInstallationsPage() {
                 <p><b>Contact:</b> {r.contact}</p>
                 <p><b>Emp:</b> {r.emp_name}</p>
                 <p><b>Address:</b> {r.delivery_address}</p>
-                <p className={`${dateColor(r.installation_status)} mt-1`}>
-                  <b>Delivery:</b> {r.delivery_date}
-                </p>
+                <div className="mt-1">
+                  <b>Delivery:</b>
+                  <UpcomingInstallationDeliveryColumn record={r} />
+                </div>
+                <div className="mt-1">
+                  <b>Status:</b>
+                  <UpcomingInstallationServiceStatusColumn record={r} />
+                </div>
                 <p className={`${dateColor(r.installation_status)}`}>
-                  <b>Days:</b> {formatDays(r.days_until_installation)}
+                  <b>Days:</b> {formatUpcomingInstallationDays(r)}
+                </p>
+                <p className="mt-1">
+                  <b>Warranty:</b>{" "}
+                  {Number(r.warranty_registered) === 1 ? (
+                    <span className="text-green-600 font-semibold">✔ Registered</span>
+                  ) : (
+                    <span className="text-gray-400">Not Registered</span>
+                  )}
                 </p>
               </div>
 
@@ -283,12 +362,12 @@ export default function UpcomingInstallationsPage() {
                 >
                   <Eye size={14} className="mr-1" /> View
                 </Link>
-                <button
+                {/* <button
                   onClick={() => handleAction(r.order_id, "INSTALLED")}
                   className="w-full px-3 py-2 bg-green-600 text-white text-xs rounded hover:bg-green-700"
                 >
                   Installed
-                </button>
+                </button> */}
                 {/* <button
                   onClick={() => openReturnModal(r.order_id)}
                   className="w-full px-3 py-2 bg-orange-600 text-white text-xs rounded hover:bg-orange-700"
@@ -303,7 +382,8 @@ export default function UpcomingInstallationsPage() {
                 </button> */}
               </div>
             </div>
-          ))}
+          );
+          })}
         </div>
       )}
 
@@ -313,33 +393,60 @@ export default function UpcomingInstallationsPage() {
           <table className="w-full text-sm table-auto border-collapse">
             <thead className="bg-gray-800 text-white">
               <tr>
-                <th className="p-3">Order ID</th>
+                <th className="p-3">Inv | Ord | Ser</th>
                 <th className="p-3">Model</th>
                 <th className="p-3">Name</th>
                 <th className="p-3">Delivery Address</th>
                 <th className="p-3">Company</th>
                 <th className="p-3">Contact</th>
                 <th className="p-3">Emp</th>
-                <th className="p-3">Delivery</th>
+                <th
+                  className="p-3"
+                  title="Expected and actual delivery dates, early or delay vs expected"
+                >
+                  Delivery
+                </th>
                 <th className="p-3">Days</th>
+                <th className="p-3" title="Service record status">
+                  Status
+                </th>
+                <th className="p-3">Warranty</th>
                 <th className="p-3">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {filteredRecords.map((r, i) => (
-                <tr key={i} className={getRowClass(r.installation_status)}>
-                  <td className="p-3">{r.order_id}</td>
+              {filteredRecords.map((r, i) => {
+                return (
+                <tr key={i} className={getUpcomingInstallationRowClass(r)}>
+                  <td className="p-3 font-semibold">
+                    <UpcomingInstallationReferenceIds record={r} />
+                  </td>
                   <td className="p-3">{r.model}</td>
                   <td className="p-3">{r.name}</td>
                   <td className="p-3">{r.delivery_address}</td>
                   <td className="p-3">{r.company_name}</td>
                   <td className="p-3">{r.contact}</td>
                   <td className="p-3">{r.emp_name}</td>
-                  <td className={`p-3 ${dateColor(r.installation_status)}`}>
-                    {r.delivery_date}
+                  <td className="p-3 align-top">
+                    <UpcomingInstallationDeliveryColumn record={r} />
                   </td>
                   <td className={`p-3 ${dateColor(r.installation_status)}`}>
-                    {formatDays(r.days_until_installation)}
+                    {formatUpcomingInstallationDays(r)}
+                  </td>
+                  <td className="p-3 align-top">
+                    <UpcomingInstallationServiceStatusColumn record={r} />
+                  </td>
+                  <td className="p-3 text-center">
+                    {Number(r.warranty_registered) === 1 ? (
+                      <span title="Registered in Warranty" className="inline-flex items-center gap-1 text-green-600 font-semibold text-xs">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        Registered
+                      </span>
+                    ) : (
+                      <span className="text-gray-400 text-xs">—</span>
+                    )}
                   </td>
                   <td className="p-3">
                     <div className="flex flex-col gap-2 items-stretch">
@@ -350,12 +457,12 @@ export default function UpcomingInstallationsPage() {
                       >
                         <Eye size={14} className="mr-1" /> View
                       </Link>
-                      <button
+                      {/* <button
                         onClick={() => handleAction(r.order_id, "INSTALLED")}
                         className="px-3 py-1.5 bg-green-600 text-white rounded text-xs hover:bg-green-700"
                       >
                         Installed
-                      </button>
+                      </button> */}
                       {/* <button
                         onClick={() => openReturnModal(r.order_id)}
                         className="px-3 py-1.5 bg-orange-600 text-white rounded text-xs hover:bg-orange-700"
@@ -371,7 +478,8 @@ export default function UpcomingInstallationsPage() {
                     </div>
                   </td>
                 </tr>
-              ))}
+              );
+              })}
             </tbody>
           </table>
         </div>

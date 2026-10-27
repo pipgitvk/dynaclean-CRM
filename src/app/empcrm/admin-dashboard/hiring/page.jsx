@@ -1,10 +1,19 @@
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Eye, Filter, Loader2, Pencil, UserPlus, X } from "lucide-react";
-import { HR_SCORE_RATING_OPTIONS, HIRING_TAG_OPTIONS as TAG_OPTIONS, HAVE_NOT_TALKED_REASONS } from "@/lib/hiringPayload";
+import {
+  HR_SCORE_RATING_OPTIONS,
+  HIRING_TAG_OPTIONS as TAG_OPTIONS,
+  HAVE_NOT_TALKED_REASONS,
+  hiringStatusSkipsNextFollowup,
+} from "@/lib/hiringPayload";
 import { HR_TARGET_ALLOWED_DESIGNATIONS, mergeDesignationOptions, normalizeDesignationKey, resolveCanonicalDesignation } from "@/lib/designationDedupe";
+import { getDirectorHrHiringBase } from "@/lib/directorHrPaths";
+import { formatInterviewAt } from "@/components/empcrm/hiring/HiringEntryCard";
 
 /** Shared field styles */
 const fieldClass =
@@ -26,6 +35,8 @@ const STATUS_OPTIONS = [
   "Backup",
   "Hired",
   "Joined",
+  "Backout",
+  "After joining backout",
   "Rejected",
 ];
 
@@ -65,6 +76,71 @@ const HR_SCORE_RATING_LABELS = {
 };
 
 const FILTER_STORAGE_KEY = "empcrm-hiring-filters-v1";
+const HIRING_PAGE_SIZES = [25, 50, 100];
+
+function HiringListPagination({
+  total,
+  page,
+  pageSize,
+  totalPages,
+  loading,
+  onPageChange,
+  onPageSizeChange,
+}) {
+  if (total <= 0) return null;
+  const rangeStart = (page - 1) * pageSize + 1;
+  const rangeEnd = Math.min(page * pageSize, total);
+  const go = (p) => {
+    const next = Math.min(Math.max(1, p), totalPages);
+    onPageChange(next);
+  };
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-slate-50/80 px-3 py-3 sm:px-4">
+      <p className="text-xs sm:text-sm text-slate-600">
+        <span className="font-semibold text-slate-900 tabular-nums">{total}</span> total
+        <span className="text-slate-500">
+          {" "}
+          · showing {rangeStart}–{rangeEnd}
+        </span>
+      </p>
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+        <label className="inline-flex items-center gap-2 text-xs sm:text-sm text-slate-600">
+          Per page
+          <select
+            value={pageSize}
+            onChange={(e) => onPageSizeChange(Number(e.target.value))}
+            className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-sm"
+          >
+            {HIRING_PAGE_SIZES.map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button
+          type="button"
+          disabled={page <= 1 || loading}
+          onClick={() => go(page - 1)}
+          className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-slate-50"
+        >
+          Previous
+        </button>
+        <span className="text-xs sm:text-sm text-slate-700 tabular-nums px-1">
+          Page {page} of {totalPages}
+        </span>
+        <button
+          type="button"
+          disabled={page >= totalPages || loading}
+          onClick={() => go(page + 1)}
+          className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-slate-50"
+        >
+          Next
+        </button>
+      </div>
+    </div>
+  );
+}
 
 const readStoredFilters = () => {
   if (typeof window === "undefined") return null;
@@ -78,24 +154,6 @@ const readStoredFilters = () => {
     return null;
   }
 };
-
-function formatInterviewAt(v) {
-  if (!v) return "—";
-  try {
-    const s = String(v).replace("Z", "");
-    const d = new Date(s);
-    if (Number.isNaN(d.getTime())) return s.slice(0, 16);
-    return d.toLocaleString("en-IN", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return "—";
-  }
-}
 
 const STATUS_CHIP_STYLES = {
   Talked:        "bg-amber-50 text-amber-900 border-amber-200 ring-1 ring-amber-500/15",
@@ -112,6 +170,9 @@ const STATUS_CHIP_STYLES = {
   Backup:        "bg-slate-100 text-slate-700 border-slate-300 ring-1 ring-slate-400/20",
   Hired:         "bg-emerald-50 text-emerald-900 border-emerald-200 ring-1 ring-emerald-500/20",
   Joined:        "bg-teal-50 text-teal-900 border-teal-200 ring-1 ring-teal-500/20",
+  Backout:       "bg-rose-50 text-rose-900 border-rose-200 ring-1 ring-rose-500/15",
+  "After joining backout":
+    "bg-fuchsia-50 text-fuchsia-900 border-fuchsia-200 ring-1 ring-fuchsia-500/15",
   Rejected:      "bg-red-50 text-red-900 border-red-200 ring-1 ring-red-500/15",
   // Legacy — old rows still render with correct colours
   "Shortlisted for interview": "bg-sky-50 text-sky-900 border-sky-200 ring-1 ring-sky-500/15",
@@ -141,6 +202,9 @@ function StatusChip({ status, tag }) {
 }
 
 export default function HiringPage() {
+  const pathname = usePathname();
+  const hiringBase = getDirectorHrHiringBase(pathname);
+  const paginateList = hiringBase === "/director-dashboard/hiring";
   const [candidate_name, setCandidateName] = useState("");
   const [emp_contact, setEmpContact] = useState("");
   const [designation, setDesignation] = useState("");
@@ -184,6 +248,14 @@ export default function HiringPage() {
   const [designationOptions, setDesignationOptions] = useState([]);
   const [loadingDesignations, setLoadingDesignations] = useState(true);
   const [entries, setEntries] = useState([]);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const [listPagination, setListPagination] = useState({
+    total: 0,
+    pages: 1,
+    page: 1,
+    limit: 25,
+  });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null);
@@ -260,13 +332,28 @@ export default function HiringPage() {
       if (filterJoinTo) params.append("join_to", filterJoinTo);
       if (filterInterviewFrom) params.append("interview_from", filterInterviewFrom);
       if (filterInterviewTo) params.append("interview_to", filterInterviewTo);
-      
+      if (paginateList) {
+        params.append("page", String(page));
+        params.append("limit", String(pageSize));
+      }
+
       url += params.toString();
 
       const res = await fetch(url, { cache: "no-store" });
       const json = await res.json();
       if (json.success) {
         setEntries(json.entries || []);
+        if (json.pagination) {
+          setListPagination(json.pagination);
+        } else if (paginateList) {
+          const total = (json.entries || []).length;
+          setListPagination({
+            page,
+            limit: pageSize,
+            total,
+            pages: 1,
+          });
+        }
         if (typeof json.next_id === "number" && Number.isFinite(json.next_id)) {
           setNextId(json.next_id);
         }
@@ -278,7 +365,26 @@ export default function HiringPage() {
     }
   }, [
     filterCandidateName, filterEmpContact, filterStatus, filterNextFollowupFrom, filterNextFollowupTo,
-    filterMode, filterDesignation, filterJoinFrom, filterJoinTo, filterInterviewFrom, filterInterviewTo
+    filterMode, filterDesignation, filterJoinFrom, filterJoinTo, filterInterviewFrom, filterInterviewTo,
+    paginateList, page, pageSize,
+  ]);
+
+  useEffect(() => {
+    if (!paginateList) return;
+    setPage(1);
+  }, [
+    paginateList,
+    filterCandidateName,
+    filterEmpContact,
+    filterStatus,
+    filterNextFollowupFrom,
+    filterNextFollowupTo,
+    filterMode,
+    filterDesignation,
+    filterJoinFrom,
+    filterJoinTo,
+    filterInterviewFrom,
+    filterInterviewTo,
   ]);
 
   useEffect(() => {
@@ -466,7 +572,7 @@ export default function HiringPage() {
           experience_type: experience_type || null,
           interview_at: interview_at || null,
           rescheduled_at: rescheduled ? rescheduled_at || null : null,
-          next_followup_at: (status !== "Rejected" && status !== "Reject" && status !== "Joined" && status !== "Attended Interview")
+          next_followup_at: !hiringStatusSkipsNextFollowup(status)
             ? next_followup_at || null
             : null,
           interview_mode: interview_mode || null,
@@ -627,22 +733,11 @@ export default function HiringPage() {
               Joining date (from – to)
             </label>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <input
-                type="date"
-                value={filterJoinFrom}
-                onChange={(e) => setFilterJoinFrom(e.target.value)}
-                className={`${fieldClass} min-h-[44px] w-full min-w-0 flex-1 sm:min-h-0`}
-                title="Joining from"
-              />
+              <TypeableDateFilterInput value={filterJoinFrom} onChange={setFilterJoinFrom} className={`${fieldClass} min-h-[44px] w-full min-w-0 flex-1 sm:min-h-0`}
+                title="Joining from"/>
               <span className="hidden text-xs text-slate-400 sm:inline">–</span>
-              <input
-                type="date"
-                value={filterJoinTo}
-                min={filterJoinFrom || undefined}
-                onChange={(e) => setFilterJoinTo(e.target.value)}
-                className={`${fieldClass} min-h-[44px] w-full min-w-0 flex-1 sm:min-h-0`}
-                title="Joining to"
-              />
+              <TypeableDateFilterInput value={filterJoinTo} onChange={setFilterJoinTo} min={filterJoinFrom || undefined} className={`${fieldClass} min-h-[44px] w-full min-w-0 flex-1 sm:min-h-0`}
+                title="Joining to"/>
             </div>
           </div>
 
@@ -652,22 +747,11 @@ export default function HiringPage() {
               Interview date (from – to)
             </label>
             <div className="flex items-center gap-2">
-              <input
-                type="date"
-                value={filterInterviewFrom}
-                onChange={(e) => setFilterInterviewFrom(e.target.value)}
-                className={`${fieldClass} flex-1 min-w-0`}
-                title="Interview from"
-              />
+              <TypeableDateFilterInput value={filterInterviewFrom} onChange={setFilterInterviewFrom} className={`${fieldClass} flex-1 min-w-0`}
+                title="Interview from"/>
               <span className="text-xs text-slate-400">–</span>
-              <input
-                type="date"
-                value={filterInterviewTo}
-                min={filterInterviewFrom || undefined}
-                onChange={(e) => setFilterInterviewTo(e.target.value)}
-                className={`${fieldClass} flex-1 min-w-0`}
-                title="Interview to"
-              />
+              <TypeableDateFilterInput value={filterInterviewTo} onChange={setFilterInterviewTo} min={filterInterviewFrom || undefined} className={`${fieldClass} flex-1 min-w-0`}
+                title="Interview to"/>
             </div>
           </div>
 
@@ -677,22 +761,11 @@ export default function HiringPage() {
               Next follow-up date (from – to)
             </label>
             <div className="flex items-center gap-2">
-              <input
-                type="date"
-                value={filterNextFollowupFrom}
-                onChange={(e) => setFilterNextFollowupFrom(e.target.value)}
-                className={`${fieldClass} flex-1 min-w-0`}
-                title="Next follow-up from"
-              />
+              <TypeableDateFilterInput value={filterNextFollowupFrom} onChange={setFilterNextFollowupFrom} className={`${fieldClass} flex-1 min-w-0`}
+                title="Next follow-up from"/>
               <span className="text-xs text-slate-400">–</span>
-              <input
-                type="date"
-                value={filterNextFollowupTo}
-                min={filterNextFollowupFrom || undefined}
-                onChange={(e) => setFilterNextFollowupTo(e.target.value)}
-                className={`${fieldClass} flex-1 min-w-0`}
-                title="Next follow-up to"
-              />
+              <TypeableDateFilterInput value={filterNextFollowupTo} onChange={setFilterNextFollowupTo} min={filterNextFollowupFrom || undefined} className={`${fieldClass} flex-1 min-w-0`}
+                title="Next follow-up to"/>
             </div>
           </div>
         </div>
@@ -710,6 +783,7 @@ export default function HiringPage() {
             Loading…
           </div>
         ) : (
+          <>
           <div className="overflow-x-auto overscroll-x-contain [scrollbar-gutter:stable]">
             <table className="min-w-[760px] w-full text-xs sm:text-sm">
               <thead className="border-b border-slate-200 bg-gradient-to-b from-slate-50 to-slate-100/90">
@@ -823,14 +897,14 @@ export default function HiringPage() {
                       <td className="px-3 py-2.5 text-right sm:px-4">
                         <div className="inline-flex flex-wrap items-center justify-end gap-1.5">
                           <Link
-                            href={`/empcrm/admin-dashboard/hiring/${row.id}/view`}
+                            href={`${hiringBase}/${row.id}/view`}
                             className="inline-flex items-center gap-1 rounded-lg border border-indigo-200/90 bg-indigo-50/90 px-2 py-1 text-xs font-medium text-indigo-800 transition hover:bg-indigo-100"
                           >
                             <Eye className="h-3.5 w-3.5 shrink-0" />
                             View
                           </Link>
                           <Link
-                            href={`/empcrm/admin-dashboard/hiring/${row.id}/edit`}
+                            href={`${hiringBase}/${row.id}/edit`}
                             className="inline-flex items-center gap-1 rounded-lg border border-emerald-200/80 bg-emerald-50/80 px-2 py-1 text-xs font-medium text-emerald-800 transition hover:bg-emerald-100"
                           >
                             <Pencil className="h-3.5 w-3.5 shrink-0" />
@@ -844,6 +918,21 @@ export default function HiringPage() {
               </tbody>
             </table>
           </div>
+          {paginateList && (
+            <HiringListPagination
+              total={listPagination.total ?? 0}
+              page={listPagination.page ?? page}
+              pageSize={listPagination.limit ?? pageSize}
+              totalPages={listPagination.pages ?? 1}
+              loading={loading}
+              onPageChange={setPage}
+              onPageSizeChange={(n) => {
+                setPageSize(n);
+                setPage(1);
+              }}
+            />
+          )}
+          </>
         )}
       </div>
 
@@ -962,7 +1051,7 @@ export default function HiringPage() {
                     )}
                   </div>
 
-                  {!["Talked", "Have not talked", "Didn't receive the call", "Cut the call", "Not reachable", "next-follow-up", "follow-up", "Joined", "Attended Interview"].includes(status) && (
+                  {!["Talked", "Have not talked", "Didn't receive the call", "Cut the call", "Not reachable", "next-follow-up", "follow-up", "Joined", "Attended Interview", "Backout", "After joining backout"].includes(status) && (
                     <>
                       <div>
                         <label className="mb-1 block text-sm font-medium text-slate-700">HR Interview Score (1–10)</label>
@@ -1108,7 +1197,7 @@ export default function HiringPage() {
                           setProbationMonths("");
                         }
                         if (v !== "Rescheduled") setRescheduledAt("");
-                        if (v === "Rejected" || v === "Reject") setNextFollowupAt("");
+                        if (hiringStatusSkipsNextFollowup(v)) setNextFollowupAt("");
                       }}
                       className={`w-full max-w-full sm:max-w-md ${fieldClass} min-h-[44px]`}
                     >
@@ -1135,14 +1224,14 @@ export default function HiringPage() {
                     </div>
                   )}
 
-                  {status !== "Rejected" && status !== "Reject" && status !== "Joined" && status !== "Attended Interview" && (
+                  {!hiringStatusSkipsNextFollowup(status) && (
                     <div className="sm:col-span-2">
                       <label className="mb-1 block text-sm font-medium text-slate-700">
                         Next follow-up date &amp; time *
                       </label>
                       <input
                         type="datetime-local"
-                        required={status !== "Rejected" && status !== "Reject" && status !== "Joined" && status !== "Attended Interview"}
+                        required={!hiringStatusSkipsNextFollowup(status)}
                         value={next_followup_at}
                         onChange={(e) => setNextFollowupAt(e.target.value)}
                         className={formFieldClass}
@@ -1156,13 +1245,7 @@ export default function HiringPage() {
                       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <div>
                           <label className="mb-1 block text-sm font-medium text-slate-700">Joining date *</label>
-                          <input
-                            type="date"
-                            required={status === "Hired"}
-                            value={hire_date}
-                            onChange={(e) => setHireDate(e.target.value)}
-                            className={formFieldClass}
-                          />
+                          <TypeableDateFilterInput value={hire_date} onChange={setHireDate} required={status === "Hired"} className={formFieldClass}/>
                         </div>
                         <div>
                           <label className="mb-1 block text-sm font-medium text-slate-700">Package *</label>
@@ -1233,13 +1316,7 @@ export default function HiringPage() {
                       <p className="text-sm font-semibold text-teal-900">Joined Info</p>
                       <div>
                         <label className="mb-1 block text-sm font-medium text-slate-700">Joined date *</label>
-                        <input
-                          type="date"
-                          required={status === "Joined"}
-                          value={hire_date}
-                          onChange={(e) => setHireDate(e.target.value)}
-                          className={formFieldClass}
-                        />
+                        <TypeableDateFilterInput value={hire_date} onChange={setHireDate} required={status === "Joined"} className={formFieldClass}/>
                       </div>
                     </div>
                   )}
@@ -1260,7 +1337,7 @@ export default function HiringPage() {
                     </div>
                   )}
 
-                  {!["Talked", "Have not talked", "Didn't receive the call", "Cut the call", "Not reachable", "next-follow-up", "follow-up", "Joined", "Attended Interview"].includes(status) && (
+                  {!["Talked", "Have not talked", "Didn't receive the call", "Cut the call", "Not reachable", "next-follow-up", "follow-up", "Joined", "Attended Interview", "Backout", "After joining backout"].includes(status) && (
                     <div className="space-y-4 rounded-xl border border-indigo-200 bg-indigo-50/40 p-4 sm:col-span-2">
                       <p className="text-sm font-semibold text-indigo-900">Selected — resume &amp; score</p>
                       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

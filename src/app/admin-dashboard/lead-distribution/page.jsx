@@ -1,5 +1,6 @@
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect } from "react";
 import ManualLeadModal from "@/components/models/ManualLeadModal";
 import { redirect } from "next/dist/server/api-utils";
@@ -343,24 +344,13 @@ export default function LeadDistributionPage() {
               <label className="text-sm block mb-1 text-gray-700">
                 From Date
               </label>
-              <input
-                type="date"
-                value={fromDate}
-                onChange={(e) => setFromDate(e.target.value)}
-                className="border rounded p-2"
-              />
+              <TypeableDateFilterInput value={fromDate} onChange={setFromDate} className="border rounded p-2"/>
             </div>
             <div>
               <label className="text-sm block mb-1 text-gray-700">
                 To Date
               </label>
-              <input
-                type="date"
-                value={toDate}
-                min={fromDate}
-                onChange={(e) => setToDate(e.target.value)}
-                className="border rounded p-2"
-              />
+              <TypeableDateFilterInput value={toDate} onChange={setToDate} min={fromDate} className="border rounded p-2"/>
             </div>
           </div>
         </div>

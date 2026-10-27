@@ -305,8 +305,12 @@ const generateInstallationHTMLTemplate = (
   const contactPerson =
     productData?.contact_person || productData?.site_person || "";
   const rate = reportData.service_rate || installData?.service_rating || "";
-  const installationComplete =
-    String(reportData.status || "").toUpperCase() === "COMPLETED";
+  const statusUpper = String(reportData.status || "")
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "");
+  const installationComplete = statusUpper === "COMPLETED";
+  const installationIncomplete = statusUpper === "INCOMPLETE";
 
   const traineeRows =
     trainees && trainees.length > 0
@@ -422,7 +426,7 @@ const generateInstallationHTMLTemplate = (
                 <div class="install-status-row">
                     <strong>Status of Installation:</strong>
                     <label><input type="radio" ${installationComplete ? "checked" : ""} disabled> Complete</label>
-                    <label><input type="radio" ${!installationComplete ? "checked" : ""} disabled> Incomplete</label>
+                    <label><input type="radio" ${installationIncomplete ? "checked" : ""} disabled> Incomplete</label>
                 </div>
                 <div class="form-group">
                     <label>Defects found on inspection (if any):</label>

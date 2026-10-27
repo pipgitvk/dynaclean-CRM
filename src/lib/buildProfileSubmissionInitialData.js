@@ -347,3 +347,79 @@ export function mergeSubmissionInitialWithLiveProfile(submissionInitial, liveApi
 
   return merged;
 }
+
+/**
+ * Maps a live /api/empcrm/profile response row to ProfileForm state.
+ * Handles joining_form_documents as strings OR [{ docKey, url }] without throwing.
+ */
+export function liveProfileToFormInitialData(profile) {
+  if (!profile) return null;
+
+  let joiningDocs = profile.joining_form_documents;
+  if (typeof joiningDocs === "string") {
+    try {
+      joiningDocs = JSON.parse(joiningDocs);
+    } catch {
+      joiningDocs = [];
+    }
+  }
+  if (!Array.isArray(joiningDocs)) joiningDocs = [];
+
+  let docsSubmitted = profile.documents_submitted;
+  if (typeof docsSubmitted === "string") {
+    try {
+      docsSubmitted = JSON.parse(docsSubmitted);
+    } catch {
+      docsSubmitted = {};
+    }
+  }
+  if (!docsSubmitted || typeof docsSubmitted !== "object" || Array.isArray(docsSubmitted)) {
+    docsSubmitted = {};
+  }
+
+  const stringUrls = [];
+  for (const item of joiningDocs) {
+    if (typeof item === "string" && item.trim()) stringUrls.push(item.trim());
+  }
+
+  const fileUrls = mergeFileUrlMaps(
+    fileUrlsFromDocumentsSubmittedObject(docsSubmitted),
+    fileUrlsFromJoiningFormDocuments(joiningDocs),
+    fileUrlsFromUploadedFilesArray(stringUrls)
+  );
+
+  const normalizedDocs = normalizeDocumentsSubmittedForForm(docsSubmitted);
+  if (Object.keys(normalizedDocs).length === 0 && Object.keys(fileUrls).length > 0) {
+    for (const key of Object.keys(fileUrls)) {
+      normalizedDocs[key] = true;
+    }
+  }
+
+  let leavePolicy = profile.leave_policy;
+  if (typeof leavePolicy === "string") {
+    try {
+      leavePolicy = JSON.parse(leavePolicy);
+    } catch {
+      leavePolicy = {};
+    }
+  }
+  if (!leavePolicy || typeof leavePolicy !== "object" || Array.isArray(leavePolicy)) {
+    leavePolicy = { sick_allowed: 0, paid_allowed: 0, sick_enabled: false, paid_enabled: false };
+  }
+
+  const formData = {
+    ...profile,
+    joining_form_documents: joiningDocs,
+    documents_submitted: normalizedDocs,
+    fileUrls,
+    leave_policy: leavePolicy,
+  };
+
+  return {
+    formData,
+    references: mapReferencesForForm(profile.references),
+    education: Array.isArray(profile.education) ? profile.education : [],
+    experience: Array.isArray(profile.experience) ? profile.experience : [],
+    documents: normalizedDocs,
+  };
+}

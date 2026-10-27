@@ -16,7 +16,14 @@ export default function SpecialPricingSearch({ initialSearch, suggestions }) {
     const seen = new Set();
     const result = [];
     (suggestions || []).forEach((sugg) => {
-      [sugg.customerName, sugg.productName, sugg.productCode].forEach(
+      [
+        sugg.customerId,
+        sugg.customerName,
+        sugg.productName,
+        sugg.productCode,
+        sugg.priceType,
+        sugg.status,
+      ].forEach(
         (text) => {
           const normalized = (text || "").trim();
           if (normalized && !seen.has(normalized)) {
@@ -59,7 +66,7 @@ export default function SpecialPricingSearch({ initialSearch, suggestions }) {
         value={value}
         onChange={(e) => setValue(e.target.value)}
         list="special-price-approvals-search"
-        placeholder="Search by customer, product, code or status"
+        placeholder="Search customer ID, name, product, code, status, price type"
         className="border border-gray-300 rounded px-3 py-2 text-sm w-full sm:w-80"
       />
       <datalist id="special-price-approvals-search">

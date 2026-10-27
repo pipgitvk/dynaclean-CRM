@@ -13,9 +13,11 @@ export async function GET(req, { params }) {
     );
   }
 
-  const conn = await getDbConnection();
+  const pool = await getDbConnection();
+  let conn;
 
   try {
+    conn = await pool.getConnection();
     const [headerRows] = await conn.execute(
       "SELECT * FROM quotations_records WHERE quote_number = ?",
       [quoteNumber],
@@ -30,10 +32,16 @@ export async function GET(req, { params }) {
 
     const header = headerRows[0];
 
-    const [customerDetails] = await conn.execute(
-      `SELECT first_name, email, phone FROM customers WHERE customer_id = ?`,
-      [header.customer_id],
-    );
+    const customerId =
+      header.customer_id != null && header.customer_id !== ""
+        ? header.customer_id
+        : null;
+    const [customerDetails] = customerId
+      ? await conn.execute(
+          `SELECT first_name, email, phone FROM customers WHERE customer_id = ?`,
+          [customerId],
+        )
+      : [[]];
 
     const cust = customerDetails[0];
     const customerFirstName = cust?.first_name || "";
@@ -45,7 +53,6 @@ export async function GET(req, { params }) {
       [quoteNumber],
     );
 
-    // Full payload for QuotationViewer modal
     const response = {
       success: true,
       header,
@@ -53,8 +60,8 @@ export async function GET(req, { params }) {
       customerEmail,
       customerPhone,
       customerFirstName,
-      // Backward compatibility (order forms, upload, etc.)
       quote_number: header.quote_number,
+      quotation_id: header["S.No."],
       company_name: header.company_name,
       company_address: header.company_address,
       state: header.state,
@@ -74,11 +81,16 @@ export async function GET(req, { params }) {
       { success: false, message: "Server error" },
       { status: 500 },
     );
+  } finally {
+    try {
+      if (conn) conn.release();
+    } catch {
+      /* ignore release errors */
+    }
   }
 }
 
 export async function PUT(req, { params }) {
-  // Superadmin-only: verify role from JWT
   const cookieStore = await cookies();
   const token = cookieStore.get("token")?.value;
   if (!token) {
@@ -101,8 +113,12 @@ export async function PUT(req, { params }) {
     return Response.json({ success: false, message: "Missing quote number" }, { status: 400 });
   }
 
-  const conn = await getDbConnection();
+  const pool = await getDbConnection();
+  let conn;
+  let response;
+
   try {
+    conn = await pool.getConnection();
     const body = await req.json();
     const {
       company,
@@ -126,7 +142,8 @@ export async function PUT(req, { params }) {
       quote_date,
     } = body;
 
-    // Update header
+    await conn.beginTransaction();
+
     await conn.execute(
       `UPDATE quotations_records SET
         quote_date = ?,
@@ -169,7 +186,6 @@ export async function PUT(req, { params }) {
       ],
     );
 
-    // Delete old items and re-insert updated ones
     await conn.execute("DELETE FROM quotation_items WHERE quote_number = ?", [quoteId]);
 
     for (const item of items) {
@@ -212,9 +228,25 @@ export async function PUT(req, { params }) {
       );
     }
 
-    return Response.json({ success: true, message: "Quotation updated successfully" });
+    await conn.commit();
+    response = Response.json({ success: true, message: "Quotation updated successfully" });
+    return response;
   } catch (err) {
+    if (conn) {
+      try {
+        await conn.rollback();
+      } catch {
+        /* ignore rollback errors */
+      }
+    }
     console.error("Quotation update error:", err);
-    return Response.json({ success: false, message: "Server error: " + err.message }, { status: 500 });
+    response = Response.json({ success: false, message: "Server error: " + err.message }, { status: 500 });
+    return response;
+  } finally {
+    try {
+      if (conn) conn.release();
+    } catch {
+      /* ignore release errors */
+    }
   }
 }

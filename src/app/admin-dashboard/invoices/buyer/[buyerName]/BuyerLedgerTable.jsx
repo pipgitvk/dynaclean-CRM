@@ -1,5 +1,6 @@
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useMemo, useEffect } from "react";
 import {
   Plus,
@@ -51,27 +52,8 @@ export default function BuyerLedgerTable({ rows: initialRows, buyerName, billing
     company_email: "sales@dynacleanindustries.com",
   });
 
-  // Calculate min/max dates from actual data
-  const minDate = useMemo(() => {
-    if (initialRows.length === 0) return dayjs().startOf("month").format("YYYY-MM-DD");
-    const dates = initialRows.map(r => String(r.entry_date).slice(0, 10)).sort();
-    return dates[0] || dayjs().startOf("month").format("YYYY-MM-DD");
-  }, [initialRows]);
-  
-  const maxDate = useMemo(() => {
-    if (initialRows.length === 0) return dayjs().endOf("month").format("YYYY-MM-DD");
-    const dates = initialRows.map(r => String(r.entry_date).slice(0, 10)).sort();
-    return dates[dates.length - 1] || dayjs().endOf("month").format("YYYY-MM-DD");
-  }, [initialRows]);
-
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-
-  useEffect(() => {
-    // Set dates after component mounts (to use calculated min/max)
-    if (!dateFrom && minDate) setDateFrom(minDate);
-    if (!dateTo && maxDate) setDateTo(maxDate);
-  }, [minDate, maxDate, dateFrom, dateTo]);
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -132,11 +114,15 @@ export default function BuyerLedgerTable({ rows: initialRows, buyerName, billing
       return 0;
     });
 
-    // Filter by date range
-    return data.filter((r) => {
-      const entryDate = String(r.entry_date).slice(0, 10);
-      return entryDate >= dateFrom && entryDate <= dateTo;
-    });
+    if (dateFrom || dateTo) {
+      return data.filter((r) => {
+        const entryDate = String(r.entry_date).slice(0, 10);
+        if (dateFrom && entryDate < dateFrom) return false;
+        if (dateTo && entryDate > dateTo) return false;
+        return true;
+      });
+    }
+    return data;
   }, [rows, sortCol, sortDir, dateFrom, dateTo]);
 
   const totals = useMemo(() => {
@@ -268,7 +254,7 @@ export default function BuyerLedgerTable({ rows: initialRows, buyerName, billing
     filtered.forEach((r) => {
       csvLines.push(
         [
-          `"${dayjs(r.entry_date).format("DD/MM/YYYY")}"`,
+          `"${dayjs(r.entry_date).format("DD-MM-YYYY")}"`,
           `"${String(r.particulars || "").replace(/"/g, '""')}"`,
           `"${r.vch_type || ""}"`,
           `"${r.vch_no || ""}"`,
@@ -588,32 +574,23 @@ left("Closing Balance", col.particulars, y, 9, true);
             <label className="block text-xs font-medium text-gray-700 mb-2">
               From Date
             </label>
-            <input
-              type="date"
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
-            />
+            <TypeableDateFilterInput value={dateFrom} onChange={setDateFrom} className="px-3 py-2 border border-gray-300 rounded-lg outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"/>
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-2">
               To Date
             </label>
-            <input
-              type="date"
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
-            />
+            <TypeableDateFilterInput value={dateTo} onChange={setDateTo} className="px-3 py-2 border border-gray-300 rounded-lg outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"/>
           </div>
           <button
+            type="button"
             onClick={() => {
-              setDateFrom(dayjs().startOf("month").format("YYYY-MM-DD"));
-              setDateTo(dayjs().endOf("month").format("YYYY-MM-DD"));
+              setDateFrom("");
+              setDateTo("");
             }}
             className="px-4 py-2 text-sm font-semibold text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
           >
-            Reset
+            Clear dates
           </button>
         </div>
       </div>
@@ -664,14 +641,14 @@ left("Closing Balance", col.particulars, y, 9, true);
                   className="bg-white hover:bg-blue-50 transition-colors"
                 >
                   <td className="px-4 py-3 whitespace-nowrap text-gray-700">
-                    {dayjs(row.entry_date).format("DD MMM YYYY")}
+                    {dayjs(row.entry_date).format("DD-MM-YYYY")}
                   </td>
 
-                  <td className="px-4 py-3 text-gray-800 max-w-xs">
+                  <td className="px-4 py-3 text-gray-800 max-w-xs break-all">
                     {row.particulars}
                   </td>
 
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3 whitespace-nowrap">
                     <VchBadge type={row.vch_type} />
                   </td>
 
@@ -771,7 +748,7 @@ left("Closing Balance", col.particulars, y, 9, true);
                   </p>
 
                   <p className="text-xs text-gray-500 mt-0.5">
-                    {dayjs(row.entry_date).format("DD MMM YYYY")}
+                    {dayjs(row.entry_date).format("DD-MM-YYYY")}
                   </p>
                 </div>
 
@@ -949,6 +926,8 @@ left("Closing Balance", col.particulars, y, 9, true);
 function VchBadge({ type }) {
   const colorMap = {
     Payment: "bg-orange-100 text-orange-700",
+    Spare: "bg-cyan-100 text-cyan-700",
+    "Spare Purchase": "bg-cyan-100 text-cyan-800",
     Receipt: "bg-green-100 text-green-700",
     Journal: "bg-blue-100 text-blue-700",
     Sales: "bg-purple-100 text-purple-700",
@@ -957,6 +936,8 @@ function VchBadge({ type }) {
     "Credit Note": "bg-teal-100 text-teal-700",
     "Debit Note": "bg-pink-100 text-pink-700",
     Opening: "bg-gray-100 text-gray-700",
+    Return: "bg-rose-100 text-rose-700",
+    "Return Completed": "bg-orange-100 text-orange-800",
     Other: "bg-slate-100 text-slate-700",
   };
 

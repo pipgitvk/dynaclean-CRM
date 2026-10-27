@@ -57,8 +57,10 @@ export default function ThemeSwitcher() {
     <>
       {/* Theme Button */}
       <button
+        type="button"
+        data-theme-switcher
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 bg-white rounded-full p-4 shadow-2xl hover:shadow-3xl transition-all hover:scale-110 z-40 border-2 border-gray-200"
+        className="print:hidden fixed bottom-6 right-6 bg-white rounded-full p-4 shadow-2xl hover:shadow-3xl transition-all hover:scale-110 z-40 border-2 border-gray-200"
         title="Change Theme"
       >
         <Palette className="w-6 h-6 text-gray-700" />

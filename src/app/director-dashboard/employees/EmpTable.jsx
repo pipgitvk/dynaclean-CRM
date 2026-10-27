@@ -294,8 +294,8 @@ const EmployeeCard = ({
         }`}
         title={
           employee.login_time_restriction_enabled === 1
-            ? "Login time restriction ON (09:00–19:15 IST) — click to disable"
-            : "Login time restriction OFF — click to enable (09:00–19:15 IST)"
+            ? "Login time restriction ON (07:00–20:30 IST) — click to disable"
+            : "Login time restriction OFF — click to enable (07:00–20:30 IST)"
         }
       >
         <Clock size={16} />
@@ -350,7 +350,10 @@ const EmpTable = ({ employees }) => {
       );
       if (!res.ok) return [];
       const data = await res.json();
-      const modules = Array.isArray(data?.moduleKeys) ? data.moduleKeys : [];
+      let modules = Array.isArray(data?.moduleKeys) ? data.moduleKeys : [];
+      if (!modules.length) {
+        modules = getRoleDefaultModuleKeys(key);
+      }
       setBulkRoleSelections((prev) => ({ ...(prev || {}), [key]: modules }));
       if (applyToSelection && !bulkUserEditedRef.current) {
         setBulkSelectedModules(modules);
@@ -403,7 +406,7 @@ const EmpTable = ({ employees }) => {
       setTimeRestrictionMap((prev) => ({ ...prev, [username]: next }));
       toast.success(
         next === 1
-          ? `${username}: login restricted to 09:00–19:15 IST`
+          ? `${username}: login restricted to 07:00–20:30 IST`
           : `${username}: login time restriction removed`,
       );
     } catch (err) {
@@ -542,7 +545,10 @@ const EmpTable = ({ employees }) => {
     "PRODUCTION ENGINEER",
   ];
 
-  const bulkModuleTree = useMemo(() => getModuleTreeForEmployeeBulkUi(), []);
+  const bulkModuleTree = useMemo(
+    () => getModuleTreeForEmployeeBulkUi(bulkRole),
+    [bulkRole],
+  );
 
   const bulkModuleIndex = useMemo(
     () => buildModuleUiSearchIndex(bulkModuleTree || []),
@@ -579,7 +585,7 @@ const EmpTable = ({ employees }) => {
     setBulkTouched(false);
     const key = String(role || "").trim();
     const cached = bulkRoleSelections?.[key];
-    if (Array.isArray(cached)) {
+    if (Array.isArray(cached) && cached.length > 0) {
       setBulkSelectedModules(cached);
     } else {
       await fetchRoleModulesFromDB(role, { applyToSelection: true });
@@ -620,12 +626,33 @@ const EmpTable = ({ employees }) => {
     setBulkSelectedModules(allSelected ? [] : [...ALL_MODULE_KEYS]);
   };
 
-  const applyDefaultModules = () => {
+  const applyDefaultModules = async () => {
+    const trimmedRole = String(bulkRole || "").trim();
+    if (!trimmedRole) return;
     bulkUserEditedRef.current = true;
     setBulkTouched(true);
-    const trimmedRole = String(bulkRole || "").trim();
-    const defaults = getRoleDefaultModuleKeys(trimmedRole);
-    setBulkSelectedModules(defaults);
+    setBulkRoleLoading(true);
+    try {
+      const res = await fetch(
+        `/api/admin/bulk-module-access?role=${encodeURIComponent(trimmedRole)}&defaultsOnly=1&t=${Date.now()}`,
+        { cache: "no-store" },
+      );
+      let defaults = getRoleDefaultModuleKeys(trimmedRole);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data?.moduleKeys) && data.moduleKeys.length > 0) {
+          defaults = data.moduleKeys;
+        }
+      }
+      setBulkSelectedModules(defaults);
+      persistBulkSelectionForRole(trimmedRole, defaults);
+    } catch {
+      const defaults = getRoleDefaultModuleKeys(trimmedRole);
+      setBulkSelectedModules(defaults);
+      persistBulkSelectionForRole(trimmedRole, defaults);
+    } finally {
+      setBulkRoleLoading(false);
+    }
   };
 
   const submitBulkModules = async () => {
@@ -705,11 +732,10 @@ const EmpTable = ({ employees }) => {
             setBulkTouched(false);
             const key = String(bulkRole || "").trim();
             const cached = bulkRoleSelections?.[key];
-            if (Array.isArray(cached)) {
+            setShowGlobalModulesModal(true);
+            if (Array.isArray(cached) && cached.length > 0) {
               setBulkSelectedModules(cached);
-              setShowGlobalModulesModal(true);
             } else {
-              setShowGlobalModulesModal(true);
               await fetchRoleModulesFromDB(bulkRole, { applyToSelection: true });
             }
           }}
@@ -1079,8 +1105,8 @@ const EmpTable = ({ employees }) => {
                           }`}
                           title={
                             emp.login_time_restriction_enabled === 1
-                              ? "Login time restriction ON (09:00–19:15 IST) — click to disable"
-                              : "Login time restriction OFF — click to enable (09:00–19:15 IST)"
+                              ? "Login time restriction ON (07:00–20:30 IST) — click to disable"
+                              : "Login time restriction OFF — click to enable (07:00–20:30 IST)"
                           }
                         >
                           <Clock size={20} />

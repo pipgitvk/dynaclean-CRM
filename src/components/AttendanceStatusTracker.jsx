@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { FiLogOut } from "react-icons/fi";
+import { CircleCheck, LogOut, X } from "lucide-react";
 import { MdFastfood } from "react-icons/md";
 import { FaBuildingCircleCheck } from "react-icons/fa6";
 import { SiGitea } from "react-icons/si";
@@ -31,6 +31,7 @@ export default function AttendanceStatusTracker({ username }) {
   const [nowMs, setNowMs] = useState(Date.now());
   const [actionLoading, setActionLoading] = useState(false);
   const [breakRemainingSec, setBreakRemainingSec] = useState(null);
+  const [showCheckoutConfirm, setShowCheckoutConfirm] = useState(false);
 
   const refreshData = useCallback(async () => {
     try {
@@ -137,11 +138,22 @@ export default function AttendanceStatusTracker({ username }) {
   );
 
   const canCheckIn = useCallback(() => {
-    // Check-in allowed anytime from 09:00 IST onwards (no early check-in before 9 AM)
-    return currentMinutes >= 9 * 60;
+    return currentMinutes >= 7 * 60;
   }, [currentMinutes]);
 
-  const getBreakStatus = useCallback(() => {
+  const getCheckoutAction = useCallback(() => {
+    if (!rules) return null;
+    const checkinTime = status?.checkin_time;
+    const checkoutTime = status?.checkout_time;
+    if (!checkinTime) return null;
+    if (checkoutTime) {
+      return { type: "checkout", status: "completed", label: "Day Completed" };
+    }
+    return { type: "checkout", status: "ready", label: "Check Out" };
+  }, [rules, status]);
+
+  /** Check-in + breaks only (checkout is a separate button). */
+  const getPrimaryAction = useCallback(() => {
     if (!rules) return { type: "loading", status: "pending", label: "Loading" };
 
     const checkinTime = status?.checkin_time;
@@ -152,22 +164,21 @@ export default function AttendanceStatusTracker({ username }) {
         return {
           type: "waiting",
           status: "pending",
-          label: "Check-in at 9:00 am",
+          label: "Check-in at 7:00 am",
         };
       }
       return { type: "checkin", status: "pending", label: "Check In" };
     }
 
     if (checkoutTime) {
-      return { type: "checkout", status: "completed", label: "Day Completed" };
+      return null;
     }
 
-    // Step 4: Evening break khatam → turant checkout
+    // Evening break done → no check-in / working icon; only checkout button
     if (status?.break_evening_end) {
-      return { type: "checkout", status: "ready", label: "Check Out" };
+      return null;
     }
 
-    // Step 1: Subah tea break
     const morning = evaluateBreakSlot(
       "break_morning",
       rules.break_morning,
@@ -177,7 +188,6 @@ export default function AttendanceStatusTracker({ username }) {
     );
     if (morning) return morning;
 
-    // Step 2: Tea break khatam ke baad hi lunch
     if (status?.break_morning_end) {
       const lunch = evaluateBreakSlot(
         "break_lunch",
@@ -189,7 +199,6 @@ export default function AttendanceStatusTracker({ username }) {
       if (lunch) return lunch;
     }
 
-    // Step 3: Lunch khatam ke baad hi evening break
     if (status?.break_lunch_end) {
       const evening = evaluateBreakSlot(
         "break_evening",
@@ -201,42 +210,38 @@ export default function AttendanceStatusTracker({ username }) {
       if (evening) return evening;
     }
 
-    // Evening skip ho to scheduled checkout time par
-    const checkoutMin = scheduleTimeToMinutes(rules.checkout_time);
-    if (checkoutMin != null && currentMinutes >= checkoutMin) {
-      return { type: "checkout", status: "ready", label: "Check Out" };
-    }
-
     return { type: "working", status: "completed", label: "Checked In" };
-  }, [rules, status, evaluateBreakSlot, currentMinutes, canCheckIn]);
+  }, [rules, status, evaluateBreakSlot, canCheckIn]);
 
-  const breakInfo = useMemo(() => getBreakStatus(), [getBreakStatus]);
+  const primaryInfo = useMemo(() => getPrimaryAction(), [getPrimaryAction]);
+  const checkoutInfo = useMemo(() => getCheckoutAction(), [getCheckoutAction]);
 
   useEffect(() => {
-    if (breakInfo.status !== "in_progress" || !breakInfo.type.startsWith("break_")) {
+    if (
+      !primaryInfo ||
+      primaryInfo.status !== "in_progress" ||
+      !primaryInfo.type.startsWith("break_")
+    ) {
       setBreakRemainingSec(null);
       return;
     }
 
-    const startedAt = parseAttendanceDateTime(getBreakStartField(breakInfo.type));
+    const startedAt = parseAttendanceDateTime(getBreakStartField(primaryInfo.type));
     if (!startedAt) {
       setBreakRemainingSec(null);
       return;
     }
 
-    const durationMin = getBreakDurationMinutes(breakInfo.type);
+    const durationMin = getBreakDurationMinutes(primaryInfo.type);
     const endMs = startedAt.getTime() + durationMin * 60 * 1000;
     const remaining = Math.ceil((endMs - nowMs) / 1000);
-    // Keep signed value:
-    //  - positive/zero => countdown remaining
-    //  - negative => overtime seconds after break duration
     setBreakRemainingSec(remaining);
-  }, [breakInfo, nowMs, getBreakDurationMinutes, status]);
+  }, [primaryInfo, nowMs, getBreakDurationMinutes, status]);
 
   const isBreakReadyToStart =
-    breakInfo.status === "ready" && breakInfo.type.startsWith("break_");
+    primaryInfo?.status === "ready" && primaryInfo?.type.startsWith("break_");
   const isBreakInProgress =
-    breakInfo.status === "in_progress" && breakInfo.type.startsWith("break_");
+    primaryInfo?.status === "in_progress" && primaryInfo?.type.startsWith("break_");
   const isBreakOvertime =
     isBreakInProgress && breakRemainingSec != null && breakRemainingSec < 0;
   const displayedBreakSec =
@@ -259,8 +264,9 @@ export default function AttendanceStatusTracker({ username }) {
     }
   };
 
-  const renderIcon = () => {
-    switch (breakInfo.type) {
+  const renderPrimaryIcon = () => {
+    if (!primaryInfo) return null;
+    switch (primaryInfo.type) {
       case "checkin":
         return (
           <FaBuildingCircleCheck size={20} className="text-white" />
@@ -269,23 +275,14 @@ export default function AttendanceStatusTracker({ username }) {
         return (
           <FaBuildingCircleCheck size={20} className="text-slate-400" />
         );
-      case "checkout":
-        return (
-          <FiLogOut
-            size={20}
-            className={
-              breakInfo.status === "ready" ? "text-white" : "text-green-500"
-            }
-          />
-        );
       case "break_morning":
       case "break_evening":
         return (
-          <SiGitea size={20} className={getBreakIconColor(breakInfo.status)} />
+          <SiGitea size={20} className={getBreakIconColor(primaryInfo.status)} />
         );
       case "break_lunch":
         return (
-          <MdFastfood size={20} className={getBreakIconColor(breakInfo.status)} />
+          <MdFastfood size={20} className={getBreakIconColor(primaryInfo.status)} />
         );
       case "working":
         return <FaBuildingCircleCheck size={20} className="text-white" />;
@@ -311,21 +308,19 @@ export default function AttendanceStatusTracker({ username }) {
       );
     });
 
-  const handleAction = async () => {
-    if (actionLoading) return;
+  const performAction = async (actionInfo) => {
+    if (actionLoading || !actionInfo) return;
 
-    const currentBreakInfo = getBreakStatus();
-    if (
-      currentBreakInfo.type === "working" ||
-      currentBreakInfo.type === "waiting"
-    ) {
+    if (actionInfo.type === "working" || actionInfo.type === "waiting") {
       return;
     }
+    if (actionInfo.type === "checkout" && actionInfo.status === "completed") {
+      return;
+    }
+
     const needsGps =
-      (currentBreakInfo.type === "checkin" &&
-        currentBreakInfo.status === "pending") ||
-      (currentBreakInfo.type === "checkout" &&
-        currentBreakInfo.status === "ready");
+      (actionInfo.type === "checkin" && actionInfo.status === "pending") ||
+      (actionInfo.type === "checkout" && actionInfo.status === "ready");
 
     setActionLoading(true);
     try {
@@ -351,8 +346,8 @@ export default function AttendanceStatusTracker({ username }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           username,
-          action: currentBreakInfo.type,
-          status: currentBreakInfo.status,
+          action: actionInfo.type,
+          status: actionInfo.status,
           latitude,
           longitude,
         }),
@@ -366,24 +361,22 @@ export default function AttendanceStatusTracker({ username }) {
 
       await refreshData();
 
-      if (
-        currentBreakInfo.type === "checkin" &&
-        currentBreakInfo.status === "pending"
-      ) {
+      if (actionInfo.type === "checkin" && actionInfo.status === "pending") {
         toast.success("Checked in successfully.");
       } else if (
-        currentBreakInfo.type === "checkout" &&
-        currentBreakInfo.status === "ready"
+        actionInfo.type === "checkout" &&
+        actionInfo.status === "ready"
       ) {
+        setShowCheckoutConfirm(false);
         toast.success("Checked out successfully.");
       } else if (
-        currentBreakInfo.status === "ready" &&
-        currentBreakInfo.type.startsWith("break_")
+        actionInfo.status === "ready" &&
+        actionInfo.type.startsWith("break_")
       ) {
         toast.success("Break started.");
       } else if (
-        currentBreakInfo.status === "in_progress" &&
-        currentBreakInfo.type.startsWith("break_")
+        actionInfo.status === "in_progress" &&
+        actionInfo.type.startsWith("break_")
       ) {
         toast.success("Break ended.");
       }
@@ -403,83 +396,188 @@ export default function AttendanceStatusTracker({ username }) {
     return <div className="text-xs text-gray-500">Rules not configured</div>;
   }
 
-  const warnAtSeconds =
-    breakInfo.type === "break_lunch"
-      ? 26 * 60
-      : 12 * 60;
-
   const scheduleHint = rules
     ? `In: ${formatScheduleTimeLabel(rules.checkin_time)} | Out: ${formatScheduleTimeLabel(rules.checkout_time)} | Tea: ${formatScheduleTimeLabel(rules.break_morning)} (${rules.morning_duration_minutes}m) | Lunch: ${formatScheduleTimeLabel(rules.break_lunch)} (${rules.lunch_duration_minutes}m) | Evening: ${formatScheduleTimeLabel(rules.break_evening)} (${rules.evening_duration_minutes}m)`
     : "";
 
-  const buttonTitle = actionLoading
-    ? "Processing..."
-    : `${breakInfo.label}${isBreakOvertime ? " (Overtime)" : ""}${
-        scheduleHint ? ` | ${scheduleHint}` : ""
-      }`;
+  const buildButtonClasses = (info, { isPrimary }) => {
+    if (!info) return "";
+    const isPassiveWorking = info.type === "working";
+    const isWaitingCheckin = info.type === "waiting";
+    const isBreakPending =
+      info.status === "pending" && info.type.startsWith("break_");
+    const breakReady =
+      info.status === "ready" && info.type.startsWith("break_");
+    const breakProgress =
+      info.status === "in_progress" && info.type.startsWith("break_");
+    const warnAtSeconds = info.type === "break_lunch" ? 26 * 60 : 12 * 60;
+    const isCheckoutButton = info.type === "checkout";
 
-  const isPassiveWorking = breakInfo.type === "working";
-  const isWaitingCheckin = breakInfo.type === "waiting";
-  const isBreakPending =
-    breakInfo.status === "pending" && breakInfo.type.startsWith("break_");
-
-  return (
-    <button
-      type="button"
-      onClick={handleAction}
-      disabled={
-        actionLoading ||
-        isPassiveWorking ||
-        isWaitingCheckin ||
-        isBreakPending ||
-        (breakInfo.type === "checkout" && breakInfo.status === "completed")
-      }
-      className={`flex min-h-10 min-w-10 items-center justify-center rounded-lg p-2 transition-colors ${
-        isPassiveWorking || isWaitingCheckin || isBreakPending
-          ? "cursor-default"
-          : "disabled:cursor-not-allowed disabled:opacity-50"
-      } ${
-        isBreakReadyToStart || isBreakPending ? "animate-pulse" : ""
-      } ${
-        isBreakReadyToStart || isBreakPending
-          ? isBreakPending
-            ? "bg-red-400 text-white"
-            : "bg-red-500 hover:bg-red-600 text-white"
-          : isWaitingCheckin
-            ? "bg-slate-200 text-slate-500"
-          : breakInfo.type === "checkin" && breakInfo.status === "pending"
+    return [
+      isCheckoutButton
+        ? "flex min-h-10 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold sm:text-sm whitespace-nowrap transition-colors shadow-sm"
+        : "flex min-h-10 min-w-10 items-center justify-center rounded-lg p-2 transition-colors",
+      isPassiveWorking || isWaitingCheckin || isBreakPending
+        ? "cursor-default"
+        : "disabled:cursor-not-allowed disabled:opacity-50",
+      breakReady || isBreakPending ? "animate-pulse" : "",
+      breakReady || isBreakPending
+        ? isBreakPending
+          ? "bg-red-400 text-white"
+          : "bg-red-500 hover:bg-red-600 text-white"
+        : isWaitingCheckin
+          ? "bg-slate-200 text-slate-500"
+          : info.type === "checkin" && info.status === "pending"
             ? "bg-red-500 hover:bg-red-600 text-white"
-            : isPassiveWorking ||
-                (breakInfo.type === "checkin" &&
-                  breakInfo.status === "completed") ||
-                isBreakInProgress
+            : isPassiveWorking || breakProgress
               ? isBreakOvertime
                 ? "bg-red-500 text-white hover:bg-red-600"
                 : "bg-green-500 text-white hover:bg-green-600"
-              : breakInfo.type === "checkout" && breakInfo.status === "ready"
-                ? "bg-red-500 hover:bg-red-600 text-white"
-                : "hover:bg-gray-100"
-      } ${
-        isBreakInProgress &&
-        breakRemainingSec != null &&
-        breakRemainingSec >= 0 &&
-        breakRemainingSec <= warnAtSeconds
-          ? "animate-pulse ring-2 ring-amber-400"
-          : ""
-      } ${
-        isBreakOvertime ? "animate-pulse ring-2 ring-red-300" : ""
-      }`}
-      title={buttonTitle}
-    >
-      {actionLoading ? (
-        <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
-      ) : isBreakInProgress && displayedBreakSec != null ? (
-        <span className="text-[11px] font-bold tabular-nums leading-none text-white">
-          {formatCountdown(displayedBreakSec)}
-        </span>
-      ) : (
-        renderIcon()
+              : info.type === "checkout" && info.status === "ready"
+                ? "bg-red-600 hover:bg-red-700 text-white"
+                : info.type === "checkout" && info.status === "completed"
+                  ? "bg-green-100 text-green-700"
+                  : "hover:bg-gray-100",
+      isPrimary &&
+      breakProgress &&
+      breakRemainingSec != null &&
+      breakRemainingSec >= 0 &&
+      breakRemainingSec <= warnAtSeconds
+        ? "animate-pulse ring-2 ring-amber-400"
+        : "",
+      isPrimary && isBreakOvertime ? "animate-pulse ring-2 ring-red-300" : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+  };
+
+  const titleFor = (info) =>
+    actionLoading
+      ? "Processing..."
+      : `${info?.label ?? ""}${isBreakOvertime && info === primaryInfo ? " (Overtime)" : ""}${
+          scheduleHint ? ` | ${scheduleHint}` : ""
+        }`;
+
+  const isPassiveWorking = primaryInfo?.type === "working";
+  const isWaitingCheckin = primaryInfo?.type === "waiting";
+  const isBreakPending =
+    primaryInfo?.status === "pending" &&
+    primaryInfo?.type.startsWith("break_");
+
+  const showCheckout = Boolean(checkoutInfo);
+
+  if (!primaryInfo && !showCheckout) {
+    return null;
+  }
+
+  return (
+    <div className="flex shrink-0 items-center gap-1.5">
+      {primaryInfo ? (
+        <button
+          type="button"
+          onClick={() => performAction(primaryInfo)}
+          disabled={
+            actionLoading ||
+            isPassiveWorking ||
+            isWaitingCheckin ||
+            isBreakPending
+          }
+          className={buildButtonClasses(primaryInfo, { isPrimary: true })}
+          title={titleFor(primaryInfo)}
+        >
+          {actionLoading ? (
+            <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+          ) : isBreakInProgress && displayedBreakSec != null ? (
+            <span className="text-[11px] font-bold tabular-nums leading-none text-white">
+              {formatCountdown(displayedBreakSec)}
+            </span>
+          ) : (
+            renderPrimaryIcon()
+          )}
+        </button>
+      ) : null}
+      {showCheckout ? (
+        <button
+          type="button"
+          onClick={() => {
+            if (checkoutInfo.status === "completed") return;
+            setShowCheckoutConfirm(true);
+          }}
+          disabled={actionLoading || checkoutInfo.status === "completed"}
+          className={buildButtonClasses(checkoutInfo, { isPrimary: false })}
+          title={titleFor(checkoutInfo)}
+        >
+          {actionLoading && !primaryInfo ? (
+            <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+          ) : checkoutInfo.status === "completed" ? (
+            <span className="inline-flex items-center gap-1.5">
+              <CircleCheck size={17} strokeWidth={2.25} aria-hidden />
+              Checked out
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5">
+              <LogOut size={17} strokeWidth={2.25} aria-hidden />
+              Checkout
+            </span>
+          )}
+        </button>
+      ) : null}
+
+      {showCheckoutConfirm && checkoutInfo?.status === "ready" && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="checkout-confirm-title"
+        >
+          <div className="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <h2
+                id="checkout-confirm-title"
+                className="text-lg font-semibold text-gray-900"
+              >
+                Confirm checkout
+              </h2>
+              <button
+                type="button"
+                onClick={() => setShowCheckoutConfirm(false)}
+                disabled={actionLoading}
+                className="rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50"
+                aria-label="Close"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <p className="mb-6 text-sm text-gray-600">
+              Are you sure you want to check out for today? Your location will be
+              recorded when you confirm.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowCheckoutConfirm(false)}
+                disabled={actionLoading}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => performAction(checkoutInfo)}
+                disabled={actionLoading}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                {actionLoading ? (
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                ) : (
+                  <LogOut size={16} aria-hidden />
+                )}
+                Checkout
+              </button>
+            </div>
+          </div>
+        </div>
       )}
-    </button>
+    </div>
   );
 }

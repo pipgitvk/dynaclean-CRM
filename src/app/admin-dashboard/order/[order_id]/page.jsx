@@ -3,12 +3,17 @@ import { notFound } from "next/navigation";
 import OrderDetailsClient from "./OrderDetailsClient";
 import dayjs from "dayjs";
 import { getSessionPayload } from "@/lib/auth";
+import { isOrderVisibleToViewer } from "@/lib/orderApprovalVisibility";
+import { ensureOrderShipmentTrackingColumns } from "@/lib/ensureOrderShipmentTrackingColumns";
+import { fetchBookingBatchesForOrder } from "@/lib/orderBookingBatches";
+import { collectOrderShipmentTracks } from "@/lib/orderShipmentTracking";
 
 export const dynamic = "force-dynamic";
 
 async function fetchOrderData(orderId) {
   console.log("order id", orderId);
   const conn = await getDbConnection();
+  await ensureOrderShipmentTrackingColumns(conn);
 
   const [orderRows] = await conn.execute(
     "SELECT * FROM neworder WHERE order_id = ?",
@@ -43,13 +48,15 @@ async function fetchOrderData(orderId) {
     gstin = null;
   }
 
-  // await conn.end();
+  const bookingBatches = await fetchBookingBatchesForOrder(conn, orderId);
+  const shipmentTracks = collectOrderShipmentTracks(orderDetails, bookingBatches);
 
   return {
     orderDetails,
     items,
     statuses,
     gstin,
+    shipmentTracks,
   };
 }
 
@@ -70,15 +77,18 @@ export default async function Page({ params }) {
     userRole = roleRows[0]?.userRole || "";
   }
 
-  const { orderDetails, items, statuses, gstin } =
+  const { orderDetails, items, statuses, gstin, shipmentTracks } =
     await fetchOrderData(orderId);
 
-  if (!orderDetails) {
-    return (
-      <div className="p-8 text-center text-red-600 text-xl">
-        ❌ Order not found or invalid ID.
-      </div>
-    );
+  if (
+    !orderDetails ||
+    !isOrderVisibleToViewer(
+      orderDetails.approval_status,
+      userRole || payload?.role || payload?.userRole || "",
+      { order: orderDetails, username: payload?.username || "" },
+    )
+  ) {
+    notFound();
   }
 
   return (
@@ -89,7 +99,7 @@ export default async function Page({ params }) {
           <span className="font-medium">Client Delivery Date: </span>
           <span>
             {orderDetails.client_delivery_date
-              ? dayjs(orderDetails.client_delivery_date).format("DD/MM/YYYY")
+              ? dayjs(orderDetails.client_delivery_date).format("DD-MM-YYYY")
               : "NA"}
           </span>
         </div>
@@ -97,7 +107,7 @@ export default async function Page({ params }) {
           <span className="font-medium">Expected Delivery Date: </span>
           <span>
             {orderDetails.delivery_date
-              ? dayjs(orderDetails.delivery_date).format("DD/MM/YYYY")
+              ? dayjs(orderDetails.delivery_date).format("DD-MM-YYYY")
               : "NA"}
           </span>
         </div>
@@ -109,6 +119,7 @@ export default async function Page({ params }) {
         orderId={orderId}
         gstin={gstin}
         userRole={userRole}
+        shipmentTracks={shipmentTracks}
       />
     </div>
   );

@@ -94,7 +94,7 @@ export default function PreBookingColumn({ customerId }) {
                       <div className="text-gray-300">
                         Expected:{" "}
                         <span className="font-medium">
-                          {dayjs(booking.expected_date).format("DD/MM/YYYY")}
+                          {dayjs(booking.expected_date).format("DD-MM-YYYY")}
                         </span>
                       </div>
                     )}

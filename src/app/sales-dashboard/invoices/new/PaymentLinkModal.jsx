@@ -1,5 +1,6 @@
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import toast from "react-hot-toast";
 
@@ -253,21 +254,11 @@ export default function PaymentLinkModal({
             <div className="flex flex-col sm:flex-row gap-3 items-end">
               <div className="flex-1">
                 <label className="block text-xs text-gray-500 mb-1">From Date</label>
-                <input
-                  type="date"
-                  className="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                  value={fromDate}
-                  onChange={(e) => setFromDate(e.target.value)}
-                />
+                <TypeableDateFilterInput value={fromDate} onChange={setFromDate} className="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"/>
               </div>
               <div className="flex-1">
                 <label className="block text-xs text-gray-500 mb-1">To Date</label>
-                <input
-                  type="date"
-                  className="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                  value={toDate}
-                  onChange={(e) => setToDate(e.target.value)}
-                />
+                <TypeableDateFilterInput value={toDate} onChange={setToDate} className="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"/>
               </div>
               <div className="flex gap-2">
                 <button

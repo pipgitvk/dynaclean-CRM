@@ -1,6 +1,9 @@
 "use client";
 import { useEffect, useRef, useState, useMemo } from "react";
+import { Filter, BarChart3, X } from "lucide-react";
 import { loadGoogleMaps } from "@/lib/loadGoogleMaps";
+
+const DEFAULT_STATUS_FILTERS = ["PENDING", "PENDING FOR SPARES", "PENDING BY CUSTOMER"];
 
 export default function ServiceMapView({ services = [] }) {
   const mapRef = useRef(null);
@@ -8,10 +11,12 @@ export default function ServiceMapView({ services = [] }) {
   const markersRef = useRef([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedService, setSelectedService] = useState(null);
-  
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [mobileStatsOpen, setMobileStatsOpen] = useState(false);
+
   // Filter states
   const [serviceTypeFilter, setServiceTypeFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
+  const [statusFilters, setStatusFilters] = useState(new Set(DEFAULT_STATUS_FILTERS));
 
   useEffect(() => {
     loadGoogleMaps().then(() => setIsLoading(false));
@@ -32,10 +37,10 @@ export default function ServiceMapView({ services = [] }) {
   const filteredServices = useMemo(() => {
     return services.filter(service => {
       const matchesType = !serviceTypeFilter || service.service_type === serviceTypeFilter;
-      const matchesStatus = !statusFilter || service.status === statusFilter;
+      const matchesStatus = statusFilters.size === 0 || statusFilters.has(service.status);
       return matchesType && matchesStatus;
     });
-  }, [services, serviceTypeFilter, statusFilter]);
+  }, [services, serviceTypeFilter, statusFilters]);
 
   // Helper function to get marker color and shape based on service type and status
   const getMarkerStyle = (service) => {
@@ -48,7 +53,9 @@ export default function ServiceMapView({ services = [] }) {
     } else if (service.status === "PENDING") {
       color = "#f59e0b"; // Orange
     } else if (service.status === "PENDING FOR SPARES") {
-      color = "#ef4444"; // Red
+      color = "#ffff00"; // Yellow
+    } else if (service.status === "PENDING BY CUSTOMER") {
+      color = "#3b82f6"; // Blue
     } else if (service.status === "IN PROGRESS") {
       color = "#6366f1"; // Indigo
     }
@@ -126,8 +133,12 @@ export default function ServiceMapView({ services = [] }) {
       });
 
       // Create info window content
+      const isPendingByCustomer = service.status && service.status.toUpperCase() === "PENDING BY CUSTOMER";
+      const isPendingForSpares = service.status && service.status.toUpperCase() === "PENDING FOR SPARES";
+      const showComplaintHighlight = isPendingByCustomer || isPendingForSpares;
+      
       const infoContent = `
-        <div style="min-width: 280px; font-family: system-ui, -apple-system, sans-serif;">
+        <div style="min-width: 320px; font-family: system-ui, -apple-system, sans-serif;">
           <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
             <h3 style="font-size: 16px; font-weight: 600; margin: 0; color: #1f2937;">
               ${service.product_name || "Service Record"}
@@ -139,6 +150,7 @@ export default function ServiceMapView({ services = [] }) {
           <div style="font-size: 13px; color: #4b5563; line-height: 1.6;">
             <p style="margin: 4px 0;"><strong>Service ID:</strong> ${service.service_id || "N/A"}</p>
             <p style="margin: 4px 0;"><strong>Serial:</strong> ${service.serial_number || "N/A"}</p>
+            <p style="margin: 4px 0;"><strong>Model:</strong> ${service.model || "N/A"}</p>
             <p style="margin: 4px 0;"><strong>Type:</strong> ${service.service_type || "N/A"}</p>
             <p style="margin: 4px 0;"><strong>Company:</strong> ${service.customer_name || "N/A"}</p>
             <p style="margin: 4px 0;"><strong>Address:</strong> ${service.installed_address || service.customer_address || "N/A"}</p>
@@ -146,6 +158,30 @@ export default function ServiceMapView({ services = [] }) {
             <p style="margin: 4px 0;"><strong>Assigned To:</strong> ${service.assigned_to || "N/A"}</p>
             ${service.completed_date ? `<p style="margin: 4px 0;"><strong>Completed:</strong> ${service.completed_date}</p>` : ''}
           </div>
+          ${showComplaintHighlight && service.complaint_summary ? `
+            <div style="margin-top: 10px; padding: 8px; background-color: ${isPendingByCustomer ? '#eff6ff' : '#fff7ed'}; border-left: 4px solid ${isPendingByCustomer ? '#3b82f6' : '#f59e0b'}; border-radius: 4px;">
+              <p style="margin: 0; font-size: 12px; font-weight: 600; color: ${isPendingByCustomer ? '#1d4ed8' : '#ea580c'}; margin-bottom: 4px;">
+                ${isPendingByCustomer ? '🔵' : '🟠'} Complaint Summary:
+              </p>
+              <p style="margin: 0; font-size: 12px; color: #374151; line-height: 1.4;">
+                ${service.complaint_summary}
+              </p>
+              ${service.status_description ? `
+                <p style="margin: 6px 0 0 0; font-size: 11px; color: #6b7280; font-style: italic;">
+                  <strong>Note:</strong> ${service.status_description}
+                </p>
+              ` : ''}
+            </div>
+          ` : service.complaint_summary ? `
+            <div style="margin-top: 10px; padding: 8px; background-color: #f9fafb; border-left: 4px solid #6b7280; border-radius: 4px;">
+              <p style="margin: 0; font-size: 12px; font-weight: 600; color: #374151; margin-bottom: 4px;">
+                Complaint Summary:
+              </p>
+              <p style="margin: 0; font-size: 12px; color: #4b5563; line-height: 1.4;">
+                ${service.complaint_summary}
+              </p>
+            </div>
+          ` : ''}
           <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #e5e7eb;">
             <a href="/user-dashboard/view_service_reports" 
                style="color: #3b82f6; text-decoration: none; font-size: 13px; font-weight: 500;">
@@ -214,137 +250,254 @@ export default function ServiceMapView({ services = [] }) {
     return acc;
   }, {});
 
-  return (
-    <div className="relative w-full h-full">
-      <div
-        ref={mapRef}
-        className="w-full h-full rounded-lg shadow-lg"
-        style={{ minHeight: "500px", backgroundColor: "#e5e3df" }}
-      />
-      
-      {/* Filter Controls */}
-      <div className="absolute top-4 left-4 bg-white rounded-lg shadow-lg p-4 z-[1000] max-w-sm">
-        <h4 className="font-semibold text-gray-800 mb-3">Filters</h4>
-        
-        {/* Service Type Filter */}
-        <div className="mb-3">
-          <label className="block text-xs font-medium text-gray-700 mb-1">Service Type</label>
-          <select
-            className="w-full p-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
-            value={serviceTypeFilter}
-            onChange={(e) => setServiceTypeFilter(e.target.value)}
-          >
-            <option value="">All Types</option>
-            {uniqueServiceTypes.map((type) => (
-              <option key={type} value={type}>{type}</option>
-            ))}
-          </select>
-        </div>
-        
-        {/* Status Filter */}
-        <div className="mb-3">
-          <label className="block text-xs font-medium text-gray-700 mb-1">Status</label>
-          <select
-            className="w-full p-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-          >
-            <option value="">All Statuses</option>
-            {uniqueStatuses.map((status) => (
-              <option key={status} value={status}>{status}</option>
-            ))}
-          </select>
-        </div>
-        
-        {/* Reset Button */}
-        <button
-          onClick={() => {
-            setServiceTypeFilter("");
-            setStatusFilter("");
-          }}
-          className="w-full px-3 py-2 text-sm bg-gray-200 hover:bg-gray-300 rounded-md transition-colors"
+  const filtersPanel = (
+    <>
+      <div className="mb-3">
+        <label className="block text-xs font-medium text-gray-700 mb-1">Service Type</label>
+        <select
+          className="w-full p-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
+          value={serviceTypeFilter}
+          onChange={(e) => setServiceTypeFilter(e.target.value)}
         >
-          Reset Filters
-        </button>
-        
-        {/* Legend */}
-        <div className="mt-4 pt-4 border-t border-gray-200">
-          <p className="text-xs font-semibold text-gray-700 mb-2">Legend</p>
-          <div className="space-y-1">
-            <div className="flex items-center text-xs text-gray-600">
-              <span className="inline-block w-3 h-3 rounded-full bg-green-500 mr-2"></span>
-              Completed
-            </div>
-            <div className="flex items-center text-xs text-gray-600">
-              <span className="inline-block w-3 h-3 rounded-full bg-orange-500 mr-2"></span>
-              Pending
-            </div>
-            <div className="flex items-center text-xs text-gray-600">
-              <span className="inline-block w-3 h-3 rounded-full bg-red-500 mr-2"></span>
-              Pending for Spares
-            </div>
-            <div className="flex items-center text-xs text-gray-600">
-              <span className="inline-block w-3 h-3 rounded-full bg-indigo-500 mr-2"></span>
-              In Progress
-            </div>
+          <option value="">All Types</option>
+          {uniqueServiceTypes.map((type) => (
+            <option key={type} value={type}>{type}</option>
+          ))}
+        </select>
+      </div>
+
+      <div className="mb-3">
+        <label className="block text-xs font-medium text-gray-700 mb-1">Status</label>
+        <div className="space-y-1 max-h-36 overflow-y-auto md:max-h-36">
+          {uniqueStatuses.map((status) => (
+            <label key={status} className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer hover:text-gray-900">
+              <input
+                type="checkbox"
+                checked={statusFilters.has(status)}
+                onChange={(e) => {
+                  setStatusFilters((prev) => {
+                    const next = new Set(prev);
+                    e.target.checked ? next.add(status) : next.delete(status);
+                    return next;
+                  });
+                }}
+                className="w-3.5 h-3.5 accent-blue-600 cursor-pointer"
+              />
+              {status}
+            </label>
+          ))}
+        </div>
+        {statusFilters.size > 0 && (
+          <button
+            type="button"
+            onClick={() => setStatusFilters(new Set())}
+            className="mt-1 text-[11px] text-blue-600 hover:underline"
+          >
+            Clear all
+          </button>
+        )}
+      </div>
+
+      <button
+        type="button"
+        onClick={() => {
+          setServiceTypeFilter("");
+          setStatusFilters(new Set(DEFAULT_STATUS_FILTERS));
+        }}
+        className="w-full px-3 py-2 text-sm bg-gray-200 hover:bg-gray-300 rounded-md transition-colors"
+      >
+        Reset Filters
+      </button>
+
+      <div className="mt-4 pt-4 border-t border-gray-200">
+        <p className="text-xs font-semibold text-gray-700 mb-2">Legend</p>
+        <div className="space-y-1">
+          <div className="flex items-center text-xs text-gray-600">
+            <span className="inline-block w-3 h-3 rounded-full bg-green-500 mr-2" />
+            Completed
           </div>
-          <div className="mt-2 pt-2 border-t border-gray-100">
-            <div className="flex items-center text-xs text-gray-600 mb-1">
-              <span className="inline-block mr-2">▼</span>
-              Installation
-            </div>
-            <div className="flex items-center text-xs text-gray-600">
-              <span className="inline-block w-3 h-3 rounded-full bg-gray-400 mr-2"></span>
-              Complaint
-            </div>
+          <div className="flex items-center text-xs text-gray-600">
+            <span className="inline-block w-3 h-3 rounded-full bg-orange-500 mr-2" />
+            Pending
+          </div>
+          <div className="flex items-center text-xs text-gray-600">
+            <span className="inline-block w-3 h-3 rounded-full bg-yellow-300 mr-2" />
+            Pending for Spares
+          </div>
+          <div className="flex items-center text-xs text-gray-600">
+            <span className="inline-block w-3 h-3 rounded-full bg-blue-500 mr-2" />
+            Pending by Customer
+          </div>
+          <div className="flex items-center text-xs text-gray-600">
+            <span className="inline-block w-3 h-3 rounded-full bg-indigo-500 mr-2" />
+            In Progress
+          </div>
+        </div>
+        <div className="mt-2 pt-2 border-t border-gray-100">
+          <div className="flex items-center text-xs text-gray-600 mb-1">
+            <span className="inline-block mr-2">▼</span>
+            Installation
+          </div>
+          <div className="flex items-center text-xs text-gray-600">
+            <span className="inline-block w-3 h-3 rounded-full bg-gray-400 mr-2" />
+            Complaint
           </div>
         </div>
       </div>
-      
-      {/* Info overlay */}
-      <div className="absolute top-4 right-4 bg-white rounded-lg shadow-lg p-4 z-[1000] max-w-xs">
+    </>
+  );
+
+  const statsPanel = (
+    <>
+      <p className="text-sm text-gray-600">
+        <strong>Filtered:</strong> {filteredServices.length} / {services.length}
+      </p>
+      <p className="text-sm text-gray-600">
+        <strong>On Map:</strong> {validServicesCount}
+      </p>
+      <p className="text-sm text-gray-600">
+        <strong>Missing Coords:</strong> {filteredServices.length - validServicesCount}
+      </p>
+
+      <div className="mt-3 pt-3 border-t border-gray-200">
+        <p className="text-xs font-semibold text-gray-700 mb-1">Service Types:</p>
+        {Object.entries(typeCounts).map(([type, count]) => (
+          <p key={type} className="text-xs text-gray-600">
+            {type}: {count}
+          </p>
+        ))}
+      </div>
+
+      <div className="mt-3 pt-3 border-t border-gray-200">
+        <p className="text-xs font-semibold text-gray-700 mb-1">Status Breakdown:</p>
+        {Object.entries(statusCounts).map(([status, count]) => (
+          <p key={status} className="text-xs text-gray-600">
+            <span
+              className={`inline-block w-2 h-2 rounded-full mr-1 ${
+                status === "COMPLETED"
+                  ? "bg-green-500"
+                  : status === "PENDING"
+                    ? "bg-orange-500"
+                    : status === "PENDING FOR SPARES"
+                      ? "bg-yellow-300"
+                      : status === "PENDING BY CUSTOMER"
+                        ? "bg-blue-500"
+                        : status === "IN PROGRESS"
+                          ? "bg-indigo-500"
+                          : "bg-blue-500"
+              }`}
+            />
+            {status}: {count}
+          </p>
+        ))}
+      </div>
+    </>
+  );
+
+  const closeMobileSheets = () => {
+    setMobileFiltersOpen(false);
+    setMobileStatsOpen(false);
+  };
+
+  return (
+    <div className="relative w-full h-full min-h-[min(70vh,520px)]">
+      <div
+        ref={mapRef}
+        className="absolute inset-0 w-full h-full rounded-lg shadow-lg"
+        style={{ backgroundColor: "#e5e3df" }}
+      />
+
+      {/* Desktop: side panels */}
+      <div className="hidden md:block absolute top-4 left-4 bg-white rounded-lg shadow-lg p-4 z-[1000] max-w-sm max-h-[calc(100%-2rem)] overflow-y-auto">
+        <h4 className="font-semibold text-gray-800 mb-3">Filters</h4>
+        {filtersPanel}
+      </div>
+
+      <div className="hidden md:block absolute top-4 right-4 bg-white rounded-lg shadow-lg p-4 z-[1000] max-w-xs max-h-[calc(100%-2rem)] overflow-y-auto">
         <h4 className="font-semibold text-gray-800 mb-2">Statistics</h4>
-        <p className="text-sm text-gray-600">
-          <strong>Filtered:</strong> {filteredServices.length} / {services.length}
-        </p>
-        <p className="text-sm text-gray-600">
-          <strong>On Map:</strong> {validServicesCount}
-        </p>
-        <p className="text-sm text-gray-600">
-          <strong>Missing Coords:</strong> {filteredServices.length - validServicesCount}
-        </p>
-        
-        {/* Service Type Breakdown */}
-        <div className="mt-3 pt-3 border-t border-gray-200">
-          <p className="text-xs font-semibold text-gray-700 mb-1">Service Types:</p>
-          {Object.entries(typeCounts).map(([type, count]) => (
-            <p key={type} className="text-xs text-gray-600">
-              {type}: {count}
-            </p>
-          ))}
-        </div>
-        
-        {/* Status Breakdown */}
-        <div className="mt-3 pt-3 border-t border-gray-200">
-          <p className="text-xs font-semibold text-gray-700 mb-1">Status Breakdown:</p>
-          {Object.entries(statusCounts).map(([status, count]) => (
-            <p key={status} className="text-xs text-gray-600">
-              <span className={`inline-block w-2 h-2 rounded-full mr-1 ${
-                status === "COMPLETED" ? "bg-green-500" :
-                status === "PENDING" ? "bg-orange-500" :
-                status === "PENDING FOR SPARES" ? "bg-red-500" :
-                status === "IN PROGRESS" ? "bg-indigo-500" :
-                "bg-blue-500"
-              }`}></span>
-              {status}: {count}
-            </p>
-          ))}
+        {statsPanel}
+      </div>
+
+      {/* Mobile: compact summary + toggle buttons (map stays visible) */}
+      <div className="md:hidden absolute top-2 left-2 right-2 z-[1000] flex items-center justify-between gap-2 pointer-events-none">
+        <div className="pointer-events-auto rounded-lg bg-white/95 shadow-md px-3 py-1.5 text-xs text-gray-700 border border-gray-200">
+          <span className="font-semibold text-gray-900">{validServicesCount}</span> on map
+          <span className="text-gray-400 mx-1">·</span>
+          {filteredServices.length} filtered
         </div>
       </div>
 
+      <div className="md:hidden fixed bottom-4 left-3 right-3 z-[1001] flex gap-2 pb-[env(safe-area-inset-bottom)]">
+        <button
+          type="button"
+          onClick={() => {
+            setMobileStatsOpen(false);
+            setMobileFiltersOpen((o) => !o);
+          }}
+          className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-white shadow-lg border border-gray-200 py-3 text-sm font-semibold text-gray-800"
+        >
+          <Filter className="h-4 w-4 text-blue-600" />
+          Filters
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setMobileFiltersOpen(false);
+            setMobileStatsOpen((o) => !o);
+          }}
+          className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-white shadow-lg border border-gray-200 py-3 text-sm font-semibold text-gray-800"
+        >
+          <BarChart3 className="h-4 w-4 text-indigo-600" />
+          Statistics
+        </button>
+      </div>
+
+      {(mobileFiltersOpen || mobileStatsOpen) && (
+        <button
+          type="button"
+          aria-label="Close panel"
+          className="md:hidden fixed inset-0 z-[1002] bg-black/40"
+          onClick={closeMobileSheets}
+        />
+      )}
+
+      {mobileFiltersOpen && (
+        <div className="md:hidden fixed inset-x-0 bottom-0 z-[1003] max-h-[min(85vh,640px)] overflow-y-auto rounded-t-2xl bg-white shadow-2xl p-4 pb-6">
+          <div className="flex items-center justify-between mb-3 sticky top-0 bg-white pb-2 border-b border-gray-100">
+            <h4 className="font-semibold text-gray-800">Filters</h4>
+            <button
+              type="button"
+              onClick={() => setMobileFiltersOpen(false)}
+              className="p-2 rounded-full hover:bg-gray-100 text-gray-600"
+              aria-label="Close filters"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          {filtersPanel}
+        </div>
+      )}
+
+      {mobileStatsOpen && (
+        <div className="md:hidden fixed inset-x-0 bottom-0 z-[1003] max-h-[min(70vh,480px)] overflow-y-auto rounded-t-2xl bg-white shadow-2xl p-4 pb-6">
+          <div className="flex items-center justify-between mb-3 sticky top-0 bg-white pb-2 border-b border-gray-100">
+            <h4 className="font-semibold text-gray-800">Statistics</h4>
+            <button
+              type="button"
+              onClick={() => setMobileStatsOpen(false)}
+              className="p-2 rounded-full hover:bg-gray-100 text-gray-600"
+              aria-label="Close statistics"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          {statsPanel}
+        </div>
+      )}
+
       {/* Selected service details */}
       {selectedService && (
-        <div className="absolute bottom-4 left-4 bg-white rounded-lg shadow-lg p-4 z-[1000] max-w-md">
+        <div className="absolute bottom-4 left-4 right-4 md:right-auto bg-white rounded-lg shadow-lg p-4 z-[1000] max-w-md md:bottom-4 mb-20 md:mb-0">
           <div className="flex justify-between items-start mb-2">
             <div>
               <h4 className="font-semibold text-gray-800">
@@ -361,6 +514,7 @@ export default function ServiceMapView({ services = [] }) {
           </div>
           <div className="text-sm text-gray-600 space-y-1">
             <p><strong>Serial:</strong> {selectedService.serial_number}</p>
+            <p><strong>Model:</strong> {selectedService.model || "N/A"}</p>
             <p><strong>Company:</strong> {selectedService.customer_name}</p>
             <p><strong>Status:</strong> <span className={`font-semibold ${
               selectedService.status === "COMPLETED" ? "text-green-600" :

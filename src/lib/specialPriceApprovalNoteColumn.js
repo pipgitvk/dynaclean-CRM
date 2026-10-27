@@ -1,4 +1,4 @@
-/**
+  /**
  * DB may not have `special_price.approval_note` until migration is applied.
  * Use this to fall back to queries/updates without that column.
  */

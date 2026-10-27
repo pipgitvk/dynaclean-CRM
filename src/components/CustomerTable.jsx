@@ -36,6 +36,9 @@ const SkeletonRows = () => (
           <div className="h-4 bg-gray-200 rounded w-full"></div>
         </td>
         <td className="px-3 py-4">
+          <div className="h-4 bg-gray-200 rounded w-full"></div>
+        </td>
+        <td className="px-3 py-4">
           <div className="h-4 bg-gray-200 rounded w-1/2"></div>
         </td>
         <td className="px-3 py-4">
@@ -152,19 +155,20 @@ export default function CustomerTable({ customers, isLoading }) {
       
       return [
         i + 1,
-        dayjs.utc(c.date_created).format("DD-MMM-YYYY HH:mm"),
+        dayjs.utc(c.date_created).format("DD-MM-YYYY HH:mm"),
         c.lead_campaign,
         c.first_name,
         c.company,
+        c.address ? `${c.address}${c.state ? `, ${c.state}` : ''}` : '-',
         c.status,
         c.stage || "-",
         c.lead_source,
-        c.next_followup_time ? dayjs.utc(c.next_followup_time).format("DD-MMM-YYYY HH:mm") : "-",
+        c.next_followup_time ? dayjs.utc(c.next_followup_time).format("DD-MM-YYYY HH:mm") : "-",
         contactedValue,
       ];
     });
     autoTable(doc, {
-      head: [["#", "Date", "Campaign", "Name", "Company", "Status", "Stage", "Source", "Next Followup", "Contacted"]],
+      head: [["#", "Date", "Campaign", "Name", "Company", "Address", "Status", "Stage", "Source", "Next Followup", "Contacted"]],
       body: tableData,
       styles: { fontSize: 8 },
       headStyles: { fillColor: "#e5e7eb", textColor: 0, fontStyle: "bold" },
@@ -185,6 +189,7 @@ export default function CustomerTable({ customers, isLoading }) {
                 <th className="px-3 py-3 font-semibold text-left">Campaign</th>
                 <th className="px-3 py-3 font-semibold text-left">Name</th>
                 <th className="px-3 py-3 font-semibold text-left">Company</th>
+                <th className="px-3 py-3 font-semibold text-left">Address</th>
                 <th className="px-3 py-3 font-semibold text-left">Status</th>
                 <th className="px-3 py-3 font-semibold text-left">Stage</th>
                 <th className="px-3 py-3 font-semibold text-left">Source</th>
@@ -245,6 +250,7 @@ export default function CustomerTable({ customers, isLoading }) {
               <th className="px-3 py-3 font-semibold text-left">Campaign</th>
               <th className="px-3 py-3 font-semibold text-left">Name</th>
               <th className="px-3 py-3 font-semibold text-left">Company</th>
+              <th className="px-3 py-3 font-semibold text-left">Address</th>
               <th className="px-3 py-3 font-semibold text-left">Status</th>
               <th className="px-3 py-3 font-semibold text-left">Stage</th>
               <th className="px-3 py-3 font-semibold text-left">Source</th>
@@ -263,12 +269,15 @@ export default function CustomerTable({ customers, isLoading }) {
                 >
                   <td className="px-3 py-3">{i + 1}</td>
                   <td className="px-3 py-3 text-left">
-                    {dayjs.utc(c.date_created).format("DD-MMM-YYYY HH:mm")}
+                    {dayjs.utc(c.date_created).format("DD-MM-YYYY HH:mm")}
                   </td>
                   <td className="px-3 py-3 text-left">{c.lead_campaign}</td>
                   <td className="px-3 py-3 text-left">{c.first_name}</td>
                   <td className="px-3 py-3 text-left whitespace-normal break-words max-w-[200px]">
                     {c.company}
+                  </td>
+                  <td className="px-3 py-3 text-left whitespace-normal break-words max-w-[200px]">
+                    {c.address ? `${c.address}${c.state ? `, ${c.state}` : ''}` : '-'}
                   </td>
                   <td className="px-3 py-3 text-left">{c.status}</td>
                   <td className="px-3 py-3 text-left">
@@ -285,7 +294,7 @@ export default function CustomerTable({ customers, isLoading }) {
                   <td className="px-3 py-3 text-left">
                     {c.next_followup_time ? (
                       <span className="text-orange-600 font-medium">
-                        {dayjs.utc(c.next_followup_time).format("DD-MMM-YYYY HH:mm")}
+                        {dayjs.utc(c.next_followup_time).format("DD-MM-YYYY HH:mm")}
                       </span>
                     ) : (
                       <span className="text-gray-400">-</span>
@@ -323,7 +332,7 @@ export default function CustomerTable({ customers, isLoading }) {
               ))
             ) : (
               <tr>
-                <td colSpan="10" className="px-6 py-4 text-center text-gray-500">
+                <td colSpan="12" className="px-6 py-4 text-center text-gray-500">
                   No customers found.
                 </td>
               </tr>
@@ -342,7 +351,7 @@ export default function CustomerTable({ customers, isLoading }) {
               <div className="flex justify-between items-center text-gray-500">
                 <span className="text-xs font-medium">#{i + 1}</span>
                 <span className="font-medium text-gray-800">
-                  {dayjs.utc(c.date_created).format("DD-MMM-YYYY HH:mm")}
+                  {dayjs.utc(c.date_created).format("DD-MM-YYYY HH:mm")}
                 </span>
               </div>
               <div className="space-y-1">
@@ -351,6 +360,9 @@ export default function CustomerTable({ customers, isLoading }) {
                 </div>
                 <div className="break-words whitespace-normal">
                   <strong>Company:</strong> {c.company}
+                </div>
+                <div className="break-words whitespace-normal">
+                  <strong>Address:</strong> {c.address ? `${c.address}${c.state ? `, ${c.state}` : ''}` : '-'}
                 </div>
                 <div>
                   <strong>Campaign:</strong> {c.lead_campaign}
@@ -368,7 +380,7 @@ export default function CustomerTable({ customers, isLoading }) {
                   <strong>Next Followup:</strong> 
                   {c.next_followup_time ? (
                     <span className="text-orange-600 font-medium ml-1">
-                      {dayjs.utc(c.next_followup_time).format("DD-MMM-YYYY HH:mm")}
+                      {dayjs.utc(c.next_followup_time).format("DD-MM-YYYY HH:mm")}
                     </span>
                   ) : (
                     <span className="text-gray-400 ml-1">-</span>

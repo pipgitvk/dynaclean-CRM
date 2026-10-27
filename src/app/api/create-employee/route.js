@@ -1,56 +1,57 @@
 import { getDbConnection } from "@/lib/db";
 import { NextResponse } from "next/server";
-import { HR_TARGET_ALLOWED_DESIGNATIONS } from "@/lib/designationDedupe";
-
-const ALLOWED_USER_ROLES = new Set([
-  ...HR_TARGET_ALLOWED_DESIGNATIONS,
-  "DIRECTOR",
-  "JUNIOR HR EXECUTIVE",
-  "HR RECRUITER",
-  "HR EXECUTIVE",
-  "GEM",
-  "ACCOUNTANT",
-  "TEAM LEADER",
-  "SALES",
-  "SALES CUM BACKOFFICE",
-  "SALES HEAD",
-  "DIGITAL MARKETER",
-  "ADMIN",
-  "HR",
-  "HR HEAD",
-  "GRAPHIC DESIGNER",
-  "DESIGN ENGINEER",
-  "DEVELOPER",
-  "SERVICE ENGINEER",
-  "SERVICE TECHNICIAN",
-  "SERVICE HEAD",
-  "SERVICE SUPPORT",
-  "WELDER",
-  "WELDER HELPER",
-  "WAREHOUSE INCHARGE",
-  "EA",
-]);
+import { ensureRepListMachineCodeColumn } from "@/lib/ensureRepListMachineCode";
+import { resolveAllowedEmployeeRole } from "@/lib/crmEmployeeRoles";
 
 export async function POST(request) {
   try {
-    const { username, email, gender, dob, password, number, userRole } = await request.json();
+    const {
+      username,
+      email,
+      gender,
+      dob,
+      password,
+      number,
+      userRole,
+      employeeType,
+      machineCode,
+    } = await request.json();
 
     // Basic validation
     if (!username || !email || !password ) {
       return NextResponse.json({ error: "Required fields are missing." }, { status: 400 });
     }
 
-    const roleStr = String(userRole ?? "").trim();
-    if (!roleStr || !ALLOWED_USER_ROLES.has(roleStr)) {
+    const roleStr = await resolveAllowedEmployeeRole(userRole);
+    if (!roleStr) {
       return NextResponse.json({ error: "Invalid user role." }, { status: 400 });
     }
 
+    // Validate employee type
+    const empTypeStr = String(employeeType ?? "").trim();
+    if (!empTypeStr || empTypeStr === "Select Type") {
+      return NextResponse.json({ error: "Please select a valid employee type." }, { status: 400 });
+    }
+
     const conn = await getDbConnection();
+    await ensureRepListMachineCodeColumn(conn);
+    const machineCodeStr = String(machineCode ?? "").trim() || null;
     const query = `
-      INSERT INTO rep_list (username, email, gender, dob, password, number, userRole , status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO rep_list (username, email, gender, dob, password, number, userRole, employeeType, machine_code, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
-    const values = [username, email, gender, dob, password, number, roleStr, 1];
+    const values = [
+      username,
+      email,
+      gender,
+      dob,
+      password,
+      number,
+      roleStr,
+      empTypeStr,
+      machineCodeStr,
+      1,
+    ];
     
     const [result] = await conn.execute(query, values);
         // await conn.end();

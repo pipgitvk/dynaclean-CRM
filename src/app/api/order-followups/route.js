@@ -1,10 +1,21 @@
 // src/app/api/order-followups/route.js
 import { getDbConnection } from "@/lib/db";
 import { NextResponse } from "next/server";
+import { getSessionPayload } from "@/lib/auth";
+import {
+  isServiceSupportRole,
+  sqlColumnInActiveServiceSupportUsers,
+} from "@/lib/serviceSupportTeamScope";
 
 export async function GET(req) {
   let connection;
   try {
+    const payload = await getSessionPayload();
+    const roleNorm = String(payload?.role || payload?.userRole || "")
+      .trim()
+      .toUpperCase();
+    const isServiceSupport = isServiceSupportRole(roleNorm);
+
     const { searchParams } = new URL(req.url);
     const startDate = searchParams.get("startDate");
     const endDate = searchParams.get("endDate");
@@ -12,8 +23,6 @@ export async function GET(req) {
 
     connection = await getDbConnection();
 
-    // Build query with all data including amounts from quotations_records
-    // Use COLLATE for joins to avoid "Illegal mix of collations" errors
     let query = `
       SELECT 
         o.order_id, 
@@ -43,6 +52,10 @@ export async function GET(req) {
     const whereClause = [];
     const queryParams = [];
 
+    if (isServiceSupport) {
+      whereClause.push(sqlColumnInActiveServiceSupportUsers("o.created_by"));
+    }
+
     if (startDate) {
       whereClause.push("o.created_at >= ?");
       queryParams.push(startDate);
@@ -64,14 +77,20 @@ export async function GET(req) {
 
     const [rows] = await connection.execute(query, queryParams);
 
-    // Get unique created_by values for filter dropdown
-    const [created_byList] = await connection.execute(
-      "SELECT DISTINCT created_by FROM neworder WHERE created_by IS NOT NULL AND created_by != '' ORDER BY created_by"
-    );
+    const createdByListSql = isServiceSupport
+      ? `SELECT DISTINCT created_by FROM neworder
+         WHERE created_by IS NOT NULL AND created_by != ''
+           AND ${sqlColumnInActiveServiceSupportUsers("created_by")}
+         ORDER BY created_by`
+      : `SELECT DISTINCT created_by FROM neworder
+         WHERE created_by IS NOT NULL AND created_by != ''
+         ORDER BY created_by`;
 
-    return NextResponse.json({ 
-      data: rows, 
-      created_byList: created_byList.map(item => item.created_by)
+    const [created_byList] = await connection.execute(createdByListSql);
+
+    return NextResponse.json({
+      data: rows,
+      created_byList: created_byList.map((item) => item.created_by),
     }, { status: 200 });
   } catch (error) {
     console.error("Order-followups API error:", error?.message || error);

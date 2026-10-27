@@ -1,4 +1,15 @@
 import { getDbConnection } from "@/lib/db";
+import { hasOrderInvoiceReport } from "@/lib/orderDocumentEditRules";
+import { isBookingAllowedForOrder } from "@/lib/orderBookingEligibility";
+import { isOrderVisibleToViewer } from "@/lib/orderApprovalVisibility";
+import {
+  canCreateFollowUpBooking,
+  ORDER_LIST_DISPATCHED_STOCK_COUNT_SELECT,
+  ORDER_LIST_PENDING_DISPATCH_UNITS_SELECT,
+  orderHasDispatchedStock,
+} from "@/lib/orderDeliveryEligibility";
+
+export { hasOrderInvoiceReport };
 
 export function formatDateForInput(value) {
   if (!value) return "";
@@ -24,34 +35,105 @@ export function canEditOrderBooking(role) {
 
 export function resolveBookingUploadPage(order, role) {
   const booked = hasOrderBooking(order);
-  const dispatched = Number(order.dispatch_status) === 1;
+  const dispatchStatus = Number(order.dispatch_status);
 
-  if (booked && dispatched) {
-    return { redirectToView: true, isEditMode: false, initialBooking: null };
+  if (!booked && !isBookingAllowedForOrder(order)) {
+    return {
+      redirectToView: false,
+      redirectToUploadReport: true,
+      isEditMode: false,
+      initialBooking: null,
+    };
   }
 
-  const isEditMode = booked && !dispatched;
-  if (isEditMode && !canEditOrderBooking(role)) {
-    return { redirectToView: true, isEditMode: false, initialBooking: null };
+  if (booked && dispatchStatus === 1) {
+    return {
+      redirectToView: true,
+      redirectToUploadReport: false,
+      isEditMode: false,
+      initialBooking: null,
+    };
+  }
+
+  if (canCreateFollowUpBooking(order)) {
+    return {
+      redirectToView: false,
+      redirectToUploadReport: false,
+      isEditMode: false,
+      initialBooking: null,
+    };
+  }
+
+  const wantsEditBooking =
+    booked &&
+    (dispatchStatus === 0 ||
+      (dispatchStatus === 2 && !orderHasDispatchedStock(order)));
+
+  if (wantsEditBooking) {
+    if (!canEditOrderBooking(role)) {
+      return {
+        redirectToView: true,
+        redirectToUploadReport: false,
+        isEditMode: false,
+        initialBooking: null,
+      };
+    }
+    return {
+      redirectToView: false,
+      redirectToUploadReport: false,
+      isEditMode: true,
+      initialBooking: getInitialBookingValues(order),
+    };
+  }
+
+  if (booked) {
+    return {
+      redirectToView: true,
+      redirectToUploadReport: false,
+      isEditMode: false,
+      initialBooking: null,
+    };
   }
 
   return {
     redirectToView: false,
-    isEditMode,
-    initialBooking: isEditMode ? getInitialBookingValues(order) : null,
+    redirectToUploadReport: false,
+    isEditMode: false,
+    initialBooking: null,
   };
 }
 
-export async function getOrderForBookingUpload(orderId) {
+export async function getOrderForBookingUpload(
+  orderId,
+  viewerRole = "",
+  username = "",
+) {
   const conn = await getDbConnection();
   const [rows] = await conn.execute(
-    `SELECT order_id, client_name, contact, email, delivery_location, quote_number,
-            client_delivery_date, booking_id, booking_date, booking_url, admin_remark,
-            delivery_date, dispatch_status
-     FROM neworder WHERE order_id = ?`,
+    `SELECT
+       no.order_id, no.client_name, no.contact, no.email, no.delivery_location, no.quote_number,
+       no.client_delivery_date, no.booking_id, no.booking_date, no.booking_url, no.admin_remark,
+       no.delivery_date, no.dispatch_status, no.report_file, no.approval_status,
+       no.totalamt, no.baseAmount, no.taxamt,
+       qr.grand_total AS quotation_grand_total,
+       ${ORDER_LIST_DISPATCHED_STOCK_COUNT_SELECT},
+       ${ORDER_LIST_PENDING_DISPATCH_UNITS_SELECT}
+     FROM neworder no
+     LEFT JOIN quotations_records qr ON qr.quote_number = no.quote_number
+     WHERE no.order_id = ?`,
     [orderId],
   );
-  return rows[0] || null;
+  const order = rows[0] || null;
+  if (
+    order &&
+    !isOrderVisibleToViewer(order.approval_status, viewerRole, {
+      order,
+      username,
+    })
+  ) {
+    return null;
+  }
+  return order;
 }
 
 export function getInitialBookingValues(order) {

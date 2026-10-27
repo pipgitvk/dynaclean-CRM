@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
+import { isGemCrmRoleAllowed } from "@/lib/gemCrmAuth";
 import { parseFormData } from "@/lib/parseForm";
 import { v2 as cloudinary } from "cloudinary";
 import fs from "fs/promises";
@@ -75,8 +76,8 @@ export async function GET(req, { params }) {
     if (!payload) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     
     const role = payload.role;
-    if (!["SUPERADMIN", "GEM"].includes(role)) {
-      return NextResponse.json({ error: "Forbidden - SUPERADMIN/GEM only" }, { status: 403 });
+    if (!isGemCrmRoleAllowed(role)) {
+      return NextResponse.json({ error: "Forbidden - SUPERADMIN/GEM/DIRECTOR only" }, { status: 403 });
     }
     const currentEmpId = payload.empId || payload.id || null;
     if (role === "GEM" && !currentEmpId) {
@@ -98,7 +99,6 @@ export async function GET(req, { params }) {
         [bid_id, currentEmpId]
       );
       if (allowedBids.length === 0) {
-        await conn.end();
         return NextResponse.json({ error: "Bid not found" }, { status: 404 });
       }
     }
@@ -112,8 +112,6 @@ export async function GET(req, { params }) {
       [bid_id]
     );
 
-    await conn.end();
-
     return NextResponse.json({
       success: true,
       data: documents,
@@ -125,6 +123,7 @@ export async function GET(req, { params }) {
       { status: 500 }
     );
   }
+  // Note: Do NOT call conn.end() here - the pool is global and shared across requests
 }
 
 // POST - Upload document for a bid
@@ -134,8 +133,8 @@ export async function POST(req, { params }) {
     if (!payload) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     
     const role = payload.role;
-    if (!["SUPERADMIN", "GEM"].includes(role)) {
-      return NextResponse.json({ error: "Forbidden - SUPERADMIN/GEM only" }, { status: 403 });
+    if (!isGemCrmRoleAllowed(role)) {
+      return NextResponse.json({ error: "Forbidden - SUPERADMIN/GEM/DIRECTOR only" }, { status: 403 });
     }
     const currentEmpId = payload.empId || payload.id || null;
     if (role === "GEM" && !currentEmpId) {
@@ -176,7 +175,6 @@ export async function POST(req, { params }) {
         [bid_id, currentEmpId]
       );
       if (allowedBids.length === 0) {
-        await conn.end();
         return NextResponse.json({ error: "Bid not found" }, { status: 404 });
       }
     }
@@ -193,8 +191,6 @@ export async function POST(req, { params }) {
       ]
     );
 
-    await conn.end();
-
     return NextResponse.json({
       success: true,
       message: "Document uploaded successfully",
@@ -207,4 +203,5 @@ export async function POST(req, { params }) {
       { status: 500 }
     );
   }
+  // Note: Do NOT call conn.end() here - the pool is global and shared across requests
 }

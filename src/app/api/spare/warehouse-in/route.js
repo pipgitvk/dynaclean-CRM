@@ -46,10 +46,8 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const db = await getDbConnection();
-    console.log("[GET] DB connection established");
-
-    const [requests] = await db.execute(`
+    const pool = await getDbConnection();
+    const [requests] = await pool.execute(`
       SELECT id, spare_id, spare_name, spare_image ,quantity, from_company, contact,
              mode_of_transport, porter_contact, created_at, created_by, status
       FROM spare_stock_request

@@ -72,6 +72,7 @@ export default function AddAMCCMCPage() {
   const [serialSuggestions, setSerialSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [formData, setFormData] = useState({
+    contract_type: "",
     serial_number: "",
     model: "",
     company_name: "",
@@ -204,6 +205,22 @@ export default function AddAMCCMCPage() {
           <section>
             <h2 className="text-xl font-semibold mb-4 pb-2 border-b">Product Information</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Type *</label>
+                <select
+                  name="contract_type"
+                  value={formData.contract_type}
+                  onChange={handleInputChange}
+                  required
+                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                >
+                  <option value="" disabled>
+                    Select
+                  </option>
+                  <option value="AMC">AMC</option>
+                  <option value="CMC">CMC</option>
+                </select>
+              </div>
               <div className="relative">
                 <label className="block text-sm font-medium mb-1">Serial Number *</label>
                 <input

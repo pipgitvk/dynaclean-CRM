@@ -1,7 +1,8 @@
 // app/order/upload/[order_id]/page.jsx
 import { getDbConnection } from "@/lib/db";
-import { notFound } from "next/navigation";
-import UploadForm from "../UploadForm";
+import { notFound, redirect } from "next/navigation";
+import UploadForm from "@/app/user-dashboard/order/upload/UploadForm";
+import { shouldRedirectUploadPageToView } from "@/lib/orderDocumentEditRules";
 
 export const dynamic = "force-dynamic";
 
@@ -9,10 +10,15 @@ async function getOrderDetails(orderId) {
   const conn = await getDbConnection();
 
   const [rows] = await conn.execute(
-    "SELECT * FROM neworder WHERE order_id = ?",
+    `SELECT no.*,
+            qr.grand_total AS quotation_grand_total,
+            qr.subtotal AS quotation_subtotal,
+            qr.gst AS quotation_gst
+     FROM neworder no
+     LEFT JOIN quotations_records qr ON qr.quote_number = no.quote_number
+     WHERE no.order_id = ?`,
     [orderId],
   );
-  // await conn.end();
 
   return rows.length ? rows[0] : null;
 }
@@ -25,12 +31,23 @@ export default async function Page({ params }) {
   const orderDetails = await getOrderDetails(orderId);
   if (!orderDetails) notFound();
 
+  if (shouldRedirectUploadPageToView(orderDetails)) {
+    redirect(`/accounts-dashboard/order/view/${orderId}`);
+  }
+
+  const isEditMode = Boolean(orderDetails.report_file);
+
   return (
     <div className="max-w-7xl mx-auto bg-white p-6 rounded-lg  my-6">
       <h1 className="text-2xl font-bold text-center mb-6">
-        Upload E-way Bill & E-invoice
+        {isEditMode ? "Edit Report & Tax Documents" : "Upload E-way Bill & E-invoice"}
       </h1>
-      <UploadForm orderDetails={orderDetails} />
+      <UploadForm
+        orderDetails={orderDetails}
+        isEditMode={isEditMode}
+        redirectPath="/accounts-dashboard/order"
+        nonFileFieldsReadOnly
+      />
     </div>
   );
 }

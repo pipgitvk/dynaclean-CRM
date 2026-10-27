@@ -1,5 +1,6 @@
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import SignaturePad from "signature_pad";
@@ -527,7 +528,14 @@ export default function ServiceForm({ service }) {
         }
       );
 
-      if (!response.ok) throw new Error("Failed to save service record.");
+      let errorMsg = "Failed to save service record.";
+      if (!response.ok) {
+        try {
+          const errBody = await response.json();
+          if (errBody?.message) errorMsg = errBody.message;
+        } catch (_) {}
+        throw new Error(errorMsg);
+      }
 
       // Generate PDF after successful save
       try {
@@ -664,7 +672,7 @@ export default function ServiceForm({ service }) {
       router.push("/user-dashboard/view_service_reports");
     } catch (error) {
       console.error("❌ Submission error:", error);
-      alert("Failed to save service record. Please try again.");
+      alert(`Error: ${error.message || "Failed to save service record. Please try again."}`);
     } finally {
       setIsLoading(false);
     }
@@ -834,14 +842,7 @@ export default function ServiceForm({ service }) {
                 <label className="block mb-1 font-medium text-sm">
                   Completed Date
                 </label>
-                <input
-                  type="date"
-                  name="completed_date"
-                  className="border p-2 w-full rounded text-sm"
-                  value={formData.completed_date}
-                  onChange={handleChange}
-                  required
-                />
+                <TypeableDateFilterInput value={formData.completed_date} onChange={(v) => handleChange({ target: { name: "completed_date", value: v } })} className="border p-2 w-full rounded text-sm" required/>
               </div>
               <FileUploader
                 label="Pre-Completion Images"

@@ -1,5 +1,6 @@
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
@@ -741,18 +742,12 @@ export default function AssetFormPage() {
                 <label className="text-sm font-medium text-gray-700">
                   Purchase Date <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="date"
-                  name="purchaseDate"
-                  value={formData.purchaseDate}
-                  onChange={handleChange}
-                  max={new Date().toISOString().split("T")[0]} // Set the max date to today
+                <TypeableDateFilterInput value={formData.purchaseDate} onChange={(v) => handleChange({ target: { name: "purchaseDate", value: v } })} max={new Date().toISOString().split("T")[0]} // Set the max date to today
                   className={`mt-1 p-3 border rounded-md shadow-sm focus:outline-none ${
                     errors.purchaseDate
                       ? "border-red-500"
                       : "border-gray-300 focus:ring-blue-500 focus:border-blue-500"
-                  }`}
-                />
+                  }`}/>
 
                 {errors.purchaseDate && (
                   <p className="text-red-500 text-xs mt-1">

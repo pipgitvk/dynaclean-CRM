@@ -5,7 +5,19 @@ import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Cookies from "js-cookie";
 import Link from "next/link";
-import { LogIn, Key, Edit, Shield, UserPlus, X, ExternalLink } from "lucide-react";
+import {
+  LogIn,
+  Key,
+  Edit,
+  Shield,
+  UserPlus,
+  X,
+  ExternalLink,
+  Clock,
+  BadgePlus,
+  Trash2,
+} from "lucide-react";
+import { getRoleDashboardPath } from "@/lib/getRoleDashboardPath";
 import SearchableSelect from "@/components/ui/SearchableSelect";
 import toast from "react-hot-toast";
 import {
@@ -15,9 +27,21 @@ import {
   buildModuleUiSearchIndex,
 } from "@/lib/moduleAccess";
 import { getModuleUrl } from "@/lib/moduleUrlMapping";
+import { getRoleDefaultModuleKeys } from "@/lib/roleDefaultModuleAccess";
+import { ADMIN_EMPLOYEES_RELOAD_MESSAGE } from "@/lib/employeesPageReload";
+import EmployeeIframeModal from "@/components/employees/EmployeeIframeModal";
+import { useEmployeeSubPageNavigation } from "@/hooks/useEmployeeSubPageNavigation";
+import { useEmployeeRoleOptions } from "@/hooks/useEmployeeRoleOptions";
+import { ROLE_DASHBOARD_HOME_OPTIONS } from "@/lib/employeeRoles";
 
 function uniqueStrings(arr) {
   return [...new Set((arr || []).map((v) => String(v || "").trim()).filter(Boolean))];
+}
+
+function isSuperAdminEmployee(employee) {
+  const role = String(employee?.userRole || "").trim().toUpperCase();
+  const username = String(employee?.username || "").trim().toLowerCase();
+  return role === "SUPERADMIN" || username === "admin";
 }
 
 /** Global Module Access: mirrors super-admin sidebar (single row vs nested groups). */
@@ -62,7 +86,7 @@ function ModuleUiBlock({
             <input
               type="checkbox"
               checked={isChecked}
-              onChange={() => !disabled && onToggleChild(node.key)}
+              onChange={(e) => !disabled && onToggleChild(node.key, e.target.checked)}
               disabled={disabled}
               className="w-4 h-4 accent-blue-600 flex-shrink-0"
             />
@@ -161,7 +185,7 @@ function ModuleUiBlock({
                     <input
                       type="checkbox"
                       checked={selected.includes(ch.key)}
-                      onChange={() => !disabled && onToggleChild(ch.key)}
+                      onChange={(e) => !disabled && onToggleChild(ch.key, e.target.checked)}
                       disabled={disabled}
                       className="w-3.5 h-3.5 accent-blue-600 flex-shrink-0"
                     />
@@ -191,9 +215,12 @@ const EmployeeCard = ({
   employee,
   handleImpersonateLogin,
   handleOpenReportingManagerModal,
+  handleToggleLoginTimeRestriction,
+  togglingTimeRestriction,
   maskEmail,
   maskNumber,
   maskStatus,
+  openSubPage,
 }) => (
   <div className="bg-white shadow-md rounded-lg p-4 mb-4 border border-gray-200">
     <div className="mb-2">
@@ -233,36 +260,36 @@ const EmployeeCard = ({
 
     <div className="flex flex-wrap gap-2 sm:gap-3 justify-between items-center pt-2 border-t border-gray-100">
       <button
-        onClick={() => handleImpersonateLogin(employee.empId)}
+        onClick={() => handleImpersonateLogin(employee.empId, employee.userRole)}
         className="text-blue-600 hover:text-blue-900 font-medium flex items-center space-x-1 text-sm"
       >
         <LogIn size={16} />
         <span>Login</span>
       </button>
 
-      <Link
-        href={`/admin-dashboard/password/${employee.username}`}
+      <button
+        onClick={() => openSubPage("password", employee.username, `Change Password — ${employee.username}`)}
         className="text-yellow-600 hover:text-yellow-900 font-medium flex items-center space-x-1 text-sm"
       >
         <Key size={16} />
         <span>Password</span>
-      </Link>
+      </button>
 
-      <Link
-        href={`/admin-dashboard/quick-edit/${employee.username}`}
+      <button
+        onClick={() => openSubPage("quick-edit", employee.username, `Edit Employee — ${employee.username}`)}
         className="text-green-600 hover:text-green-900 font-medium flex items-center space-x-1 text-sm"
       >
         <Edit size={16} />
         <span>Edit</span>
-      </Link>
+      </button>
 
-      <Link
-        href={`/admin-dashboard/ip-restrictions/${employee.username}`}
+      <button
+        onClick={() => openSubPage("ip-restrictions", employee.username, `IP Restrictions — ${employee.username}`)}
         className="text-purple-600 hover:text-purple-900 font-medium flex items-center space-x-1 text-sm"
       >
         <Shield size={16} />
         <span>IP</span>
-      </Link>
+      </button>
 
       <button
         onClick={() => handleOpenReportingManagerModal(employee)}
@@ -273,6 +300,26 @@ const EmployeeCard = ({
         <span>Manager</span>
       </button>
 
+      {!isSuperAdminEmployee(employee) && (
+      <button
+        onClick={() => handleToggleLoginTimeRestriction(employee)}
+        disabled={togglingTimeRestriction === employee.username}
+        className={`font-medium flex items-center space-x-1 text-sm disabled:opacity-50 ${
+          employee.login_time_restriction_enabled === 1
+            ? "text-green-600 hover:text-green-800"
+            : "text-red-600 hover:text-red-800"
+        }`}
+        title={
+          employee.login_time_restriction_enabled === 1
+            ? "Login time restriction ON (07:00–20:30 IST) — click to disable"
+            : "Login time restriction OFF — click to enable (07:00–20:30 IST)"
+        }
+      >
+        <Clock size={16} />
+        <span>Time</span>
+      </button>
+      )}
+
     </div>
   </div>
 );
@@ -281,6 +328,7 @@ const EmpTable = ({ employees }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("active");
   const [isMobile, setIsMobile] = useState(false);
+  const { iframePopup, openSubPage, closeIframe } = useEmployeeSubPageNavigation("admin-dashboard");
   const [showReportingManagerModal, setShowReportingManagerModal] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState("");
   const [selectedReportingManager, setSelectedReportingManager] = useState("");
@@ -295,7 +343,17 @@ const EmpTable = ({ employees }) => {
   const [bulkTouched, setBulkTouched] = useState(false);
   const [bulkSaving, setBulkSaving] = useState(false);
   const [bulkModuleSearch, setBulkModuleSearch] = useState("");
+  const [togglingTimeRestriction, setTogglingTimeRestriction] = useState("");
+  const [timeRestrictionMap, setTimeRestrictionMap] = useState({});
+  const [showManageRolesModal, setShowManageRolesModal] = useState(false);
+  const [roleEntries, setRoleEntries] = useState([]);
+  const [newRoleName, setNewRoleName] = useState("");
+  const [newRoleDashboard, setNewRoleDashboard] = useState("/user-dashboard");
+  const [rolesModalLoading, setRolesModalLoading] = useState(false);
+  const [rolesModalSaving, setRolesModalSaving] = useState(false);
+  const bulkUserEditedRef = useRef(false);
   const router = useRouter();
+  const { roles: allRoles, reload: reloadEmployeeRoles } = useEmployeeRoleOptions();
 
   const persistBulkSelectionForRole = useCallback((role, modules) => {
     const key = String(role || "").trim();
@@ -306,7 +364,7 @@ const EmpTable = ({ employees }) => {
     }));
   }, []);
 
-  const fetchRoleModulesFromDB = useCallback(async (role) => {
+  const fetchRoleModulesFromDB = useCallback(async (role, { applyToSelection = false } = {}) => {
     const key = String(role || "").trim();
     if (!key) return [];
     setBulkRoleLoading(true);
@@ -317,8 +375,14 @@ const EmpTable = ({ employees }) => {
       );
       if (!res.ok) return [];
       const data = await res.json();
-      const modules = Array.isArray(data?.moduleKeys) ? data.moduleKeys : [];
+      let modules = Array.isArray(data?.moduleKeys) ? data.moduleKeys : [];
+      if (!modules.length) {
+        modules = getRoleDefaultModuleKeys(key);
+      }
       setBulkRoleSelections((prev) => ({ ...(prev || {}), [key]: modules }));
+      if (applyToSelection && !bulkUserEditedRef.current) {
+        setBulkSelectedModules(modules);
+      }
       return modules;
     } catch {
       return [];
@@ -334,6 +398,66 @@ const EmpTable = ({ employees }) => {
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
+
+  useEffect(() => {
+    const onMessage = (event) => {
+      if (event.origin !== window.location.origin) return;
+      if (event.data?.type !== ADMIN_EMPLOYEES_RELOAD_MESSAGE) return;
+      closeIframe();
+      window.location.reload();
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, [closeIframe]);
+
+  useEffect(() => {
+    const map = {};
+    employees.forEach((emp) => {
+      map[emp.username] = emp.login_time_restriction_enabled === 0 ? 0 : 1;
+    });
+    setTimeRestrictionMap(map);
+  }, [employees]);
+
+  const handleToggleLoginTimeRestriction = async (employee) => {
+    const username = employee?.username;
+    if (!username) return;
+
+    const current = timeRestrictionMap[username] === 1 ? 1 : 0;
+    const next = current === 1 ? 0 : 1;
+
+    setTogglingTimeRestriction(username);
+    try {
+      const res = await fetch("/api/employees/set-login-time-restriction", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username,
+          login_time_restriction_enabled: next,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to update login time restriction.");
+      }
+      setTimeRestrictionMap((prev) => ({ ...prev, [username]: next }));
+      toast.success(
+        next === 1
+          ? `${username}: login restricted to 07:00–20:30 IST`
+          : `${username}: login time restriction removed`,
+      );
+      window.location.reload();
+    } catch (err) {
+      toast.error(err.message || "Failed to update login time restriction.");
+    } finally {
+      setTogglingTimeRestriction("");
+    }
+  };
+
+  const getEmployeeWithTimeRestriction = (employee) => ({
+    ...employee,
+    login_time_restriction_enabled:
+      timeRestrictionMap[employee.username] === 0 ? 0 : 1,
+  });
 
   const handleOpenReportingManagerModal = (employee) => {
     setSelectedEmployee(employee?.username || "");
@@ -360,7 +484,7 @@ const EmpTable = ({ employees }) => {
       const data = await res.json();
       if (res.ok) {
         setShowReportingManagerModal(false);
-        router.refresh();
+        window.location.reload();
       } else {
         alert(data.error || "Failed to update reporting manager.");
       }
@@ -371,7 +495,7 @@ const EmpTable = ({ employees }) => {
     }
   };
 
-  const handleImpersonateLogin = async (empId) => {
+  const handleImpersonateLogin = async (empId, userRole) => {
     console.log("Impersonate login for empId:", empId);
     try {
       const response = await fetch("/api/impersonate", {
@@ -384,7 +508,7 @@ const EmpTable = ({ employees }) => {
 
       if (response.ok) {
         Cookies.set("impersonation_token", data.token, { expires: 1 / 24 });
-        router.push("/user-dashboard");
+        router.push(getRoleDashboardPath(userRole));
       } else {
         console.log("error data :", data.error);
         // alert(data.error);
@@ -428,35 +552,109 @@ const EmpTable = ({ employees }) => {
 
   const maskStatus = (status) => (status == 1 ? "Active" : "Inactive");
 
-  const allRoles = [
-    "ACCOUNTANT",
-    "TEAM LEADER",
-    "SALES",
-    "SALES CUM BACKOFFICE",
-    "SALES HEAD",
-    "DIGITAL MARKETER",
-    "ADMIN",
-    "DIRECTOR",
-    "HR",
-    "HR HEAD",
-    "JUNIOR HR EXECUTIVE",
-    "HR EXECUTIVE",
-    "HR RECRUITER",
-    "GEM",
-    "GRAPHIC DESIGNER",
-    "DESIGN ENGINEER",
-    "DEVELOPER",
-    "SERVICE ENGINEER",
-    "SERVICE TECHNICIAN",
-    "SERVICE HEAD",
-    "SERVICE SUPPORT ",
-    "WELDER",
-    "WELDER HELPER",
-    "WAREHOUSE INCHARGE",
-    "EA",
-  ];
+  const loadRolesModalData = useCallback(async () => {
+    setRolesModalLoading(true);
+    try {
+      const res = await fetch(`/api/admin/employee-roles?t=${Date.now()}`, {
+        cache: "no-store",
+      });
+      if (!res.ok) {
+        toast.error("Could not load roles.");
+        return;
+      }
+      const data = await res.json();
+      setRoleEntries(
+        Array.isArray(data?.entries)
+          ? data.entries
+          : Array.isArray(data?.custom)
+            ? data.custom
+            : [],
+      );
+      await reloadEmployeeRoles();
+    } catch {
+      toast.error("Could not load roles.");
+    } finally {
+      setRolesModalLoading(false);
+    }
+  }, [reloadEmployeeRoles]);
 
-  const bulkModuleTree = useMemo(() => getModuleTreeForEmployeeBulkUi(), []);
+  const openManageRolesModal = async () => {
+    setShowManageRolesModal(true);
+    setNewRoleName("");
+    setNewRoleDashboard("/user-dashboard");
+    await loadRolesModalData();
+  };
+
+  const submitNewRole = async () => {
+    const name = String(newRoleName || "").trim();
+    if (!name) {
+      toast.error("Enter a role name.");
+      return;
+    }
+    setRolesModalSaving(true);
+    try {
+      const res = await fetch("/api/admin/employee-roles", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          roleName: name,
+          dashboardPath: newRoleDashboard,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(data?.message || "Failed to create role.");
+        return;
+      }
+      toast.success(`Role "${data?.created?.roleName || name}" created.`);
+      setNewRoleName("");
+      setRoleEntries(
+        Array.isArray(data?.entries)
+          ? data.entries
+          : Array.isArray(data?.custom)
+            ? data.custom
+            : [],
+      );
+      await reloadEmployeeRoles();
+    } catch {
+      toast.error("Failed to create role.");
+    } finally {
+      setRolesModalSaving(false);
+    }
+  };
+
+  const deleteCustomRole = async (id, roleName) => {
+    if (!window.confirm(`Delete custom role "${roleName}"?`)) return;
+    setRolesModalSaving(true);
+    try {
+      const res = await fetch(`/api/admin/employee-roles?id=${id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(data?.message || "Could not delete role.");
+        return;
+      }
+      toast.success("Role deleted.");
+      setRoleEntries(
+        Array.isArray(data?.entries)
+          ? data.entries
+          : Array.isArray(data?.custom)
+            ? data.custom
+            : [],
+      );
+      await reloadEmployeeRoles();
+    } catch {
+      toast.error("Could not delete role.");
+    } finally {
+      setRolesModalSaving(false);
+    }
+  };
+
+  const bulkModuleTree = useMemo(
+    () => getModuleTreeForEmployeeBulkUi(bulkRole),
+    [bulkRole],
+  );
 
   const bulkModuleIndex = useMemo(
     () => buildModuleUiSearchIndex(bulkModuleTree || []),
@@ -488,26 +686,31 @@ const EmpTable = ({ employees }) => {
   const setRoleAndResetSelection = async (role) => {
     // Persist the in-progress selection for the current role before switching.
     persistBulkSelectionForRole(bulkRole, bulkSelectedModules);
+    bulkUserEditedRef.current = false;
     setBulkRole(role);
     setBulkTouched(false);
     const key = String(role || "").trim();
     const cached = bulkRoleSelections?.[key];
-    if (Array.isArray(cached)) {
+    if (Array.isArray(cached) && cached.length > 0) {
       setBulkSelectedModules(cached);
     } else {
-      const fromDB = await fetchRoleModulesFromDB(role);
-      setBulkSelectedModules(fromDB);
+      await fetchRoleModulesFromDB(role, { applyToSelection: true });
     }
   };
 
-  const toggleBulkChild = (key) => {
+  const toggleBulkChild = (key, checked) => {
+    bulkUserEditedRef.current = true;
     setBulkTouched(true);
-    setBulkSelectedModules((prev) =>
-      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key],
-    );
+    setBulkSelectedModules((prev) => {
+      if (checked) {
+        return prev.includes(key) ? prev : [...prev, key];
+      }
+      return prev.filter((k) => k !== key);
+    });
   };
 
   const toggleBulkGroup = (node) => {
+    bulkUserEditedRef.current = true;
     setBulkTouched(true);
     const keys = collectModuleKeysFromUiNode(node);
     if (keys.length === 0) return;
@@ -523,280 +726,39 @@ const EmpTable = ({ employees }) => {
   };
 
   const toggleBulkAll = () => {
+    bulkUserEditedRef.current = true;
     setBulkTouched(true);
     const allSelected = ALL_MODULE_KEYS.every((k) => bulkSelectedModules.includes(k));
     setBulkSelectedModules(allSelected ? [] : [...ALL_MODULE_KEYS]);
   };
 
-  const roleDefaultModules = {
-    SALES: [
-      "dashboard-home",
-      "task-manager",
-      "fast-card",
-      "view-customers",
-      "add-customer",
-      "daily-report",
-      "lead-reports",
-      "demo-details",
-      "quotations",
-      "orders-process",
-      "product-stock",
-      "expenses",
-      "employee-crm",
-      "prospects-view",
-      "prospects-add",
-      "installation-videos",
-    ],
-    ACCOUNTANT: [
-      "dashboard-home",
-      "task-manager",
-      "regularization-approvals",
-      "view-customers",
-      "add-customer",
-      "daily-report",
-      "demo-details",
-      "quotations",
-      "orders-process",
-      "invoices",
-      "product-stock",
-      "product-accessories",
-      "spare-parts",
-      "purchase-direct-in",
-      "purchase-request",
-      "purchase-warehouse-in",
-      "purchases",
-      "spare-direct-in",
-      "spare-request",
-      "spare-warehouse-in",
-      "spare-purchases",
-      "payment-pending",
-      "manual-payments",
-      "expenses",
-      "view-expenses",
-      "dd-management",
-      "other-income",
-      "client-expenses",
-      "delivery-challan",
-      "statements",
-      "salary-slips",
-      "employee-crm",
-      "company-documents",
-      "assets",
-      "attendance-log",
-    ],
-    "TEAM LEADER": [
-      "dashboard-home",
-      "task-manager",
-      "regularization-approvals",
-      "view-customers",
-      "add-customer",
-      "my-leads",
-      "daily-report",
-      "customer-payment-behavior",
-      "leads-upload",
-      "denied-leads",
-      "warranty-console",
-      "registered-products",
-      "service-followups",
-      "warranty-map",
-      "service-records",
-      "upcoming-installations",
-      "service-map",
-      "payment-pending",
-      "employee-crm",
-    ],
-    "DIGITAL MARKETER": [
-      "dashboard-home",
-      "task-manager",
-      "view-customers",
-      "my-leads",
-      "leads-upload",
-      "keywords-management",
-      "backlinks-management",
-      "daily-report",
-      "blog",
-      "employee-crm",
-    ],
-    HR: [
-      "dashboard-home",
-      "task-manager",
-      "regularization-approvals",
-      "salary-slips",
-      "employee-list",
-      "employee-crm",
-      "hiring-process",
-      "hr-daily-report",
-      "attendance-log",
-    ],
-    "HR HEAD": [
-      "dashboard-home",
-      "task-manager",
-      "regularization-approvals",
-      "salary-slips",
-      "employee-list",
-      "employee-crm",
-      "hiring-process",
-      "hr-daily-report",
-      "attendance-log",
-    ],
-    "JUNIOR HR EXECUTIVE": [
-      "dashboard-home",
-      "task-manager",
-      "regularization-approvals",
-      "salary-slips",
-      "employee-list",
-      "employee-crm",
-      "hiring-process",
-      "hr-daily-report",
-      "attendance-log",
-    ],
-    "HR EXECUTIVE": [
-      "dashboard-home",
-      "task-manager",
-      "regularization-approvals",
-      "salary-slips",
-      "employee-list",
-      "employee-crm",
-      "hiring-process",
-      "hr-daily-report",
-      "attendance-log",
-    ],
-    "HR RECRUITER": [
-      "dashboard-home",
-      "task-manager",
-      "regularization-approvals",
-      "salary-slips",
-      "employee-list",
-      "employee-crm",
-      "hiring-process",
-      "hr-daily-report",
-      "attendance-log",
-    ],
-    GEM: [
-      "dashboard-home",
-      "task-manager",
-      "add-customer",
-      "view-customers",
-      "quotations",
-      "orders-process",
-      "payment-pending",
-      "dd-management",
-      "employee-crm",
-      "gem-crm-dashboard",
-      "gem-crm-bids",
-      "gem-crm-reports",
-      "installation-videos",
-    ],
-    "GRAPHIC DESIGNER": [
-      "dashboard-home",
-      "task-manager",
-      "daily-report",
-      "employee-crm",
-      "installation-videos",
-      "installation-videos-manage",
-      "assets",
-    ],
-    "DESIGN ENGINEER": [
-      "dashboard-home",
-      "task-manager",
-      "spare-parts",
-      "spare-direct-in",
-      "spare-request",
-      "spare-warehouse-in",
-      "spare-purchases",
-      "production-status",
-      "bom-list",
-      "expenses",
-      "employee-crm",
-    ],
-    DEVELOPER: [
-      "dashboard-home",
-      "task-manager",
-      "regularization-approvals",
-      "employee-crm",
-    ],
-    "SERVICE ENGINEER": [
-      "dashboard-home",
-      "task-manager",
-      "regularization-approvals",
-      "employee-crm",
-    ],
-    "SERVICE TECHNICIAN": [
-      "dashboard-home",
-      "task-manager",
-      "regularization-approvals",
-      "employee-crm",
-    ],
-    "SERVICE HEAD": [
-      "dashboard-home",
-      "task-manager",
-      "add-customer",
-      "view-customers",
-      "employee-crm",
-      "quotations",
-      "orders-process",
-      "orders-delay",
-      "warranty-console",
-      "registered-products",
-      "service-followups",
-      "warranty-map",
-      "service-records",
-      "upcoming-installations",
-      "service-map",
-      "product-stock",
-      "spare-parts",
-      "installation-videos",
-      "return-products",
-    ],
-    "SERVICE SUPPORT": [
-      "dashboard-home",
-      "task-manager",
-      "add-customer",
-      "view-customers",
-      "employee-crm",
-      "quotations",
-      "orders-process",
-      "orders-delay",
-      "warranty-console",
-      "registered-products",
-      "service-followups",
-      "warranty-map",
-      "service-records",
-      "upcoming-installations",
-      "service-map",
-      "product-stock",
-      "spare-parts",
-      "installation-videos",
-      "return-products",
-    ],
-    "SALES CUM BACKOFFICE": [
-      "dashboard-home",
-      "daily-report",
-      "add-customer",
-      "view-customers",
-      "my-leads",
-      "bulk-reassign",
-      "denied-leads",
-      "task-manager",
-      "fast-card",
-      "quotations",
-      "orders-process",
-      "product-stock",
-      "spare-parts",
-      "payment-pending",
-      "manual-payments",
-      "employee-crm",
-      "prospects-add",
-      "prospects-ne",
-      "installation-videos",
-    ],
-  };
-
-  const applyDefaultModules = () => {
-    setBulkTouched(true);
+  const applyDefaultModules = async () => {
     const trimmedRole = String(bulkRole || "").trim();
-    const defaults = roleDefaultModules[trimmedRole] || [];
-    setBulkSelectedModules(defaults);
+    if (!trimmedRole) return;
+    bulkUserEditedRef.current = true;
+    setBulkTouched(true);
+    setBulkRoleLoading(true);
+    try {
+      const res = await fetch(
+        `/api/admin/bulk-module-access?role=${encodeURIComponent(trimmedRole)}&defaultsOnly=1&t=${Date.now()}`,
+        { cache: "no-store" },
+      );
+      let defaults = getRoleDefaultModuleKeys(trimmedRole);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data?.moduleKeys) && data.moduleKeys.length > 0) {
+          defaults = data.moduleKeys;
+        }
+      }
+      setBulkSelectedModules(defaults);
+      persistBulkSelectionForRole(trimmedRole, defaults);
+    } catch {
+      const defaults = getRoleDefaultModuleKeys(trimmedRole);
+      setBulkSelectedModules(defaults);
+      persistBulkSelectionForRole(trimmedRole, defaults);
+    } finally {
+      setBulkRoleLoading(false);
+    }
   };
 
   const submitBulkModules = async () => {
@@ -821,15 +783,13 @@ const EmpTable = ({ employees }) => {
         throw new Error(data?.message || "Failed to apply module access.");
       }
       toast.success(`Applied to ${data.updated ?? 0} users`);
-      // Clear cached state so next open fetches fresh from DB
       const key = String(bulkRole || "").trim();
-      setBulkRoleSelections((prev) => {
-        const next = { ...(prev || {}) };
-        delete next[key];
-        return next;
-      });
+      setBulkRoleSelections((prev) => ({
+        ...(prev || {}),
+        [key]: [...bulkSelectedModules],
+      }));
       setShowGlobalModulesModal(false);
-      router.refresh();
+      window.location.reload();
     } catch (e) {
       toast.error(e.message || "Failed to apply module access.");
     } finally {
@@ -839,6 +799,14 @@ const EmpTable = ({ employees }) => {
 
   return (
     <div className="bg-white shadow-md rounded-lg p-4 sm:p-6 overflow-hidden">
+
+      <EmployeeIframeModal
+        open={iframePopup.open}
+        url={iframePopup.url}
+        title={iframePopup.title}
+        pageKey={iframePopup.pageKey}
+        onClose={closeIframe}
+      />
       {/* ⭐ KPI SECTION */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <div className="p-4 bg-blue-100 rounded shadow text-center">
@@ -864,32 +832,156 @@ const EmpTable = ({ employees }) => {
         >
           Add Employee
         </Link>
-        <Link
-          href="/admin-dashboard/ip-restrictions"
+        <button
+          type="button"
+          onClick={() => openSubPage("global-ip-restrictions", null, "Global IP Settings")}
           className="text-white bg-red-600 hover:bg-red-700 font-medium whitespace-nowrap rounded-lg text-sm px-5 py-2.5 flex items-center justify-center space-x-2 shadow-md"
         >
           <Shield size={18} />
           <span>Global IP Settings</span>
-        </Link>
+        </button>
+        <button
+          type="button"
+          onClick={openManageRolesModal}
+          className="text-white bg-violet-600 hover:bg-violet-700 font-medium whitespace-nowrap rounded-lg text-sm px-5 py-2.5 flex items-center justify-center space-x-2 shadow-md"
+        >
+          <BadgePlus size={18} />
+          <span>Manage Roles</span>
+        </button>
         <button
           type="button"
           onClick={async () => {
+            bulkUserEditedRef.current = false;
             setBulkTouched(false);
             const key = String(bulkRole || "").trim();
             const cached = bulkRoleSelections?.[key];
-            if (Array.isArray(cached)) {
+            setShowGlobalModulesModal(true);
+            if (Array.isArray(cached) && cached.length > 0) {
               setBulkSelectedModules(cached);
             } else {
-              const fromDB = await fetchRoleModulesFromDB(bulkRole);
-              setBulkSelectedModules(fromDB);
+              await fetchRoleModulesFromDB(bulkRole, { applyToSelection: true });
             }
-            setShowGlobalModulesModal(true);
           }}
           className="text-white bg-emerald-600 hover:bg-emerald-700 font-medium whitespace-nowrap rounded-lg text-sm px-5 py-2.5 flex items-center justify-center space-x-2 shadow-md"
         >
           <span>Global Module Access</span>
         </button>
       </div>
+
+      {showManageRolesModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full p-6 max-h-[90vh] overflow-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold text-gray-800">Manage Employee Roles</h2>
+              <button
+                type="button"
+                onClick={() => setShowManageRolesModal(false)}
+                className="text-gray-500 hover:text-gray-700 p-1"
+                disabled={rolesModalSaving}
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <p className="text-sm text-gray-600 mb-4">
+              Roles are stored in database table <code className="text-xs bg-gray-100 px-1 rounded">crm_employee_roles</code>.
+              New custom roles appear in Add Employee, Quick Edit, and Global Module Access.
+            </p>
+
+            <div className="space-y-3 border rounded-lg p-4 bg-gray-50 mb-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Role name
+                </label>
+                <input
+                  value={newRoleName}
+                  onChange={(e) => setNewRoleName(e.target.value)}
+                  placeholder="e.g. REGIONAL MANAGER"
+                  className="w-full border rounded-md px-3 py-2 text-sm"
+                  disabled={rolesModalSaving}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Dashboard home
+                </label>
+                <select
+                  value={newRoleDashboard}
+                  onChange={(e) => setNewRoleDashboard(e.target.value)}
+                  className="w-full border rounded-md px-3 py-2 text-sm"
+                  disabled={rolesModalSaving}
+                >
+                  {ROLE_DASHBOARD_HOME_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <button
+                type="button"
+                onClick={submitNewRole}
+                disabled={rolesModalSaving || rolesModalLoading}
+                className="w-full py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 disabled:opacity-50 text-sm font-medium"
+              >
+                {rolesModalSaving ? "Saving..." : "Create role"}
+              </button>
+            </div>
+
+            <div className="text-sm font-semibold text-gray-800 mb-2">All roles</div>
+            {rolesModalLoading ? (
+              <p className="text-sm text-gray-500">Loading...</p>
+            ) : roleEntries.length === 0 ? (
+              <p className="text-sm text-gray-500">No roles in table yet.</p>
+            ) : (
+              <div className="border rounded-lg overflow-hidden">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-gray-50 text-left text-gray-600">
+                    <tr>
+                      <th className="px-3 py-2 font-medium">Role</th>
+                      <th className="px-3 py-2 font-medium">Dashboard</th>
+                      <th className="px-3 py-2 font-medium">Type</th>
+                      <th className="px-3 py-2 font-medium w-12" />
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {roleEntries.map((r) => (
+                      <tr key={r.id} className="hover:bg-gray-50/80">
+                        <td className="px-3 py-2 font-medium text-gray-900">{r.roleName}</td>
+                        <td className="px-3 py-2 text-gray-600 text-xs">{r.dashboardPath}</td>
+                        <td className="px-3 py-2">
+                          <span
+                            className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${
+                              r.isBuiltin
+                                ? "bg-slate-100 text-slate-700"
+                                : "bg-violet-100 text-violet-800"
+                            }`}
+                          >
+                            {r.isBuiltin ? "Built-in" : "Custom"}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          {!r.isBuiltin && (
+                            <button
+                              type="button"
+                              onClick={() => deleteCustomRole(r.id, r.roleName)}
+                              disabled={rolesModalSaving}
+                              className="text-red-600 hover:text-red-800 p-1 disabled:opacity-50"
+                              title="Delete role"
+                            >
+                              <Trash2 size={18} />
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {showGlobalModulesModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -1008,7 +1100,7 @@ const EmpTable = ({ employees }) => {
                       key={node.id}
                       node={node}
                       selected={bulkSelectedModules}
-                      disabled={bulkSaving}
+                      disabled={bulkSaving || bulkRoleLoading}
                       onToggleGroup={toggleBulkGroup}
                       onToggleChild={toggleBulkChild}
                     />
@@ -1136,12 +1228,15 @@ const EmpTable = ({ employees }) => {
             filteredEmployees.map((employee) => (
               <EmployeeCard
                 key={employee.empId}
-                employee={employee}
+                employee={getEmployeeWithTimeRestriction(employee)}
                 handleImpersonateLogin={handleImpersonateLogin}
                 handleOpenReportingManagerModal={handleOpenReportingManagerModal}
+                handleToggleLoginTimeRestriction={handleToggleLoginTimeRestriction}
+                togglingTimeRestriction={togglingTimeRestriction}
                 maskEmail={maskEmail}
                 maskNumber={maskNumber}
                 maskStatus={maskStatus}
+                openSubPage={openSubPage}
               />
             ))
           ) : (
@@ -1184,7 +1279,9 @@ const EmpTable = ({ employees }) => {
 
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredEmployees.length ? (
-                filteredEmployees.map((employee) => (
+                filteredEmployees.map((employee) => {
+                  const emp = getEmployeeWithTimeRestriction(employee);
+                  return (
                   <tr key={employee.empId} className="hover:bg-gray-50">
                     <td className="px-3 sm:px-6 py-3 sm:py-4 text-sm">{employee.username}</td>
                     <td className="px-3 sm:px-6 py-3 sm:py-4 text-sm">{maskEmail(employee.email)}</td>
@@ -1198,33 +1295,37 @@ const EmpTable = ({ employees }) => {
                     <td className="px-3 sm:px-6 py-3 sm:py-4">
                       <div className="flex flex-wrap gap-2 sm:gap-4">
                         <button
-                          onClick={() => handleImpersonateLogin(employee.empId)}
+                          onClick={() =>
+                            handleImpersonateLogin(employee.empId, employee.userRole)
+                          }
                           className="text-blue-600"
                         >
                           <LogIn size={20} />
                         </button>
 
-                        <Link
-                          href={`/admin-dashboard/password/${employee.username}`}
-                          className="text-yellow-600"
+                        <button
+                          onClick={() => openSubPage("password", employee.username, `Change Password — ${employee.username}`)}
+                          className="text-yellow-600 hover:text-yellow-800"
+                          title="Change Password"
                         >
                           <Key size={20} />
-                        </Link>
+                        </button>
 
-                        <Link
-                          href={`/admin-dashboard/quick-edit/${employee.username}`}
-                          className="text-green-600"
+                        <button
+                          onClick={() => openSubPage("quick-edit", employee.username, `Edit Employee — ${employee.username}`)}
+                          className="text-green-600 hover:text-green-800"
+                          title="Edit Employee"
                         >
-                          <Edit size={20} />
-                        </Link>
+                          <Edit size={22} />
+                        </button>
 
-                        <Link
-                          href={`/admin-dashboard/ip-restrictions/${employee.username}`}
-                          className="text-purple-600"
+                        <button
+                          onClick={() => openSubPage("ip-restrictions", employee.username, `IP Restrictions — ${employee.username}`)}
+                          className="text-purple-600 hover:text-purple-800"
                           title="IP Restriction Settings"
                         >
                           <Shield size={20} />
-                        </Link>
+                        </button>
 
                         <button
                           onClick={() => handleOpenReportingManagerModal(employee)}
@@ -1233,10 +1334,30 @@ const EmpTable = ({ employees }) => {
                         >
                           <UserPlus size={20} />
                         </button>
+
+                        {!isSuperAdminEmployee(employee) && (
+                        <button
+                          onClick={() => handleToggleLoginTimeRestriction(employee)}
+                          disabled={togglingTimeRestriction === employee.username}
+                          className={`disabled:opacity-50 ${
+                            emp.login_time_restriction_enabled === 1
+                              ? "text-green-600 hover:text-green-800"
+                              : "text-red-600 hover:text-red-800"
+                          }`}
+                          title={
+                            emp.login_time_restriction_enabled === 1
+                              ? "Login time restriction ON (07:00–20:30 IST) — click to disable"
+                              : "Login time restriction OFF — click to enable (07:00–20:30 IST)"
+                          }
+                        >
+                          <Clock size={20} />
+                        </button>
+                        )}
                       </div>
                     </td>
                   </tr>
-                ))
+                  );
+                })
               ) : (
                 <tr>
                   <td colSpan="8" className="text-center py-4 text-gray-500">

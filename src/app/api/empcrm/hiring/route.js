@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
-import { canAccessHiringModule } from "@/lib/hrTargetEligibleRoles";
+import { canAccessHiringModule, isEmpCrmHrAdmin } from "@/lib/hrTargetEligibleRoles";
 import { normalizeRoleKey } from "@/lib/roleKeyUtils";
 import { logHiringCreated, logHiringNoteUpdate, logHiringStatusChange } from "@/lib/hiringStatusHistory";
 import { parseHiringPayload, toMysqlDatetime } from "@/lib/hiringPayload";
 import { omitBlockedDesignations } from "@/lib/designationDedupe";
+import {
+  ensureHiringCandidatesInsertReady,
+  isHiringDuplicatePrimaryZeroError,
+} from "@/lib/ensureHiringCandidatesInsertReady";
 
 function assertHrRole(payload) {
   if (!payload?.username) {
@@ -48,7 +52,7 @@ export async function GET(req) {
     if (denied) return denied;
 
     const role = normalizeRoleKey(payload.role ?? payload.userRole ?? "");
-    const isSuperadmin = role === "SUPERADMIN";
+    const isSuperadmin = isEmpCrmHrAdmin(role);
 
     const { searchParams } = new URL(req.url);
     const entryIdParam = searchParams.get("entryId");
@@ -221,9 +225,42 @@ export async function GET(req) {
       sql += ` AND DATE(h.created_at) <= ?`;
       params.push(createdTo);
     }
+
+    const usePagination =
+      searchParams.has("page") || searchParams.has("limit");
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
+    const limit = Math.min(
+      100,
+      Math.max(1, parseInt(searchParams.get("limit") || "25", 10)),
+    );
+
     sql += ` ORDER BY COALESCE(h.hire_date, DATE(h.interview_at), DATE(h.created_at)) DESC, h.id DESC`;
 
-    const [rows] = await conn.execute(sql, params);
+    let rows;
+    let pagination;
+    if (usePagination) {
+      const sqlBase = sql.replace(/\s+ORDER BY[\s\S]*$/i, "");
+      const countSql = sqlBase.replace(
+        /^SELECT[\s\S]+?\sFROM\s/i,
+        "SELECT COUNT(*) AS c FROM ",
+      );
+      const [countRows] = await conn.execute(countSql, params);
+      const total = Number(countRows[0]?.c ?? 0);
+      const offset = (page - 1) * limit;
+      [rows] = await conn.execute(`${sql} LIMIT ? OFFSET ?`, [
+        ...params,
+        limit,
+        offset,
+      ]);
+      pagination = {
+        page,
+        limit,
+        total,
+        pages: Math.max(1, Math.ceil(total / limit) || 1),
+      };
+    } else {
+      [rows] = await conn.execute(sql, params);
+    }
     let next_id = 1;
     try {
       const [[row]] = await conn.execute(
@@ -233,7 +270,14 @@ export async function GET(req) {
     } catch {
       /* table missing handled below if needed */
     }
-    return NextResponse.json({ success: true, entries: rows, next_id, designations, creators });
+    return NextResponse.json({
+      success: true,
+      entries: rows,
+      next_id,
+      designations,
+      creators,
+      ...(pagination ? { pagination } : {}),
+    });
   } catch (error) {
     console.error("[empcrm/hiring GET]", error);
     const msg = `${error?.message || ""} ${error?.sqlMessage || ""}`;
@@ -261,7 +305,7 @@ export async function POST(request) {
     if (denied) return denied;
 
     const role = normalizeRoleKey(payload.role ?? payload.userRole ?? "");
-    const isSuperadmin = role === "SUPERADMIN";
+    const isSuperadmin = isEmpCrmHrAdmin(role);
 
     const body = await request.json();
     const parsed = parseHiringPayload(body);
@@ -272,8 +316,8 @@ export async function POST(request) {
 
     const pool = await getDbConnection();
     const conn = await pool.getConnection();
-    try {
-      await conn.beginTransaction();
+
+    const insertCandidate = async () => {
       const [result] = await conn.execute(
         `INSERT INTO candidates (
         created_by, candidate_name, emp_contact, designation, marital_status,
@@ -311,10 +355,25 @@ export async function POST(request) {
       if (insertId) {
         await logHiringCreated(conn, insertId, d.status, payload.username, d.note);
       }
-      await conn.commit();
-    } catch (e) {
-      await conn.rollback();
-      throw e;
+    };
+
+    try {
+      await ensureHiringCandidatesInsertReady(conn);
+      try {
+        await conn.beginTransaction();
+        await insertCandidate();
+        await conn.commit();
+      } catch (e) {
+        await conn.rollback();
+        if (isHiringDuplicatePrimaryZeroError(e)) {
+          await ensureHiringCandidatesInsertReady(conn);
+          await conn.beginTransaction();
+          await insertCandidate();
+          await conn.commit();
+        } else {
+          throw e;
+        }
+      }
     } finally {
       conn.release();
     }
@@ -323,6 +382,16 @@ export async function POST(request) {
   } catch (error) {
     console.error("[empcrm/hiring POST]", error);
     const msg = `${error?.message || ""} ${error?.sqlMessage || ""}`;
+    if (isHiringDuplicatePrimaryZeroError(error)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Could not save (database ID issue). Please try again once; if it repeats, ask admin to repair hiring tables.",
+        },
+        { status: 500 }
+      );
+    }
     if (msg.includes("candidates") && msg.includes("doesn't exist")) {
       return NextResponse.json(
         {
@@ -368,7 +437,7 @@ export async function PATCH(request) {
     if (denied) return denied;
 
     const role = normalizeRoleKey(payload.role ?? payload.userRole ?? "");
-    const isSuperadmin = role === "SUPERADMIN";
+    const isSuperadmin = isEmpCrmHrAdmin(role);
 
     const body = await request.json();
     const id = parseInt(body.id, 10);
@@ -386,6 +455,7 @@ export async function PATCH(request) {
     const conn = await pool.getConnection();
     let result;
     try {
+      await ensureHiringCandidatesInsertReady(conn);
       await conn.beginTransaction();
       const [rows] = await conn.execute(
         `SELECT status, note FROM candidates WHERE id = ?${isSuperadmin ? "" : " AND LOWER(TRIM(created_by)) = LOWER(TRIM(?))"}`,
@@ -458,6 +528,16 @@ export async function PATCH(request) {
   } catch (error) {
     console.error("[empcrm/hiring PATCH]", error);
     const msg = `${error?.message || ""} ${error?.sqlMessage || ""}`;
+    if (isHiringDuplicatePrimaryZeroError(error)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Could not update (database ID issue). Please try again once; if it repeats, ask admin to repair hiring tables.",
+        },
+        { status: 500 }
+      );
+    }
     if (isMysqlUnknownColumnError(error)) {
       if (msg.includes("note") && msg.includes("candidates_followups")) {
         return NextResponse.json(

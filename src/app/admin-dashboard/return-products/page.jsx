@@ -199,6 +199,7 @@ function ReturnProductsPage() {
       }));
 
       const returnData = {
+        order_id: selectedInstallation.order_id,
         quotation_no: selectedInstallation.quote_number || `QT-${selectedInstallation.order_id}`,
         invoice_no: selectedInstallation.invoice_number || `INV-${selectedInstallation.order_id}`,
         model_no: itemsArray.map((i) => i.item_code).join(', '),
@@ -245,6 +246,7 @@ function ReturnProductsPage() {
       }));
 
       const returnData = {
+        order_id: selectedInstallation.order_id,
         quotation_no: selectedInstallation.quote_number || `QT-${selectedInstallation.order_id}`,
         invoice_no: selectedInstallation.invoice_number || `INV-${selectedInstallation.order_id}`,
         model_no: itemsArray.map((i) => i.item_code).join(', '),
@@ -257,7 +259,9 @@ function ReturnProductsPage() {
         items: itemsArray,
       };
 
-      const response = await axios.post('/api/admin/return-products', returnData);
+      const response = await axios.post('/api/admin/return-products', returnData, {
+        withCredentials: true,
+      });
 
       if (response.data.success) {
         toast.success('Full return initiated successfully');
@@ -306,6 +310,7 @@ function ReturnProductsPage() {
         `/api/admin/return-products/${selectedReturn.id}`,
         formData,
         {
+          withCredentials: true,
           headers: {
             'Content-Type': 'multipart/form-data',
           },
@@ -532,7 +537,12 @@ function ReturnProductsPage() {
             <div className="p-6 border-b border-gray-200 flex justify-between items-center flex-shrink-0">
               <div>
                 <h2 className="text-2xl font-bold text-gray-900">Existing Returns</h2>
-                <p className="text-gray-600 mt-1">View and manage existing product returns</p>
+                <p className="text-gray-600 mt-1">
+                  View and manage existing product returns
+                  {!existingReturnsLoading && existingReturns.length > 0 && (
+                    <span className="ml-2 text-gray-500">({existingReturns.length} total)</span>
+                  )}
+                </p>
               </div>
               <div className="flex gap-3 items-center">
                 <button
@@ -557,12 +567,12 @@ function ReturnProductsPage() {
                   <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
                   <p className="text-gray-600 mt-4">Loading existing returns...</p>
                 </div>
-              ) : existingReturns.filter(r => r.return_status !== 'delivered_in_warehouse').length > 0 ? (
+              ) : existingReturns.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead className="bg-gray-100 border-b">
                       <tr>
-                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">ID</th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Order ID</th>
                         <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Quotation No</th>
                         <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Invoice No</th>
                         <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Model No</th>
@@ -571,15 +581,17 @@ function ReturnProductsPage() {
                         <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Tracking No</th>
                         <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Return Type</th>
                         <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Status</th>
-                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Created By</th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Order Created By</th>
                         <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Updated By</th>
                         <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {existingReturns.filter(r => r.return_status !== 'delivered_in_warehouse').map((ret, index) => (
+                      {existingReturns.map((ret, index) => (
                         <tr key={ret.id || index} className="border-b hover:bg-gray-50 transition">
-                          <td className="px-4 py-4 text-sm text-gray-900 font-medium">{ret.id}</td>
+                          <td className="px-4 py-4 text-sm text-gray-900 font-medium">
+                            {ret.order_id ? `#${ret.order_id}` : '—'}
+                          </td>
                           <td className="px-4 py-4 text-sm text-gray-900 font-medium">{ret.quotation_no}</td>
                           <td className="px-4 py-4 text-sm text-gray-900">{ret.invoice_no}</td>
                           <td className="px-4 py-4 text-sm text-gray-900">{ret.model_no}</td>
@@ -598,15 +610,21 @@ function ReturnProductsPage() {
                               {ret.return_status === 'delivered_in_warehouse' ? 'Delivered in Warehouse' : 'Return Booking'}
                             </span>
                           </td>
-                          <td className="px-4 py-4 text-sm text-gray-900">{ret.created_by_username || ret.created_by || 'N/A'}</td>
+                          <td className="px-4 py-4 text-sm text-gray-900">
+                            {ret.created_by_username || 'N/A'}
+                          </td>
                           <td className="px-4 py-4 text-sm text-gray-900">{ret.updated_by_username || ret.updated_by || 'N/A'}</td>
                           <td className="px-4 py-4 text-sm">
-                            <button
-                              onClick={() => { setShowExistingReturnsModal(false); handleWarehouseInClick(ret); }}
-                              className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-xs font-medium transition"
-                            >
-                              Warehouse In
-                            </button>
+                            {ret.return_status === 'delivered_in_warehouse' ? (
+                              <span className="text-gray-400 text-xs">Done</span>
+                            ) : (
+                              <button
+                                onClick={() => { setShowExistingReturnsModal(false); handleWarehouseInClick(ret); }}
+                                className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-xs font-medium transition"
+                              >
+                                Warehouse In
+                              </button>
+                            )}
                           </td>
                         </tr>
                       ))}

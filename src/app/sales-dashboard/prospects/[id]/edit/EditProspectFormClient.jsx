@@ -1,5 +1,6 @@
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useMemo, useState } from "react";
 import { updateProspect } from "../../actions";
 import {
@@ -158,15 +159,7 @@ export default function EditProspectFormClient({
             date on or after today to final submit.
           </div>
         ) : null}
-        <input
-          id="commitment_date"
-          name="commitment_date"
-          type="date"
-          min={minCommitmentYmd}
-          value={commitmentStr}
-          onChange={(e) => setCommitmentStr(e.target.value)}
-          className={inputClass}
-        />
+        <TypeableDateFilterInput value={commitmentStr} onChange={setCommitmentStr} id="commitment_date" min={minCommitmentYmd} className={inputClass}/>
       </div>
 
       <div>
