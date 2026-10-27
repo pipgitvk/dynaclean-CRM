@@ -1,64 +1,35 @@
   "use client";
 
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { Loader2, Mail } from "lucide-react";
-import toast from "react-hot-toast";
-import {
-  sendInvoiceCustomerEmail,
-  customerEmailSendMessage,
-} from "@/lib/sendInvoiceCustomerEmailClient";
 import MultiInvoiceLinkModal from "./MultiInvoiceLinkModal";
-
-function InvoiceTableLoadingState({ label = "Loading invoices…" }) {
-  return (
-    <tr>
-      <td colSpan={13} className="py-16">
-        <div className="flex flex-col items-center justify-center gap-4 text-center">
-          <div className="relative flex h-14 w-14 items-center justify-center">
-            <div
-              className="absolute inset-0 rounded-full border-4 border-blue-100"
-              aria-hidden
-            />
-            <Loader2
-              className="h-10 w-10 animate-spin text-blue-600"
-              aria-hidden
-            />
-          </div>
-          <p className="text-sm font-medium text-gray-700">{label}</p>
-          <p className="text-xs text-gray-400 max-w-xs">
-            Please wait while we fetch your invoice list
-          </p>
-        </div>
-      </td>
-    </tr>
-  );
-}
 
 const InvoiceEditModal = dynamic(() => import("@/app/admin-dashboard/invoices/InvoiceEditModal"), { ssr: false });
 
 export default function InvoiceTable({ onSummaryUpdate }) {
-  const PAGE_SIZE = 40;
-  const SCROLL_LOAD_OFFSET_PX = 200;
-  const pageRef = useRef(1);
+  // Get current month's start and end dates
+  const now = new Date();
+  const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  
+  const formatDateForInput = (date) => {
+    return date.toISOString().split('T')[0];
+  };
 
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [fromDate, setFromDate] = useState("");
-  const [toDate, setToDate] = useState("");
+  const [fromDate, setFromDate] = useState(formatDateForInput(firstDayOfMonth));
+  const [toDate, setToDate] = useState(formatDateForInput(lastDayOfMonth));
   const [invoiceTypeFilter, setInvoiceTypeFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
 
-  const [currentPage, setCurrentPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [scrollLoadEnabled, setScrollLoadEnabled] = useState(false);
+  // Single page — fetch all records
+  const [currentPage] = useState(1);
+  const limit = 10000;
   const [meta, setMeta] = useState({
     page: 1,
-    limit: PAGE_SIZE,
+    limit: 10000,
     total: 0,
     totalPages: 1,
   });
@@ -68,212 +39,139 @@ export default function InvoiceTable({ onSummaryUpdate }) {
   const [sortOrder, setSortOrder] = useState("desc");
   const [fetchError, setFetchError] = useState(null);
   const [editId, setEditId] = useState(null);
-  const [sendingEmailId, setSendingEmailId] = useState(null);
   
   // Link payment modal
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState(new Set());
   const [selectedInvoices, setSelectedInvoices] = useState([]);
-  const [reconciling, setReconciling] = useState(false);
 
-  const processInvoicesForView = (data) => {
-    const grouped = {};
-
-    data.forEach((invoice) => {
-      if (invoice.parent_id) {
-        if (!grouped[invoice.parent_id]) {
-          grouped[invoice.parent_id] = { parent: null, children: [] };
-        }
-        grouped[invoice.parent_id].children.push(invoice);
-      } else {
-        if (!grouped[invoice.id]) {
-          grouped[invoice.id] = { parent: null, children: [] };
-        }
-        grouped[invoice.id].parent = invoice;
-      }
-    });
-
-    data.forEach((inv) => {
-      inv.totalLinkedAmount =
-        inv.linkedStatements?.reduce(
-          (sum, stmt) => sum + Number(stmt.amount || 0),
-          0,
-        ) || 0;
-    });
-
-    const sortedData = [];
-    const processedIds = new Set();
-    const groupIds = Object.keys(grouped)
-      .map(Number)
-      .sort((a, b) => b - a);
-
-    groupIds.forEach((parentId) => {
-      const group = grouped[parentId];
-      if (group.parent && !processedIds.has(group.parent.id)) {
-        if (group.parent.type !== "performa") {
-          sortedData.push(group.parent);
-          processedIds.add(group.parent.id);
-        }
-      }
-      group.children
-        .sort((a, b) => a.id - b.id)
-        .forEach((child) => {
-          if (!processedIds.has(child.id) && child.type !== "performa") {
-            sortedData.push(child);
-            processedIds.add(child.id);
-          }
-        });
-    });
-
-    return sortedData;
-  };
-
-  const fetchData = async ({ page = 1, append = false } = {}) => {
-    if (append) {
-      setLoadingMore(true);
-    } else {
-      setLoading(true);
-      setFetchError(null);
-      setInvoices([]);
-    }
+  const fetchData = async () => {
+    setLoading(true);
 
     const params = new URLSearchParams();
-    params.append("page", page);
-    params.append("limit", PAGE_SIZE);
+    params.append("page", currentPage);
+    params.append("limit", limit);
     params.append("sort", sortBy);
     params.append("order", sortOrder);
-    params.append("includeDetails", "0");
-    params.append("includeCount", "0");
 
     if (fromDate) params.append("fromDate", fromDate);
     if (toDate) params.append("toDate", toDate);
     if (search) params.append("search", search);
     if (invoiceTypeFilter) params.append("invoiceType", invoiceTypeFilter);
-    if (statusFilter) params.append("status", statusFilter);
 
     try {
-      if (!append && fetchAbortRef.current) {
-        fetchAbortRef.current.abort();
-      }
-      const controller = new AbortController();
-      if (!append) fetchAbortRef.current = controller;
-
-      const res = await fetch(`/api/invoice-table?${params.toString()}`, {
-        signal: controller.signal,
-      });
+      setFetchError(null);
+      const res = await fetch(`/api/invoice-table?${params.toString()}`);
       const response = await res.json();
+      console.log("response data :", response);
 
       if (response.success) {
-        const data = response.data || [];
-        const sortedData = processInvoicesForView(data);
-        setInvoices((prev) => {
-          if (!append) return sortedData;
-          const existing = new Set(prev.map((inv) => inv.id));
-          const merged = [...prev];
-          sortedData.forEach((inv) => {
-            if (!existing.has(inv.id)) {
-              existing.add(inv.id);
-              merged.push(inv);
+        let data = response.data || [];
+        
+        // Group invoices by parent_id and sort so parent appears first, then children
+        const grouped = {};
+        
+        // First pass: organize by parent
+        data.forEach(invoice => {
+          if (invoice.parent_id) {
+            // This is a child
+            if (!grouped[invoice.parent_id]) {
+              grouped[invoice.parent_id] = { parent: null, children: [] };
+            }
+            grouped[invoice.parent_id].children.push(invoice);
+          } else {
+            // This is a standalone or parent
+            if (!grouped[invoice.id]) {
+              grouped[invoice.id] = { parent: null, children: [] };
+            }
+            grouped[invoice.id].parent = invoice;
+          }
+        });
+
+        // Calculate per invoice linked amount (for display only)
+        data.forEach(inv => {
+          inv.totalLinkedAmount = inv.linkedStatements?.reduce(
+            (sum, stmt) => sum + Number(stmt.amount || 0),
+            0
+          ) || 0;
+        });
+
+        // Build final sorted array: parent followed by its children
+        const sortedData = [];
+        const processedIds = new Set();
+
+        // Sort groups by parent id
+        const groupIds = Object.keys(grouped)
+          .map(Number)
+          .sort((a, b) => b - a); // Descending order (highest first)
+
+        groupIds.forEach(parentId => {
+          const group = grouped[parentId];
+          if (group.parent && !processedIds.has(group.parent.id)) {
+            sortedData.push(group.parent);
+            processedIds.add(group.parent.id);
+          }
+          // Add children sorted by id (ascending)
+          group.children.sort((a, b) => a.id - b.id).forEach(child => {
+            if (!processedIds.has(child.id)) {
+              sortedData.push(child);
+              processedIds.add(child.id);
             }
           });
-          return merged;
         });
+
+        setInvoices(sortedData);
         setMeta(response.meta);
-        setCurrentPage(page);
-        pageRef.current = page;
-        if (typeof response.meta?.hasMore === "boolean") {
-          setHasMore(response.meta.hasMore);
-        } else {
-          setHasMore(data.length === PAGE_SIZE);
+
+        // Calculate and update summary data
+        const summaryData = {
+          grandTotal: sortedData.reduce((sum, inv) => sum + Number(inv.grand_total || 0), 0),
+          balanceAmount: sortedData.reduce((sum, inv) => sum + Number(inv.balance_amount || 0), 0),
+          taxAmount: sortedData.reduce((sum, inv) => sum + Number(inv.tax_amount || 0), 0),
+          totalInvoices: sortedData.length,
+        };
+        
+        if (onSummaryUpdate) {
+          onSummaryUpdate(summaryData);
         }
-      } else if (!append) {
+      } else {
         setInvoices([]);
         setFetchError(response.detail || response.error || "Failed to load invoices");
+        if (onSummaryUpdate) {
+          onSummaryUpdate({ grandTotal: 0, balanceAmount: 0, taxAmount: 0, totalInvoices: 0 });
+        }
       }
     } catch (err) {
-      if (err?.name === "AbortError") return;
       console.error("Fetch invoices failed:", err);
-      if (!append) {
-        setInvoices([]);
-        setFetchError(err?.message || "Failed to load invoices");
+      setInvoices([]);
+      setFetchError(err?.message || "Failed to load invoices");
+      if (onSummaryUpdate) {
+        onSummaryUpdate({ grandTotal: 0, balanceAmount: 0, taxAmount: 0, totalInvoices: 0 });
       }
     } finally {
-      if (fetchAbortRef.current?.signal.aborted && !append) return;
-      if (append) {
-        setLoadingMore(false);
-      } else {
-        setLoading(false);
-        setScrollLoadEnabled(true);
-      }
+      setLoading(false);
     }
   };
 
-  const resetAndFetch = () => {
-    setCurrentPage(1);
-    pageRef.current = 1;
-    setHasMore(true);
-    setScrollLoadEnabled(false);
-    setLinkedDetailsById({});
-    setExpandedInvoiceId(null);
-    fetchData({ page: 1, append: false });
-  };
-
-  const fetchDataRef = useRef(fetchData);
-  fetchDataRef.current = fetchData;
-
-  const loadMore = useCallback(() => {
-    if (loading || loadingMore || !hasMore) return;
-    fetchDataRef.current({ page: pageRef.current + 1, append: true });
-  }, [loading, loadingMore, hasMore]);
+  useEffect(() => {
+    fetchData();
+  }, [fromDate, toDate, sortBy, sortOrder, invoiceTypeFilter]);
 
   useEffect(() => {
-    resetAndFetch();
-  }, [fromDate, toDate, sortBy, sortOrder, invoiceTypeFilter, statusFilter]);
-
-  useEffect(() => {
-    if (skipInitialSearchFetch.current) {
-      skipInitialSearchFetch.current = false;
-      return;
-    }
     const t = setTimeout(() => {
-      resetAndFetch();
+      fetchData();
     }, 500);
     return () => clearTimeout(t);
   }, [search]);
-
-  useEffect(() => {
-    if (!onSummaryUpdate || loading) return;
-    const filteredForSummary = invoices.filter(
-      (inv) => inv.type !== "performa" && inv.status !== "CANCELLED",
-    );
-    onSummaryUpdate({
-      grandTotal: filteredForSummary.reduce(
-        (sum, inv) => sum + Number(inv.grand_total || 0),
-        0,
-      ),
-      balanceAmount: filteredForSummary.reduce(
-        (sum, inv) => sum + Number(inv.balance_amount || 0),
-        0,
-      ),
-      taxAmount: filteredForSummary.reduce(
-        (sum, inv) => sum + Number(inv.tax_amount || 0),
-        0,
-      ),
-      totalInvoices: filteredForSummary.length,
-    });
-  }, [invoices, loading, onSummaryUpdate]);
 
   const handleReset = () => {
     setSearch("");
     setFromDate("");
     setToDate("");
     setInvoiceTypeFilter("");
-    setStatusFilter("");
     setSortBy("created_at");
     setSortOrder("desc");
     setFetchError(null);
-    setSelectedInvoiceIds(new Set());
-    setSelectedInvoices([]);
   };
 
   const handleSort = (column) => {
@@ -282,29 +180,6 @@ export default function InvoiceTable({ onSummaryUpdate }) {
     } else {
       setSortBy(column);
       setSortOrder("desc");
-    }
-  };
-
-  const handleSendCustomerEmail = async (invoice) => {
-    if (invoice.type === "performa") {
-      toast.error("Performa invoice par email nahi bhejte.");
-      return;
-    }
-    const email = String(invoice.customer_email || "").trim();
-    if (!email) {
-      toast.error("Is invoice par customer email nahi hai — Edit se email add karein.");
-      return;
-    }
-    setSendingEmailId(invoice.id);
-    try {
-      const { out } = await sendInvoiceCustomerEmail(invoice.id, email);
-      const msg = customerEmailSendMessage(out, email);
-      if (msg.type === "success") toast.success(msg.message);
-      else toast.error(msg.message);
-    } catch (err) {
-      toast.error(err?.message || "Email send failed");
-    } finally {
-      setSendingEmailId(null);
     }
   };
 
@@ -367,63 +242,6 @@ export default function InvoiceTable({ onSummaryUpdate }) {
     setShowLinkModal(true);
   };
 
-  const handleReconcileLinkedPayments = async (scope) => {
-    const runAll = scope === "all";
-    if (
-      !window.confirm(
-        runAll
-          ? "Purani linked payments ko invoice + order + statements par sync karega. Continue?"
-          : "Selected invoice(s) ki linked payment dubara sync hogi. Continue?",
-      )
-    ) {
-      return;
-    }
-    setReconciling(true);
-    try {
-      if (runAll) {
-        const res = await fetch("/api/invoices/reconcile-linked-payments", {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ all: true }),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Reconcile failed");
-        window.alert(data.message || "Done");
-      } else {
-        const nums = [
-          ...new Set(
-            selectedInvoices
-              .map((i) => String(i.invoice_number || "").trim())
-              .filter(Boolean),
-          ),
-        ];
-        if (!nums.length) {
-          window.alert("Select at least one invoice with invoice number.");
-          return;
-        }
-        const messages = [];
-        for (const invoice_number of nums) {
-          const res = await fetch("/api/invoices/reconcile-linked-payments", {
-            method: "POST",
-            credentials: "include",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ invoice_number }),
-          });
-          const data = await res.json();
-          if (!res.ok) throw new Error(data.error || invoice_number);
-          messages.push(data.message || invoice_number);
-        }
-        window.alert(messages.join("\n"));
-      }
-      resetAndFetch();
-    } catch (err) {
-      window.alert(err.message || "Reconcile failed");
-    } finally {
-      setReconciling(false);
-    }
-  };
-
   const SortIcon = ({ column }) =>
     sortBy !== column ? (
       <span className="ml-1 text-gray-400">↕</span>
@@ -435,90 +253,6 @@ export default function InvoiceTable({ onSummaryUpdate }) {
 
   // State to track expanded invoices for showing linked statements
   const [expandedInvoiceId, setExpandedInvoiceId] = useState(null);
-  const [linkedDetailsById, setLinkedDetailsById] = useState({});
-  const [loadingLinkedId, setLoadingLinkedId] = useState(null);
-  const skipInitialSearchFetch = useRef(true);
-  const fetchAbortRef = useRef(null);
-
-  const invoiceMayHaveLinkedPayments = (inv) => {
-    const paid = Number(inv?.amount_paid || 0);
-    const status = String(inv?.status || "").toUpperCase();
-    return (
-      paid > 0 ||
-      status === "PAID" ||
-      status.includes("PARTIAL")
-    );
-  };
-
-  const getLinkedStatementsForRow = (inv) =>
-    linkedDetailsById[inv.id]?.linkedStatements ||
-    inv.linkedStatements ||
-    [];
-
-  const getTotalLinkedAmountForRow = (inv) =>
-    linkedDetailsById[inv.id]?.totalLinkedAmount ??
-    inv.totalLinkedAmount ??
-    0;
-
-  const fetchLinkedDetails = async (invoiceId) => {
-    if (linkedDetailsById[invoiceId] || loadingLinkedId === invoiceId) return;
-    setLoadingLinkedId(invoiceId);
-    try {
-      const params = new URLSearchParams({
-        page: "1",
-        limit: "1",
-        includeDetails: "1",
-        includeCount: "0",
-        invoiceIds: String(invoiceId),
-      });
-      const res = await fetch(`/api/invoice-table?${params.toString()}`);
-      const response = await res.json();
-      if (response.success && response.data?.[0]) {
-        const row = response.data[0];
-        const stmts = row.linkedStatements || [];
-        const totalLinkedAmount =
-          row.totalLinkedAmount ??
-          stmts.reduce((sum, stmt) => sum + Number(stmt.amount || 0), 0);
-        setLinkedDetailsById((prev) => ({
-          ...prev,
-          [invoiceId]: { linkedStatements: stmts, totalLinkedAmount },
-        }));
-      }
-    } catch (err) {
-      console.error("Failed to load linked payments:", err);
-    } finally {
-      setLoadingLinkedId(null);
-    }
-  };
-
-  const toggleLinkedPayments = async (inv) => {
-    if (expandedInvoiceId === inv.id) {
-      setExpandedInvoiceId(null);
-      return;
-    }
-    setExpandedInvoiceId(inv.id);
-    await fetchLinkedDetails(inv.id);
-  };
-
-  useEffect(() => {
-    if (!scrollLoadEnabled) return;
-
-    const scrollRoot = document.querySelector("main.overflow-auto");
-    if (!scrollRoot) return;
-
-    const onScroll = () => {
-      if (loading || loadingMore || !hasMore) return;
-      const nearBottom =
-        scrollRoot.scrollTop + scrollRoot.clientHeight >=
-        scrollRoot.scrollHeight - SCROLL_LOAD_OFFSET_PX;
-      if (nearBottom) {
-        loadMore();
-      }
-    };
-
-    scrollRoot.addEventListener("scroll", onScroll, { passive: true });
-    return () => scrollRoot.removeEventListener("scroll", onScroll);
-  }, [scrollLoadEnabled, loadMore, hasMore, loading, loadingMore]);
 
   return (
     <div className="bg-white rounded shadow p-4">
@@ -531,8 +265,18 @@ export default function InvoiceTable({ onSummaryUpdate }) {
           >
             Reset
           </button>
-          <TypeableDateFilterInput value={fromDate} onChange={setFromDate} className="border px-3 py-1 rounded"/>
-          <TypeableDateFilterInput value={toDate} onChange={setToDate} className="border px-3 py-1 rounded"/>
+          <input
+            type="date"
+            value={fromDate}
+            onChange={(e) => setFromDate(e.target.value)}
+            className="border px-3 py-1 rounded"
+          />
+          <input
+            type="date"
+            value={toDate}
+            onChange={(e) => setToDate(e.target.value)}
+            className="border px-3 py-1 rounded"
+          />
           <select
             value={invoiceTypeFilter}
             onChange={(e) => setInvoiceTypeFilter(e.target.value)}
@@ -540,16 +284,7 @@ export default function InvoiceTable({ onSummaryUpdate }) {
           >
             <option value="">All Types</option>
             <option value="tax">Tax Invoice</option>
-          </select>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="border px-3 py-1 rounded"
-          >
-            <option value="">All Status</option>
-            <option value="PAID">Paid</option>
-            <option value="PARTIAL PAID">Partial Paid</option>
-            <option value="CANCELLED">Cancelled</option>
+            <option value="performa">Performa Invoice</option>
           </select>
         </div>
         <div className="flex flex-col sm:flex-row gap-2 items-center">
@@ -561,28 +296,12 @@ export default function InvoiceTable({ onSummaryUpdate }) {
             className="border px-3 py-1 rounded w-full md:w-64"
           />
           {selectedInvoiceIds.size > 0 && (
-            <>
-              <button
-                type="button"
-                onClick={() => handleReconcileLinkedPayments("selected")}
-                disabled={reconciling}
-                className="px-3 py-1 rounded whitespace-nowrap text-sm bg-amber-100 text-amber-900 border border-amber-400 hover:bg-amber-200 disabled:opacity-50"
-              >
-                Sync selected ({selectedInvoiceIds.size})
-              </button>
-              <button
-                onClick={handleLinkPaymentClick}
-                disabled={selectedInvoices.some(inv => inv.type === 'performa')}
-                className={`px-4 py-1 rounded whitespace-nowrap font-semibold ${
-                  selectedInvoices.some(inv => inv.type === 'performa')
-                    ? 'bg-gray-400 text-white cursor-not-allowed opacity-50'
-                    : 'bg-blue-600 text-white hover:bg-blue-700'
-                }`}
-                title={selectedInvoices.some(inv => inv.type === 'performa') ? 'Cannot link payments to Performa Invoices' : ''}
-              >
-                Link Payment ({selectedInvoiceIds.size})
-              </button>
-            </>
+            <button
+              onClick={handleLinkPaymentClick}
+              className="bg-blue-600 text-white px-4 py-1 rounded hover:bg-blue-700 whitespace-nowrap font-semibold"
+            >
+              Link Payment ({selectedInvoiceIds.size})
+            </button>
           )}
         </div>
       </div>
@@ -617,7 +336,7 @@ export default function InvoiceTable({ onSummaryUpdate }) {
                 Invoice No <SortIcon column="invoice_number" />
               </th>
               <th className="px-4 py-2">Buyer</th>
-              <th className="px-4 py-2">Created By</th>
+              <th className="px-4 py-2">Employee</th>
               <th
                 onClick={() => handleSort("order_date")}
                 className="px-4 py-2 cursor-pointer"
@@ -625,7 +344,6 @@ export default function InvoiceTable({ onSummaryUpdate }) {
                 Order Date <SortIcon column="order_date" />
               </th>
               <th className="px-4 py-2">Type</th>
-              <th className="px-4 py-2">Status</th>
               <th className="px-4 py-2">Tax</th>
               <th className="px-4 py-2">Grand Total</th>
               <th className="px-4 py-2">Balance Amount</th>
@@ -640,30 +358,26 @@ export default function InvoiceTable({ onSummaryUpdate }) {
           </thead>
           <tbody>
             {loading ? (
-              <InvoiceTableLoadingState />
+              <tr>
+                <td colSpan="12" className="text-center py-4">
+                  Loading...
+                </td>
+              </tr>
             ) : fetchError ? (
               <tr>
-                <td colSpan="13" className="text-center py-6 text-red-600">
+                <td colSpan="12" className="text-center py-6 text-red-600">
                   {fetchError}
                 </td>
               </tr>
             ) : invoices.length ? (
-              invoices.map((i) => {
-                const linkedStatements = getLinkedStatementsForRow(i);
-                const totalLinkedAmount = getTotalLinkedAmountForRow(i);
-                const showLinkedExpand =
-                  linkedStatements.length > 0 || invoiceMayHaveLinkedPayments(i);
-
-                return (
+              invoices.map((i) => (
                 <React.Fragment key={i.id}>
                   <tr className={`border-t hover:bg-gray-50 ${selectedInvoiceIds.has(i.id) ? 'bg-blue-50' : ''}`}>
                     <td className="px-4 py-2 w-12">
-                      {showLinkedExpand && (
+                      {i.linkedStatements && i.linkedStatements.length > 0 && (
                         <button
-                          type="button"
-                          onClick={() => toggleLinkedPayments(i)}
+                          onClick={() => setExpandedInvoiceId(expandedInvoiceId === i.id ? null : i.id)}
                           className="text-gray-600 hover:text-blue-600"
-                          title="Linked payments"
                         >
                           {expandedInvoiceId === i.id ? '▼' : '▶'}
                         </button>
@@ -685,9 +399,9 @@ export default function InvoiceTable({ onSummaryUpdate }) {
                       {!i.parent_id && invoices.some(inv => inv.parent_id === i.id) && (
                         <span className="text-xs bg-blue-100 text-blue-700 ml-2 px-2 py-0.5 rounded">Parent</span>
                       )}
-                      {linkedStatements.length > 0 && (
+                      {i.linkedStatements && i.linkedStatements.length > 0 && (
                         <span className="text-xs bg-green-100 text-green-700 ml-2 px-2 py-0.5 rounded">
-                          {linkedStatements.length} Linked Payment{linkedStatements.length > 1 ? 's' : ''}
+                          {i.linkedStatements.length} Linked Payment{i.linkedStatements.length > 1 ? 's' : ''}
                         </span>
                       )}
                     </td>
@@ -706,24 +420,6 @@ export default function InvoiceTable({ onSummaryUpdate }) {
                       </span>
                     </td>
                     <td className="px-4 py-2">
-                      <span className={`px-3 py-1 rounded text-sm font-semibold ${
-                        i.status === 'PAID'
-                          ? 'bg-green-100 text-green-800'
-                          : i.status === 'PARTIAL PAID' || i.status === 'PARTIAL'
-                            ? 'bg-yellow-100 text-yellow-800'
-                            : i.status === 'CANCELLED'
-                              ? 'bg-red-100 text-red-800'
-                              : 'bg-gray-100 text-gray-600'
-                      }`}>
-                        {i.status || '—'}
-                      </span>
-                      {i.order_id && (
-                        <div className="mt-1 text-xs text-gray-500">
-                          Ord: {i.order_id}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-4 py-2">
                       ₹{Number(i.tax_amount).toLocaleString("en-IN")}
                     </td>
                     <td className="px-4 py-2 font-semibold">
@@ -733,9 +429,9 @@ export default function InvoiceTable({ onSummaryUpdate }) {
                       <span className={Number(i.balance_amount) > 0 ? 'text-red-600' : 'text-green-600'}>
                         ₹{Number(i.balance_amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                       </span>
-                      {totalLinkedAmount > 0 && (
+                      {i.totalLinkedAmount > 0 && (
                         <div className="text-xs text-gray-500">
-                          (-₹{Number(totalLinkedAmount).toLocaleString("en-IN", { minimumFractionDigits: 2 })})
+                          (-₹{Number(i.totalLinkedAmount).toLocaleString("en-IN", { minimumFractionDigits: 2 })})
                         </div>
                       )}
                     </td>
@@ -757,29 +453,6 @@ export default function InvoiceTable({ onSummaryUpdate }) {
                         >
                           Edit
                         </button>
-                        {i.type !== "performa" && (
-                          <button
-                            type="button"
-                            onClick={() => handleSendCustomerEmail(i)}
-                            disabled={
-                              sendingEmailId === i.id ||
-                              !String(i.customer_email || "").trim()
-                            }
-                            className="inline-flex items-center justify-center w-8 h-8 rounded bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed"
-                            title={
-                              String(i.customer_email || "").trim()
-                                ? `Email invoice to ${i.customer_email}`
-                                : "Customer email missing"
-                            }
-                            aria-label="Send invoice email to customer"
-                          >
-                            {sendingEmailId === i.id ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <Mail className="h-4 w-4" />
-                            )}
-                          </button>
-                        )}
                         <button
                           type="button"
                           onClick={() => {
@@ -795,34 +468,28 @@ export default function InvoiceTable({ onSummaryUpdate }) {
                               setShowLinkModal(true);
                             }
                           }}
-                          disabled={i.type === 'performa' || (selectedInvoiceIds.size > 0 && !selectedInvoiceIds.has(i.id))}
+                          disabled={selectedInvoiceIds.size > 0 && !selectedInvoiceIds.has(i.id)}
                           className={`text-white px-3 py-1 rounded ${
-                            i.type === 'performa' || (selectedInvoiceIds.size > 0 && !selectedInvoiceIds.has(i.id))
+                            selectedInvoiceIds.size > 0 && !selectedInvoiceIds.has(i.id)
                               ? 'bg-gray-400 cursor-not-allowed opacity-50'
                               : 'bg-purple-600 hover:bg-purple-700'
                           }`}
-                          title={i.type === 'performa' ? 'Link Payment not available for Performa Invoices' : selectedInvoiceIds.size > 0 && !selectedInvoiceIds.has(i.id) ? 'Disabled: These invoices are linked to a payment' : ''}
+                          title={selectedInvoiceIds.size > 0 && !selectedInvoiceIds.has(i.id) ? 'Disabled: These invoices are linked to a payment' : ''}
                         >
                           Link Payment
                         </button>
                       </div>
                     </td>
                   </tr>
-                  {expandedInvoiceId === i.id && (
+                  {expandedInvoiceId === i.id && i.linkedStatements && i.linkedStatements.length > 0 && (
                     <tr>
-                      <td colSpan="13" className="px-8 py-4 bg-gray-50">
-                        {loadingLinkedId === i.id ? (
-                          <p className="text-sm text-gray-600">Loading linked payments…</p>
-                        ) : linkedStatements.length === 0 ? (
-                          <p className="text-sm text-gray-500">No linked payments found.</p>
-                        ) : (
-                        <>
+                      <td colSpan="12" className="px-8 py-4 bg-gray-50">
                         <div className="flex justify-between items-center mb-3">
                           <h4 className="font-semibold text-gray-700">Linked Payments:</h4>
                           <div className="text-right">
                             <span className="text-sm text-gray-600">Total Linked: </span>
                             <span className="text-lg font-bold text-red-600">
-                              ₹{Number(totalLinkedAmount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                              ₹{Number(i.totalLinkedAmount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                             </span>
                           </div>
                         </div>
@@ -839,7 +506,7 @@ export default function InvoiceTable({ onSummaryUpdate }) {
                               </tr>
                             </thead>
                             <tbody>
-                              {linkedStatements.map((stmt) => (
+                              {i.linkedStatements.map((stmt) => (
                                 <tr key={stmt.id} className="border-t">
                                   <td className="px-4 py-2">{stmt.id}</td>
                                   <td className="px-4 py-2 font-mono">{stmt.trans_id || "-"}</td>
@@ -868,17 +535,14 @@ export default function InvoiceTable({ onSummaryUpdate }) {
                             </tbody>
                           </table>
                         </div>
-                        </>
-                        )}
                       </td>
                     </tr>
                   )}
                 </React.Fragment>
-              );
-              })
+              ))
             ) : (
               <tr>
-                <td colSpan="13" className="text-center py-6 text-gray-500">
+                <td colSpan="12" className="text-center py-6 text-gray-500">
                   No invoices found
                 </td>
               </tr>
@@ -886,34 +550,13 @@ export default function InvoiceTable({ onSummaryUpdate }) {
           </tbody>
         </table>
       </div>
-      {!loading && invoices.length > 0 && (
-        <div className="mt-3 space-y-2">
-          <div className="flex items-center justify-between text-xs text-gray-600">
-            <span>
-              Loaded {invoices.length}
-              {meta.total != null && meta.total > 0
-                ? ` of ${meta.total}`
-                : ""}{" "}
-              invoices
-            </span>
-            {loadingMore ? (
-              <span className="font-medium text-blue-600">Loading more...</span>
-            ) : hasMore ? (
-              <span>Scroll down to load more</span>
-            ) : (
-              <span>All invoices loaded</span>
-            )}
-          </div>
-        </div>
-      )}
 
       {editId != null && (
         <InvoiceEditModal
-          key={editId}
           open
           invoiceId={editId}
           onClose={() => setEditId(null)}
-          onSaved={() => resetAndFetch()}
+          onSaved={fetchData}
           viewHrefBase="/user-dashboard/invoices"
         />
       )}
@@ -930,7 +573,7 @@ export default function InvoiceTable({ onSummaryUpdate }) {
           selectedGrandTotal={selectedInvoices.reduce((sum, inv) => sum + Number(inv.grand_total || 0), 0)}
           invoices={invoices}
           onLinkSuccess={() => {
-            resetAndFetch();
+            fetchData();
           }}
         />
       )}

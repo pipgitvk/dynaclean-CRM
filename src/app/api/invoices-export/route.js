@@ -15,55 +15,50 @@ export async function GET(req) {
     const fromDate = searchParams.get("fromDate");
     const toDate = searchParams.get("toDate");
 
-    // WHERE clause builder (matches invoice-list route logic)
+    // WHERE clause builder
     let whereClause = "WHERE 1=1";
     const values = [];
 
     if (search) {
       whereClause += `
         AND (
-          i.invoice_number LIKE ? OR
-          i.customer_name LIKE ? OR
-          i.gst_number LIKE ? OR
-          i.employee_name LIKE ? OR
-          ii.item_code LIKE ? OR
-          ii.item_name LIKE ? OR
-          ii.hsn_code LIKE ?
+          invoice_number LIKE ? OR
+          customer_name LIKE ?
         )
       `;
-      const searchPattern = `%${search}%`;
-      values.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
+      values.push(`%${search}%`, `%${search}%`);
     }
 
     if (fromDate) {
-      whereClause += " AND DATE(i.invoice_date) >= DATE(?)";
+      whereClause += " AND COALESCE(order_date, invoice_date) >= ?";
       values.push(fromDate);
     }
 
     if (toDate) {
-      whereClause += " AND DATE(i.invoice_date) <= DATE(?)";
+      whereClause += " AND COALESCE(order_date, invoice_date) <= ?";
       values.push(toDate);
     }
 
     conn = await getDbConnection();
 
-    // Fetch all matching invoices (using LEFT JOIN for search compatibility)
+    // Fetch all invoices
     const [rows] = await conn.execute(
       `
-      SELECT DISTINCT
-        i.id,
-        i.invoice_number,
-        i.invoice_date,
-        i.customer_name AS buyer_name,
-        i.gst_number,
-        i.employee_name,
-        COALESCE(i.cgst, 0) + COALESCE(i.sgst, 0) + COALESCE(i.igst, 0) AS tax_amount,
-        i.grand_total,
-        i.created_at
-      FROM invoices i
-      LEFT JOIN invoice_items ii ON i.id = ii.invoice_id
+      SELECT
+        id,
+        invoice_number,
+        COALESCE(order_date, invoice_date) AS order_date,
+        customer_name as buyer_name,
+        gst_number,
+        employee_name,
+        COALESCE(cgst, 0) AS cgst,
+        COALESCE(sgst, 0) AS sgst,
+        COALESCE(igst, 0) AS igst,
+        grand_total,
+        created_at
+      FROM invoices
       ${whereClause}
-      ORDER BY i.created_at DESC
+      ORDER BY created_at DESC
       `,
       values,
     );
@@ -81,7 +76,7 @@ export async function GET(req) {
             cgst_amount, 
             sgst_amount, 
             igst_amount,
-            rate AS price_per_unit
+            rate as price_per_unit
           FROM invoice_items 
           WHERE invoice_id = ?`,
           [invoice.id]
@@ -101,15 +96,13 @@ export async function GET(req) {
     worksheet.columns = [
       { header: "ID", key: "id", width: 8 },
       { header: "Invoice Number", key: "invoice_number", width: 15 },
-      { header: "Buyer Name", key: "buyer_name", width: 25 },
+      { header: "Buyer Name", key: "buyer_name", width: 20 },
       { header: "GSTIN", key: "gst_number", width: 18 },
       { header: "Employee Name", key: "employee_name", width: 18 },
-      { header: "Invoice Date", key: "invoice_date", width: 15 },
+      { header: "Created At", key: "created_at", width: 15 },
       { header: "Tax Amount", key: "tax_amount", width: 15 },
       { header: "Taxable Amt", key: "taxable_amount", width: 15 },
       { header: "Grand Total", key: "grand_total", width: 15 },
-      { header: "Item Code", key: "item_code", width: 12 },
-      { header: "Item Name", key: "item_name", width: 20 },
       { header: "HSN Code", key: "hsn_code", width: 12 },
       { header: "Quantity", key: "quantity", width: 10 },
       { header: "Taxable Value", key: "taxable_value", width: 15 },
@@ -136,18 +129,16 @@ export async function GET(req) {
             buyer_name: inv.buyer_name || "-",
             gst_number: inv.gst_number || "-",
             employee_name: inv.employee_name || "-",
-            invoice_date: inv.invoice_date ? new Date(inv.invoice_date).toLocaleDateString("en-IN") : "-",
-            tax_amount: Number(inv.tax_amount) || 0,
-            taxable_amount: Number(item.taxable_value) || 0,
-            grand_total: Number(inv.grand_total) || 0,
-            item_code: item.item_code || "-",
-            item_name: item.item_name || "-",
+            created_at: inv.created_at ? new Date(inv.created_at).toLocaleDateString("en-IN") : "-",
+            tax_amount: inv.tax_amount || 0,
+            taxable_amount: item.taxable_value || 0,
+            grand_total: inv.grand_total || 0,
             hsn_code: item.hsn_code || "-",
             quantity: item.quantity || 0,
-            taxable_value: Number(item.taxable_value) || 0,
-            cgst_amount: Number(item.cgst_amount) || 0,
-            sgst_amount: Number(item.sgst_amount) || 0,
-            igst_amount: Number(item.igst_amount) || 0,
+            taxable_value: item.taxable_value || 0,
+            cgst_amount: item.cgst_amount || 0,
+            sgst_amount: item.sgst_amount || 0,
+            igst_amount: item.igst_amount || 0,
           });
         });
       } else {
@@ -157,12 +148,10 @@ export async function GET(req) {
           buyer_name: inv.buyer_name || "-",
           gst_number: inv.gst_number || "-",
           employee_name: inv.employee_name || "-",
-          invoice_date: inv.invoice_date ? new Date(inv.invoice_date).toLocaleDateString("en-IN") : "-",
-          tax_amount: Number(inv.tax_amount) || 0,
+          created_at: inv.created_at ? new Date(inv.created_at).toLocaleDateString("en-IN") : "-",
+          tax_amount: inv.tax_amount || 0,
           taxable_amount: 0,
-          grand_total: Number(inv.grand_total) || 0,
-          item_code: "-",
-          item_name: "-",
+          grand_total: inv.grand_total || 0,
           hsn_code: "-",
           quantity: 0,
           taxable_value: 0,
@@ -173,16 +162,17 @@ export async function GET(req) {
       }
     });
 
-    // Format number columns
+    // Format numbers
     worksheet.columns.forEach((col) => {
       if (["tax_amount", "taxable_amount", "taxable_value", "cgst_amount", "sgst_amount", "igst_amount", "grand_total"].includes(col.key)) {
-        col.numFmt = "#,##0.00";
+        col.numFmt = "₹#,##0.00";
       }
     });
 
     // Generate buffer
     const buffer = await workbook.xlsx.writeBuffer();
 
+    // Return as downloadable file
     return new NextResponse(buffer, {
       headers: {
         "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

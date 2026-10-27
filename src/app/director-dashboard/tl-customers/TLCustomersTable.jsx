@@ -1,6 +1,5 @@
 "use client";
 
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useTransition, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -65,7 +64,9 @@ export default function TLCustomersTable({
 
   console.log("customer data ", customers);
 
-  const basePath = "/director-dashboard/tl-customers";
+  const basePath = isAdmin
+    ? "/admin-dashboard/tl-customers"
+    : "/user-dashboard/tl-customers";
 
   // Use allCustomersForKPI for counts, or fallback to customers if not provided
   const customersForKPI =
@@ -460,10 +461,10 @@ export default function TLCustomersTable({
         <div className="flex items-center justify-between gap-6">
           {/* Left side - Search filters */}
           <div className="flex-1">
-            <form onSubmit={handleSearch}>
-              <div className="flex flex-wrap items-end gap-3">
+            <form onSubmit={handleSearch} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
                 {/* Search */}
-                <div className="min-w-[14rem] flex-1 sm:max-w-md">
+                <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Search (ID, Phone, Name, Company)
                   </label>
@@ -645,17 +646,30 @@ export default function TLCustomersTable({
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Next Followup from
                   </label>
-                  <TypeableDateFilterInput value={nextFromDate} onChange={setNextFromDate} placeholder="dd/mm/yyyy" className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                  <input
+                    type="date"
+                    placeholder="dd/mm/yyyy"
+                    value={nextFromDate}
+                    onChange={(e) => setNextFromDate(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Next Followup to
                   </label>
-                  <TypeableDateFilterInput value={nextToDate} onChange={setNextToDate} placeholder="dd/mm/yyyy" wrapperClassName="relative flex w-full min-w-[10rem] shrink-0 items-stretch" className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                  <input
+                    type="date"
+                    placeholder="dd/mm/yyyy"
+                    value={nextToDate}
+                    onChange={(e) => setNextToDate(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
                 </div>
+              </div>
 
-                <div className="flex shrink-0 flex-wrap items-center gap-2 pb-0.5">
+              <div className="flex gap-2 items-center">
                 <button
                   type="submit"
                   disabled={isPending}
@@ -724,7 +738,6 @@ export default function TLCustomersTable({
                   >
                     {tlOnly ? "ON" : "OFF"}
                   </span>
-                </div>
                 </div>
               </div>
             </form>
@@ -950,7 +963,7 @@ export default function TLCustomersTable({
                       {customer.followup_start_at
                         ? formatCrmDatetimeForISTDisplay(
                             customer.followup_start_at,
-                            "DD-MM-YYYY HH:mm",
+                            "DD MMM, YYYY HH:mm",
                           ) || "N/A"
                         : "N/A"}
                     </td>
@@ -1002,18 +1015,18 @@ export default function TLCustomersTable({
                     {tlOnly
                       ? formatCrmDatetimeForISTDisplay(
                           customer.tl_next_followup,
-                          "DD-MM-YYYY HH:mm",
+                          "DD MMM, YYYY HH:mm",
                         ) || "N/A"
                       : formatCrmDayjsForISTDisplay(
                           pickEffectiveNextFollowup(customer),
-                          "DD-MM-YYYY HH:mm",
+                          "DD MMM, YYYY HH:mm",
                         ) || "N/A"}
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
                     {customer.estimated_order_date
                       ? formatCrmDatetimeForISTDisplay(
                           customer.estimated_order_date,
-                          "DD-MM-YYYY HH:mm",
+                          "DD MMM, YYYY HH:mm",
                         ) || "N/A"
                       : "N/A"}
                   </td>
@@ -1138,7 +1151,7 @@ export default function TLCustomersTable({
                               <p>
                                 <b>Date:</b>{" "}
                                 {dayjs(latestquote.quote_date).format(
-                                  "DD-MM-YYYY",
+                                  "DD MMM YYYY",
                                 )}
                               </p>
                               <p>
@@ -1157,7 +1170,7 @@ export default function TLCustomersTable({
                           {latestquote?.quote_number && (
                             <div className="flex justify-end gap-2 mt-5">
                               <a
-                                href={`/director-dashboard/quotations/${latestquote.quote_number}`}
+                                href={`/admin-dashboard/quotations/${latestquote.quote_number}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"

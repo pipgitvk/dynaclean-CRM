@@ -1,6 +1,5 @@
 "use client";
 
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useCallback, useEffect, useState } from "react";
 import toast from "react-hot-toast";
 
@@ -269,7 +268,14 @@ export default function PublicBillingFormClient({ token }) {
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <Label htmlFor="bill_date">Bill date</Label>
-                <TypeableDateFilterInput value={bill_date} onChange={setBillDate} id="bill_date" className={inputCls}/>
+                <input
+                  id="bill_date"
+                  name="bill_date"
+                  type="date"
+                  value={bill_date}
+                  onChange={(e) => setBillDate(e.target.value)}
+                  className={inputCls}
+                />
               </div>
               <div>
                 <Label htmlFor="bill_amount">Bill amount (₹)</Label>

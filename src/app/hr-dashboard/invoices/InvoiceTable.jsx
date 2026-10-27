@@ -1,32 +1,15 @@
 "use client";
 
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import InvoiceEditModal from "@/app/admin-dashboard/invoices/InvoiceEditModal";
 
 export default function InvoiceTable() {
-  const getMonthStartEnd = () => {
-    const now = new Date();
-    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    return { firstDay, lastDay };
-  };
-
-  const formatDateForInput = (date) => {
-    const y = date.getFullYear();
-    const m = String(date.getMonth() + 1).padStart(2, "0");
-    const d = String(date.getDate()).padStart(2, "0");
-    return `${y}-${m}-${d}`;
-  };
-
-  const { firstDay: firstDayOfMonth, lastDay: lastDayOfMonth } = getMonthStartEnd();
-
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [fromDate, setFromDate] = useState(formatDateForInput(firstDayOfMonth));
-  const [toDate, setToDate] = useState(formatDateForInput(lastDayOfMonth));
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -92,10 +75,9 @@ export default function InvoiceTable() {
   }, [search]);
 
   const handleReset = () => {
-    const { firstDay, lastDay } = getMonthStartEnd();
     setSearch("");
-    setFromDate(formatDateForInput(firstDay));
-    setToDate(formatDateForInput(lastDay));
+    setFromDate("");
+    setToDate("");
     setSortBy("created_at");
     setSortOrder("desc");
     setCurrentPage(1);
@@ -141,8 +123,18 @@ export default function InvoiceTable() {
           >
             Reset
           </button>
-          <TypeableDateFilterInput value={fromDate} onChange={setFromDate} className="border px-3 py-1 rounded"/>
-          <TypeableDateFilterInput value={toDate} onChange={setToDate} className="border px-3 py-1 rounded"/>
+          <input
+            type="date"
+            value={fromDate}
+            onChange={(e) => setFromDate(e.target.value)}
+            className="border px-3 py-1 rounded"
+          />
+          <input
+            type="date"
+            value={toDate}
+            onChange={(e) => setToDate(e.target.value)}
+            className="border px-3 py-1 rounded"
+          />
         </div>
         <input
           type="text"

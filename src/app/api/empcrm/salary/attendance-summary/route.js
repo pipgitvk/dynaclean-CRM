@@ -8,7 +8,6 @@ import {
   mergeGlobalRulesWithEmployeeSchedule,
 } from "@/lib/attendanceRulesDb";
 import { computeSalaryPayDaysForUser } from "@/lib/salaryPayDaysFromAttendance";
-import { isServiceEngineerRole } from "@/lib/serviceEngineerSundayPayroll";
 import { computeAttendanceDetailsCardSummaryForMonth } from "@/lib/attendanceDetailsCardSummary";
 import { getPayrollAttendanceLogDateRange } from "@/lib/payrollLogDateRange";
 
@@ -20,8 +19,6 @@ function normalizeUserKey(value) {
 
 const ATT_SELECT = `
       a.username, a.date, a.checkin_time, a.checkout_time,
-      a.checkin_latitude, a.checkin_longitude, a.checkin_address,
-      a.checkout_latitude, a.checkout_longitude, a.checkout_address,
       a.break_morning_start, a.break_morning_end,
       a.break_lunch_start, a.break_lunch_end,
       a.break_evening_start, a.break_evening_end
@@ -40,8 +37,6 @@ function mapOneEmployeeSummary(emp, logs, holidays, leaves, globalRules, schedul
     username: emp.username,
     rules,
     dateOfJoining: emp.date_of_joining ?? null,
-    userRole: emp.userRole ?? null,
-    workLocation: emp.work_location ?? null,
   });
 
   const attendance_cards = computeAttendanceDetailsCardSummaryForMonth({
@@ -62,9 +57,6 @@ function mapOneEmployeeSummary(emp, logs, holidays, leaves, globalRules, schedul
     total_punched_days:
       stats.total_punched_days != null ? Number(stats.total_punched_days) : stats.present + stats.late_days,
     half_day_count: stats.half_day,
-    half_day_paid_count: stats.half_day_paid || 0,
-    half_day_unpaid_count: stats.half_day_unpaid || 0,
-    unpaid_leave_count: stats.lop || 0,
     late_day_count: stats.late_days,
     sunday_count: stats.sunday,
     weekend_off_count: stats.weekend_off,
@@ -74,8 +66,6 @@ function mapOneEmployeeSummary(emp, logs, holidays, leaves, globalRules, schedul
     pay_days: Number(stats.pay_days),
     pay_days_raw: stats.pay_days_raw != null ? Number(stats.pay_days_raw) : null,
     pay_period_days: stats.period_days != null ? Number(stats.period_days) : null,
-    pay_salary_period_cap:
-      stats.salary_period_cap != null ? Number(stats.salary_period_cap) : null,
     pay_sundays_in_period: stats.sundays_in_period != null ? Number(stats.sundays_in_period) : null,
     pay_sundays_in_period_dates: stats.sundays_in_period_dates,
     pay_holiday_weekdays_in_period:
@@ -94,33 +84,9 @@ function mapOneEmployeeSummary(emp, logs, holidays, leaves, globalRules, schedul
       stats.sundays_unpaid_whole_week_off != null
         ? Number(stats.sundays_unpaid_whole_week_off)
         : null,
-    pay_sunday_work_credits:
-      stats.sunday_work_pay_credits != null ? Number(stats.sunday_work_pay_credits) : null,
-    pay_holiday_work_credits:
-      stats.holiday_work_pay_credits != null
-        ? Number(stats.holiday_work_pay_credits)
-        : null,
     attendance_log_days: logs.length,
     dates_worked: logs.map((l) => l.date),
     sunday_worked_dates: stats.sunday_worked_dates,
-    holiday_worked_dates: stats.holiday_worked_dates,
-    paid_leave_worked_dates: stats.leave_worked_dates,
-    user_role: emp.userRole ?? null,
-    work_location: emp.work_location ?? null,
-    off_day_work_location_policy: "attendance_location_matches_work_location",
-    has_profile_work_location: Boolean(String(emp.work_location ?? "").trim()),
-    off_day_work_pay_enabled:
-      (Number(stats.sunday_work_pay_credits) || 0) > 0 ||
-      (Number(stats.holiday_work_pay_credits) || 0) > 0,
-    service_engineer_sunday_work_policy: isServiceEngineerRole(emp.userRole)
-      ? "attendance_location_matches_work_location"
-      : null,
-    service_engineer_has_work_location: isServiceEngineerRole(emp.userRole)
-      ? Boolean(String(emp.work_location ?? "").trim())
-      : null,
-    service_engineer_sunday_work_enabled:
-      (Number(stats.sunday_work_pay_credits) || 0) > 0 ||
-      (Number(stats.holiday_work_pay_credits) || 0) > 0,
   };
 }
 
@@ -151,7 +117,7 @@ export async function GET(request) {
     );
 
     const [leaves] = await db.query(
-      `SELECT username, from_date, to_date, leave_type, reason, is_half_day, half_day_type
+      `SELECT username, from_date, to_date, leave_type, reason
        FROM employee_leaves
        WHERE status = 'approved'`
     );
@@ -181,24 +147,17 @@ export async function GET(request) {
       }
 
       let dateOfJoining = null;
-      let workLocation = null;
       try {
         const [profileRows] = await db.query(
-          `SELECT date_of_joining, work_location FROM employee_profiles WHERE username = ? LIMIT 1`,
+          `SELECT date_of_joining FROM employee_profiles WHERE username = ? LIMIT 1`,
           [empRows[0].username]
         );
         dateOfJoining = profileRows[0]?.date_of_joining ?? null;
-        workLocation = profileRows[0]?.work_location ?? null;
       } catch {
         /* table/column missing in some DBs */
       }
 
-      const emp = {
-        ...empRows[0],
-        _monthStr: month,
-        date_of_joining: dateOfJoining,
-        work_location: workLocation,
-      };
+      const emp = { ...empRows[0], _monthStr: month, date_of_joining: dateOfJoining };
 
       const [attendance] = await db.query(
         `
@@ -227,16 +186,12 @@ export async function GET(request) {
     `);
 
     let dojByUser = new Map();
-    let workLocationByUser = new Map();
     try {
       const [profileRows] = await db.query(
-        `SELECT username, date_of_joining, work_location FROM employee_profiles`
+        `SELECT username, date_of_joining FROM employee_profiles`
       );
       dojByUser = new Map(
         (profileRows || []).map((p) => [normalizeUserKey(p.username), p.date_of_joining])
-      );
-      workLocationByUser = new Map(
-        (profileRows || []).map((p) => [normalizeUserKey(p.username), p.work_location])
       );
     } catch {
       /* employee_profiles missing */
@@ -245,8 +200,8 @@ export async function GET(request) {
     const [attendance] = await db.query(
       `
       SELECT ${ATT_SELECT}
-      FROM attendance_logs a
-      WHERE a.date >= ? AND a.date <= ?
+      FROM attendance_logs 
+      WHERE date >= ? AND date <= ?
     `,
       [logRange.from, logRange.to]
     );
@@ -260,11 +215,9 @@ export async function GET(request) {
 
     const employeeSummary = employees.map((emp) => {
       const logs = logsByUser[normalizeUserKey(emp.username)] || [];
-      const uk = normalizeUserKey(emp.username);
-      const dateOfJoining = dojByUser.get(uk) ?? null;
-      const workLocation = workLocationByUser.get(uk) ?? null;
+      const dateOfJoining = dojByUser.get(normalizeUserKey(emp.username)) ?? null;
       return mapOneEmployeeSummary(
-        { ...emp, _monthStr: month, date_of_joining: dateOfJoining, work_location: workLocation },
+        { ...emp, _monthStr: month, date_of_joining: dateOfJoining },
         logs,
         holidays,
         leaves,

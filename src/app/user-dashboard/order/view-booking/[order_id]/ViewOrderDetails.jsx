@@ -1,9 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import { resolveStoredFileUrl } from "@/lib/resolveStoredFileUrl";
 
-export default function ViewOrderDetails({ data, orderBasePath }) {
+export default function ViewOrderDetails({ data }) {
   const {
     orderDetails,
     items,
@@ -11,7 +10,6 @@ export default function ViewOrderDetails({ data, orderBasePath }) {
     currentStage,
     currentIndex,
     progressPercent,
-    bookingViewLabel,
   } = data;
 
   const currency = (val) =>
@@ -36,14 +34,9 @@ export default function ViewOrderDetails({ data, orderBasePath }) {
 
   return (
     <div className="max-w-7xl mx-auto p-6">
-      <h1 className="text-2xl font-bold mb-1 text-center">
+      <h1 className="text-2xl font-bold mb-4 text-center">
         View Order by Quotation
       </h1>
-      {bookingViewLabel && (
-        <p className="text-sm text-amber-800 mb-4 text-center">
-          {bookingViewLabel}
-        </p>
-      )}
 
       {/* Progress Bar */}
       <div className="mb-6">
@@ -188,7 +181,19 @@ export default function ViewOrderDetails({ data, orderBasePath }) {
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
         {files.map(({ label, key }) => {
           const fileUrl = orderDetails[key];
-          const displayUrl = resolveStoredFileUrl(fileUrl);
+          let displayUrl = fileUrl;
+          
+          // Convert direct upload paths to API routes for proper file serving
+          if (fileUrl && fileUrl.startsWith('/uploads/')) {
+            const parts = fileUrl.split('/');
+            if (parts.length >= 3) {
+              // Extract folder and filename from /uploads/folder/filename
+              const folder = parts[2];
+              const filename = parts.slice(3).join('/');
+              displayUrl = `/api/files/${folder}/${encodeURIComponent(filename)}`;
+            }
+          }
+          
           return (
             <div key={key} className="p-4 border rounded-lg">
               <h4 className="text-sm font-semibold mb-2">{label}</h4>

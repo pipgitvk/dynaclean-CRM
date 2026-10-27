@@ -1,6 +1,5 @@
 "use client";
 
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import Link from "next/link";
 import dayjs from "dayjs";
 import { useState } from "react";
@@ -16,7 +15,7 @@ export default function OtherIncomeTable({ rows, role }) {
   // Filter rows based on search, status, and date range
   const filteredRows = rows.filter((row) => {
     const totalIncome = Number(row.amount || 0) + Number(row.gst_amount || 0);
-    const formattedDate = dayjs(row.income_date).format("DD-MM-YYYY");
+    const formattedDate = dayjs(row.income_date).format("DD MMM YYYY");
 
     const matchesSearch =
       Object.values(row)
@@ -100,12 +99,22 @@ export default function OtherIncomeTable({ rows, role }) {
 
           <div>
             <label className="block text-sm font-medium mb-1">From Date</label>
-            <TypeableDateFilterInput value={fromDate} onChange={setFromDate} className="w-full border p-2 rounded-md"/>
+            <input
+              type="date"
+              value={fromDate}
+              onChange={(e) => setFromDate(e.target.value)}
+              className="w-full border p-2 rounded-md"
+            />
           </div>
 
           <div>
             <label className="block text-sm font-medium mb-1">To Date</label>
-            <TypeableDateFilterInput value={toDate} onChange={setToDate} className="w-full border p-2 rounded-md"/>
+            <input
+              type="date"
+              value={toDate}
+              onChange={(e) => setToDate(e.target.value)}
+              className="w-full border p-2 rounded-md"
+            />
           </div>
 
           <div>
@@ -155,7 +164,7 @@ export default function OtherIncomeTable({ rows, role }) {
               sortedRows.map((row, idx) => (
                 <tr key={row.id || idx} className="border-b hover:bg-gray-50">
                   <td className="px-4 py-3 text-gray-700">
-                    {dayjs(row.income_date).format("DD-MM-YYYY")}
+                    {dayjs(row.income_date).format("DD MMM YYYY")}
                   </td>
                   <td className="px-4 py-3 text-gray-700 font-medium">{row.income_name}</td>
                   <td className="px-4 py-3 text-gray-700">{row.income_source}</td>

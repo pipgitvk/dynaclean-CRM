@@ -1,8 +1,5 @@
 "use client";
 
-import { formatCrmDateOnly } from "@/lib/crmDateFormat";
-
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Search, CreditCard } from "lucide-react";
 import toast from "react-hot-toast";
@@ -21,7 +18,7 @@ function formatDateOnly(value) {
   if (!value) return "—";
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return "—";
-  return formatCrmDateOnly(d);
+  return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 }
 function numMoney(v) {
   if (v == null || v === "") return "—";
@@ -171,7 +168,12 @@ function PaymentModal({ open, row, onClose, onDone }) {
           {/* Payment date */}
           <div>
             <label className="mb-1.5 block text-xs font-medium text-slate-700">Payment date</label>
-            <TypeableDateFilterInput value={paymentDate} onChange={setPaymentDate} className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm text-slate-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"/>
+            <input
+              type="date"
+              value={paymentDate}
+              onChange={(e) => setPaymentDate(e.target.value)}
+              className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm text-slate-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+            />
           </div>
 
           {/* Payment mode */}

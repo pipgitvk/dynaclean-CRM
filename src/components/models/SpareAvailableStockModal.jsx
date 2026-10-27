@@ -14,7 +14,7 @@ export default function SpareAvailableStockModal({ isOpen, onClose }) {
 
   useEffect(() => {
     if (isOpen) {
-      fetch("/api/spare/available-stock")
+      fetch("/api/spare-available-stock")
         .then((res) => res.json())
         .then((res) => setData(Array.isArray(res) ? res : []))
         .catch(() => setData([]));

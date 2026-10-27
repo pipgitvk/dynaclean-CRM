@@ -1,7 +1,6 @@
 "use client";
 
 import Image from "next/image";
-import { resolveStoredFileUrl } from "@/lib/resolveStoredFileUrl";
 
 export default function OrderDetails({ data }) {
   const {
@@ -10,7 +9,7 @@ export default function OrderDetails({ data }) {
     stages,
     currentStage,
     progressPercent,
-    stepCompleted,
+    currentIndex,
   } = data;
 
   const currency = (n) =>
@@ -51,7 +50,7 @@ export default function OrderDetails({ data }) {
         {stages.map((label, idx) => (
           <div key={`stage-${idx}`} className="text-center flex-1">
             <div
-              className={`w-6 h-6 mx-auto rounded-full text-white flex items-center justify-center text-xs font-bold ${stepCompleted?.[idx] ? "bg-green-500" : "bg-gray-300"
+              className={`w-6 h-6 mx-auto rounded-full text-white flex items-center justify-center text-xs font-bold ${idx <= currentIndex ? "bg-green-500" : "bg-gray-300"
                 }`}
             >
               {idx + 1}
@@ -179,7 +178,19 @@ export default function OrderDetails({ data }) {
       <div className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {files.map(({ label, key }) => {
           const fileUrl = orderDetails[key];
-          const displayUrl = resolveStoredFileUrl(fileUrl);
+          let displayUrl = fileUrl;
+          
+          // Convert direct upload paths to API routes for proper file serving
+          if (fileUrl && fileUrl.startsWith('/uploads/')) {
+            const parts = fileUrl.split('/');
+            if (parts.length >= 3) {
+              // Extract folder and filename from /uploads/folder/filename
+              const folder = parts[2];
+              const filename = parts.slice(3).join('/');
+              displayUrl = `/api/files/${folder}/${encodeURIComponent(filename)}`;
+            }
+          }
+          
           return (
             <div key={key} className="p-4 border rounded-lg">
               <h4 className="text-sm font-semibold mb-2">{label}</h4>

@@ -90,13 +90,13 @@ export default async function OtherIncomeDetailPage({ params }) {
             <div className="bg-gray-50 p-3 rounded">
               <p className="text-xs text-gray-500 font-semibold uppercase">Income Date</p>
               <p className="text-gray-900 font-medium">
-                {dayjs(income.income_date).format("DD-MM-YYYY")}
+                {dayjs(income.income_date).format("DD MMM YYYY")}
               </p>
             </div>
             <div className="bg-gray-50 p-3 rounded">
               <p className="text-xs text-gray-500 font-semibold uppercase">Transaction Date</p>
               <p className="text-gray-900 font-medium">
-                {income.transaction_date ? dayjs(income.transaction_date).format("DD-MM-YYYY") : "-"}
+                {income.transaction_date ? dayjs(income.transaction_date).format("DD MMM YYYY") : "-"}
               </p>
             </div>
             <div className="bg-blue-50 p-3 rounded border-2 border-blue-200">
@@ -197,8 +197,8 @@ export default async function OtherIncomeDetailPage({ params }) {
 
         {/* Metadata */}
         <div className="border-t pt-6 text-xs text-gray-500">
-          <p>Created: {dayjs(income.created_at).format("DD-MM-YYYY HH:mm")}</p>
-          <p>Last Updated: {dayjs(income.updated_at).format("DD-MM-YYYY HH:mm")}</p>
+          <p>Created: {dayjs(income.created_at).format("DD MMM YYYY HH:mm")}</p>
+          <p>Last Updated: {dayjs(income.updated_at).format("DD MMM YYYY HH:mm")}</p>
         </div>
       </div>
 

@@ -102,11 +102,11 @@ export default async function UpcomingServiceFollowups({ username, userRole }) {
                   <div className="space-y-1 text-xs text-gray-500">
                     <div className="flex items-center gap-1.5">
                       <CalendarDays size={12} />
-                      <span>Last: {dayjs(fu.followed_at).tz(IST).format("DD-MM-YYYY hh:mm A")}</span>
+                      <span>Last: {dayjs(fu.followed_at).tz(IST).format("DD MMM YYYY, hh:mm A")}</span>
                     </div>
                     <div className={`flex items-center gap-1.5 font-semibold ${color.text}`}>
                       <CalendarDays size={12} />
-                      <span>Next: {fu.next_followup_date ? dayjs(fu.next_followup_date).tz(IST).format("DD-MM-YYYY hh:mm A") : "—"}</span>
+                      <span>Next: {fu.next_followup_date ? dayjs(fu.next_followup_date).tz(IST).format("DD MMM YYYY, hh:mm A") : "—"}</span>
                     </div>
                   </div>
                 </div>

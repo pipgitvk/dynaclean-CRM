@@ -1,7 +1,5 @@
 "use client";
 
-import { formatCrmDateOnly } from "@/lib/crmDateFormat";
-
 import { useState, useEffect } from "react";
 import {
   Calendar,
@@ -213,7 +211,11 @@ export default function HROperationsPage() {
   };
 
   const formatDate = (dateString) => {
-    return new formatCrmDateOnly(Date(dateString));
+    return new Date(dateString).toLocaleDateString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric'
+    });
   };
 
   const selectedEmpName = selectedEmployee

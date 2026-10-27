@@ -12,8 +12,6 @@ const HIRING_STATUS_OPTIONS = [
   "Backup",
   "Hired",
   "Joined",
-  "Backout",
-  "After joining backout",
   "Rejected",
   // Legacy — kept so old DB rows can still be saved without being reset
   "Have not talked",
@@ -35,19 +33,6 @@ export const HIRING_TAG_OPTIONS = [
   "Post-ponding",
   "Not-looking",
 ];
-
-/** No next follow-up datetime required (terminal / closed-loop statuses). */
-export function hiringStatusSkipsNextFollowup(status) {
-  const s = String(status ?? "").trim();
-  return (
-    s === "Rejected" ||
-    s === "Reject" ||
-    s === "Joined" ||
-    s === "Attended Interview" ||
-    s === "Backout" ||
-    s === "After joining backout"
-  );
-}
 
 export const HAVE_NOT_TALKED_REASONS = [
   "Didn't receive the call",
@@ -187,7 +172,7 @@ export function parseHiringPayload(body, options = {}) {
   if (isRescheduled && !rescheduled_at_raw) {
     return { error: "Rescheduled date and time is required when status is Rescheduled." };
   }
-  if (!hiringStatusSkipsNextFollowup(status) && !next_followup_at_raw) {
+  if (status !== "Rejected" && status !== "Reject" && status !== "Joined" && status !== "Attended Interview" && !next_followup_at_raw) {
     return { error: "Next follow-up date and time is required for this status." };
   }
   if (isSelected && !skipSelectedResumeValidation && !selected_resume) {
@@ -197,9 +182,7 @@ export function parseHiringPayload(body, options = {}) {
     return { error: "Management interview score (1–10) is required when status is Selected." };
   }
 
-  const resolved_next_followup_at = hiringStatusSkipsNextFollowup(status)
-    ? null
-    : next_followup_at_raw;
+  const resolved_next_followup_at = (status !== "Rejected" && status !== "Reject" && status !== "Joined" && status !== "Attended Interview") ? next_followup_at_raw : null;
 
   return {
     data: {

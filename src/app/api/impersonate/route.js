@@ -33,7 +33,7 @@ export async function POST(request) {
 
     const conn = await getDbConnection();
     const [empRows] = await conn.execute(
-      "SELECT username, userRole, empId FROM rep_list WHERE empId = ?",
+      "SELECT username, userRole FROM rep_list WHERE empId = ?",
       [empId],
     );
     // await conn.end();
@@ -49,8 +49,7 @@ export async function POST(request) {
 
     // Generate a new, temporary token for the employee
     const impersonationToken = await new SignJWT({
-      id: employee.empId,
-      empId: employee.empId,
+      id: employee.id, // Assuming 'id' exists
       username: employee.username,
       role: employee.userRole,
       impersonated: true,

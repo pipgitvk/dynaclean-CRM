@@ -1,7 +1,5 @@
 "use client";
 
-import { formatCrmDateOnly } from "@/lib/crmDateFormat";
-
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Target } from "lucide-react";
 
@@ -59,7 +57,10 @@ export default function SalesAchievedQuickCard() {
   const achievedPercent = hasTarget ? Math.round((completed / target) * 100) : 0;
   const ringPercent = Math.min(Math.max(achievedPercent, 0), 100);
   const strokeColor = getRingColor(achievedPercent);
-  const monthLabel = formatCrmDateOnly(new Date());
+  const monthLabel = new Date().toLocaleDateString("en-IN", {
+    month: "short",
+    year: "numeric",
+  });
 
   const ring = useMemo(() => {
     const radius = 22;

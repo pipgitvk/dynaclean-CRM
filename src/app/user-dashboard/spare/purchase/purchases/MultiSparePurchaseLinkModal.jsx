@@ -1,8 +1,5 @@
 "use client";
 
-import { formatCrmDateOnly } from "@/lib/crmDateFormat";
-
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import React, { useEffect, useState, useMemo } from "react";
 import { Search, X, Link2 } from "lucide-react";
 import { toast } from "react-hot-toast";
@@ -453,8 +450,18 @@ export default function MultiSparePurchaseLinkModal({
               />
             </div>
             <div className="flex gap-2">
-              <TypeableDateFilterInput value={stmtStartDate} onChange={setStmtStartDate} className="px-3 py-1.5 border rounded-md text-sm"/>
-              <TypeableDateFilterInput value={stmtEndDate} onChange={setStmtEndDate} className="px-3 py-1.5 border rounded-md text-sm"/>
+              <input
+                type="date"
+                value={stmtStartDate}
+                onChange={(e) => setStmtStartDate(e.target.value)}
+                className="px-3 py-1.5 border rounded-md text-sm"
+              />
+              <input
+                type="date"
+                value={stmtEndDate}
+                onChange={(e) => setStmtEndDate(e.target.value)}
+                className="px-3 py-1.5 border rounded-md text-sm"
+              />
               {(stmtStartDate || stmtEndDate) && (
                 <button
                   onClick={() => {
@@ -515,7 +522,7 @@ export default function MultiSparePurchaseLinkModal({
                       </td>
                       <td className="p-3 font-medium text-gray-600">#{s.id}</td>
                       <td className="p-3 font-mono text-xs text-gray-500">{s.trans_id || "—"}</td>
-                      <td className="p-3 text-gray-600">{s.date ? formatCrmDateOnly(s.date) : "—"}</td>
+                      <td className="p-3 text-gray-600">{s.date ? new Date(s.date).toLocaleDateString() : "—"}</td>
                       <td className="p-3 max-w-[300px] truncate text-gray-600" title={s.description || ""}>{s.description || "—"}</td>
                       <td className="p-3 font-bold text-red-600">₹{Number(s.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                       <td className="p-3 font-medium text-green-700">

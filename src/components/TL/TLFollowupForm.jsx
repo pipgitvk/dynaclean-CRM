@@ -1,6 +1,5 @@
 "use client";
 
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Calendar, Save, X, Search } from "lucide-react";
@@ -149,7 +148,27 @@ export default function TLFollowupForm({
     setModelSearchInput("");
   }, [latestfollowup]);
 
-  const availableStages = stageOptions;
+  // Filter stages based on customer's current stage from database
+  const getAvailableStages = (currentStage) => {
+    if (!currentStage) return stageOptions;
+
+    const stageOrder = stageOptions;
+    const currentIndex = stageOrder.indexOf(currentStage);
+
+    // For final stages, only allow staying in the same stage or going back
+    if (
+      currentStage === "Won (Order Received)" ||
+      currentStage === "Lost" ||
+      currentStage === "Disqualified / Invalid Lead"
+    ) {
+      return [currentStage];
+    }
+
+    // Show current stage and all stages after it (progressive flow)
+    return stageOrder.slice(currentIndex);
+  };
+
+  const availableStages = getAvailableStages(customerCurrentStage);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -330,7 +349,13 @@ export default function TLFollowupForm({
               <Calendar size={14} className="inline mr-1" />
               Estimated Order Date (optional)
             </label>
-            <TypeableDateFilterInput value={formData.estimated_order_date} onChange={(v) => handleChange({ target: { name: "estimated_order_date", value: v } })} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+            <input
+              type="date"
+              name="estimated_order_date"
+              value={formData.estimated_order_date}
+              onChange={handleChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
           </div>
 
           {/* Lead Quality Score */}

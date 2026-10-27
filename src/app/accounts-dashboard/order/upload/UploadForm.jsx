@@ -3,8 +3,6 @@
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
-import { useInvoiceLinkedPaymentAutofill } from "@/hooks/useInvoiceLinkedPaymentAutofill";
-import { useOrderUploadInvoicePrefill } from "@/hooks/useOrderUploadInvoicePrefill";
 
 export default function UploadForm({ orderDetails }) {
   const [form, setForm] = useState({
@@ -27,18 +25,8 @@ export default function UploadForm({ orderDetails }) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [quoteTotalsLoaded, setQuoteTotalsLoaded] = useState(false);
-  const [invoicePrefillLoaded, setInvoicePrefillLoaded] = useState(false);
   const [paymentTermDays, setPaymentTermDays] = useState(null);
   const [computedPaymentStatus, setComputedPaymentStatus] = useState("pending");
-
-  useOrderUploadInvoicePrefill(orderDetails?.order_id, setForm, {
-    onPrefilled: () => {
-      setInvoicePrefillLoaded(true);
-      setQuoteTotalsLoaded(true);
-    },
-  });
-
-  useInvoiceLinkedPaymentAutofill(form.invoice_number, setForm);
 
   useEffect(() => {
     // Clear alert message once base amount is entered
@@ -50,7 +38,7 @@ export default function UploadForm({ orderDetails }) {
   // Fetch amounts from quotation items using quote_number
   useEffect(() => {
     const quoteNumber = orderDetails?.quote_number;
-    if (!quoteNumber || quoteTotalsLoaded || invoicePrefillLoaded) return;
+    if (!quoteNumber || quoteTotalsLoaded) return;
 
     (async () => {
       try {
@@ -85,7 +73,7 @@ export default function UploadForm({ orderDetails }) {
         // silent fail; user can still enter manually
       }
     })();
-  }, [orderDetails?.quote_number, quoteTotalsLoaded, invoicePrefillLoaded]);
+  }, [orderDetails?.quote_number, quoteTotalsLoaded]);
 
   // Compute payment status automatically
   useEffect(() => {
@@ -169,7 +157,7 @@ export default function UploadForm({ orderDetails }) {
       const result = await res.json();
       if (res.ok) {
         setMessage("✅ Files uploaded successfully.");
-        router.push("/accounts-dashboard/order");
+        router.push("/user-dashboard/order");
       } else {
         setMessage("❌ " + result.error);
       }
@@ -315,7 +303,7 @@ export default function UploadForm({ orderDetails }) {
           {loading ? "Uploading..." : "Upload Files"}
         </button>
         <a
-          href="/accounts-dashboard/order"
+          href="/user-dashboard/order"
           className="text-sm text-gray-600 hover:text-gray-800 underline"
         >
           ← Back to Order List

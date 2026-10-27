@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { dbExecute, withPool } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
-import { resolveGemCrmEmployeeId, isGemCrmAdmin } from "@/lib/gemCrmAuth";
+import { resolveGemCrmEmployeeId } from "@/lib/gemCrmAuth";
 
 export async function GET(req) {
   try {
@@ -15,7 +15,7 @@ export async function GET(req) {
       let params = [];
 
       // Only SUPERADMIN can see all stats, others see only their own bids
-      if (!isGemCrmAdmin(payload.role)) {
+      if (payload.role !== "SUPERADMIN") {
         if (currentEmpId) {
           whereClause = "WHERE assigned_employee_id = ?";
           params.push(currentEmpId);

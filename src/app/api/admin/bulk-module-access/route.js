@@ -5,16 +5,10 @@ import { getDbConnection } from "@/lib/db";
 import { getMainSessionPayload } from "@/lib/auth";
 import {
   ALL_MODULE_KEYS,
-  getModuleAccessForDisplay,
-  parseStoredModuleAccess,
-  stripParentSectionKeys,
-  applyRoleDenyModuleRestrictions,
+  parseModuleAccess,
   applySuperadminOnlyModuleRestrictions,
+  applyRoleDenyModuleRestrictions,
 } from "@/lib/moduleAccess";
-import {
-  getRoleDefaultModulesForBulkUi,
-  saveRoleDefaultModulesForBulkUi,
-} from "@/lib/crmEmployeeRoles";
 
 const VALID_OPERATIONS = new Set(["REPLACE", "MERGE", "REMOVE"]);
 
@@ -61,54 +55,26 @@ export async function GET(req) {
   const db = await getDbConnection();
   await ensureModuleAccessColumn(db);
 
-  if (searchParams.get("defaultsOnly") === "1") {
-    const moduleKeys = await getRoleDefaultModulesForBulkUi(db, role);
-    return NextResponse.json({
-      role,
-      moduleKeys,
-      userCount: 0,
-      source: "role-default",
-    });
-  }
-
-  const rolePreset = await getRoleDefaultModulesForBulkUi(db, role);
-
   const [rows] = await db.query(
     `SELECT module_access, userRole FROM rep_list WHERE UPPER(TRIM(userRole)) = ?`,
     [role],
   );
 
   if (!rows.length) {
-    return NextResponse.json({
-      role,
-      moduleKeys: rolePreset,
-      userCount: 0,
-      source: "role-default",
-    });
+    return NextResponse.json({ role, moduleKeys: [] });
   }
 
+  // Union of all users' module_access for this role
   const unionSet = new Set();
   for (const row of rows) {
-    const stored = parseStoredModuleAccess(row.module_access ?? null);
-    const keys =
-      stored === null ? getModuleAccessForDisplay(null, row.userRole) : stored;
+    const keys = parseModuleAccess(row.module_access ?? null);
     for (const k of keys) unionSet.add(k);
   }
 
   const known = new Set(ALL_MODULE_KEYS);
-  let moduleKeys = uniqueStrings([...unionSet]).filter((k) => known.has(k));
-  let source = "users-union";
-  if (moduleKeys.length === 0) {
-    moduleKeys = rolePreset;
-    source = "role-default";
-  }
+  const moduleKeys = uniqueStrings([...unionSet]).filter((k) => known.has(k));
 
-  return NextResponse.json({
-    role,
-    moduleKeys,
-    userCount: rows.length,
-    source,
-  });
+  return NextResponse.json({ role, moduleKeys, userCount: rows.length });
 }
 
 export async function POST(req) {
@@ -163,11 +129,7 @@ export async function POST(req) {
       continue;
     }
 
-    const stored = parseStoredModuleAccess(row?.module_access ?? null);
-    const existing =
-      stored === null
-        ? getModuleAccessForDisplay(null, userRole)
-        : stored;
+    const existing = parseModuleAccess(row?.module_access ?? null);
     let next;
 
     if (operation === "REPLACE") {
@@ -184,19 +146,13 @@ export async function POST(req) {
 
     next = applySuperadminOnlyModuleRestrictions(next, userRole) ?? [];
     next = applyRoleDenyModuleRestrictions(next, userRole) ?? [];
-    next = stripParentSectionKeys(uniqueStrings(next));
+    next = uniqueStrings(next);
 
     await db.query(
       `UPDATE rep_list SET module_access = ? WHERE username = ?`,
       [JSON.stringify(next), username],
     );
     updated += 1;
-  }
-
-  if (operation === "REPLACE") {
-    for (const r of roles) {
-      await saveRoleDefaultModulesForBulkUi(db, r, moduleKeys);
-    }
   }
 
   return NextResponse.json({

@@ -1,6 +1,5 @@
 // app/dashboard/page.jsx
 "use client";
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect, useCallback } from "react";
 import SummaryBox from "@/components/SummaryBox";
 import GoodFollowupsTable from "@/components/GoodFollowupsTable";
@@ -123,7 +122,7 @@ export default function DashboardPage() {
     setIsModalOpen(true);
   };
 
-  const formattedDate = dayjs().format("DD-MM-YYYY");
+  const formattedDate = dayjs().format("DD MMM, YYYY");
 
   const tableData = {
     quotations: data.quotations.map((item) => ({
@@ -145,7 +144,7 @@ export default function DashboardPage() {
       "Customer Name": item.customer_name,
       Mobile: item.mobile,
       Company: item.company,
-      "Demo Date": dayjs(item.demo_date_time).format("DD-MM-YYYY"),
+      "Demo Date": dayjs(item.demo_date_time).format("DD-MMM-YYYY"),
       "Demo Date/Time": item.demo_date_time,
       Address: item.demo_address,
       Username: item.username,
@@ -227,9 +226,19 @@ export default function DashboardPage() {
           </div>
           {/* Custom Date Picker */}
           <div className="flex flex-col sm:flex-row items-center gap-2">
-            <TypeableDateFilterInput value={customFromDate} onChange={setCustomFromDate} className="px-3 py-2 border rounded-lg text-sm w-full sm:w-auto"/>
+            <input
+              type="date"
+              value={customFromDate}
+              onChange={(e) => setCustomFromDate(e.target.value)}
+              className="px-3 py-2 border rounded-lg text-sm w-full sm:w-auto"
+            />
             <span className="text-gray-500 hidden sm:block">to</span>
-            <TypeableDateFilterInput value={customToDate} onChange={setCustomToDate} className="px-3 py-2 border rounded-lg text-sm w-full sm:w-auto"/>
+            <input
+              type="date"
+              value={customToDate}
+              onChange={(e) => setCustomToDate(e.target.value)}
+              className="px-3 py-2 border rounded-lg text-sm w-full sm:w-auto"
+            />
             <button
               onClick={() => {
                 if (customFromDate && customToDate) {

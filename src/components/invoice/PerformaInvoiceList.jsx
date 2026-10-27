@@ -1,6 +1,5 @@
 "use client";
 
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import React, { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
@@ -145,8 +144,18 @@ export default function PerformaInvoiceList({
         >
           Reset
         </button>
-        <TypeableDateFilterInput value={fromDate} onChange={setFromDate} className="border px-3 py-1 rounded text-sm"/>
-        <TypeableDateFilterInput value={toDate} onChange={setToDate} className="border px-3 py-1 rounded text-sm"/>
+        <input
+          type="date"
+          value={fromDate}
+          onChange={(e) => setFromDate(e.target.value)}
+          className="border px-3 py-1 rounded text-sm"
+        />
+        <input
+          type="date"
+          value={toDate}
+          onChange={(e) => setToDate(e.target.value)}
+          className="border px-3 py-1 rounded text-sm"
+        />
         <input
           type="text"
           placeholder="Search invoice / buyer..."

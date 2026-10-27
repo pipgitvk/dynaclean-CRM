@@ -1,17 +1,13 @@
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import AddSpecialPriceModal from "@/components/specialPrice/AddSpecialPriceModal";
-import RequestDealerPriceModal from "@/components/specialPrice/RequestDealerPriceModal";
 import DeleteButton from "@/components/specialPrice/DeleteButton";
-import CustomerSpecialPriceTable from "@/components/specialPrice/CustomerSpecialPriceTable";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
-export default async function CustomerSpecialPrice({ params, searchParams }) {
+export default async function CustomerSpecialPrice({ params }) {
   const { customerId } = await params;
-  const resolvedSearchParams = await searchParams;
-  const initialStatusFilter = resolvedSearchParams?.status?.trim() || "";
 
   const payload = await getSessionPayload();
   if (!payload) return null;
@@ -51,7 +47,6 @@ export default async function CustomerSpecialPrice({ params, searchParams }) {
     SELECT 
       sp.product_id,
       sp.special_price,
-      sp.price_term,
       sp.status,
       sp.set_by,
       sp.approved_by,
@@ -124,10 +119,8 @@ export default async function CustomerSpecialPrice({ params, searchParams }) {
       
  
         </div>
-        <div className="flex flex-wrap gap-2 items-center">
-          <RequestDealerPriceModal customerId={customerId} />
-          <AddSpecialPriceModal customerId={customerId} />
-        </div>
+         <AddSpecialPriceModal customerId={customerId} />
+      
       </div>
 
       {customerInfo && (
@@ -149,16 +142,126 @@ export default async function CustomerSpecialPrice({ params, searchParams }) {
         </div>
       )}
 
-      <CustomerSpecialPriceTable
-        customerId={customerId}
-        customerName={customerInfo?.name || ""}
-        initialStatusFilter={initialStatusFilter}
-        rows={rows.map((row) => ({
-          ...row,
-          set_date: row.set_date ? String(row.set_date) : null,
-          approved_date: row.approved_date ? String(row.approved_date) : null,
-        }))}
-      />
+      {rows.length === 0 ? (
+        <div className="bg-gray-100 p-4 rounded">
+          No special prices available.
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full border border-gray-200 rounded-lg">
+            <thead className="bg-gray-100">
+              <tr>
+                <th className="p-3 text-left">Image</th>
+                <th className="p-3 text-left">Code</th>
+                <th className="p-3 text-left">Product</th>
+                <th className="p-3 text-left">Product No</th>
+                <th className="p-3 text-right">Original Price</th>
+                <th className="p-3 text-right">Special Price</th>
+                <th className="p-3 text-center">Status</th>
+                <th className="p-3 text-left">Set By</th>
+                <th className="p-3 text-left">Set Date</th>
+                <th className="p-3 text-center">Actions</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {rows.map((row) => {
+                const imageUrl =
+                  row.image_path || row.product_image || null;
+
+                return (
+                  <tr key={row.product_id} className="hover:bg-gray-50">
+                    {/* Image */}
+                    <td className="p-3">
+                      {imageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={imageUrl}
+                          alt={row.item_name || "Product"}
+                          className="w-10 h-10 object-cover rounded"
+                        />
+                      ) : (
+                        <span className="text-gray-400 text-xs">No image</span>
+                      )}
+                    </td>
+
+                    {/* Code */}
+                    <td className="p-3 text-sm text-gray-700">
+                      {row.item_code || "-"}
+                    </td>
+
+                    {/* Product */}
+                    <td className="p-3">{row.item_name}</td>
+
+                    {/* Product No */}
+                    <td className="p-3 text-sm text-gray-700">
+                      {row.product_number || "-"}
+                    </td>
+
+                    {/* Original */}
+                    <td className="p-3 text-right text-gray-500">
+                      ₹ {row.price_per_unit}
+                    </td>
+
+                    {/* Special Price */}
+                    <td className="p-3 text-right font-semibold text-green-600">
+                      ₹ {row.special_price}
+                    </td>
+
+                    {/* Status */}
+                    <td className="p-3 text-center">
+                      {(() => {
+                        const status = (row.status || "").toLowerCase();
+                        const isApproved = status === "approved";
+                        const isRejected = status === "rejected";
+                        const badgeClass = isApproved
+                          ? "bg-green-100 text-green-700"
+                          : isRejected
+                          ? "bg-red-100 text-red-700"
+                          : "bg-yellow-100 text-yellow-700";
+
+                        const label = isApproved
+                          ? "approved"
+                          : isRejected
+                          ? "rejected"
+                          : "pending";
+
+                        return (
+                          <span
+                            className={`px-3 py-1 text-xs rounded-full capitalize ${badgeClass}`}
+                          >
+                            {label}
+                          </span>
+                        );
+                      })()}
+                    </td>
+
+                    {/* Set By */}
+                    <td className="p-3">
+                      {row.set_by_name || row.set_by}
+                    </td>
+
+                    {/* Set Date */}
+                    <td className="p-3 text-sm text-gray-500">
+                      {new Date(row.set_date).toLocaleDateString()}
+                    </td>
+
+                    {/* Actions */}
+                    <td className="p-3 text-center">
+                      <Link
+                        href={`/admin-dashboard/special-pricing/${customerId}/${row.product_id}`}
+                        className="text-xs text-blue-600 hover:underline"
+                      >
+                        Edit
+                      </Link>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

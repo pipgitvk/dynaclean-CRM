@@ -29,7 +29,7 @@ function attachProfileApprovalsBadge(items, pendingCount) {
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret";
 
-export const empCrmAdminMenuItems = [
+const empCrmMenuItems = [
   { path: "/empcrm/admin-dashboard", name: "EMPCRM Dashboard", roles: ["SUPERADMIN", "HR HEAD", "HR", "Junior HR Executive", "HR Executive", "HR Recruiter"], icon: "Home" },
   { path: "/empcrm/admin-dashboard/profile", name: "Profile Management", roles: ["SUPERADMIN", "HR HEAD", "HR", "Junior HR Executive", "HR Executive", "HR Recruiter"], icon: "UserCircle" },
   { path: "/empcrm/admin-dashboard/profile/approvals", name: "Profile Approvals", roles: ["SUPERADMIN", "HR HEAD", "HR", "Junior HR Executive", "HR Executive", "HR Recruiter"], icon: "UserCircle" },
@@ -37,36 +37,13 @@ export const empCrmAdminMenuItems = [
 
 
   { path: "/empcrm/admin-dashboard/attendance-summary", name: "Attendance Summary", roles: ["SUPERADMIN", "HR HEAD", "HR", "Junior HR Executive", "HR Executive", "HR Recruiter"], icon: "LayoutGrid" },
-  { path: "/empcrm/admin-dashboard/attendance-sheet", name: "Attendance Sheet", roles: ["SUPERADMIN", "HR HEAD", "HR", "Junior HR Executive", "HR Executive", "HR Recruiter", "ACCOUNTANT"], icon: "FileSpreadsheet" },
   { path: "/empcrm/admin-dashboard/attendance", name: "Attendance details", roles: ["SUPERADMIN", "HR HEAD", "HR", "Junior HR Executive", "HR Executive", "HR Recruiter"], icon: "Clock" },
-  { path: "/empcrm/admin-dashboard/auto-checkout-approvals", name: "Auto check-out approval", roles: ["SUPERADMIN", "HR HEAD", "HR", "HR Executive"], icon: "AlertTriangle" },
-  { path: "/empcrm/admin-dashboard/machine-attendance", name: "Machine Attendance", roles: ["SUPERADMIN", "HR HEAD", "HR", "Junior HR Executive", "HR Executive", "HR Recruiter", "ACCOUNTANT"], icon: "Fingerprint" },
   { path: "/empcrm/admin-dashboard/attendance-rules", name: "Attendance Rules", roles: ["SUPERADMIN", "HR HEAD", "HR", "Junior HR Executive", "HR Executive", "HR Recruiter"], icon: "Settings" },
   { path: "/empcrm/admin-dashboard/documents", name: "Employee Documents", roles: ["SUPERADMIN", "HR HEAD", "HR", "Junior HR Executive", "HR Executive", "HR Recruiter"], icon: "FileText" },
   { path: "/empcrm/admin-dashboard/hiring", name: "Hiring", roles: ["HR HEAD", "HR", "Junior HR Executive", "HR Executive", "HR Recruiter"], icon: "UserPlus" },
   { path: "/empcrm/admin-dashboard/salary", name: "Salary Management", roles: ["SUPERADMIN", "HR HEAD", "HR", "Junior HR Executive", "HR Executive", "HR Recruiter", "ACCOUNTANT"], icon: "DollarSign" },
-  { path: "/empcrm/admin-dashboard/salary-sheet", name: "Salary Sheet", roles: ["SUPERADMIN", "HR HEAD", "HR", "Junior HR Executive", "HR Executive", "HR Recruiter", "ACCOUNTANT"], icon: "FileSpreadsheet" },
   { path: "/empcrm/admin-dashboard/salary-slips", name: "Salary slips", roles: ["SUPERADMIN", "HR HEAD", "HR", "Junior HR Executive", "HR Executive", "HR Recruiter", "ACCOUNTANT"], icon: "Receipt" },
 ];
-
-/** Filtered EMPCRM admin links for nesting under main admin sidebar (Employee CRM). */
-export async function getEmpCrmAdminMenuChildrenForRole(roleKeyNormalized) {
-  let items = empCrmAdminMenuItems.filter(
-    (item) =>
-      item.roles.includes("ALL") ||
-      item.roles.some((r) => normalizeRoleKey(r) === roleKeyNormalized),
-  );
-
-  const seesProfileApprovals = items.some(
-    (item) => item.path === PROFILE_APPROVALS_PATH,
-  );
-  if (seesProfileApprovals) {
-    const pending = await countPendingHrProfileApprovals();
-    items = attachProfileApprovalsBadge(items, pending);
-  }
-
-  return items;
-}
 
 export default async function getEmpCrmAdminSidebarMenuItems() {
   const cookieStore = await cookies();
@@ -85,7 +62,7 @@ export default async function getEmpCrmAdminSidebarMenuItems() {
 
   const roleKey = normalizeRoleKey(role || "GUEST") || "GUEST";
 
-  let items = empCrmAdminMenuItems.filter(
+  let items = empCrmMenuItems.filter(
     (item) =>
       item.roles.includes("ALL") ||
       item.roles.some((r) => normalizeRoleKey(r) === roleKey),

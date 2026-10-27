@@ -1,9 +1,5 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
-import {
-  buildLatestShipmentMap,
-  findShipmentFromMap,
-} from "@/lib/incomingShipmentProductMatch";
 
 export async function GET() {
   try {
@@ -46,38 +42,9 @@ export async function GET() {
       ORDER BY pl.item_name ASC
     `);
 
-    const [shipments] = await db.execute(`
-      SELECT 
-        id,
-        product_code,
-        item_name,
-        qty,
-        expected_arrival_date,
-        status,
-        created_at
-      FROM incoming_shipments
-      WHERE COALESCE(status, '') <> 'Delivered'
-      ORDER BY created_at DESC
-    `);
-
-    const latestShipmentMap = buildLatestShipmentMap(shipments);
-
-    const addShipmentData = (rows) => {
-      return rows.map((row) => {
-        const shipment = findShipmentFromMap(row, latestShipmentMap);
-        return {
-          ...row,
-          latest_shipment_qty:
-            shipment?.qty != null && shipment.qty !== "" ? shipment.qty : null,
-          latest_shipment_expected_date: shipment?.expected_arrival_date || null,
-          latest_shipment_status: shipment?.status || null,
-        };
-      });
-    };
-
     return NextResponse.json({
-      lowStock: addShipmentData(lowStockRows),
-      zeroStock: addShipmentData(zeroStockRows),
+      lowStock: lowStockRows,
+      zeroStock: zeroStockRows,
       lowStockCount: lowStockRows.length,
       zeroStockCount: zeroStockRows.length,
     });

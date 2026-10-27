@@ -7,7 +7,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import toast from "react-hot-toast";
 import { Select } from "@headlessui/react";
-import { LetterheadCompanyInfo, LetterheadBankLine, LetterheadSignatoryLine } from "@/components/invoice/InvoiceLetterheadSection";
 
 // Remove local generation - will fetch from API
 
@@ -507,7 +506,7 @@ Thanks for doing business with us!`,
       const data = await res.json();
       if (data.success) {
         toast.success("✅ Quotation added successfully");
-        router.push(`/user-dashboard/quotations?customer_id=${form.customer_id || ""}`);
+        router.push("/user-dashboard/quotations");
       } else {
         alert("Error: " + data.error);
       }
@@ -596,8 +595,29 @@ Thanks for doing business with us!`,
             className="object-contain"
             unoptimized
           />
-          <LetterheadCompanyInfo />
-        
+          <div className="flex-1 text-sm text-gray-700">
+            <h2 className="text-xl font-bold text-red-600 mb-1">
+              Dynaclean Industries Pvt Ltd
+            </h2>
+            <p className="leading-relaxed">
+              <span className="block">
+                1st Floor, 13-B, Kattabomman Street, Gandhi Nagar Main Road,
+              </span>
+              <span className="block">
+                Gandhi Nagar, Ganapathy, Coimbatore, Tamil Nadu, 641006
+              </span>
+              <span className="block mt-1">
+                <strong>Phone:</strong> 011-45143666, +91-7982456944
+              </span>
+              <span className="block">
+                <strong>Email:</strong> sales@dynacleanindustries.com
+              </span>
+              <span className="block mt-1">
+                <strong>GSTIN:</strong> 07AAKCD6495M1ZV |{" "}
+                <strong>State:</strong> Delhi (07)
+              </span>
+            </p>
+          </div>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-gray-50 p-4 rounded">
           <div>
@@ -835,7 +855,7 @@ Thanks for doing business with us!`,
           </div>
           <div className="lg:col-span-1 border p-4 rounded bg-gray-50 text-sm text-center flex flex-col justify-between">
             <div>
-              <LetterheadSignatoryLine />
+              <p>For Dynaclean Industries Pvt Ltd</p>
               <Image
                 src="/images/sign.png"
                 alt="Sign"

@@ -1,8 +1,5 @@
 "use client";
 
-import { formatCrmDateOnly } from "@/lib/crmDateFormat";
-
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useCallback, useEffect, useState } from "react";
 import {
   Dialog,
@@ -22,7 +19,11 @@ function formatDate(value) {
   if (!value) return "—";
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return "—";
-  return formatCrmDateOnly(d);
+  return d.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
 }
 
 const emptyForm = () => ({
@@ -511,13 +512,27 @@ export default function ShipmentsListClient() {
                   </div>
                   <div>
                     <label className={labelClass}>Material ready date</label>
-                    <TypeableDateFilterInput value={form.material_ready_date} onChange={(v) => update("material_ready_date", v)} className={inputClass}/>
+                    <input
+                      className={inputClass}
+                      type="date"
+                      value={form.material_ready_date}
+                      onChange={(e) =>
+                        update("material_ready_date", e.target.value)
+                      }
+                    />
                   </div>
                   <div>
                     <label className={labelClass}>
                       Agent delivery deadline
                     </label>
-                    <TypeableDateFilterInput value={form.agent_delivery_deadline} onChange={(v) => update("agent_delivery_deadline", v)} className={inputClass}/>
+                    <input
+                      className={inputClass}
+                      type="date"
+                      value={form.agent_delivery_deadline}
+                      onChange={(e) =>
+                        update("agent_delivery_deadline", e.target.value)
+                      }
+                    />
                   </div>
                   <div className="sm:col-span-2">
                     <label className={labelClass}>Extra remarks</label>

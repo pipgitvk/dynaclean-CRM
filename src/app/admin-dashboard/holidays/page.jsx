@@ -1,6 +1,4 @@
 "use client";
-
-import { formatCrmDateOnly } from "@/lib/crmDateFormat";
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 
@@ -99,7 +97,7 @@ export default function HolidaysAdminPage() {
               <li key={h.id} className="py-3 flex items-center justify-between">
                 <div>
                   <p className="font-medium">{h.title}</p>
-                  <p className="text-sm text-gray-600">{formatCrmDateOnly(h.holiday_date)} {h.is_optional ? "(Optional)" : ""}</p>
+                  <p className="text-sm text-gray-600">{new Date(h.holiday_date).toLocaleDateString()} {h.is_optional ? "(Optional)" : ""}</p>
                   {h.description ? <p className="text-sm text-gray-500">{h.description}</p> : null}
                 </div>
                 <span className="text-xs text-gray-400">Created by {h.created_by}</span>

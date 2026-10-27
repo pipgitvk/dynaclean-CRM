@@ -1,21 +1,15 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { Shield, ArrowLeft, Save } from "lucide-react";
 import Link from "next/link";
-import {
-  notifyEmployeesListReload,
-  reloadEmployeesAdminPage,
-} from "@/lib/employeesPageReload";
-import { EmbedHeightReporter } from "@/components/embed/EmbedHeightReporter";
 
 export default function UserIpRestrictionPage() {
    
     let { username } = useParams();
    username = decodeURIComponent(username);
     const router = useRouter();
-    const isEmbed = useSearchParams().get("embed") === "1";
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [data, setData] = useState({
@@ -59,9 +53,7 @@ export default function UserIpRestrictionPage() {
             const result = await res.json();
             if (res.ok) {
                 alert("Settings saved successfully!");
-                if (!notifyEmployeesListReload()) {
-                    reloadEmployeesAdminPage();
-                }
+                router.back();
             } else {
                 alert(result.error || "Failed to save settings");
             }
@@ -75,15 +67,7 @@ export default function UserIpRestrictionPage() {
     if (loading) return <div className="p-8 text-center">Loading...</div>;
 
     return (
-        <div
-            className={
-                isEmbed
-                    ? "bg-white pb-1"
-                    : "max-w-2xl mx-auto p-6 bg-white shadow-lg rounded-xl mt-10"
-            }
-        >
-            {isEmbed && <EmbedHeightReporter />}
-            {!isEmbed && (
+        <div className="max-w-2xl mx-auto p-6 bg-white shadow-lg rounded-xl mt-10">
             <div className="flex items-center justify-between mb-8 border-b pb-4">
                 <div className="flex items-center space-x-3">
                     <div className="p-2 bg-blue-100 rounded-lg">
@@ -98,15 +82,8 @@ export default function UserIpRestrictionPage() {
                     <ArrowLeft size={24} />
                 </Link>
             </div>
-            )}
 
-            {isEmbed && (
-              <p className="mb-3 text-xs text-gray-500">
-                User: <span className="font-semibold text-gray-800">{username}</span>
-              </p>
-            )}
-
-            <form onSubmit={handleSave} className={isEmbed ? "space-y-4" : "space-y-6"}>
+            <form onSubmit={handleSave} className="space-y-6">
                 {/* Toggle */}
                 <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-100">
                     <div>
@@ -128,7 +105,7 @@ export default function UserIpRestrictionPage() {
                 <div className="space-y-2">
                     <label className="block text-sm font-medium text-gray-700">Allowed IP Addresses</label>
                     <textarea
-                        className={`w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all ${isEmbed ? "h-24" : "h-32"}`}
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all h-32"
                         placeholder="Enter IPs separated by commas (e.g., 192.168.1.1, 103.44.12.5)"
                         value={data.allowed_ips}
                         onChange={(e) => setData({ ...data, allowed_ips: e.target.value })}
@@ -138,8 +115,7 @@ export default function UserIpRestrictionPage() {
                 </div>
 
                 {/* Action Buttons */}
-                <div className={`flex justify-end space-x-4 pt-4 ${isEmbed ? "" : "border-t"}`}>
-                    {!isEmbed && (
+                <div className="flex justify-end space-x-4 pt-4 border-t">
                     <button
                         type="button"
                         onClick={() => router.back()}
@@ -147,7 +123,6 @@ export default function UserIpRestrictionPage() {
                     >
                         Cancel
                     </button>
-                    )}
                     <button
                         type="submit"
                         disabled={saving}

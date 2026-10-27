@@ -2,60 +2,35 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { CheckSquare } from "lucide-react";
-import SummaryStatCard from "@/components/sales/SummaryStatCard";
 
-export default function LeaveApprovalButton({ variant = "default" }) {
+export default function LeaveApprovalButton() {
   const [isReportingManager, setIsReportingManager] = useState(false);
   const [pendingLeavesCount, setPendingLeavesCount] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [debugInfo, setDebugInfo] = useState(null);
 
   useEffect(() => {
     const fetchReportingManagerStatus = async () => {
       try {
         const response = await fetch("/api/empcrm/reporting-manager-status");
         const data = await response.json();
+        console.log("LeaveApprovalButton - API Response:", data);
+        setDebugInfo(data);
         if (data.success) {
           setIsReportingManager(data.hasReportees);
           setPendingLeavesCount(data.pendingLeavesCount || 0);
         }
-      } catch {
-        setIsReportingManager(false);
-      } finally {
-        setLoading(false);
+      } catch (error) {
+        console.error("Error fetching reporting manager status:", error);
       }
     };
 
     fetchReportingManagerStatus();
   }, []);
 
-  if (variant === "sales") {
-    if (loading) {
-      return (
-        <SummaryStatCard
-          href="/empcrm/user-dashboard/leave-approvals"
-          label="Leave Approval"
-          count={0}
-          suffix="Pending"
-          icon={CheckSquare}
-          iconWrapClass="bg-indigo-500"
-          arrowClass="text-indigo-500"
-          loading
-        />
-      );
-    }
-    if (!isReportingManager) return null;
-    return (
-      <SummaryStatCard
-        href="/empcrm/user-dashboard/leave-approvals"
-        label="Leave Approval"
-        count={pendingLeavesCount}
-        suffix="Pending"
-        icon={CheckSquare}
-        iconWrapClass="bg-indigo-500"
-        arrowClass="text-indigo-500"
-      />
-    );
+  // Temporary debug: Show button for all users to test
+  // Remove this after debugging
+  if (process.env.NODE_ENV === 'development') {
+    console.log("LeaveApprovalButton - Debug Info:", debugInfo);
   }
 
   if (!isReportingManager) {

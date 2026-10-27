@@ -1,7 +1,5 @@
 "use client";
 
-import { formatCrmDateOnly } from "@/lib/crmDateFormat";
-
 import {
   LineChart,
   Line,
@@ -47,7 +45,10 @@ export default function RankChart({ followups, keywordRank, keywordPage }) {
     })
     .map((followup, index) => ({
       label: followup.followup_date
-        ? new formatCrmDateOnly(Date(followup.followup_date)) + (followups.filter(f => f.followup_date === followup.followup_date).length > 1 ? ` #${index + 1}` : "")
+        ? new Date(followup.followup_date).toLocaleDateString("en-GB", {
+            day: "2-digit",
+            month: "short",
+          }) + (followups.filter(f => f.followup_date === followup.followup_date).length > 1 ? ` #${index + 1}` : "")
         : `Entry ${index + 1}`,
       rank: followup.rank !== null ? Number(followup.rank) : 0,
       page: followup.page !== null && followup.page !== "" ? Number(followup.page) : 0,

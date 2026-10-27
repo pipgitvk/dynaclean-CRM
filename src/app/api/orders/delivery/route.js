@@ -1,25 +1,6 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
-import { canEditDeliveryProof } from "@/lib/orderDocumentEditRules";
-import { canManageAnyOrderDeliveryRole } from "@/lib/roleKeyUtils";
-import {
-  dispatchStatusAllowsDeliveryUpdate,
-  orderHasDispatchedStockForOrderId,
-  orderRemainBookingBatchDone,
-} from "@/lib/orderDeliveryEligibility";
-import {
-  DELIVERY_STATUS_FULL,
-  DELIVERY_STATUS_PARTIAL,
-  resolveDeliveryStatusAfterUpdate,
-} from "@/lib/orderDeliveryStatus";
-import { attachBookingBatchesToOrders } from "@/lib/orderBookingBatches";
-import {
-  attachDeliveryBatchesToOrders,
-  ensureOrderDeliveryBatchesTable,
-  orderHasSecondDeliveryBatch,
-  persistOrderDeliveryBatch,
-} from "@/lib/orderDeliveryBatches";
 
 export async function POST(request) {
   try {
@@ -30,13 +11,7 @@ export async function POST(request) {
 
     const currentUsername = payload.username;
     const body = await request.json();
-    const {
-      order_id,
-      delivered_on,
-      delivery_proof,
-      delivery_remark,
-      update_proof_only,
-    } = body;
+    const { order_id, delivered_on, delivery_proof, delivery_remark } = body;
 
     if (!order_id) {
       return NextResponse.json({ error: "Order ID is required" }, { status: 400 });
@@ -44,10 +19,10 @@ export async function POST(request) {
 
     const conn = await getDbConnection();
 
+    // Fetch the order to check booking_by person
     const [orderRows] = await conn.execute(
-      `SELECT booking_by, booking_id, dispatch_status, delivery_status, delivered_on, delivery_proof, delivery_remark
-       FROM neworder WHERE order_id = ?`,
-      [order_id],
+      "SELECT booking_by, dispatch_status, delivery_status FROM neworder WHERE order_id = ?",
+      [order_id]
     );
 
     if (orderRows.length === 0) {
@@ -56,138 +31,34 @@ export async function POST(request) {
 
     const order = orderRows[0];
 
-    const [roleRows] = await conn.execute(
-      "SELECT userRole FROM rep_list WHERE username = ? LIMIT 1",
-      [currentUsername],
-    );
-    const userRole = roleRows[0]?.userRole || payload.role || "";
-    const canManageDelivery =
-      order.booking_by === currentUsername ||
-      canManageAnyOrderDeliveryRole(userRole);
-
-    if (!canManageDelivery) {
+    // Check if current user is the booking_by person
+    if (order.booking_by !== currentUsername) {
       return NextResponse.json(
         { error: "Only the booking person can update delivery status" },
-        { status: 403 },
+        { status: 403 }
       );
     }
 
-    const hasDispatchedStock = await orderHasDispatchedStockForOrderId(
-      conn,
-      order_id,
-    );
-    if (
-      !dispatchStatusAllowsDeliveryUpdate(
-        order.dispatch_status,
-        hasDispatchedStock,
-      )
-    ) {
+    // Check if dispatch_status is 1
+    if (Number(order.dispatch_status) !== 1) {
       return NextResponse.json(
-        {
-          error:
-            "Delivery can be updated only after at least one item is dispatched",
-        },
-        { status: 400 },
+        { error: "Delivery can only be updated after dispatch is done" },
+        { status: 400 }
       );
     }
 
-    let [orderMeta] = await attachBookingBatchesToOrders(conn, [
-      { order_id, booking_id: order.booking_id },
-    ]);
-    [orderMeta] = await attachDeliveryBatchesToOrders(conn, [orderMeta]);
-    const requiresSecondDeliveryProof = orderRemainBookingBatchDone(orderMeta);
-    const deliveryBatchCountBeforeSave = (orderMeta.delivery_batches || [])
-      .length;
-    const canSaveRemainWhileMarkedFull =
-      requiresSecondDeliveryProof &&
-      !orderHasSecondDeliveryBatch(orderMeta);
-
-    const isFullyDelivered = Number(order.delivery_status) === DELIVERY_STATUS_FULL;
-
-    if (isFullyDelivered && update_proof_only) {
-      if (!canEditDeliveryProof(order)) {
-        return NextResponse.json(
-          { error: "Delivery proof can only be edited within 24 hours of delivery." },
-          { status: 403 },
-        );
-      }
-
-      if (!delivery_proof) {
-        return NextResponse.json(
-          { error: "Delivery proof file is required" },
-          { status: 400 },
-        );
-      }
-
-      await conn.execute(
-        "UPDATE neworder SET delivery_proof = ? WHERE order_id = ?",
-        [delivery_proof, order_id],
-      );
-
-      return NextResponse.json({
-        success: true,
-        message: "Delivery proof updated successfully",
-      });
-    }
-
-    if (isFullyDelivered && !canSaveRemainWhileMarkedFull) {
+    // Check if delivery_status is already 1
+    if (Number(order.delivery_status) === 1) {
       return NextResponse.json(
         { error: "Delivery is already marked as complete" },
-        { status: 400 },
+        { status: 400 }
       );
     }
 
-    const nextDeliveryStatus = await resolveDeliveryStatusAfterUpdate(
-      conn,
-      order_id,
-      order.dispatch_status,
-      {
-        requiresSecondDeliveryProof,
-        deliveryBatchCountBeforeSave,
-      },
-    );
-
-    const deliveredOnVal = delivered_on || new Date();
-    await ensureOrderDeliveryBatchesTable(conn);
-
-    const [batch1] = await conn.execute(
-      `SELECT id FROM order_delivery_batches WHERE order_id = ? AND sequence_no = 1 LIMIT 1`,
-      [order_id],
-    );
-    if (
-      !batch1?.length &&
-      (Number(order.delivery_status) === DELIVERY_STATUS_PARTIAL ||
-        order.delivered_on ||
-        order.delivery_proof)
-    ) {
-      await conn.execute(
-        `INSERT INTO order_delivery_batches
-          (order_id, sequence_no, delivered_on, delivery_proof, delivery_remark)
-         VALUES (?, 1, ?, ?, ?)`,
-        [
-          order_id,
-          order.delivered_on || null,
-          order.delivery_proof || null,
-          order.delivery_remark || null,
-        ],
-      );
-    }
-
-    await persistOrderDeliveryBatch(conn, order_id, {
-      delivered_on: deliveredOnVal,
-      delivery_proof: delivery_proof || null,
-      delivery_remark: delivery_remark || null,
-    });
-
+    // Update delivery status
     await conn.execute(
-      "UPDATE neworder SET delivery_status = ?, delivered_on = ?, delivery_proof = ?, delivery_remark = ? WHERE order_id = ?",
-      [
-        nextDeliveryStatus,
-        deliveredOnVal,
-        delivery_proof || null,
-        delivery_remark || null,
-        order_id,
-      ],
+      "UPDATE neworder SET delivery_status = 1, delivered_on = ?, delivery_proof = ?, delivery_remark = ? WHERE order_id = ?",
+      [delivered_on || new Date(), delivery_proof || null, delivery_remark || null, order_id]
     );
 
     return NextResponse.json({
@@ -198,7 +69,7 @@ export async function POST(request) {
     console.error("Error updating delivery status:", error);
     return NextResponse.json(
       { error: "Failed to update delivery status" },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }

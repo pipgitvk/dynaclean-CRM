@@ -1,7 +1,9 @@
 import { getDbConnection } from '@/lib/db';
-import { getReturnProductActorUsername } from '@/lib/returnProductsActor';
+import { verify } from 'jsonwebtoken';
 import fs from 'fs/promises';
 import path from 'path';
+
+const SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
 // GET - एक return product fetch करें
 export async function GET(request, { params }) {
@@ -88,12 +90,18 @@ export async function PUT(request, { params }) {
   try {
     const { id } = await params;
 
-    const actorUsername = await getReturnProductActorUsername();
-    if (!actorUsername) {
-      return Response.json(
-        { success: false, message: 'Unauthorized' },
-        { status: 401 },
-      );
+    // Get user ID from token first
+    const token = request.headers.get('authorization')?.split(' ')[1];
+    let userId = 1;
+    let username = 'system';
+    if (token) {
+      try {
+        const decoded = verify(token, SECRET);
+        userId = decoded.username || decoded.empId || decoded.id || decoded.userId || decoded.client_index || 1;
+        username = decoded.username || 'system';
+      } catch (err) {
+        console.error('Token verification failed:', err);
+      }
     }
 
     let body = {};
@@ -188,7 +196,7 @@ export async function PUT(request, { params }) {
     updateFields.push('updated_at = NOW()');
     if (hasRpUpdatedBy) {
       updateFields.push('updated_by = ?');
-      updateValues.push(actorUsername);
+      updateValues.push(userId);
     }
     
     const updateQuery = `UPDATE return_products SET ${updateFields.join(', ')} WHERE id = ?`;
@@ -211,7 +219,7 @@ export async function PUT(request, { params }) {
       }
       if (hasRiUpdatedBy) {
         riUpdateFields.push('updated_by = ?');
-        riUpdateValues.push(actorUsername);
+        riUpdateValues.push(userId);
       }
       
       if (riUpdateFields.length > 0) {
@@ -231,29 +239,9 @@ export async function PUT(request, { params }) {
       for (const item of items) {
         const itemCode = item.item_code;
         const qty = Number(item.quantity) || 1;
+        const isProduct = /[a-zA-Z]/.test(itemCode);
 
-        // Resolve whether this is a spare or a product by checking spare_list first
-        // item_code can be spare_number (stored as INT in spare_list) or spare_list.id
-        const [spareMatch] = await pool.query(
-          `SELECT id FROM spare_list WHERE CAST(spare_number AS CHAR) = ? OR CAST(id AS CHAR) = ? LIMIT 1`,
-          [String(itemCode), String(itemCode)]
-        );
-
-        // Fallback: match by item_name if spare_number didn't match
-        let spareMatchFinal = spareMatch;
-        if (spareMatch.length === 0) {
-          const [spareByName] = await pool.query(
-            `SELECT id FROM spare_list WHERE LOWER(TRIM(item_name)) = LOWER(TRIM(?)) LIMIT 1`,
-            [item.item_name || itemCode]
-          );
-          spareMatchFinal = spareByName;
-        }
-
-        const isSpare = spareMatchFinal.length > 0;
-        console.log(`[Return WH-IN] item_code=${itemCode}, item_name=${item.item_name}, isSpare=${isSpare}, spareId=${isSpare ? spareMatchFinal[0].id : 'N/A'}`);
-
-        if (!isSpare) {
-          // ── Product stock IN ───────────────────────────────────────────────
+        if (isProduct) {
           const [lastRows] = await pool.query(
             `SELECT total, delhi, south FROM product_stock WHERE product_code = ? ORDER BY created_at DESC LIMIT 1`,
             [itemCode]
@@ -275,7 +263,7 @@ export async function PUT(request, { params }) {
              VALUES (?, ?, NULL, NULL, ?, ?, 'IN', NULL, NULL, ?, ?, ?, NULL, ?, ?, ?, ?, ?)`,
             [itemCode, qty, `Return Warehouse In (Return #${id})`, targetGodown,
              returnRecord.model_no || null, returnRecord.model_no || null,
-             returnRecord.quotation_no || null, actorUsername, targetGodown, totalD, delhiD, southD]
+             returnRecord.quotation_no || null, username, targetGodown, totalD, delhiD, southD]
           );
 
           const [summary] = await pool.query(
@@ -294,12 +282,9 @@ export async function PUT(request, { params }) {
             );
           }
         } else {
-          // ── Spare stock IN ─────────────────────────────────────────────────
-          const spareId = spareMatchFinal[0].id;
-
           const [lastRows] = await pool.query(
             `SELECT total, delhi, south FROM stock_list WHERE spare_id = ? ORDER BY created_at DESC LIMIT 1`,
-            [spareId]
+            [itemCode]
           );
           let totalDB = 0, delhiDB = 0, southDB = 0;
           if (lastRows.length > 0) {
@@ -316,24 +301,24 @@ export async function PUT(request, { params }) {
               (spare_id, quantity, amount_per_unit, net_amount, note, location, stock_status,
                to_company, delivery_address, quotation_id, order_id, added_by, godown, total, delhi, south)
              VALUES (?, ?, NULL, NULL, ?, ?, 'IN', ?, ?, ?, NULL, ?, ?, ?, ?, ?)`,
-            [spareId, qty, `Return Warehouse In (Return #${id})`, targetGodown,
+            [itemCode, qty, `Return Warehouse In (Return #${id})`, targetGodown,
              returnRecord.model_no || null, returnRecord.model_no || null,
-             returnRecord.quotation_no || null, actorUsername, targetGodown, totalD, delhiD, southD]
+             returnRecord.quotation_no || null, username, targetGodown, totalD, delhiD, southD]
           );
 
           const [summary] = await pool.query(
             `SELECT total_quantity, ${locationColumn} FROM stock_summary WHERE spare_id = ?`,
-            [spareId]
+            [itemCode]
           );
           if (summary.length > 0) {
             await pool.query(
               `UPDATE stock_summary SET last_updated_quantity = ?, total_quantity = ?, last_status = 'IN', updated_at = NOW(), ${locationColumn} = ? WHERE spare_id = ?`,
-              [qty, (Number(summary[0].total_quantity) || 0) + qty, (Number(summary[0][locationColumn]) || 0) + qty, spareId]
+              [qty, (Number(summary[0].total_quantity) || 0) + qty, (Number(summary[0][locationColumn]) || 0) + qty, itemCode]
             );
           } else {
             await pool.query(
               `INSERT INTO stock_summary (spare_id, last_updated_quantity, total_quantity, Delhi, South, last_status) VALUES (?, ?, ?, ?, ?, 'IN')`,
-              [spareId, qty, qty, targetGodown === 'Delhi - Mundka' ? qty : 0, targetGodown === 'Delhi - Mundka' ? 0 : qty]
+              [itemCode, qty, qty, targetGodown === 'Delhi - Mundka' ? qty : 0, targetGodown === 'Delhi - Mundka' ? 0 : qty]
             );
           }
         }

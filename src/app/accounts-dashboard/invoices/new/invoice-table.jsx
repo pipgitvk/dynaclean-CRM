@@ -2,18 +2,8 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import {
-  splitGstPercentForSupply,
-  totalGstPercentFromInvoiceItem,
-} from "@/lib/gstSupplyType";
 
-export default function InvoiceItemsTable({
-  items,
-  setItems,
-  isEditMode = false,
-  canEditHsn = true,
-  interstate = false,
-}) {
+export default function InvoiceItemsTable({ items, setItems, isEditMode = false }) {
   const [productSuggestions, setProductSuggestions] = useState([]);
   const [activeRowIndex, setActiveRowIndex] = useState(null);
 
@@ -28,7 +18,7 @@ export default function InvoiceItemsTable({
       field === "discount_amount"
     ) {
       newValue = parseFloat(value) || 0;
-    } 
+    }
 
     updated[index][field] = newValue;
 
@@ -88,35 +78,21 @@ export default function InvoiceItemsTable({
 
       const item = data[0];
       const imageUrl = item.image_path || "";
-      const itemName = item.item_name || "";
-      const totalGst = totalGstPercentFromInvoiceItem({
-        item_name: itemName,
-        item_code: item.item_code || code,
-        description: item.specification || "",
-        gst_rate: item.gst_rate,
-      });
-      const { cgst_percent, sgst_percent, igst_percent } =
-        splitGstPercentForSupply(totalGst, interstate);
+      const gstRate = parseFloat(item.gst_rate) || 18;
 
       const updated = [...items];
       updated[index] = {
         ...updated[index],
         item_code: item.item_code || code,
-        product_number: item.product_number || "",
-        item_name: itemName,
+        item_name: item.item_name || "",
         description: item.specification || "",
         hsn_code: item.hsn_sac || "",
         unit: item.unit || "",
         rate: parseFloat(item.price_per_unit) || 0,
         last_negotiation_price: parseFloat(item.last_negotiation_price) || 0,
-        gst_rate:
-          item.gst_rate != null && String(item.gst_rate).trim() !== ""
-            ? Number(item.gst_rate)
-            : null,
-        gst: totalGst,
-        cgst_percent,
-        sgst_percent,
-        igst_percent,
+        cgst_percent: gstRate / 2,
+        sgst_percent: gstRate / 2,
+        igst_percent: 0,
         imageUrl,
         quantity: updated[index].quantity || 1,
         discount_percent: 0,
@@ -135,7 +111,6 @@ export default function InvoiceItemsTable({
       ...items,
       {
         item_code: "",
-        product_number: "",
         imageUrl: "",
         item_name: "",
         description: "",
@@ -184,7 +159,6 @@ export default function InvoiceItemsTable({
             <th className="border px-2 py-2">Image</th>
             <th className="border px-2 py-2">Item Name</th>
             <th className="border px-2 py-2">Code</th>
-            <th className="border px-2 py-2">Product #</th>
             <th className="border px-2 py-2">HSN</th>
             <th className="border px-2 py-2">Description</th>
             <th className="border px-2 py-2">Qty</th>
@@ -239,22 +213,7 @@ export default function InvoiceItemsTable({
                   )}
                 </div>
               </td>
-              <td className="border px-2 py-2 bg-gray-50">{item.product_number || "-"}</td>
-              <td className="border px-2 py-2">
-                {canEditHsn ? (
-                  <input
-                    type="text"
-                    value={item.hsn_code || ""}
-                    onChange={(e) =>
-                      handleChange(idx, "hsn_code", e.target.value)
-                    }
-                    className="border p-1 w-24 text-xs rounded"
-                    placeholder="HSN/SAC"
-                  />
-                ) : (
-                  item.hsn_code || "-"
-                )}
-              </td>
+              <td className="border px-2 py-2">{item.hsn_code || "-"}</td>
               <td className="border px-2 py-2 align-top">
                 <textarea
                   value={item.description || ""}
@@ -310,7 +269,7 @@ export default function InvoiceItemsTable({
             </tr>
           ))}
           <tr className="font-semibold bg-gray-100">
-            <td className="border px-2 py-2 text-center" colSpan={7}>Total</td>
+            <td className="border px-2 py-2 text-center" colSpan={6}>Total</td>
             <td className="border px-2 py-2">{totals.totalQty.toFixed(2)}</td>
             <td className="border px-2 py-2"></td>
             <td className="border px-2 py-2"></td>

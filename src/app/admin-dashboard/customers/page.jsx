@@ -1,8 +1,6 @@
 import { getDbConnection } from "@/lib/db";
 import CustomerTable from "./CustomerTable"; // Import the new component
 import { getSessionPayload } from "@/lib/auth";
-import { notesLanguageExistsSql } from "@/constants/notesLanguageOptions";
-import { getCurrentMonthRangeIso } from "@/lib/crmDateFormat";
 
 export const dynamic = "force-dynamic";
 
@@ -34,17 +32,12 @@ export default async function HomePage({ searchParams }) {
     from,
     to,
     tags,
-    notes_language,
     page = "1",
   } = searchParamsResolved;
 
   const currentPage = parseInt(page);
   const pageSize = 50;
   const offset = (currentPage - 1) * pageSize;
-
-  const monthDefault = getCurrentMonthRangeIso();
-  const fromDate = from || monthDefault.from;
-  const toDate = to || monthDefault.to;
 
   try {
     connection = await getDbConnection();
@@ -113,24 +106,19 @@ export default async function HomePage({ searchParams }) {
       params.push(stage);
     }
 
-    if (fromDate) {
+    if (from) {
       query += ` AND c.date_created >= ?`;
-      params.push(fromDate);
+      params.push(from);
     }
 
-    if (toDate) {
+    if (to) {
       query += ` AND c.date_created <= ?`;
-      params.push(`${toDate} 23:59:59`);
+      params.push(to);
     }
 
     if (tags) {
       query += ` AND cf.multi_tag LIKE ?`;
       params.push(`%${tags}%`);
-    }
-
-    if (notes_language) {
-      query += ` AND ${notesLanguageExistsSql("?")}`;
-      params.push(notes_language);
     }
 
     // Get total count

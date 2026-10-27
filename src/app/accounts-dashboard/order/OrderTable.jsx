@@ -1,7 +1,6 @@
 "use client";
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import {
   FileText,
   UploadCloud,
@@ -14,55 +13,9 @@ import {
   Truck,
   Download,
   ArrowUp,
-  Pencil,
-  CreditCard,
 } from "lucide-react";
-import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import dayjs from "dayjs";
-import {
-  buildOrderPaymentRows,
-  getOrderPaidAmountForDisplay,
-  sumOrderPaymentAmounts,
-} from "@/lib/orderPaymentHistory";
-import {
-  deriveOrderListPaymentStatus,
-  getOrderTotalForPayment,
-} from "@/lib/paymentOrderStatus";
-import { isBookingAllowedForOrder } from "@/lib/orderBookingEligibility";
-import {
-  canCreateAdditionalBooking,
-  canOpenFirstDispatchForOrder,
-  canOpenRemainDispatchForOrder,
-  canViewDispatchPanelForOrder,
-  canShowOrderDeliveryActions,
-  orderHasDispatchedStock,
-} from "@/lib/orderDeliveryEligibility";
-import {
-  isOrderFullyDelivered,
-  isOrderPartialDelivery,
-  orderHasDeliveryRecord,
-} from "@/lib/orderDeliveryStatus";
-import {
-  getDeliveryBatchForView,
-  orderHasSecondDeliveryBatch,
-  orderNeedsRemainDeliverySave,
-} from "@/lib/orderDeliveryBatches";
-import AccountantReportActionLinks from "@/components/orders/AccountantReportActionLinks";
-import OrderInvoiceMenuLinks from "@/components/orders/OrderInvoiceMenuLinks";
-import DispatchProductSelectModal from "@/components/orders/DispatchProductSelectModal";
-import OrderBookingViewMenuLinks from "@/components/orders/OrderBookingViewMenuLinks";
-import OrderDeliveryMenuLinks from "@/components/orders/OrderDeliveryMenuLinks";
-import {
-  OrderListSearchInput,
-  OrderListSearchApplyButton,
-  OrderListSearchResetButton,
-} from "@/components/orders/OrderListSearchFilterControls";
-import {
-  canManageAnyOrderDeliveryRole,
-  canViewOrderDeliveryDetailsRole,
-  isAccountantOnlyMenuRole,
-  isSuperAdminRole,
-} from "@/lib/roleKeyUtils";
 
 import DeleteButton from "@/components/accounts/DeleteButton";
 import ReturnInitiateMenuItem from "@/components/orders/ReturnInitiateMenuItem";
@@ -71,65 +24,40 @@ import {
   ReturnBookingMenuItem,
   WarehouseInMenuItem,
 } from "@/components/orders/ReturnBookingWarehouseMenuItems";
-import ViewCreditNoteMenuLink from "@/components/orders/ViewCreditNoteMenuLink";
-import AccountantReturnViewMenuItems from "@/components/orders/AccountantReturnViewMenuItems";
-import LinkedStatementPaymentCell from "@/components/orders/LinkedStatementPaymentCell";
-import { orderMatchesSearchQuery } from "@/lib/orderListClientSearch";
-/** Single fetch for filtered range (default: current month). */
-const LIST_FETCH_LIMIT = 5000;
 
-function getDefaultOrderListMonthRange() {
-  const now = new Date();
-  const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-  const format = (date) => {
-    const y = date.getFullYear();
-    const m = String(date.getMonth() + 1).padStart(2, "0");
-    const d = String(date.getDate()).padStart(2, "0");
-    return `${y}-${m}-${d}`;
-  };
-  return { from: format(firstDay), to: format(lastDay) };
-}
+// 👻 A sleek skeleton loader for a modern feel
+const SkeletonLoader = () => (
+  <div className="animate-pulse space-y-4">
+    {/* Search bar and filter skeleton */}
+    <div className="h-10 bg-gray-200 rounded-lg w-full mb-6"></div>
 
-function orderListPaymentStatusKey(order) {
-  return (deriveOrderListPaymentStatus(order) || "")
-    .toString()
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, "");
-}
+    {/* Desktop table skeleton */}
+    <div className="hidden lg:block overflow-x-auto">
+      <div className="bg-gray-200 h-12 rounded-t-lg"></div>
+      <div className="border border-gray-200 rounded-b-lg p-4 space-y-2">
+        {[...Array(5)].map((_, i) => (
+          <div key={i} className="h-10 bg-gray-200 rounded-lg"></div>
+        ))}
+      </div>
+    </div>
 
-function getOrderTotalAmount(order) {
-  return getOrderTotalForPayment(order);
-}
+    {/* Mobile card skeleton */}
+    <div className="lg:hidden space-y-4">
+      {[...Array(3)].map((_, i) => (
+        <div
+          key={i}
+          className="bg-gray-100 border rounded-xl shadow-sm p-4 space-y-2"
+        >
+          <div className="h-6 bg-gray-200 w-3/4 rounded"></div>
+          <div className="h-4 bg-gray-200 w-1/2 rounded"></div>
+          <div className="h-4 bg-gray-200 w-2/3 rounded"></div>
+        </div>
+      ))}
+    </div>
+  </div>
+);
 
-function getOrderPaidAmount(order) {
-  return getOrderPaidAmountForDisplay(order);
-}
-
-function getOrderBalanceAmount(order) {
-  const total = getOrderTotalAmount(order);
-  const paid = getOrderPaidAmount(order);
-  return Math.max(0, total - paid);
-}
-
-function readDateFilterFromStorage(key) {
-  const { from, to } = getDefaultOrderListMonthRange();
-  const fallback = key.endsWith("From") ? from : to;
-  if (typeof window === "undefined") return fallback;
-  const stored = localStorage.getItem(key);
-  if (stored === null || stored === "") return fallback;
-  return stored;
-}
-
-export default function OrderTable({ userRole }) {
-  const router = useRouter();
-  const [orders, setOrders] = useState([]);
-  const [listLoading, setListLoading] = useState(true);
-  const [fetchError, setFetchError] = useState(null);
-  const fetchAbortRef = useRef(null);
-  const tableScrollRef = useRef(null);
-  const searchParams = useSearchParams();
+export default function OrderTable({ orders, userRole }) {
   // Initialize from localStorage with defaults
   const [searchQuery, setSearchQuery] = useState(() => {
     if (typeof window !== "undefined") {
@@ -137,19 +65,8 @@ export default function OrderTable({ userRole }) {
     }
     return "";
   });
-  const [appliedSearchQuery, setAppliedSearchQuery] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("accountsOrderTable_searchQuery") || "";
-    }
-    return "";
-  });
+  const [filteredOrders, setFilteredOrders] = useState([]);
   const [statusFilter, setStatusFilter] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("accountsOrderTable_statusFilter") || "";
-    }
-    return "";
-  });
-  const [appliedStatusFilter, setAppliedStatusFilter] = useState(() => {
     if (typeof window !== "undefined") {
       return localStorage.getItem("accountsOrderTable_statusFilter") || "";
     }
@@ -161,229 +78,215 @@ export default function OrderTable({ userRole }) {
     }
     return "";
   });
-  const [appliedPaymentTermsFilter, setAppliedPaymentTermsFilter] = useState(() => {
+  const [dateFrom, setDateFrom] = useState(() => {
     if (typeof window !== "undefined") {
-      return localStorage.getItem("accountsOrderTable_paymentTermsFilter") || "";
+      return localStorage.getItem("accountsOrderTable_dateFrom") || "";
     }
     return "";
   });
-  const [paymentStatusFilter, setPaymentStatusFilter] = useState(() => {
+  const [dateTo, setDateTo] = useState(() => {
     if (typeof window !== "undefined") {
-      return localStorage.getItem("accountsOrderTable_paymentStatusFilter") || "";
+      return localStorage.getItem("accountsOrderTable_dateTo") || "";
     }
     return "";
   });
-  const [appliedPaymentStatusFilter, setAppliedPaymentStatusFilter] = useState(
-    () => {
-      if (typeof window !== "undefined") {
-        return localStorage.getItem("accountsOrderTable_paymentStatusFilter") || "";
-      }
-      return "";
-    },
-  );
-  const [dateFrom, setDateFrom] = useState(() =>
-    readDateFilterFromStorage("accountsOrderTable_dateFrom"),
-  );
-  const [appliedDateFrom, setAppliedDateFrom] = useState(() =>
-    readDateFilterFromStorage("accountsOrderTable_dateFrom"),
-  );
-  const [dateTo, setDateTo] = useState(() =>
-    readDateFilterFromStorage("accountsOrderTable_dateTo"),
-  );
-  const [appliedDateTo, setAppliedDateTo] = useState(() =>
-    readDateFilterFromStorage("accountsOrderTable_dateTo"),
-  );
   const [createdByFilter, setCreatedByFilter] = useState(() => {
     if (typeof window !== "undefined") {
       return localStorage.getItem("accountsOrderTable_createdByFilter") || "";
     }
     return "";
   });
-  const [appliedCreatedByFilter, setAppliedCreatedByFilter] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("accountsOrderTable_createdByFilter") || "";
-    }
-    return "";
-  });
   const [openMenuId, setOpenMenuId] = useState(null); // State to track which menu is open
+  const [paymentPendingData, setPaymentPendingData] = useState({}); // Maps order_id to remaining amount
+  const [loadingPendingData, setLoadingPendingData] = useState(true);
+  // const canShowInstall = ["ADMIN", "SALES", "SERVICE"].includes(userRole);
 
-  const fetchOrders = useCallback(
-    async ({ filters } = {}) => {
-      const f = filters || {
-        search: appliedSearchQuery,
-        dateFrom: appliedDateFrom,
-        dateTo: appliedDateTo,
-        createdBy: appliedCreatedByFilter,
-        paymentTerms: appliedPaymentTermsFilter,
-      };
-      const controller = new AbortController();
-
-      setListLoading(true);
-      setFetchError(null);
-      setOrders([]);
-
-      const params = new URLSearchParams();
-      params.set("page", "1");
-      params.set("limit", String(LIST_FETCH_LIMIT));
-      if (f.search) params.set("search", f.search);
-      if (f.dateFrom) params.set("dateFrom", f.dateFrom);
-      if (f.dateTo) params.set("dateTo", f.dateTo);
-      if (f.createdBy) params.set("createdBy", f.createdBy);
-      if (f.paymentTerms) params.set("paymentTerms", f.paymentTerms);
-
-      try {
-        if (fetchAbortRef.current) {
-          fetchAbortRef.current.abort();
-        }
-        fetchAbortRef.current = controller;
-
-        const res = await fetch(`/api/accounts/orders/list?${params.toString()}`, {
-          signal: controller.signal,
-        });
-        const json = await res.json();
-        if (!res.ok || !json.success) {
-          throw new Error(json.detail || json.error || "Failed to load orders");
-        }
-
-        setOrders(json.data || []);
-      } catch (err) {
-        if (err?.name === "AbortError") return;
-        console.error("Order list fetch failed:", err);
-        setOrders([]);
-        setFetchError(err?.message || "Failed to load orders");
-      } finally {
-        if (fetchAbortRef.current !== controller) return;
-        setListLoading(false);
-      }
-    },
-    [
-      appliedSearchQuery,
-      appliedDateFrom,
-      appliedDateTo,
-      appliedCreatedByFilter,
-      appliedPaymentTermsFilter,
-    ],
-  );
-
-  const resetAndFetchOrders = useCallback(() => {
-    fetchOrders();
-  }, [fetchOrders]);
-
-  const handleApplySearch = useCallback(() => {
-    let nextFrom = dateFrom;
-    let nextTo = dateTo;
-    if (nextFrom && nextTo && nextFrom > nextTo) {
-      [nextFrom, nextTo] = [nextTo, nextFrom];
-      setDateFrom(nextFrom);
-      setDateTo(nextTo);
-    }
-    setAppliedSearchQuery(searchQuery);
-    setAppliedStatusFilter(statusFilter);
-    setAppliedPaymentTermsFilter(paymentTermsFilter);
-    setAppliedPaymentStatusFilter(paymentStatusFilter);
-    setAppliedDateFrom(nextFrom);
-    setAppliedDateTo(nextTo);
-    setAppliedCreatedByFilter(createdByFilter);
+  // Save filter states to localStorage whenever they change
+  useEffect(() => {
     if (typeof window !== "undefined") {
       localStorage.setItem("accountsOrderTable_searchQuery", searchQuery);
+    }
+  }, [searchQuery]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
       localStorage.setItem("accountsOrderTable_statusFilter", statusFilter);
+    }
+  }, [statusFilter]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
       localStorage.setItem("accountsOrderTable_paymentTermsFilter", paymentTermsFilter);
-      localStorage.setItem(
-        "accountsOrderTable_paymentStatusFilter",
-        paymentStatusFilter,
-      );
-      localStorage.setItem("accountsOrderTable_dateFrom", nextFrom);
-      localStorage.setItem("accountsOrderTable_dateTo", nextTo);
+    }
+  }, [paymentTermsFilter]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("accountsOrderTable_dateFrom", dateFrom);
+    }
+  }, [dateFrom]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("accountsOrderTable_dateTo", dateTo);
+    }
+  }, [dateTo]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
       localStorage.setItem("accountsOrderTable_createdByFilter", createdByFilter);
     }
-    fetchOrders({
-      filters: {
-        search: searchQuery,
-        dateFrom: nextFrom,
-        dateTo: nextTo,
-        createdBy: createdByFilter,
-        paymentTerms: paymentTermsFilter,
-      },
-    });
-  }, [
-    searchQuery,
-    statusFilter,
-    paymentTermsFilter,
-    paymentStatusFilter,
-    dateFrom,
-    dateTo,
-    createdByFilter,
-    fetchOrders,
-  ]);
+  }, [createdByFilter]);
 
-  const handleResetFilters = useCallback(() => {
-    const { from, to } = getDefaultOrderListMonthRange();
+  const toggleMenu = (id) => {
+    setOpenMenuId(openMenuId === id ? null : id);
+  };
+
+  const handleResetFilters = () => {
     setSearchQuery("");
-    setAppliedSearchQuery("");
     setStatusFilter("");
-    setAppliedStatusFilter("");
     setPaymentTermsFilter("");
-    setAppliedPaymentTermsFilter("");
-    setPaymentStatusFilter("");
-    setAppliedPaymentStatusFilter("");
-    setDateFrom(from);
-    setAppliedDateFrom(from);
-    setDateTo(to);
-    setAppliedDateTo(to);
+    setDateFrom("");
+    setDateTo("");
     setCreatedByFilter("");
-    setAppliedCreatedByFilter("");
+    
+    // Clear localStorage
     if (typeof window !== "undefined") {
       localStorage.removeItem("accountsOrderTable_searchQuery");
       localStorage.removeItem("accountsOrderTable_statusFilter");
       localStorage.removeItem("accountsOrderTable_paymentTermsFilter");
-      localStorage.removeItem("accountsOrderTable_paymentStatusFilter");
-      localStorage.setItem("accountsOrderTable_dateFrom", from);
-      localStorage.setItem("accountsOrderTable_dateTo", to);
+      localStorage.removeItem("accountsOrderTable_dateFrom");
+      localStorage.removeItem("accountsOrderTable_dateTo");
       localStorage.removeItem("accountsOrderTable_createdByFilter");
     }
-    router.replace("/accounts-dashboard/order", { scroll: false });
-    fetchOrders({
-      filters: {
-        search: "",
-        dateFrom: from,
-        dateTo: to,
-        createdBy: "",
-        paymentTerms: "",
-      },
-    });
-  }, [router, fetchOrders]);
+  };
 
+  // Fetch payment pending data on component mount
   useEffect(() => {
-    fetchOrders();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const fetchPaymentPendingData = async () => {
+      try {
+        setLoadingPendingData(true);
+        const res = await fetch("/api/reports/payment-pending");
+        const data = await res.json();
+        
+        if (data.success && data.orders) {
+          // Create a map of order_id to remaining amount
+          const pendingMap = {};
+          data.orders.forEach(order => {
+            pendingMap[order.order_id] = order.remaining_amount;
+          });
+          setPaymentPendingData(pendingMap);
+        }
+      } catch (error) {
+        console.error("Error fetching payment pending data:", error);
+      } finally {
+        setLoadingPendingData(false);
+      }
+    };
+
+    fetchPaymentPendingData();
   }, []);
 
+  // Filter orders based on search query, status filter, and date range
   useEffect(() => {
-    const statusFromCard = searchParams.get("status");
-    const fromCard = searchParams.get("fromCard");
+    if (!orders) return;
 
-    if (statusFromCard) {
-      setStatusFilter(statusFromCard);
-      setAppliedStatusFilter(statusFromCard);
-    }
+    const lowercasedQuery = searchQuery.toLowerCase();
+    const result = orders.filter((order) => {
+      // Step 1: Filter by status
+      if (statusFilter) {
+        const orderStatus = getStatusText(order)
+          .text.toLowerCase()
+          .replace(/\s+/g, "");
+        if (orderStatus !== statusFilter.toLowerCase()) return false;
+      }
 
-    if (fromCard === "1") {
-      setSearchQuery("");
-      setDateFrom("");
-      setDateTo("");
-      setCreatedByFilter("");
-      setPaymentTermsFilter("");
-      setAppliedSearchQuery("");
-      setAppliedDateFrom("");
-      setAppliedDateTo("");
-      setAppliedCreatedByFilter("");
-      setAppliedPaymentTermsFilter("");
-      resetAndFetchOrders();
-    }
-  }, [searchParams, resetAndFetchOrders]);
+      // Step 2: Date range filter (created_at)
+      if (dateFrom || dateTo) {
+        const created = order.created_at ? new Date(order.created_at) : null;
+        if (!created || isNaN(created)) return false;
+        if (dateFrom) {
+          const from = new Date(dateFrom + "T00:00:00");
+          if (created < from) return false;
+        }
+        if (dateTo) {
+          const to = new Date(dateTo + "T23:59:59");
+          if (created > to) return false;
+        }
+      }
 
-  const toggleMenu = (id) => {
-    setOpenMenuId(openMenuId === id ? null : id);
+      // Step 2.5: Filter by created_by
+      if (createdByFilter && order.created_by !== createdByFilter) {
+        return false;
+      }
+
+      // Step 2.6: Filter by approval_status (User Dashboard specific)
+      if (order.approval_status === 'pending') {
+        return false;
+      }
+
+      // Step 2.7: Filter by payment_terms
+      if (paymentTermsFilter && order.payment_terms !== paymentTermsFilter) {
+        return false;
+      }
+
+      // Step 3: Search across multiple fields
+      return (
+        order.order_id?.toLowerCase().includes(lowercasedQuery) ||
+        order.client_name?.toLowerCase().includes(lowercasedQuery) ||
+        order.company_name?.toLowerCase().includes(lowercasedQuery) ||
+        order.contact?.toLowerCase().includes(lowercasedQuery) ||
+        order.state?.toLowerCase().includes(lowercasedQuery)
+      );
+    });
+    setFilteredOrders(result);
+  }, [searchQuery, orders, statusFilter, paymentTermsFilter, dateFrom, dateTo, createdByFilter]);
+
+  const exportToCSV = () => {
+    const headers = [
+      "Order ID", "Quotation", "Created By", "Order Date", "Client Name", "Company Name", 
+      "Contact", "Location", "Item Name", "Item Code", "Status", "Payment Status", "Due Date", "Total Amount", "Paid Amount"
+    ];
+    const csvData = filteredOrders.map(order => {
+      // Calculate total paid amount
+      const prevAmounts = (order.payment_amount || "")
+        .toString()
+        .split(",")
+        .map(s => s.trim())
+        .filter(Boolean)
+        .map(x => Number(x))
+        .filter(n => !isNaN(n));
+      const totalPaid = prevAmounts.reduce((sum, n) => sum + n, 0);
+      
+      return [
+        order.order_id,
+        order.quote_number,
+        order.created_by,
+        dayjs(order.created_at).format("DD/MM/YYYY"),
+        order.client_name,
+        order.company_name,
+        order.contact,
+        order.state,
+        order.item_name,
+        order.item_code,
+        getStatusText(order).text,
+        order.payment_status,
+        dayjs(order.duedate).format("DD/MM/YYYY"),
+        order.totalamt || 0,
+        totalPaid
+      ];
+    });
+
+    const csvContent = [
+      headers.join(","),
+      ...csvData.map(row => row.map(cell => `"${cell || ""}"`).join(","))
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `orders-${dayjs().format("YYYY-MM-DD")}.csv`;
+    link.click();
   };
 
   const getStatusText = (order) => {
@@ -408,8 +311,8 @@ export default function OrderTable({ userRole }) {
       if (Number(order.warehouse_in_done) === 1) {
         return {
           text: "Return Completed",
-          bg: "bg-orange-100",
-          textCol: "text-orange-800",
+          bg: "bg-teal-100",
+          textCol: "text-teal-800",
           icon: <CheckCircle size={14} className="mr-1" />,
         };
       }
@@ -535,139 +438,49 @@ export default function OrderTable({ userRole }) {
     );
   };
 
-  const matchesListFilters = useCallback(
-    (order, { omitCreatedBy = false } = {}) => {
-      const activeStatus = appliedStatusFilter || statusFilter;
-      if (activeStatus) {
-        const orderStatus = getStatusText(order)
-          .text.toLowerCase()
-          .replace(/\s+/g, "");
-        if (orderStatus !== activeStatus.toLowerCase()) return false;
-      }
+  if (!orders) {
+    return <SkeletonLoader />;
+  }
 
-      if (order.approval_status === "pending") {
-        return false;
-      }
-
-      if (!omitCreatedBy && appliedCreatedByFilter && order.created_by !== appliedCreatedByFilter) {
-        return false;
-      }
-
-      if (appliedPaymentTermsFilter && order.payment_terms !== appliedPaymentTermsFilter) {
-        return false;
-      }
-
-      if (appliedPaymentStatusFilter) {
-        const payKey = orderListPaymentStatusKey(order);
-        const want = appliedPaymentStatusFilter.toLowerCase().replace(/\s+/g, "");
-        if (want === "partiallypaid" && payKey !== "partiallypaid") return false;
-        if (want === "paid" && payKey !== "paid") return false;
-        if (want === "pending" && payKey !== "pending") return false;
-      }
-
-      if (!orderMatchesSearchQuery(order, searchQuery)) return false;
-
-      return true;
-    },
-    [
-      searchQuery,
-      statusFilter,
-      appliedStatusFilter,
-      appliedCreatedByFilter,
-      appliedPaymentTermsFilter,
-      appliedPaymentStatusFilter,
-    ],
-  );
-
-  const createdByFilterOptions = useMemo(() => {
-    if (!orders?.length) return [];
-    const users = new Set();
-    orders.forEach((order) => {
-      if (matchesListFilters(order, { omitCreatedBy: true }) && order.created_by) {
-        users.add(String(order.created_by).trim());
-      }
-    });
-    return [...users].sort((a, b) => a.localeCompare(b));
-  }, [orders, matchesListFilters]);
-
-  const filteredOrders = useMemo(() => {
-    if (!orders) return [];
-    return orders.filter((order) => matchesListFilters(order));
-  }, [orders, matchesListFilters]);
-
-  const exportToCSV = () => {
-    const headers = [
-      "Order ID", "Quotation", "Created By", "Order Date", "Client Name", "Company Name",
-      "Contact", "Location", "Item Name", "Item Code", "Status", "Payment Status",
-      "Invoice Number", "Amount Received (Linked)", "Due Date", "Total Amount", "Paid Amount",
-    ];
-    const csvData = filteredOrders.map((order) => {
-      const prevAmounts = (order.payment_amount || "")
-        .toString()
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean)
-        .map((x) => Number(x))
-        .filter((n) => !isNaN(n));
-      const totalPaid = prevAmounts.reduce((sum, n) => sum + n, 0);
-
-      return [
-        order.order_id,
-        order.quote_number,
-        order.created_by,
-        dayjs(order.created_at).format("DD-MM-YYYY"),
-        order.client_name,
-        order.company_name,
-        order.contact,
-        order.state,
-        order.item_name,
-        order.item_code,
-        getStatusText(order).text,
-        order.payment_status,
-        order.invoice_number || "",
-        order.amount_received ?? "",
-        dayjs(order.duedate).format("DD-MM-YYYY"),
-        order.totalamt || 0,
-        totalPaid,
-      ];
-    });
-
-    const csvContent = [
-      headers.join(","),
-      ...csvData.map((row) => row.map((cell) => `"${cell || ""}"`).join(",")),
-    ].join("\n");
-
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = `orders-${dayjs().format("YYYY-MM-DD")}.csv`;
-    link.click();
-  };
-
-  const showListLoadingEmpty = listLoading && filteredOrders.length === 0;
-  const showNoOrdersEmpty = !listLoading && filteredOrders.length === 0;
+  if (orders.length === 0)
+    return <p className="text-gray-600">No orders submitted yet.</p>;
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-end">
-        <button
-          type="button"
-          onClick={exportToCSV}
-          className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors duration-200 text-sm font-medium"
-        >
-          <Download size={18} />
-          Export CSV
-        </button>
+      {/* 🔍 Search and Quick Status Filter */}
+      <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div className="relative w-full sm:w-2/3">
+          <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+            <Search size={20} className="text-gray-400" />
+          </div>
+          <input
+            type="text"
+            placeholder="Search by ID, client, company, etc."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200 ease-in-out"
+          />
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={handleResetFilters}
+            className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm font-medium rounded-lg transition-colors"
+          >
+            Reset Filters
+          </button>
+          <button
+            onClick={exportToCSV}
+            className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors duration-200"
+          >
+            <Download size={18} />
+            Export CSV
+          </button>
+        </div>
       </div>
 
       {/* 🧰 Filters */}
-      <div className="flex flex-wrap items-end gap-3">
-        <OrderListSearchInput
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
-          onApply={handleApplySearch}
-        />
-        <div className="min-w-[140px] flex-1 sm:max-w-[200px]">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+        <div>
           <label className="block text-xs text-gray-600 mb-1">Status</label>
           <select
             value={statusFilter}
@@ -689,15 +502,25 @@ export default function OrderTable({ userRole }) {
             <option value="returncompleted">Return Completed</option>
           </select>
         </div>
-        <div className="min-w-[140px] flex-1 sm:max-w-[200px]">
+        <div>
           <label className="block text-xs text-gray-600 mb-1">From Date</label>
-          <TypeableDateFilterInput value={dateFrom} onChange={setDateFrom} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"/>
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+          />
         </div>
-        <div className="min-w-[140px] flex-1 sm:max-w-[200px]">
+        <div>
           <label className="block text-xs text-gray-600 mb-1">To Date</label>
-          <TypeableDateFilterInput value={dateTo} onChange={setDateTo} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"/>
+          <input
+            type="date"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+          />
         </div>
-        <div className="min-w-[140px] flex-1 sm:max-w-[200px]">
+        <div>
           <label className="block text-xs text-gray-600 mb-1">Created By</label>
           <select
             value={createdByFilter}
@@ -705,14 +528,16 @@ export default function OrderTable({ userRole }) {
             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
           >
             <option value="">All Users</option>
-            {createdByFilterOptions.map((user) => (
-              <option key={user} value={user}>
-                {user}
-              </option>
-            ))}
+            {[...new Set(orders?.map((o) => o.created_by).filter(Boolean))]
+              .sort()
+              .map((user) => (
+                <option key={user} value={user}>
+                  {user}
+                </option>
+              ))}
           </select>
         </div>
-        <div className="min-w-[140px] flex-1 sm:max-w-[200px]">
+        <div>
           <label className="block text-xs text-gray-600 mb-1">Payment Terms</label>
           <select
             value={paymentTermsFilter}
@@ -729,35 +554,10 @@ export default function OrderTable({ userRole }) {
               ))}
           </select>
         </div>
-        <div className="min-w-[140px] flex-1 sm:max-w-[200px]">
-          <label className="block text-xs text-gray-600 mb-1">Payment Status</label>
-          <select
-            value={paymentStatusFilter}
-            onChange={(e) => setPaymentStatusFilter(e.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-          >
-            <option value="">All</option>
-            <option value="pending">Pending</option>
-            <option value="partiallypaid">Partially Paid</option>
-            <option value="paid">Paid</option>
-          </select>
-        </div>
-        <div className="flex items-end gap-2 shrink-0 order-last">
-          <OrderListSearchResetButton onReset={handleResetFilters} />
-          <OrderListSearchApplyButton onApply={handleApplySearch} embedded />
-        </div>
       </div>
-      <p className="text-xs text-gray-500">Set filters, then click Search to update the list.</p>
 
       {/* 👨‍💼 TABLE VIEW for large screens */}
-      {fetchError && (
-        <p className="text-sm text-red-600">{fetchError}</p>
-      )}
-
-      <div
-        ref={tableScrollRef}
-        className="hidden lg:block overflow-x-auto overflow-y-auto max-h-[calc(100vh-160px)] min-h-[calc(100vh-240px)] bg-white rounded-xl shadow-lg"
-      >
+      <div className="hidden lg:block overflow-x-auto overflow-y-auto max-h-[calc(100vh-300px)] bg-white rounded-xl shadow-lg">
         <table className="w-full min-w-[1100px] text-sm">
           <thead className="bg-gray-800 text-white sticky top-0 z-10">
             <tr>
@@ -769,9 +569,8 @@ export default function OrderTable({ userRole }) {
               <th className="px-3 py-3 font-semibold text-left">Item</th>
               <th className="px-3 py-3 font-semibold text-left">Payment Terms</th>
               <th className="px-3 py-3 font-semibold text-center">Status</th>
-              <th className="px-3 py-3 font-semibold text-center">Payment Status</th>
-              <th className="px-3 py-3 font-semibold text-center">Balance</th>
-              <th className="px-3 py-3 font-semibold text-center">Linked Payment</th>
+              <th className="px-3 py-3 font-semibold text-center">Payment</th>
+              <th className="px-3 py-3 font-semibold text-center">Payment Pending</th>
               <th className="px-3 py-3 font-semibold text-center">Due Date</th>
               {/* {canShowInstall && (
                 <th className="px-3 py-3 font-semibold text-center">Install</th>
@@ -783,8 +582,7 @@ export default function OrderTable({ userRole }) {
             {filteredOrders.length > 0 ? (
               filteredOrders.map((r, i) => {
                 const status = getStatusText(r);
-                const pay = getPaymentBadge(deriveOrderListPaymentStatus(r));
-                const orderBalance = getOrderBalanceAmount(r);
+                const pay = getPaymentBadge(r.payment_status);
                 // const inst = getInstallationLabel(r.installation_status);
                 return (
                   <tr
@@ -810,7 +608,7 @@ export default function OrderTable({ userRole }) {
                       {r.created_by}
                     </td>
                     <td className="px-3 py-3 text-left">
-                      {dayjs(r.created_at).format("DD-MM-YYYY")}
+                      {dayjs(r.created_at).format("DD/MM/YYYY")}
                     </td>
                     <td className="px-3 py-3 text-left">
                       <div className="space-y-1 text-xs">
@@ -865,19 +663,19 @@ export default function OrderTable({ userRole }) {
                         {pay.text}
                       </span>
                     </td>
-                    <td className="px-3 py-3">
-                      <span className="font-bold text-orange-600">
-                        ₹{orderBalance.toLocaleString("en-IN", {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
-                      </span>
-                    </td>
-                    <td className="px-3 py-3">
-                      <LinkedStatementPaymentCell order={r} />
+                    <td className="px-3 py-3 text-center">
+                      {loadingPendingData ? (
+                        <span className="text-gray-400 text-xs">Loading...</span>
+                      ) : paymentPendingData[r.order_id] ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                          ₹{paymentPendingData[r.order_id].toFixed(2)}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400 text-xs">—</span>
+                      )}
                     </td>
                     <td className="px-3 py-3 text-center">
-                      {dayjs(r.duedate).format("DD-MM-YYYY")}
+                      {dayjs(r.duedate).format("DD/MM/YYYY")}
                     </td>
                     {/* {canShowInstall && (
                       <td className="px-3 py-3">
@@ -897,39 +695,22 @@ export default function OrderTable({ userRole }) {
                   </tr>
                 );
               })
-            ) : showListLoadingEmpty ? (
+            ) : (
               <tr>
-                <td colSpan={13} className="px-6 py-8 text-center text-gray-600">
-                  Loading…
-                </td>
-              </tr>
-            ) : showNoOrdersEmpty ? (
-              <tr>
-                <td colSpan={13} className="px-6 py-4 text-center text-gray-500">
+                <td colSpan={12} className="px-6 py-4 text-center text-gray-500">
                   No orders found.
                 </td>
               </tr>
-            ) : null}
+            )}
           </tbody>
         </table>
       </div>
-
-      {!listLoading && orders.length > 0 && (
-        <div className="text-xs text-gray-600 px-1">
-          Showing {filteredOrders.length}
-          {filteredOrders.length !== orders.length
-            ? ` of ${orders.length} orders`
-            : ` order${filteredOrders.length === 1 ? "" : "s"}`}
-        </div>
-      )}
 
       {/* 📱 CARD VIEW for mobile */}
       <div className="lg:hidden space-y-4">
         {filteredOrders.length > 0 ? (
           filteredOrders.map((r, i) => {
             const status = getStatusText(r);
-            const pay = getPaymentBadge(deriveOrderListPaymentStatus(r));
-            const orderBalance = getOrderBalanceAmount(r);
             return (
               <div
                 key={r.order_id}
@@ -939,7 +720,7 @@ export default function OrderTable({ userRole }) {
                   <span className="text-xs">#{i + 1}</span>
                   <div className="flex items-center">
                     <span className="font-medium text-gray-800 mr-2">
-                      {dayjs(r.created_at).format("DD-MM-YYYY")}
+                      {dayjs(r.created_at).format("DD/MM/YYYY")}
                     </span>
                     <span
                       className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${status.bg} ${status.textCol}`}
@@ -982,34 +763,23 @@ export default function OrderTable({ userRole }) {
                   <strong>Location:</strong> {r.state}
                 </div>
                 <div>
-                  <strong>Payment Status:</strong>{" "}
-                  <span
-                    className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${pay.cls}`}
-                  >
-                    {pay.text}
-                  </span>
-                </div>
-                <div className="text-xs text-orange-600">
-                  <strong>Balance:</strong> ₹
-                  {orderBalance.toLocaleString("en-IN", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </div>
-                <div className="pt-1">
-                  <strong>Linked Payment:</strong>
-                  <div className="mt-1 pl-1">
-                    <LinkedStatementPaymentCell order={r} />
-                  </div>
+                  <strong>Payment Pending:</strong>{" "}
+                  {loadingPendingData ? (
+                    <span className="text-gray-400 text-xs">Loading...</span>
+                  ) : paymentPendingData[r.order_id] ? (
+                    <span className="font-semibold text-red-600">
+                      ₹{paymentPendingData[r.order_id].toFixed(2)}
+                    </span>
+                  ) : (
+                    <span className="text-gray-400">—</span>
+                  )}
                 </div>
               </div>
             );
           })
-        ) : showListLoadingEmpty ? (
-          <p className="text-center text-gray-600 py-8">Loading…</p>
-        ) : showNoOrdersEmpty ? (
+        ) : (
           <p className="text-center text-gray-500">No orders found.</p>
-        ) : null}
+        )}
       </div>
     </div>
   );
@@ -1022,47 +792,28 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
   }
 
   const popRef = useRef(null);
-  const [bookingProductSelectOpen, setBookingProductSelectOpen] = useState(false);
   const role = (userRole || "").toString().trim().toLowerCase();
   const canViewSales = [
     "back office",
     "accountant",
     "admin",
-    "superadmin",
     "sales",
     "warehouse incharge",
     "gem portal",
     "team leader",
     "service head",
   ].includes(role);
-  const isSuperAdmin = isSuperAdminRole(userRole);
   const isAdmin = role === "admin";
   const isAccountant = role.includes("accountant");
   const isTeamLeader = role === "team leader";
   const isWarehouse = role === "warehouse incharge";
-  const canManageInvoiceDocs =
-    isSuperAdmin || isAdmin || isAccountant || isTeamLeader;
-  const canManageReturns = isSuperAdmin || isTeamLeader;
-  const accountantOnlyMenu = isAccountantOnlyMenuRole(userRole);
-  const canEditBooking = isSuperAdmin || isAdmin;
-  const reportUploaded = isBookingAllowedForOrder(r);
-  const canAdminAfterReport = (isAdmin || isSuperAdmin) && reportUploaded;
-  const canManageBookingActions =
-    isSuperAdmin ||
-    isAdmin ||
-    canManageReturns ||
-    canAdminAfterReport ||
-    ((isTeamLeader || isWarehouse) && reportUploaded);
+  const canManageReturns = isAdmin || isAccountant || isTeamLeader;
   const hasBooking =
     r.booking_id !== undefined &&
     r.booking_id !== null &&
     String(r.booking_id).trim() !== "" &&
     String(r.booking_id) !== "0";
   const dispatchStatus = Number(r.dispatch_status);
-  const followUpBooking = canCreateAdditionalBooking(r);
-  const canOpenFirstDispatch = canOpenFirstDispatchForOrder(r);
-  const canOpenRemainDispatch = canOpenRemainDispatchForOrder(r);
-  const canViewDispatchPanel = canViewDispatchPanelForOrder(r);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -1098,100 +849,12 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
       >
         <MoreVertical size={18} />
       </button>
-      <DispatchProductSelectModal
-        open={bookingProductSelectOpen}
-        orderId={r.order_id}
-        nextHref={`/accounts-dashboard/order/upload-booking/${r.order_id}`}
-        onClose={() => setBookingProductSelectOpen(false)}
-        purpose="booking"
-        title={
-          followUpBooking
-            ? "Select remaining products for booking"
-            : "Select products for booking"
-        }
-        confirmLabel="Continue to booking"
-        partialHint="Partial booking"
-      />
       {isOpen && (
         <div
           ref={popRef}
           className="absolute right-0 mt-2 w-56 origin-top-right rounded-lg bg-white shadow-lg ring-1 ring-black/5 z-20 border"
         >
           <div className="py-1 text-sm">
-            {accountantOnlyMenu ? (
-              <>
-                <AccountantReportActionLinks
-                  order={r}
-                  viewSalesHref={`/user-dashboard/order/${r.order_id}`}
-                  uploadHref={`/accounts-dashboard/order/upload/${r.order_id}`}
-                  viewHref={`/accounts-dashboard/order/view/${r.order_id}`}
-                  onClick={(e) => e.stopPropagation()}
-                />
-                <OrderBookingViewMenuLinks
-                  order={r}
-                  basePath="/accounts-dashboard/order"
-                  canSee={hasBooking}
-                  onClick={(e) => e.stopPropagation()}
-                />
-                <OrderInvoiceMenuLinks
-                  order={r}
-                  invoicesBasePath="/accounts-dashboard/invoices"
-                  onClick={(e) => e.stopPropagation()}
-                />
-                {r.report_file && (
-                  <div onClick={(e) => e.stopPropagation()}>
-                    <ViewPaymentButton order={r} />
-                  </div>
-                )}
-                {canViewDispatchPanel && (
-                  <Link
-                    href={`/accounts-dashboard/order/dispatch/view/${r.order_id}`}
-                    className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
-                    title="View Dispatch"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <Search size={16} />
-                    <span>View Dispatch</span>
-                  </Link>
-                )}
-                <OrderDeliveryMenuLinks
-                  order={r}
-                  userRole={userRole}
-                  DeliveryMenuItem={UpdateDeliveryMenuItem}
-                />
-                {dispatchStatus === 1 &&
-                  ![1, 2, 3].includes(Number(r.is_returned || 0)) && (
-                    <div
-                      className="border-t border-gray-100 mt-1 pt-1"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <ReturnInitiateMenuItem
-                        order={r}
-                        orderListPath="/accounts-dashboard/order"
-                      />
-                    </div>
-                  )}
-                <ViewCreditNoteMenuLink
-                  order={r}
-                  userRole={userRole}
-                  hrefBase="/admin-dashboard"
-                  onClick={(e) => e.stopPropagation()}
-                />
-                <AccountantReturnViewMenuItems
-                  order={r}
-                  onClick={(e) => e.stopPropagation()}
-                />
-                {canShowOrderCancelMenu(r) && (
-                  <div
-                    className="border-t border-gray-100 mt-1 pt-1"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <DeleteButton orderId={r.order_id} />
-                  </div>
-                )}
-              </>
-            ) : (
-              <>
             {canViewSales && (
               <Link
                 href={`/user-dashboard/order/${r.order_id}`}
@@ -1203,34 +866,21 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                 <span>View Sales</span>
               </Link>
             )}
-            {canManageInvoiceDocs &&
+            {["accountant", "admin", "team leader"].includes(role) &&
               (r.report_file ? (
-                <>
-                  <Link
-                    href={`/accounts-dashboard/order/view/${r.order_id}`}
-                    className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
-                    title="View Report"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <FileText size={16} />
-                    <span>View Report</span>
-                  </Link>
-                  {(isSuperAdmin || isAdmin) && dispatchStatus === 0 && (
-                    <Link
-                      href={`/accounts-dashboard/order/upload/${r.order_id}`}
-                      className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-blue-700"
-                      title="Edit Report"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <Pencil size={16} />
-                      <span>Edit Report</span>
-                    </Link>
-                  )}
-                </>
+                <Link
+                  href={`/user-dashboard/order/view/${r.order_id}`}
+                  className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
+                  title="View Report"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <FileText size={16} />
+                  <span>View Report</span>
+                </Link>
               ) : (
                 <div className="flex items-center">
                   <Link
-                    href={`/accounts-dashboard/order/upload/${r.order_id}`}
+                    href={`/user-dashboard/order/upload/${r.order_id}`}
                     className="flex-1 flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-yellow-700"
                     title="Upload Report"
                     onClick={(e) => e.stopPropagation()}
@@ -1239,96 +889,66 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                     <span>Upload Report</span>
                   </Link>
                   <div className="px-2">
-                    {isSuperAdmin && <DeleteButton orderId={r.order_id} />}
+                    <DeleteButton orderId={r.order_id} />
                   </div>
                 </div>
               ))}
-            {canManageBookingActions &&
-              (!hasBooking || followUpBooking) && (
-                <button
-                  type="button"
-                  className="flex w-full items-center gap-2 px-3 py-2 hover:bg-gray-50 text-green-700 text-left"
-                  title={
-                    followUpBooking
-                      ? "Create booking for remaining products"
-                      : "Create Booking"
-                  }
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setBookingProductSelectOpen(true);
-                    toggleMenu();
-                  }}
+            {canManageReturns &&
+              (hasBooking ? (
+                <Link
+                  href={`/accounts-dashboard/order/view-booking/${r.order_id}`}
+                  className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
+                  title="View Booking"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <FileCheck size={16} />
+                  <span>View Booking</span>
+                </Link>
+              ) : (
+                <Link
+                  href={`/accounts-dashboard/order/upload-booking/${r.order_id}`}
+                  className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-green-700"
+                  title="Create Booking"
+                  onClick={(e) => e.stopPropagation()}
                 >
                   <UploadCloud size={16} />
-                  <span>
-                    {followUpBooking
-                      ? "Create Booking (Remaining)"
-                      : "Create Booking"}
-                  </span>
-                </button>
-              )}
-            {canEditBooking &&
+                  <span>Create Booking</span>
+                </Link>
+              ))}
+            {isWarehouse && hasBooking && dispatchStatus === 0 && (
+              <>
+                <Link
+                  href={`/user-dashboard/order/dispatch/${r.order_id}`}
+                  className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
+                  title="Dispatch"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <CheckCircle size={16} />
+                  <span>Dispatch</span>
+                </Link>
+              </>
+            )}
+            {(isWarehouse || canManageReturns) &&
               hasBooking &&
-              !followUpBooking &&
-              !orderHasDispatchedStock(r) &&
-              dispatchStatus !== 1 && (
-              <Link
-                href={`/accounts-dashboard/order/upload-booking/${r.order_id}`}
-                className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-blue-700"
-                title="Edit Booking"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <Pencil size={16} />
-                <span>Edit Booking</span>
-              </Link>
+              dispatchStatus === 1 && (
+                <>
+                  <Link
+                    href={`/accounts-dashboard/order/dispatch/view/${r.order_id}`}
+                    className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
+                    title="View Dispatch"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Search size={16} />
+                    <span>View Dispatch</span>
+                  </Link>
+                </>
+              )}
+            {["accountant", "admin"].includes(role) && r.report_file && (
+              <div className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                <EditPaymentButton order={r} />
+              </div>
             )}
-            <OrderBookingViewMenuLinks
-              order={r}
-              basePath="/accounts-dashboard/order"
-              canSee={hasBooking && (canManageReturns || canEditBooking || isAccountant)}
-              onClick={(e) => e.stopPropagation()}
-            />
-            {(isWarehouse || isSuperAdmin || isAdmin || canAdminAfterReport) &&
-              canOpenFirstDispatch && (
-              <Link
-                href={`/accounts-dashboard/order/dispatch/${r.order_id}`}
-                className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
-                title="Dispatch — pehli booking ke products"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <CheckCircle size={16} />
-                <span>Dispatch</span>
-              </Link>
-            )}
-            {(isWarehouse || isSuperAdmin || isAdmin || canAdminAfterReport) &&
-              canOpenRemainDispatch && (
-              <Link
-                href={`/accounts-dashboard/order/dispatch/${r.order_id}?round=remain`}
-                className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
-                title="Dispatch (Remain) — doosri booking ke products"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <CheckCircle size={16} />
-                <span>Dispatch (Remain)</span>
-              </Link>
-            )}
-            {(isWarehouse || canManageReturns || isAdmin || canViewSales) &&
-              canViewDispatchPanel && (
-              <Link
-                href={`/accounts-dashboard/order/dispatch/view/${r.order_id}`}
-                className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
-                title="View Dispatch"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <Search size={16} />
-                <span>View Dispatch</span>
-              </Link>
-            )}
-            <OrderDeliveryMenuLinks
-              order={r}
-              userRole={userRole}
-              DeliveryMenuItem={UpdateDeliveryMenuItem}
-            />
+            <UpdateDeliveryMenuItem order={r} />
             {canManageReturns &&
               dispatchStatus === 1 &&
               ![1, 2, 3].includes(Number(r.is_returned || 0)) && (
@@ -1339,38 +959,43 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                 />
               </div>
             )}
-            {(canManageReturns || isAdmin) && Number(r.is_returned) === 3 && (
+            {canManageReturns && Number(r.is_returned) === 3 && (
               <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>
                 <ReturnBookingMenuItem order={r} />
               </div>
             )}
-            {(canManageReturns || isAdmin || isAccountant || isWarehouse) &&
-              Number(r.return_booking_done) === 1 && (
+            {(canManageReturns || isWarehouse) && Number(r.return_booking_done) === 1 && (
               <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>
                 <ViewReturnBookingMenuItem order={r} />
               </div>
             )}
-            <ViewCreditNoteMenuLink
-              order={r}
-              userRole={userRole}
-              hrefBase="/admin-dashboard"
-              onClick={(e) => e.stopPropagation()}
-            />
-            {(isSuperAdmin || isAdmin || isAccountant || isWarehouse) &&
-              Number(r.warehouse_in_done) === 1 && (
+            {(isAdmin || isAccountant) &&
+              [3, 1, 2].includes(Number(r.is_returned)) &&
+              r.credit_note_id && (
+              <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>
+                <Link
+                  href={`/admin-dashboard/credit-notes/${r.credit_note_id}`}
+                  className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-teal-700"
+                  title="View Credit Note"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <FileText size={16} />
+                  <span>View Credit Note</span>
+                </Link>
+              </div>
+            )}
+            {(isAdmin || isAccountant || isWarehouse) && Number(r.warehouse_in_done) === 1 && (
               <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>
                 <WarehouseInMenuItem order={r} />
               </div>
             )}
-            {(isWarehouse || isAdmin) &&
+            {isWarehouse &&
               Number(r.is_returned) === 3 &&
               Number(r.return_booking_done) === 1 &&
               Number(r.warehouse_in_done) !== 1 && (
               <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>
                 <WarehouseInMenuItem order={r} />
               </div>
-            )}
-              </>
             )}
           </div>
         </div>
@@ -1379,41 +1004,118 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
   );
 }
 
-function ViewPaymentButton({ order }) {
+function EditPaymentButton({ order }) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({
+    payment_id: order.payment_id || "",
+    payment_date: "",
+    payment_amount: "",
+    payment_status: order.payment_status || "",
+  });
+  const [status, setStatus] = useState(order.payment_status || "");
   const totalamt = order.totalamt || 0;
-  const rows = buildOrderPaymentRows(order);
+
+  const prevIds = (order.payment_id || "")
+    .toString()
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const prevDates = (order.payment_date || "")
+    .toString()
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const prevAmounts = (order.payment_amount || "")
+    .toString()
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const rows = Array.from({
+    length: Math.max(prevIds.length, prevDates.length, prevAmounts.length),
+  }).map((_, i) => ({
+    id: prevIds[i] || "",
+    date: prevDates[i] || "",
+    amount: prevAmounts[i] || "",
+  }));
 
   const formatPrevDate = (d) => {
     if (!d) return "-";
     const v = dayjs(d);
-    return v.isValid() ? v.format("DD-MM-YYYY") : d;
+    return v.isValid() ? v.format("DD/MM/YYYY") : d;
   };
 
-  const totalPaid = sumOrderPaymentAmounts(order);
+  const totalPaid = prevAmounts
+    .map((x) => Number(x))
+    .filter((n) => !isNaN(n))
+    .reduce((sum, n) => sum + n, 0);
+
+  const onChange = (e) => {
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const save = async () => {
+    try {
+      setSaving(true);
+      const res = await fetch("/api/orders/payment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          order_id: order.order_id,
+          payment_id: form.payment_id || null,
+          payment_date: form.payment_date || null,
+          payment_amount:
+            form.payment_amount === "" ? null : Number(form.payment_amount),
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success)
+        throw new Error(json.error || "Save failed");
+      setStatus(json.payment_status);
+      setForm((prev) => ({ ...prev, payment_status: json.payment_status }));
+      setOpen(false);
+      // Optionally refresh page/client state here
+      router.refresh();
+    } catch (e) {
+      console.error(e);
+      alert(e.message || "Failed to save");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const isPaid =
+    (order.payment_status || "")
+      .toString()
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, "") === "paid";
 
   return (
     <>
       <button
-        type="button"
         onClick={(e) => {
           e.stopPropagation();
           setOpen(true);
         }}
-        className="flex w-full items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700 text-left"
-        title="View Payment"
+        className="inline-flex items-center justify-center px-2 py-1 rounded bg-purple-50 text-purple-700 hover:bg-purple-100 text-xs"
+        title={isPaid ? "View Payment" : "Edit Payment"}
       >
-        <CreditCard size={16} />
-        <span>View Payment</span>
+        {isPaid ? "View Payment" : "Edit Payment"}
       </button>
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
           <div className="bg-white rounded-lg shadow-lg p-4 w-full max-w-md">
-            <h3 className="font-semibold mb-3">View Payment</h3>
+            <h3 className="font-semibold mb-3">
+              {isPaid ? "View Payment" : "Edit Payment"}
+            </h3>
             <p>Total Amount : {totalamt}</p>
             <div className="space-y-3">
               <div className="text-xs text-gray-700">
-                <div className="font-medium mb-1">Payments</div>
+                <div className="font-medium mb-1">Previous Payments</div>
                 {rows.length ? (
                   <div className="border rounded">
                     <div className="grid grid-cols-3 text-gray-600 bg-gray-50 px-2 py-1">
@@ -1443,24 +1145,53 @@ function ViewPaymentButton({ order }) {
                     </div>
                   </div>
                 ) : (
-                  <div className="text-gray-500">No payments recorded</div>
+                  <div className="text-gray-500">No previous payments</div>
                 )}
               </div>
+              {!isPaid && (
+                <>
+                  <Input
+                    label="Payment ID (UTR No)"
+                    name="payment_id"
+                    onChange={onChange}
+                  />
+                  <Input
+                    label="Payment Date"
+                    name="payment_date"
+                    type="date"
+                    onChange={onChange}
+                  />
+                  <Input
+                    label="Payment Amount"
+                    name="payment_amount"
+                    type="number"
+                    onChange={onChange}
+                  />
+                </>
+              )}
               <div className="text-sm text-gray-600">
                 Status:{" "}
                 <span className="font-medium">
-                  {order.payment_status || "-"}
+                  {form.payment_status || "-"}
                 </span>
               </div>
             </div>
-            <div className="mt-4 flex justify-end">
+            <div className="mt-4 flex justify-end gap-2">
               <button
-                type="button"
                 onClick={() => setOpen(false)}
                 className="px-3 py-1 rounded border"
               >
-                Close
+                {isPaid ? "Close" : "Cancel"}
               </button>
+              {!isPaid && (
+                <button
+                  onClick={save}
+                  disabled={saving}
+                  className="px-3 py-1 rounded bg-purple-600 text-white disabled:opacity-50"
+                >
+                  {saving ? "Saving..." : "Save"}
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -1469,19 +1200,31 @@ function ViewPaymentButton({ order }) {
   );
 }
 
-function UpdateDeliveryMenuItem({ order, userRole, variant = "auto" }) {
+function Input({ label, name, value, onChange, type = "text" }) {
+  return (
+    <div>
+      <label className="block text-xs text-gray-600 mb-1">{label}</label>
+      <input
+        name={name}
+        type={type}
+        value={value}
+        onChange={onChange}
+        className="w-full border rounded px-2 py-1 text-sm"
+      />
+    </div>
+  );
+}
+
+function UpdateDeliveryMenuItem({ order }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [deliveredOn, setDeliveredOn] = useState("");
   const [deliveryProof, setDeliveryProof] = useState(null);
-  const [deliveryRemark, setDeliveryRemark] = useState("");
   const [uploading, setUploading] = useState(false);
-  const canViewDeliveryDetails = canViewOrderDeliveryDetailsRole(userRole);
-  const superAdmin = isSuperAdminRole(userRole);
-  const canManageAnyDelivery = canManageAnyOrderDeliveryRole(userRole);
 
+  // Fetch current user
   useEffect(() => {
     const fetchUser = async () => {
       try {
@@ -1497,22 +1240,18 @@ function UpdateDeliveryMenuItem({ order, userRole, variant = "auto" }) {
     fetchUser();
   }, []);
 
-  const isFullyDelivered = isOrderFullyDelivered(order);
-  const hasDeliveryRecord = orderHasDeliveryRecord(order);
-
+  // Check if menu item should be shown
   const shouldShow = () => {
-    if (!canShowOrderDeliveryActions(order)) return false;
-    if (superAdmin || canManageAnyDelivery) return true;
-    if (canViewDeliveryDetails) return hasDeliveryRecord;
+    // Only show if dispatch_status is 1
+    if (Number(order.dispatch_status) !== 1) return false;
+
+    // Only show if current user is the booking_by person
     if (!currentUser || order.booking_by !== currentUser) return false;
+
     return true;
   };
 
-  const viewOnly =
-    !superAdmin &&
-    !canManageAnyDelivery &&
-    canViewDeliveryDetails &&
-    hasDeliveryRecord;
+  const isDelivered = Number(order.delivery_status) === 1;
 
   const handleSave = async () => {
     if (!deliveredOn) {
@@ -1524,6 +1263,7 @@ function UpdateDeliveryMenuItem({ order, userRole, variant = "auto" }) {
       setSaving(true);
       let deliveryProofUrl = null;
 
+      // Upload delivery proof if file is selected
       if (deliveryProof) {
         setUploading(true);
         const formData = new FormData();
@@ -1550,7 +1290,6 @@ function UpdateDeliveryMenuItem({ order, userRole, variant = "auto" }) {
           order_id: order.order_id,
           delivered_on: deliveredOn,
           delivery_proof: deliveryProofUrl,
-          delivery_remark: deliveryRemark,
         }),
       });
 
@@ -1571,64 +1310,7 @@ function UpdateDeliveryMenuItem({ order, userRole, variant = "auto" }) {
     }
   };
 
-  if (variant === "view_first") {
-    if (!canShowOrderDeliveryActions(order) || !hasDeliveryRecord) return null;
-  } else if (variant === "view_remain") {
-    if (
-      !canShowOrderDeliveryActions(order) ||
-      !orderHasSecondDeliveryBatch(order)
-    ) {
-      return null;
-    }
-  } else if (variant === "update_remain") {
-    if (
-      !canShowOrderDeliveryActions(order) ||
-      !hasDeliveryRecord ||
-      (isFullyDelivered && !orderNeedsRemainDeliverySave(order))
-    ) {
-      return null;
-    }
-  } else if (variant === "view") {
-    if (!canShowOrderDeliveryActions(order) || !hasDeliveryRecord) return null;
-  } else if (variant === "update") {
-    if (!canShowOrderDeliveryActions(order) || isFullyDelivered) return null;
-  } else if (!shouldShow()) {
-    return null;
-  }
-
-  const batchForModal =
-    variant === "view_first"
-      ? getDeliveryBatchForView(order, "first")
-      : variant === "view_remain"
-        ? getDeliveryBatchForView(order, "remain")
-        : null;
-  const displayOrder = batchForModal
-    ? {
-        ...order,
-        delivered_on: batchForModal.delivered_on,
-        delivery_proof: batchForModal.delivery_proof,
-        delivery_remark: batchForModal.delivery_remark,
-      }
-    : order;
-
-  const readOnlyDeliveryModal =
-    variant === "view_first" ||
-    variant === "view_remain" ||
-    variant === "view" ||
-    (variant === "auto" && (viewOnly || isFullyDelivered));
-
-  const menuLabel =
-    variant === "view_first"
-      ? "View Delivery"
-      : variant === "view_remain"
-        ? "View Delivery (Remain)"
-        : variant === "update_remain"
-          ? "Update Delivery (Remain)"
-          : variant === "update"
-            ? "Update Delivery"
-            : readOnlyDeliveryModal
-              ? "View Delivery"
-              : "Update Delivery";
+  if (!shouldShow()) return null;
 
   const formatDate = (d) => {
     if (!d) return "-";
@@ -1644,10 +1326,10 @@ function UpdateDeliveryMenuItem({ order, userRole, variant = "auto" }) {
           setOpen(true);
         }}
         className="w-full flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-blue-700 text-left"
-        title={readOnlyDeliveryModal ? "View Delivery" : "Update Delivery Status"}
+        title={isDelivered ? "View Delivery" : "Update Delivery Status"}
       >
         <Truck size={16} />
-        <span>{menuLabel}</span>
+        <span>{isDelivered ? "View Delivery" : "Update Delivery"}</span>
       </button>
       {open && (
         <div
@@ -1659,13 +1341,7 @@ function UpdateDeliveryMenuItem({ order, userRole, variant = "auto" }) {
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="text-lg font-semibold mb-4">
-              {readOnlyDeliveryModal
-                ? variant === "view_remain"
-                  ? "Delivery Details (Remain)"
-                  : "Delivery Details"
-                : variant === "update_remain"
-                  ? "Update Delivery (Remain)"
-                  : "Update Delivery Status"}
+              {isDelivered ? "Delivery Details" : "Update Delivery Status"}
             </h3>
 
             <div className="space-y-4">
@@ -1693,14 +1369,14 @@ function UpdateDeliveryMenuItem({ order, userRole, variant = "auto" }) {
                 </p>
               </div>
 
-              {readOnlyDeliveryModal ? (
+              {isDelivered ? (
                 <>
                   <div>
                     <label className="block text-sm text-gray-700 font-medium mb-1">
                       Actual Delivery Date:
                     </label>
                     <p className="text-sm font-medium text-gray-800">
-                      {formatDate(displayOrder.delivered_on)}
+                      {formatDate(order.delivered_on)}
                     </p>
                   </div>
 
@@ -1708,10 +1384,10 @@ function UpdateDeliveryMenuItem({ order, userRole, variant = "auto" }) {
                     <label className="block text-sm text-gray-700 font-medium mb-1">
                       Delivery Proof:
                     </label>
-                    {displayOrder.delivery_proof ? (
+                    {order.delivery_proof ? (
                       <div className="flex gap-3">
                         <a
-                          href={displayOrder.delivery_proof}
+                          href={order.delivery_proof}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 text-sm font-medium transition"
@@ -1738,7 +1414,7 @@ function UpdateDeliveryMenuItem({ order, userRole, variant = "auto" }) {
                           View
                         </a>
                         <a
-                          href={displayOrder.delivery_proof}
+                          href={order.delivery_proof}
                           download
                           className="inline-flex items-center gap-1 px-3 py-1.5 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 text-sm font-medium transition"
                         >
@@ -1771,8 +1447,13 @@ function UpdateDeliveryMenuItem({ order, userRole, variant = "auto" }) {
                     <label className="block text-sm text-gray-700 font-medium mb-1">
                       Actual Delivery Date *
                     </label>
-                    <TypeableDateFilterInput value={deliveredOn} onChange={setDeliveredOn} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      required/>
+                    <input
+                      type="date"
+                      value={deliveredOn}
+                      onChange={(e) => setDeliveredOn(e.target.value)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      required
+                    />
                   </div>
 
                   <div>
@@ -1800,9 +1481,9 @@ function UpdateDeliveryMenuItem({ order, userRole, variant = "auto" }) {
                 onClick={() => setOpen(false)}
                 className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm font-medium"
               >
-                {readOnlyDeliveryModal ? "Close" : "Cancel"}
+                {isDelivered ? "Close" : "Cancel"}
               </button>
-              {!readOnlyDeliveryModal && (
+              {!isDelivered && (
                 <button
                   onClick={handleSave}
                   disabled={saving || uploading}
@@ -1821,16 +1502,4 @@ function UpdateDeliveryMenuItem({ order, userRole, variant = "auto" }) {
       )}
     </>
   );
-}
-
-/** Order Cancel: allowed through booking done (incl. after invoice upload); hidden once dispatch starts. */
-function canShowOrderCancelMenu(order) {
-  if (!order || order.is_cancelled) return false;
-  const dispatch = Number(order.dispatch_status);
-  if (dispatch === 1 || dispatch === 2) return false;
-  if (order.installation_status) return false;
-  if (Number(order.is_returned || 0) !== 0) return false;
-  if (isOrderFullyDelivered(order) || isOrderPartialDelivery(order)) return false;
-  if (orderHasDispatchedStock(order)) return false;
-  return true;
 }

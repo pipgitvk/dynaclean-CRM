@@ -1,5 +1,4 @@
 "use client";
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import Link from "next/link";
 import React, { useState, useEffect } from "react";
 
@@ -125,8 +124,14 @@ const TargetAssignForm = () => {
             <label className="block text-sm font-medium text-gray-800 mb-1">
               Start Date
             </label>
-            <TypeableDateFilterInput value={formData.target_start_date} onChange={(v) => handleChange({ target: { name: "target_start_date", value: v } })} required
-              className="w-full px-4 py-3 border border-gray-600 rounded-lg"/>
+            <input
+              type="date"
+              name="target_start_date"
+              value={formData.target_start_date}
+              onChange={handleChange}
+              required
+              className="w-full px-4 py-3 border border-gray-600 rounded-lg"
+            />
           </div>
 
           {/* End Date */}
@@ -134,8 +139,14 @@ const TargetAssignForm = () => {
             <label className="block text-sm font-medium text-gray-800 mb-1">
               End Date
             </label>
-            <TypeableDateFilterInput value={formData.target_end_date} onChange={(v) => handleChange({ target: { name: "target_end_date", value: v } })} required
-              className="w-full px-4 py-3 border border-gray-600 rounded-lg"/>
+            <input
+              type="date"
+              name="target_end_date"
+              value={formData.target_end_date}
+              onChange={handleChange}
+              required
+              className="w-full px-4 py-3 border border-gray-600 rounded-lg"
+            />
           </div>
 
           {/* Username */}

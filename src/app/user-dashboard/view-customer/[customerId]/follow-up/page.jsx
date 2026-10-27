@@ -1,6 +1,5 @@
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
-import { ensureCustomersFollowupNotesText } from "@/lib/ensureCustomersFollowupNotesText";
 import FollowupForm from "./FollowupForm";
 import dayjs from "dayjs";
 export const dynamic = "force-dynamic";
@@ -12,7 +11,6 @@ export default async function FollowUpPage({ params }) {
   const userRole = payload?.role || "";
 
   const conn = await getDbConnection();
-  await ensureCustomersFollowupNotesText(conn);
 
   let [rows] = await conn.execute(
     `SELECT 
@@ -81,7 +79,7 @@ export default async function FollowUpPage({ params }) {
         <p>
           <strong>Last Called:</strong>{" "}
           {customer.followed_date
-            ? dayjs(customer.followed_date).format("DD-MM-YYYY hh:mm A")
+            ? dayjs(customer.followed_date).format("DD MMM YYYY, hh:mm A")
             : "—"}
         </p>
         <p>

@@ -1,7 +1,5 @@
 "use client";
 
-import { formatCrmDateOnly } from "@/lib/crmDateFormat";
-
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import { Upload, X, Search, Filter, Plus, Edit2, Trash2 } from "lucide-react";
@@ -268,12 +266,12 @@ const QAPage = () => {
                     </div>
                     
                     <div className="text-sm text-gray-500 space-y-1">
-                      <p>Added by: {q.added_by} on {formatCrmDateOnly(q.added_on)}</p>
+                      <p>Added by: {q.added_by} on {new Date(q.added_on).toLocaleDateString()}</p>
                       {q.is_approved && q.approved_by && (
-                        <p>Approved by: {q.approved_by} on {formatCrmDateOnly(q.approved_on)}</p>
+                        <p>Approved by: {q.approved_by} on {new Date(q.approved_on).toLocaleDateString()}</p>
                       )}
                       {q.modified_by && (
-                        <p>Modified by: {q.modified_by} on {formatCrmDateOnly(q.modified_on)}</p>
+                        <p>Modified by: {q.modified_by} on {new Date(q.modified_on).toLocaleDateString()}</p>
                       )}
                     </div>
                   </div>

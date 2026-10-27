@@ -76,12 +76,12 @@ const TaskTable = ({ tasks = [], currentUser = "" }) => {
                   </td>
                   <td className="px-4 py-3 text-gray-700">{task.taskname}</td>
                   <td className="px-4 py-3 text-gray-600">
-                    {dayjs(task.followed_date).format("DD-MM-YYYY hh:mm A")}
+                    {dayjs(task.followed_date).format("DD MMM, YYYY hh:mm A")}
                   </td>
                   <td className="px-4 py-3 text-gray-600">
                     {task.next_followup_date
                       ? dayjs(task.next_followup_date).format(
-                          "DD-MM-YYYY hh:mm A"
+                          "DD MMM, YYYY hh:mm A"
                         )
                       : "Not set"}
                   </td>
@@ -104,6 +104,7 @@ const TaskTable = ({ tasks = [], currentUser = "" }) => {
                       >
                         <PenLine size={14} /> Follow
                       </a>
+
                       {currentUser && task.createdby === currentUser && (
                         <button
                           onClick={() => openReassign(task)}
@@ -149,13 +150,13 @@ const TaskTable = ({ tasks = [], currentUser = "" }) => {
               </p>
               <p className="text-gray-700 text-sm mb-1">
                 <strong className="font-medium">Assign Date:</strong>{" "}
-                {dayjs(task.followed_date).format("DD-MM-YYYY hh:mm A")}
+                {dayjs(task.followed_date).format("DD MMM, YYYY hh:mm A")}
               </p>
               <p className="text-gray-700 text-sm mb-4">
                 <strong className="font-medium">Deadline:</strong>{" "}
                 {task.next_followup_date
                   ? dayjs(task.next_followup_date).format(
-                      "DD-MM-YYYY hh:mm A"
+                      "DD MMM, YYYY hh:mm A"
                     )
                   : "Not set"}
               </p>

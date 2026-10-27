@@ -8,9 +8,8 @@ import FastCardsWidget from "@/components/FastCardsWidget";
 import TodayReportButton from "@/components/TodayReportButton";
 import LeaveApprovalButton from "@/components/LeaveApprovalButton";
 import UpcomingFollowupsWidget from "@/components/service/UpcomingFollowupsWidget";
-import ScheduleVisitCard from "@/components/scheduleVisit/ScheduleVisitCard";
 
-export default function ServiceHeadDashboard({ user, reportingManager, counts }) {
+export default function ServiceHeadDashboard({ user, counts }) {
   return (
     <div className="space-y-4 md:space-y-6">
       {/* Header Section */}
@@ -25,11 +24,6 @@ export default function ServiceHeadDashboard({ user, reportingManager, counts })
                   Welcome, <span className="text-green-700">{user.username}</span>
                 </h1>
                 <p className="text-gray-500 text-sm">Role: {user.userRole}</p>
-                {reportingManager && (
-                  <p className="text-gray-500 text-sm">
-                    Reporting Manager: {reportingManager}
-                  </p>
-                )}
               </div>
             </div>
 
@@ -62,8 +56,7 @@ export default function ServiceHeadDashboard({ user, reportingManager, counts })
       </div>
 
       {/* Stats Boxes */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <ScheduleVisitCard variant="infobox" href="/service-head-dashboard/schedule-visits" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <InfoBox
           title="Completed"
           number={counts.completed}

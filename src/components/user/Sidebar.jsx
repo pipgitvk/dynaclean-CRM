@@ -77,7 +77,6 @@
 import { useState } from "react";
 import clsx from "clsx";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useTheme } from "@/context/ThemeContext";
 
@@ -119,7 +118,6 @@ import {
   Briefcase,
   Globe,
   TrendingUp,
-  FileSpreadsheet,
 } from "lucide-react";
 
 // Icon map
@@ -161,24 +159,9 @@ const iconMap = {
   Briefcase,
   Globe,
   TrendingUp,
-  FileSpreadsheet,
 };
 
-function isPathActive(pathname, path) {
-  if (!path || !pathname) return false;
-  const normalizedPath = String(path).replace(/\/+$/, "");
-  const normalizedPathname = String(pathname).replace(/\/+$/, "");
-  if (normalizedPathname === normalizedPath) return true;
-  return normalizedPathname.startsWith(`${normalizedPath}/`);
-}
-
-function menuTreeHasActivePath(item, pathname) {
-  if (item.path && isPathActive(pathname, item.path)) return true;
-  if (item.children?.length) {
-    return item.children.some((child) => menuTreeHasActivePath(child, pathname));
-  }
-  return false;
-}
+//this is test
 
 export default function Sidebar({
   isOpen,
@@ -189,13 +172,6 @@ export default function Sidebar({
 }) {
   const [openMenus, setOpenMenus] = useState({});
   const { theme } = useTheme();
-  const pathname = usePathname();
-  const isAdminDashboardRoute =
-    pathname?.includes("/admin-dashboard") ||
-    pathname?.startsWith("/empcrm/admin-dashboard");
-  const sidebarTitle = isAdminDashboardRoute
-    ? "Admin Dashboard"
-    : "User Dashboard";
 
   const toggleMenu = (key) => {
     setOpenMenus((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -218,9 +194,7 @@ export default function Sidebar({
       const Icon = iconMap[item.icon] || null;
 
       if (item.children?.length) {
-        const childActive = menuTreeHasActivePath(item, pathname);
-        const isSubOpen =
-          openMenus[itemKey] !== undefined ? openMenus[itemKey] : childActive;
+        const isSubOpen = openMenus[itemKey];
         return (
           <li key={itemKey} className="m-2">
             <button
@@ -246,10 +220,6 @@ export default function Sidebar({
         );
       }
 
-      if (!item.path) {
-        return null;
-      }
-
       return (
         <li key={itemKey} className="m-2">
           <Link
@@ -272,9 +242,8 @@ export default function Sidebar({
 
   return (
     <div
-      data-dashboard-sidebar
       className={clsx(
-        `print:hidden h-full bg-gradient-to-b ${theme.sidebar.gradient} ${theme.sidebar.text} ${theme.sidebar.textureClass || ""} overflow-y-auto overflow-x-hidden [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden transition-all duration-300 ease-in-out shadow-2xl border-r ${theme.sidebar.border}`,
+        `h-full bg-gradient-to-b ${theme.sidebar.gradient} ${theme.sidebar.text} ${theme.sidebar.textureClass || ""} overflow-y-auto overflow-x-hidden [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden transition-all duration-300 ease-in-out shadow-2xl border-r ${theme.sidebar.border}`,
         isOpen ? "w-72" : "w-0",
       )}
       style={{
@@ -287,7 +256,7 @@ export default function Sidebar({
           <h2
             className={`text-xl font-bold mb-4 ${theme.sidebar.text} border-b ${theme.sidebar.border} pb-3`}
           >
-            {sidebarTitle}
+            User Dashboard
           </h2>
           {showBackButton && backButtonPath && (
             <Link

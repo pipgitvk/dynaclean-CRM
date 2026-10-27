@@ -1,15 +1,7 @@
 "use client";
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { Eye } from "lucide-react";
-import UpcomingInstallationStatusFilter from "@/components/installation/UpcomingInstallationStatusFilter";
-import {
-  getUpcomingInstallationDeliveryDisplay,
-  getUpcomingInstallationRowClass,
-  installationStatusDateColor,
-  matchesUpcomingInstallationStatusFilter,
-  formatUpcomingInstallationDays,
-} from "@/lib/upcomingInstallationDeliveryDisplay";
 
 export default function UpcomingInstallationsPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -19,7 +11,6 @@ export default function UpcomingInstallationsPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [pageSize] = useState(50);
-  const [statusFilter, setStatusFilter] = useState("all");
 
   // Partial return modal state
   const [showReturnModal, setShowReturnModal] = useState(false);
@@ -153,27 +144,26 @@ export default function UpcomingInstallationsPage() {
   }, []);
 
   // ========= UI HELPERS ==========
-  const dateColor = installationStatusDateColor;
-  const deliveryDisplay = getUpcomingInstallationDeliveryDisplay;
+  const getRowClass = (status) => {
+    if (status === "overdue") return "bg-red-100";
+    if (status === "upcoming") return "bg-yellow-100";
+    return "bg-white";
+  };
 
-  const filteredRecords = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    return records.filter((r) => {
-      if (!matchesUpcomingInstallationStatusFilter(r, statusFilter)) return false;
-      if (!q) return true;
-      return (
-        String(r.model ?? "").toLowerCase().includes(q) ||
-        String(r.company_name ?? "").toLowerCase().includes(q) ||
-        String(r.emp_name ?? "").toLowerCase().includes(q) ||
-        String(r.name ?? "").toLowerCase().includes(q) ||
-        String(r.contact ?? "").toLowerCase().includes(q) ||
-        String(r.invoice_number ?? "").toLowerCase().includes(q) ||
-        String(r.order_id ?? "").toLowerCase().includes(q) ||
-        String(r.serial_number ?? "").toLowerCase().includes(q) ||
-        String(r.delivery_address ?? "").toLowerCase().includes(q)
-      );
-    });
-  }, [records, searchQuery, statusFilter]);
+  const dateColor = (status) => {
+    return status === "overdue"
+      ? "text-red-600 font-bold"
+      : status === "upcoming"
+      ? "text-orange-600 font-bold"
+      : "text-gray-800";
+  };
+
+  const formatDays = (days) =>
+    days < 0
+      ? `${Math.abs(days)} days overdue`
+      : days === 0
+      ? "Today"
+      : `In ${days} days`;
 
   // ================= UI START ===================
   return (
@@ -181,10 +171,7 @@ export default function UpcomingInstallationsPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-3xl font-bold">Upcoming Installations</h2>
-        <p className="text-sm text-gray-600">
-          Total: {filteredRecords.length}
-          {searchQuery || statusFilter !== "all" ? ` (filtered from ${total})` : ` records`}
-        </p>
+        <p className="text-sm text-gray-600">Total: {total} records</p>
       </div>
 
       {/* Search + Legend */}
@@ -197,12 +184,7 @@ export default function UpcomingInstallationsPage() {
           className="px-4 py-2 border rounded shadow-sm"
         />
 
-        <UpcomingInstallationStatusFilter
-          value={statusFilter}
-          onChange={setStatusFilter}
-        />
-
-        <div className="flex flex-wrap gap-6">
+        <div className="flex gap-6">
           <div className="flex items-center">
             <div className="w-4 h-4 bg-red-100 mr-2" />
             Overdue
@@ -210,10 +192,6 @@ export default function UpcomingInstallationsPage() {
           <div className="flex items-center">
             <div className="w-4 h-4 bg-yellow-100 mr-2" />
             Within 10 Days
-          </div>
-          <div className="flex items-center">
-            <div className="w-4 h-4 bg-green-100 mr-2" />
-            Actual Delivery Done
           </div>
           <div className="flex items-center">
             <div className="w-4 h-4 bg-white border mr-2" />
@@ -224,13 +202,11 @@ export default function UpcomingInstallationsPage() {
 
       {/** ================= MOBILE VIEW (CARDS) ================= */}
       <div className="md:hidden space-y-4">
-        {filteredRecords.map((r, i) => {
-          const delivery = deliveryDisplay(r);
-          return (
+        {records.map((r, i) => (
           <div
             key={i}
-            className={`rounded-xl shadow p-4 border ${getUpcomingInstallationRowClass(
-              r
+            className={`rounded-xl shadow p-4 border ${getRowClass(
+              r.installation_status
             )}`}
           >
             <div className="text-lg font-bold mb-2">Order #{r.order_id}</div>
@@ -254,11 +230,11 @@ export default function UpcomingInstallationsPage() {
               <p>
                 <b>Address:</b> {r.delivery_address}
               </p>
-              <p className={`${delivery.className} mt-1`}>
-                <b>Delivery:</b> {delivery.text}
+              <p className={`${dateColor(r.installation_status)} mt-1`}>
+                <b>Delivery:</b> {r.delivery_date}
               </p>
               <p className={`${dateColor(r.installation_status)}`}>
-                <b>Days:</b> {formatUpcomingInstallationDays(r)}
+                <b>Days:</b> {formatDays(r.days_until_installation)}
               </p>
             </div>
 
@@ -271,12 +247,12 @@ export default function UpcomingInstallationsPage() {
               >
                 <Eye size={14} className="mr-1" /> View
               </Link>
-              {/* <button
+              <button
                 onClick={() => handleAction(r.order_id, "INSTALLED")}
                 className="w-full px-3 py-2 bg-green-600 text-white text-xs rounded hover:bg-green-700"
               >
                 Installed
-              </button> */}
+              </button>
               <button
                 onClick={() => openReturnModal(r.order_id)}
                 className="w-full px-3 py-2 bg-orange-600 text-white text-xs rounded hover:bg-orange-700"
@@ -291,8 +267,7 @@ export default function UpcomingInstallationsPage() {
               </button>
             </div>
           </div>
-        );
-        })}
+        ))}
       </div>
 
       {/** ================= DESKTOP TABLE VIEW ================= */}
@@ -313,10 +288,8 @@ export default function UpcomingInstallationsPage() {
             </tr>
           </thead>
           <tbody>
-            {filteredRecords.map((r, i) => {
-              const delivery = deliveryDisplay(r);
-              return (
-              <tr key={i} className={getUpcomingInstallationRowClass(r)}>
+            {records.map((r, i) => (
+              <tr key={i} className={getRowClass(r.installation_status)}>
                 <td className="p-3">{r.order_id}</td>
                 <td className="p-3">{r.model}</td>
                 <td className="p-3">{r.name}</td>
@@ -324,11 +297,11 @@ export default function UpcomingInstallationsPage() {
                 <td className="p-3">{r.company_name}</td>
                 <td className="p-3">{r.contact}</td>
                 <td className="p-3">{r.emp_name}</td>
-                <td className={`p-3 ${delivery.className}`}>
-                  {delivery.text}
+                <td className={`p-3 ${dateColor(r.installation_status)}`}>
+                  {r.delivery_date}
                 </td>
                 <td className={`p-3 ${dateColor(r.installation_status)}`}>
-                  {formatUpcomingInstallationDays(r)}
+                  {formatDays(r.days_until_installation)}
                 </td>
                 <td className="p-3">
                   <div className="flex flex-col gap-2 items-stretch">
@@ -339,12 +312,12 @@ export default function UpcomingInstallationsPage() {
                     >
                       <Eye size={14} className="mr-1" /> View
                     </Link>
-                    {/* <button
+                    <button
                       onClick={() => handleAction(r.order_id, "INSTALLED")}
                       className="px-3 py-1.5 bg-green-600 text-white rounded text-xs hover:bg-green-700"
                     >
                       Installed
-                    </button> */}
+                    </button>
                     <button
                       onClick={() => openReturnModal(r.order_id)}
                       className="px-3 py-1.5 bg-orange-600 text-white rounded text-xs hover:bg-orange-700"
@@ -360,8 +333,7 @@ export default function UpcomingInstallationsPage() {
                   </div>
                 </td>
               </tr>
-            );
-            })}
+            ))}
           </tbody>
         </table>
       </div>

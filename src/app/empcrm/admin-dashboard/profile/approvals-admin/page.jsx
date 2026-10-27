@@ -3,9 +3,7 @@
 import { useEffect, useState } from "react";
 import { Check, X, RefreshCcw, Eye, Shield } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import toast from "react-hot-toast";
-import { getDirectorHrProfileApprovalDetailPath } from "@/lib/directorHrPaths";
 
 const TABS = [
   { key: "pending_admin", label: "Pending publish" },
@@ -56,7 +54,6 @@ function getChangedFieldLabels(submission) {
  * API returns 403 for non–Super Admin.
  */
 export default function ProfileApprovalsAdminPage() {
-  const pathname = usePathname();
   const [submissions, setSubmissions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [allowed, setAllowed] = useState(true);
@@ -335,7 +332,7 @@ export default function ProfileApprovalsAdminPage() {
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
                     <div className="flex items-center gap-2 flex-wrap">
                       <Link
-                        href={getDirectorHrProfileApprovalDetailPath(s.id, pathname, "admin")}
+                        href={`/empcrm/admin-dashboard/profile/approvals/${s.id}?from=admin`}
                         className="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-1 w-fit"
                       >
                         <Eye className="w-4 h-4" /> View

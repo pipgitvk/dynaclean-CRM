@@ -21,6 +21,7 @@ export async function GET(req) {
     //   [quotationNumber],
     // );
 
+    // Use named placeholders when mysql2 namedPlaceholders is enabled on the pool.
     const [quotationRows] = await conn.execute(
       `
   SELECT 
@@ -31,10 +32,10 @@ export async function GET(req) {
   FROM quotations_records q
   LEFT JOIN customers c 
     ON q.customer_id = c.customer_id
-  WHERE q.quote_number = ?
+  WHERE q.quote_number = :quotationNumber
   LIMIT 1
   `,
-      [quotationNumber],
+      { quotationNumber },
     );
 
     if (quotationRows.length === 0) {
@@ -109,24 +110,6 @@ export async function GET(req) {
       [quotationNumber],
     );
 
-    const itemCodes = [
-      ...new Set(
-        itemRows.map((row) => String(row.item_code || "").trim()).filter(Boolean),
-      ),
-    ];
-    const gstRateByItemCode = new Map();
-    if (itemCodes.length > 0) {
-      const placeholders = itemCodes.map(() => "?").join(",");
-      const [productGstRows] = await conn.execute(
-        `SELECT item_code, gst_rate FROM products_list WHERE item_code IN (${placeholders})`,
-        itemCodes,
-      );
-      for (const row of productGstRows) {
-        const code = String(row.item_code || "").trim();
-        if (code) gstRateByItemCode.set(code, row.gst_rate);
-      }
-    }
-
     return NextResponse.json({
       success: true,
       quotation: {
@@ -181,11 +164,6 @@ export async function GET(req) {
             igst_percent = 0;
           }
 
-          const itemCode = String(item.item_code || "").trim();
-          const stockGstRate = itemCode
-            ? gstRateByItemCode.get(itemCode)
-            : null;
-
           return {
             item_name: item.item_name,
             item_code: item.item_code,
@@ -199,10 +177,6 @@ export async function GET(req) {
             cgst_percent,
             sgst_percent,
             igst_percent,
-            gst_rate:
-              stockGstRate != null && String(stockGstRate).trim() !== ""
-                ? Number(stockGstRate)
-                : null,
             img_url: item.img_url,
           };
         }),

@@ -1,5 +1,4 @@
 import { getDbConnection } from "@/lib/db";
-import { fetchManualPaymentsList } from "@/lib/fetchManualPaymentsList";
 import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 import { redirect } from "next/navigation";
@@ -42,7 +41,23 @@ export default async function ManualPaymentsPage() {
     }
 
     const conn = await getDbConnection();
-    const { rows, stats } = await fetchManualPaymentsList(conn);
+
+    // Fetch all payment entries
+    const [rows] = await conn.execute(`
+    SELECT * FROM manual_payment_pending 
+    ORDER BY created_at DESC
+  `);
+
+    // Get statistics
+    const [stats] = await conn.execute(`
+    SELECT 
+      COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_count,
+      COUNT(CASE WHEN status = 'received' THEN 1 END) as received_count,
+      COALESCE(SUM(CASE WHEN status = 'pending' THEN amount ELSE 0 END), 0) as pending_amount,
+      COALESCE(SUM(CASE WHEN status = 'received' THEN amount ELSE 0 END), 0) as received_amount,
+      COUNT(CASE WHEN status = 'cancelled' THEN 1 END) as cancelled_count
+    FROM manual_payment_pending
+  `);
 
     return (
         <div className="max-w-full mx-auto p-4 md:p-6">
@@ -65,7 +80,7 @@ export default async function ManualPaymentsPage() {
                         <div className="flex items-center justify-between">
                             <div>
                                 <p className="text-sm font-medium text-yellow-700">Pending Payments</p>
-                                <p className="text-2xl font-bold text-yellow-900">{stats.pending_count}</p>
+                                <p className="text-2xl font-bold text-yellow-900">{stats[0].pending_count}</p>
                             </div>
                             <div className="bg-yellow-200 rounded-full p-3">
                                 <svg className="w-6 h-6 text-yellow-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -79,7 +94,7 @@ export default async function ManualPaymentsPage() {
                         <div className="flex items-center justify-between">
                             <div>
                                 <p className="text-sm font-medium text-green-700">Received Payments</p>
-                                <p className="text-2xl font-bold text-green-900">{stats.received_count}</p>
+                                <p className="text-2xl font-bold text-green-900">{stats[0].received_count}</p>
                             </div>
                             <div className="bg-green-200 rounded-full p-3">
                                 <svg className="w-6 h-6 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -93,7 +108,7 @@ export default async function ManualPaymentsPage() {
                         <div className="flex items-center justify-between">
                             <div>
                                 <p className="text-sm font-medium text-orange-700">Pending Amount</p>
-                                <p className="text-2xl font-bold text-orange-900">₹{parseFloat(stats.pending_amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                                <p className="text-2xl font-bold text-orange-900">₹{parseFloat(stats[0].pending_amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                             </div>
                             <div className="bg-orange-200 rounded-full p-3">
                                 <svg className="w-6 h-6 text-orange-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -107,7 +122,7 @@ export default async function ManualPaymentsPage() {
                         <div className="flex items-center justify-between">
                             <div>
                                 <p className="text-sm font-medium text-blue-700">Received Amount</p>
-                                <p className="text-2xl font-bold text-blue-900">₹{parseFloat(stats.received_amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                                <p className="text-2xl font-bold text-blue-900">₹{parseFloat(stats[0].received_amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                             </div>
                             <div className="bg-blue-200 rounded-full p-3">
                                 <svg className="w-6 h-6 text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">

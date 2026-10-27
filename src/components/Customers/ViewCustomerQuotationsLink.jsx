@@ -4,17 +4,15 @@ import Link from "next/link";
 import { FileText } from "lucide-react";
 
 /**
- * Links to the dedicated customer quotations page.
- * Works for all dashboards that have a view-customer/[customerId]/quotations route
- * (admin-dashboard, user-dashboard, sales-dashboard users, accounts users, etc.)
+ * Opens quotation list filtered to this customer (admin or user dashboard).
  */
 export default function ViewCustomerQuotationsLink({
   customerId,
   dashboardBase,
   className = "",
-  variant = "admin", // kept for backwards compat but no longer changes the URL
+  variant = "admin",
 }) {
-  const href = `/${dashboardBase}/view-customer/${encodeURIComponent(String(customerId))}/quotations`;
+  const href = `/${dashboardBase}/quotations?customer_id=${encodeURIComponent(String(customerId))}`;
 
   const base =
     variant === "user"

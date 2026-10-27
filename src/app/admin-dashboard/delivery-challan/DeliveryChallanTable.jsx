@@ -1,6 +1,5 @@
 "use client";
 
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import React from "react";
 import Link from "next/link";
 import Image from "next/image";
@@ -117,8 +116,8 @@ export default function DeliveryChallanTable({ rows }) {
           : 0}
       </td>
       <td className="p-3 text-gray-600">{row.challan_no || "-"}</td>
-      <td className="p-3 text-gray-600">{row.challan_date ? dayjs(row.challan_date).format("DD-MM-YYYY") : "-"}</td>
-      <td className="p-3 text-gray-600">{row.created_at ? dayjs(row.created_at).format("DD-MM-YYYY") : "-"}</td>
+      <td className="p-3 text-gray-600">{row.challan_date ? dayjs(row.challan_date).format("DD MMM YYYY") : "-"}</td>
+      <td className="p-3 text-gray-600">{row.created_at ? dayjs(row.created_at).format("DD MMM YYYY") : "-"}</td>
       <td className="p-3">
         <div className="flex gap-1.5 items-center">
           <Link href={`/admin-dashboard/delivery-challan/${row.id}/edit`} className="p-2 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 hover:text-green-700 transition-colors" title="Edit">
@@ -162,10 +161,20 @@ export default function DeliveryChallanTable({ rows }) {
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-1 min-w-0">
                 <Calendar className="w-4 h-4 text-gray-400 shrink-0" />
-                <TypeableDateFilterInput value={fromDate} onChange={setFromDate} className="flex-1 min-w-0 w-full sm:w-28 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"/>
+                <input
+                  type="date"
+                  value={fromDate}
+                  onChange={(e) => setFromDate(e.target.value)}
+                  className="flex-1 min-w-0 w-full sm:w-28 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                />
               </div>
               <span className="text-gray-400 shrink-0">to</span>
-              <TypeableDateFilterInput value={toDate} onChange={setToDate} className="flex-1 min-w-0 w-full sm:w-28 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"/>
+              <input
+                type="date"
+                value={toDate}
+                onChange={(e) => setToDate(e.target.value)}
+                className="flex-1 min-w-0 w-full sm:w-28 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+              />
             </div>
             <button
               onClick={handleReset}
@@ -245,8 +254,8 @@ export default function DeliveryChallanTable({ rows }) {
           ? row.products.reduce((sum, p) => sum + (parseInt(p.qty) || 0), 0)
           : 0}</div>
               <div><span className="text-gray-500">Challan No:</span> {row.challan_no || "-"}</div>
-              <div><span className="text-gray-500">Challan Date:</span> {row.challan_date ? dayjs(row.challan_date).format("DD-MM-YYYY") : "-"}</div>
-              <div className="col-span-2"><span className="text-gray-500">Created:</span> {row.created_at ? dayjs(row.created_at).format("DD-MM-YYYY") : "-"}</div>
+              <div><span className="text-gray-500">Challan Date:</span> {row.challan_date ? dayjs(row.challan_date).format("DD MMM YYYY") : "-"}</div>
+              <div className="col-span-2"><span className="text-gray-500">Created:</span> {row.created_at ? dayjs(row.created_at).format("DD MMM YYYY") : "-"}</div>
             </div>
             <div className="pt-3 border-t border-gray-100 flex justify-end items-center">
               <div className="flex gap-1.5">

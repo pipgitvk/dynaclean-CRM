@@ -5,7 +5,7 @@ import { ArrowRight, Wrench, X } from "lucide-react";
 import dayjs from "dayjs";
 
 const formatDT = (val) =>
-  val ? dayjs(val).format("DD-MM-YYYY hh:mm A") : "—";
+  val ? dayjs(val).format("DD MMM YYYY, hh:mm A") : "—";
 
 function getMachineStatusDisplay(status) {
   const normalized = String(status || "Ok").trim().toUpperCase();

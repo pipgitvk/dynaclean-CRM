@@ -1,6 +1,5 @@
 "use client";
 
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect } from "react";
 import dayjs from "dayjs";
 
@@ -14,21 +13,6 @@ export default function ItemWiseSalesPage() {
   const [to, setTo] = useState(dayjs().endOf("month").format("YYYY-MM-DD"));
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [isDirector, setIsDirector] = useState(false);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch("/api/me");
-        if (!res.ok) return;
-        const me = await res.json();
-        const role = String(me.userRole || me.role || "").trim().toUpperCase();
-        setIsDirector(role === "DIRECTOR");
-      } catch {
-        setIsDirector(false);
-      }
-    })();
-  }, []);
 
   const fetchData = async () => {
     setLoading(true);
@@ -61,9 +45,6 @@ export default function ItemWiseSalesPage() {
     e.preventDefault();
     fetchData();
   };
-
-  const showBatteryAmount = (row) =>
-    isDirector && Number(row.battery_amount) > 0;
 
   const totalWithoutGst = data.reduce(
     (acc, curr) => acc + (parseFloat(curr.amount_without_gst) || 0),
@@ -118,11 +99,21 @@ export default function ItemWiseSalesPage() {
       >
         <div className="flex-1 min-w-[200px]">
           <label className="text-sm font-medium block mb-2 text-gray-700">From date</label>
-          <TypeableDateFilterInput value={from} onChange={setFrom} className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"/>
+          <input
+            type="date"
+            value={from}
+            onChange={(e) => setFrom(e.target.value)}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
+          />
         </div>
         <div className="flex-1 min-w-[200px]">
           <label className="text-sm font-medium block mb-2 text-gray-700">To date</label>
-          <TypeableDateFilterInput value={to} onChange={setTo} className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"/>
+          <input
+            type="date"
+            value={to}
+            onChange={(e) => setTo(e.target.value)}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
+          />
         </div>
         <button
           type="submit"
@@ -186,7 +177,7 @@ export default function ItemWiseSalesPage() {
                           {row.lead_source || "—"}
                         </td>
                         <td className="px-3 py-3 whitespace-nowrap text-gray-600">
-                          {row.order_date ? dayjs(row.order_date).format("DD-MM-YYYY") : "—"}
+                          {row.order_date ? dayjs(row.order_date).format("DD MMM YYYY") : "—"}
                         </td>
                         <td className="px-3 py-3 text-gray-900 max-w-[140px]">
                           <span className="line-clamp-2" title={row.model}>
@@ -211,9 +202,6 @@ export default function ItemWiseSalesPage() {
                           <div className="text-gray-900">Qty: {row.qty ?? "—"}</div>
                           <div className="text-gray-900">Sale: ₹{formatInr(row.sale_price)}</div>
                           <div className="text-gray-500 text-xs">Buy: ₹{formatInr(row.purchase_price)}</div>
-                          {showBatteryAmount(row) && (
-                            <div className="text-amber-700 text-xs">Battery: ₹{formatInr(row.battery_amount)}</div>
-                          )}
                           <div className="text-gray-400 text-xs">Tax: ₹{formatInr(row.tax)}</div>
                         </td>
                         <td
@@ -253,7 +241,7 @@ export default function ItemWiseSalesPage() {
                     data.map((row, index) => (
                       <tr key={index}>
                         <td className="px-2 py-2 align-top whitespace-nowrap">
-                          {row.order_date ? dayjs(row.order_date).format("DD-MM-YYYY") : "—"}
+                          {row.order_date ? dayjs(row.order_date).format("DD MMM YY") : "—"}
                         </td>
                         <td className="px-2 py-2 align-top">
                           <div className="font-medium">{row.customer_name}</div>
@@ -262,9 +250,6 @@ export default function ItemWiseSalesPage() {
                         </td>
                         <td className="px-2 py-2 align-top text-right">
                           <div>₹{formatInr(row.amount_without_gst)}</div>
-                          {showBatteryAmount(row) && (
-                            <div className="text-amber-700">Battery ₹{formatInr(row.battery_amount)}</div>
-                          )}
                           <div className="text-gray-500">Tax ₹{formatInr(row.tax)}</div>
                         </td>
                         <td
@@ -294,7 +279,7 @@ export default function ItemWiseSalesPage() {
                 <div key={index} className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 space-y-3">
                   <div className="flex justify-between gap-2">
                     <span className="text-xs text-gray-500">
-                      {row.order_date ? dayjs(row.order_date).format("DD-MM-YYYY") : "—"}
+                      {row.order_date ? dayjs(row.order_date).format("DD MMM YYYY") : "—"}
                     </span>
                     <span className="text-xs font-medium text-gray-700 capitalize">
                       {row.payment_status || "—"}
@@ -320,9 +305,6 @@ export default function ItemWiseSalesPage() {
                     <p className="text-sm">
                       Qty {row.qty ?? "—"} · Sale ₹{formatInr(row.sale_price)} · Buy ₹{formatInr(row.purchase_price)}
                     </p>
-                    {showBatteryAmount(row) && (
-                      <p className="text-sm text-amber-700">Battery ₹{formatInr(row.battery_amount)}</p>
-                    )}
                     <p className="text-xs text-gray-500">Tax ₹{formatInr(row.tax)}</p>
                     <p className="text-base font-semibold text-gray-900 mt-1">
                       Amt (w/o GST) ₹{formatInr(row.amount_without_gst)}

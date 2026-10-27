@@ -1,4 +1,3 @@
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { shouldShowField, isReassignFieldMode } from "@/lib/reassignFieldVisibility";
 import { Eye, Upload, Loader } from "lucide-react";
 import { useState } from "react";
@@ -67,27 +66,16 @@ export default function PersonalInfoSection({
 
       setFiles(prev => ({ ...prev, doc_employment_confirmation_letter: file }));
       
-      const today = new Date().toISOString().split('T')[0];
+      // Clear the old file URL so new one is used
+      setFormData(prev => ({
+        ...prev,
+        fileUrls: {
+          ...prev.fileUrls,
+          doc_employment_confirmation_letter: null,
+        }
+      }));
       
-      // Save the Cloudinary URL and set leave accrual date
-      setFormData(prev => {
-        const updated = {
-          ...prev,
-          fileUrls: {
-            ...prev.fileUrls,
-            doc_employment_confirmation_letter: result.url,
-          },
-          leave_policy: {
-            ...(prev.leave_policy || {}),
-            accrual_start_date: today
-          }
-        };
-        console.log('Employment Confirmation Letter uploaded. Setting accrual date to:', today);
-        console.log('Updated leave_policy:', updated.leave_policy);
-        return updated;
-      });
-      
-      toast.success(`Employment Confirmation Letter uploaded. Leave accrual date set to ${new Date(today).toLocaleDateString('en-IN')}`);
+      toast.success("Employment Confirmation Letter uploaded to Cloudinary");
     } catch (error) {
       console.error('Upload error:', error);
       toast.error("Failed to upload Employment Confirmation Letter");
@@ -177,24 +165,6 @@ export default function PersonalInfoSection({
         </div>
 
         <div>
-          <label className={labelClass}>Machine Employee ID</label>
-          <input
-            type="text"
-            name="machine_code"
-            value={formData.machine_code || ""}
-            onChange={handleChange}
-            readOnly={ro || !isPrivilegedEditor}
-            placeholder="e.g. 102"
-            className={
-              ro || !isPrivilegedEditor
-                ? `${inputClass} bg-gray-100 cursor-not-allowed text-gray-500`
-                : inactive(inputClass)
-            }
-            title="eTimeOffice / attendance machine employee ID"
-          />
-        </div>
-
-        <div>
           <label className={labelClass}>Username *</label>
           <input
             type="text"
@@ -272,9 +242,15 @@ export default function PersonalInfoSection({
         {show("date_of_joining") && (
         <div>
           <label className={labelClass}>Date of Joining *</label>
-          <TypeableDateFilterInput value={formData.date_of_joining || ""} onChange={(v) => handleChange({ target: { name: "date_of_joining", value: v } })} required={!rf || show("date_of_joining")}
+          <input
+            type="date"
+            name="date_of_joining"
+            value={formData.date_of_joining || ""}
+            onChange={handleChange}
+            required={!rf || show("date_of_joining")}
             disabled={ro}
-            className={inactive(inputClass)}/>
+            className={inactive(inputClass)}
+          />
         </div>
         )}
 
@@ -352,7 +328,7 @@ export default function PersonalInfoSection({
               <input
                 type="file"
                 name="doc_employment_confirmation_letter"
-                accept="image/*,application/pdf,.pdf"
+                accept="image/*"
                 onChange={handleConfirmationLetterUpload}
                 disabled={ro || uploadingFiles.doc_employment_confirmation_letter}
                 className="hidden"
@@ -390,9 +366,15 @@ export default function PersonalInfoSection({
         {show("date_of_birth") && (
         <div>
           <label className={labelClass}>Date of Birth *</label>
-          <TypeableDateFilterInput value={formData.date_of_birth || ""} onChange={(v) => handleChange({ target: { name: "date_of_birth", value: v } })} required={!rf || show("date_of_birth")}
+          <input
+            type="date"
+            name="date_of_birth"
+            value={formData.date_of_birth || ""}
+            onChange={handleChange}
+            required={!rf || show("date_of_birth")}
             disabled={ro}
-            className={inactive(inputClass)}/>
+            className={inactive(inputClass)}
+          />
         </div>
         )}
 

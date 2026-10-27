@@ -1,6 +1,5 @@
 "use client";
 
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
@@ -8,80 +7,6 @@ import toast from "react-hot-toast";
 import QuotationItemsTable from "@/app/admin-dashboard/quotations/new/quotation-table";
 import TaxAndSummary from "@/app/admin-dashboard/quotations/new/TaxAndSummary";
 import { LetterheadCompanyInfo, LetterheadBankLine, LetterheadSignatoryLine } from "@/components/invoice/InvoiceLetterheadSection";
-
-function mapQuotationItemFromApi(item) {
-  const qty = parseFloat(item.quantity) || 1;
-  const priceFromUnit = parseFloat(item.price_per_unit);
-  const priceFromTaxable =
-    (parseFloat(item.total_taxable_amt) || parseFloat(item.taxable_price) || 0) /
-    qty;
-  const price =
-    Number.isFinite(priceFromUnit) && priceFromUnit > 0
-      ? priceFromUnit
-      : priceFromTaxable > 0
-        ? priceFromTaxable
-        : 0;
-
-  return {
-    productCode: String(item.item_code ?? ""),
-    imageUrl: item.img_url || "",
-    name: item.item_name || "",
-    hsn: item.hsn_sac || "",
-    specification: item.specification || "",
-    unit: item.unit || "",
-    quantity: qty,
-    price,
-    gst: parseFloat(item.gst) || 18,
-    item_type: item.item_type || null,
-  };
-}
-
-async function enrichQuotationItemsWithCatalogPrices(items, customerId) {
-  return Promise.all(
-    items.map(async (row) => {
-      const code = String(row.productCode ?? "").trim();
-      if (!code || (row.price && row.price > 0)) return row;
-
-      try {
-        const customerParam = customerId
-          ? `&customerId=${encodeURIComponent(customerId)}`
-          : "";
-        const res = await fetch(
-          `/api/get-product-details?code=${encodeURIComponent(code)}&mode=full${customerParam}`,
-        );
-        const data = await res.json();
-        if (!res.ok || !Array.isArray(data) || data.length === 0) return row;
-
-        const p = data[0];
-        const special =
-          p.special_price != null ? parseFloat(p.special_price) : null;
-        const catalog = parseFloat(p.price_per_unit) || 0;
-        const resolvedPrice =
-          special != null && Number.isFinite(special) ? special : catalog;
-
-        if (!resolvedPrice) return row;
-
-        return {
-          ...row,
-          productCode: String(p.item_code ?? code),
-          name: row.name || p.item_name || "",
-          hsn: row.hsn || p.hsn_sac || "",
-          unit: row.unit || p.unit || "",
-          gst: row.gst || parseFloat(p.gst_rate) || 18,
-          imageUrl: row.imageUrl || p.image_path || "",
-          item_type: p.item_type || row.item_type,
-          price: resolvedPrice,
-          special_price: special,
-          original_price: catalog,
-          last_negotiation_price:
-            parseFloat(p.last_negotiation_price) || row.last_negotiation_price || 0,
-        };
-      } catch {
-        return row;
-      }
-    }),
-  );
-}
 
 const STATE_CODE_TO_NAME = {
   "01": "Jammu & Kashmir",
@@ -234,14 +159,20 @@ export default function QuotationSalesEditForm({ quoteId, hasOrder = false, redi
         setIgstRate(parseFloat(h.igst_rate) || 0);
         setRoundOff(parseFloat(h.round_off) || 0);
 
-        const mappedItems = (data.items || []).map(mapQuotationItemFromApi);
-        const enrichedItems = await enrichQuotationItemsWithCatalogPrices(
-          mappedItems,
-          h.customer_id || "",
-        );
+        const mappedItems = (data.items || []).map((item) => ({
+          productCode: item.item_code || "",
+          imageUrl: item.img_url || "",
+          name: item.item_name || "",
+          hsn: item.hsn_sac || "",
+          specification: item.specification || "",
+          unit: item.unit || "",
+          quantity: parseFloat(item.quantity) || 1,
+          price: parseFloat(item.price_per_unit) || 0,
+          gst: parseFloat(item.gst) || 18,
+        }));
         const finalItems =
-          enrichedItems.length > 0
-            ? enrichedItems
+          mappedItems.length > 0
+            ? mappedItems
             : [
                 {
                   productCode: "",
@@ -513,8 +444,13 @@ export default function QuotationSalesEditForm({ quoteId, hasOrder = false, redi
         </div>
         <div>
           <label className="text-sm text-gray-600">Date</label>
-          <TypeableDateFilterInput value={quoteDate} onChange={setQuoteDate} className="input w-full"
-            disabled={hasOrder}/>
+          <input
+            type="date"
+            value={quoteDate}
+            onChange={(e) => setQuoteDate(e.target.value)}
+            className="input w-full"
+            disabled={hasOrder}
+          />
         </div>
       </div>
 
@@ -644,7 +580,6 @@ export default function QuotationSalesEditForm({ quoteId, hasOrder = false, redi
         cgstRate={cgstRate}
         sgstRate={sgstRate}
         igstRate={igstRate}
-        editableSpecification={false}
       />
 
       <TaxAndSummary

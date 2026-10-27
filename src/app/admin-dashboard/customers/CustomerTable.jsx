@@ -1,12 +1,9 @@
 "use client";
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useTransition } from "react";
 import { format } from "date-fns";
 import { useRouter } from "next/navigation";
 import { Eye, Pencil, Search, RefreshCw, Loader2 } from "lucide-react";
 import Link from "next/link";
-import { NOTES_LANGUAGE_OPTIONS } from "@/constants/notesLanguageOptions";
-import { getCurrentMonthRangeIso } from "@/lib/crmDateFormat";
 
 export default function CustomerTable({ 
   data, 
@@ -20,17 +17,15 @@ export default function CustomerTable({
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const monthDefault = getCurrentMonthRangeIso();
   const [search, setSearch] = useState(searchParams?.search || "");
   const [filters, setFilters] = useState({
     lead_source: searchParams?.lead_source || "",
     lead_campaign: searchParams?.lead_campaign || "",
     status: searchParams?.status || "",
     stage: searchParams?.stage || "",
-    from: searchParams?.from || monthDefault.from,
-    to: searchParams?.to || monthDefault.to,
+    from: searchParams?.from || "",
+    to: searchParams?.to || "",
     tags: searchParams?.tags || "",
-    notes_language: searchParams?.notes_language || "",
   });
 
   const handleSearch = (e) => {
@@ -45,13 +40,11 @@ export default function CustomerTable({
       if (filters.from) params.set("from", filters.from);
       if (filters.to) params.set("to", filters.to);
       if (filters.tags) params.set("tags", filters.tags);
-      if (filters.notes_language) params.set("notes_language", filters.notes_language);
       router.push(`/admin-dashboard/customers?${params.toString()}`);
     });
   };
 
   const resetFilters = () => {
-    const range = getCurrentMonthRangeIso();
     startTransition(() => {
       setSearch("");
       setFilters({
@@ -59,15 +52,11 @@ export default function CustomerTable({
         lead_campaign: "",
         status: "",
         stage: "",
-        from: range.from,
-        to: range.to,
+        from: "",
+        to: "",
         tags: "",
-        notes_language: "",
       });
-      const params = new URLSearchParams();
-      params.set("from", range.from);
-      params.set("to", range.to);
-      router.push(`/admin-dashboard/customers?${params.toString()}`);
+      router.push("/admin-dashboard/customers");
     });
   };
 
@@ -82,7 +71,6 @@ export default function CustomerTable({
       if (filters.from) params.set("from", filters.from);
       if (filters.to) params.set("to", filters.to);
       if (filters.tags) params.set("tags", filters.tags);
-      if (filters.notes_language) params.set("notes_language", filters.notes_language);
       params.set("page", newPage.toString());
       router.push(`/admin-dashboard/customers?${params.toString()}`);
     });
@@ -91,14 +79,25 @@ export default function CustomerTable({
   return (
     <div className="space-y-4">
       <form onSubmit={handleSearch}>
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+        {/* Search + Daily Follow-Ups - stack on mobile */}
+        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full mb-4">
           <input
             type="text"
             value={search}
             placeholder="Search customers (ID, phone, name, email)..."
             onChange={(e) => setSearch(e.target.value)}
-            className="border border-gray-300 p-2.5 sm:p-2 rounded-lg min-w-[12rem] flex-1 text-sm basis-full sm:basis-auto sm:min-w-[240px] sm:max-w-md"
+            className="border border-gray-300 p-2.5 sm:p-2 rounded-lg flex-1 min-w-0 text-sm"
           />
+          <Link
+            href={`/admin-dashboard/customers/followups`}
+            className="bg-blue-500 text-white px-4 py-2.5 sm:py-2 rounded-lg hover:bg-blue-600 text-center text-sm font-medium whitespace-nowrap"
+          >
+            Daily Follow-Ups
+          </Link>
+        </div>
+        
+        {/* Filters - wrap on small screens */}
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           {(userRole === "ADMIN" || userRole === "SUPERADMIN" || userRole === "TEAM LEADER" || userRole === "EA") && (
             <select
               value={filters.lead_source}
@@ -181,62 +180,39 @@ export default function CustomerTable({
             <option value="Repeat Order">Repeat Order</option>
             <option value="Running Order">Running Order</option>
             <option value="Strong Follow-Up">Strong Follow-Up</option>
-            <option value="Reseller">Reseller</option>
-            <option value="Contractor">Contractor</option>
             <option value="N/A">N/A</option>
           </select>
-
-          <select
-            value={filters.notes_language}
-            onChange={(e) =>
-              setFilters({ ...filters, notes_language: e.target.value })
-            }
-            className="border border-gray-300 rounded-lg px-3 py-2 text-sm min-w-[140px] sm:min-w-0"
-          >
-            <option value="">All Notes Languages</option>
-            {NOTES_LANGUAGE_OPTIONS.map((lang) => (
-              <option key={lang.code} value={lang.code}>
-                {lang.name}
-              </option>
-            ))}
-          </select>
-          <TypeableDateFilterInput
+          <input
+            type="date"
             value={filters.from}
-            onChange={(v) => setFilters({ ...filters, from: v })}
-            wrapperClassName="relative flex w-[10.5rem] shrink-0 items-stretch"
-            className="border border-gray-300 rounded-lg px-3 py-2 text-sm w-full"
-            placeholder="From date"
+            onChange={(e) => setFilters({ ...filters, from: e.target.value })}
+            className="border border-gray-300 rounded-lg px-3 py-2 text-sm min-w-[120px] sm:min-w-0"
           />
-          <TypeableDateFilterInput
+          <input
+            type="date"
             value={filters.to}
-            onChange={(v) => setFilters({ ...filters, to: v })}
-            wrapperClassName="relative flex w-[10.5rem] shrink-0 items-stretch"
-            className="border border-gray-300 rounded-lg px-3 py-2 text-sm w-full"
-            placeholder="To date"
+            onChange={(e) => setFilters({ ...filters, to: e.target.value })}
+            className="border border-gray-300 rounded-lg px-3 py-2 text-sm min-w-[120px] sm:min-w-0"
           />
+          
           <button
             type="submit"
             disabled={isPending}
-            className="shrink-0 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 disabled:opacity-50 text-sm font-medium"
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 disabled:opacity-50 text-sm font-medium"
           >
             {isPending ? <Loader2 size={18} className="animate-spin" /> : <Search size={18} />}
             {isPending ? "Searching..." : "Search"}
           </button>
+          
           <button
             type="button"
             onClick={resetFilters}
             disabled={isPending}
-            className="shrink-0 px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors flex items-center gap-2 disabled:opacity-50 text-sm font-medium"
+            className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors flex items-center gap-2 disabled:opacity-50 text-sm font-medium"
           >
             {isPending ? <Loader2 size={18} className="animate-spin" /> : <RefreshCw size={18} />}
             Reset
           </button>
-          <Link
-            href="/admin-dashboard/customers/followups"
-            className="shrink-0 bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 text-center text-sm font-medium whitespace-nowrap"
-          >
-            Daily Follow-Ups
-          </Link>
         </div>
       </form>
       

@@ -1,12 +1,7 @@
 "use client";
 
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect } from "react";
 import dayjs from "dayjs";
-import {
-  getOrderTableDefaultDateFrom,
-  getOrderTableDefaultDateTo,
-} from "@/lib/orderTableDateDefaults";
 
 function formatInr(n) {
   const v = Number(n) || 0;
@@ -14,8 +9,8 @@ function formatInr(n) {
 }
 
 export default function ItemWiseSalesPage() {
-  const [from, setFrom] = useState(() => getOrderTableDefaultDateFrom());
-  const [to, setTo] = useState(() => getOrderTableDefaultDateTo());
+  const [from, setFrom] = useState(dayjs().startOf("month").format("YYYY-MM-DD"));
+  const [to, setTo] = useState(dayjs().endOf("month").format("YYYY-MM-DD"));
   const [employee, setEmployee] = useState("");
   const [employeeOptions, setEmployeeOptions] = useState([]);
   const [data, setData] = useState([]);
@@ -128,11 +123,21 @@ export default function ItemWiseSalesPage() {
       >
         <div className="flex-1 min-w-[160px]">
           <label className="text-sm font-medium block mb-2 text-gray-700">From date</label>
-          <TypeableDateFilterInput value={from} onChange={setFrom} className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"/>
+          <input
+            type="date"
+            value={from}
+            onChange={(e) => setFrom(e.target.value)}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
+          />
         </div>
         <div className="flex-1 min-w-[160px]">
           <label className="text-sm font-medium block mb-2 text-gray-700">To date</label>
-          <TypeableDateFilterInput value={to} onChange={setTo} className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"/>
+          <input
+            type="date"
+            value={to}
+            onChange={(e) => setTo(e.target.value)}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
+          />
         </div>
         <div className="flex-1 min-w-[200px]">
           <label className="text-sm font-medium block mb-2 text-gray-700">Employee</label>
@@ -211,7 +216,7 @@ export default function ItemWiseSalesPage() {
                           {row.lead_source || "—"}
                         </td>
                         <td className="px-3 py-3 whitespace-nowrap text-gray-600">
-                          {row.order_date ? dayjs(row.order_date).format("DD-MM-YYYY") : "—"}
+                          {row.order_date ? dayjs(row.order_date).format("DD MMM YYYY") : "—"}
                         </td>
                         <td className="px-3 py-3 text-gray-900 max-w-[140px]">
                           <span className="line-clamp-2" title={row.model}>
@@ -276,7 +281,7 @@ export default function ItemWiseSalesPage() {
                     data.map((row, index) => (
                       <tr key={index}>
                         <td className="px-2 py-2 align-top whitespace-nowrap">
-                          {row.order_date ? dayjs(row.order_date).format("DD-MM-YYYY") : "—"}
+                          {row.order_date ? dayjs(row.order_date).format("DD MMM YY") : "—"}
                         </td>
                         <td className="px-2 py-2 align-top">
                           <div className="font-medium">{row.customer_name}</div>
@@ -314,7 +319,7 @@ export default function ItemWiseSalesPage() {
                 <div key={index} className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 space-y-3">
                   <div className="flex justify-between gap-2">
                     <span className="text-xs text-gray-500">
-                      {row.order_date ? dayjs(row.order_date).format("DD-MM-YYYY") : "—"}
+                      {row.order_date ? dayjs(row.order_date).format("DD MMM YYYY") : "—"}
                     </span>
                     <span className="text-xs font-medium text-gray-700 capitalize">
                       {row.payment_status || "—"}

@@ -64,7 +64,7 @@ export default async function FollowUpPage({ params }) {
         <p>
           <strong>Last Called:</strong>{" "}
           {customer.followed_date
-            ? dayjs(customer.followed_date).format("DD-MM-YYYY hh:mm A")
+            ? dayjs(customer.followed_date).format("DD MMM YYYY, hh:mm A")
             : "—"}
         </p>
         <p>

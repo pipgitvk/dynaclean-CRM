@@ -1,8 +1,5 @@
 "use client";
 
-import { formatCrmDateOnly } from "@/lib/crmDateFormat";
-
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -105,7 +102,7 @@ function ProcessModal({ productionId, onClose, onChanged }) {
               <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div className="rounded border bg-white p-2">
                   <div className="text-[10px] uppercase text-gray-400">Expected Date</div>
-                  <div className="text-sm">{data.header?.expected_date ? formatCrmDateOnly(data.header.expected_date) : '-'}</div>
+                  <div className="text-sm">{data.header?.expected_date ? new Date(data.header.expected_date).toLocaleDateString() : '-'}</div>
                 </div>
                 <div className="rounded border bg-white p-2">
                   <div className="text-[10px] uppercase text-gray-400">Created By</div>
@@ -410,7 +407,7 @@ export default function ProductionStatusPage() {
                 <td className="p-2">{r.production_id}</td>
                 <td className="p-2">{r.product_code}</td>
                 <td className="p-2">{r.product_name}</td>
-                <td className="p-2">{r.expected_date ? formatCrmDateOnly(r.expected_date) : '-'}</td>
+                <td className="p-2">{r.expected_date ? new Date(r.expected_date).toLocaleDateString() : '-'}</td>
                 <td className="p-2">
                   <div className="w-40 bg-gray-100 rounded h-2">
                     <div className="bg-green-600 h-2 rounded" style={{ width: `${Math.round(r.progress_percent || 0)}%` }} />
@@ -453,7 +450,7 @@ export default function ProductionStatusPage() {
               </div>
               <div className="text-xs text-gray-500">ID: {r.production_id}</div>
               <div className="text-xs text-gray-500">{r.product_code}</div>
-              <div className="text-xs text-gray-500">{r.expected_date ? formatCrmDateOnly(r.expected_date) : '-'}</div>
+              <div className="text-xs text-gray-500">{r.expected_date ? new Date(r.expected_date).toLocaleDateString() : '-'}</div>
               <div className="mt-2">
                 <div className="h-2 bg-gray-100 rounded">
                   <div className="h-2 bg-green-600 rounded" style={{ width: `${Math.round(r.progress_percent || 0)}%` }} />
@@ -580,7 +577,7 @@ function AddProductionModal({ onClose, onSaved }) {
             </div>
             <div className="flex items-center gap-3">
               <label className="w-28 text-sm">Expected Date<span className="text-red-600">*</span></label>
-              <TypeableDateFilterInput value={expected} onChange={setExpected} required className="w-48 border p-2 rounded"/>
+              <input required type="date" value={expected} onChange={(e)=>setExpected(e.target.value)} className="w-48 border p-2 rounded" />
             </div>
 
             <div className="flex justify-end gap-2">

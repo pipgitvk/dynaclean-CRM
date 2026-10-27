@@ -1,7 +1,5 @@
 "use client";
 
-import { formatCrmDateOnly } from "@/lib/crmDateFormat";
-
 import { useState, useEffect } from "react";
 import { X, Plus, Edit, Trash2 } from "lucide-react";
 import toast from "react-hot-toast";
@@ -79,7 +77,11 @@ export default function KeywordFollowupsModal({ open, onClose, keyword }) {
   const formatDate = (dateString) => {
     if (!dateString) return "-";
     const date = new Date(dateString);
-    return formatCrmDateOnly(date);
+    return date.toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
   };
 
   if (!open || !keyword) return null;

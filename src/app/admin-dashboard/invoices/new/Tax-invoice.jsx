@@ -1,6 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
 import { toWords } from "number-to-words";
-import { buildInvoiceTaxTableRows } from "@/lib/gstSupplyType";
 
 export default function TaxAndSummary({
   items,
@@ -22,8 +21,9 @@ export default function TaxAndSummary({
 }) {
   const [amountInWords, setAmountInWords] = useState("Zero");
 
+  // Recalculate tax amounts using cgstRate/sgstRate/igstRate (from quotation DB)
+  // instead of per-item percent which may be stale from state useEffect
   const computedTax = useMemo(() => {
-    let computedSubtotal = 0;
     let computedCgst = 0;
     let computedSgst = 0;
     let computedIgst = 0;
@@ -33,34 +33,21 @@ export default function TaxAndSummary({
       const rate = item.rate || 0;
       const discountAmount = item.discount_amount || 0;
       const itemSubtotal = qty * rate - discountAmount;
-      computedSubtotal += itemSubtotal;
 
-      computedCgst += (itemSubtotal * (item.cgst_percent || 0)) / 100;
-      computedSgst += (itemSubtotal * (item.sgst_percent || 0)) / 100;
-      computedIgst += (itemSubtotal * (item.igst_percent || 0)) / 100;
+      computedCgst += (itemSubtotal * cgstRate) / 100;
+      computedSgst += (itemSubtotal * sgstRate) / 100;
+      computedIgst += (itemSubtotal * igstRate) / 100;
     });
 
     const totalTax = computedCgst + computedSgst + computedIgst;
-    const taxableSubtotal = computedSubtotal || subtotal;
-    const totalBeforeRound = taxableSubtotal + totalTax;
+    const totalBeforeRound = subtotal + totalTax;
     const finalRoundOff = isAutoRoundOff
       ? Math.round(totalBeforeRound) - totalBeforeRound
       : parseFloat(roundOff) || 0;
     const computedGrandTotal = totalBeforeRound + finalRoundOff;
 
-    const taxTableRows = buildInvoiceTaxTableRows(items);
-
-    return {
-      computedCgst,
-      computedSgst,
-      computedIgst,
-      totalTax,
-      computedGrandTotal,
-      finalRoundOff,
-      taxableSubtotal,
-      taxTableRows,
-    };
-  }, [items, subtotal, roundOff, isAutoRoundOff]);
+    return { computedCgst, computedSgst, computedIgst, totalTax, computedGrandTotal, finalRoundOff };
+  }, [items, cgstRate, sgstRate, igstRate, subtotal, roundOff, isAutoRoundOff]);
 
   // Sync roundOff when auto
   useEffect(() => {
@@ -93,27 +80,31 @@ export default function TaxAndSummary({
             </tr>
           </thead>
           <tbody>
-            {computedTax.taxTableRows.map((row, idx) => (
-              <tr key={`${row.type}-${row.rate}-${idx}`} className="border">
-                <td className="px-3 py-2 border">{row.type}</td>
-                <td className="px-3 py-2 border">₹ {row.taxableAmount.toFixed(2)}</td>
-                <td className="px-3 py-2 border text-center">{row.rate}%</td>
-                <td className="px-3 py-2 border">₹ {row.taxAmount.toFixed(2)}</td>
+            {cgstRate > 0 && (
+              <tr className="border">
+                <td className="px-3 py-2 border">CGST</td>
+                <td className="px-3 py-2 border">₹ {subtotal.toFixed(2)}</td>
+                <td className="px-3 py-2 border text-center">{cgstRate}%</td>
+                <td className="px-3 py-2 border">₹ {computedTax.computedCgst.toFixed(2)}</td>
               </tr>
-            ))}
+            )}
+            {sgstRate > 0 && (
+              <tr className="border">
+                <td className="px-3 py-2 border">SGST</td>
+                <td className="px-3 py-2 border">₹ {subtotal.toFixed(2)}</td>
+                <td className="px-3 py-2 border text-center">{sgstRate}%</td>
+                <td className="px-3 py-2 border">₹ {computedTax.computedSgst.toFixed(2)}</td>
+              </tr>
+            )}
+            {igstRate > 0 && (
+              <tr className="border">
+                <td className="px-3 py-2 border">IGST</td>
+                <td className="px-3 py-2 border">₹ {subtotal.toFixed(2)}</td>
+                <td className="px-3 py-2 border text-center">{igstRate}%</td>
+                <td className="px-3 py-2 border">₹ {computedTax.computedIgst.toFixed(2)}</td>
+              </tr>
+            )}
           </tbody>
-          {computedTax.taxTableRows.length > 0 && (
-            <tfoot>
-              <tr className="border bg-gray-50 font-semibold">
-                <td className="px-3 py-2 border" colSpan={3}>
-                  Total Tax (all slabs)
-                </td>
-                <td className="px-3 py-2 border">
-                  ₹ {computedTax.totalTax.toFixed(2)}
-                </td>
-              </tr>
-            </tfoot>
-          )}
         </table>
       </div>
 
@@ -123,50 +114,31 @@ export default function TaxAndSummary({
           <h3 className="text-lg font-semibold mb-4 text-center">Invoice Summary</h3>
           <div className="flex justify-between py-1 border-b">
             <span className="font-medium">Subtotal:</span>
-            <span>₹ {computedTax.taxableSubtotal.toFixed(2)}</span>
+            <span>₹ {subtotal.toFixed(2)}</span>
           </div>
-          {computedTax.taxTableRows
-            .filter((row) => row.type === "IGST")
-            .map((row) => (
-              <div
-                key={`summary-igst-${row.rate}`}
-                className="flex justify-between py-1 border-b text-gray-800"
-              >
-                <span className="font-medium">
-                  IGST @ {row.rate}% (on ₹ {row.taxableAmount.toFixed(2)})
-                </span>
-                <span>₹ {row.taxAmount.toFixed(2)}</span>
-              </div>
-            ))}
-          {computedTax.computedIgst > 0 &&
-            computedTax.taxTableRows.filter((r) => r.type === "IGST").length > 1 && (
-              <div className="flex justify-between py-1 border-b font-semibold">
-                <span>Total IGST</span>
+          {igstRate > 0 ? (
+            <>
+              <div className="flex justify-between py-1 border-b">
+                <span className="font-medium">IGST ({igstRate}%):</span>
                 <span>₹ {computedTax.computedIgst.toFixed(2)}</span>
               </div>
-            )}
-          {computedTax.taxTableRows
-            .filter((row) => row.type === "CGST")
-            .map((row) => (
-              <div
-                key={`summary-cgst-${row.rate}`}
-                className="flex justify-between py-1 border-b text-gray-800"
-              >
-                <span className="font-medium">CGST @ {row.rate}%</span>
-                <span>₹ {row.taxAmount.toFixed(2)}</span>
-              </div>
-            ))}
-          {computedTax.taxTableRows
-            .filter((row) => row.type === "SGST")
-            .map((row) => (
-              <div
-                key={`summary-sgst-${row.rate}`}
-                className="flex justify-between py-1 border-b text-gray-800"
-              >
-                <span className="font-medium">SGST @ {row.rate}%</span>
-                <span>₹ {row.taxAmount.toFixed(2)}</span>
-              </div>
-            ))}
+            </>
+          ) : (
+            <>
+              {cgstRate > 0 && (
+                <div className="flex justify-between py-1 border-b">
+                  <span className="font-medium">CGST ({cgstRate}%):</span>
+                  <span>₹ {computedTax.computedCgst.toFixed(2)}</span>
+                </div>
+              )}
+              {sgstRate > 0 && (
+                <div className="flex justify-between py-1 border-b">
+                  <span className="font-medium">SGST ({sgstRate}%):</span>
+                  <span>₹ {computedTax.computedSgst.toFixed(2)}</span>
+                </div>
+              )}
+            </>
+          )}
           <div className="flex justify-between py-1 border-b">
             <span className="font-medium">Total Tax:</span>
             <span>₹ {computedTax.totalTax.toFixed(2)}</span>

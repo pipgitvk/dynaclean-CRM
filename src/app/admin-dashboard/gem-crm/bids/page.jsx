@@ -1,6 +1,5 @@
 "use client";
 
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect } from "react";
 import {
   Plus,
@@ -18,8 +17,7 @@ import {
   Info,
 } from "lucide-react";
 import toast from "react-hot-toast";
-import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { getGemCrmBasePath } from "@/lib/gemCrmBasePath";
+import { useRouter, useSearchParams } from "next/navigation";
 
 const StatusBadge = ({ status }) => {
   const styles = {
@@ -47,8 +45,6 @@ const StatusBadge = ({ status }) => {
 
 export default function GemCrmBidsPage() {
   const router = useRouter();
-  const pathname = usePathname();
-  const gemCrmBase = getGemCrmBasePath(pathname);
   const searchParams = useSearchParams();
   const [bids, setBids] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -65,16 +61,8 @@ export default function GemCrmBidsPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 0 });
   const [stats, setStats] = useState({ total: 0, won: 0, lost: 0 });
-  const [createdByFilter, setCreatedByFilter] = useState("");
-  const [createdByOptions, setCreatedByOptions] = useState([]);
-  const [employeeFilter, setEmployeeFilter] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [selectedBid, setSelectedBid] = useState(null);
-  const [selectedBids, setSelectedBids] = useState(new Set());
-  const [showBulkAssignModal, setShowBulkAssignModal] = useState(false);
-  const [employees, setEmployees] = useState([]);
-  const [selectedEmployee, setSelectedEmployee] = useState("");
-  const [isAssigning, setIsAssigning] = useState(false);
   const [bidForm, setBidForm] = useState({
     selected_level: "",
     l1_level: "",
@@ -89,25 +77,7 @@ export default function GemCrmBidsPage() {
   useEffect(() => {
     fetchBids();
     fetchStats();
-    fetchEmployees();
-  }, [pagination.page, statusFilter, technicalStatusFilter, financialStatusFilter, platformFilter, dateFrom, dateTo, endingSoonFilter, activeRAFilter, raFilter, createdByFilter]);
-
-  const fetchEmployees = async () => {
-    try {
-      const res = await fetch("/api/gem-crm/employees", {
-        credentials: "include",
-      });
-      const result = await res.json();
-      if (result.success && Array.isArray(result.data)) {
-        setEmployees(result.data);
-      } else if (Array.isArray(result)) {
-        setEmployees(result);
-      }
-    } catch (error) {
-      console.error("Error fetching employees:", error);
-      toast.error("Failed to load GEM employees");
-    }
-  };
+  }, [pagination.page, statusFilter, technicalStatusFilter, financialStatusFilter, platformFilter, dateFrom, dateTo, endingSoonFilter, activeRAFilter, raFilter]);
 
   const fetchBids = async () => {
     try {
@@ -125,7 +95,6 @@ export default function GemCrmBidsPage() {
         ...(raFilter && { raParticipated: raFilter }),
         ...(endingSoonFilter && { endingSoon: 'true' }),
         ...(activeRAFilter && { activeRA: 'true' }),
-        ...(createdByFilter && { createdBy: createdByFilter }),
       });
 
       const res = await fetch(`/api/gem-crm/bids?${params}`);
@@ -167,12 +136,12 @@ export default function GemCrmBidsPage() {
 
   const clearEndingSoonFilter = () => {
     setEndingSoonFilter(false);
-    router.push(`${gemCrmBase}/bids`);
+    router.push('/admin-dashboard/gem-crm/bids');
   };
 
   const clearActiveRAFilter = () => {
     setActiveRAFilter(false);
-    router.push(`${gemCrmBase}/bids`);
+    router.push('/admin-dashboard/gem-crm/bids');
   };
 
   const openBidOpenedModal = (bid) => {
@@ -214,65 +183,6 @@ export default function GemCrmBidsPage() {
     }
   };
 
-  const toggleBidSelection = (bidId) => {
-    setSelectedBids((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(bidId)) {
-        newSet.delete(bidId);
-      } else {
-        newSet.add(bidId);
-      }
-      return newSet;
-    });
-  };
-
-  const toggleSelectAll = () => {
-    if (selectedBids.size === bids.length) {
-      setSelectedBids(new Set());
-    } else {
-      const allIds = new Set(bids.map((bid) => bid.bid_id));
-      setSelectedBids(allIds);
-    }
-  };
-
-  const handleBulkAssign = async () => {
-    if (selectedBids.size === 0 || !selectedEmployee) {
-      toast.error("Please select bids and an employee");
-      return;
-    }
-
-    try {
-      setIsAssigning(true);
-      const bidIds = Array.from(selectedBids);
-      
-      const res = await fetch("/api/gem-crm/bids/bulk-assign", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          bid_ids: bidIds,
-          employee_id: selectedEmployee,
-        }),
-        credentials: "include",
-      });
-
-      const result = await res.json();
-      if (result.success) {
-        toast.success(`Successfully assigned ${bidIds.length} bid(s)`);
-        setSelectedBids(new Set());
-        setSelectedEmployee("");
-        setShowBulkAssignModal(false);
-        fetchBids();
-      } else {
-        toast.error(result.message || "Failed to assign bids");
-      }
-    } catch (error) {
-      console.error("Error assigning bids:", error);
-      toast.error("Error assigning bids");
-    } finally {
-      setIsAssigning(false);
-    }
-  };
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -282,7 +192,7 @@ export default function GemCrmBidsPage() {
           <p className="text-gray-600 mt-1">Manage government tenders and bids</p>
         </div>
         <button
-          onClick={() => router.push(`${gemCrmBase}/bids/new`)}
+          onClick={() => router.push("/admin-dashboard/gem-crm/bids/new")}
           className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
         >
           <Plus className="w-4 h-4" />
@@ -312,7 +222,7 @@ export default function GemCrmBidsPage() {
         <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Timer className="w-5 h-5 text-purple-600" />
-            <span className="text-purple-800 font-medium">Showing bids with RA period within 1 week</span>
+            <span className="text-purple-800 font-medium">Showing bids with active RA period</span>
           </div>
           <button
             onClick={clearActiveRAFilter}
@@ -398,22 +308,6 @@ export default function GemCrmBidsPage() {
           <div className="mt-4 pt-4 border-t border-gray-200 space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <select
-                value={employeeFilter}
-                onChange={(e) => setEmployeeFilter(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">All Employees</option>
-                {employees
-                  .slice()
-                  .sort((a, b) => (a.username || "").localeCompare(b.username || ""))
-                  .map((emp) => (
-                    <option key={emp.empId} value={emp.username}>
-                      {emp.username}
-                    </option>
-                  ))}
-              </select>
-
-              <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
                 className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
@@ -467,12 +361,22 @@ export default function GemCrmBidsPage() {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Date From</label>
-                <TypeableDateFilterInput value={dateFrom} onChange={setDateFrom} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"/>
+                <input
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
               </div>
 
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Date To</label>
-                <TypeableDateFilterInput value={dateTo} onChange={setDateTo} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"/>
+                <input
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => setDateTo(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
               </div>
 
               <div>
@@ -494,32 +398,10 @@ export default function GemCrmBidsPage() {
 
       {/* Bids Table */}
       <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
-        {/* Bulk Action Bar */}
-        {selectedBids.size > 0 && (
-          <div className="bg-blue-50 border-b border-blue-200 px-4 py-3 flex items-center justify-between">
-            <span className="text-sm font-medium text-blue-900">
-              {selectedBids.size} bid{selectedBids.size !== 1 ? "s" : ""} selected
-            </span>
-            <button
-              onClick={() => setShowBulkAssignModal(true)}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
-            >
-              Assign to Employee
-            </button>
-          </div>
-        )}
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="text-left py-3 px-4 text-xs font-semibold text-gray-600 uppercase">
-                  <input
-                    type="checkbox"
-                    checked={selectedBids.size === bids.length && bids.length > 0}
-                    onChange={toggleSelectAll}
-                    className="w-4 h-4 text-blue-600 rounded cursor-pointer"
-                  />
-                </th>
                 <th className="text-left py-3 px-4 text-xs font-semibold text-gray-600 uppercase bg-purple-50">
                   Customer ID
                 </th>
@@ -534,9 +416,6 @@ export default function GemCrmBidsPage() {
                 </th>
                 <th className="text-left py-3 px-4 text-xs font-semibold text-gray-600 uppercase">
                   Employee
-                </th>
-                <th className="text-left py-3 px-4 text-xs font-semibold text-gray-600 uppercase">
-                  Created By
                 </th>
                 <th className="text-right py-3 px-4 text-xs font-semibold text-gray-600 uppercase">
                   Estimated Bid Value
@@ -556,12 +435,6 @@ export default function GemCrmBidsPage() {
                 <th className="text-center py-3 px-4 text-xs font-semibold text-gray-600 uppercase">
                   RA
                 </th>
-                <th className="text-left py-3 px-4 text-xs font-semibold text-gray-600 uppercase">
-                  RA Start Date
-                </th>
-                <th className="text-left py-3 px-4 text-xs font-semibold text-gray-600 uppercase">
-                  RA End Date
-                </th>
                 <th className="text-center py-3 px-4 text-xs font-semibold text-gray-600 uppercase">
                   Status
                 </th>
@@ -573,7 +446,7 @@ export default function GemCrmBidsPage() {
             <tbody className="divide-y divide-gray-100">
               {isLoading ? (
                 <tr>
-                  <td colSpan="16" className="py-8 text-center text-gray-500">
+                  <td colSpan="13" className="py-8 text-center text-gray-500">
                     <div className="flex items-center justify-center">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                     </div>
@@ -581,23 +454,13 @@ export default function GemCrmBidsPage() {
                 </tr>
               ) : bids.length === 0 ? (
                 <tr>
-                  <td colSpan="16" className="py-8 text-center text-gray-500">
+                  <td colSpan="13" className="py-8 text-center text-gray-500">
                     No bids found
                   </td>
                 </tr>
               ) : (
-                bids
-                  .filter(bid => !employeeFilter || (bid.assigned_employee_name || "") === employeeFilter)
-                  .map((bid) => (
+                bids.map((bid) => (
                   <tr key={bid.bid_id} className="hover:bg-gray-50 transition-colors">
-                    <td className="py-3 px-4 text-center">
-                      <input
-                        type="checkbox"
-                        checked={selectedBids.has(bid.bid_id)}
-                        onChange={() => toggleBidSelection(bid.bid_id)}
-                        className="w-4 h-4 text-blue-600 rounded cursor-pointer"
-                      />
-                    </td>
                     <td className="py-3 px-4 text-sm font-medium text-purple-600 bg-purple-50">
                       {bid.customer_id || "-"}
                     </td>
@@ -612,12 +475,6 @@ export default function GemCrmBidsPage() {
                     </td>
                     <td className="py-3 px-4 text-sm text-gray-900">
                       {bid.assigned_employee_name || "-"}
-                    </td>
-                    <td className="py-3 px-4 text-sm text-gray-700">
-                      {(() => {
-                        const emp = employees.find(e => e.empId === bid.created_by || e.id === bid.created_by);
-                        return emp?.username || emp?.name || bid.created_by || "-";
-                      })()}
                     </td>
                     <td className="py-3 px-4 text-sm text-gray-900 text-right">
                       {bid.estimated_bid_value
@@ -643,26 +500,20 @@ export default function GemCrmBidsPage() {
                         {bid.ra_participated === 'yes' ? 'YES' : 'NO'}
                       </span>
                     </td>
-                    <td className="py-3 px-4 text-sm text-gray-600">
-                      {bid.ra_start_date ? new Date(bid.ra_start_date).toLocaleDateString('en-IN') : "-"}
-                    </td>
-                    <td className="py-3 px-4 text-sm text-gray-600">
-                      {bid.ra_end_date ? new Date(bid.ra_end_date).toLocaleDateString('en-IN') : "-"}
-                    </td>
                     <td className="py-3 px-4 text-center">
                       <StatusBadge status={bid.bid_status} />
                     </td>
                     <td className="py-3 px-4">
                       <div className="flex items-center justify-center gap-2">
                         <button
-                          onClick={() => router.push(`${gemCrmBase}/bids/${bid.bid_id}`)}
+                          onClick={() => router.push(`/admin-dashboard/gem-crm/bids/${bid.bid_id}`)}
                           className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                           title="View Details"
                         >
                           <Eye className="w-4 h-4" />
                         </button>
                         <button
-                          onClick={() => router.push(`${gemCrmBase}/bids/${bid.bid_id}/edit`)}
+                          onClick={() => router.push(`/admin-dashboard/gem-crm/bids/${bid.bid_id}/edit`)}
                           className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
                           title="Edit"
                         >
@@ -836,78 +687,6 @@ export default function GemCrmBidsPage() {
                   </>
                 ) : (
                   "Save"
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Bulk Assign Modal */}
-      {showBulkAssignModal && (
-        <div className="fixed inset-0 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-6 border-b border-gray-200">
-              <h2 className="text-xl font-bold text-gray-900">Assign to GEM Employee</h2>
-              <button
-                onClick={() => {
-                  setShowBulkAssignModal(false);
-                  setSelectedEmployee("");
-                }}
-                className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg"
-              >
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-            <div className="p-6 space-y-4">
-              <div>
-                <p className="text-sm text-gray-600 mb-4">
-                  {selectedBids.size} bid{selectedBids.size !== 1 ? "s" : ""} selected
-                </p>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Select GEM Employee *
-                </label>
-                <select
-                  value={selectedEmployee}
-                  onChange={(e) => setSelectedEmployee(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  required
-                >
-                  <option value="">-- Select Employee --</option>
-                  {employees.length === 0 ? (
-                    <option disabled>No GEM employees available</option>
-                  ) : (
-                    employees.map((emp) => (
-                      <option key={emp.empId || emp.id} value={emp.empId || emp.id || emp.username}>
-                        {emp.username || emp.name || emp}
-                      </option>
-                    ))
-                  )}
-                </select>
-              </div>
-            </div>
-            <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200">
-              <button
-                onClick={() => {
-                  setShowBulkAssignModal(false);
-                  setSelectedEmployee("");
-                }}
-                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleBulkAssign}
-                disabled={isAssigning || !selectedEmployee}
-                className="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              >
-                {isAssigning ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    Assigning...
-                  </>
-                ) : (
-                  "Assign"
                 )}
               </button>
             </div>

@@ -3,7 +3,6 @@ import { getDbConnection } from "@/lib/db";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 import { getSessionPayload } from "@/lib/auth";
-import { ensureRepListMachineCodeColumn } from "@/lib/ensureRepListMachineCode";
 import { v2 as cloudinary } from "cloudinary";
 
 // Initialize Cloudinary
@@ -15,15 +14,12 @@ cloudinary.config({
 
 // Helper function to upload file to Cloudinary
 async function uploadFileToCloudinary(buffer, filename, folder) {
-  const isPdf = String(filename || "").toLowerCase().endsWith(".pdf");
-  const baseName = path.parse(filename).name;
   return new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
       {
         folder: folder,
-        public_id: baseName,
-        resource_type: isPdf ? "image" : "auto",
-        access_mode: "public",
+        public_id: path.parse(filename).name,
+        resource_type: "auto",
       },
       (error, result) => {
         if (error) {
@@ -57,7 +53,6 @@ export async function GET(request) {
     }
 
     const conn = await getDbConnection();
-    await ensureRepListMachineCodeColumn(conn);
     console.log('[EMPCRM][GET] Incoming:', {
       requestedUsername: username,
       sessionUsername: session?.username || null,
@@ -116,24 +111,14 @@ export async function GET(request) {
 
     if (profiles.length === 0) {
       console.log('[EMPCRM][GET] Profile not found for request:', { requestedUsername: username });
-      const [repOnly] = await conn.execute(
-        `SELECT machine_code FROM rep_list WHERE username = ? LIMIT 1`,
-        [username]
-      );
       return NextResponse.json({
         success: true,
         profile: null,
-        machine_code: repOnly[0]?.machine_code ?? null,
         message: "Profile not found",
       });
     }
 
     const profile = profiles[0];
-    const [repMachine] = await conn.execute(
-      `SELECT machine_code FROM rep_list WHERE username = ? LIMIT 1`,
-      [profile.username]
-    );
-    profile.machine_code = repMachine[0]?.machine_code ?? null;
     console.log('[EMPCRM][GET] Returning profile id:', profile?.id);
 
     // Normalize date fields to YYYY-MM-DD for UI consistency
@@ -377,10 +362,6 @@ async function saveProfile(request, methodType) {
     if (data.date_of_birth) data.date_of_birth = toYyyyMmDd(data.date_of_birth) || null;
 
     conn = await getDbConnection();
-    await ensureRepListMachineCodeColumn(conn);
-
-    const machineCodeRaw = data.machine_code;
-    delete data.machine_code;
 
     // Check Existence
     const [existing] = await conn.execute(
@@ -420,17 +401,6 @@ async function saveProfile(request, methodType) {
           { status: 400 }
         );
       }
-    }
-
-    if (machineCodeRaw !== undefined) {
-      const machineCode =
-        String(machineCodeRaw ?? "").trim() === ""
-          ? null
-          : String(machineCodeRaw).trim();
-      await conn.execute(
-        `UPDATE rep_list SET machine_code = ? WHERE username = ?`,
-        [machineCode, username]
-      );
     }
 
     if (existing.length > 0) {

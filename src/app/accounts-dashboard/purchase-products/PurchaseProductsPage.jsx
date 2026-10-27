@@ -1,8 +1,5 @@
 "use client";
 
-import { formatCrmDateOnly } from "@/lib/crmDateFormat";
-
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import Link from "next/link";
 import { Search, Eye, Plus, Upload, Trash2, Edit2, ChevronDown, FileSpreadsheet, Printer, Link2, MoreVertical, Mail, Save, X } from "lucide-react";
@@ -288,11 +285,21 @@ function LinkPaymentModal({ open, onClose, purchase, onLinked, currentStatementI
             {/* Date Filters */}
             <div className="flex items-center gap-2 border border-gray-300 rounded-md px-3 py-1.5 bg-gray-50">
               <span className="text-sm font-medium text-gray-600">From:</span>
-              <TypeableDateFilterInput value={fromDate} onChange={setFromDate} className="border-0 bg-transparent text-sm focus:outline-none"/>
+              <input
+                type="date"
+                value={fromDate}
+                onChange={(e) => setFromDate(e.target.value)}
+                className="border-0 bg-transparent text-sm focus:outline-none"
+              />
             </div>
             <div className="flex items-center gap-2 border border-gray-300 rounded-md px-3 py-1.5 bg-gray-50">
               <span className="text-sm font-medium text-gray-600">To:</span>
-              <TypeableDateFilterInput value={toDate} onChange={setToDate} className="border-0 bg-transparent text-sm focus:outline-none"/>
+              <input
+                type="date"
+                value={toDate}
+                onChange={(e) => setToDate(e.target.value)}
+                className="border-0 bg-transparent text-sm focus:outline-none"
+              />
             </div>
             
             {/* Reset Button */}
@@ -371,7 +378,7 @@ function LinkPaymentModal({ open, onClose, purchase, onLinked, currentStatementI
                     <tr key={s.id} className={`hover:bg-gray-50 transition-colors ${alreadyLinkedToThis ? 'bg-emerald-50/30' : ''}`}>
                       <td className="p-3 font-medium text-gray-600">#{s.id}</td>
                       <td className="p-3 font-mono text-xs text-gray-500">{s.trans_id || "—"}</td>
-                      <td className="p-3 text-gray-600">{s.date ? formatCrmDateOnly(s.date) : "—"}</td>
+                      <td className="p-3 text-gray-600">{s.date ? new Date(s.date).toLocaleDateString() : "—"}</td>
                       <td className="p-3 max-w-[400px] truncate text-gray-600" title={s.description || ""}>{s.description || "—"}</td>
                       <td className="p-3 font-bold text-red-600">₹{Number(s.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                       <td className="p-3">
@@ -661,9 +668,19 @@ export default function PurchaseProductsPage() {
               <span className="px-3 py-2 bg-gray-500 text-white text-xs font-semibold rounded">
                 Between
               </span>
-              <TypeableDateFilterInput value={fromDate} onChange={(v) => handleDateChange("from", v)} className="border border-gray-300 rounded-md px-3 py-2 text-sm"/>
+              <input
+                type="date"
+                value={fromDate}
+                onChange={(e) => handleDateChange("from", e.target.value)}
+                className="border border-gray-300 rounded-md px-3 py-2 text-sm"
+              />
               <span className="text-gray-500 text-sm font-medium">To</span>
-              <TypeableDateFilterInput value={toDate} onChange={(v) => handleDateChange("to", v)} className="border border-gray-300 rounded-md px-3 py-2 text-sm"/>
+              <input
+                type="date"
+                value={toDate}
+                onChange={(e) => handleDateChange("to", e.target.value)}
+                className="border border-gray-300 rounded-md px-3 py-2 text-sm"
+              />
             </div>
 
             <div className="relative">
@@ -1076,7 +1093,13 @@ function AddPurchaseModal({ open, onClose, onSaved }) {
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Purchase Date *</label>
-              <TypeableDateFilterInput value={form.purchase_date} onChange={(v) => handleChange({ target: { name: "purchase_date", value: v } })} className="w-full border rounded px-3 py-2"/>
+              <input
+                type="date"
+                name="purchase_date"
+                value={form.purchase_date}
+                onChange={handleChange}
+                className="w-full border rounded px-3 py-2"
+              />
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Vendor Name *</label>
@@ -1274,7 +1297,13 @@ function EditPurchaseModal({ open, onClose, purchase, onSaved }) {
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Purchase Date *</label>
-              <TypeableDateFilterInput value={form.purchase_date} onChange={(v) => handleChange({ target: { name: "purchase_date", value: v } })} className="w-full border rounded px-3 py-2"/>
+              <input
+                type="date"
+                name="purchase_date"
+                value={form.purchase_date}
+                onChange={handleChange}
+                className="w-full border rounded px-3 py-2"
+              />
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Vendor Name *</label>

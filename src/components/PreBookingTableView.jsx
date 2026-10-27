@@ -29,7 +29,7 @@ export default function PreBookingTableView({ basePath }) {
       console.error("Error fetching pre-bookings:", error);
       // Fallback to regular API if new endpoint doesn't exist
       try {
-        const response = await fetch("/api/pre-booking?limit=500");
+        const response = await fetch("/api/pre-booking?limit=5.00");
         const data = await response.json();
         if (data.success) {
           setPreBookings(data.bookings || []);
@@ -118,7 +118,7 @@ export default function PreBookingTableView({ basePath }) {
                 </td>
                 <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
                   {booking.expected_date
-                    ? dayjs(booking.expected_date).format("DD-MM-YYYY")
+                    ? dayjs(booking.expected_date).format("DD MMM YYYY")
                     : "N/A"}
                 </td>
               </tr>

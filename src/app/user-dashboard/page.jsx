@@ -1,12 +1,9 @@
 // app/user-dashboard/page.jsx
 import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
-import { redirect } from "next/navigation";
 import { getDbConnection } from "@/lib/db";
-import { isSalesRole } from "@/lib/isSalesRole";
 import { DASHBOARD_MAP } from "@/components/Dashboards";
 import GemCrmDashboardWrapper from "@/components/GemCrmDashboardWrapper";
-import { getReportingManagerForEmployee } from "@/lib/reportingManager";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret";
 
@@ -29,15 +26,6 @@ export default async function UserDashboardPage() {
 
     const username = payload.username;
     const role = payload.role;
-    const roleKey = String(role || "").toUpperCase();
-
-    if (roleKey === "SUPERADMIN") {
-      redirect("/admin-dashboard");
-    }
-
-    if (isSalesRole(role)) {
-      redirect("/sales-dashboard");
-    }
 
     const connection = await getDbConnection();
 
@@ -52,9 +40,6 @@ export default async function UserDashboardPage() {
     );
 
     const user = rows[0];
-
-    // Fetch reporting manager for the user
-    const reportingManager = await getReportingManagerForEmployee(username);
 
     // Dispatch Pendings
     const [dispatchPendings] = await connection.execute(
@@ -127,30 +112,6 @@ export default async function UserDashboardPage() {
       `
     );
 
-    // Check if user is a reporting manager and fetch pending expenses count
-    const { getReportees } = await import("@/lib/reportingManager");
-    const reportees = await getReportees(username);
-    const hasReportees = reportees.length > 0;
-    
-    let pendingExpensesCount = 0;
-    if (hasReportees) {
-      const today = new Date();
-      const currentMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-      const currentMonthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-      const fromDate = currentMonthStart.toISOString().split('T')[0];
-      const toDate = currentMonthEnd.toISOString().split('T')[0];
-      
-      const placeholders = reportees.map(() => "?").join(", ");
-      const [expenseRows] = await connection.execute(
-        `SELECT COUNT(*) as cnt FROM expenses 
-         WHERE username IN (${placeholders}) 
-         AND approval_status = 'Pending'
-         AND TravelDate >= ? AND TravelDate <= ?`,
-        [...reportees, fromDate, toDate]
-      );
-      pendingExpensesCount = expenseRows[0]?.cnt || 0;
-    }
-
     // Fetch purchase price data (latest per product)
     const [purchasePrices] = await connection.execute(
       `
@@ -199,11 +160,9 @@ export default async function UserDashboardPage() {
       pending: pendingCount,
       pendingSpares: pendingSparesCount,
       totalAvailableStockPrice: totalAvailableStockPrice,
-      hasReportees: hasReportees,
-      pendingExpensesCount: pendingExpensesCount,
     };
 
-    return <DashboardComponent user={user} reportingManager={reportingManager} counts={counts} />;
+    return <DashboardComponent user={user} counts={counts} />;
   } catch (error) {
     console.error("Dashboard error:", error.message);
     return <p className="text-red-600">Failed to load dashboard</p>;

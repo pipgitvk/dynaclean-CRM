@@ -1,6 +1,5 @@
 "use client";
 
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect } from "react";
 import { ArrowLeft, Search, TrendingDown, IndianRupee } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -98,11 +97,21 @@ export default function TotalRevenuePage() {
         <div className="flex items-center gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
           <div className="flex items-center gap-2">
             <label className="text-sm font-medium text-slate-600">From Date:</label>
-            <TypeableDateFilterInput value={fromDate} onChange={setFromDate} className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+            <input
+              type="date"
+              value={fromDate}
+              onChange={(e) => setFromDate(e.target.value)}
+              className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
           </div>
           <div className="flex items-center gap-2">
             <label className="text-sm font-medium text-slate-600">To Date:</label>
-            <TypeableDateFilterInput value={toDate} onChange={setToDate} className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+            <input
+              type="date"
+              value={toDate}
+              onChange={(e) => setToDate(e.target.value)}
+              className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
           </div>
           {(fromDate || toDate) && (
             <button

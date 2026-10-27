@@ -1,7 +1,4 @@
 "use client";
-
-import { formatCrmDateOnly } from "@/lib/crmDateFormat";
-import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect } from "react";
 import {
   BarChart,
@@ -130,13 +127,23 @@ const TargetCompletionModal = ({ isOpen, onClose, targetData }) => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Start Date
                 </label>
-                <TypeableDateFilterInput value={startDate} onChange={setStartDate} className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   End Date
                 </label>
-                <TypeableDateFilterInput value={endDate} onChange={setEndDate} className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
               </div>
             </div>
           </div>
@@ -238,8 +245,10 @@ const TargetCompletionModal = ({ isOpen, onClose, targetData }) => {
                 <div className="flex justify-between">
                   <span className="text-gray-600">Original Target Period:</span>
                   <span className="font-semibold text-gray-800">
-                    {formatCrmDateOnly(targetData.target_start_date)}{" "}
-                    - {formatCrmDateOnly(targetData.target_end_date)}
+                    {new Date(
+                      targetData.target_start_date
+                    ).toLocaleDateString()}{" "}
+                    - {new Date(targetData.target_end_date).toLocaleDateString()}
                   </span>
                 </div>
               </div>

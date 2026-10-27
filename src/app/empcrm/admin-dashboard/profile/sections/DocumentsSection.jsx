@@ -123,38 +123,18 @@ export default function DocumentsSection({
       setFiles(prev => ({ ...prev, [fieldName]: file }));
       setDocuments(prev => ({ ...prev, [fieldName]: true }));
       
-      // Store Cloudinary URL
-      setFormData(prev => ({
-        ...prev,
-        fileUrls: {
-          ...prev.fileUrls,
-          [fieldName]: result.url,
-        }
-      }));
-      
-      // If Employment Confirmation Letter is uploaded, auto-set leave accrual date
+      // Store Cloudinary URL so it can be used for email links
       if (fieldName === 'doc_employment_confirmation_letter') {
-        const today = new Date().toISOString().split('T')[0];
-        
-        console.log('Setting accrual date to:', today);
-        
-        // Update form data with the accrual start date
-        setFormData(prev => {
-          const updated = {
-            ...prev,
-            leave_policy: {
-              ...(prev.leave_policy || {}),
-              accrual_start_date: today
-            }
-          };
-          console.log('Updated formData with accrual_start_date:', updated.leave_policy.accrual_start_date);
-          return updated;
-        });
-        
-        toast.success(`Employment Confirmation Letter uploaded. Leave accrual date set to ${new Date(today).toLocaleDateString('en-IN')}`);
-      } else {
-        toast.success(`${fieldName.replace('_', ' ')} uploaded`);
+        setFormData(prev => ({
+          ...prev,
+          fileUrls: {
+            ...prev.fileUrls,
+            [fieldName]: result.url,
+          }
+        }));
       }
+      
+      toast.success(`${fieldName.replace('_', ' ')} uploaded to Cloudinary`);
     } catch (error) {
       console.error('Upload error:', error);
       toast.error(`Failed to upload ${fieldName.replace('_', ' ')}`);
@@ -302,7 +282,7 @@ export default function DocumentsSection({
           <div className="flex items-center gap-4">
             <input
               type="file"
-              accept="image/*,application/pdf,.pdf"
+              accept="image/*"
               onChange={(e) => handleFileChange(e, "profile_photo")}
               disabled={ro || uploadingFiles.profile_photo}
               className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -336,7 +316,7 @@ export default function DocumentsSection({
           <div className="flex items-center gap-4">
             <input
               type="file"
-              accept="image/*,application/pdf,.pdf"
+              accept="image/*"
               onChange={(e) => handleFileChange(e, "signature")}
               disabled={ro || uploadingFiles.signature}
               className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -416,7 +396,6 @@ export default function DocumentsSection({
                         <input
                           id={`${htmlIdPrefix}file_${doc.key}`}
                           type="file"
-                          accept="image/*,application/pdf,.pdf"
                           onChange={(e) => handleFileChange(e, doc.key)}
                           disabled={ro}
                           className="hidden"

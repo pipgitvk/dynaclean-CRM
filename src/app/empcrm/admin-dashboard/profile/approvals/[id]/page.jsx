@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter, useSearchParams, useParams, usePathname } from "next/navigation";
+import { useRouter, useSearchParams, useParams } from "next/navigation";
 import ProfileForm from "@/app/empcrm/admin-dashboard/profile/ProfileForm";
 import ReassignFieldsModal from "@/app/empcrm/admin-dashboard/profile/approvals/ReassignFieldsModal";
 import { Check, X, ListChecks } from "lucide-react";
@@ -9,13 +9,10 @@ import toast from "react-hot-toast";
 import { buildProfileSubmissionInitialData, mergeSubmissionInitialWithLiveProfile } from "@/lib/buildProfileSubmissionInitialData";
 import { labelForReassignKey } from "@/lib/profileReassignFields";
 import { parseReassignKeys } from "@/lib/reassignFieldVisibility";
-import { isEmpCrmHrAdmin } from "@/lib/hrTargetEligibleRoles";
-import { getDirectorHrProfileApprovalsAdminBase } from "@/lib/directorHrPaths";
 
 export default function SubmissionDetailsPage() {
     const { id } = useParams();
     const searchParams = useSearchParams();
-    const pathname = usePathname();
     const fromAdminQueue = searchParams.get("from") === "admin";
 
     const router = useRouter();
@@ -26,10 +23,6 @@ export default function SubmissionDetailsPage() {
     const [loading, setLoading] = useState(true);
     const [reassignOpen, setReassignOpen] = useState(false);
     const [reassignSubmitting, setReassignSubmitting] = useState(false);
-
-    const adminApprovalsBase = getDirectorHrProfileApprovalsAdminBase(pathname);
-    const hrApprovalsBase = "/empcrm/admin-dashboard/profile/approvals";
-    const listBackPath = fromAdminQueue ? adminApprovalsBase : hrApprovalsBase;
 
     useEffect(() => {
         (async () => {
@@ -167,8 +160,8 @@ export default function SubmissionDetailsPage() {
                 }
                 const back =
                     fromAdminQueue || submission?.status === "pending_admin"
-                        ? adminApprovalsBase
-                        : hrApprovalsBase;
+                        ? "/empcrm/admin-dashboard/profile/approvals-admin"
+                        : "/empcrm/admin-dashboard/profile/approvals";
                 router.push(back);
             } else {
                 toast.error(data.error || `Failed to ${action}`);
@@ -184,7 +177,7 @@ export default function SubmissionDetailsPage() {
             const currentStatus = String(submission?.status ?? "").trim().toLowerCase();
             const forceEmployeeReassign =
                 currentStatus === "pending_admin" &&
-                isEmpCrmHrAdmin(sessionRole);
+                String(sessionRole || "").trim().toUpperCase() === "SUPERADMIN";
             const payloadToSend = forceEmployeeReassign
                 ? {
                       ...payload,
@@ -208,7 +201,11 @@ export default function SubmissionDetailsPage() {
             if (data.success) {
                 toast.success(data.message || "Updated");
                 setReassignOpen(false);
-                router.push(fromAdminQueue ? adminApprovalsBase : hrApprovalsBase);
+                router.push(
+                    fromAdminQueue
+                        ? "/empcrm/admin-dashboard/profile/approvals-admin"
+                        : "/empcrm/admin-dashboard/profile/approvals"
+                );
             } else {
                 toast.error(data.error || "Failed to reassign");
             }
@@ -246,7 +243,7 @@ export default function SubmissionDetailsPage() {
     const isPendingHrDocs = stNorm === "pending_hr_docs";
     const isPendingAdmin = stNorm === "pending_admin";
     const isReassign = stNorm === "reassign" || stNorm === "revision_requested";
-    const isSuperAdmin = isEmpCrmHrAdmin(sessionRole);
+    const isSuperAdmin = String(sessionRole || "").trim().toUpperCase() === "SUPERADMIN";
     const assignedTo =
         typeof submission.pending_assignee_username === "string" ? submission.pending_assignee_username.trim() : "";
     const roleLower = String(sessionRole || "").trim().toLowerCase();
@@ -278,7 +275,13 @@ export default function SubmissionDetailsPage() {
                 <div>
                     <button
                         type="button"
-                        onClick={() => router.push(listBackPath)}
+                        onClick={() =>
+                            router.push(
+                                fromAdminQueue
+                                    ? "/empcrm/admin-dashboard/profile/approvals-admin"
+                                    : "/empcrm/admin-dashboard/profile/approvals"
+                            )
+                        }
                         className="text-gray-500 hover:text-gray-700 text-sm mb-1"
                     >
                         &larr; Back to List
@@ -495,7 +498,10 @@ export default function SubmissionDetailsPage() {
                     reviewMode={true}
                     submissionReviewContext={{ id: submission.id, status: stNorm }}
                     onAfterHrForwardToAdmin={() => {
-                        router.push(listBackPath);
+                        const back = fromAdminQueue
+                            ? "/empcrm/admin-dashboard/profile/approvals-admin"
+                            : "/empcrm/admin-dashboard/profile/approvals";
+                        router.push(back);
                     }}
                 />
             </div>
