@@ -143,7 +143,15 @@ export default function OrderTable({ orders, userRole }) {
         icon: <XCircle size={14} className="mr-1" />,
       };
     }
-    if (order.is_cancelled || order.approval_status === 'rejected') {
+    if (order.approval_status === "rejected") {
+      return {
+        text: "Rejected",
+        bg: "bg-red-100",
+        textCol: "text-red-800",
+        icon: <XCircle size={14} className="mr-1" />,
+      };
+    }
+    if (order.is_cancelled) {
       return {
         text: "Canceled",
         bg: "bg-red-100",
@@ -336,6 +344,7 @@ export default function OrderTable({ orders, userRole }) {
             <option value="dispatchdone">Dispatch Done</option>
             <option value="delivered">Delivered</option>
             <option value="installed">Installed</option>
+            <option value="rejected">Rejected</option>
             <option value="canceled">Canceled</option>
             <option value="partiallyreturned">Partially Returned</option>
             <option value="fullyreturned">Fully Returned</option>

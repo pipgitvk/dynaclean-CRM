@@ -6,10 +6,11 @@ export function normalizeOrderApprovalStatus(status) {
   return String(status ?? "").trim().toLowerCase();
 }
 
-/** Listed in normal order tables (approved or legacy empty status). */
+/** Listed in normal order tables (approved, rejected by admin, or legacy empty). */
 export function isOrderApprovedForListing(approvalStatus) {
   const s = normalizeOrderApprovalStatus(approvalStatus);
   if (s === "approved") return true;
+  if (s === "rejected") return true;
   if (s === "") return true;
   return false;
 }
@@ -40,13 +41,19 @@ export function sqlApprovedOrdersOnlyClause(tableAlias = "no") {
   return `(LOWER(TRIM(COALESCE(${col}, ''))) = 'approved' OR TRIM(COALESCE(${col}, '')) = '')`;
 }
 
+/** Sales / user order lists: approved + admin-rejected (+ legacy empty). Pending stays hidden. */
+export function sqlListedOrderApprovalClause(tableAlias = "no") {
+  const col = `${tableAlias}.approval_status`;
+  return `(LOWER(TRIM(COALESCE(${col}, ''))) IN ('approved', 'rejected') OR TRIM(COALESCE(${col}, '')) = '')`;
+}
+
 /**
  * SQL fragment for order list queries. On admin order page, approvers see pending/rejected too.
  * @returns {string|null}
  */
 export function orderListApprovalWhereSql(userRole, { adminOrderPage = false } = {}) {
   if (adminOrderPage && canViewUnapprovedOrder(userRole)) return null;
-  return sqlApprovedOrdersOnlyClause("no");
+  return sqlListedOrderApprovalClause("no");
 }
 
 export function appendSqlWhereClause(sql, condition) {
