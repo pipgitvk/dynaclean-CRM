@@ -5,6 +5,7 @@ import { isSpare1110 } from "@/lib/isSpare1110";
 import { isDelhiGodown, pickRowColumn } from "@/lib/godownStock";
 import { computeDispatchCompletionStatus } from "@/lib/dispatchPartialSelection";
 import { canMutateDispatchRole } from "@/lib/roleKeyUtils";
+import { dispatchRowRequiresSerial } from "@/lib/dispatchSerialRules";
 
 export async function POST(req) {
   try {
@@ -57,18 +58,25 @@ export async function POST(req) {
       (row) => Number(row.stock_deducted) !== 1,
     );
 
-    const pendingProductSerials = dispatchRows.filter((row) => {
-      const itemCode = row.item_code || "";
-      const isProduct = /[a-zA-Z]/.test(itemCode);
-      if (!isProduct) return false; // spare item – serial not mandatory
-      const serial = row.serial_no || "";
-      return serial.trim() === ""; // product without serial => pending
-    }).length;
+    const missingSerialRows = dispatchRows.filter((row) => {
+      if (!dispatchRowRequiresSerial(row)) return false;
+      return !String(row.serial_no || "").trim();
+    });
 
-    if (pendingProductSerials > 0) {
+    if (missingSerialRows.length > 0) {
+      const labels = missingSerialRows.map(
+        (row) => row.item_name || row.item_code || "product",
+      );
+      const detail =
+        labels.length === 1
+          ? labels[0]
+          : `${labels.length} items: ${labels.join(", ")}`;
       return NextResponse.json(
-        { success: false, error: "Please fill serial numbers for all product items before completing dispatch." },
-        { status: 400 }
+        {
+          success: false,
+          error: `Please fill serial numbers before completing dispatch (${detail}).`,
+        },
+        { status: 400 },
       );
     }
 

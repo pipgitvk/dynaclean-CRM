@@ -5,6 +5,12 @@ import { buildChecklistAccessoriesUrl } from "@/lib/dispatchChecklistAccessories
 import { useRouter, useSearchParams } from "next/navigation";
 import { use } from "react";
 import { loadDispatchFormRows } from "@/lib/loadDispatchFormRows";
+import {
+  dispatchRowRequiresSerial,
+  formatMissingSerialError,
+  isProductItem,
+  isServiceCharge,
+} from "@/lib/dispatchSerialRules";
 
 export default function DispatchFormPage({ params }) {
   const router = useRouter();
@@ -184,28 +190,6 @@ export default function DispatchFormPage({ params }) {
     }));
   };
 
-  // Treat items with any alphabet in item_code as "product"; others are spares
-  const isProductItem = (itemCode) => /[a-zA-Z]/.test(itemCode || "");
-
-  // Check if item is a service charge (doesn't require stock check)
-  const isServiceCharge = (itemName, itemCode) => {
-    if (!itemName && !itemCode) return false;
-    const name = (itemName || "").toLowerCase();
-    const code = (itemCode || "").toLowerCase();
-    
-    // Service charges typically contain these keywords
-    return name.includes("camc") || 
-           name.includes("amc") || 
-           name.includes("charges") || 
-           name.includes("service") ||
-           name.includes("labour") ||
-           name.includes("installation") ||
-           code.includes("camc") ||
-           code.includes("amc") ||
-           code.includes("charges") ||
-           code.includes("service");
-  };
-
   const uploadForRow = async (row) => {
     const form = new FormData();
     form.append("id", row.id);
@@ -258,12 +242,9 @@ export default function DispatchFormPage({ params }) {
   const completeAll = async () => {
     try {
       setSaving(true);
-      // For products: serial number is mandatory; for spares: serial number is optional
-      const allProductSerialNosFilled = rows
-        .filter(r => isProductItem(r.item_code))
-        .every(r => r.serial_no && r.serial_no.trim() !== "");
-      if (!allProductSerialNosFilled) {
-        throw new Error("Please fill serial numbers for all product items before completing dispatch");
+      const serialMsg = formatMissingSerialError(rows);
+      if (serialMsg) {
+        throw new Error(serialMsg);
       }
       // Check if all godowns are selected
       const allGodownsSelected = rows.every(r => r.godown && r.godown.trim() !== "");
@@ -279,9 +260,7 @@ export default function DispatchFormPage({ params }) {
       }
 
       for (const row of rows) {
-        const alreadyPersisted =
-          initialSerialNos.has(row.id) || savedIds.has(row.id);
-        if (!alreadyPersisted) {
+        if (!initialSerialNos.has(row.id)) {
           await uploadForRow(row);
         }
       }
@@ -463,7 +442,7 @@ export default function DispatchFormPage({ params }) {
                       hasGodown={r.godown && r.godown.trim() !== ""}
                       isLocked={false}
                       hasLowStockWarning={!isServiceCharge(r.item_name, r.item_code) && !!lowStockWarnings[r.id]}
-                      isProduct={isProductItem(r.item_code)}
+                      isProduct={dispatchRowRequiresSerial(r)}
                     />
                   )}
                   {initialSerialNos.has(r.id) && (

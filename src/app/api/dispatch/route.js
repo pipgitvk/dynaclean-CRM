@@ -56,16 +56,34 @@ export async function GET(req) {
       return NextResponse.json({ success: true, data: [] });
     }
 
+    const scope = (searchParams.get("scope") || "").trim().toLowerCase();
+
     if (orderId) {
       try {
         await ensureDispatchActiveColumn(conn);
-        await ensureAddedAccessoryDispatchRows(conn, quoteNumber);
+        if (scope === "active") {
+          const [activeCodes] = await conn.execute(
+            `SELECT DISTINCT TRIM(item_code) AS item_code
+             FROM dispatch
+             WHERE TRIM(CONVERT(quote_number USING utf8mb4)) = TRIM(?)
+               AND COALESCE(stock_deducted, 0) = 0
+               AND COALESCE(dispatch_active, 1) = 1`,
+            [quoteNumber],
+          );
+          const limitToProductCodes = (activeCodes || [])
+            .map((r) => r.item_code)
+            .filter((code) => /[a-zA-Z]/.test(String(code || "")));
+          await ensureAddedAccessoryDispatchRows(conn, quoteNumber, {
+            limitToProductCodes,
+          });
+        } else {
+          await ensureAddedAccessoryDispatchRows(conn, quoteNumber);
+        }
       } catch (seedErr) {
         console.error("Dispatch GET ensure added accessories:", seedErr);
       }
     }
 
-    const scope = (searchParams.get("scope") || "").trim().toLowerCase();
     let whereExtra = `(
            COALESCE(stock_deducted, 0) = 1
            OR COALESCE(dispatch_active, 1) = 1

@@ -87,7 +87,15 @@ export async function seedAddedAccessoryDispatchRows(conn, quoteNumber, quotatio
 /**
  * Ensure added accessories exist for an order quote (safe to call on every dispatch load).
  */
-export async function ensureAddedAccessoryDispatchRows(conn, quoteNumber) {
+/**
+ * @param {{ limitToProductCodes?: string[] }} [options]
+ *   When set (active dispatch form), only seed accessories for these main product codes.
+ */
+export async function ensureAddedAccessoryDispatchRows(
+  conn,
+  quoteNumber,
+  options = {},
+) {
   if (!quoteNumber) return 0;
 
   const [quotationItems] = await conn.execute(
@@ -96,5 +104,26 @@ export async function ensureAddedAccessoryDispatchRows(conn, quoteNumber) {
   );
 
   if (!quotationItems.length) return 0;
-  return seedAddedAccessoryDispatchRows(conn, quoteNumber, quotationItems);
+
+  let items = quotationItems;
+  const limit = options.limitToProductCodes;
+  if (limit?.length) {
+    const allowed = new Set(
+      limit.map((c) => String(c || "").trim().toLowerCase()).filter(Boolean),
+    );
+    const filtered = [];
+    for (const qi of quotationItems) {
+      const resolved = await resolveProductCode(conn, qi.item_code);
+      const keys = [
+        String(qi.item_code || "").trim().toLowerCase(),
+        String(resolved || "").trim().toLowerCase(),
+      ].filter(Boolean);
+      if (keys.some((k) => allowed.has(k))) {
+        filtered.push(qi);
+      }
+    }
+    items = filtered;
+  }
+
+  return seedAddedAccessoryDispatchRows(conn, quoteNumber, items);
 }
