@@ -400,10 +400,16 @@ function ApprovalRemarkHover({ remark }) {
   );
 }
 
-/** Cancelled and rejected orders are excluded from dashboard stat cards. */
+/** Rejected + cancelled orders stay out of approved/pending/dispatch stat buckets. */
 function isOrderExcludedFromStatCards(order) {
+  if (normalizeApprovalStatus(order.approval_status) === "rejected") return true;
   if (order.is_cancelled) return true;
-  return (order.approval_status || "").toString().trim().toLowerCase() === "rejected";
+  return false;
+}
+
+/** Admin reject sets approval_status=rejected (often with is_cancelled=1). */
+function isRejectedApprovalOrder(order) {
+  return normalizeApprovalStatus(order.approval_status) === "rejected";
 }
 
 /** neworder.dispatch_status: 1 = dispatched, anything else = not dispatched. */
@@ -1473,10 +1479,13 @@ export default function OrderTable({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const ordersForStatCards = useMemo(
-    () => filteredOrders.filter((order) => !isOrderExcludedFromStatCards(order)),
-    [filteredOrders],
-  );
+  const isRejectedOnlyView =
+    appliedApprovalStatusFilter.toString().trim().toLowerCase() === "rejected";
+
+  const ordersForStatCards = useMemo(() => {
+    if (isRejectedOnlyView) return [];
+    return filteredOrders.filter((order) => !isOrderExcludedFromStatCards(order));
+  }, [filteredOrders, isRejectedOnlyView]);
 
   const leadCampaignFilterOptions = useMemo(() => {
     const keys = new Set(LEAD_CAMPAIGN_OPTIONS.map((o) => o.value));
@@ -1563,22 +1572,28 @@ export default function OrderTable({
   }, [ordersForStatCards]);
 
   const rejectedOrderStats = useMemo(() => {
-    return (orders || []).reduce(
+    return filteredOrders.reduce(
       (acc, order) => {
-        if (!orderCreatedInDateRange(order, appliedDateFrom, appliedDateTo)) {
-          return acc;
-        }
-        if (order.is_cancelled) return acc;
-        if (normalizeApprovalStatus(order.approval_status) !== "rejected") {
-          return acc;
-        }
+        if (!isRejectedApprovalOrder(order)) return acc;
         acc.rejected += 1;
         acc.rejectedAmount += getPaymentColumnAmount(order);
         return acc;
       },
       { rejected: 0, rejectedAmount: 0 },
     );
-  }, [orders, appliedDateFrom, appliedDateTo]);
+  }, [filteredOrders]);
+
+  const rejectedFilteredTotals = useMemo(() => {
+    return filteredOrders.reduce(
+      (acc, order) => {
+        if (!isRejectedApprovalOrder(order)) return acc;
+        acc.taxableAmount += getPaymentColumnAmount(order);
+        acc.totalAmount += getTotalAmount(order);
+        return acc;
+      },
+      { taxableAmount: 0, totalAmount: 0 },
+    );
+  }, [filteredOrders]);
 
   const activeStatCard = useMemo(() => {
     if (appliedPaymentStatusFilter === "paid") return "paid";
@@ -1818,10 +1833,12 @@ export default function OrderTable({
   }, [filteredOrders]);
 
   const filteredAmountTotals = useMemo(() => {
-    if (!filteredOrders?.length) return { totalAmount: 0, paidAmount: 0, taxableAmount: 0, balanceAmount: 0 };
+    if (!filteredOrders?.length) {
+      return { totalAmount: 0, paidAmount: 0, taxableAmount: 0, balanceAmount: 0 };
+    }
     return filteredOrders.reduce(
       (acc, o) => {
-        if (o.approval_status !== "approved") return acc;
+        if (normalizeApprovalStatus(o.approval_status) !== "approved") return acc;
         if (isOrderExcludedFromStatCards(o)) return acc;
         acc.totalAmount += getTotalAmount(o);
         acc.paidAmount += getAccountantReportPaidAmount(o);
@@ -1829,9 +1846,22 @@ export default function OrderTable({
         acc.balanceAmount += getBalanceAmount(o);
         return acc;
       },
-      { totalAmount: 0, paidAmount: 0, taxableAmount: 0, balanceAmount: 0 }
+      { totalAmount: 0, paidAmount: 0, taxableAmount: 0, balanceAmount: 0 },
     );
   }, [filteredOrders]);
+
+  const displayAmountTotals = isRejectedOnlyView
+    ? {
+        totalAmount: rejectedFilteredTotals.totalAmount,
+        paidAmount: 0,
+        taxableAmount: rejectedFilteredTotals.taxableAmount,
+        balanceAmount: 0,
+      }
+    : filteredAmountTotals;
+
+  const amountSummaryScopeLabel = isRejectedOnlyView
+    ? "Rejected orders only"
+    : "Approved orders only (excludes rejected & cancelled)";
 
   const getPaymentBadge = (paymentStatusRaw) => {
     const s = (paymentStatusRaw || "").toString().trim().toLowerCase();
@@ -2110,14 +2140,14 @@ export default function OrderTable({
                 Amount Summary
               </p>
               <p className="text-[10px] text-emerald-600/90 mb-2 leading-tight">
-                Approved orders only
+                {amountSummaryScopeLabel}
               </p>
               
               {/* Total Amount */}
               <div className="mb-2 pb-2 border-b border-emerald-100">
                 <p className="text-[10px] text-emerald-600 font-medium">Total Amount</p>
                 <p className="text-lg font-bold text-emerald-950 tabular-nums">
-                  ₹{filteredAmountTotals.totalAmount.toLocaleString("en-IN", {
+                  ₹{displayAmountTotals.totalAmount.toLocaleString("en-IN", {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
                   })}
@@ -2125,15 +2155,17 @@ export default function OrderTable({
               </div>
 
               {/* Paid Amount */}
-              <div>
-                <p className="text-[10px] text-blue-600 font-medium">Paid Amount</p>
-                <p className="text-lg font-bold text-blue-700 tabular-nums">
-                  ₹{filteredAmountTotals.paidAmount.toLocaleString("en-IN", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </p>
-              </div>
+              {!isRejectedOnlyView ? (
+                <div>
+                  <p className="text-[10px] text-blue-600 font-medium">Paid Amount</p>
+                  <p className="text-lg font-bold text-blue-700 tabular-nums">
+                    ₹{displayAmountTotals.paidAmount.toLocaleString("en-IN", {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </p>
+                </div>
+              ) : null}
             </div>
           </div>
         </div>
@@ -2146,25 +2178,26 @@ export default function OrderTable({
                 Balance & Taxable
               </p>
               <p className="text-[10px] text-purple-600/90 mb-2 leading-tight">
-                Approved orders only
+                {amountSummaryScopeLabel}
               </p>
 
-              {/* Balance Amount */}
-              <div className="mb-2 pb-2 border-b border-purple-100">
-                <p className="text-[10px] text-orange-600 font-medium">Balance Amount</p>
-                <p className="text-lg font-bold text-orange-700 tabular-nums">
-                  ₹{filteredAmountTotals.balanceAmount.toLocaleString("en-IN", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </p>
-              </div>
+              {!isRejectedOnlyView ? (
+                <div className="mb-2 pb-2 border-b border-purple-100">
+                  <p className="text-[10px] text-orange-600 font-medium">Balance Amount</p>
+                  <p className="text-lg font-bold text-orange-700 tabular-nums">
+                    ₹{displayAmountTotals.balanceAmount.toLocaleString("en-IN", {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </p>
+                </div>
+              ) : null}
 
               {/* Taxable Amount */}
               <div>
                 <p className="text-[10px] text-purple-600 font-medium">Taxable Amount</p>
                 <p className="text-lg font-bold text-purple-950 tabular-nums">
-                  ₹{filteredAmountTotals.taxableAmount.toLocaleString("en-IN", {
+                  ₹{displayAmountTotals.taxableAmount.toLocaleString("en-IN", {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
                   })}
@@ -2486,7 +2519,7 @@ export default function OrderTable({
       </div>
 
       <p className="mt-2 text-xs text-gray-500">
-        Rejected orders are hidden by default — use Approval Status &quot;Rejected&quot;, then Search.
+        Approval Status &quot;Rejected&quot; + Search shows only rejected orders in the list and Rejected card.
       </p>
 
       {/* 👨‍💼 TABLE VIEW for large screens */}
