@@ -149,7 +149,15 @@ export default function ProductsNewContent() {
     setSelectedProduct((prev) =>
       prev?.item_code === updated.item_code ? { ...prev, ...updated } : prev,
     );
-  }, []);
+    const listPrice = Number(updated.price_per_unit);
+    if (Number.isFinite(listPrice) && listPrice > 0) {
+      setSalePricePerUnit(listPrice);
+    }
+    reloadProductDetail();
+  }, [reloadProductDetail]);
+
+  const formatInr = (n) =>
+    Number(n || 0).toLocaleString("en-IN", { maximumFractionDigits: 0 });
 
   const fetchProductsListQuiet = useCallback(async () => {
     try {
@@ -390,59 +398,62 @@ export default function ProductsNewContent() {
                 {detailError}
               </div>
             )}
-            {/* Purchase and Sales Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 max-w-4xl">
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-3 md:p-4">
-                <h3 className="text-base font-semibold text-gray-800 mb-3">Prices</h3>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-gray-500 text-xs font-medium">Purchase Price: <span className="text-lg font-bold text-gray-900">₹{purchasePricePerUnit.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</span></p>
-                    </div>
-                    <div className="p-2 bg-green-100 rounded-lg">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-gray-500 text-xs font-medium">Sales Price: <span className="text-lg font-bold text-gray-900">₹{salePricePerUnit.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</span></p>
-                    </div>
-                    <div className="p-2 bg-blue-100 rounded-lg">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                      </svg>
-                    </div>
-                  </div>
-                </div>
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6 mb-6 max-w-4xl">
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                <h3 className="text-base font-semibold text-gray-800">Prices</h3>
+                <InventoryPriceEditMenu
+                  kind="product"
+                  row={selectedProduct}
+                  trigger="button"
+                  onSaved={handleProductPricesSaved}
+                  purchasePriceHint={formatInr(purchasePricePerUnit)}
+                  latestSalePriceHint={formatInr(salePricePerUnit)}
+                />
               </div>
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-3 md:p-4">
-                <h3 className="text-base font-semibold text-gray-800 mb-3">Pricing Details</h3>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600">GEM Price:</span>
-                    <span className="font-semibold">₹{parseFloat(selectedProduct.gem_price) || 0}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600">GEM Last Neg. Price:</span>
-                    <span className="font-semibold">₹{parseFloat(selectedProduct.gem_last_negotiation_price) || 0}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Dealer Price:</span>
-                    <span className="font-semibold">₹{parseFloat(selectedProduct.dealer_price) || 0}</span>
-                  </div>
-                  <div className="flex justify-between items-center border-t pt-2">
-                    <span className="text-gray-600">Last Neg. Price:</span>
-                    <span className="font-semibold">₹{parseFloat(selectedProduct.last_negotiation_price) || 0}</span>
-                  </div>
-                </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
+                <PriceRow label="Purchase Price" value={purchasePricePerUnit} hint="latest purchase" />
+                <PriceRow
+                  label="Sales Price"
+                  value={
+                    salePricePerUnit ||
+                    parseFloat(selectedProduct.price_per_unit) ||
+                    0
+                  }
+                  hint="latest sale / list"
+                />
+                <PriceRow
+                  label="Last Neg. Price"
+                  value={parseFloat(selectedProduct.last_negotiation_price) || 0}
+                />
+                <PriceRow label="DP" value={selectedProduct.dp} raw />
+                <PriceRow
+                  label="DP No-Warranty"
+                  value={selectedProduct.dp_no_warranty}
+                  raw
+                />
+                <PriceRow
+                  label="GEM Price"
+                  value={parseFloat(selectedProduct.gem_price) || 0}
+                />
+                <PriceRow
+                  label="GEM Last Neg. Price"
+                  value={parseFloat(selectedProduct.gem_last_negotiation_price) || 0}
+                />
+                <PriceRow
+                  label="Dealer Price"
+                  value={parseFloat(selectedProduct.dealer_price) || 0}
+                />
+                <PriceRow
+                  label="List Price (per unit)"
+                  value={parseFloat(selectedProduct.price_per_unit) || 0}
+                />
               </div>
             </div>
 
-            {/* Product Information Card */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6 mb-6 max-w-4xl">
-              <h3 className="text-base font-semibold text-gray-800 mb-4">Product Information</h3>
+              <h3 className="text-base font-semibold text-gray-800 mb-4">
+                Product Information
+              </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <p className="text-gray-600 text-sm font-medium">Item Code</p>
@@ -453,24 +464,37 @@ export default function ProductsNewContent() {
                   <p className="text-gray-900 font-semibold">{selectedProduct.item_name}</p>
                 </div>
                 <div>
+                  <p className="text-gray-600 text-sm font-medium">Product Number</p>
+                  <p className="text-gray-900 font-semibold">
+                    {selectedProduct.product_number || "-"}
+                  </p>
+                </div>
+                <div>
                   <p className="text-gray-600 text-sm font-medium">GST Rate</p>
                   <p className="text-gray-900 font-semibold">{selectedProduct.gst_rate}%</p>
                 </div>
                 <div>
-                  <p className="text-gray-600 text-sm font-medium">DP NO-warranty</p>
-                  <p className="text-gray-900 font-semibold">{selectedProduct.dp_no_warranty || '-'}</p>
-                </div>
-                <div>
-                  <p className="text-gray-600 text-sm font-medium">DP</p>
-                  <p className="text-gray-900 font-semibold">{selectedProduct.dp || '-'}</p>
+                  <p className="text-gray-600 text-sm font-medium">HSN / SAC</p>
+                  <p className="text-gray-900 font-semibold">
+                    {selectedProduct.hsn_sac || "-"}
+                  </p>
                 </div>
                 <div>
                   <p className="text-gray-600 text-sm font-medium">Min Qty</p>
-                  <p className="text-gray-900 font-semibold">{selectedProduct.min_qty || '0'}</p>
+                  <p className="text-gray-900 font-semibold">{selectedProduct.min_qty || "0"}</p>
                 </div>
               </div>
+              {selectedProduct.specification ? (
+                <div className="mt-4 pt-4 border-t border-gray-100">
+                  <p className="text-gray-600 text-sm font-medium mb-1">Specification</p>
+                  <p className="text-gray-900 text-sm whitespace-pre-wrap">
+                    {selectedProduct.specification}
+                  </p>
+                </div>
+              ) : null}
             </div>
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-3 md:p-4">
+
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-3 md:p-4 mb-6 max-w-4xl">
                 <h3 className="text-base font-semibold text-gray-800 mb-3">Stock</h3>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
@@ -781,6 +805,25 @@ export default function ProductsNewContent() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function PriceRow({ label, value, hint, raw = false }) {
+  const display = raw
+    ? value != null && value !== ""
+      ? String(value)
+      : "-"
+    : `₹${Number(value || 0).toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
+  return (
+    <div className="flex justify-between items-baseline gap-2 py-1 border-b border-gray-50">
+      <span className="text-gray-600">
+        {label}
+        {hint ? (
+          <span className="block text-[10px] font-normal text-gray-400">{hint}</span>
+        ) : null}
+      </span>
+      <span className="font-semibold text-gray-900 tabular-nums">{display}</span>
     </div>
   );
 }

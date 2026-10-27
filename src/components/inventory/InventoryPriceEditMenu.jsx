@@ -8,6 +8,7 @@ const emptyProductForm = () => ({
   last_negotiation_price: "",
   gem_price: "",
   gem_last_negotiation_price: "",
+  dealer_price: "",
   dp_no_warranty: "",
   dp: "",
 });
@@ -24,6 +25,7 @@ function productFormFromRow(row) {
     last_negotiation_price: row.last_negotiation_price ?? "",
     gem_price: row.gem_price ?? "",
     gem_last_negotiation_price: row.gem_last_negotiation_price ?? "",
+    dealer_price: row.dealer_price ?? "",
     dp_no_warranty: row.dp_no_warranty ?? "",
     dp: row.dp ?? "",
   };
@@ -45,6 +47,10 @@ export default function InventoryPriceEditMenu({
   row,
   onSaved,
   className = "",
+  /** "menu" = 3-dot; "button" = Edit prices button on detail panel */
+  trigger = "menu",
+  purchasePriceHint,
+  latestSalePriceHint,
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
@@ -83,7 +89,7 @@ export default function InventoryPriceEditMenu({
         fd.append("price_per_unit", form.price_per_unit);
         fd.append("gem_price", form.gem_price);
         fd.append("gem_last_negotiation_price", form.gem_last_negotiation_price);
-        fd.append("dealer_price", row.dealer_price ?? "");
+        fd.append("dealer_price", form.dealer_price);
         fd.append("dp_no_warranty", form.dp_no_warranty);
         fd.append("dp", form.dp);
         fd.append("last_negotiation_price", form.last_negotiation_price);
@@ -103,6 +109,7 @@ export default function InventoryPriceEditMenu({
           last_negotiation_price: form.last_negotiation_price,
           gem_price: form.gem_price,
           gem_last_negotiation_price: form.gem_last_negotiation_price,
+          dealer_price: form.dealer_price,
           dp_no_warranty: form.dp_no_warranty,
           dp: form.dp,
         });
@@ -155,38 +162,48 @@ export default function InventoryPriceEditMenu({
 
   return (
     <>
-      <div
-        className={`relative flex-shrink-0 ${className}`}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <button
-          type="button"
-          aria-label="More actions"
-          onClick={() => setMenuOpen((o) => !o)}
-          className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-200 hover:text-gray-800"
+      {trigger === "menu" ? (
+        <div
+          className={`relative flex-shrink-0 ${className}`}
+          onClick={(e) => e.stopPropagation()}
         >
-          <MoreVertical size={18} />
-        </button>
-        {menuOpen && (
-          <>
-            <button
-              type="button"
-              className="fixed inset-0 z-20 cursor-default"
-              aria-label="Close menu"
-              onClick={() => setMenuOpen(false)}
-            />
-            <div className="absolute right-0 top-full mt-1 z-30 min-w-[140px] rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+          <button
+            type="button"
+            aria-label="More actions"
+            onClick={() => setMenuOpen((o) => !o)}
+            className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-200 hover:text-gray-800"
+          >
+            <MoreVertical size={18} />
+          </button>
+          {menuOpen && (
+            <>
               <button
                 type="button"
-                className="w-full px-3 py-2 text-left text-sm text-gray-800 hover:bg-gray-50"
-                onClick={openEdit}
-              >
-                Edit prices
-              </button>
-            </div>
-          </>
-        )}
-      </div>
+                className="fixed inset-0 z-20 cursor-default"
+                aria-label="Close menu"
+                onClick={() => setMenuOpen(false)}
+              />
+              <div className="absolute right-0 top-full mt-1 z-30 min-w-[140px] rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+                <button
+                  type="button"
+                  className="w-full px-3 py-2 text-left text-sm text-gray-800 hover:bg-gray-50"
+                  onClick={openEdit}
+                >
+                  Edit prices
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={openEdit}
+          className={`px-3 py-1.5 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors ${className}`}
+        >
+          Edit prices
+        </button>
+      )}
 
       {modalOpen && (
         <div
@@ -209,8 +226,28 @@ export default function InventoryPriceEditMenu({
             <div className="p-4 space-y-3">
               {kind === "product" ? (
                 <>
+                  {(purchasePriceHint != null || latestSalePriceHint != null) && (
+                    <div className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-xs text-gray-600 space-y-1">
+                      {purchasePriceHint != null && (
+                        <p>
+                          Latest purchase (records):{" "}
+                          <span className="font-semibold text-gray-800">
+                            ₹{purchasePriceHint}
+                          </span>
+                        </p>
+                      )}
+                      {latestSalePriceHint != null && (
+                        <p>
+                          Latest sale (records):{" "}
+                          <span className="font-semibold text-gray-800">
+                            ₹{latestSalePriceHint}
+                          </span>
+                        </p>
+                      )}
+                    </div>
+                  )}
                   <Field
-                    label="Price"
+                    label="Sale Price (list / per unit)"
                     value={form.price_per_unit}
                     onChange={(v) =>
                       setForm((f) => ({ ...f, price_per_unit: v }))
@@ -229,11 +266,24 @@ export default function InventoryPriceEditMenu({
                     onChange={(v) => setForm((f) => ({ ...f, gem_price: v }))}
                   />
                   <Field
-                    label="GEM Last Neg."
+                    label="GEM Last Neg. Price"
                     value={form.gem_last_negotiation_price}
                     onChange={(v) =>
                       setForm((f) => ({ ...f, gem_last_negotiation_price: v }))
                     }
+                  />
+                  <Field
+                    label="Dealer Price"
+                    value={form.dealer_price}
+                    onChange={(v) =>
+                      setForm((f) => ({ ...f, dealer_price: v }))
+                    }
+                  />
+                  <Field
+                    label="DP"
+                    value={form.dp}
+                    onChange={(v) => setForm((f) => ({ ...f, dp: v }))}
+                    type="text"
                   />
                   <Field
                     label="DP No-Warranty"
@@ -241,12 +291,6 @@ export default function InventoryPriceEditMenu({
                     onChange={(v) =>
                       setForm((f) => ({ ...f, dp_no_warranty: v }))
                     }
-                    type="text"
-                  />
-                  <Field
-                    label="DP"
-                    value={form.dp}
-                    onChange={(v) => setForm((f) => ({ ...f, dp: v }))}
                     type="text"
                   />
                 </>
