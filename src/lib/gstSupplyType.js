@@ -79,6 +79,7 @@ export function isInterstateInvoiceSupply({
   return code !== SUPPLIER_STATE_CODE;
 }
 
+/** Product-stock `gst_rate` first; else battery 5%; else line %; else default (18%). */
 export function totalGstPercentFromInvoiceItem(item, fallback = 18) {
   const catalogGst =
     item?.gst_rate != null && String(item.gst_rate).trim() !== ""
@@ -86,20 +87,15 @@ export function totalGstPercentFromInvoiceItem(item, fallback = 18) {
       : item?.product_gst_rate;
 
   if (
-    isBatteryOperatedInvoiceItem(item) ||
-    (catalogGst != null &&
-      String(catalogGst).trim() !== "" &&
-      Number(catalogGst) > 0)
+    catalogGst != null &&
+    String(catalogGst).trim() !== "" &&
+    Number(catalogGst) > 0
   ) {
-    return effectiveGstPercentForProduct(
-      {
-        item_name: item?.item_name,
-        item_code: item?.item_code,
-        description: item?.description,
-        gst_rate: catalogGst,
-      },
-      fallback,
-    );
+    return Number(catalogGst);
+  }
+
+  if (isBatteryOperatedInvoiceItem(item)) {
+    return BATTERY_OPERATED_GST_PERCENT;
   }
 
   const igst = Number(item?.igst_percent) || 0;
@@ -108,9 +104,53 @@ export function totalGstPercentFromInvoiceItem(item, fallback = 18) {
   const combined = cgst + sgst;
   if (igst > 0) return igst;
   if (combined > 0) return combined;
+
   const gst = Number(item?.gst);
   if (gst > 0) return gst;
   return fallback;
+}
+
+export function invoiceLineTaxableValue(item) {
+  const qty = Number(item?.quantity) || 0;
+  const rate = Number(item?.rate) || 0;
+  const discountAmount = Number(item?.discount_amount) || 0;
+  return qty * rate - discountAmount;
+}
+
+/** One row per tax type + rate with the taxable base that actually attracted that rate. */
+export function buildInvoiceTaxTableRows(items) {
+  const buckets = {
+    CGST: new Map(),
+    SGST: new Map(),
+    IGST: new Map(),
+  };
+
+  for (const item of items || []) {
+    const taxable = invoiceLineTaxableValue(item);
+    const pairs = [
+      ["CGST", Number(item.cgst_percent) || 0],
+      ["SGST", Number(item.sgst_percent) || 0],
+      ["IGST", Number(item.igst_percent) || 0],
+    ];
+    for (const [type, rate] of pairs) {
+      if (rate <= 0) continue;
+      const map = buckets[type];
+      const prev = map.get(rate) || { taxableAmount: 0, taxAmount: 0 };
+      prev.taxableAmount += taxable;
+      prev.taxAmount += (taxable * rate) / 100;
+      map.set(rate, prev);
+    }
+  }
+
+  const rows = [];
+  for (const type of ["CGST", "SGST", "IGST"]) {
+    const rates = [...buckets[type].keys()].sort((a, b) => a - b);
+    for (const rate of rates) {
+      const { taxableAmount, taxAmount } = buckets[type].get(rate);
+      rows.push({ type, rate, taxableAmount, taxAmount });
+    }
+  }
+  return rows;
 }
 
 export function splitGstPercentForSupply(totalGstPercent, interstate) {
@@ -139,10 +179,25 @@ export function invoiceHeaderTaxRates(items, interstate, fallbackTotalGst = 18) 
   if (lines.length === 0) {
     return headerRatesForInterstate(interstate, fallbackTotalGst);
   }
-  const totals = lines.map((line) => totalGstPercentFromInvoiceItem(line));
-  const allSame = totals.every((r) => r === totals[0]);
-  const totalGst = allSame ? totals[0] : fallbackTotalGst;
-  return headerRatesForInterstate(interstate, totalGst);
+
+  const unique = (values) => [...new Set(values.filter((v) => v > 0))];
+  const cgstRates = unique(lines.map((l) => Number(l.cgst_percent) || 0));
+  const sgstRates = unique(lines.map((l) => Number(l.sgst_percent) || 0));
+  const igstRates = unique(lines.map((l) => Number(l.igst_percent) || 0));
+
+  if (interstate) {
+    return {
+      cgstRate: 0,
+      sgstRate: 0,
+      igstRate: igstRates.length === 1 ? igstRates[0] : 0,
+    };
+  }
+
+  return {
+    cgstRate: cgstRates.length === 1 ? cgstRates[0] : 0,
+    sgstRate: sgstRates.length === 1 ? sgstRates[0] : 0,
+    igstRate: 0,
+  };
 }
 
 export function headerRatesForInterstate(interstate, defaultTotalGst = 18) {

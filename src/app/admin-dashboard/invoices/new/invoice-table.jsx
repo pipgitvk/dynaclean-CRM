@@ -3,8 +3,8 @@
 import { useState } from "react";
 import Image from "next/image";
 import {
-  effectiveGstPercentForProduct,
   splitGstPercentForSupply,
+  totalGstPercentFromInvoiceItem,
 } from "@/lib/gstSupplyType";
 
 export default function InvoiceItemsTable({
@@ -98,7 +98,7 @@ export default function InvoiceItemsTable({
 
       const imageUrl = item.image_path || "";
       const itemName = item.item_name || "";
-      const totalGst = effectiveGstPercentForProduct({
+      const totalGst = totalGstPercentFromInvoiceItem({
         item_name: itemName,
         item_code: item.item_code || code,
         description: item.specification || "",
@@ -118,6 +118,10 @@ export default function InvoiceItemsTable({
         unit: item.unit || "",
         rate: parseFloat(item.price_per_unit) || 0,
         last_negotiation_price: parseFloat(item.last_negotiation_price) || 0,
+        gst_rate:
+          item.gst_rate != null && String(item.gst_rate).trim() !== ""
+            ? Number(item.gst_rate)
+            : null,
         gst: totalGst,
         cgst_percent,
         sgst_percent,

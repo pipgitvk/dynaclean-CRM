@@ -229,7 +229,7 @@ export default function InvoiceForm({
       items
         .map(
           (i) =>
-            `${i.item_code ?? ""}|${i.item_name ?? ""}|${i.description ?? ""}|${i.gst ?? ""}`,
+            `${i.item_code ?? ""}|${i.item_name ?? ""}|${i.description ?? ""}|${i.gst_rate ?? ""}|${i.product_gst_rate ?? ""}|${i.gst ?? ""}`,
         )
         .join("§"),
     [items],
@@ -511,8 +511,15 @@ const fetchQuotationAndFill = async (quoteNoArg) => {
         cgst_percent: cg,
         sgst_percent: sg,
         igst_percent: ig,
+        gst_rate:
+          it.gst_rate != null && String(it.gst_rate).trim() !== ""
+            ? Number(it.gst_rate)
+            : null,
         gst: totalGstPercentFromInvoiceItem({
           item_name: it.item_name || "",
+          item_code: it.item_code || "",
+          description: it.specification || it.description || "",
+          gst_rate: it.gst_rate,
           cgst_percent: cg,
           sgst_percent: sg,
           igst_percent: ig,
