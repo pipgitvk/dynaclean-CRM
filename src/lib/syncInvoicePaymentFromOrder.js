@@ -1,6 +1,5 @@
 import { EXCLUDE_PROFORMA_INVOICE_SQL } from "@/lib/ledgerInvoiceFilters";
 import { parseOrderLinkedPayments } from "@/lib/orderLinkedPaymentsDisplay";
-import { sumPaymentAmountCsv } from "@/lib/orderPaymentHistory";
 import { resolveInvoiceNumberForOrder } from "@/lib/resolveInvoiceNumberForOrder";
 import { sqlTrimUtf8Eq, sqlUtf8TrimExpr } from "@/lib/sqlUtf8Compare";
 
@@ -86,26 +85,40 @@ export async function syncInvoicePaymentFromOrder(conn, orderOrOrderId) {
   const inv = invRows[0];
 
   const payments = parseOrderLinkedPayments(order);
-  const transIds = new Set(parseLinkedTransIds(inv.linked_trans_ids));
+  const existingTransIds = parseLinkedTransIds(inv.linked_trans_ids);
+  const transIds = new Set(existingTransIds);
   for (const tid of statementLinkedTransIdsFromOrderPayments(payments)) {
     transIds.add(tid);
   }
 
-  const paidFromLines = payments.reduce(
-    (s, p) => s + Math.abs(Number(p.amount) || 0),
-    0,
-  );
-  const paidFromOrder =
-    Number(order.amount_received) ||
-    sumPaymentAmountCsv(order.payment_amount) ||
-    paidFromLines;
+  // Only bank-statement–linked order payments reduce invoice balance.
+  // Booking UTR / amount_received without statement_id must NOT count as invoice paid
+  // (otherwise balance drops with no payment link — e.g. ₹10,000 advance on order).
+  const paidFromStatementLinkedLines = payments
+    .filter(isStatementLinkedOrderPayment)
+    .reduce((s, p) => s + Math.abs(Number(p.amount) || 0), 0);
 
-  if (paidFromOrder <= 0 && transIds.size === 0) return;
+  if (paidFromStatementLinkedLines <= 0 && transIds.size === 0) {
+    // Clear booking-only amount_paid left on invoice with no payment links.
+    const existingPaid = Number(inv.amount_paid) || 0;
+    if (existingPaid > 0 && existingTransIds.length === 0) {
+      const grandTotal = Number(inv.grand_total) || 0;
+      await conn.execute(
+        `UPDATE invoices
+         SET amount_paid = 0, balance_amount = ?, payment_status = 'UNPAID'
+         WHERE id = ?`,
+        [grandTotal, inv.id],
+      );
+    }
+    return;
+  }
 
   const grandTotal = Number(inv.grand_total) || 0;
   const existingPaid = Number(inv.amount_paid) || 0;
   const amountPaid =
-    paidFromOrder > 0 ? Math.max(existingPaid, paidFromOrder) : existingPaid;
+    paidFromStatementLinkedLines > 0
+      ? Math.max(existingPaid, paidFromStatementLinkedLines)
+      : existingPaid;
   const balance = Math.max(0, grandTotal - amountPaid);
   const paymentStatus = invoicePaymentStatusFromAmounts(amountPaid, grandTotal);
   const linkedTransIdsJson =
