@@ -211,8 +211,30 @@ async function applyAutomaticCheckoutsOnConn(conn, options = {}) {
   `;
     const params = [todayIst];
     if (filterUsername) {
-      sql += ` AND a.username = ?`;
-      params.push(filterUsername);
+      sql += ` AND a.username = ?
+        AND (
+          a.checkout_time IS NULL
+          OR a.checkout_time = ''
+          OR (
+            TRIM(COALESCE(a.checkout_address, '')) = ?
+            AND TIME(a.checkout_time) <> TIME(?)
+          )
+        )`;
+      params.push(
+        filterUsername,
+        AUTO_CHECKOUT_ATTENDANCE_ADDRESS,
+        AUTO_CHECKOUT_WALL_TIME,
+      );
+    } else {
+      sql += `
+        AND a.checkin_time IS NOT NULL
+        AND TRIM(a.checkin_time) <> ''
+        AND (
+          a.checkout_time IS NULL
+          OR TRIM(a.checkout_time) = ''
+          OR TRIM(COALESCE(a.checkout_address, '')) = ?
+        )`;
+      params.push(AUTO_CHECKOUT_ATTENDANCE_ADDRESS);
     }
 
     const [crmRows] = await conn.query(sql, params);

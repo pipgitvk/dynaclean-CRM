@@ -6,26 +6,11 @@ import { DEFAULT_ATTENDANCE_RULES } from "@/lib/attendanceRulesEngine";
 import { computeAttendanceDetailsCardSummaryForMonth } from "@/lib/attendanceDetailsCardSummary";
 import { formatPresentSummaryCount } from "@/lib/attendanceLogForPayroll";
 import AttendanceSummaryGrid from "@/components/AttendanceSummaryGrid";
+import { attendanceRowsForSessionUser } from "@/lib/attendanceSessionUserFilter";
 
 function currentMonthStr() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-}
-
-function attendanceRowsForSessionUser(attendance, username) {
-  const rows = Array.isArray(attendance) ? attendance : [];
-  const me = String(username || "")
-    .trim()
-    .replace(/\s+/g, " ")
-    .toLowerCase();
-  if (!me) return rows;
-  return rows.filter((row) => {
-    const who = String(row?.username || "")
-      .trim()
-      .replace(/\s+/g, " ")
-      .toLowerCase();
-    return !who || who === me;
-  });
 }
 
 /**
