@@ -193,6 +193,7 @@ export default async function CustomersPage({ searchParams }) {
   if (search) {
     const term = `%${search}%`;
     const fields = [
+      "CAST(c.customer_id AS CHAR)",
       "c.first_name",
       "c.last_name",
       "c.email",

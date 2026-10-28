@@ -223,7 +223,7 @@ export default function CustomerTable({
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-8 gap-2">
         <input
           type="text"
-          placeholder="Search name, phone, email…"
+          placeholder="Search customer ID, name, phone, email…"
           value={searchDraft}
           onChange={(e) => setSearchDraft(e.target.value)}
           onKeyDown={(e) => {
