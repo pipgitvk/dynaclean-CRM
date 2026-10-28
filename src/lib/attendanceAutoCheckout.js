@@ -134,11 +134,13 @@ async function revertCrmAutomaticCheckoutForMachinePreference(
  * @returns {Promise<number>} rows updated
  */
 export async function applyAutomaticCheckouts(_connIgnored, options = {}) {
-  return withAutoCheckoutMutex(() =>
+  const run = () =>
     withDeadlockRetry(() =>
       withDbConnection((conn) => applyAutomaticCheckoutsOnConn(conn, options))
-    )
-  );
+    );
+  // A full-company pass must not sit in front of one employee's page load.
+  if (options.username) return run();
+  return withAutoCheckoutMutex(run);
 }
 
 async function applyAutomaticCheckoutsOnConn(conn, options = {}) {
@@ -149,8 +151,8 @@ async function applyAutomaticCheckoutsOnConn(conn, options = {}) {
   }
 
   const [[lockRow]] = await conn.query(
-    `SELECT GET_LOCK(?, 2) AS got`,
-    [MYSQL_AUTO_CHECKOUT_LOCK]
+    `SELECT GET_LOCK(?, ?) AS got`,
+    [MYSQL_AUTO_CHECKOUT_LOCK, filterUsername ? 0 : 2]
   );
   if (!lockRow?.got) {
     return 0;
