@@ -133,7 +133,7 @@ export default function CustomerTable({
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-8 gap-2">
         <input
           type="text"
-          placeholder="Search"
+          placeholder="Search customer ID, name, phone, email…"
           value={filters.search}
           onChange={(e) => update("search", e.target.value)}
           className="p-2 border rounded w-full"

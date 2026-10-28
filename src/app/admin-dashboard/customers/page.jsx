@@ -3,6 +3,7 @@ import CustomerTable from "./CustomerTable"; // Import the new component
 import { getSessionPayload } from "@/lib/auth";
 import { notesLanguageExistsSql } from "@/constants/notesLanguageOptions";
 import { getCurrentMonthRangeIso } from "@/lib/crmDateFormat";
+import { buildCustomerListSearchClause } from "@/lib/customerListSearch";
 
 export const dynamic = "force-dynamic";
 
@@ -87,10 +88,10 @@ export default async function HomePage({ searchParams }) {
     const params = [];
 
     // Apply filters
-    if (search) {
-      query += ` AND (c.customer_id = ? OR c.phone LIKE ? OR c.first_name LIKE ? OR c.last_name LIKE ? OR c.email LIKE ?)`;
-      const searchTerm = `%${search}%`;
-      params.push(search, searchTerm, searchTerm, searchTerm, searchTerm);
+    const searchClause = buildCustomerListSearchClause(search);
+    if (searchClause) {
+      query += ` AND ${searchClause.sql}`;
+      params.push(...searchClause.params);
     }
 
     if (lead_source) {

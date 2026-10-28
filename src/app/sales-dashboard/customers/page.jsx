@@ -10,6 +10,7 @@ import {
   appendLatestFollowedDateIstFilter,
   latestFollowedDateSelectSql,
 } from "@/lib/customerFollowupNotesLanguage";
+import { appendCustomerListSearchFilter } from "@/lib/customerListSearch";
 
 export const dynamic = "force-dynamic";
 
@@ -190,32 +191,7 @@ export default async function CustomersPage({ searchParams }) {
     customerParams.push(lead_campaign);
   }
 
-  if (search) {
-    const term = `%${search}%`;
-    const fields = [
-      "CAST(c.customer_id AS CHAR)",
-      "c.first_name",
-      "c.last_name",
-      "c.email",
-      "c.phone",
-      "c.address",
-      "c.company",
-      "c.lead_source",
-      "c.status",
-      "c.followup_notes",
-      "c.communication_history",
-      "c.products_interest",
-      "c.sales_representative",
-      "c.assigned_to",
-      "c.tags",
-      "c.notes",
-      "c.date_created",
-    ];
-    customerConditions.push(
-      `(${fields.map((field) => `${field} LIKE ?`).join(" OR ")})`
-    );
-    customerParams.push(...fields.map(() => term));
-  }
+  appendCustomerListSearchFilter(customerConditions, customerParams, search);
 
   if (date_from && date_to) {
     const createdBounds = mysqlBoundsForIstDateRange(date_from, date_to);

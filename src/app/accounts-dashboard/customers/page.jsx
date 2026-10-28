@@ -3,6 +3,7 @@ import CustomerTable from "./CustomerTable";
 import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 import { getSessionPayload } from "@/lib/auth";
+import { appendCustomerListSearchFilter } from "@/lib/customerListSearch";
 
 export const dynamic = "force-dynamic";
 
@@ -115,31 +116,7 @@ export default async function CustomersPage({ searchParams }) {
     customerParams.push(lead_campaign);
   }
 
-  if (search) {
-    const term = `%${search}%`;
-    const fields = [
-      "c.first_name",
-      "c.last_name",
-      "c.email",
-      "c.phone",
-      "c.address",
-      "c.company",
-      "c.lead_source",
-      "c.status",
-      "c.followup_notes",
-      "c.communication_history",
-      "c.products_interest",
-      "c.sales_representative",
-      "c.assigned_to",
-      "c.tags",
-      "c.notes",
-      "c.date_created",
-    ];
-    customerConditions.push(
-      `(${fields.map((field) => `${field} LIKE ?`).join(" OR ")})`
-    );
-    customerParams.push(...fields.map(() => term));
-  }
+  appendCustomerListSearchFilter(customerConditions, customerParams, search);
 
   if (date_from && date_to) {
     customerConditions.push("c.date_created BETWEEN ? AND ?");
