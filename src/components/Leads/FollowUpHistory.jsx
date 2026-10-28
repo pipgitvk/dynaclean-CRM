@@ -286,6 +286,40 @@ function getContactDisplayName(entry) {
   );
 }
 
+function isTlFollowupEntry(entry) {
+  return String(entry?.followup_source || "").trim().toUpperCase() === "TL";
+}
+
+function TlRemarksCell({ entry }) {
+  const notes = String(entry?.notes || "").trim();
+  if (!notes) {
+    return <span className="text-gray-500">—</span>;
+  }
+  const followedBy = String(entry?.followed_by || "").trim();
+  const byAdmin = followedBy.toLowerCase() === "admin";
+  return (
+    <div className="whitespace-pre-wrap break-words [overflow-wrap:anywhere] leading-relaxed text-yellow-950">
+      <div className="mb-1 flex flex-wrap items-center gap-2 text-[10px] font-bold uppercase tracking-wide text-yellow-900">
+        <span>TL Remark</span>
+        {byAdmin ? (
+          <span className="rounded border border-yellow-600 bg-yellow-300 px-1.5 py-0.5 text-yellow-950">
+            Admin
+          </span>
+        ) : followedBy ? (
+          <span className="font-normal normal-case text-yellow-900/90">
+            — {followedBy}
+          </span>
+        ) : null}
+      </div>
+      {notes}
+    </div>
+  );
+}
+
+function tlRowHighlight(entry) {
+  return isTlFollowupEntry(entry) && String(entry?.notes || "").trim().length > 0;
+}
+
 function FollowupTagsCell({ multiTag }) {
   const raw = String(multiTag || "").trim();
   if (!raw) {
@@ -475,11 +509,16 @@ export default function FollowUpHistory({
                 const rowUploads = getRowUploads(entry);
                 const nextFollowup = pickNextFollowupField(entry, userRole);
                 const rowKey = `${entry.time_stamp || entry.followed_date || "f"}-${index}`;
+                const yellowRow = tlRowHighlight(entry);
+                const cellBg = yellowRow ? "bg-yellow-200" : "";
 
                 return (
-                  <tr key={rowKey} className="align-top">
+                  <tr
+                    key={rowKey}
+                    className={`align-top ${yellowRow ? "bg-yellow-200" : ""}`}
+                  >
                     {showNameColumn && (
-                      <td className="px-3 py-2 text-gray-700 align-top">
+                      <td className={`px-3 py-2 text-gray-700 align-top ${cellBg}`}>
                         <div className="font-medium text-gray-800">
                           {getContactDisplayName(entry) || "-"}
                         </div>
@@ -490,12 +529,12 @@ export default function FollowUpHistory({
                         ) : null}
                       </td>
                     )}
-                    <td className="px-3 py-2 align-top">
+                    <td className={`px-3 py-2 align-top ${cellBg}`}>
                       {nextFollowup
                         ? formatCrmDatetimeForISTDisplay(nextFollowup)
                         : "-"}
                     </td>
-                    <td className="px-3 py-2 align-top">
+                    <td className={`px-3 py-2 align-top ${cellBg}`}>
                       <div className="flex flex-wrap items-center gap-1">
                         <span>{entry.followed_by || "-"}</span>
                         {entry.followup_source === "TL" ? (
@@ -505,23 +544,29 @@ export default function FollowUpHistory({
                         ) : null}
                       </div>
                     </td>
-                    <td className="px-3 py-2 align-top">
+                    <td className={`px-3 py-2 align-top ${cellBg}`}>
                       {entry.followed_date
                         ? formatCrmDatetimeForISTDisplay(entry.followed_date)
                         : "-"}
                     </td>
-                    <td className="px-3 py-2 align-top">{entry.comm_mode || "-"}</td>
-                    <td className="px-3 py-2 min-w-0 align-top">
+                    <td className={`px-3 py-2 align-top ${cellBg}`}>
+                      {entry.comm_mode || "-"}
+                    </td>
+                    <td className={`px-3 py-2 min-w-0 align-top ${cellBg}`}>
                       <FollowupTagsCell multiTag={entry.multi_tag} />
                     </td>
-                    <td className="px-3 py-2 min-w-0 align-top">
-                      <div className="whitespace-pre-wrap break-words [overflow-wrap:anywhere] leading-snug text-gray-800">
-                        {entry.notes || "-"}
-                      </div>
+                    <td className={`px-3 py-2 min-w-0 align-top ${cellBg}`}>
+                      {yellowRow ? (
+                        <TlRemarksCell entry={entry} />
+                      ) : (
+                        <div className="whitespace-pre-wrap break-words [overflow-wrap:anywhere] leading-snug text-gray-800">
+                          {entry.notes || "-"}
+                        </div>
+                      )}
                     </td>
                     {hasUploads && (
                       <>
-                        <td className="px-3 py-2 align-top">
+                        <td className={`px-3 py-2 align-top ${cellBg}`}>
                           {rowUploads.length > 0
                             ? rowUploads.map((upload, uploadIndex) => (
                                 <div key={uploadIndex} className="mb-2 last:mb-0">
@@ -532,7 +577,7 @@ export default function FollowUpHistory({
                               ))
                             : "-"}
                         </td>
-                        <td className="px-3 py-2 align-top">
+                        <td className={`px-3 py-2 align-top ${cellBg}`}>
                           {rowUploads.length > 0
                             ? rowUploads.map((upload, uploadIndex) => (
                                 <div key={uploadIndex} className="mb-2 last:mb-0">
@@ -541,7 +586,7 @@ export default function FollowUpHistory({
                               ))
                             : "-"}
                         </td>
-                        <td className="px-3 py-2 min-w-0 align-top">
+                        <td className={`px-3 py-2 min-w-0 align-top ${cellBg}`}>
                           {rowUploads.length > 0
                             ? rowUploads.map((upload, uploadIndex) => (
                                 <div
@@ -553,7 +598,7 @@ export default function FollowUpHistory({
                               ))
                             : "-"}
                         </td>
-                        <td className="px-3 py-2 align-top">
+                        <td className={`px-3 py-2 align-top ${cellBg}`}>
                           {rowUploads.length > 0
                             ? rowUploads.map((upload, uploadIndex) => (
                                 <div key={uploadIndex} className="mb-2 last:mb-0">
