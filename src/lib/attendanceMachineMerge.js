@@ -4,6 +4,10 @@ import { attendanceDateKey } from "@/lib/leaveDateRange";
 import { ensureRepListMachineCodeColumn } from "@/lib/ensureRepListMachineCode";
 import { ensureMachineAttendancePunchesTable } from "@/lib/ensureMachineAttendancePunchesTable";
 import {
+  loadRepListCanonicalUsernameMaps,
+  resolveCanonicalUsername,
+} from "@/lib/attendanceCanonicalUsername";
+import {
   AUTO_CHECKOUT_WALL_TIME,
   isAutomaticCheckoutAddress,
 } from "@/lib/attendanceAutoCheckoutConstants";
@@ -255,8 +259,9 @@ export function mergeCrmAndMachineDay(crmRow, machineDay) {
 
 export async function loadMachineCodeMaps(conn) {
   await ensureRepListMachineCodeColumn(conn);
+  const canonicalMaps = await loadRepListCanonicalUsernameMaps(conn);
   const [profileRows] = await conn.query(
-    `SELECT username, TRIM(machine_code) AS machine_code
+    `SELECT username, empId, TRIM(machine_code) AS machine_code
      FROM rep_list
      WHERE status = 1
        AND TRIM(COALESCE(machine_code, '')) <> ''`
@@ -264,15 +269,23 @@ export async function loadMachineCodeMaps(conn) {
   const usernameToMachineCode = new Map();
   const machineCodeToUsername = new Map();
   for (const row of profileRows || []) {
-    const username = String(row.username || "").trim();
     const code = String(row.machine_code || "").trim();
-    if (!username || !code) continue;
-    usernameToMachineCode.set(username, code);
-    if (!machineCodeToUsername.has(code)) {
-      machineCodeToUsername.set(code, username);
-    }
+    if (!code) continue;
+    const canon = resolveCanonicalUsername(row.username, canonicalMaps, {
+      employee_id: row.empId,
+      machine_code: code,
+    });
+    if (!canon) continue;
+    usernameToMachineCode.set(canon, code);
+    machineCodeToUsername.set(code, canon);
   }
-  return { usernameToMachineCode, machineCodeToUsername };
+  return {
+    usernameToMachineCode,
+    machineCodeToUsername,
+    canonicalMaps,
+    resolveCanonicalUsername: (username, extras = {}) =>
+      resolveCanonicalUsername(username, canonicalMaps, extras),
+  };
 }
 
 /** emp_code (machine) → rep_list userRole / userDepartment via machine_code or empId. */

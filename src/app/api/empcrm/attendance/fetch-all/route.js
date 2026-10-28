@@ -12,16 +12,64 @@ import {
   loadMachineCodeMaps,
   loadMachineDailyByUsername,
   mergeAttendanceListWithMachine,
+  mergeCrmAndMachineDay,
 } from "@/lib/attendanceMachineMerge";
 import { ensureAttendanceLogsEmployeeColumns } from "@/lib/ensureAttendanceLogsEmployeeColumns";
 import { applyAutomaticCheckouts } from "@/lib/attendanceAutoCheckout";
+import {
+  applyCanonicalUsernameToRow,
+  normalizeUsernameKey,
+} from "@/lib/attendanceCanonicalUsername";
 import { attendanceDateKey } from "@/lib/leaveDateRange";
 export const dynamic = 'force-dynamic';
 
 function normalizeUserKey(value) {
-  return String(value ?? "")
-    .trim()
-    .toLowerCase();
+  return normalizeUsernameKey(value);
+}
+
+/** Same employee + date can appear twice before canonical usernames align — merge once. */
+function pickCrmRowForMerge(a, b) {
+  if (a._syntheticMachineOnly && !b._syntheticMachineOnly) return b;
+  if (b._syntheticMachineOnly && !a._syntheticMachineOnly) return a;
+  return a;
+}
+
+function combineMachineDays(a, b) {
+  if (!a) return b || null;
+  if (!b) return a;
+  const pickEarlier = (x, y) => {
+    if (!x) return y;
+    if (!y) return x;
+    return String(x) <= String(y) ? x : y;
+  };
+  const pickLater = (x, y) => {
+    if (!x) return y;
+    if (!y) return x;
+    return String(x) >= String(y) ? x : y;
+  };
+  return {
+    emp_code: a.emp_code || b.emp_code,
+    punch_date: a.punch_date || b.punch_date,
+    machine_checkin: pickEarlier(a.machine_checkin, b.machine_checkin),
+    machine_checkout: pickLater(a.machine_checkout, b.machine_checkout),
+  };
+}
+
+function dedupeMergedAttendanceRows(mergedRows) {
+  const byKey = new Map();
+  for (const row of mergedRows || []) {
+    const dk = attendanceDateKey(row.date);
+    const key = `${normalizeUserKey(row.username)}|${dk}`;
+    const prev = byKey.get(key);
+    if (!prev) {
+      byKey.set(key, row);
+      continue;
+    }
+    const machineDay = combineMachineDays(prev.machine_day, row.machine_day);
+    const crmRow = pickCrmRowForMerge(prev, row);
+    byKey.set(key, mergeCrmAndMachineDay(crmRow, machineDay));
+  }
+  return [...byKey.values()];
 }
 
 export async function GET(request) {
@@ -84,6 +132,14 @@ export async function GET(request) {
     const globalRow = await loadGlobalAttendanceRulesRow(db);
     const globalRules = rowToAttendanceRulesShape(globalRow);
     await ensureEmployeeAttendanceScheduleTable();
+
+    const { machineCodeToUsername, canonicalMaps, resolveCanonicalUsername: resolveCanon } =
+      await loadMachineCodeMaps(db);
+
+    for (const row of rows) {
+      applyCanonicalUsernameToRow(row, canonicalMaps);
+    }
+
     const [schedules] = await db.query(`SELECT * FROM employee_attendance_schedule`);
     const scheduleByUser = new Map(
       (schedules || []).map((s) => [normalizeUserKey(s.username), s])
@@ -116,7 +172,8 @@ export async function GET(request) {
       );
       for (const r of regRows || []) {
         const dk = attendanceDateKey(r.log_date);
-        const key = `${r.username}|${dk}`;
+        const canonUser = resolveCanon(r.username, canonicalMaps);
+        const key = `${canonUser}|${dk}`;
         regMap.set(key, {
           createdBy: r.username,
           approvedBy: r.reviewed_by || "—",
@@ -127,26 +184,28 @@ export async function GET(request) {
       console.warn("attendance regularization metadata skipped:", e.message);
     }
 
-    const { machineCodeToUsername } = await loadMachineCodeMaps(db);
     const machineByUserDate = await loadMachineDailyByUsername(
       db,
-      machineCodeToUsername
+      machineCodeToUsername,
     );
-    const mergedRows = mergeAttendanceListWithMachine(rows, machineByUserDate);
+    let mergedRows = mergeAttendanceListWithMachine(rows, machineByUserDate);
+    mergedRows = dedupeMergedAttendanceRows(mergedRows);
 
     const [idRows] = await db.query(
       `SELECT username, empId, TRIM(machine_code) AS machine_code
        FROM rep_list WHERE status = 1`
     );
-    const idsByUser = new Map(
-      (idRows || []).map((r) => [
-        r.username,
-        {
-          employee_id: r.empId ?? null,
-          machine_code: String(r.machine_code || "").trim() || null,
-        },
-      ])
-    );
+    const idsByUser = new Map();
+    for (const r of idRows || []) {
+      const canon = resolveCanon(r.username, canonicalMaps, {
+        employee_id: r.empId,
+        machine_code: r.machine_code,
+      });
+      idsByUser.set(canon, {
+        employee_id: r.empId ?? null,
+        machine_code: String(r.machine_code || "").trim() || null,
+      });
+    }
 
     for (const row of mergedRows) {
       const dk = attendanceDateKey(row.date);
@@ -173,6 +232,7 @@ export async function GET(request) {
 
     const normalizedLeaves = (leaves || []).map((leave) => ({
       ...leave,
+      username: resolveCanon(leave.username, canonicalMaps),
       from_date: attendanceDateKey(leave.from_date),
       to_date: attendanceDateKey(leave.to_date),
     }));
