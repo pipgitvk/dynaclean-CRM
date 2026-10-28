@@ -592,6 +592,43 @@ const PAT_LATEST_PURCHASE_BY_INVENTORY_SQL = `
   WHERE rn = 1
 `;
 
+/** Fallback unit cost from Spare master (admin-dashboard/spare purchase_price). */
+const PAT_SPARE_MASTER_UNIT_PRICE_SQL = `
+  SELECT
+    CONCAT('spare:', sl.id) AS inventory_key,
+    COALESCE(sl.purchase_price, 0) AS unit_price
+  FROM spare_list sl
+`;
+
+/** Fallback unit cost from Product master (admin-dashboard/product-stock price_per_unit). */
+const PAT_PRODUCT_MASTER_UNIT_PRICE_SQL = `
+  SELECT inventory_key, MAX(unit_price) AS unit_price
+  FROM (
+    SELECT
+      CONCAT('product:', LOWER(TRIM(pl.item_code))) AS inventory_key,
+      COALESCE(pl.price_per_unit, 0) AS unit_price
+    FROM products_list pl
+    WHERE TRIM(COALESCE(pl.item_code, '')) <> ''
+    UNION ALL
+    SELECT
+      CONCAT('product:', LOWER(TRIM(pl.product_number))) AS inventory_key,
+      COALESCE(pl.price_per_unit, 0) AS unit_price
+    FROM products_list pl
+    WHERE TRIM(COALESCE(pl.product_number, '')) <> ''
+      AND LOWER(TRIM(pl.product_number)) <> LOWER(TRIM(pl.item_code))
+  ) product_keys
+  GROUP BY inventory_key
+`;
+
+const PAT_COGS_UNIT_PRICE_EXPR = `
+  COALESCE(
+    latest.latest_price,
+    spare_master.unit_price,
+    product_master.unit_price,
+    0
+  )
+`;
+
 const PAT_SOLD_LINES_BY_INVENTORY_SQL = `
   SELECT
     inventory_key,
@@ -621,10 +658,14 @@ export async function fetchPurchaseCogsFromSalesLatestPurchasePrice(
   try {
     const [rows] = await conn.execute(
       `
-        SELECT COALESCE(SUM(sold.qty_sold * COALESCE(latest.latest_price, 0)), 0) AS total
+        SELECT COALESCE(SUM(sold.qty_sold * ${PAT_COGS_UNIT_PRICE_EXPR}), 0) AS total
         FROM (${PAT_SOLD_LINES_BY_INVENTORY_SQL}) sold
         LEFT JOIN (${PAT_LATEST_PURCHASE_BY_INVENTORY_SQL}) latest
           ON latest.inventory_key = sold.inventory_key
+        LEFT JOIN (${PAT_SPARE_MASTER_UNIT_PRICE_SQL}) spare_master
+          ON spare_master.inventory_key = sold.inventory_key
+        LEFT JOIN (${PAT_PRODUCT_MASTER_UNIT_PRICE_SQL}) product_master
+          ON product_master.inventory_key = sold.inventory_key
       `,
       [dateFrom, dateTo],
     );
@@ -825,7 +866,7 @@ export async function buildAdminPatSummary(
     periodLabel,
     dateFrom,
     dateTo,
-    note: "All amounts ex-GST. Order-based lines (A, B, D) include only orders with invoice/report uploaded; cancelled, rejected, and returned orders are excluded. Line D: sold qty × latest purchase price_per_unit from Purchases. Salary from monthly_salary_records; operating expenses from client_expenses (by entry date). Tax & interest are zero until configured.",
+    note: "All amounts ex-GST. Order-based lines (A, B, D) include only orders with invoice/report uploaded; cancelled, rejected, and returned orders are excluded. Line D: sold qty × latest purchase price_per_unit from Purchases; if no purchase, product price_per_unit (Product stock) or spare purchase_price (Spare list) is used. Salary from monthly_salary_records; operating expenses from client_expenses (by entry date). Tax & interest are zero until configured.",
     lines: {
       revenueSales: {
         id: "A",
@@ -884,11 +925,17 @@ export async function fetchPatDrillRows(conn, section, dateFrom, dateTo) {
             latest.purchase_id,
             latest.purchase_date,
             latest.purchase_kind,
-            COALESCE(latest.latest_price, 0) AS unit_price,
-            sold.qty_sold * COALESCE(latest.latest_price, 0) AS line_total
+            ${PAT_COGS_UNIT_PRICE_EXPR} AS unit_price,
+            spare_master.unit_price AS spare_master_unit_price,
+            product_master.unit_price AS product_master_unit_price,
+            sold.qty_sold * ${PAT_COGS_UNIT_PRICE_EXPR} AS line_total
           FROM (${PAT_SOLD_LINES_BY_INVENTORY_SQL}) sold
           LEFT JOIN (${PAT_LATEST_PURCHASE_BY_INVENTORY_SQL}) latest
             ON latest.inventory_key = sold.inventory_key
+          LEFT JOIN (${PAT_SPARE_MASTER_UNIT_PRICE_SQL}) spare_master
+            ON spare_master.inventory_key = sold.inventory_key
+          LEFT JOIN (${PAT_PRODUCT_MASTER_UNIT_PRICE_SQL}) product_master
+            ON product_master.inventory_key = sold.inventory_key
           ORDER BY sold.item_code_display ASC
         `,
         [dateFrom, dateTo],
@@ -904,7 +951,11 @@ export async function fetchPatDrillRows(conn, section, dateFrom, dateTo) {
           r.purchase_kind === "SP" ? "Spare purchase" : "Purchase";
         const purchaseRef = purchaseId
           ? `${purchaseLabel} #${purchaseId} · ${purchaseDate} · ₹${unit.toLocaleString("en-IN")}/unit`
-          : "No matching purchase";
+          : Number(r.spare_master_unit_price) > 0
+            ? `Spare master · ₹${Number(r.spare_master_unit_price).toLocaleString("en-IN")}/unit`
+            : Number(r.product_master_unit_price) > 0
+              ? `Product stock · ₹${Number(r.product_master_unit_price).toLocaleString("en-IN")}/unit`
+              : "No matching purchase";
         return {
           id: r.item_code_display,
           col1: r.item_code_display,
