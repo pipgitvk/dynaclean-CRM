@@ -41,6 +41,22 @@ import {
 const AUTO_CHECKOUT_WARNING_TITLE =
   "No manual check-out — automatic check-out at 9:00 PM only.";
 
+function attendanceRowsForSessionUser(attendance, username) {
+  const rows = Array.isArray(attendance) ? attendance : [];
+  const me = String(username || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+  if (!me) return rows;
+  return rows.filter((row) => {
+    const who = String(row?.username || "")
+      .trim()
+      .replace(/\s+/g, " ")
+      .toLowerCase();
+    return !who || who === me;
+  });
+}
+
 function getDefaultAttendanceMonthRange() {
   const today = dayjs();
   return {
@@ -157,7 +173,7 @@ const AttendancePage = () => {
       }
 
       const data = await response.json();
-      setLogs(data.attendance);
+      setLogs(attendanceRowsForSessionUser(data.attendance, data.username));
       setHolidays(data.holidays || []);
       setLeaves(data.leaves || []);
 

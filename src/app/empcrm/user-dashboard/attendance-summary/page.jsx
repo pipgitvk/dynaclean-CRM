@@ -12,6 +12,22 @@ function currentMonthStr() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
+function attendanceRowsForSessionUser(attendance, username) {
+  const rows = Array.isArray(attendance) ? attendance : [];
+  const me = String(username || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+  if (!me) return rows;
+  return rows.filter((row) => {
+    const who = String(row?.username || "")
+      .trim()
+      .replace(/\s+/g, " ")
+      .toLowerCase();
+    return !who || who === me;
+  });
+}
+
 /**
  * Logged-in employee only — uses /api/empcrm/attendance/fetch (session user).
  */
@@ -40,7 +56,7 @@ export default function UserAttendanceSummaryPage() {
         const data = await response.json();
         if (cancelled) return;
         setSessionUsername(data.username || "");
-        setLogs(data.attendance || []);
+        setLogs(attendanceRowsForSessionUser(data.attendance, data.username));
         setHolidays(data.holidays || []);
         setLeaves(data.leaves || []);
         if (rulesRes.ok) {
