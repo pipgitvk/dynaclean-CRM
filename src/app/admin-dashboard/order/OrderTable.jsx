@@ -84,7 +84,6 @@ import OrderBookingViewMenuLinks from "@/components/orders/OrderBookingViewMenuL
 import OrderDeliveryMenuLinks from "@/components/orders/OrderDeliveryMenuLinks";
 import toast from "react-hot-toast";
 import LinkedStatementPaymentCell from "@/components/orders/LinkedStatementPaymentCell";
-import { orderInvoiceHasPaymentLink } from "@/lib/orderLinkedPaymentsDisplay";
 import { normalizeOrderListDateRange } from "@/lib/orderTableDateDefaults";
 
 ChartJS.register(ArcElement, Tooltip, Legend);
@@ -464,9 +463,10 @@ function getAccountantReportPaidAmount(order) {
   return getOrderPaidAmountForDisplay(order);
 }
 
-/** Green only after invoice Link Payment; otherwise grey (no booking advance count). */
+/** Green when any paid amount shows (invoice link or neworder payment_amount). */
 function getOrderPaidAmountUiClasses(order) {
-  if (!orderInvoiceHasPaymentLink(order)) {
+  const paid = getOrderPaidAmountForDisplay(order);
+  if (paid <= 0) {
     return {
       label: "font-semibold text-gray-500",
       value:

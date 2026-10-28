@@ -124,12 +124,12 @@ export function sumOrderPaymentAmounts(order) {
 
 /**
  * Order list Paid / Balance (admin / accounts / superadmin).
- * Only invoice Link Payment amounts count. Booking advance stays hidden
- * until payment is linked on the invoice.
+ * Invoice Link Payment → invoice-linked amounts; otherwise neworder.payment_amount CSV.
  */
 export function getOrderPaidAmountForDisplay(order) {
   const orderTotal = orderTotalForPaidCap(order);
   let paid = 0;
+
   if (orderInvoiceHasPaymentLink(order)) {
     const invPaid = Number(order?.invoice_amount_paid);
     if (Number.isFinite(invPaid) && invPaid >= 0) {
@@ -137,7 +137,10 @@ export function getOrderPaidAmountForDisplay(order) {
     } else {
       paid = sumStatementLinkedOrderPayments(order);
     }
+  } else {
+    paid = sumOrderPaymentAmounts(order);
   }
+
   if (orderTotal > 0) {
     paid = Math.min(paid, orderTotal);
   }

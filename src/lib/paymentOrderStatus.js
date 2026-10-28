@@ -7,7 +7,6 @@ import {
   sumOrderPaymentAmounts,
 } from "@/lib/orderPaymentHistory";
 import { hasOrderInvoiceReport } from "@/lib/orderDocumentEditRules";
-import { orderInvoiceHasPaymentLink } from "@/lib/orderLinkedPaymentsDisplay";
 
 /** Paise/rounding drift (e.g. ₹0.40 on ₹802.40) — treat as fully settled in reports. */
 export const PAYMENT_REMAINING_TOLERANCE_INR = 1;
@@ -49,17 +48,8 @@ export function getOrderTotalForPayment(order) {
   return Math.max(total, base + tax);
 }
 
-/**
- * Order list Payment column: booking advance never counts as Paid.
- * Status stays pending until invoice has Link Payment.
- */
+/** Order list payment badge: uses invoice link paid or neworder payment_amount. */
 export function deriveOrderListPaymentStatus(order) {
-  if (!hasOrderInvoiceReport(order)) {
-    return "pending";
-  }
-  if (!orderInvoiceHasPaymentLink(order)) {
-    return "pending";
-  }
   return deriveOrderPaymentStatus(order);
 }
 

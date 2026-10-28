@@ -6,6 +6,7 @@ import {
   orderHasInvoiceNumber,
   orderInvoiceHasPaymentLink,
 } from "@/lib/orderLinkedPaymentsDisplay";
+import { sumOrderPaymentAmounts } from "@/lib/orderPaymentHistory";
 
 export default function LinkedStatementPaymentCell({ order }) {
   const inv = String(
@@ -29,24 +30,30 @@ export default function LinkedStatementPaymentCell({ order }) {
       maximumFractionDigits: 2,
     })}`;
 
-  const showPaymentDetails = lines.length > 0;
+  const bookingPaid = !orderInvoiceHasPaymentLink(order)
+    ? sumOrderPaymentAmounts(order)
+    : 0;
+
+  const showPaymentDetails = lines.length > 0 || bookingPaid > 0;
 
   if (!inv && !showPaymentDetails) {
     return <span className="text-gray-400 text-xs">—</span>;
   }
 
   const hoverSummary = showPaymentDetails
-    ? lines
-        .map((p) => {
-          const id = p.trans_id || "—";
-          const d = p.date ? dayjs(p.date).format("DD-MM-YYYY") : "—";
-          const amt =
-            p.amount != null && Number(p.amount) > 0
-              ? formatAmt(p.amount)
-              : "—";
-          return `ID: ${id} | Date: ${d} | Received: ${amt}`;
-        })
-        .join("\n")
+    ? lines.length
+      ? lines
+          .map((p) => {
+            const id = p.trans_id || "—";
+            const d = p.date ? dayjs(p.date).format("DD-MM-YYYY") : "—";
+            const amt =
+              p.amount != null && Number(p.amount) > 0
+                ? formatAmt(p.amount)
+                : "—";
+            return `ID: ${id} | Date: ${d} | Received: ${amt}`;
+          })
+          .join("\n")
+      : `Order payment_amount: ${formatAmt(bookingPaid)}`
     : "";
 
   return (
@@ -65,6 +72,8 @@ export default function LinkedStatementPaymentCell({ order }) {
               <span className="font-semibold text-gray-600">Inv No: </span>
               {inv}
             </>
+          ) : bookingPaid > 0 ? (
+            <span className="text-blue-800">Order payment</span>
           ) : showPaymentDetails ? (
             <span className="text-blue-800">Payment linked</span>
           ) : (
@@ -78,27 +87,34 @@ export default function LinkedStatementPaymentCell({ order }) {
             role="tooltip"
           >
             <div className="space-y-2">
-              {lines.map((p, idx) => (
-                <div
-                  key={`${p.trans_id || idx}-${idx}`}
-                  className={idx > 0 ? "pt-2 border-t border-gray-100" : ""}
-                >
-                  <div className="truncate max-w-[16rem]" title={p.trans_id}>
-                    <span className="font-semibold text-gray-600">ID:</span>{" "}
-                    {p.trans_id || "—"}
+              {lines.length ? (
+                lines.map((p, idx) => (
+                  <div
+                    key={`${p.trans_id || idx}-${idx}`}
+                    className={idx > 0 ? "pt-2 border-t border-gray-100" : ""}
+                  >
+                    <div className="truncate max-w-[16rem]" title={p.trans_id}>
+                      <span className="font-semibold text-gray-600">ID:</span>{" "}
+                      {p.trans_id || "—"}
+                    </div>
+                    <div>
+                      <span className="font-semibold text-gray-600">Date:</span>{" "}
+                      {p.date ? dayjs(p.date).format("DD-MM-YYYY") : "—"}
+                    </div>
+                    <div>
+                      <span className="font-semibold text-gray-600">Received:</span>{" "}
+                      {p.amount != null && Number(p.amount) > 0
+                        ? formatAmt(p.amount)
+                        : "—"}
+                    </div>
                   </div>
-                  <div>
-                    <span className="font-semibold text-gray-600">Date:</span>{" "}
-                    {p.date ? dayjs(p.date).format("DD-MM-YYYY") : "—"}
-                  </div>
-                  <div>
-                    <span className="font-semibold text-gray-600">Received:</span>{" "}
-                    {p.amount != null && Number(p.amount) > 0
-                      ? formatAmt(p.amount)
-                      : "—"}
-                  </div>
+                ))
+              ) : (
+                <div>
+                  <span className="font-semibold text-gray-600">Amount:</span>{" "}
+                  {formatAmt(bookingPaid)}
                 </div>
-              ))}
+              )}
               {lines.length > 1 && total > 0 ? (
                 <div className="pt-1 border-t border-gray-200 font-semibold text-emerald-700">
                   Total: {formatAmt(total)}
