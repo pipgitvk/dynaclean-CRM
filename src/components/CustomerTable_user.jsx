@@ -1,7 +1,7 @@
 // components/CustomerTable.jsx
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import { Search, Download } from "lucide-react";
@@ -70,12 +70,33 @@ export default function CustomerTable({ customers, isLoading }) {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
+  const searchDebounceRef = useRef(null);
 
-  // Read search query from URL on initial load
+  // Read search query from URL on initial load / external navigation
   useEffect(() => {
     const queryFromUrl = searchParams.get("search") || "";
     setSearchQuery(queryFromUrl);
   }, [searchParams]);
+
+  const syncSearchToUrl = useCallback(
+    (newQuery) => {
+      const newParams = new URLSearchParams(searchParams.toString());
+      if (newQuery.trim()) {
+        newParams.set("search", newQuery.trim());
+      } else {
+        newParams.delete("search");
+      }
+      newParams.set("page", "1");
+      router.replace(`?${newParams.toString()}`, { scroll: false });
+    },
+    [router, searchParams],
+  );
+
+  useEffect(() => {
+    return () => {
+      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    };
+  }, []);
 
   // Use useMemo for efficient filtering based on customers and searchQuery
   const filteredCustomers = useMemo(() => {
@@ -106,17 +127,13 @@ export default function CustomerTable({ customers, isLoading }) {
     return result;
   }, [searchQuery, customers, sortConfig]);
 
-  // Update URL search parameter when search input changes
   const handleSearchChange = (e) => {
     const newQuery = e.target.value;
     setSearchQuery(newQuery);
-    const newParams = new URLSearchParams(searchParams);
-    if (newQuery) {
-      newParams.set("search", newQuery);
-    } else {
-      newParams.delete("search");
-    }
-    router.push(`?${newParams.toString()}`);
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    searchDebounceRef.current = setTimeout(() => {
+      syncSearchToUrl(newQuery);
+    }, 350);
   };
 
   const downloadPDF = () => {

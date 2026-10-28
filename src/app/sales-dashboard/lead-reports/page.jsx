@@ -1,8 +1,8 @@
 // app/reports/page.jsx
 "use client";
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
-import { useState, useEffect } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useState, useEffect, useRef } from "react";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import CustomerTable from "@/components/CustomerTable_user";
 import CustomerCharts from "@/components/CustomerCharts";
 import { RefreshCcw } from "lucide-react";
@@ -20,7 +20,9 @@ const statusList = ["Very Good", "Average", "Poor", "Denied", "Invalid"];
 
 export default function ReportsPage() {
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
+  const prevFetchSignatureRef = useRef("");
 
   const [filters, setFilters] = useState({
     startDate: "",
@@ -47,7 +49,18 @@ export default function ReportsPage() {
   // Use a single useEffect to handle all data fetching based on URL changes
   useEffect(() => {
     const fetchAllData = async () => {
-      setIsLoading(true);
+      const signatureParams = new URLSearchParams(searchParams.toString());
+      signatureParams.delete("search");
+      signatureParams.delete("page");
+      const signature = signatureParams.toString();
+      const searchOnly =
+        prevFetchSignatureRef.current === signature &&
+        prevFetchSignatureRef.current !== "";
+      prevFetchSignatureRef.current = signature;
+
+      if (!searchOnly) {
+        setIsLoading(true);
+      }
       const params = new URLSearchParams(searchParams);
 
       try {
@@ -139,7 +152,7 @@ export default function ReportsPage() {
       }
     });
     newParams.set("page", "1");
-    router.push(`/user-dashboard/lead-reports?${newParams.toString()}`);
+    router.push(`${pathname}?${newParams.toString()}`, { scroll: false });
   };
 
   const handleReset = () => {
@@ -153,7 +166,7 @@ export default function ReportsPage() {
     });
     setCustomers(null);
     setPagination({ total: 0, totalPages: 1, currentPage: 1, pageSize: 50 });
-    router.push("/user-dashboard/lead-reports");
+    router.push(pathname, { scroll: false });
     // toast.success("Filters have been reset.");
   };
 
@@ -362,9 +375,9 @@ export default function ReportsPage() {
                     if (pagination.currentPage > 1) {
                       const params = new URLSearchParams(searchParams);
                       params.set("page", String(pagination.currentPage - 1));
-                      router.push(
-                        `/user-dashboard/lead-reports?${params.toString()}`
-                      );
+                      router.push(`${pathname}?${params.toString()}`, {
+                        scroll: false,
+                      });
                     }
                   }}
                   disabled={pagination.currentPage === 1 || isLoading}
@@ -377,9 +390,9 @@ export default function ReportsPage() {
                     if (pagination.currentPage < pagination.totalPages) {
                       const params = new URLSearchParams(searchParams);
                       params.set("page", String(pagination.currentPage + 1));
-                      router.push(
-                        `/user-dashboard/lead-reports?${params.toString()}`
-                      );
+                      router.push(`${pathname}?${params.toString()}`, {
+                        scroll: false,
+                      });
                     }
                   }}
                   disabled={
