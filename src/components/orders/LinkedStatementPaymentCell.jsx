@@ -6,14 +6,16 @@ import {
   orderHasInvoiceNumber,
   orderInvoiceHasPaymentLink,
 } from "@/lib/orderLinkedPaymentsDisplay";
-import { sumOrderPaymentAmounts } from "@/lib/orderPaymentHistory";
+import {
+  allowNeworderPaymentAmountWithoutInvoiceLink,
+  sumOrderPaymentAmounts,
+} from "@/lib/orderPaymentHistory";
 
 export default function LinkedStatementPaymentCell({ order }) {
   const inv = String(
     order.invoice_number || order.active_invoice_number || "",
   ).trim();
 
-  // Hover: only trans_ids that are linked on the invoice (invoices.linked_trans_ids)
   const lines =
     orderHasInvoiceNumber(order) && orderInvoiceHasPaymentLink(order)
       ? getOrderPaymentsLinkedToInvoice(order)
@@ -30,9 +32,11 @@ export default function LinkedStatementPaymentCell({ order }) {
       maximumFractionDigits: 2,
     })}`;
 
-  const bookingPaid = !orderInvoiceHasPaymentLink(order)
-    ? sumOrderPaymentAmounts(order)
-    : 0;
+  const bookingPaid =
+    !orderInvoiceHasPaymentLink(order) &&
+    allowNeworderPaymentAmountWithoutInvoiceLink(order)
+      ? sumOrderPaymentAmounts(order)
+      : 0;
 
   const showPaymentDetails = lines.length > 0 || bookingPaid > 0;
 

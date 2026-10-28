@@ -4,6 +4,40 @@ import {
   sumStatementLinkedOrderPayments,
 } from "@/lib/orderLinkedPaymentsDisplay";
 
+/** Without invoice link, neworder.payment_amount counts only for orders before this date. */
+export const LEGACY_NEWORDER_PAYMENT_AMOUNT_BEFORE_YMD = "2026-04-08";
+
+export function orderDateYmdForPaymentRules(order) {
+  if (!order) return null;
+  const created = order.created_at;
+  if (created != null && created !== "") {
+    if (created instanceof Date && !Number.isNaN(created.getTime())) {
+      return created.toISOString().slice(0, 10);
+    }
+    const s = String(created).trim();
+    const m = s.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (m) return m[1];
+  }
+  const invDate = order.invoice_date;
+  if (invDate != null && invDate !== "") {
+    const s = String(invDate).trim();
+    const m = s.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (m) return m[1];
+  }
+  const oid = String(order.order_id ?? "").trim();
+  if (/^\d{8}/.test(oid)) {
+    return `${oid.slice(0, 4)}-${oid.slice(4, 6)}-${oid.slice(6, 8)}`;
+  }
+  return null;
+}
+
+/** Show booking / neworder payment_amount when there is no invoice Link Payment. */
+export function allowNeworderPaymentAmountWithoutInvoiceLink(order) {
+  const ymd = orderDateYmdForPaymentRules(order);
+  if (!ymd) return false;
+  return ymd < LEGACY_NEWORDER_PAYMENT_AMOUNT_BEFORE_YMD;
+}
+
 function orderTotalForPaidCap(order) {
   const invGrand = Number(order?.invoice_grand_total);
   if (Number.isFinite(invGrand) && invGrand > 0) return invGrand;
@@ -124,7 +158,8 @@ export function sumOrderPaymentAmounts(order) {
 
 /**
  * Order list Paid / Balance (admin / accounts / superadmin).
- * Invoice Link Payment → invoice-linked amounts; otherwise neworder.payment_amount CSV.
+ * Invoice Link Payment → invoice-linked amounts; otherwise neworder.payment_amount
+ * only for orders dated before LEGACY_NEWORDER_PAYMENT_AMOUNT_BEFORE_YMD.
  */
 export function getOrderPaidAmountForDisplay(order) {
   const orderTotal = orderTotalForPaidCap(order);
@@ -137,7 +172,7 @@ export function getOrderPaidAmountForDisplay(order) {
     } else {
       paid = sumStatementLinkedOrderPayments(order);
     }
-  } else {
+  } else if (allowNeworderPaymentAmountWithoutInvoiceLink(order)) {
     paid = sumOrderPaymentAmounts(order);
   }
 
@@ -145,6 +180,21 @@ export function getOrderPaidAmountForDisplay(order) {
     paid = Math.min(paid, orderTotal);
   }
   return paid;
+}
+
+/** Payment lines for list / View Payment when no invoice link (date cutoff applies). */
+export function buildOrderOnlyPaymentLinesForDisplay(order) {
+  if (orderInvoiceHasPaymentLink(order)) {
+    return [];
+  }
+  if (!allowNeworderPaymentAmountWithoutInvoiceLink(order)) {
+    return [];
+  }
+  return buildOrderPaymentRows(order).map((row) => ({
+    ref: (row.id || "").trim() || null,
+    date: (row.date || "").trim() || null,
+    amount: Number(row.amount) || 0,
+  }));
 }
 
 function paymentFieldsFromRows(rows) {

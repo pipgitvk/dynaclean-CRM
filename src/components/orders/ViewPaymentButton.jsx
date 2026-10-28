@@ -4,23 +4,50 @@ import { useState } from "react";
 import dayjs from "dayjs";
 import { CreditCard } from "lucide-react";
 import {
-  buildOrderPaymentRows,
-  sumOrderPaymentAmounts,
+  allowNeworderPaymentAmountWithoutInvoiceLink,
+  buildOrderOnlyPaymentLinesForDisplay,
+  getOrderPaidAmountForDisplay,
 } from "@/lib/orderPaymentHistory";
+import {
+  getOrderPaymentsLinkedToInvoice,
+  orderInvoiceHasPaymentLink,
+} from "@/lib/orderLinkedPaymentsDisplay";
+import {
+  deriveOrderListPaymentStatus,
+  getOrderTotalForPayment,
+} from "@/lib/paymentOrderStatus";
+
+function formatPrevDate(d) {
+  if (!d) return "-";
+  const v = dayjs(d);
+  return v.isValid() ? v.format("DD-MM-YYYY") : d;
+}
+
+function formatInr(n) {
+  return Number(n || 0).toLocaleString("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
 
 /** Read-only payment details for order actions menu. */
 export default function ViewPaymentButton({ order, className }) {
   const [open, setOpen] = useState(false);
-  const totalamt = order.totalamt || 0;
-  const rows = buildOrderPaymentRows(order);
-
-  const formatPrevDate = (d) => {
-    if (!d) return "-";
-    const v = dayjs(d);
-    return v.isValid() ? v.format("DD-MM-YYYY") : d;
-  };
-
-  const totalPaid = sumOrderPaymentAmounts(order);
+  const total = getOrderTotalForPayment(order);
+  const totalPaid = getOrderPaidAmountForDisplay(order);
+  const balance = Math.max(0, total - totalPaid);
+  const invoiceLinked = orderInvoiceHasPaymentLink(order);
+  const csvLines = buildOrderOnlyPaymentLinesForDisplay(order);
+  const linkedLines = invoiceLinked
+    ? getOrderPaymentsLinkedToInvoice(order)
+    : [];
+  const displayLines = invoiceLinked
+    ? linkedLines.map((p) => ({
+        ref: p.trans_id || "",
+        date: p.date,
+        amount: p.amount,
+      }))
+    : csvLines;
 
   const buttonClass =
     className ||
@@ -42,19 +69,50 @@ export default function ViewPaymentButton({ order, className }) {
       </button>
       {open && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4"
           onClick={(e) => e.stopPropagation()}
         >
           <div
-            className="bg-white rounded-lg shadow-lg p-4 w-full max-w-md"
+            className="bg-white rounded-lg shadow-lg p-4 w-full max-w-md max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="font-semibold mb-3">View Payment</h3>
-            <p>Total Amount : {totalamt}</p>
+            <h3 className="font-semibold mb-1">View Payment</h3>
+            <p className="text-sm text-gray-600 mb-3">Order {order.order_id}</p>
+            <div className="mb-3 grid grid-cols-3 gap-2 text-sm">
+              <div className="rounded border bg-gray-50 px-2 py-1.5">
+                <div className="text-xs text-gray-500">Total</div>
+                <div className="font-semibold">₹{formatInr(total)}</div>
+              </div>
+              <div className="rounded border bg-green-50 px-2 py-1.5">
+                <div className="text-xs text-gray-500">Paid</div>
+                <div className="font-semibold text-green-800">
+                  ₹{formatInr(totalPaid)}
+                </div>
+              </div>
+              <div className="rounded border bg-amber-50 px-2 py-1.5">
+                <div className="text-xs text-gray-500">Balance</div>
+                <div className="font-semibold text-amber-800">
+                  ₹{formatInr(balance)}
+                </div>
+              </div>
+            </div>
             <div className="space-y-3">
               <div className="text-xs text-gray-700">
-                <div className="font-medium mb-1">Payments</div>
-                {rows.length ? (
+                <div className="font-medium mb-1">
+                  {invoiceLinked
+                    ? "Invoice linked payments"
+                    : allowNeworderPaymentAmountWithoutInvoiceLink(order)
+                      ? "Order payments (before 08-Apr-2026)"
+                      : "Order payments"}
+                </div>
+                {!invoiceLinked &&
+                !allowNeworderPaymentAmountWithoutInvoiceLink(order) ? (
+                  <p className="text-gray-500 py-2">
+                    Without invoice link, booking payment on neworder is shown
+                    only for orders before 08-Apr-2026.
+                  </p>
+                ) : null}
+                {displayLines.length ? (
                   <div className="border rounded">
                     <div className="grid grid-cols-3 text-gray-600 bg-gray-50 px-2 py-1">
                       <div>ID</div>
@@ -62,34 +120,41 @@ export default function ViewPaymentButton({ order, className }) {
                       <div className="text-right">Amount</div>
                     </div>
                     <div className="max-h-40 overflow-auto">
-                      {rows.map((r, idx) => (
+                      {displayLines.map((r, idx) => (
                         <div
                           key={idx}
                           className="grid grid-cols-3 px-2 py-1 border-t"
                         >
-                          <div className="truncate" title={r.id}>
-                            {r.id || "-"}
+                          <div className="truncate" title={r.ref}>
+                            {r.ref || "-"}
                           </div>
                           <div>{formatPrevDate(r.date)}</div>
-                          <div className="text-right">{r.amount || "-"}</div>
+                          <div className="text-right">
+                            {r.amount != null && r.amount !== ""
+                              ? formatInr(r.amount)
+                              : "-"}
+                          </div>
                         </div>
                       ))}
                     </div>
                     <div className="grid grid-cols-3 px-2 py-1 border-t bg-gray-50">
-                      <div className="col-span-2 font-medium">Total Paid</div>
+                      <div className="col-span-2 font-medium">Total paid</div>
                       <div className="text-right font-semibold">
-                        {totalPaid}
+                        ₹{formatInr(totalPaid)}
                       </div>
                     </div>
                   </div>
-                ) : (
-                  <div className="text-gray-500">No payments recorded</div>
+                ) : !invoiceLinked &&
+                  !allowNeworderPaymentAmountWithoutInvoiceLink(order) ? null : (
+                  <div className="text-gray-500 py-2">No payments recorded</div>
                 )}
               </div>
               <div className="text-sm text-gray-600">
                 Status:{" "}
-                <span className="font-medium">
-                  {order.payment_status || "-"}
+                <span className="font-medium capitalize">
+                  {deriveOrderListPaymentStatus(order) ||
+                    order.payment_status ||
+                    "—"}
                 </span>
               </div>
             </div>
@@ -111,10 +176,16 @@ export default function ViewPaymentButton({ order, className }) {
 
 export function orderHasViewablePayment(order) {
   if (!order) return false;
-  if (order.report_file) return true;
+  if (getOrderPaidAmountForDisplay(order) > 0) return true;
+  if (orderInvoiceHasPaymentLink(order)) return true;
+  if (
+    allowNeworderPaymentAmountWithoutInvoiceLink(order) &&
+    String(order.payment_amount || "").trim()
+  ) {
+    return true;
+  }
   if (order.amount_received != null && order.amount_received !== "") return true;
   if (String(order.payment_id || "").trim()) return true;
-  if (String(order.payment_amount || "").trim()) return true;
   if (order.linked_payments_json) return true;
   return false;
 }

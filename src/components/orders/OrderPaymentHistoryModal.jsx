@@ -4,7 +4,7 @@ import { useState } from "react";
 import dayjs from "dayjs";
 import {
   buildOrderPaymentRows,
-  sumOrderPaymentAmounts,
+  getOrderPaidAmountForDisplay,
 } from "@/lib/orderPaymentHistory";
 import { orderHasViewablePayment } from "@/components/orders/ViewPaymentButton";
 
@@ -22,7 +22,7 @@ export function orderShowsPaymentHistory(order, paymentStatusRaw) {
     .toLowerCase()
     .replace(/\s+/g, "");
   if (compact === "paid" || compact === "partiallypaid") return true;
-  if (sumOrderPaymentAmounts(order) > 0) return true;
+  if (getOrderPaidAmountForDisplay(order) > 0) return true;
   return orderHasViewablePayment(order);
 }
 
@@ -35,7 +35,7 @@ export default function OrderPaymentHistoryModal({
   if (!open || !order) return null;
 
   const rows = buildOrderPaymentRows(order);
-  const totalPaid = sumOrderPaymentAmounts(order);
+  const totalPaid = getOrderPaidAmountForDisplay(order);
   const total =
     totalAmount != null && totalAmount !== ""
       ? Number(totalAmount)
