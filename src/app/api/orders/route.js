@@ -334,6 +334,10 @@ export async function POST(req) {
       Number(total_price) ||
       0;
     const paidAtBooking = Number(paymentAmount) || 0;
+    const advanceRequested =
+      Number.isFinite(paidAtBooking) && paidAtBooking > 0
+        ? paidAtBooking
+        : null;
     const paymentStatusAtBooking = derivePaymentStatus({
       total: orderTotalForPayment,
       paidAmount: paidAtBooking,
@@ -359,9 +363,9 @@ export async function POST(req) {
          (order_id, quote_number, quotation_id, po_file, payment_proof, client_name,
           contact, email, delivery_location, company_name, company_address,
           state, sales_status, sales_remark, ship_to, created_by, duedate, client_delivery_date, approval_status,
-          po_number, payment_date, transaction_id, payment_id, payment_amount, payment_status, item_name, item_code, specification,
+          po_number, payment_date, transaction_id, payment_id, payment_amount, payment_status, advance_requested, item_name, item_code, specification,
           quantity, unit, price_per_unit, taxable_price, gst, total_price, img_url, customer_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         orderId,
         quote_number,
@@ -386,8 +390,9 @@ export async function POST(req) {
         paymentDate || null,
         transactionId || null,
         transactionId || null,
-        paymentAmount || null,
+        null,
         paymentStatusAtBooking,
+        advanceRequested,
         item_name || null,
         item_code || null,
         specification || null,
@@ -406,7 +411,7 @@ export async function POST(req) {
       await seedOrderBookingPaymentSnapshot(conn, orderId, {
         transactionId,
         paymentDate,
-        paymentAmount,
+        paymentAmount: advanceRequested,
       });
     } catch (seedErr) {
       console.error("⚠️ Booking payment snapshot seed failed:", seedErr);

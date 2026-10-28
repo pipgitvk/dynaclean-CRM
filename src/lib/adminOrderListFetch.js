@@ -75,7 +75,7 @@ function buildAdminOrderListSql(userRole, username, serviceSupportOnly) {
                 0 AS pending_dispatch_units,
                 no.created_at, no.created_by , no.einvoice_file, no.booking_id, no.quote_number, no.duedate,
                 no.invoice_date , no.account_by ,no.booking_by , no.dispatch_person,
-                no.payment_id, no.payment_date, no.payment_amount, no.amount_received, no.payment_received_date,
+                no.payment_id, no.payment_date, no.payment_amount, no.advance_requested, no.amount_received, no.payment_received_date,
                 no.linked_payments_json,
                 no.payment_status,no.totalamt, no.transaction_id,
                 no.baseAmount, no.taxamt,

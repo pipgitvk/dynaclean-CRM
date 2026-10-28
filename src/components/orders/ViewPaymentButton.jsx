@@ -180,7 +180,8 @@ export function orderHasViewablePayment(order) {
   if (orderInvoiceHasPaymentLink(order)) return true;
   if (
     allowNeworderPaymentAmountWithoutInvoiceLink(order) &&
-    String(order.payment_amount || "").trim()
+    (Number(order.advance_requested) > 0 ||
+      String(order.payment_amount || "").trim())
   ) {
     return true;
   }

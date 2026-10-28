@@ -8,7 +8,7 @@ import {
 } from "@/lib/orderLinkedPaymentsDisplay";
 import {
   allowNeworderPaymentAmountWithoutInvoiceLink,
-  sumOrderPaymentAmounts,
+  sumAdvanceRequestedForDisplay,
 } from "@/lib/orderPaymentHistory";
 
 export default function LinkedStatementPaymentCell({ order }) {
@@ -35,7 +35,7 @@ export default function LinkedStatementPaymentCell({ order }) {
   const bookingPaid =
     !orderInvoiceHasPaymentLink(order) &&
     allowNeworderPaymentAmountWithoutInvoiceLink(order)
-      ? sumOrderPaymentAmounts(order)
+      ? sumAdvanceRequestedForDisplay(order)
       : 0;
 
   const showPaymentDetails = lines.length > 0 || bookingPaid > 0;

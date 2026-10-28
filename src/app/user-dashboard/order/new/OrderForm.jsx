@@ -6,6 +6,7 @@ export default function OrderForm({ quotation, reset }) {
   const { user } = useUser();
   const isGemRole = user?.userRole === "GEM";
   const [formData, setFormData] = useState({
+    ...quotation,
     paymentProofFiles: [],
     poFiles: [],
     salesRemark: "",
@@ -14,7 +15,6 @@ export default function OrderForm({ quotation, reset }) {
     paymentDate: "",
     transactionId: "",
     paymentAmount: "",
-    ...quotation,
   });
   const [hasPO, setHasPO] = useState(null);
   const [submitting, setSubmitting] = useState(false);
@@ -101,7 +101,9 @@ export default function OrderForm({ quotation, reset }) {
     if (submitting) return;
 
     const fd = new FormData();
+    const skipFormKeys = new Set(["items", "payment_amount"]);
     for (const key in formData) {
+      if (skipFormKeys.has(key)) continue;
       if (key === "paymentProofFiles" || key === "poFiles") {
         // Handle arrays of files
         if (formData[key].length > 0) {
@@ -275,6 +277,7 @@ export default function OrderForm({ quotation, reset }) {
               type="number"
               step="0.01"
               required
+              name="paymentAmount"
               value={formData.paymentAmount}
               onChange={(e) =>
                 setFormData((fd) => ({ ...fd, paymentAmount: e.target.value }))

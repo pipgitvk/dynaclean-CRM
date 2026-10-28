@@ -156,6 +156,16 @@ export function sumOrderPaymentAmounts(order) {
     .reduce((sum, n) => sum + n, 0);
 }
 
+/** Booking advance from new order form (`advance_requested`, else legacy payment_amount). */
+export function sumAdvanceRequestedForDisplay(order) {
+  const adv = order?.advance_requested;
+  if (adv != null && String(adv).trim() !== "") {
+    const n = Number(adv);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  return sumOrderPaymentAmounts(order);
+}
+
 /**
  * Order list Paid / Balance (admin / accounts / superadmin).
  * Invoice Link Payment → invoice-linked amounts; otherwise neworder.payment_amount
@@ -173,7 +183,7 @@ export function getOrderPaidAmountForDisplay(order) {
       paid = sumStatementLinkedOrderPayments(order);
     }
   } else if (allowNeworderPaymentAmountWithoutInvoiceLink(order)) {
-    paid = sumOrderPaymentAmounts(order);
+    paid = sumAdvanceRequestedForDisplay(order);
   }
 
   if (orderTotal > 0) {
@@ -189,6 +199,22 @@ export function buildOrderOnlyPaymentLinesForDisplay(order) {
   }
   if (!allowNeworderPaymentAmountWithoutInvoiceLink(order)) {
     return [];
+  }
+  const adv = Number(order?.advance_requested);
+  if (Number.isFinite(adv) && adv > 0) {
+    const tid = String(order?.transaction_id || order?.payment_id || "")
+      .split(",")[0]
+      .trim();
+    const pDate = order?.payment_date
+      ? String(order.payment_date).split(",")[0].trim().slice(0, 10)
+      : null;
+    return [
+      {
+        ref: tid || null,
+        date: pDate,
+        amount: adv,
+      },
+    ];
   }
   return buildOrderPaymentRows(order).map((row) => ({
     ref: (row.id || "").trim() || null,
