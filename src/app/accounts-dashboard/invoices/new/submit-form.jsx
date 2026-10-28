@@ -1,23 +1,48 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import InvoiceItemsTable from "./invoice-table";
 import TaxAndSummary from "./Tax-invoice";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import {
+  navigateAfterInvoiceCreate,
+  resolveOrderListRedirectAfterInvoiceCreate,
+} from "@/lib/invoiceCreateRedirect";
 import Image from "next/image";
 import toast from "react-hot-toast";
 import AddSpecialPriceModal from "@/components/specialPrice/AddSpecialPriceModal";
 import dynacleanLogo from "@/components/logo1.jpg";
+import { LetterheadCompanyInfo, LetterheadBankLine, LetterheadSignatoryLine } from "@/components/invoice/InvoiceLetterheadSection";
+import {
+  applyTaxPercentsToInvoiceItems,
+  getStateCodeFromGstin,
+  invoiceHeaderTaxRates,
+  isInterstateInvoiceSupply,
+  totalGstPercentFromInvoiceItem,
+} from "@/lib/gstSupplyType";
 
-export default function InvoiceForm({ invoiceNumber, invoiceDate, invoiceType = "tax", onBack }) {
+export default function InvoiceForm({
+  invoiceNumber,
+  invoiceDate,
+  invoiceType = "tax",
+  onBack,
+  onSuccessRedirect,
+  initialQuotationNumber = "",
+  initialOrderId = "",
+}) {
   const router = useRouter();
+  const pathname = usePathname();
+  const autoFilledQuoteRef = useRef(false);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Determine the display label based on invoice type
   const invoiceTypeLabel = invoiceType === "performa" ? "Performa Invoice" : "Invoice";
   const [showQuotationModal, setShowQuotationModal] = useState(false);
-  const [quotationNumber, setQuotationNumber] = useState("");
+  const [quotationNumber, setQuotationNumber] = useState(
+    String(initialQuotationNumber || "").trim(),
+  );
+  const [orderId, setOrderId] = useState(String(initialOrderId || "").trim());
   const [isFromQuotation, setIsFromQuotation] = useState(false);
 
   const [items, setItems] = useState([
@@ -61,8 +86,6 @@ export default function InvoiceForm({ invoiceNumber, invoiceDate, invoiceType = 
   const [sgstRate, setSgstRate] = useState(9);
   const [igstRate, setIgstRate] = useState(0);
   const [roundOff, setRoundOff] = useState(0);
-
-  const SUPPLIER_STATE_CODE = "07";
 
   const stateCodeToName = useMemo(() => ({
     "01": "Jammu & Kashmir", "02": "Himachal Pradesh", "03": "Punjab",
@@ -139,29 +162,69 @@ export default function InvoiceForm({ invoiceNumber, invoiceDate, invoiceType = 
     }
   }, [taxSummary.finalRoundOff, isAutoRoundOff]);
 
-  // Auto-set state + state_code from GSTIN
-  useEffect(() => {
-    const st = getStateFromGSTIN(form.gst_number?.trim());
-    if (!st) return;
-    setForm((prev) => ({ ...prev, state: st.display, state_code: st.code }));
-    setStateSearch(st.display);
-    setShowStateSuggestions(false);
-  }, [form.gst_number]);
+  const interstateSupply = useMemo(
+    () =>
+      isInterstateInvoiceSupply({
+        buyerGstin: form.gst_number?.trim(),
+        buyerStateCode: form.state_code,
+        stateDisplay: form.state,
+        parseCodeFromDisplay,
+      }),
+    [form.gst_number, form.state, form.state_code],
+  );
 
-  // State-based rate setting — skip if from quotation
-  useEffect(() => {
-    if (isFromQuotation) return;
-    const code = form.state_code || parseCodeFromDisplay(form.state);
-    if (!code) return;
+  const lineTaxSignature = useMemo(
+    () =>
+      items
+        .map(
+          (i) =>
+            `${i.item_code ?? ""}|${i.item_name ?? ""}|${i.description ?? ""}|${i.gst_rate ?? ""}|${i.product_gst_rate ?? ""}|${i.gst ?? ""}`,
+        )
+        .join("§"),
+    [items],
+  );
 
-    if (code === SUPPLIER_STATE_CODE) {
-      setCgstRate(9); setSgstRate(9); setIgstRate(0);
-      setItems((prev) => prev.map((item) => ({ ...item, cgst_percent: 9, sgst_percent: 9, igst_percent: 0 })));
-    } else {
-      setCgstRate(0); setSgstRate(0); setIgstRate(18);
-      setItems((prev) => prev.map((item) => ({ ...item, cgst_percent: 0, sgst_percent: 0, igst_percent: 18 })));
+  // Auto-set state from GSTIN (quotation: buyer GSTIN/state, not stored quote tax)
+  useEffect(() => {
+    const gstinValue = form.gst_number?.trim();
+
+    if (gstinValue) {
+      const st = getStateFromGSTIN(gstinValue);
+      if (st) {
+        setForm((prev) => {
+          if (prev.state === st.display && prev.state_code === st.code) return prev;
+          return { ...prev, state: st.display, state_code: st.code };
+        });
+        setStateSearch(st.display);
+        setShowStateSuggestions(false);
+      }
     }
-  }, [form.state, form.state_code, isFromQuotation, SUPPLIER_STATE_CODE]);
+  }, [form.gst_number, form.state, form.state_code, stateCodeToName]);
+
+  useEffect(() => {
+    const interstate = interstateSupply;
+    const { cgstRate: cR, sgstRate: sR, igstRate: iR } = invoiceHeaderTaxRates(
+      items,
+      interstate,
+    );
+    setCgstRate(cR);
+    setSgstRate(sR);
+    setIgstRate(iR);
+
+    setItems((prev) => {
+      const next = applyTaxPercentsToInvoiceItems(prev, interstate);
+      const same =
+        prev.length === next.length &&
+        prev.every(
+          (row, idx) =>
+            row.cgst_percent === next[idx].cgst_percent &&
+            row.sgst_percent === next[idx].sgst_percent &&
+            row.igst_percent === next[idx].igst_percent &&
+            row.gst === next[idx].gst,
+        );
+      return same ? prev : next;
+    });
+  }, [lineTaxSignature, interstateSupply]);
 
   const [editableTerms, setEditableTerms] = useState(
     `1. Payment due within specified due date.
@@ -210,8 +273,15 @@ Thanks for doing business with us!`,
       else if (balanceAmount > 0 && balanceAmount < taxSummary.grandTotal) finalPaymentStatus = "PARTIAL";
       else if (balanceAmount >= taxSummary.grandTotal) finalPaymentStatus = "UNPAID";
 
+      const buyersOrderNo = String(
+        form.buyers_order_no || orderId || initialOrderId || "",
+      ).trim();
+
       const dataToSend = {
         ...form,
+        buyers_order_no: buyersOrderNo,
+        order_id: buyersOrderNo || undefined,
+        quotation_id: form.quotation_id || quotationNumber || undefined,
         invoice_number: invoiceNumber,
         invoice_date: invoiceDate,
         invoice_type: invoiceType,
@@ -231,6 +301,7 @@ Thanks for doing business with us!`,
         cgst_rate: cgstRate,
         sgst_rate: sgstRate,
         igst_rate: igstRate,
+        linked_trans_ids: null,
       };
 
       const res = await fetch("/api/invoice-table", {
@@ -240,11 +311,27 @@ Thanks for doing business with us!`,
       });
 
       const data = await res.json();
-      if (data.success) {
+      const created = res.ok && (data.success || data.invoiceNumber);
+      if (created) {
         toast.success("Invoice created successfully");
-        router.push("/accounts-dashboard/invoices");
+        const redirectAfterOrder = resolveOrderListRedirectAfterInvoiceCreate({
+          onSuccessRedirect,
+          orderId,
+          initialOrderId,
+          buyersOrderNo: form.buyers_order_no,
+          pathname,
+        });
+        if (redirectAfterOrder) {
+          navigateAfterInvoiceCreate(router, redirectAfterOrder);
+          return;
+        }
+        if (invoiceType === "performa") {
+          router.push("/accounts-dashboard/performa-invoices");
+        } else {
+          router.push("/accounts-dashboard/invoices");
+        }
       } else {
-        alert("Error: " + data.error);
+        alert("Error: " + (data.error || "Failed to create invoice"));
       }
     } catch (error) {
       console.error("Error submitting invoice:", error);
@@ -254,25 +341,30 @@ Thanks for doing business with us!`,
     }
   };
 
-  const fetchQuotationAndFill = async () => {
-    if (!quotationNumber) { toast.error("Enter quotation number"); return; }
+  const fetchQuotationAndFill = async (quoteNoArg) => {
+    const raw =
+      typeof quoteNoArg === "string" || typeof quoteNoArg === "number"
+        ? quoteNoArg
+        : quotationNumber;
+    const qn = String(raw ?? "").trim();
+    if (!qn) {
+      toast.error("Enter quotation number");
+      return;
+    }
 
     try {
-      const res = await fetch(`/api/get-quotation?quotation_number=${quotationNumber}`);
+      const res = await fetch(
+        `/api/get-quotation?quotation_number=${encodeURIComponent(qn)}`,
+      );
       const data = await res.json();
 
       if (!data.success) { toast.error(data.error || "Quotation not found"); return; }
 
       const quotation = data.quotation;
 
-      if (quotation.cgstRate !== undefined && quotation.cgstRate !== null) setCgstRate(Number(quotation.cgstRate));
-      if (quotation.sgstRate !== undefined && quotation.sgstRate !== null) setSgstRate(Number(quotation.sgstRate));
-      if (quotation.igstRate !== undefined && quotation.igstRate !== null) setIgstRate(Number(quotation.igstRate));
-
       setIsFromQuotation(true);
 
-      setForm((prev) => ({
-        ...prev,
+      const nextForm = {
         customer_name: quotation.customer_name,
         customer_email: quotation.customer_email,
         customer_phone: quotation.customer_contact,
@@ -280,14 +372,36 @@ Thanks for doing business with us!`,
         shipping_address: quotation.shipping_address,
         gst_number: quotation.gst_number,
         state: quotation.state,
-        state_code: quotation.state_code,
+        state_code:
+          quotation.state_code ||
+          getStateCodeFromGstin(quotation.gst_number) ||
+          "",
         customer_id: quotation.customer_id,
         quotation_id: quotation.quotation_id,
         due_date: quotation.due_date ? quotation.due_date.split("T")[0] : "",
+      };
+
+      setForm((prev) => ({
+        ...prev,
+        ...nextForm,
+        buyers_order_no:
+          prev.buyers_order_no ||
+          String(orderId || initialOrderId || "").trim() ||
+          prev.buyers_order_no,
       }));
 
-      setItems(
-        quotation.items.map((it) => ({
+      const interstate = isInterstateInvoiceSupply({
+        buyerGstin: nextForm.gst_number,
+        buyerStateCode: nextForm.state_code,
+        stateDisplay: nextForm.state,
+        parseCodeFromDisplay,
+      });
+
+      const mappedItems = quotation.items.map((it) => {
+        const cg = Number(it.cgst_percent) || 0;
+        const sg = Number(it.sgst_percent) || 0;
+        const ig = Number(it.igst_percent) || 0;
+        return {
           item_name: it.item_name || "",
           item_code: it.item_code || "",
           description: it.specification || it.description || "",
@@ -297,23 +411,62 @@ Thanks for doing business with us!`,
           rate: it.rate || it.price_per_unit || 0,
           discount_percent: it.discount_percent || 0,
           discount_amount: it.discount_amount || 0,
-          cgst_percent: it.cgst_percent || 0,
-          sgst_percent: it.sgst_percent || 0,
-          igst_percent: it.igst_percent || 0,
+          cgst_percent: cg,
+          sgst_percent: sg,
+          igst_percent: ig,
+          gst_rate:
+            it.gst_rate != null && String(it.gst_rate).trim() !== ""
+              ? Number(it.gst_rate)
+              : null,
+          gst: totalGstPercentFromInvoiceItem({
+            item_name: it.item_name || "",
+            item_code: it.item_code || "",
+            description: it.specification || it.description || "",
+            gst_rate: it.gst_rate,
+            cgst_percent: cg,
+            sgst_percent: sg,
+            igst_percent: ig,
+            gst: ig || cg + sg,
+          }),
           imageUrl: it.img_url || "",
-        })),
-      );
+        };
+      });
+
+      const taxedItems = applyTaxPercentsToInvoiceItems(mappedItems, interstate);
+      setItems(taxedItems);
+      const rates = invoiceHeaderTaxRates(taxedItems, interstate);
+      setCgstRate(rates.cgstRate);
+      setSgstRate(rates.sgstRate);
+      setIgstRate(rates.igstRate);
 
       if (quotation.round_off) setRoundOff(Number(quotation.round_off) || 0);
 
       toast.success("Quotation loaded successfully");
       setShowQuotationModal(false);
-      setTimeout(() => setQuotationNumber(""), 500);
+      setQuotationNumber(qn);
     } catch (err) {
       console.error(err);
       toast.error("Failed to load quotation");
     }
   };
+
+  useEffect(() => {
+    const qn = String(initialQuotationNumber || "").trim();
+    if (!qn || autoFilledQuoteRef.current) return;
+    autoFilledQuoteRef.current = true;
+    void fetchQuotationAndFill(qn);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-time autofill from order link
+  }, [initialQuotationNumber]);
+
+  useEffect(() => {
+    const oid = String(initialOrderId || "").trim();
+    if (!oid) return;
+    setOrderId(oid);
+    setForm((prev) => ({
+      ...prev,
+      buyers_order_no: prev.buyers_order_no || oid,
+    }));
+  }, [initialOrderId]);
 
   return (
     <>
@@ -327,9 +480,15 @@ Thanks for doing business with us!`,
             Back
           </button>
         )}
-        <button className="bg-green-500 px-4 py-2 rounded text-white cursor-pointer ml-auto" onClick={() => setShowQuotationModal(true)}>
-          Add with quotation number
-        </button>
+        <div className="flex flex-wrap gap-2 ml-auto">
+          <button
+            type="button"
+            className="bg-green-500 px-4 py-2 rounded text-white cursor-pointer hover:bg-green-600"
+            onClick={() => setShowQuotationModal(true)}
+          >
+            Add with quotation number
+          </button>
+        </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6 max-w-5xl mx-auto px-4 text-gray-800">
@@ -340,16 +499,8 @@ Thanks for doing business with us!`,
           ) : (
             <div className="w-[120px] h-[80px] border border-gray-200 flex items-center justify-center text-xs font-semibold text-red-600">DYNACLEAN</div>
           )}
-          <div className="flex-1 text-sm text-gray-700">
-            <h2 className="text-xl font-bold text-red-600 mb-1">Dynaclean Industries Pvt Ltd</h2>
-            <p className="leading-relaxed">
-              <span className="block">1st Floor, 13-B, Kattabomman Street, Gandhi Nagar Main Road,</span>
-              <span className="block">Gandhi Nagar, Ganapathy, Coimbatore, Tamil Nadu, 641006</span>
-              <span className="block mt-1"><strong>Phone:</strong> 011-45143666, +91-7982456944</span>
-              <span className="block"><strong>Email:</strong> sales@dynacleanindustries.com</span>
-              <span className="block mt-1"><strong>GSTIN:</strong> 07AAKCD6495M1ZV | <strong>State:</strong> Delhi (07)</span>
-            </p>
-          </div>
+          <LetterheadCompanyInfo />
+        
         </div>
 
         {/* Invoice Info */}
@@ -378,6 +529,29 @@ Thanks for doing business with us!`,
             />
           </div>
         </div>
+
+        {(quotationNumber || orderId) && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-emerald-50/80 p-4 rounded border border-emerald-100">
+            <div>
+              <label className="text-sm text-gray-600">Quotation Number</label>
+              <input
+                type="text"
+                value={quotationNumber}
+                readOnly
+                className="input w-full bg-gray-100"
+              />
+            </div>
+            <div>
+              <label className="text-sm text-gray-600">Order ID</label>
+              <input
+                type="text"
+                value={orderId}
+                readOnly
+                className="input w-full bg-gray-100"
+              />
+            </div>
+          </div>
+        )}
 
         {/* Order Reference */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-gray-50 p-4 rounded">
@@ -449,7 +623,7 @@ Thanks for doing business with us!`,
 
           <div>
             <label className="text-sm text-gray-600">Amount Paid</label>
-            <input type="number" min="0" className="input w-full bg-gray-100 cursor-not-allowed" value={form.amount_paid} readOnly tabIndex={-1} title="Set via Payment Link or quotation load" />
+            <input type="number" min="0" className="input w-full bg-gray-100 cursor-not-allowed" value={form.amount_paid} readOnly tabIndex={-1} title="From quotation when applicable" />
           </div>
           <div>
             <label className="text-sm text-gray-600">Payment Status</label>
@@ -465,7 +639,11 @@ Thanks for doing business with us!`,
           <AddSpecialPriceModal customerId={form.customer_id} buttonLabel="Set Special Price" />
         </div>
 
-        <InvoiceItemsTable items={items} setItems={setItems} />
+        <InvoiceItemsTable
+          items={items}
+          setItems={setItems}
+          interstate={interstateSupply}
+        />
 
         <TaxAndSummary
           items={items}
@@ -498,14 +676,14 @@ Thanks for doing business with us!`,
           <div className="lg:col-span-1 space-y-4">
             <div className="border p-4 rounded bg-gray-50 text-sm">
               <h4 className="font-semibold mb-2">Bank Details</h4>
-              <p>A/C Holder: Dynaclean Industries Private Limited</p>
+              <LetterheadBankLine />
               <p>ICICI Bank</p>
               <p>Account: 343405500379</p>
               <p>IFSC: ICIC0003434</p>
             </div>
             <div className="border p-4 rounded bg-gray-50 text-sm text-center flex flex-col justify-between">
               <div>
-                <p>For Dynaclean Industries Pvt Ltd</p>
+                <LetterheadSignatoryLine />
                 <Image src="/images/sign.png" alt="Sign" width={100} height={80} className="mx-auto mt-2" unoptimized />
               </div>
               <p className="mt-2 font-semibold">Authorized Signatory</p>

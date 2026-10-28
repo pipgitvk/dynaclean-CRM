@@ -1,6 +1,24 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import Image from "next/image";
+import OrderDocumentFileCard from "@/components/orders/OrderDocumentFileCard";
+import OrderInvoiceNumberEditor from "@/components/orders/OrderInvoiceNumberEditor";
+import { sumOrderPaymentAmounts } from "@/lib/orderPaymentHistory";
+import {
+  deriveOrderPaymentStatus,
+  getOrderTotalForPayment,
+} from "@/lib/paymentOrderStatus";
+
+const FILE_FIELDS = [
+  { label: "Payment Proof", key: "payment_proof" },
+  { label: "Purchase Order", key: "po_file" },
+  { label: "Invoice", key: "report_file" },
+  { label: "E-way Bill", key: "ewaybill_file" },
+  { label: "E-invoice", key: "einvoice_file" },
+  { label: "Delivery Challan", key: "deliverchallan" },
+  { label: "Delivery Proof", key: "delivery_proof" },
+];
 
 export default function OrderDetails({ data }) {
   const {
@@ -9,7 +27,7 @@ export default function OrderDetails({ data }) {
     stages,
     currentStage,
     progressPercent,
-    currentIndex,
+    stepCompleted,
   } = data;
 
   const currency = (n) =>
@@ -23,26 +41,57 @@ export default function OrderDetails({ data }) {
     return isNaN(date) ? d : date.toLocaleDateString("en-IN");
   };
 
-  const totalPaid = () => {
-    if (!orderDetails.payment_amount) return 0;
-    const amounts = String(orderDetails.payment_amount)
-      .split(",")
-      .map(s => s.trim())
-      .filter(Boolean)
-      .map(x => Number(x))
-      .filter(n => !isNaN(n));
-    return amounts.reduce((sum, n) => sum + n, 0);
+  const displayTotal = useMemo(
+    () => getOrderTotalForPayment(orderDetails),
+    [orderDetails],
+  );
+
+  const displayTax = useMemo(() => {
+    const tax = Number(orderDetails.taxamt);
+    if (tax > 0) return tax;
+    const base = Number(orderDetails.baseAmount) || 0;
+    const total = displayTotal || 0;
+    if (total > 0 && base > 0 && total >= base) return total - base;
+    const gst = Number(orderDetails.quotation_gst);
+    return gst > 0 ? gst : 0;
+  }, [orderDetails, displayTotal]);
+
+  const totalPaid = useMemo(
+    () => sumOrderPaymentAmounts(orderDetails),
+    [orderDetails],
+  );
+
+  const paymentStatus = useMemo(
+    () => deriveOrderPaymentStatus(orderDetails),
+    [orderDetails],
+  );
+
+  const files = FILE_FIELDS;
+
+  const [fileValues, setFileValues] = useState(() => {
+    const initial = {};
+    FILE_FIELDS.forEach(({ key }) => {
+      initial[key] = orderDetails[key] || "";
+    });
+    return initial;
+  });
+
+  const handleFilesUploaded = (fieldKey, newValue) => {
+    setFileValues((prev) => ({ ...prev, [fieldKey]: newValue }));
   };
 
-  const files = [
-    { label: "Payment Proof", key: "payment_proof" },
-    { label: "Purchase Order", key: "po_file" },
-    { label: "Invoice", key: "report_file" },
-    { label: "E-way Bill", key: "ewaybill_file" },
-    { label: "E-invoice", key: "einvoice_file" },
-    { label: "Delivery Challan", key: "deliverchallan" },
-    { label: "Delivery Proof", key: "delivery_proof" },
-  ];
+  const orderForDocRules = useMemo(
+    () => ({
+      dispatch_status: orderDetails.dispatch_status,
+      delivery_status: orderDetails.delivery_status,
+      delivered_on: orderDetails.delivered_on,
+    }),
+    [
+      orderDetails.dispatch_status,
+      orderDetails.delivery_status,
+      orderDetails.delivered_on,
+    ],
+  );
 
   return (
     <div className="max-w-6xl mx-auto p-6">
@@ -61,7 +110,7 @@ export default function OrderDetails({ data }) {
         {stages.map((label, idx) => (
           <div key={`stage-${idx}`} className="text-center flex-1">
             <div
-              className={`w-6 h-6 mx-auto rounded-full text-white flex items-center justify-center text-xs font-bold ${idx <= currentIndex ? "bg-green-500" : "bg-gray-300"
+              className={`w-6 h-6 mx-auto rounded-full text-white flex items-center justify-center text-xs font-bold ${stepCompleted?.[idx] ? "bg-green-500" : "bg-gray-300"
                 }`}
             >
               {idx + 1}
@@ -84,10 +133,10 @@ export default function OrderDetails({ data }) {
           ["Email", orderDetails.email],
           ["Delivery Location", orderDetails.delivery_location],
           ["Client Delivery Date", formatDate(orderDetails.client_delivery_date)],
-          ["Invoice Number", orderDetails.invoice_number],
-          ["Total Tax", currency(orderDetails.taxamt)],
-          ["Total Amount", currency(orderDetails.totalamt)],
-          ["Total Paid Amount", currency(totalPaid())],
+          ["Total Tax", currency(displayTax)],
+          ["Total Amount", currency(displayTotal)],
+          ["Total Paid Amount", currency(totalPaid)],
+          ["Payment Status", paymentStatus],
           ["Due Date", formatDate(orderDetails.duedate)],
           ["Booking ID", orderDetails.booking_id],
           ["Dispatch Person", orderDetails.dispatch_person],
@@ -100,6 +149,13 @@ export default function OrderDetails({ data }) {
             <p className="font-medium text-gray-800">{value || "-"}</p>
           </div>
         ))}
+        <div>
+          <p className="text-gray-500 text-sm">Invoice Number</p>
+          <OrderInvoiceNumberEditor
+            orderId={orderDetails.order_id}
+            initialValue={orderDetails.invoice_number}
+          />
+        </div>
       </div>
 
       {/* Product Table */}
@@ -187,52 +243,27 @@ export default function OrderDetails({ data }) {
       </div>
 
       {/* File Downloads */}
-      <div className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {files.map(({ label, key }) => {
-          const fileUrl = orderDetails[key];
-          let displayUrl = fileUrl;
-          
-          // Convert direct upload paths to API routes for proper file serving
-          if (fileUrl && fileUrl.startsWith('/uploads/')) {
-            const parts = fileUrl.split('/');
-            if (parts.length >= 3) {
-              // Extract folder and filename from /uploads/folder/filename
-              const folder = parts[2];
-              const filename = parts.slice(3).join('/');
-              displayUrl = `/api/files/${folder}/${encodeURIComponent(filename)}`;
-            }
-          }
-          
-          return (
-            <div key={key} className="p-4 border rounded-lg">
-              <h4 className="text-sm font-semibold mb-2">{label}</h4>
-              {fileUrl ? (
-                <div className="flex gap-2">
-                  <a
-                    href={displayUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:underline text-sm"
-                  >
-                    View
-                  </a>
-                  <a
-                    href={displayUrl}
-                    download
-                    className="text-green-600 hover:underline text-sm"
-                  >
-                    Download
-                  </a>
-                </div>
-              ) : (
-                <p className="text-gray-500 text-xs">Not uploaded</p>
-              )}
-            </div>
-          );
-        })}
+      <div className="mt-8">
+        <p className="text-xs text-gray-500 mb-3">
+          Invoice, e-way bill & e-invoice: up to 5 files each — add more anytime until limit.
+          Delivery challan before delivered. Delivery proof within 24 hours of delivery.
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {files.map(({ label, key }) => (
+            <OrderDocumentFileCard
+              key={key}
+              label={label}
+              fieldKey={key}
+              file={fileValues[key]}
+              orderId={orderDetails.order_id}
+              order={orderForDocRules}
+              onUploaded={handleFilesUploaded}
+            />
+          ))}
+        </div>
 
         {orderDetails.booking_url && (
-          <div className="p-4 border rounded-lg">
+          <div className="p-4 border rounded-lg mt-4">
             <h4 className="text-sm font-semibold mb-2">Booking URL</h4>
             <a
               href={orderDetails.booking_url}
@@ -248,7 +279,7 @@ export default function OrderDetails({ data }) {
 
       <div className="mt-8 text-center">
         <a
-          href="/user-dashboard/order"
+          href="/accounts-dashboard/order"
           className="inline-block text-sm px-4 py-2 border rounded hover:bg-gray-100"
         >
           ← Back to Order List

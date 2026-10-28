@@ -59,7 +59,7 @@ const AttendanceTracker = ({ username }) => {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/empcrm/attendance:schedule");
+        const res = await fetch("/api/empcrm/attendance-schedule");
         if (!res.ok) return;
         const data = await res.json();
         if (!cancelled) setSchedulePayload(data);

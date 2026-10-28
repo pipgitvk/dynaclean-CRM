@@ -1,10 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import {
+  notifyEmployeesListReload,
+  reloadEmployeesAdminPage,
+} from "@/lib/employeesPageReload";
+import { EmbedHeightReporter } from "@/components/embed/EmbedHeightReporter";
 
-export default function RepUpdateForm({ initialPassword, username }) {
-  const router = useRouter();
+export default function RepUpdateForm({ initialPassword, username, compact = false }) {
   const [newPassword, setNewPassword] = useState(initialPassword);
   const [isUpdating, setIsUpdating] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
@@ -25,8 +28,9 @@ export default function RepUpdateForm({ initialPassword, username }) {
 
       if (response.ok) {
         setStatusMessage("✅ Password updated successfully!");
-        // Redirect to the admin dashboard on success
-        router.push("/admin-dashboard/employees");
+        if (!notifyEmployeesListReload()) {
+          reloadEmployeesAdminPage();
+        }
       } else {
         setStatusMessage(`❌ Error: ${result.error || "Update failed."}`);
       }
@@ -39,7 +43,8 @@ export default function RepUpdateForm({ initialPassword, username }) {
   };
 
   return (
-    <form onSubmit={handleUpdate} className="space-y-6">
+    <form onSubmit={handleUpdate} className={compact ? "space-y-4 bg-white" : "space-y-6"}>
+      {compact && <EmbedHeightReporter />}
       <div className="mb-4">
         <label
           htmlFor="new-password"

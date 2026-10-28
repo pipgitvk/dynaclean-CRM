@@ -6,7 +6,6 @@ import {
   rowToAttendanceRulesShape,
   mergeGlobalRulesWithEmployeeSchedule,
 } from "@/lib/attendanceRulesDb";
-
 export const dynamic = 'force-dynamic';
 
 function normalizeUserKey(value) {

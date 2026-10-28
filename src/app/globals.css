@@ -79,6 +79,24 @@ body {
     display: none !important;
   }
 
+  [data-dashboard-sidebar],
+  [data-dashboard-navbar],
+  [data-theme-switcher] {
+    display: none !important;
+  }
+
+  .dashboard-print-shell {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  .dashboard-print-main {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow: visible !important;
+  }
+
   /* Ensure key sections don't get broken across pages */
   .avoid-break {
     page-break-inside: avoid;

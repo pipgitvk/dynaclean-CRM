@@ -98,10 +98,46 @@ export default async function StatementsPage() {
         await conn.execute("ALTER TABLE statements ADD COLUMN cancelled_transaction_id INT UNSIGNED NULL AFTER failed_transaction_id");
       } catch (__) {}
     }
+    // Ensure bank_masters table exists and bank_id / account_number columns exist on statements
+    try {
+      await conn.execute("SELECT id FROM bank_masters LIMIT 1");
+    } catch (_) {
+      try {
+        await conn.execute(`
+          CREATE TABLE IF NOT EXISTS bank_masters (
+            id                  INT UNSIGNED NOT NULL AUTO_INCREMENT,
+            bank_name           VARCHAR(150) NOT NULL,
+            ifsc                VARCHAR(20)  NULL,
+            account_number      VARCHAR(50)  NULL,
+            branch_address      TEXT         NULL,
+            account_holder_name VARCHAR(200) NULL,
+            created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at          TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id)
+          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        `);
+      } catch (__) {}
+    }
+    try {
+      await conn.execute("SELECT bank_id FROM statements LIMIT 1");
+    } catch (_) {
+      try {
+        await conn.execute("ALTER TABLE statements ADD COLUMN bank_id INT UNSIGNED NULL");
+      } catch (__) {}
+    }
+    try {
+      await conn.execute("SELECT account_number FROM statements LIMIT 1");
+    } catch (_) {
+      try {
+        await conn.execute("ALTER TABLE statements ADD COLUMN account_number VARCHAR(50) NULL");
+      } catch (__) {}
+    }
     const [result] = await conn.execute(
-      `SELECT id, trans_id, date, txn_dated_deb, txn_posted_date, cheq_no, description, type, amount, closing_balance, client_expense_id, invoice_number, invoice_status, linked_purchase_ids, dd_id, linked_module_type, linked_module_id, failed_transaction_id, cancelled_transaction_id, created_at
-       FROM statements
-       ORDER BY date DESC, id DESC`
+      `SELECT s.id, s.trans_id, s.date, s.txn_dated_deb, s.txn_posted_date, s.cheq_no, s.description, s.type, s.amount, s.closing_balance, s.client_expense_id, s.invoice_number, s.invoice_status, s.linked_purchase_ids, s.dd_id, s.linked_module_type, s.linked_module_id, s.failed_transaction_id, s.cancelled_transaction_id, s.bank_id, s.account_number, s.created_at,
+              bm.bank_name
+       FROM statements s
+       LEFT JOIN bank_masters bm ON bm.id = s.bank_id
+       ORDER BY s.date DESC, s.id DESC`
     );
     rows = result;
   } catch (err) {

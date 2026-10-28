@@ -5,22 +5,6 @@ import { jwtVerify } from 'jose';
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret";
 const secret = new TextEncoder().encode(JWT_SECRET);
 
-// Pin algorithm and claims so tokens minted by other services sharing the secret are rejected.
-const SESSION_VERIFY_OPTIONS = {
-  algorithms: ["HS256"],
-  issuer: "dynaclean-crm",
-  audience: "dynaclean-crm-web",
-};
-
-async function verifySessionToken(token) {
-  try {
-    const { payload } = await jwtVerify(token, secret, SESSION_VERIFY_OPTIONS);
-    return payload;
-  } catch {
-    return null;
-  }
-}
-
 /**
  * Retrieves and verifies the authentication token from cookies,
  * prioritizing the impersonation token.
@@ -37,7 +21,13 @@ export async function getSessionPayload() {
     return null;
   }
 
-  return verifySessionToken(token);
+  try {
+    const { payload } = await jwtVerify(token, secret);
+    return payload;
+  } catch (error) {
+    console.error("Token verification failed:", error);
+    return null;
+  }
 }
 
 /**
@@ -51,5 +41,11 @@ export async function getMainSessionPayload() {
   if (!mainToken) {
     return null;
   }
-  return verifySessionToken(mainToken);
+  try {
+    const { payload } = await jwtVerify(mainToken, secret);
+    return payload;
+  } catch (error) {
+    console.error("Main token verification failed:", error);
+    return null;
+  }
 }

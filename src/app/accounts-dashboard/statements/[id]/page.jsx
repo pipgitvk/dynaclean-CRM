@@ -108,7 +108,7 @@ export default async function StatementDetailPage({ params }) {
               <p><span className="font-medium">Type of Ledger:</span> {expense.type_of_ledger || "-"}</p>
               <p><span className="font-medium">HSN:</span> {expense.hsn || "-"}</p>
               <p><span className="font-medium">Amount:</span> {expense.amount != null ? `₹${Number(expense.amount).toFixed(2)}` : "-"}</p>
-              <p><span className="font-medium">Created:</span> {expense.created_at ? dayjs(expense.created_at).format("DD MMM YYYY HH:mm") : "-"}</p>
+              <p><span className="font-medium">Created:</span> {expense.created_at ? dayjs(expense.created_at).format("DD-MM-YYYY HH:mm") : "-"}</p>
             </div>
           </div>
         </div>

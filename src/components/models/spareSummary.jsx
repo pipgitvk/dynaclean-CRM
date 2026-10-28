@@ -15,7 +15,7 @@ export default function StockStatusModal({ isOpen, onClose }) {
 
   useEffect(() => {
     if (isOpen) {
-      fetch("/api/spare/model-summary")
+      fetch("/api/spare/modelsummary")
         .then((res) => res.json())
         .then((result) => {
           if (Array.isArray(result)) {

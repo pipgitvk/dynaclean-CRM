@@ -1,5 +1,6 @@
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import Link from "next/link";
@@ -396,13 +397,7 @@ export default function WarrantyForm() {
             placeholder="Invoice Number"
             className="input-sleek border border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-md p-2"
           />
-          <input
-            name="invoice_date"
-            type="date"
-            value={form.invoice_date || ""}
-            onChange={handleChange}
-            className="input-sleek border border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-md p-2"
-          />
+          <TypeableDateFilterInput value={form.invoice_date || ""} onChange={(v) => handleChange({ target: { name: "invoice_date", value: v } })} className="input-sleek border border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-md p-2"/>
 
           {/* File Inputs */}
           <div className="sm:col-span-2">

@@ -3,9 +3,24 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import Link from "next/link";
 import toast from "react-hot-toast";
+import { Pencil } from "lucide-react";
 import InvoiceItemsTable from "./new/invoice-table";
 import TaxAndSummary from "./new/Tax-invoice";
 import PaymentLinkModal from "@/app/user-dashboard/invoices/new/PaymentLinkModal";
+import { useUser } from "@/context/UserContext";
+import { canEditInvoiceHsn } from "@/lib/performaInvoiceAccess";
+import {
+  isPerformaInvoiceType,
+  resolvePerformaInvoiceTerms,
+} from "@/lib/performaInvoiceTerms";
+import {
+  applyTaxPercentsToInvoiceItems,
+  getStateCodeFromGstin,
+  invoiceHeaderTaxRates,
+  isInterstateInvoiceSupply,
+  parseStateCodeFromDisplay,
+  totalGstPercentFromInvoiceItem,
+} from "@/lib/gstSupplyType";
 
 const emptyItem = () => ({
   item_name: "",
@@ -60,7 +75,7 @@ function parseLinkedTransIds(raw) {
 }
 
 function mapItemFromDb(row) {
-  return {
+  const mapped = {
     ...emptyItem(),
     ...row,
     quantity: Number(row.quantity) || 0,
@@ -71,7 +86,29 @@ function mapItemFromDb(row) {
     cgst_percent: Number(row.cgst_percent) || 0,
     sgst_percent: Number(row.sgst_percent) || 0,
     igst_percent: Number(row.igst_percent) || 0,
+    product_gst_rate:
+      row.product_gst_rate != null && String(row.product_gst_rate).trim() !== ""
+        ? Number(row.product_gst_rate)
+        : null,
   };
+  mapped.gst = totalGstPercentFromInvoiceItem(mapped);
+  return mapped;
+}
+
+function applyBuyerGstTaxToEditState(form, items, setters) {
+  const interstate = isInterstateInvoiceSupply({
+    buyerGstin: form.gst_number,
+    buyerStateCode: form.state_code,
+    stateDisplay: form.state,
+    parseCodeFromDisplay: parseStateCodeFromDisplay,
+  });
+  const nextItems = applyTaxPercentsToInvoiceItems(items, interstate);
+  const rates = invoiceHeaderTaxRates(nextItems, interstate);
+  setters.setItems(nextItems);
+  setters.setCgstRate(rates.cgstRate);
+  setters.setSgstRate(rates.sgstRate);
+  setters.setIgstRate(rates.igstRate);
+  return { interstate, nextItems, rates };
 }
 
 export default function InvoiceEditModal({
@@ -81,6 +118,8 @@ export default function InvoiceEditModal({
   onSaved,
   viewHrefBase = "/admin-dashboard/invoices",
 }) {
+  const { user } = useUser();
+  const canEditHsn = canEditInvoiceHsn(user?.userRole);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [invoiceNumber, setInvoiceNumber] = useState("");
@@ -104,6 +143,7 @@ export default function InvoiceEditModal({
     due_date: "",
     amount_paid: 0,
     payment_status: "UNPAID",
+    status: "",
     quotation_id: "",
     buyers_order_no: "",
     eway_bill_no: "",
@@ -112,6 +152,8 @@ export default function InvoiceEditModal({
   });
   const [notes, setNotes] = useState("");
   const [editableTerms, setEditableTerms] = useState("");
+  const [termsEditing, setTermsEditing] = useState(false);
+  const termsTextareaRef = useRef(null);
   const [cgstRate, setCgstRate] = useState(9);
   const [sgstRate, setSgstRate] = useState(9);
   const [igstRate, setIgstRate] = useState(0);
@@ -120,19 +162,47 @@ export default function InvoiceEditModal({
   const [showPaymentLinkModal, setShowPaymentLinkModal] = useState(false);
   const [linkedTransIds, setLinkedTransIds] = useState([]);
   const originalLinkedTransIdsRef = useRef([]);
+  const [buyerTaxReady, setBuyerTaxReady] = useState(false);
+
+  const interstateSupply = useMemo(
+    () =>
+      isInterstateInvoiceSupply({
+        buyerGstin: form.gst_number?.trim(),
+        buyerStateCode: form.state_code,
+        stateDisplay: form.state,
+        parseCodeFromDisplay: parseStateCodeFromDisplay,
+      }),
+    [form.gst_number, form.state, form.state_code],
+  );
+
+  const lineTaxSignature = useMemo(
+    () =>
+      items
+        .map(
+          (i) =>
+            `${i.item_code ?? ""}|${i.item_name ?? ""}|${i.description ?? ""}|${i.product_gst_rate ?? ""}|${i.gst ?? ""}`,
+        )
+        .join("§"),
+    [items],
+  );
 
   const taxSummary = useMemo(() => {
     let subtotal = 0;
+    let cgst = 0;
+    let sgst = 0;
+    let igst = 0;
+
     items.forEach((item) => {
       const qty = item.quantity || 0;
       const rate = item.rate || 0;
       const discountAmount = item.discount_amount || 0;
-      const itemTotal = qty * rate - discountAmount;
-      subtotal += itemTotal;
+      const itemSubtotal = qty * rate - discountAmount;
+      subtotal += itemSubtotal;
+      cgst += (itemSubtotal * (item.cgst_percent || 0)) / 100;
+      sgst += (itemSubtotal * (item.sgst_percent || 0)) / 100;
+      igst += (itemSubtotal * (item.igst_percent || 0)) / 100;
     });
-    const cgst = (subtotal * cgstRate) / 100;
-    const sgst = (subtotal * sgstRate) / 100;
-    const igst = (subtotal * igstRate) / 100;
+
     const totalTax = cgst + sgst + igst;
     
     const totalBeforeRound = subtotal + totalTax;
@@ -145,7 +215,7 @@ export default function InvoiceEditModal({
     const grandTotal = totalBeforeRound + finalRoundOff;
     
     return { subtotal, cgst, sgst, igst, totalTax, grandTotal, finalRoundOff };
-  }, [items, cgstRate, sgstRate, igstRate, roundOff, isAutoRoundOff]);
+  }, [items, roundOff, isAutoRoundOff]);
 
   useEffect(() => {
     if (isAutoRoundOff) {
@@ -154,10 +224,58 @@ export default function InvoiceEditModal({
   }, [taxSummary.finalRoundOff, isAutoRoundOff]);
 
   useEffect(() => {
+    if (!open || loading || !buyerTaxReady) return;
+
+    const gstinValue = form.gst_number?.trim();
+    if (gstinValue) {
+      const code = getStateCodeFromGstin(gstinValue);
+      if (code) {
+        setForm((prev) => {
+          if (prev.state_code === code) return prev;
+          return { ...prev, state_code: code };
+        });
+      }
+    }
+
+    const interstate = interstateSupply;
+    const { cgstRate: cR, sgstRate: sR, igstRate: iR } = invoiceHeaderTaxRates(
+      items,
+      interstate,
+    );
+    setCgstRate(cR);
+    setSgstRate(sR);
+    setIgstRate(iR);
+
+    setItems((prev) => {
+      const next = applyTaxPercentsToInvoiceItems(prev, interstate);
+      const same =
+        prev.length === next.length &&
+        prev.every(
+          (row, idx) =>
+            row.cgst_percent === next[idx].cgst_percent &&
+            row.sgst_percent === next[idx].sgst_percent &&
+            row.igst_percent === next[idx].igst_percent &&
+            row.gst === next[idx].gst,
+        );
+      return same ? prev : next;
+    });
+  }, [
+    open,
+    loading,
+    buyerTaxReady,
+    form.gst_number,
+    form.state,
+    form.state_code,
+    lineTaxSignature,
+    interstateSupply,
+  ]);
+
+  useEffect(() => {
     if (!open || !invoiceId) return;
 
     let cancelled = false;
     setLoading(true);
+    setBuyerTaxReady(false);
 
     (async () => {
       try {
@@ -178,7 +296,18 @@ export default function InvoiceEditModal({
         const pTransIds = parseLinkedTransIds(inv.linked_trans_ids);
         setLinkedTransIds(pTransIds);
         originalLinkedTransIdsRef.current = pTransIds;
-        setForm({
+        setShowPaymentLinkModal(false);
+        setNotes(inv.notes || "");
+        setEditableTerms(
+          isPerformaInvoiceType(inv.type)
+            ? resolvePerformaInvoiceTerms(inv.terms_conditions)
+            : inv.terms_conditions || "",
+        );
+        setTermsEditing(!isPerformaInvoiceType(inv.type));
+        setRoundOff(Number(inv.round_off) || 0);
+        // setIsAutoRoundOff(false); // Keep it true by default as requested
+
+        const loadedForm = {
           customer_id: inv.customer_id != null ? String(inv.customer_id) : "",
           customer_name: inv.customer_name || "",
           customer_email: inv.customer_email || "",
@@ -194,6 +323,7 @@ export default function InvoiceEditModal({
           due_date: dateInputValue(inv.due_date) || "",
           amount_paid: Number(inv.amount_paid) || 0,
           payment_status: inv.payment_status || "UNPAID",
+          status: inv.status || "",
           quotation_id:
             inv.quotation_id != null && inv.quotation_id !== ""
               ? String(inv.quotation_id)
@@ -202,40 +332,21 @@ export default function InvoiceEditModal({
           eway_bill_no: inv.eway_bill_no ?? "",
           delivery_challan_no: inv.delivery_challan_no ?? "",
           order_date: dateInputValue(inv.order_date) || "",
-        });
-        setShowPaymentLinkModal(false);
-        setNotes(inv.notes || "");
-        setEditableTerms(inv.terms_conditions || "");
-        setRoundOff(Number(inv.round_off) || 0);
-        // setIsAutoRoundOff(false); // Keep it true by default as requested
+        };
+        setForm(loadedForm);
 
         const loadedItems =
           Array.isArray(data.items) && data.items.length
             ? data.items.map(mapItemFromDb)
             : [emptyItem()];
-        setItems(loadedItems);
 
-        // Use stored cgst_rate/sgst_rate/igst_rate columns directly
-        // Fall back to back-calculation only if columns not yet populated (old invoices)
-        const storedCgstRate = Number(inv.cgst_rate);
-        const storedSgstRate = Number(inv.sgst_rate);
-        const storedIgstRate = Number(inv.igst_rate);
-        const st = Number(inv.subtotal) || 0;
-
-        if (storedCgstRate > 0 || storedSgstRate > 0 || storedIgstRate > 0) {
-          setCgstRate(storedCgstRate);
-          setSgstRate(storedSgstRate);
-          setIgstRate(storedIgstRate);
-        } else if (st > 0) {
-          // Legacy fallback for invoices created before this fix
-          setCgstRate(Math.round(((Number(inv.cgst) || 0) / st) * 10000) / 100);
-          setSgstRate(Math.round(((Number(inv.sgst) || 0) / st) * 10000) / 100);
-          setIgstRate(Math.round(((Number(inv.igst) || 0) / st) * 10000) / 100);
-        } else {
-          setCgstRate(9);
-          setSgstRate(9);
-          setIgstRate(0);
-        }
+        applyBuyerGstTaxToEditState(loadedForm, loadedItems, {
+          setItems,
+          setCgstRate,
+          setSgstRate,
+          setIgstRate,
+        });
+        if (!cancelled) setBuyerTaxReady(true);
       } catch (e) {
         if (!cancelled) {
           toast.error(e?.message || "Failed to load invoice");
@@ -258,21 +369,30 @@ export default function InvoiceEditModal({
     }
     setSaving(true);
     try {
-      const itemsWithTotals = items.map((item) => {
+      const interstate = isInterstateInvoiceSupply({
+        buyerGstin: form.gst_number,
+        buyerStateCode: form.state_code,
+        stateDisplay: form.state,
+        parseCodeFromDisplay: parseStateCodeFromDisplay,
+      });
+      const taxedItems = applyTaxPercentsToInvoiceItems(items, interstate);
+      const headerRates = invoiceHeaderTaxRates(taxedItems, interstate);
+
+      const itemsWithTotals = taxedItems.map((item) => {
         const qty = item.quantity || 0;
         const rate = item.rate || 0;
         const discountAmount = item.discount_amount || 0;
         const taxableValue = qty * rate - discountAmount;
-        const cgstAmount = (taxableValue * (cgstRate || 0)) / 100;
-        const sgstAmount = (taxableValue * (sgstRate || 0)) / 100;
-        const igstAmount = (taxableValue * (igstRate || 0)) / 100;
+        const cgstAmount = (taxableValue * (item.cgst_percent || 0)) / 100;
+        const sgstAmount = (taxableValue * (item.sgst_percent || 0)) / 100;
+        const igstAmount = (taxableValue * (item.igst_percent || 0)) / 100;
         const totalAmount =
           taxableValue + cgstAmount + sgstAmount + igstAmount;
         return {
           ...item,
-          cgst_percent: cgstRate,
-          sgst_percent: sgstRate,
-          igst_percent: igstRate,
+          cgst_percent: item.cgst_percent || 0,
+          sgst_percent: item.sgst_percent || 0,
+          igst_percent: item.igst_percent || 0,
           taxable_value: taxableValue,
           cgst_amount: cgstAmount,
           sgst_amount: sgstAmount,
@@ -281,18 +401,42 @@ export default function InvoiceEditModal({
         };
       });
 
+      const saveSubtotal = itemsWithTotals.reduce(
+        (sum, item) => sum + (Number(item.taxable_value) || 0),
+        0,
+      );
+      const saveCgst = itemsWithTotals.reduce(
+        (sum, item) => sum + (Number(item.cgst_amount) || 0),
+        0,
+      );
+      const saveSgst = itemsWithTotals.reduce(
+        (sum, item) => sum + (Number(item.sgst_amount) || 0),
+        0,
+      );
+      const saveIgst = itemsWithTotals.reduce(
+        (sum, item) => sum + (Number(item.igst_amount) || 0),
+        0,
+      );
+      const saveTotalTax = saveCgst + saveSgst + saveIgst;
+      const totalBeforeRound = saveSubtotal + saveTotalTax;
+      let saveRoundOff = parseFloat(roundOff) || 0;
+      if (isAutoRoundOff) {
+        saveRoundOff = Math.round(totalBeforeRound) - totalBeforeRound;
+      }
+      const saveGrandTotal = totalBeforeRound + saveRoundOff;
+
       const amountPaid = Number(form.amount_paid || 0);
-      const balanceAmount = Math.max(0, taxSummary.grandTotal - amountPaid);
+      const balanceAmount = Math.max(0, saveGrandTotal - amountPaid);
 
       // Auto-set payment status based on balance amount
       let finalPaymentStatus = form.payment_status;
-      if (balanceAmount === 0 && taxSummary.grandTotal > 0) {
+      if (balanceAmount === 0 && saveGrandTotal > 0) {
         // If balance is 0, automatically mark as PAID
         finalPaymentStatus = "PAID";
-      } else if (balanceAmount > 0 && balanceAmount < taxSummary.grandTotal) {
+      } else if (balanceAmount > 0 && balanceAmount < saveGrandTotal) {
         // If balance is between 0 and grand total, mark as PARTIAL
         finalPaymentStatus = "PARTIAL";
-      } else if (balanceAmount === taxSummary.grandTotal) {
+      } else if (balanceAmount === saveGrandTotal) {
         // If balance equals grand total, mark as UNPAID
         finalPaymentStatus = "UNPAID";
       }
@@ -318,16 +462,17 @@ export default function InvoiceEditModal({
         state: form.state || null,
         state_code: form.state_code || null,
         items: itemsWithTotals,
-        subtotal: taxSummary.subtotal,
-        cgst: taxSummary.cgst,
-        sgst: taxSummary.sgst,
-        igst: taxSummary.igst,
-        total_tax: taxSummary.totalTax,
-        round_off: parseFloat(roundOff) || 0,
-        grand_total: taxSummary.grandTotal,
+        subtotal: saveSubtotal,
+        cgst: saveCgst,
+        sgst: saveSgst,
+        igst: saveIgst,
+        total_tax: saveTotalTax,
+        round_off: saveRoundOff,
+        grand_total: saveGrandTotal,
         amount_paid: amountPaid,
         balance_amount: balanceAmount,
         payment_status: finalPaymentStatus,
+        status: form.status || null,
         notes: notes || null,
         terms_conditions: editableTerms || null,
         buyers_order_no: form.buyers_order_no?.trim() || null,
@@ -336,12 +481,9 @@ export default function InvoiceEditModal({
         created_at: createdAtLocal || null,
         customer_id: String(form.customer_id || "").trim() || null,
         linked_trans_ids: linkedTransIds,
-        cgst_rate: cgstRate,
-        sgst_rate: sgstRate,
-        igst_rate: igstRate,
-        send_customer_payment_notice: Boolean(
-          String(form.customer_email || "").trim(),
-        ),
+        cgst_rate: headerRates.cgstRate,
+        sgst_rate: headerRates.sgstRate,
+        igst_rate: headerRates.igstRate,
       };
 
       const removedTransIds = originalLinkedTransIdsRef.current.filter(tid => !linkedTransIds.includes(tid));
@@ -399,20 +541,7 @@ export default function InvoiceEditModal({
           }
         }
       }
-      const mailed = !!String(form.customer_email || "").trim();
-      const n = out.customerEmailNotice;
-      if (mailed && n) {
-        if (n.sent) {
-          toast.success(
-            "Invoice updated. Invoice PDF and payment summary have been emailed to the customer.",
-          );
-        } else {
-          toast.success("Invoice updated");
-          toast.error(n.error || "Customer mail send nahi ho payi.");
-        }
-      } else {
-        toast.success("Invoice updated");
-      }
+      toast.success("Invoice updated");
       onSaved?.();
       onClose?.();
     } catch (err) {
@@ -542,6 +671,11 @@ export default function InvoiceEditModal({
                       setForm({ ...form, customer_email: e.target.value })
                     }
                   />
+                  {invoiceType !== "performa" && (
+                    <p className="mt-1 text-xs text-gray-500">
+                      Save par email auto nahi jayegi — invoice list mein mail icon se bhejein.
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-gray-600 mb-1">Phone</label>
@@ -729,9 +863,31 @@ export default function InvoiceEditModal({
                     <option value="PAID">Paid</option>
                   </select>
                 </div>
+                <div>
+                  <label className="block text-gray-600 mb-1">
+                    Status
+                  </label>
+                  <select
+                    className="w-full border rounded px-2 py-1.5"
+                    value={form.status}
+                    onChange={(e) =>
+                      setForm({ ...form, status: e.target.value })
+                    }
+                  >
+                    <option value="">Select Status</option>
+                    <option value="PAID">Paid</option>
+                    <option value="PARTIAL PAID">Partial Paid</option>
+                    <option value="CANCELLED">Cancelled</option>
+                  </select>
+                </div>
               </div>
 
-              <InvoiceItemsTable items={items} setItems={setItems} isEditMode={true} />
+              <InvoiceItemsTable
+                items={items}
+                setItems={setItems}
+                isEditMode={true}
+                canEditHsn={canEditHsn}
+              />
 
               <TaxAndSummary
                 items={items}
@@ -765,19 +921,43 @@ export default function InvoiceEditModal({
                   />
                 </div>
                 <div>
-                  <label className="block text-gray-600 mb-1 font-medium">
-                    Terms &amp; conditions
-                  </label>
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <label className="block text-gray-600 font-medium">
+                      Terms &amp; conditions
+                    </label>
+                    {invoiceType === "performa" && !termsEditing && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTermsEditing(true);
+                          requestAnimationFrame(() =>
+                            termsTextareaRef.current?.focus(),
+                          );
+                        }}
+                        className="inline-flex items-center rounded p-1 text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                        title="Edit terms & conditions"
+                        aria-label="Edit terms & conditions"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
                   <textarea
-                    rows={5}
-                    className="w-full border rounded px-2 py-1.5 resize-y"
+                    ref={termsTextareaRef}
+                    rows={invoiceType === "performa" ? 10 : 5}
+                    className={`w-full border rounded px-2 py-1.5 resize-y ${
+                      invoiceType === "performa" && !termsEditing
+                        ? "cursor-default bg-gray-50"
+                        : ""
+                    }`}
                     value={editableTerms}
                     onChange={(e) => setEditableTerms(e.target.value)}
+                    readOnly={invoiceType === "performa" && !termsEditing}
                   />
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t">
+              <div className="flex flex-wrap items-center justify-end gap-2 pt-2 border-t">
                 <button
                   type="button"
                   onClick={onClose}

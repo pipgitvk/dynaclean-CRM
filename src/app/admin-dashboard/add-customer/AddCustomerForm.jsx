@@ -53,9 +53,11 @@ export default function AddCustomerForm() {
       });
 
       if (res.ok) {
+        const responseData = await res.json();
         toast.success("Customer added successfully!");
         router.refresh();
-        router.push("/admin-dashboard/customers");
+        // Redirect to customers list page
+        router.push("/user-dashboard/customers");
       } else {
         const text = await res.text();
         try {
@@ -150,6 +152,7 @@ export default function AddCustomerForm() {
             <option value="visit">Visit</option>
             <option value="website_visit">Website Visit</option>
             <option value="reference">Reference</option>
+            <option value="direct_call">Direct Call</option>
           </select>
         </div>
         <div>

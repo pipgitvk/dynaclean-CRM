@@ -1,6 +1,7 @@
 import { getDbConnection } from "@/lib/db";
 import OrderTable from "./OrderTable";
 import { getSessionPayload } from "@/lib/auth";
+import { appendSqlWhereClause, orderListApprovalWhereSql } from "@/lib/orderApprovalVisibility";
 
 // Secret for verifying JWT
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -36,7 +37,7 @@ export default async function OrdersPage() {
                 no.client_name, no.contact, no.is_cancelled, no.dispatch_status,
                 no.created_at, no.created_by , no.einvoice_file, no.booking_id, no.quote_number, no.duedate,
                 no.invoice_date , no.account_by ,no.booking_by , no.dispatch_person,
-                no.payment_id, no.payment_date, no.payment_amount, no.payment_status,no.totalamt,
+                no.payment_id, no.payment_date, no.payment_amount, no.payment_status,no.totalamt, no.transaction_id,
                 no.delivery_date, no.delivered_on, no.delivery_status,no.delivery_proof,
                 no.installation_status, no.is_returned, no.approval_status,
                 qr.company_name, qr.emp_name, qr.state,
@@ -69,6 +70,8 @@ export default async function OrdersPage() {
     sql += " WHERE no.created_by = ?";
     params.push(username);
   }
+
+  sql = appendSqlWhereClause(sql, orderListApprovalWhereSql(userRole));
 
   sql += " GROUP BY no.order_id ORDER BY no.created_at DESC";
 

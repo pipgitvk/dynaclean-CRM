@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSessionPayload } from "@/lib/auth";
 import { getDbConnection } from "@/lib/db";
 import dayjs from "dayjs";
+import { PAYMENT_PENDING_ORDER_SQL_WHERE } from "@/lib/paymentPendingFilters";
 
 export async function GET(req) {
   try {
@@ -39,9 +40,7 @@ export async function GET(req) {
         FROM neworder AS o
         LEFT JOIN emplist AS e ON CAST(o.created_by AS CHAR) = CAST(e.username AS CHAR)
         LEFT JOIN rep_list AS r ON CAST(o.created_by AS CHAR) = CAST(r.username AS CHAR)
-        WHERE (o.payment_status IS NULL OR o.payment_status != 'paid')
-          AND (o.is_returned = 0 OR o.is_returned = 2 OR o.is_returned IS NULL)
-          AND (o.is_cancelled = 0 OR o.is_cancelled IS NULL)
+        WHERE ${PAYMENT_PENDING_ORDER_SQL_WHERE}
           AND o.duedate IS NOT NULL
           AND DATE(o.duedate) >= DATE(?)
           AND DATE(o.duedate) <= DATE(?)
@@ -54,7 +53,7 @@ export async function GET(req) {
       // Process and format response
       const processedOrders = orders.map(order => {
         const daysUntilDue = dayjs(order.duedate).diff(today, 'day');
-        const dueDateFormatted = dayjs(order.duedate).format("DD MMM YYYY");
+        const dueDateFormatted = dayjs(order.duedate).format("DD-MM-YYYY");
         
         const totalAmt = parseFloat(order.totalamt || 0);
         const paidAmt = (order.payment_amount || "")

@@ -1,5 +1,8 @@
 "use client";
 
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
+
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect } from "react";
 import ManualLeadModal from "@/components/models/ManualLeadModal";
 // Inline table for assigned customers (no external table component)
@@ -10,6 +13,10 @@ export default function LeadDistributionPage() {
   const [showModal, setShowModal] = useState(false);
   const [fromDate, setFromDate] = useState(""); // YYYY-MM-DD
   const [toDate, setToDate] = useState("");   // YYYY-MM-DD
+  const [assignedTo, setAssignedTo] = useState("");
+  const [assignedToOptions, setAssignedToOptions] = useState([]);
+  const [campaign, setCampaign] = useState("");
+  const [campaignOptions, setCampaignOptions] = useState([]);
   useEffect(() => {
     let isMounted = true;
     const load = async () => {
@@ -17,12 +24,20 @@ export default function LeadDistributionPage() {
         const params = new URLSearchParams();
         if (fromDate) params.set("from", fromDate);
         if (toDate) params.set("to", toDate);
+        // Don't filter by assignedTo in API - fetch all and filter frontend
         const qs = params.toString();
         const url = qs ? `/api/assigned-customers?${qs}` : "/api/assigned-customers";
         const res = await fetch(url, { cache: "no-store" });
         if (!res.ok) throw new Error("Failed to load");
         const data = await res.json();
-        if (isMounted) setCustomers(data.data || []);
+        if (isMounted) {
+          setCustomers(data.data || []);
+          const rows = data.data || [];
+          const uniqueAssignedTo = [...new Set(rows.map((c) => c.sales_representative).filter(Boolean))];
+          const uniqueCampaigns = [...new Set(rows.map((c) => c.lead_campaign).filter(Boolean))];
+          setAssignedToOptions(uniqueAssignedTo.sort());
+          setCampaignOptions(uniqueCampaigns.sort());
+        }
       } catch (e) {
         if (isMounted) setCustomers([]);
       } finally {
@@ -34,6 +49,12 @@ export default function LeadDistributionPage() {
       isMounted = false;
     };
   }, [fromDate, toDate]);
+
+  const filteredCustomers = customers.filter((c) => {
+    if (assignedTo && c.sales_representative !== assignedTo) return false;
+    if (campaign && c.lead_campaign !== campaign) return false;
+    return true;
+  });
 
   return (
     <>
@@ -56,21 +77,41 @@ export default function LeadDistributionPage() {
         <div className="flex flex-col md:flex-row gap-3 items-start md:items-end">
           <div className="flex flex-col">
             <label className="text-xs text-gray-600 mb-1">From</label>
-            <input
-              type="date"
-              value={fromDate}
-              onChange={(e) => setFromDate(e.target.value)}
-              className="border border-gray-300 rounded px-3 py-2"
-            />
+            <TypeableDateFilterInput value={fromDate} onChange={setFromDate} className="border border-gray-300 rounded px-3 py-2"/>
           </div>
           <div className="flex flex-col">
             <label className="text-xs text-gray-600 mb-1">To</label>
-            <input
-              type="date"
-              value={toDate}
-              onChange={(e) => setToDate(e.target.value)}
+            <TypeableDateFilterInput value={toDate} onChange={setToDate} className="border border-gray-300 rounded px-3 py-2"/>
+          </div>
+          <div className="flex flex-col">
+            <label className="text-xs text-gray-600 mb-1">Campaign</label>
+            <select
+              value={campaign}
+              onChange={(e) => setCampaign(e.target.value)}
+              className="border border-gray-300 rounded px-3 py-2 min-w-[160px]"
+            >
+              <option value="">All</option>
+              {campaignOptions.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-col">
+            <label className="text-xs text-gray-600 mb-1">Assigned To</label>
+            <select
+              value={assignedTo}
+              onChange={(e) => setAssignedTo(e.target.value)}
               className="border border-gray-300 rounded px-3 py-2"
-            />
+            >
+              <option value="">All</option>
+              {assignedToOptions.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
           </div>
           {/* <button
             onClick={() => {
@@ -81,9 +122,15 @@ export default function LeadDistributionPage() {
           >
             Apply
           </button> */}
-          {(fromDate || toDate) && (
+          {(fromDate || toDate || assignedTo || campaign) && (
             <button
-              onClick={() => { setFromDate(""); setToDate(""); setIsLoading(true); }}
+              onClick={() => {
+                setFromDate("");
+                setToDate("");
+                setAssignedTo("");
+                setCampaign("");
+                setIsLoading(true);
+              }}
               className="bg-gray-200 text-gray-800 px-4 py-2 rounded shadow"
             >
               Clear
@@ -110,11 +157,11 @@ export default function LeadDistributionPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {customers.length > 0 ? (
-                  customers.map((c, i) => (
+                {filteredCustomers.length > 0 ? (
+                  filteredCustomers.map((c, i) => (
                     <tr key={c.customer_id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-3 py-3 text-center">{i + 1}</td>
-                      <td className="px-3 py-3">{new Date(c.date_created).toLocaleDateString()}</td>
+                      <td className="px-3 py-3">{formatCrmDateOnly(c.date_created)}</td>
                       <td className="px-3 py-3">{c.lead_campaign}</td>
                       <td className="px-3 py-3">{c.first_name}</td>
                       <td className="px-3 py-3 whitespace-normal break-words max-w-[240px]">{c.company}</td>

@@ -121,6 +121,7 @@ export default function EditWarrantyPage({ serial_number }) {
   const router = useRouter();
   //   const { serial_number } =  params;
   const initialSerialNumber = serial_number; // Serial number from URL
+  const encodedSerialNumber = encodeURIComponent(initialSerialNumber || "");
   // console.log("serial number is here", initialSerialNumber);
   const [productData, setProductData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -151,7 +152,7 @@ export default function EditWarrantyPage({ serial_number }) {
       setError(null);
       try {
         const response = await fetch(
-          `/api/warranty-products/${initialSerialNumber}`,
+          `/api/warranty-products/${encodedSerialNumber}`,
         );
         if (!response.ok) {
           const errorData = await response.json();
@@ -201,7 +202,7 @@ export default function EditWarrantyPage({ serial_number }) {
     }
 
     fetchProductData();
-  }, [initialSerialNumber, reset]);
+  }, [encodedSerialNumber, initialSerialNumber, reset]);
 
   const onSubmit = async (data) => {
     try {
@@ -226,7 +227,7 @@ export default function EditWarrantyPage({ serial_number }) {
       }
 
       const response = await fetch(
-        `/api/warranty-products/${initialSerialNumber}`,
+        `/api/warranty-products/${encodedSerialNumber}`,
         {
           method: "PUT",
           body: formData,

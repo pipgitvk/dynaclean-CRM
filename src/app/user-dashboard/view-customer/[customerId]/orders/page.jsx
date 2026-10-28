@@ -2,6 +2,10 @@ import { getDbConnection } from "@/lib/db";
 import OrderTable from "@/app/user-dashboard/order/OrderTable";
 import { getSessionPayload } from "@/lib/auth";
 import Link from "next/link";
+import {
+  customerOrderMatchParams,
+  sqlCustomerOrderBelongsToCustomer,
+} from "@/lib/customerOrderScope";
 
 export default async function CustomerOrdersPage({ params }) {
   const { customerId } = await params;
@@ -76,9 +80,9 @@ export default async function CustomerOrdersPage({ params }) {
                 quotation_items qi ON no.quote_number = qi.quote_number
             LEFT JOIN
                 credit_notes cn ON CAST(cn.order_id AS CHAR) COLLATE utf8mb4_unicode_ci = CAST(no.order_id AS CHAR) COLLATE utf8mb4_unicode_ci AND cn.is_saved = 1
-            WHERE no.customer_id = ?`;
+            WHERE ${sqlCustomerOrderBelongsToCustomer("no", "qr")}`;
 
-  const ordersParams = [customerId];
+  const ordersParams = customerOrderMatchParams(customerId);
   const isPrivilegedRole = ["SUPERADMIN", "DIRECTOR"].includes(String(userRole).toUpperCase());
   const isAssignedOrLeadSourceOwner =
     customer.assigned_to === username || customer.lead_source === username;

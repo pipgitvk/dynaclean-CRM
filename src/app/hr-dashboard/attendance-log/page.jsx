@@ -1,6 +1,8 @@
 // app/user-dashboard/attendance-log/page.jsx — UI aligned with EMPCRM admin attendance
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import { Loader2, Search, Info, Pencil } from "lucide-react";
@@ -328,17 +330,38 @@ const AttendancePage = () => {
       }
     });
 
+    // Create a map of paid leaves (NOT half-day) — overrides timing when approved
+    const paidLeaveMap = new Map();
+    leaves
+      .filter(leave => leave.username === user && leave.leave_type === 'paid' && !leave.is_half_day)
+      .forEach((leave) => {
+        const fromD = new Date(leave.from_date);
+        const toD = new Date(leave.to_date);
+        for (let d = new Date(fromD); d <= toD; d.setDate(d.getDate() + 1)) {
+          paidLeaveMap.set(d.toLocaleDateString("en-CA"), leave);
+        }
+      });
+
     for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
       const dateString = d.toLocaleDateString("en-CA");
       const existingLog = dateMap.get(dateString);
       const isWeekend = d.getDay() === 0;
       const isHoliday = holidayMap.has(dateString);
       const isOnLeave = leaveMap.has(dateString);
+      const approvedPaidLeave = paidLeaveMap.get(dateString) || null;
 
       const hasRealPunch =
         existingLog && rowHasMeaningfulCheckinOrCheckout(existingLog);
 
-      if (hasRealPunch) {
+      if (approvedPaidLeave) {
+        allDates.push({
+          username: existingLog?.username || user,
+          date: d.toISOString(),
+          type: "paidleave",
+          leaveType: "Paid",
+          leaveReason: approvedPaidLeave.reason || null,
+        });
+      } else if (hasRealPunch) {
         allDates.push({ ...existingLog, type: "present" });
       } else {
         const base = existingLog
@@ -447,7 +470,7 @@ const AttendancePage = () => {
   const summary = filteredLogs.reduce(
     (acc, log) => {
       if (log.type === "absent") acc.absents++;
-      if (log.type === "leave") acc.leaves++;
+      if (log.type === "leave" || log.type === "paidleave") acc.leaves++;
       if (log.type === "holiday") acc.holidays++;
       if (log.type === "sunday") acc.sundays++;
       if (log.type === "present") {
@@ -488,7 +511,7 @@ const AttendancePage = () => {
       // Map and add rows
       filteredLogs.forEach((log) => {
         worksheet.addRow({
-          Date: new Date(log.date).toLocaleDateString(),
+          Date: formatCrmDateOnly(log.date),
           User: log.username,
           Type: log.type === "present" ? "Present" : log.type === "absent" ? "Absent" : log.type === "leave" ? "Leave" : "Holiday",
           Checkin: log.checkin_time ? formatTime(log.checkin_time) : "",
@@ -677,20 +700,10 @@ const AttendancePage = () => {
               >
                 Show All
               </button>
-              <input
-                type="date"
-                value={fromDate}
-                onChange={(e) => setFromDate(e.target.value)}
-                placeholder="From Date"
-                className="px-4 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <input
-                type="date"
-                value={toDate}
-                onChange={(e) => setToDate(e.target.value)}
-                placeholder="To Date"
-                className="px-4 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+              <TypeableDateFilterInput value={fromDate} onChange={setFromDate} placeholder="From Date"
+                className="px-4 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+              <TypeableDateFilterInput value={toDate} onChange={setToDate} placeholder="To Date"
+                className="px-4 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
               <button
                 onClick={() => setFilterStatus("late")}
                 className={`px-4 py-2 rounded-md font-medium text-sm transition-colors duration-200 ${filterStatus === "late"
@@ -740,7 +753,7 @@ const AttendancePage = () => {
                   key={index}
                   className={`rounded-lg shadow-md p-4 space-y-2 ${log.type === "absent"
                     ? "bg-orange-50"
-                    : log.type === "leave"
+                    : log.type === "leave" || log.type === "paidleave"
                       ? "bg-blue-50"
                       : log.type === "sunday"
                         ? "bg-purple-50"
@@ -754,7 +767,7 @@ const AttendancePage = () => {
                       Date:
                     </span>
                     <span className="text-sm text-gray-700">
-                      {new Date(log.date).toLocaleDateString()}
+                      {formatCrmDateOnly(log.date)}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
@@ -892,7 +905,7 @@ const AttendancePage = () => {
                   ) : (
                     <div className="text-center py-4">
                       <p className="text-lg font-bold">
-                        {log.type === "absent" ? "Absent" : log.type === "leave" ? "Leave" : log.type === "sunday" ? "Sunday" : "Holiday"}
+                        {log.type === "absent" ? "Absent" : log.type === "leave" || log.type === "paidleave" ? "Leave" : log.type === "sunday" ? "Sunday" : "Holiday"}
                       </p>
                       {log.leaveType && (
                         <p className="text-sm text-gray-600 mt-1 capitalize">{log.leaveType} Leave</p>
@@ -973,7 +986,7 @@ const AttendancePage = () => {
                       className="hover:bg-gray-50 transition-colors duration-150"
                     >
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {new Date(log.date).toLocaleDateString()}
+                        {formatCrmDateOnly(log.date)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {log.username}
@@ -1106,7 +1119,7 @@ const AttendancePage = () => {
                           colSpan="8"
                           className={`px-6 py-4 text-center ${log.type === "absent"
                             ? "bg-orange-50 text-orange-700"
-                            : log.type === "leave"
+                            : log.type === "leave" || log.type === "paidleave"
                               ? "bg-blue-50 text-blue-700"
                               : log.type === "sunday"
                                 ? "bg-purple-50 text-purple-700"
@@ -1114,7 +1127,7 @@ const AttendancePage = () => {
                             }`}
                         >
                           <p className="font-bold text-lg">
-                            {log.type === "absent" ? "Absent" : log.type === "leave" ? "Leave" : log.type === "sunday" ? "Sunday" : "Holiday"}
+                            {log.type === "absent" ? "Absent" : log.type === "leave" || log.type === "paidleave" ? "Leave" : log.type === "sunday" ? "Sunday" : "Holiday"}
                           </p>
                           {log.leaveType && (
                             <p className="text-sm mt-1 capitalize">{log.leaveType} Leave</p>
@@ -1181,7 +1194,7 @@ const AttendancePage = () => {
             </div>
             <p className="text-sm text-gray-600 mb-4">
               {breakEditLog.username} ·{" "}
-              {new Date(breakEditLog.date).toLocaleDateString()}
+              {formatCrmDateOnly(breakEditLog.date)}
             </p>
             <p className="text-xs text-gray-500 mb-3">
               Leave a field empty to clear that time. Times use the attendance
@@ -1274,7 +1287,7 @@ const AttendancePage = () => {
                 {holidays.map((h) => (
                   <li key={h.id} className="py-2">
                     <p className="font-medium">{h.title}</p>
-                    <p className="text-sm text-gray-600">{new Date(h.holiday_date).toLocaleDateString()} {h.is_optional ? "(Optional)" : ""}</p>
+                    <p className="text-sm text-gray-600">{formatCrmDateOnly(h.holiday_date)} {h.is_optional ? "(Optional)" : ""}</p>
                     {h.description ? (
                       <p className="text-sm text-gray-500">{h.description}</p>
                     ) : null}

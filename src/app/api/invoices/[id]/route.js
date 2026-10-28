@@ -1,10 +1,10 @@
 import { getDbConnection } from "@/lib/db";
 import { NextResponse } from "next/server";
 import { getSessionPayload } from "@/lib/auth";
-import {
-  loadInvoiceWithItemsForPdf,
-  sendInvoicePaymentNoticeEmail,
-} from "@/lib/invoiceCustomerEmailNotice";
+import { canAccessPerformaInvoice } from "@/lib/performaInvoiceAccess";
+import { ensureInvoiceItemsInsertReady } from "@/lib/ensureInvoiceItemsAutoIncrement";
+import { refreshOrdersAfterInvoiceRemoved } from "@/lib/orderInvoicePaymentClear";
+import { syncInvoiceAndOrderPaymentLink } from "@/lib/syncInvoiceOrderPaymentLink";
 
 export async function GET(_req, context) {
   try {
@@ -27,6 +27,10 @@ export async function GET(_req, context) {
     );
 
     if (!inv) {
+      return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+    }
+
+    if (!canAccessPerformaInvoice(payload, inv)) {
       return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
     }
 
@@ -76,7 +80,12 @@ export async function GET(_req, context) {
     }
 
     const [items] = await conn.execute(
-      `SELECT *, item_code as product_code, image_url as imageUrl FROM invoice_items WHERE invoice_id = ? ORDER BY id ASC`,
+      `SELECT ii.*, ii.item_code AS product_code, ii.image_url AS imageUrl,
+              pl.gst_rate AS product_gst_rate
+       FROM invoice_items ii
+       LEFT JOIN products_list pl ON pl.item_code = ii.item_code
+       WHERE ii.invoice_id = ?
+       ORDER BY ii.id ASC`,
       [invoiceId],
     );
 
@@ -149,10 +158,10 @@ export async function PATCH(req, context) {
       created_at = null,
       customer_id: bodyCustomerId,
       linked_trans_ids: bodyLinkedTransIds,
-      send_customer_payment_notice = false,
       cgst_rate: bodyCgstRate = null,
       sgst_rate: bodySgstRate = null,
       igst_rate: bodyIgstRate = null,
+      status: bodyStatus = null,
     } = body;
 
     console.log("Invoice PATCH - Received gst_consignee:", gst_consignee);
@@ -235,12 +244,22 @@ export async function PATCH(req, context) {
         await conn.execute("ALTER TABLE invoice_items ADD COLUMN item_code VARCHAR(100) NULL");
       } catch (__) {}
     }
+    try {
+      await conn.execute("SELECT status FROM invoices LIMIT 1");
+    } catch (_) {
+      try {
+        await conn.execute("ALTER TABLE invoices ADD COLUMN status ENUM('PAID', 'PARTIAL PAID', 'CANCELLED') NULL DEFAULT NULL");
+      } catch (__) {}
+    }
 
     const [[existing]] = await conn.execute(
-      `SELECT id FROM invoices WHERE id = ? LIMIT 1`,
+      `SELECT id, type, created_by, employee_name FROM invoices WHERE id = ? LIMIT 1`,
       [invoiceId],
     );
     if (!existing) {
+      return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+    }
+    if (!canAccessPerformaInvoice(payload, existing)) {
       return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
     }
 
@@ -300,6 +319,7 @@ export async function PATCH(req, context) {
           buyers_order_no = ?, eway_bill_no = ?, delivery_challan_no = ?,
           customer_id = ?, linked_trans_ids = ?,
           cgst_rate = COALESCE(?, cgst_rate), sgst_rate = COALESCE(?, sgst_rate), igst_rate = COALESCE(?, igst_rate),
+          status = ?,
           created_at = ?
         WHERE id = ?`,
         [
@@ -339,6 +359,7 @@ export async function PATCH(req, context) {
           bodyCgstRate,
           bodySgstRate,
           bodyIgstRate,
+          bodyStatus,
           createdAtSql,
           invoiceId,
         ],
@@ -354,7 +375,8 @@ export async function PATCH(req, context) {
           amount_paid = ?, balance_amount = ?, payment_status = ?, notes = ?, terms_conditions = ?,
           buyers_order_no = ?, eway_bill_no = ?, delivery_challan_no = ?,
           customer_id = ?, linked_trans_ids = ?,
-          cgst_rate = COALESCE(?, cgst_rate), sgst_rate = COALESCE(?, sgst_rate), igst_rate = COALESCE(?, igst_rate)
+          cgst_rate = COALESCE(?, cgst_rate), sgst_rate = COALESCE(?, sgst_rate), igst_rate = COALESCE(?, igst_rate),
+          status = ?
         WHERE id = ?`,
         [
           quotation_id,
@@ -393,6 +415,7 @@ export async function PATCH(req, context) {
           bodyCgstRate,
           bodySgstRate,
           bodyIgstRate,
+          bodyStatus,
           invoiceId,
         ],
       );
@@ -401,6 +424,8 @@ export async function PATCH(req, context) {
     await conn.execute(`DELETE FROM invoice_items WHERE invoice_id = ?`, [
       invoiceId,
     ]);
+
+    await ensureInvoiceItemsInsertReady(conn);
 
     for (const item of items) {
       const item_name = item.item_name || null;
@@ -453,43 +478,31 @@ export async function PATCH(req, context) {
 
     await conn.commit();
 
-    /** @type {{ sent?: boolean, skipped?: boolean, reason?: string, error?: string } | null} */
-    let customerEmailNotice = null;
-    const shouldNotifyCustomer =
-      send_customer_payment_notice === true ||
-      send_customer_payment_notice === "true";
-    if (shouldNotifyCustomer) {
+    if (String(bodyStatus || "").trim().toUpperCase() === "CANCELLED") {
       try {
-        const emailTrim =
-          customer_email != null ? String(customer_email).trim() : "";
-        if (!emailTrim) {
-          customerEmailNotice = {
-            sent: false,
-            skipped: true,
-            reason: "missing_customer_email",
-          };
-        } else {
-          const invFull = await loadInvoiceWithItemsForPdf(pool, invoiceId);
-          if (invFull) {
-            customerEmailNotice =
-              await sendInvoicePaymentNoticeEmail(invFull);
-          } else {
-            customerEmailNotice = {
-              sent: false,
-              error: "invoice_reload_failed",
-            };
-          }
-        }
-      } catch (emailErr) {
-        console.error("Invoice PATCH customer email:", emailErr);
-        customerEmailNotice = {
-          sent: false,
-          error: emailErr?.message || String(emailErr),
-        };
+        await refreshOrdersAfterInvoiceRemoved(pool, {
+          invoice_number,
+          quotation_id,
+          buyers_order_no,
+        });
+      } catch (syncErr) {
+        console.error("Invoice PATCH order payment clear:", syncErr);
+      }
+    } else {
+      try {
+        const orderId = buyers_order_no
+          ? String(buyers_order_no).trim()
+          : "";
+        await syncInvoiceAndOrderPaymentLink(pool, {
+          invoiceNumbers: invoice_number ? [invoice_number] : [],
+          orderIds: orderId ? [orderId] : [],
+        });
+      } catch (syncErr) {
+        console.error("Invoice PATCH order payment sync:", syncErr);
       }
     }
 
-    return NextResponse.json({ success: true, invoiceId, customerEmailNotice });
+    return NextResponse.json({ success: true, invoiceId });
   } catch (e) {
     console.error("Invoice PATCH error:", e);
     if (conn) {
@@ -499,6 +512,61 @@ export async function PATCH(req, context) {
         console.error("Rollback error:", rollbackError);
       }
     }
+    return NextResponse.json(
+      { success: false, error: e.message || String(e) },
+      { status: 500 },
+    );
+  } finally {
+    try {
+      conn?.release?.();
+    } catch {}
+  }
+}
+
+export async function DELETE(_req, context) {
+  let conn;
+  try {
+    const payload = await getSessionPayload();
+    if (!payload) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { id } = await context.params;
+    const invoiceId = Number(id);
+    if (!Number.isFinite(invoiceId) || invoiceId <= 0) {
+      return NextResponse.json({ error: "Invalid invoice id" }, { status: 400 });
+    }
+
+    conn = await getDbConnection();
+
+    const [[inv]] = await conn.execute(
+      `SELECT id, invoice_number, quotation_id, buyers_order_no, type, created_by
+       FROM invoices WHERE id = ? LIMIT 1`,
+      [invoiceId],
+    );
+
+    if (!inv) {
+      return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+    }
+
+    if (!canAccessPerformaInvoice(payload, inv)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    await conn.execute(`DELETE FROM invoice_items WHERE invoice_id = ?`, [
+      invoiceId,
+    ]);
+    await conn.execute(`DELETE FROM invoices WHERE id = ?`, [invoiceId]);
+
+    try {
+      await refreshOrdersAfterInvoiceRemoved(conn, inv);
+    } catch (syncErr) {
+      console.error("Invoice DELETE order payment clear:", syncErr);
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (e) {
+    console.error("Invoice DELETE error:", e);
     return NextResponse.json(
       { success: false, error: e.message || String(e) },
       { status: 500 },

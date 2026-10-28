@@ -21,7 +21,25 @@ export async function GET(request, { params }) {
       );
     }
 
-    return NextResponse.json(rows[0]);
+    const record = rows[0];
+    let creator_signature = null;
+
+    if (record.created_by) {
+      try {
+        const [profiles] = await conn.execute(
+          `SELECT signature, updated_signature FROM employee_profiles WHERE username = ? LIMIT 1`,
+          [record.created_by]
+        );
+        if (profiles.length > 0) {
+          creator_signature =
+            profiles[0].updated_signature || profiles[0].signature || null;
+        }
+      } catch (profileErr) {
+        console.warn("AMC/CMC creator signature lookup failed:", profileErr.message);
+      }
+    }
+
+    return NextResponse.json({ ...record, creator_signature });
   } catch (error) {
     console.error("Error fetching AMC/CMC record:", error);
     return NextResponse.json(
@@ -44,6 +62,7 @@ export async function PUT(request, { params }) {
     const formData = await request.formData();
 
     const serial_number = formData.get("serial_number");
+    const contract_type = String(formData.get("contract_type") || "").trim().toUpperCase();
     const company_name = formData.get("company_name");
     const amc_start_datetime = formData.get("amc_start_datetime");
     const amc_end_datetime = formData.get("amc_end_datetime");
@@ -51,6 +70,13 @@ export async function PUT(request, { params }) {
     if (!serial_number || !company_name || !amc_start_datetime || !amc_end_datetime) {
       return NextResponse.json(
         { error: "Missing required fields" },
+        { status: 400 }
+      );
+    }
+
+    if (!["AMC", "CMC"].includes(contract_type)) {
+      return NextResponse.json(
+        { error: "Contract type must be AMC or CMC" },
         { status: 400 }
       );
     }
@@ -114,13 +140,14 @@ export async function PUT(request, { params }) {
 
     await conn.execute(
       `UPDATE amc_cmc SET
-        serial_number = ?, model = ?, image_at_the_time_of_amc = ?, company_name = ?,
+        serial_number = ?, contract_type = ?, model = ?, image_at_the_time_of_amc = ?, company_name = ?,
         contact = ?, email = ?, site_address = ?, site_contact = ?, site_email = ?,
         amc_start_datetime = ?, amc_end_datetime = ?, quotation_ref = ?, invoice = ?,
         payment_proof = ?, terms_and_conditions = ?
       WHERE id = ?`,
       [
         serial_number,
+        contract_type,
         model,
         image_filename,
         company_name,

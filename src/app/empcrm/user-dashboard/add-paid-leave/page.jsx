@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
 import {
   Calendar,
   Plus,
@@ -212,13 +213,7 @@ export default function AddPaidLeavePage() {
     return 0;
   };
 
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-IN', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric'
-    });
-  };
+  const formatDate = (dateString) => formatCrmDateOnly(dateString, "-");
 
   const getStatusBadge = (leave) => {
     if (leave.status === "approved") {

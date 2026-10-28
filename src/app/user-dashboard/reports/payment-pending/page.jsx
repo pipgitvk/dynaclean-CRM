@@ -1,23 +1,45 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import {
+  filterPaymentPendingOrders,
+  sortPaymentPendingOrders,
+} from "@/lib/filterPaymentPendingOrders";
+import PaymentPendingStatsBar from "@/components/reports/PaymentPendingStatsBar";
+import ManualFilterSearchButton, {
+  MANUAL_FILTER_HINT,
+} from "@/components/ui/ManualFilterSearchButton";
+import Link from "next/link";
 import dayjs from "dayjs";
+import {
+  getOrderTableDefaultDateFrom,
+  getOrderTableDefaultDateTo,
+} from "@/lib/orderTableDateDefaults";
 import { Download, Search, Calendar, DollarSign, ArrowUp, ArrowDown, Trash2, X, PhoneCall, History, Loader2 } from "lucide-react";
 
 export default function PaymentPendingReport() {
   const [orders, setOrders] = useState([]);
-  const [filteredOrders, setFilteredOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [appliedSearchQuery, setAppliedSearchQuery] = useState("");
   const [userRole, setUserRole] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [deletingAll, setDeletingAll] = useState(false);
   const [totalOrdersCardClicks, setTotalOrdersCardClicks] = useState(0);
   
-  // New filter states
-  const [dueDateFrom, setDueDateFrom] = useState("");
-  const [dueDateTo, setDueDateTo] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all"); // all, due, no-due
+  const [dueDateFrom, setDueDateFrom] = useState(() =>
+    getOrderTableDefaultDateFrom(),
+  );
+  const [appliedDueDateFrom, setAppliedDueDateFrom] = useState(() =>
+    getOrderTableDefaultDateFrom(),
+  );
+  const [dueDateTo, setDueDateTo] = useState(() => getOrderTableDefaultDateTo());
+  const [appliedDueDateTo, setAppliedDueDateTo] = useState(() =>
+    getOrderTableDefaultDateTo(),
+  );
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [appliedStatusFilter, setAppliedStatusFilter] = useState("all");
   const [followupModalOpen, setFollowupModalOpen] = useState(false);
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -34,7 +56,6 @@ export default function PaymentPendingReport() {
       
       if (data.success) {
         setOrders(data.orders || []);
-        setFilteredOrders(data.orders || []);
         setUserRole(data.userRole || "");
       } else {
         alert(data.error || "Failed to fetch report");
@@ -47,80 +68,29 @@ export default function PaymentPendingReport() {
     }
   };
 
-  useEffect(() => {
-    let filtered = orders;
-    
-    // Apply search filter
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(order => 
-        order.order_id?.toLowerCase().includes(query) ||
-        order.client_name?.toLowerCase().includes(query) ||
-        order.company_name?.toLowerCase().includes(query) ||
-        order.contact?.toLowerCase().includes(query) ||
-        order.created_by?.toLowerCase().includes(query)
-      );
-    }
+  const handleApplySearch = useCallback(() => {
+    setAppliedSearchQuery(searchQuery);
+    setAppliedDueDateFrom(dueDateFrom);
+    setAppliedDueDateTo(dueDateTo);
+    setAppliedStatusFilter(statusFilter);
+  }, [searchQuery, dueDateFrom, dueDateTo, statusFilter]);
 
-    // Apply due date range filter
-    if (dueDateFrom) {
-      filtered = filtered.filter(order =>
-        dayjs(order.due_date).isAfter(dayjs(dueDateFrom).subtract(1, 'day'), 'day')
-      );
-    }
-    if (dueDateTo) {
-      filtered = filtered.filter(order =>
-        dayjs(order.due_date).isBefore(dayjs(dueDateTo).add(1, 'day'), 'day')
-      );
-    }
-
-    // Apply status filter
-    if (statusFilter !== "all") {
-      const today = dayjs().startOf('day');
-      if (statusFilter === "due") {
-        // Due: due_date has passed (is before today)
-        filtered = filtered.filter(order =>
-          dayjs(order.due_date).isBefore(today, 'day')
-        );
-      } else if (statusFilter === "no-due") {
-        // No Due: due_date is in future (is same or after today)
-        filtered = filtered.filter(order => {
-          const orderDate = dayjs(order.due_date).startOf('day');
-          return !orderDate.isBefore(today, 'day');
-        });
-      }
-    }
-
-    // Apply sorting
-    if (sortConfig.key) {
-      filtered = [...filtered].sort((a, b) => {
-        let aVal = a[sortConfig.key];
-        let bVal = b[sortConfig.key];
-
-        // Handle date sorting
-        if (sortConfig.key === 'due_date' || sortConfig.key === 'next_followup_date') {
-          aVal = dayjs(aVal).unix();
-          bVal = dayjs(bVal).unix();
-        }
-        // Handle numeric sorting
-        else if (['total_amount', 'paid_amount', 'remaining_amount'].includes(sortConfig.key)) {
-          aVal = parseFloat(aVal) || 0;
-          bVal = parseFloat(bVal) || 0;
-        }
-        // Handle string sorting
-        else {
-          aVal = (aVal || '').toString().toLowerCase();
-          bVal = (bVal || '').toString().toLowerCase();
-        }
-
-        if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
-        if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
-        return 0;
-      });
-    }
-
-    setFilteredOrders(filtered);
-  }, [searchQuery, orders, sortConfig, dueDateFrom, dueDateTo, statusFilter]);
+  const filteredOrders = useMemo(() => {
+    const filtered = filterPaymentPendingOrders(orders, {
+      searchQuery: appliedSearchQuery,
+      dueDateFrom: appliedDueDateFrom,
+      dueDateTo: appliedDueDateTo,
+      statusFilter: appliedStatusFilter,
+    });
+    return sortPaymentPendingOrders(filtered, sortConfig);
+  }, [
+    orders,
+    appliedSearchQuery,
+    appliedDueDateFrom,
+    appliedDueDateTo,
+    appliedStatusFilter,
+    sortConfig,
+  ]);
 
   const handleSort = (key) => {
     setSortConfig(prev => ({
@@ -147,9 +117,9 @@ export default function PaymentPendingReport() {
       order.total_amount.toFixed(2),
       order.paid_amount.toFixed(2),
       order.remaining_amount.toFixed(2),
-      dayjs(order.due_date).format("DD/MM/YYYY"),
+      dayjs(order.due_date).format("DD-MM-YYYY"),
       order.latest_deduction || "",
-      order.next_followup_date ? dayjs(order.next_followup_date).format("DD/MM/YYYY hh:mm A") : ""
+      order.next_followup_date ? dayjs(order.next_followup_date).format("DD-MM-YYYY hh:mm A") : ""
     ]);
 
     const csvContent = [
@@ -193,7 +163,6 @@ export default function PaymentPendingReport() {
 
       alert("All data deleted successfully.");
       setOrders([]);
-      setFilteredOrders([]);
     } catch (error) {
       console.error("Error deleting all data:", error);
       alert(error.message || "Failed to delete all data");
@@ -205,9 +174,6 @@ export default function PaymentPendingReport() {
   const handleTotalOrdersCardClick = () => {
     setTotalOrdersCardClicks((clicks) => Math.min(clicks + 1, 8));
   };
-
-  const totalPending = filteredOrders.reduce((sum, order) => sum + order.remaining_amount, 0);
-  const totalAmount = filteredOrders.reduce((sum, order) => sum + order.total_amount, 0);
 
   const SkeletonRow = () => (
     <tr className="animate-pulse">
@@ -226,150 +192,111 @@ export default function PaymentPendingReport() {
   );
 
   return (
-    <div className="w-full max-w-full p-6 overflow-hidden">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-800 mb-2">Payment Pending Report</h1>
-        <p className="text-gray-600">
+    <div className="w-full max-w-full p-3 overflow-hidden">
+      <div className="mb-1">
+        <h1 className="text-2xl font-bold text-gray-800 mb-0.5">Payment Pending Report</h1>
+        <p className="text-xs text-gray-600">
           Track orders with pending payments
           {userRole === "SALES" && " (Your orders only)"}
         </p>
       </div>
 
-      {/* Summary Card with Filters */}
-      <div className="mb-6 flex flex-col lg:flex-row gap-4">
-        {/* Summary Card */}
-        <div className="w-80 bg-gradient-to-br from-teal-50 to-cyan-50 rounded-lg shadow-lg p-4 border-l-4 border-teal-500">
-          <h2 className="text-xs font-bold text-teal-600 tracking-widest mb-1">AMOUNT SUMMARY</h2>
-          <p className="text-teal-600 text-xs mb-3">All orders overview</p>
-          
-          <div className="space-y-3">
-            {/* Total Orders */}
-            <div
-              className="cursor-pointer hover:bg-white/50 p-2 rounded transition-colors"
-              onClick={handleTotalOrdersCardClick}
-            >
-              <p className="text-xs text-teal-600 font-semibold mb-1">Total Orders</p>
-              <p className="text-xl font-bold text-gray-800">{filteredOrders.length}</p>
-            </div>
-
-            <hr className="border-teal-200" />
-
-            {/* Total Amount */}
-            <div className="p-2 rounded">
-              <p className="text-xs text-teal-600 font-semibold mb-1">Total Amount</p>
-              <p className="text-xl font-bold text-gray-800">₹{totalAmount.toFixed(2)}</p>
-            </div>
-
-            <hr className="border-teal-200" />
-
-            {/* Pending Amount */}
-            <div className="p-2 rounded">
-              <p className="text-xs text-blue-600 font-semibold mb-1">Pending Amount</p>
-              <p className="text-xl font-bold text-blue-600">₹{totalPending.toFixed(2)}</p>
-            </div>
-          </div>
-
-        {/* Delete All Data Button */}
-        {totalOrdersCardClicks >= 8 && (
-          <div className="mt-6 pt-6 border-t border-teal-200">
-            <button
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation();
-                handleDeleteAllData();
-              }}
-              disabled={deletingAll}
-              className="inline-flex items-center gap-2 rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <Trash2 size={14} />
-              {deletingAll ? "Deleting..." : "Delete All Data"}
-            </button>
-          </div>
-        )}
+      {/* Cards and Filters Layout */}
+      <div className="mb-4 flex flex-col lg:flex-row gap-3">
+        {/* Cards - Left Side */}
+        <div className="flex-shrink-0 w-full lg:max-w-md">
+          <PaymentPendingStatsBar
+            orders={filteredOrders}
+            onOrdersClick={handleTotalOrdersCardClick}
+            totalOrdersCardClicks={totalOrdersCardClicks}
+            showDeleteAll
+            deletingAll={deletingAll}
+            onDeleteAll={handleDeleteAllData}
+          />
         </div>
 
-        {/* Filters Section */}
-        <div className="w-full lg:w-[500px] flex flex-col gap-4">
-          {/* Search Box */}
-          <div className="bg-white rounded-lg shadow p-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+        {/* Filters - Right Side */}
+        <div className="flex-1 bg-white rounded-lg shadow p-3 max-w-2xl">
+          <div className="space-y-2">
+            {/* Row 1: Search Box */}
+            <div className="relative max-w-md">
+              <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400" size={14} />
               <input
                 type="text"
-                placeholder="Search by order ID, customer, company..."
+                placeholder="Search..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleApplySearch();
+                  }
+                }}
+                className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
-          </div>
+            <p className="text-xs text-gray-500">{MANUAL_FILTER_HINT}</p>
 
-          {/* Date and Status Filters */}
-          <div className="bg-white rounded-lg shadow p-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Row 2: Date Filters + Status + Buttons */}
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-2 items-end">
               {/* Due Date From */}
-              <div className="flex flex-col">
-                <label className="text-xs font-semibold text-gray-700 mb-1">Due Date From</label>
-                <input
-                  type="date"
-                  value={dueDateFrom}
-                  onChange={(e) => setDueDateFrom(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                />
+              <div>
+                <TypeableDateFilterInput value={dueDateFrom} onChange={setDueDateFrom} className="w-full px-3 py-2.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  title="From Date"/>
               </div>
 
               {/* Due Date To */}
-              <div className="flex flex-col">
-                <label className="text-xs font-semibold text-gray-700 mb-1">Due Date To</label>
-                <input
-                  type="date"
-                  value={dueDateTo}
-                  onChange={(e) => setDueDateTo(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                />
+              <div>
+                <TypeableDateFilterInput value={dueDateTo} onChange={setDueDateTo} className="w-full px-3 py-2.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  title="To Date"/>
               </div>
 
               {/* Status Filter */}
-              <div className="flex flex-col">
-                <label className="text-xs font-semibold text-gray-700 mb-1">Payment Status</label>
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="w-full px-3 py-2.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="all">All</option>
+                <option value="due">Overdue</option>
+                <option value="no-due">Not Due</option>
+              </select>
+
+              <ManualFilterSearchButton
+                onClick={handleApplySearch}
+                className="w-full px-3 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded"
+              />
+
+              {/* Clear Button */}
+              {(dueDateFrom || dueDateTo || statusFilter !== "all" || searchQuery) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDueDateFrom(getOrderTableDefaultDateFrom());
+                    setDueDateTo(getOrderTableDefaultDateTo());
+                    setStatusFilter("all");
+                    setSearchQuery("");
+                    setAppliedDueDateFrom(getOrderTableDefaultDateFrom());
+                    setAppliedDueDateTo(getOrderTableDefaultDateTo());
+                    setAppliedStatusFilter("all");
+                    setAppliedSearchQuery("");
+                  }}
+                  className="flex items-center justify-center gap-1 bg-gray-500 hover:bg-gray-600 text-white px-3 py-2.5 rounded text-xs font-semibold transition-colors"
                 >
-                  <option value="all">All Orders</option>
-                  <option value="due">Due (Overdue)</option>
-                  <option value="no-due">Not Due</option>
-                </select>
-              </div>
+                  <X size={12} />
+                  Clear
+                </button>
+              )}
 
-              {/* Clear Filters Button */}
-              <div className="flex flex-col justify-end">
-                {(dueDateFrom || dueDateTo || statusFilter !== "all" || searchQuery) && (
-                  <button
-                    onClick={() => {
-                      setDueDateFrom("");
-                      setDueDateTo("");
-                      setStatusFilter("all");
-                      setSearchQuery("");
-                    }}
-                    className="flex items-center justify-center gap-2 bg-gray-500 hover:bg-gray-600 text-white px-3 py-2 rounded-lg transition-colors duration-200 text-sm"
-                  >
-                    <X size={14} />
-                    Clear
-                  </button>
-                )}
-              </div>
+              {/* Export Button */}
+              <button
+                onClick={exportToCSV}
+                className="flex items-center justify-center gap-1 bg-green-600 hover:bg-green-700 text-white px-3 py-2.5 rounded text-xs font-semibold transition-colors"
+              >
+                <Download size={12} />
+                CSV
+              </button>
             </div>
-
-            {/* Export CSV Button */}
-            <button
-              onClick={exportToCSV}
-              className="w-full mt-3 flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors duration-200 text-sm font-semibold"
-            >
-              <Download size={16} />
-              Export CSV
-            </button>
           </div>
         </div>
       </div>
@@ -452,7 +379,16 @@ export default function PaymentPendingReport() {
                   return (
                     <tr key={index} className="hover:bg-gray-50 transition-colors">
                       <td className="px-4 py-3 border-b font-medium text-gray-800">
-                        {order.order_id}
+                        <div>{order.order_id}</div>
+                        {order.quote_number && (
+                          <Link
+                            href={`/user-dashboard/quotations/${encodeURIComponent(order.quote_number)}`}
+                            className="text-[11px] font-medium text-blue-600 hover:text-blue-800 hover:underline mt-0.5 inline-block"
+                            title="View Quotation"
+                          >
+                            {order.quote_number}
+                          </Link>
+                        )}
                       </td>
                       <td className="px-4 py-3 border-b">
                         <div className="text-xs">
@@ -475,7 +411,7 @@ export default function PaymentPendingReport() {
                         <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
                           isOverdue ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
                         }`}>
-                          {dayjs(order.due_date).format("DD/MM/YYYY")}
+                          {dayjs(order.due_date).format("DD-MM-YYYY")}
                           {isOverdue && " ⚠️"}
                         </span>
                       </td>
@@ -495,7 +431,7 @@ export default function PaymentPendingReport() {
                       </td>
                       <td className="px-4 py-3 border-b text-center text-gray-700">
                         {order.next_followup_date
-                          ? dayjs(order.next_followup_date).format("DD/MM/YYYY hh:mm A")
+                          ? dayjs(order.next_followup_date).format("DD-MM-YYYY hh:mm A")
                           : "-"}
                       </td>
                       <td className="px-4 py-3 border-b">
@@ -807,14 +743,14 @@ function HistoryModal({ open, onClose, order }) {
                       {f.created_by || "Unknown"}
                     </div>
                     <div className="text-xs text-gray-600">
-                      {f.created_at ? dayjs(f.created_at).format("DD/MM/YYYY hh:mm A") : ""}
+                      {f.created_at ? dayjs(f.created_at).format("DD-MM-YYYY hh:mm A") : ""}
                     </div>
                   </div>
                   <div className="mt-2 text-sm text-gray-800 whitespace-pre-wrap">{f.notes}</div>
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     {f.followed_date && (
                       <div className="inline-flex items-center rounded-full bg-green-50 px-3 py-1 text-xs font-semibold text-green-800">
-                        Followed: {dayjs(f.followed_date).format("DD/MM/YYYY hh:mm A")}
+                        Followed: {dayjs(f.followed_date).format("DD-MM-YYYY hh:mm A")}
                       </div>
                     )}
                     {f.communication_mode && (
@@ -824,7 +760,7 @@ function HistoryModal({ open, onClose, order }) {
                     )}
                     {f.next_followup_date && (
                       <div className="inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-800">
-                        Next: {dayjs(f.next_followup_date).format("DD/MM/YYYY hh:mm A")}
+                        Next: {dayjs(f.next_followup_date).format("DD-MM-YYYY hh:mm A")}
                       </div>
                     )}
                   </div>

@@ -17,7 +17,7 @@ export default function AssetFormModal({ type, onClose }) {
   });
 
   useEffect(() => {
-    fetch("/api/-reps")
+    fetch("/api/reps")
       .then((res) => res.json())
       .then((data) => setUsers(data.users));
   }, []);

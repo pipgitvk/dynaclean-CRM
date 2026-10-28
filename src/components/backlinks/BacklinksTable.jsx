@@ -1,5 +1,8 @@
 "use client";
 
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
+
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect, useCallback } from "react";
 import { Search, Edit } from "lucide-react";
 import toast from "react-hot-toast";
@@ -20,6 +23,8 @@ const BacklinksTable = () => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedBacklink, setSelectedBacklink] = useState(null);
   const [digitalMarketers, setDigitalMarketers] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   const fetchDigitalMarketers = async () => {
     try {
@@ -43,7 +48,7 @@ const BacklinksTable = () => {
       if (dateTo) params.set("date_to", dateTo);
       if (searchTerm) params.set("search", searchTerm);
 
-      const res = await fetch(`/api/backlinks?,${params.toString()}`);
+      const res = await fetch(`/api/backlinks?${params.toString()}`);
       const data = await res.json();
 
       if (res.ok) {
@@ -75,17 +80,21 @@ const BacklinksTable = () => {
     setIsEditModalOpen(true);
   };
 
-  // Data is already filtered server-side
-  const filteredBacklinks = backlinks;
+  // Pagination logic
+  const totalPages = Math.ceil(backlinks.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedBacklinks = backlinks.slice(startIndex, endIndex);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterStatus, filterAssignedTo, dateFrom, dateTo]);
 
   const formatDate = (dateString) => {
     if (!dateString) return "-";
     const date = new Date(dateString);
-    return date.toLocaleDateString("en-GB", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
+    return formatCrmDateOnly(date);
   };
 
   const getStatusBadgeColor = (status) => {
@@ -146,7 +155,7 @@ const BacklinksTable = () => {
       </div>
 
       {/* Stats Cards */}
-      <BacklinksStatsCards backlinks={filteredBacklinks} />
+      <BacklinksStatsCards backlinks={backlinks} />
 
       {/* Search Box */}
       <div className="relative">
@@ -204,12 +213,7 @@ const BacklinksTable = () => {
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Date From
           </label>
-          <input
-            type="date"
-            value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+          <TypeableDateFilterInput value={dateFrom} onChange={setDateFrom} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"/>
         </div>
 
         {/* Filter by Date To */}
@@ -217,12 +221,7 @@ const BacklinksTable = () => {
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Date To
           </label>
-          <input
-            type="date"
-            value={dateTo}
-            onChange={(e) => setDateTo(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+          <TypeableDateFilterInput value={dateTo} onChange={setDateTo} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"/>
         </div>
       </div>
 
@@ -265,17 +264,17 @@ const BacklinksTable = () => {
             </tr>
           </thead>
           <tbody>
-            {filteredBacklinks.length === 0 ? (
+            {paginatedBacklinks.length === 0 ? (
               <tr>
                 <td colSpan="8" style={{ padding: "32px 24px", textAlign: "center", color: "#6b7280" }}>
                   No backlinks found. Add one to get started!
                 </td>
               </tr>
             ) : (
-              filteredBacklinks.map((backlink, index) => (
+              paginatedBacklinks.map((backlink, index) => (
                 <tr key={backlink.id} style={{ borderBottom: "1px solid #e5e7eb" }}>
                   <td style={{ padding: "12px 24px", fontWeight: "600", color: "#374151", textAlign: "center" }}>
-                    {index + 1}
+                    {startIndex + index + 1}
                   </td>
                   <td style={{ padding: "12px 24px", fontWeight: "500", color: "#1f2937", wordBreak: "break-all" }}>
                     <a href={backlink.website} target="_blank" rel="noopener noreferrer" style={{ color: "#2563eb", textDecoration: "none" }} onMouseOver={(e) => e.target.style.textDecoration = "underline"} onMouseOut={(e) => e.target.style.textDecoration = "none"}>
@@ -321,12 +320,12 @@ const BacklinksTable = () => {
 
       {/* Mobile Card View */}
       <div className="lg:hidden space-y-4">
-        {filteredBacklinks.length === 0 ? (
+        {paginatedBacklinks.length === 0 ? (
           <div className="bg-white rounded-lg p-6 text-center text-gray-500">
             No backlinks found. Add one to get started!
           </div>
         ) : (
-          filteredBacklinks.map((backlink) => (
+          paginatedBacklinks.map((backlink) => (
             <div
               key={backlink.id}
               className="bg-white rounded-lg shadow p-4 space-y-3"
@@ -367,6 +366,79 @@ const BacklinksTable = () => {
           ))
         )}
       </div>
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between bg-white rounded-lg p-4 shadow">
+          <div className="flex items-center gap-2">
+            <label className="text-sm text-gray-600">Items per page:</label>
+            <select
+              value={itemsPerPage}
+              onChange={(e) => {
+                setItemsPerPage(Number(e.target.value));
+                setCurrentPage(1);
+              }}
+              className="px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="5">5</option>
+              <option value="10">10</option>
+              <option value="25">25</option>
+              <option value="50">50</option>
+            </select>
+          </div>
+
+          <div className="text-sm text-gray-600">
+            Page {currentPage} of {totalPages} (Total: {backlinks.length} items)
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Previous
+            </button>
+            
+            {/* Page Numbers */}
+            <div className="flex gap-1">
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                let pageNum;
+                if (totalPages <= 5) {
+                  pageNum = i + 1;
+                } else if (currentPage <= 3) {
+                  pageNum = i + 1;
+                } else if (currentPage >= totalPages - 2) {
+                  pageNum = totalPages - 4 + i;
+                } else {
+                  pageNum = currentPage - 2 + i;
+                }
+                return (
+                  <button
+                    key={pageNum}
+                    onClick={() => setCurrentPage(pageNum)}
+                    className={`px-2 py-1 rounded text-sm ${
+                      currentPage === pageNum
+                        ? "bg-blue-600 text-white"
+                        : "border border-gray-300 hover:bg-gray-100"
+                    }`}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
+            </div>
+
+            <button
+              onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+              disabled={currentPage === totalPages}
+              className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Modals */}
       <AddBacklinkModal

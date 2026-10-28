@@ -217,6 +217,14 @@ export default function ProfileApprovalsPage() {
                           className="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-1 w-fit">
                           <Eye className="w-4 h-4" /> View
                         </Link>
+                        {tab === "approved" && s.username && (
+                          <Link
+                            href={`/empcrm/admin-dashboard/profile?username=${encodeURIComponent(s.username.trim())}`}
+                            className="px-3 py-1 bg-purple-600 text-white rounded-md hover:bg-purple-700 flex items-center gap-1 w-fit"
+                          >
+                            Open Profile
+                          </Link>
+                        )}
                         {s.status === "pending" && (
                           <>
                             <button type="button" onClick={() => approve(s.id)}

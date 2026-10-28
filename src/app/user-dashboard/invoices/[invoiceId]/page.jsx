@@ -2,6 +2,9 @@ import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 import NewInvoice from "@/components/invoice/DesignInvoice";
 import { getDbConnection } from "@/lib/db";
+import { getSessionPayload } from "@/lib/auth";
+import { canAccessPerformaInvoice } from "@/lib/performaInvoiceAccess";
+import { attachInvoiceCancelledDisplay } from "@/lib/resolveInvoiceCancelledDisplay";
 
 export const dynamic = "force-dynamic";
 
@@ -150,7 +153,7 @@ async function getInvoiceWithItems(invoiceNumber) {
   }
   // --- End recalculation ---
 
-  return {
+  const withMeta = {
     ...invoice,
     balance_amount: computedBalance,
     payment_status: computedPaymentStatus,
@@ -159,6 +162,7 @@ async function getInvoiceWithItems(invoiceNumber) {
     reference_quote_sno: resolvedQuoteSno,
     items,
   };
+  return attachInvoiceCancelledDisplay(conn, withMeta);
 }
 
 export default async function InvoicePage({ params }) {
@@ -181,8 +185,9 @@ export default async function InvoicePage({ params }) {
 
   //  Fetch invoice + items
   const invoiceData = await getInvoiceWithItems(decodedInvoiceId);
+  const payload = await getSessionPayload();
 
-  if (!invoiceData) {
+  if (!invoiceData || !canAccessPerformaInvoice(payload, invoiceData)) {
     return <p className="p-6 text-red-600">Invoice not found</p>;
   }
 

@@ -6,9 +6,12 @@ import path from "path";
 import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 import { getMainSessionPayload } from "@/lib/auth";
+import { cacheDelete } from "@/lib/cache";
+import { ensureRepListMachineCodeColumn } from "@/lib/ensureRepListMachineCode";
 import {
-  parseModuleAccess,
+  getModuleAccessForDisplay,
   ALL_MODULE_KEYS,
+  stripParentSectionKeys,
   applySuperadminOnlyModuleRestrictions,
 } from "@/lib/moduleAccess";
 // Login username rename disabled — keep import commented if re-enabled:
@@ -68,9 +71,10 @@ export async function GET(request, { params }) {
     const { username } = await params;
     const db = await getDbConnection();
     await ensureModuleAccessColumn(db);
+    await ensureRepListMachineCodeColumn(db);
 
     const [rows] = await db.query(
-      "SELECT username, email, dob, number, address, state, userRole, profile_pic, status, module_access FROM rep_list WHERE username = ?",
+      "SELECT username, email, dob, number, address, state, userRole, profile_pic, status, module_access, machine_code FROM rep_list WHERE username = ?",
       [username],
     );
 
@@ -89,7 +93,7 @@ export async function GET(request, { params }) {
     // Return the raw parsed module_access — DO NOT strip here.
     // Stripping (superadmin-only, HR deny, etc.) happens at save time in the PUT handler
     // and at sidebar-render time. Stripping in GET causes the UI to "lose" ticks on reload.
-    const moduleAccess = parseModuleAccess(emp.module_access ?? null);
+    const moduleAccess = getModuleAccessForDisplay(emp.module_access ?? null, emp.userRole);
 
     return NextResponse.json({
       employee: { ...emp, module_access: moduleAccess },
@@ -118,6 +122,7 @@ export async function PUT(request, { params }) {
 
     const db = await getDbConnection();
     await ensureModuleAccessColumn(db);
+    await ensureRepListMachineCodeColumn(db);
 
     const email = formData.get("email");
     const dob = formData.get("dob");
@@ -125,6 +130,9 @@ export async function PUT(request, { params }) {
     const address = formData.get("address");
     const state = formData.get("state");
     const userRole = formData.get("userRole");
+    const machineCodeRaw = formData.get("machine_code");
+    const machineCode =
+      machineCodeRaw == null ? null : String(machineCodeRaw).trim() || null;
     const profilePic = formData.get("profile_pic");
     const statusRaw = formData.get("status");
     const moduleAccessRaw = formData.get("module_access"); // JSON string from frontend
@@ -161,8 +169,10 @@ export async function PUT(request, { params }) {
       try {
         const parsed = JSON.parse(moduleAccessRaw);
         if (Array.isArray(parsed)) {
-          const effective = applySuperadminOnlyModuleRestrictions(parsed, userRole);
-          moduleAccessToSet = JSON.stringify(effective ?? []);
+          const effective = stripParentSectionKeys(
+            applySuperadminOnlyModuleRestrictions(parsed, userRole) ?? [],
+          );
+          moduleAccessToSet = JSON.stringify(effective);
         }
       } catch {
         // ignore malformed input
@@ -172,8 +182,16 @@ export async function PUT(request, { params }) {
     let profilePicPath = formData.get("current_profile_pic");
 
     // Build dynamic SET clause
-    const setClauses = ["email = ?", "dob = ?", "number = ?", "address = ?", "state = ?", "userRole = ?"];
-    let queryParams = [email, dob, number, address, state, userRole];
+    const setClauses = [
+      "email = ?",
+      "dob = ?",
+      "number = ?",
+      "address = ?",
+      "state = ?",
+      "userRole = ?",
+      "machine_code = ?",
+    ];
+    let queryParams = [email, dob, number, address, state, userRole, machineCode];
 
     if (statusToSet !== null) {
       setClauses.push("status = ?");
@@ -213,9 +231,10 @@ export async function PUT(request, { params }) {
       // Rebuild SET clauses with profile_pic included at correct position (after userRole)
       const setClausesWithPic = [
         "email = ?", "dob = ?", "number = ?", "address = ?", "state = ?", "userRole = ?",
+        "machine_code = ?",
         "profile_pic = ?",
       ];
-      const queryParamsWithPic = [email, dob, number, address, state, userRole, profilePicPath];
+      const queryParamsWithPic = [email, dob, number, address, state, userRole, machineCode, profilePicPath];
 
       if (statusToSet !== null) {
         setClausesWithPic.push("status = ?");
@@ -244,6 +263,8 @@ export async function PUT(request, { params }) {
     // Append the WHERE param and execute
     const finalParams = [...queryParams, effectiveUsername];
     const [result] = await db.query(query, finalParams);
+
+    cacheDelete(`user:${effectiveUsername}`);
 
     return NextResponse.json({
       message:

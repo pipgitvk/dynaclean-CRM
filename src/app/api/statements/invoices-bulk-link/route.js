@@ -1,5 +1,5 @@
 import { getDbConnection } from "@/lib/db";
-import { parseLinkedPurchaseTokens } from "@/lib/statementLinkedPurchases";
+import { parseLinkedPurchaseTokens, parseLinkedTransIds } from "@/lib/statementLinkedPurchases";
 
 export async function PATCH(req) {
   const pool = await getDbConnection();
@@ -113,6 +113,23 @@ export async function PATCH(req) {
         }
 
         await conn.commit();
+
+        try {
+          const { pushInvoiceIdsPaymentToNeworder } = await import(
+            "@/lib/pushInvoicePaymentToNeworder"
+          );
+          const clearResults = await pushInvoiceIdsPaymentToNeworder(
+            conn,
+            invoice_ids,
+          );
+          console.log(
+            `[invoices-bulk-link] unlink cleared neworder:`,
+            JSON.stringify(clearResults),
+          );
+        } catch (clearErr) {
+          console.error("[invoices-bulk-link] order clear on unlink:", clearErr);
+        }
+
         return new Response(JSON.stringify({ ok: true }), {
           status: 200,
           headers: { "Content-Type": "application/json" },
@@ -130,7 +147,7 @@ export async function PATCH(req) {
 
       // Fetch invoices early so we have invoice_number for statement linking
       const [invoices] = await conn.query(
-        "SELECT id, grand_total, amount_paid, linked_trans_ids, invoice_number FROM invoices WHERE id IN (?)",
+        "SELECT id, grand_total, amount_paid, linked_trans_ids, invoice_number, buyers_order_no FROM invoices WHERE id IN (?)",
         [invoice_ids]
       );
 
@@ -193,7 +210,7 @@ export async function PATCH(req) {
 
       // First, get the CURRENT state of the invoices before any changes!
       const [currentInvoices] = await conn.query(
-        "SELECT id, grand_total, amount_paid, linked_trans_ids, invoice_number FROM invoices WHERE id IN (?)",
+        "SELECT id, grand_total, amount_paid, linked_trans_ids, invoice_number, buyers_order_no FROM invoices WHERE id IN (?)",
         [invoice_ids]
       );
 
@@ -223,7 +240,7 @@ export async function PATCH(req) {
       const invoiceTransIdsMap = {};
       sortedInvoices.forEach(inv => {
         invoicePaidMap[inv.id] = Number(inv.amount_paid || 0);
-        invoiceTransIdsMap[inv.id] = new Set(parseLinkedPurchaseTokens(inv.linked_trans_ids)); // preserve existing trans_ids!
+        invoiceTransIdsMap[inv.id] = new Set(parseLinkedTransIds(inv.linked_trans_ids));
       });
 
       // Add initially linked statements (that are still selected) to invoiceTransIdsMap!
@@ -327,9 +344,17 @@ export async function PATCH(req) {
         
         const linkedIdsFromInvoiceNumber = [];
         if (stmt.invoice_number) {
-          const invWithMatchingNumber = sortedInvoices.find(i => i.invoice_number === stmt.invoice_number);
-          if (invWithMatchingNumber) {
-            linkedIdsFromInvoiceNumber.push(invWithMatchingNumber.id);
+          const invoiceNumbers = String(stmt.invoice_number)
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean);
+          for (const num of invoiceNumbers) {
+            const invWithMatchingNumber = sortedInvoices.find(
+              (i) => i.invoice_number === num,
+            );
+            if (invWithMatchingNumber) {
+              linkedIdsFromInvoiceNumber.push(invWithMatchingNumber.id);
+            }
           }
         }
 
@@ -391,6 +416,54 @@ export async function PATCH(req) {
       }
 
       await conn.commit();
+
+      try {
+        const { pushInvoiceIdsPaymentToNeworder } = await import(
+          "@/lib/pushInvoicePaymentToNeworder"
+        );
+        const pushResults = await pushInvoiceIdsPaymentToNeworder(
+          conn,
+          invoice_ids,
+        );
+        console.log(
+          `[invoices-bulk-link] pushInvoicePaymentToNeworder:`,
+          JSON.stringify(pushResults),
+        );
+
+        const { syncInvoiceAndOrderPaymentLink } = await import(
+          "@/lib/syncInvoiceOrderPaymentLink"
+        );
+        const invoiceNumbers = sortedInvoices
+          .map((i) => i.invoice_number)
+          .filter(Boolean);
+        let orderIds = [
+          ...new Set(
+            sortedInvoices
+              .map((i) => String(i.buyers_order_no || "").trim())
+              .filter(Boolean),
+          ),
+        ];
+        if (!orderIds.length && invoiceNumbers.length) {
+          const [bonRows] = await conn.query(
+            "SELECT buyers_order_no FROM invoices WHERE invoice_number IN (?)",
+            [invoiceNumbers],
+          );
+          orderIds = [
+            ...new Set(
+              (bonRows || [])
+                .map((r) => String(r.buyers_order_no || "").trim())
+                .filter(Boolean),
+            ),
+          ];
+        }
+        await syncInvoiceAndOrderPaymentLink(conn, {
+          invoiceNumbers,
+          orderIds,
+        });
+      } catch (syncErr) {
+        console.error("[invoices-bulk-link] order linked-payment sync:", syncErr);
+      }
+
       return new Response(JSON.stringify({ ok: true }), {
         status: 200,
         headers: { "Content-Type": "application/json" },

@@ -57,7 +57,7 @@ export default async function ViewTaskPage({ params }) {
   const formatDate = (d) => {
     if (!d || String(d).startsWith("0000-00-00")) return "Not set";
     const parsed = dayjs(d);
-    return parsed.isValid() ? parsed.format("DD MMM YYYY, hh:mm A") : "Not set";
+    return parsed.isValid() ? parsed.format("DD-MM-YYYY hh:mm A") : "Not set";
   };
 
   const normalizeImagePath = (p) => {

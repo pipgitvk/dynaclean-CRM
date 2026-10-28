@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
-import { EXCLUDE_PROFORMA_INVOICE_SQL } from "@/lib/ledgerInvoiceFilters";
+import { LEDGER_INVOICE_SQL } from "@/lib/ledgerInvoiceFilters";
 import { parseLinkedStatementIds } from "@/lib/statementLinkedPurchases";
 
 function parseTransIds(raw) {
@@ -262,12 +262,26 @@ async function getPartyNameAliases(conn, decodedCompany, customerId) {
     );
     for (const r of custRows) {
       const company = String(r.company || "").trim();
-      if (company) {
-        aliases.add(company);
-        continue;
-      }
+      if (company) aliases.add(company);
       const person = String(r.full_name || r.first_name || "").trim();
       if (person) aliases.add(person);
+    }
+
+    try {
+      const [quoteNames] = await conn.execute(
+        `SELECT DISTINCT TRIM(company_name) AS company_name
+         FROM quotations_records
+         WHERE CAST(customer_id AS CHAR) = ?
+           AND company_name IS NOT NULL
+           AND TRIM(company_name) != ''`,
+        [cid],
+      );
+      for (const row of quoteNames) {
+        const qn = String(row.company_name || "").trim();
+        if (qn) aliases.add(qn);
+      }
+    } catch (_) {
+      /* quotations_records optional */
     }
   }
 
@@ -290,17 +304,30 @@ export async function buildLedgerForParty(decodedCompany, customerIdFilter = nul
       ? String(customerIdFilter).trim()
       : null;
 
-  const nameAliases = cidFilter
-    ? []
-    : await getPartyNameAliases(conn, decodedCompany, null);
+  const nameAliases = await getPartyNameAliases(
+    conn,
+    decodedCompany,
+    cidFilter,
+  );
 
-  // A selected party is loaded only by customer_id. Name and address
-  // must not pull in another customer's invoices.
+  // Match production company ledger: invoices by customer_name. Parties UI also
+  // passes customer_id — include those rows AND any invoice whose buyer name
+  // matches this party (many invoices have null/mismatched customer_id).
   const invoiceWhereParts = [];
   const invoiceParams = [];
   if (cidFilter) {
-    invoiceWhereParts.push("CAST(customer_id AS CHAR) = ?");
+    const cidParts = ["CAST(customer_id AS CHAR) = ?"];
     invoiceParams.push(cidFilter);
+    if (nameAliases.length > 0) {
+      const nameClause = nameAliases
+        .map(() => "(TRIM(customer_name) = ? OR customer_name = ?)")
+        .join(" OR ");
+      cidParts.push(`(${nameClause})`);
+      for (const alias of nameAliases) {
+        invoiceParams.push(alias, alias);
+      }
+    }
+    invoiceWhereParts.push(`(${cidParts.join(" OR ")})`);
   } else if (nameAliases.length > 0) {
     const nameClause = nameAliases
       .map(() => "(TRIM(customer_name) = ? OR customer_name = ?)")
@@ -330,7 +357,7 @@ export async function buildLedgerForParty(decodedCompany, customerIdFilter = nul
        created_at
      FROM invoices
      WHERE (${invoiceWhereParts.join(" OR ")})
-       AND ${EXCLUDE_PROFORMA_INVOICE_SQL}
+       AND ${LEDGER_INVOICE_SQL}
      ORDER BY COALESCE(order_date, invoice_date) DESC, id DESC`,
     invoiceParams,
   );
@@ -534,7 +561,7 @@ export async function buildLedgerForParty(decodedCompany, customerIdFilter = nul
       const [allInvRows] = await conn.execute(
         `SELECT id, grand_total, linked_trans_ids, invoice_number
          FROM invoices
-         WHERE (${queryParts.join(" OR ")}) AND ${EXCLUDE_PROFORMA_INVOICE_SQL}`,
+         WHERE (${queryParts.join(" OR ")}) AND ${LEDGER_INVOICE_SQL}`,
         queryParams
       );
       allLinkedInvoices = allInvRows;
@@ -729,8 +756,9 @@ export async function buildLedgerForParty(decodedCompany, customerIdFilter = nul
   } catch (_) {}
 
   let manualRows = [];
-  if (!cidFilter) {
-    const manualAliases = nameAliases.length > 0 ? nameAliases : [decodedCompany];
+  const manualAliases =
+    nameAliases.length > 0 ? nameAliases : [decodedCompany];
+  if (manualAliases.length > 0) {
     const manualPlaceholders = manualAliases.map(() => "?").join(",");
     const [rows] = await conn.execute(
       `SELECT id, entry_date, particulars, vch_type, vch_no, debit, credit, created_at
@@ -764,13 +792,13 @@ export async function buildLedgerForParty(decodedCompany, customerIdFilter = nul
   });
 
   await appendReturnCompletedEntries(conn, {
-    partyName: cidFilter ? "" : decodedCompany,
+    partyName: decodedCompany,
     customerId: customerIdForCompany,
-    invoiceNumbers: cidFilter ? [] : buyerInvoiceNumbers,
-    gstins: cidFilter ? [] : invoices.map((i) => i.gst_number).filter(Boolean),
+    invoiceNumbers: buyerInvoiceNumbers,
+    gstins: invoices.map((i) => i.gst_number).filter(Boolean),
     existingRows: filteredManualRows,
     derivedLedger,
-    onlyCustomerId: Boolean(cidFilter),
+    onlyCustomerId: false,
   });
 
   const combined = [
@@ -799,6 +827,40 @@ export async function buildLedgerForParty(decodedCompany, customerIdFilter = nul
     return 0;
   });
 
+  const enrichedInvoices = invoices.map((inv) => {
+    const linkedStatements = statementRows.filter((stmt) => {
+      const inLinkedTransIds = parseTransIds(inv.linked_trans_ids).includes(
+        stmt.trans_id,
+      );
+      const matchesInvoiceNumber = stmt.invoice_number === inv.invoice_number;
+      const hasLinkedInvoiceId = parseLinkedPurchaseIds(
+        stmt.linked_purchase_ids,
+      ).some(
+        (token) =>
+          token.startsWith("IP") &&
+          parseInt(token.replace("IP", ""), 10) === inv.id,
+      );
+      return inLinkedTransIds || matchesInvoiceNumber || hasLinkedInvoiceId;
+    });
+
+    const totalLinkedAmount = linkedStatements.reduce((sum, stmt) => {
+      const key = `${inv.id}-${stmt.trans_id}`;
+      return sum + (allocationMap[key] || 0);
+    }, 0);
+
+    const balance_amount = Math.max(
+      0,
+      Number(inv.grand_total) - totalLinkedAmount,
+    );
+
+    return {
+      ...inv,
+      linkedStatements,
+      balance_amount,
+      totalLinkedAmount,
+    };
+  });
+
   const serialized = combined.map((e) => ({
     ...e,
     entry_date: String(e.entry_date).slice(0, 10),
@@ -807,7 +869,11 @@ export async function buildLedgerForParty(decodedCompany, customerIdFilter = nul
       : undefined,
   }));
 
-  return { entries: serialized, customerId: customerIdForCompany };
+  return {
+    entries: serialized,
+    customerId: customerIdForCompany,
+    invoices: enrichedInvoices,
+  };
 }
 
 /** Sum debit/credit from ledger rows — same math as LedgerTableClient net balance. */

@@ -1,8 +1,14 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import { FileText } from "lucide-react";
 
-export default function ServiceAttachmentLink({ filePath, fileName, className = "" }) {
+export default function ServiceAttachmentLink({
+  filePath,
+  fileName,
+  className = "",
+  iconOnly = false,
+}) {
   const [resolving, setResolving] = useState(false);
   
   // Normalize the path - similar to FallbackLink
@@ -73,17 +79,27 @@ export default function ServiceAttachmentLink({ filePath, fileName, className = 
     [pathOnly, primaryHref, resolving]
   );
 
+  const defaultClassName = iconOnly
+    ? "inline-flex items-center justify-center p-1.5 rounded-md bg-green-700 text-white hover:bg-green-800 transition-colors"
+    : "text-blue-600 hover:underline";
+
   return (
     <a
       href={primaryHref}
       onClick={onClick}
       target="_blank"
       rel="noopener noreferrer"
-      className={className || "text-blue-600 hover:underline"}
-      title={resolving ? "Resolving best URL..." : primaryHref}
+      className={className || defaultClassName}
+      title={
+        resolving
+          ? "Resolving best URL..."
+          : iconOnly
+            ? displayName
+            : primaryHref
+      }
     >
-      {displayName}
-      {resolving && " (resolving...)"}
+      {iconOnly ? <FileText className="w-4 h-4" /> : displayName}
+      {!iconOnly && resolving && " (resolving...)"}
     </a>
   );
 }

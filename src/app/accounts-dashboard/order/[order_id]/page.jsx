@@ -2,6 +2,8 @@ import { getDbConnection } from "@/lib/db";
 import { notFound } from "next/navigation";
 import OrderDetailsClient from "./OrderDetailsClient";
 import dayjs from "dayjs";
+import { getSessionPayload } from "@/lib/auth";
+import { isOrderVisibleToViewer } from "@/lib/orderApprovalVisibility";
 
 export const dynamic = "force-dynamic";
 
@@ -59,15 +61,25 @@ export default async function Page({ params }) {
   const orderId = parseInt(order_id);
   if (isNaN(orderId)) notFound();
 
+  const payload = await getSessionPayload();
+  let userRole = payload?.role || payload?.userRole || "";
+  if (payload?.username) {
+    const connAuth = await getDbConnection();
+    const [roleRows] = await connAuth.execute(
+      "SELECT userRole FROM rep_list WHERE username = ?",
+      [payload.username],
+    );
+    userRole = roleRows[0]?.userRole || userRole;
+  }
+
   const { orderDetails, items, statuses, gstin, quoteCustomerId } =
     await fetchOrderData(orderId);
 
-  if (!orderDetails) {
-    return (
-      <div className="p-8 text-center text-red-600 text-xl">
-        ❌ Order not found or invalid ID.
-      </div>
-    );
+  if (
+    !orderDetails ||
+    !isOrderVisibleToViewer(orderDetails.approval_status, userRole)
+  ) {
+    notFound();
   }
 
   return (
@@ -78,7 +90,7 @@ export default async function Page({ params }) {
           <span className="font-medium">Client Delivery Date: </span>
           <span>
             {orderDetails.client_delivery_date
-              ? dayjs(orderDetails.client_delivery_date).format("DD/MM/YYYY")
+              ? dayjs(orderDetails.client_delivery_date).format("DD-MM-YYYY")
               : "NA"}
           </span>
         </div>
@@ -86,7 +98,7 @@ export default async function Page({ params }) {
           <span className="font-medium">Expected Delivery Date: </span>
           <span>
             {orderDetails.delivery_date
-              ? dayjs(orderDetails.delivery_date).format("DD/MM/YYYY")
+              ? dayjs(orderDetails.delivery_date).format("DD-MM-YYYY")
               : "NA"}
           </span>
         </div>

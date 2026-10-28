@@ -1,5 +1,7 @@
 "use client";
 
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
+
 import { useState, useEffect } from "react";
 import { Search, Mail, ExternalLink } from "lucide-react";
 import toast from "react-hot-toast";
@@ -19,7 +21,7 @@ const UserBacklinksTable = () => {
 
   const fetchCurrentUser = async () => {
     try {
-      const res = await fetch("/api/current/user");
+      const res = await fetch("/api/current-user");
       const data = await res.json();
       if (res.ok) {
         setCurrentUsername(data.username);
@@ -32,7 +34,7 @@ const UserBacklinksTable = () => {
   const fetchBacklinks = async () => {
     try {
       setLoading(true);
-      const res = await fetch("/api/back/links");
+      const res = await fetch("/api/backlinks");
       const data = await res.json();
 
       if (res.ok) {
@@ -66,11 +68,7 @@ const UserBacklinksTable = () => {
   const formatDate = (dateString) => {
     if (!dateString) return "-";
     const date = new Date(dateString);
-    return date.toLocaleDateString("en-GB", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
+    return formatCrmDateOnly(date);
   };
 
   const getStatusBadgeColor = (status) => {

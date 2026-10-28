@@ -46,7 +46,12 @@ const STATE_CODE_TO_NAME = {
 
 function canUpdateOwnQuotation(role) {
   const normalized = String(role || "").trim().toUpperCase();
-  return normalized.includes("SALES") || normalized === "SERVICE SUPPORT";
+  return (
+    normalized.includes("SALES") ||
+    normalized === "SERVICE SUPPORT" ||
+    normalized === "GEM" ||
+    normalized === "GEM PORTAL"
+  );
 }
 
 function getStateFromGSTIN(gstin) {

@@ -1,5 +1,6 @@
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useMemo, useEffect } from "react";
 import { Trash2, ArrowUp, ArrowDown, Download, FileText } from "lucide-react";
 import dayjs from "dayjs";
@@ -149,7 +150,7 @@ export default function BuyerLedgerTable({ rows: initialRows, buyerName, billing
     // Date range
     const dateFrom = filtered.length > 0 ? filtered[0].entry_date : dayjs().format("YYYY-MM-DD");
     const dateTo = filtered.length > 0 ? filtered[filtered.length - 1].entry_date : dayjs().format("YYYY-MM-DD");
-    csvLines.push(`"Period: ${dayjs(dateFrom).format("DD-MMM-YY")} to ${dayjs(dateTo).format("DD-MMM-YY")}"`);
+    csvLines.push(`"Period: ${dayjs(dateFrom).format("DD-MM-YYYY")} to ${dayjs(dateTo).format("DD-MM-YYYY")}"`);
     csvLines.push("");
 
     // Table headers
@@ -159,7 +160,7 @@ export default function BuyerLedgerTable({ rows: initialRows, buyerName, billing
     // Data rows
     filtered.forEach((r) => {
       csvLines.push([
-        `"${dayjs(r.entry_date).format("DD/MM/YYYY")}"`,
+        `"${dayjs(r.entry_date).format("DD-MM-YYYY")}"`,
         `"${(r.particulars || "").replace(/"/g, '""')}"`,
         `"${r.vch_type || ""}"`,
         `"${r.vch_no || ""}"`,
@@ -457,23 +458,13 @@ right(fmtAmt(finalTotal), col.creditEnd, y, 9, true);
             <label className="block text-xs font-medium text-gray-700 mb-2">
               From Date
             </label>
-            <input
-              type="date"
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
-            />
+            <TypeableDateFilterInput value={dateFrom} onChange={setDateFrom} className="px-3 py-2 border border-gray-300 rounded-lg outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"/>
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-2">
               To Date
             </label>
-            <input
-              type="date"
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
-            />
+            <TypeableDateFilterInput value={dateTo} onChange={setDateTo} className="px-3 py-2 border border-gray-300 rounded-lg outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"/>
           </div>
           <button
             onClick={() => {
@@ -519,7 +510,7 @@ right(fmtAmt(finalTotal), col.creditEnd, y, 9, true);
               filtered.map((row) => (
                 <tr key={row.id} className="bg-white hover:bg-blue-50 transition-colors">
                   <td className="px-4 py-3 whitespace-nowrap text-gray-700">
-                    {dayjs(row.entry_date).format("DD MMM YYYY")}
+                    {dayjs(row.entry_date).format("DD-MM-YYYY")}
                   </td>
                   <td className="px-4 py-3 text-gray-800 max-w-xs">{row.particulars}</td>
                   <td className="px-4 py-3"><VchBadge type={row.vch_type} /></td>
@@ -596,7 +587,7 @@ right(fmtAmt(finalTotal), col.creditEnd, y, 9, true);
                 <div>
                   <p className="font-semibold text-gray-800">{row.particulars}</p>
                   <p className="text-xs text-gray-500 mt-0.5">
-                    {dayjs(row.entry_date).format("DD MMM YYYY")}
+                    {dayjs(row.entry_date).format("DD-MM-YYYY")}
                   </p>
                 </div>
                 {row.source === "manual" && (
@@ -633,6 +624,8 @@ function VchBadge({ type }) {
     "Credit Note": "bg-teal-100 text-teal-700",
     "Debit Note":  "bg-pink-100 text-pink-700",
     Opening:       "bg-gray-100 text-gray-700",
+    Return:        "bg-rose-100 text-rose-700",
+    "Return Completed": "bg-orange-100 text-orange-800",
     Other:         "bg-slate-100 text-slate-700",
   };
   const cls = colorMap[type] || "bg-gray-100 text-gray-600";

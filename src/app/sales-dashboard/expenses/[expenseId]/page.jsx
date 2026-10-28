@@ -69,7 +69,7 @@ export default async function ExpenseDetailPage({ params }) {
           <p>
             <span className="font-medium">Approval Date:</span>{" "}
             {expense.approval_date
-              ? dayjs(expense.approval_date).format("DD MMM YYYY")
+              ? dayjs(expense.approval_date).format("DD-MM-YYYY")
               : "-"}
           </p>
           <p>
@@ -129,7 +129,7 @@ export default async function ExpenseDetailPage({ params }) {
           <p>
             <span className="font-medium">Travel Date:</span>{" "}
             {expense.TravelDate
-              ? dayjs(expense.TravelDate).format("DD MMM YYYY")
+              ? dayjs(expense.TravelDate).format("DD-MM-YYYY")
               : "-"}
           </p>
         </div>

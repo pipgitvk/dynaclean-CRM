@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { User, X } from "lucide-react";
 import SearchableSelect from "@/components/ui/SearchableSelect";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 function hashStringToInt(str) {
   let h = 0;
@@ -31,6 +32,11 @@ function getBadgeColorClass(username) {
 }
 
 export default function ReportingManagerSelectorPage() {
+  const pathname = usePathname();
+  const leaveAdminBase = pathname?.startsWith("/director-dashboard")
+    ? "/director-dashboard/leave"
+    : "/empcrm/admin-dashboard/leave";
+
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -170,7 +176,7 @@ export default function ReportingManagerSelectorPage() {
       <div className="p-6 max-w-3xl mx-auto">
         <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
           <p className="text-red-800 font-medium">Unauthorized</p>
-          <Link href="/empcrm/admin-dashboard/leave" className="mt-4 inline-flex text-blue-600 hover:text-blue-800">
+          <Link href={leaveAdminBase} className="mt-4 inline-flex text-blue-600 hover:text-blue-800">
             Back to Leave Management
           </Link>
         </div>
@@ -186,7 +192,7 @@ export default function ReportingManagerSelectorPage() {
           <p className="text-gray-600 mt-1">Choose an employee to assign a reporting manager.</p>
         </div>
         <Link
-          href="/empcrm/admin-dashboard/leave"
+          href={leaveAdminBase}
           className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
         >
           Back

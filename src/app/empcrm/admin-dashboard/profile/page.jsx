@@ -1,5 +1,7 @@
 "use client";
 
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
+
 import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { Search, FileText, History, X, TrendingUp } from "lucide-react";
@@ -201,7 +203,7 @@ export default function ProfileManagement() {
                     <div key={record.id} className={`border rounded-lg p-4 ${record.is_active ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'}`}>
                       <div className="flex items-center justify-between mb-3">
                         <div className="text-sm text-gray-600">
-                          <span className="font-medium">Effective From:</span> {new Date(record.effective_from).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          <span className="font-medium">Effective From:</span> {new formatCrmDateOnly(Date(record.effective_from))}
                         </div>
                         <div className="flex items-center gap-2">
                           {record.is_active && (
@@ -243,12 +245,12 @@ export default function ProfileManagement() {
                         </div>
                         <div>
                           <div className="text-gray-500 mb-1">Created At</div>
-                          <div className="font-semibold">{new Date(record.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
+                          <div className="font-semibold">{new formatCrmDateOnly(Date(record.created_at))}</div>
                         </div>
                       </div>
                       {record.effective_to && (
                         <div className="mt-3 pt-3 border-t border-gray-200 text-sm">
-                          <span className="font-medium">Effective To:</span> {new Date(record.effective_to).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          <span className="font-medium">Effective To:</span> {new formatCrmDateOnly(Date(record.effective_to))}
                         </div>
                       )}
                     </div>

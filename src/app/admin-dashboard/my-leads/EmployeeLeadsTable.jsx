@@ -1,5 +1,8 @@
 "use client";
 
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
+
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
@@ -212,18 +215,8 @@ export default function EmployeeLeadsTable() {
           </select>
         </div>
         <div className="flex flex-col sm:flex-row gap-2">
-          <input
-            type="date"
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-          />
-          <input
-            type="date"
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-          />
+          <TypeableDateFilterInput value={startDate} onChange={setStartDate} className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"/>
+          <TypeableDateFilterInput value={endDate} onChange={setEndDate} className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"/>
         </div>
       </div>
 
@@ -343,7 +336,7 @@ export default function EmployeeLeadsTable() {
                         {lead.quote_number
                           ? `${lead.quote_number} (${
                               lead.quote_date
-                                ? new Date(lead.quote_date).toLocaleDateString()
+                                ? formatCrmDateOnly(lead.quote_date)
                                 : "-"
                             })`
                           : "-"}
@@ -355,9 +348,7 @@ export default function EmployeeLeadsTable() {
                         {lead.order_id
                           ? `${lead.invoice_number || lead.order_id} (${
                               lead.invoice_date
-                                ? new Date(
-                                    lead.invoice_date,
-                                  ).toLocaleDateString()
+                                ? formatCrmDateOnly(lead.invoice_date,)
                                 : "-"
                             })`
                           : "-"}
@@ -381,7 +372,7 @@ export default function EmployeeLeadsTable() {
                       <span className="font-medium">Date Created:</span>
                       <span className="ml-2 text-right">
                         {lead.date_created
-                          ? new Date(lead.date_created).toLocaleDateString()
+                          ? formatCrmDateOnly(lead.date_created)
                           : "-"}
                       </span>
                     </div>
@@ -489,7 +480,7 @@ export default function EmployeeLeadsTable() {
                             </div>
                             <div className="text-gray-500 text-xs">
                               {lead.quote_date
-                                ? new Date(lead.quote_date).toLocaleDateString()
+                                ? formatCrmDateOnly(lead.quote_date)
                                 : "-"}
                             </div>
                             <div className="text-gray-600 text-xs">
@@ -508,9 +499,7 @@ export default function EmployeeLeadsTable() {
                             </div>
                             <div className="text-gray-500 text-xs">
                               {lead.invoice_date
-                                ? new Date(
-                                    lead.invoice_date,
-                                  ).toLocaleDateString()
+                                ? formatCrmDateOnly(lead.invoice_date,)
                                 : "-"}
                             </div>
                             <div className="text-gray-600 text-xs">
@@ -537,7 +526,7 @@ export default function EmployeeLeadsTable() {
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-500">
                         {lead.date_created
-                          ? new Date(lead.date_created).toLocaleDateString()
+                          ? formatCrmDateOnly(lead.date_created)
                           : "-"}
                       </td>
                     </tr>

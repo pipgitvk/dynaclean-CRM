@@ -1,12 +1,14 @@
 "use client";
 
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
+
 import { useState, useEffect } from "react";
 import { X } from "lucide-react";
 
 function formatDate(dateStr) {
   if (!dateStr) return "—";
   const d = new Date(dateStr);
-  return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+  return formatCrmDateOnly(d);
 }
 
 function formatAmount(n) {

@@ -82,7 +82,7 @@ export default function TLFollowupClient({
               <p>
                 <strong>Last Called:</strong>{" "}
                 {dayjs(customer.latest_followed_date).format(
-                  "DD MMM YYYY, hh:mm A",
+                  "DD-MM-YYYY hh:mm A",
                 )}
               </p>
               <p>
@@ -108,7 +108,7 @@ export default function TLFollowupClient({
               <p>
                 <strong>Date:</strong>{" "}
                 {dayjs(latestTLFollowup.followed_date).format(
-                  "DD MMM YYYY, hh:mm A",
+                  "DD-MM-YYYY hh:mm A",
                 )}
               </p>
               <p>

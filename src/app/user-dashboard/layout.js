@@ -20,19 +20,51 @@
 
 import "../globals.css";
 import getSidebarMenuItems from "@/lib/getSidebarMenuItems";
-import UserLayoutShell from "@/components/layouts/UserLayoutShell";
-import ImpersonationWrapper from './ImpersonationWrapper';
+import SalesLayoutShell from "@/components/layouts/SalesLayoutShell";
+import { cookies } from "next/headers";
+import { jwtVerify } from "jose";
+import { redirect } from "next/navigation";
 import IpGuard from "@/components/IpGuard";
+import getThirdPartyEngineerSidebarMenuItems from "@/lib/getThirdPartyEngineerSidebarMenuItems";
+import { getEngineerIdFromPayload } from "@/lib/thirdPartyEngineerPortalSession";
+
+const JWT_SECRET = process.env.JWT_SECRET || "your-secret";
 
 export default async function UserDashboardLayout({ children }) {
-  const menuItems = await getSidebarMenuItems(); // ✅ runs server-side
+  const cookieStore = await cookies();
+  const token =
+    cookieStore.get("impersonation_token")?.value ||
+    cookieStore.get("token")?.value;
+
+  let thirdPartyEngineerSession = false;
+
+  if (token) {
+    try {
+      const { payload } = await jwtVerify(
+        token,
+        new TextEncoder().encode(JWT_SECRET)
+      );
+      const roleNorm = String(payload?.role || "").trim().toUpperCase();
+      thirdPartyEngineerSession = Boolean(getEngineerIdFromPayload(payload));
+      if (roleNorm === "SUPERADMIN" || roleNorm === "EA") {
+        redirect("/admin-dashboard");
+      }
+      if (roleNorm.includes("HR")) {
+        redirect("/hr-dashboard");
+      }
+    } catch {
+      // Keep rendering flow; page-level guards handle invalid tokens.
+    }
+  }
+
+  const menuItems = thirdPartyEngineerSession
+    ? getThirdPartyEngineerSidebarMenuItems()
+    : await getSidebarMenuItems();
 
   return (
-    <UserLayoutShell menuItems={menuItems}>
+    <SalesLayoutShell menuItems={menuItems} showBackToUserCrm={false}>
       <IpGuard />
-      <ImpersonationWrapper>
-        {children}
-      </ImpersonationWrapper>
-    </UserLayoutShell>
+      {children}
+    </SalesLayoutShell>
   );
 }

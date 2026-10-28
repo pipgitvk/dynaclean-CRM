@@ -1,12 +1,23 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useAsyncClick } from "@/lib/useAsyncClick";
-import { useRouter } from "next/navigation";
+import { buildChecklistAccessoriesUrl } from "@/lib/dispatchChecklistAccessories";
+import { useRouter, useSearchParams } from "next/navigation";
 import { use } from "react";
+import { loadDispatchFormRows } from "@/lib/loadDispatchFormRows";
+import {
+  dispatchRowRequiresSerial,
+  formatMissingSerialError,
+  isProductItem,
+  isServiceCharge,
+} from "@/lib/dispatchSerialRules";
 
 export default function DispatchFormPage({ params }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { order_id } = use(params);
+  const dispatchRound =
+    searchParams.get("round") === "remain" ? "remain" : "first";
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -20,11 +31,13 @@ export default function DispatchFormPage({ params }) {
   useEffect(() => {
     const load = async () => {
       try {
-        const res = await fetch(`/api/dispatch?order_id=${order_id}`);
-        const json = await res.json();
-        if (json.success) {
-          const data = json.data || [];
-          setRows(data);
+        let data = await loadDispatchFormRows(order_id, dispatchRound);
+
+        if (data.length === 0) {
+          router.replace(`/admin-dashboard/order/dispatch/view/${order_id}`);
+          return;
+        }
+        setRows(data);
           // Track which rows already have serial numbers from database
           const idsWithSerialNo = new Set(
             data.filter(r => r.serial_no && r.serial_no.trim() !== "").map(r => r.id)
@@ -54,16 +67,24 @@ export default function DispatchFormPage({ params }) {
             }
           });
           setAccessoriesChecked(checkedState);
-        }
       } finally {
         setLoading(false);
       }
     };
     load();
-  }, [order_id]);
+  }, [order_id, router, dispatchRound]);
 
   const fetchStockForRow = async (rowId, quoteNumber, godown, itemCode) => {
     if (!quoteNumber || !godown || !itemCode) {
+      setStockInfo(prev => ({ ...prev, [rowId]: null }));
+      setLowStockWarnings(prev => ({ ...prev, [rowId]: "" }));
+      return;
+    }
+
+    // Find the row to check if it's a service charge
+    const row = rows.find(r => r.id === rowId);
+    if (row && isServiceCharge(row.item_name, row.item_code)) {
+      // Service charges don't need stock check
       setStockInfo(prev => ({ ...prev, [rowId]: null }));
       setLowStockWarnings(prev => ({ ...prev, [rowId]: "" }));
       return;
@@ -84,15 +105,15 @@ export default function DispatchFormPage({ params }) {
         const data = await res.json();
         setStockInfo(prev => ({ ...prev, [rowId]: data.stockResults }));
 
-        // Check for low stock warnings
+        // Check for stock availability (no minimum quantity check)
+        // Only prevent dispatch if no stock is available (stock_count <= 0)
         let warningMessage = "";
         data.stockResults.forEach((item) => {
           if (
             item.stock_count !== null &&
-            item.min_qty !== null &&
-            item.stock_count < item.min_qty
+            item.stock_count <= 0
           ) {
-            warningMessage += `Warning: The stock for "${item.item_name}" is currently below the minimum required quantity. Please replenish the stock in the selected godown.\n`;
+            warningMessage += `Warning: No stock available for "${item.item_name}" in the selected godown. Please add stock before dispatch.\n`;
           }
         });
         setLowStockWarnings(prev => ({ ...prev, [rowId]: warningMessage }));
@@ -109,17 +130,25 @@ export default function DispatchFormPage({ params }) {
     }
   };
 
-  const loadAccessoriesForProduct = async (itemCode) => {
+  const loadAccessoriesForProduct = async (itemCode, godown = null) => {
     try {
-      const res = await fetch(`/api/product-accessories?product_code=${itemCode}`);
+      const res = await fetch(buildChecklistAccessoriesUrl(itemCode, godown));
       if (res.ok) {
         const json = await res.json();
         if (json.success) {
-          setAccessories(prev => ({ ...prev, [itemCode]: json.data || [] }));
+          const accessoryList = json.data || [];
+          const resolvedProductCode = accessoryList[0]?.product_code || itemCode;
+          setAccessories((prev) => {
+            const next = { ...prev, [itemCode]: accessoryList };
+            if (resolvedProductCode !== itemCode) {
+              next[resolvedProductCode] = accessoryList;
+            }
+            return next;
+          });
         }
       }
     } catch (err) {
-      console.error('Failed to load accessories:', err);
+      console.error("Failed to load accessories:", err);
     }
   };
 
@@ -131,8 +160,17 @@ export default function DispatchFormPage({ params }) {
       const row = rows.find(r => r.id === id);
       if (row && row.quote_number && row.item_code) {
         if (value) {
-          // Godown selected - fetch stock for this specific item
-          fetchStockForRow(id, row.quote_number, value, row.item_code);
+          // Skip stock check for service charges
+          if (isServiceCharge(row.item_name, row.item_code)) {
+            setStockInfo(prev => ({ ...prev, [id]: null }));
+            setLowStockWarnings(prev => ({ ...prev, [id]: "" }));
+          } else {
+            // Godown selected - fetch stock for this specific item
+            fetchStockForRow(id, row.quote_number, value, row.item_code);
+          }
+          if (isProductItem(row.item_code)) {
+            loadAccessoriesForProduct(row.item_code, value);
+          }
         } else {
           // Godown cleared - clear stock info
           setStockInfo(prev => ({ ...prev, [id]: null }));
@@ -151,9 +189,6 @@ export default function DispatchFormPage({ params }) {
       }
     }));
   };
-
-  // Treat items with any alphabet in item_code as "product"; others are spares
-  const isProductItem = (itemCode) => /[a-zA-Z]/.test(itemCode || "");
 
   const uploadForRow = async (row) => {
     const form = new FormData();
@@ -187,8 +222,8 @@ export default function DispatchFormPage({ params }) {
       throw new Error("Please select a godown before saving.");
     }
 
-    // Check for low stock warning
-    if (lowStockWarnings[row.id]) {
+    // Check for stock availability warning (skip for service charges)
+    if (!isServiceCharge(row.item_name, row.item_code) && lowStockWarnings[row.id]) {
       throw new Error("Please add stock to the selected godown before dispatching this item.");
     }
 
@@ -207,23 +242,29 @@ export default function DispatchFormPage({ params }) {
   const completeAll = async () => {
     try {
       setSaving(true);
-      // For products: serial number is mandatory; for spares: serial number is optional
-      const allProductSerialNosFilled = rows
-        .filter(r => isProductItem(r.item_code))
-        .every(r => r.serial_no && r.serial_no.trim() !== "");
-      if (!allProductSerialNosFilled) {
-        throw new Error("Please fill serial numbers for all product items before completing dispatch");
+      const serialMsg = formatMissingSerialError(rows);
+      if (serialMsg) {
+        throw new Error(serialMsg);
       }
       // Check if all godowns are selected
       const allGodownsSelected = rows.every(r => r.godown && r.godown.trim() !== "");
       if (!allGodownsSelected) {
         throw new Error("Please select godowns for all items before completing dispatch");
       }
-      // Check if any items have low stock warnings
-      const hasLowStockIssues = rows.some(r => lowStockWarnings[r.id]);
-      if (hasLowStockIssues) {
-        throw new Error("Please resolve all stock warnings before completing dispatch");
+      // Check if any physical items (non-service charges) have stock issues
+      const hasStockIssues = rows.some(r => 
+        !isServiceCharge(r.item_name, r.item_code) && lowStockWarnings[r.id]
+      );
+      if (hasStockIssues) {
+        throw new Error("Please resolve all stock availability issues before completing dispatch");
       }
+
+      for (const row of rows) {
+        if (!initialSerialNos.has(row.id)) {
+          await uploadForRow(row);
+        }
+      }
+
       // mark order dispatch complete
       const doneRes = await fetch("/api/dispatch/complete", {
         method: "POST",
@@ -232,8 +273,13 @@ export default function DispatchFormPage({ params }) {
       });
       const doneJson = await doneRes.json();
       if (!doneRes.ok || !doneJson.success) throw new Error(doneJson.error || "Failed to mark dispatch complete");
-      alert("Dispatch updated and marked complete");
-      router.push(`/user-dashboard/order/dispatch/view/${order_id}`);
+      const partial = Number(doneJson.dispatch_status) === 2;
+      alert(
+        partial
+          ? "This dispatch batch is complete. Remaining products can be booked and dispatched later."
+          : "Dispatch complete for all products on this order.",
+      );
+      router.replace(`/admin-dashboard/order/dispatch/view/${order_id}`);
     } catch (e) {
       alert(e.message || "Failed to save");
     } finally {
@@ -245,7 +291,11 @@ export default function DispatchFormPage({ params }) {
 
   return (
     <div className="p-4 space-y-4">
-      <h2 className="text-lg font-semibold">Dispatch for Order #{order_id}</h2>
+      <h2 className="text-lg font-semibold">
+        {dispatchRound === "remain"
+          ? `Dispatch (Remain) for Order #${order_id}`
+          : `Dispatch for Order #${order_id}`}
+      </h2>
       {rows.length === 0 ? (
         <div className="text-gray-600">No dispatch rows.</div>
       ) : (
@@ -255,7 +305,12 @@ export default function DispatchFormPage({ params }) {
               <div key={r.id} className="border rounded-lg p-3">
                 <div className="grid grid-cols-1 md:grid-cols-5 gap-3 items-center">
                   <div className="text-sm min-w-0">
-                    <div className="font-medium truncate" title={r.item_name}>{r.item_name}</div>
+                    <div className="font-medium truncate flex items-center gap-2" title={r.item_name}>
+                      {r.item_name}
+                      {isServiceCharge(r.item_name, r.item_code) && (
+                        <span className="text-xs bg-blue-100 text-blue-800 px-1 py-0.5 rounded">Service</span>
+                      )}
+                    </div>
                     <div className="text-gray-600 truncate" title={r.item_code}>{r.item_code}</div>
                   </div>
                   <div>
@@ -314,20 +369,29 @@ export default function DispatchFormPage({ params }) {
                 </div>
 
                 {/* Stock Information Display */}
-                {stockInfo[r.id] && stockInfo[r.id].length > 0 && (
-                  <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-md">
-                    <h4 className="text-sm font-medium text-green-800 mb-2">Current Stock in {r.godown}:</h4>
-                    <div className="space-y-1">
-                      {stockInfo[r.id].map((item) => (
-                        <p key={item.item_code} className="text-sm text-green-700">
-                          {item.item_name || item.item_code}: {item.stock_count} (Min Qty: {item.min_qty || 0})
-                        </p>
-                      ))}
-                    </div>
+                {isServiceCharge(r.item_name, r.item_code) ? (
+                  <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                    <h4 className="text-sm font-medium text-blue-800 mb-2">Service Charge:</h4>
+                    <p className="text-sm text-blue-700">
+                      No stock check required for service charges.
+                    </p>
                   </div>
+                ) : (
+                  stockInfo[r.id] && stockInfo[r.id].length > 0 && (
+                    <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-md">
+                      <h4 className="text-sm font-medium text-green-800 mb-2">Current Stock in {r.godown}:</h4>
+                      <div className="space-y-1">
+                        {stockInfo[r.id].map((item) => (
+                          <p key={item.item_code} className="text-sm text-green-700">
+                            {item.item_name || item.item_code}: {item.stock_count} available
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+                  )
                 )}
 
-                {/* Low Stock Warning */}
+                {/* Stock Warning */}
                 {lowStockWarnings[r.id] && (
                   <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-md">
                     <h4 className="text-sm font-medium text-red-800 mb-2">⚠️ Stock Warning:</h4>
@@ -341,7 +405,7 @@ export default function DispatchFormPage({ params }) {
                 {accessories[r.item_code] && accessories[r.item_code].length > 0 && (
                   <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-md">
                     <h4 className="text-sm font-medium text-blue-800 mb-2">
-                      Accessories Checklist:
+                      In-package accessories (checklist only):
                     </h4>
                     <div className="space-y-1">
                       {accessories[r.item_code].map((acc) => (
@@ -377,8 +441,8 @@ export default function DispatchFormPage({ params }) {
                       hasSerialNo={r.serial_no && r.serial_no.trim() !== ""}
                       hasGodown={r.godown && r.godown.trim() !== ""}
                       isLocked={false}
-                      hasLowStockWarning={!!lowStockWarnings[r.id]}
-                      isProduct={isProductItem(r.item_code)}
+                      hasLowStockWarning={!isServiceCharge(r.item_name, r.item_code) && !!lowStockWarnings[r.id]}
+                      isProduct={dispatchRowRequiresSerial(r)}
                     />
                   )}
                   {initialSerialNos.has(r.id) && (
@@ -401,8 +465,8 @@ export default function DispatchFormPage({ params }) {
             !rows
               .filter(r => isProductItem(r.item_code))
               .every(r => r.serial_no && r.serial_no.trim() !== "") ||
-            // No pending low stock warnings
-            rows.some(r => lowStockWarnings[r.id])
+            // No stock availability issues for physical items (service charges excluded)
+            rows.some(r => !isServiceCharge(r.item_name, r.item_code) && lowStockWarnings[r.id])
           }
           saving={saving}
         />
@@ -425,8 +489,7 @@ function RowSaveButton({ r, uploadForRow, globalSaving, isSaved, hasSerialNo, ha
 
   const serialRequired = isProduct;
 
-  // Locked rows (stock already deducted): allow updating photos/accessories anytime
-  // Unlocked rows: require serial no (for products), godown, no low stock warning, and not already saved
+  // Unlocked rows: require serial no (for products), godown, no stock issues, and not already saved
   const isDisabled = isLocked
     ? globalSaving || isLoading
     : globalSaving ||

@@ -1,5 +1,6 @@
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useTransition, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -461,10 +462,10 @@ export default function TLCustomersTable({
         <div className="flex items-center justify-between gap-6">
           {/* Left side - Search filters */}
           <div className="flex-1">
-            <form onSubmit={handleSearch} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+            <form onSubmit={handleSearch}>
+              <div className="flex flex-wrap items-end gap-3">
                 {/* Search */}
-                <div className="md:col-span-2">
+                <div className="min-w-[14rem] flex-1 sm:max-w-md">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Search (ID, Phone, Name, Company)
                   </label>
@@ -646,30 +647,17 @@ export default function TLCustomersTable({
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Next Followup from
                   </label>
-                  <input
-                    type="date"
-                    placeholder="dd/mm/yyyy"
-                    value={nextFromDate}
-                    onChange={(e) => setNextFromDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                  <TypeableDateFilterInput value={nextFromDate} onChange={setNextFromDate} placeholder="dd/mm/yyyy" className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"/>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Next Followup to
                   </label>
-                  <input
-                    type="date"
-                    placeholder="dd/mm/yyyy"
-                    value={nextToDate}
-                    onChange={(e) => setNextToDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                  <TypeableDateFilterInput value={nextToDate} onChange={setNextToDate} placeholder="dd/mm/yyyy" wrapperClassName="relative flex w-full min-w-[10rem] shrink-0 items-stretch" className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"/>
                 </div>
-              </div>
 
-              <div className="flex gap-2 items-center">
+                <div className="flex shrink-0 flex-wrap items-center gap-2 pb-0.5">
                 <button
                   type="submit"
                   disabled={isPending}
@@ -738,6 +726,7 @@ export default function TLCustomersTable({
                   >
                     {tlOnly ? "ON" : "OFF"}
                   </span>
+                </div>
                 </div>
               </div>
             </form>
@@ -963,7 +952,7 @@ export default function TLCustomersTable({
                       {customer.followup_start_at
                         ? formatCrmDatetimeForISTDisplay(
                             customer.followup_start_at,
-                            "DD MMM, YYYY HH:mm",
+                            "DD-MM-YYYY HH:mm",
                           ) || "N/A"
                         : "N/A"}
                     </td>
@@ -1015,18 +1004,18 @@ export default function TLCustomersTable({
                     {tlOnly
                       ? formatCrmDatetimeForISTDisplay(
                           customer.tl_next_followup,
-                          "DD MMM, YYYY HH:mm",
+                          "DD-MM-YYYY HH:mm",
                         ) || "N/A"
                       : formatCrmDayjsForISTDisplay(
                           pickEffectiveNextFollowup(customer),
-                          "DD MMM, YYYY HH:mm",
+                          "DD-MM-YYYY HH:mm",
                         ) || "N/A"}
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
                     {customer.estimated_order_date
                       ? formatCrmDatetimeForISTDisplay(
                           customer.estimated_order_date,
-                          "DD MMM, YYYY HH:mm",
+                          "DD-MM-YYYY HH:mm",
                         ) || "N/A"
                       : "N/A"}
                   </td>
@@ -1151,7 +1140,7 @@ export default function TLCustomersTable({
                               <p>
                                 <b>Date:</b>{" "}
                                 {dayjs(latestquote.quote_date).format(
-                                  "DD MMM YYYY",
+                                  "DD-MM-YYYY",
                                 )}
                               </p>
                               <p>

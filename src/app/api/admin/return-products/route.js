@@ -1,12 +1,18 @@
 import { getDbConnection } from '@/lib/db';
-import { verify } from 'jsonwebtoken';
-
-const SECRET = process.env.JWT_SECRET || 'your-secret-key';
+import {
+  ensureReturnProductOrderColumns,
+  getReturnProductActorUsername,
+  resolveOrderMetaForReturn,
+  RETURN_PRODUCTS_UPDATED_BY_JOIN,
+  RETURN_PRODUCTS_UPDATED_BY_LABEL_SQL,
+  enrichReturnProductsList,
+} from '@/lib/returnProductsActor';
 
 // GET -  return products fetch 
 export async function GET(request) {
   try {
     const pool = await getDbConnection();
+    await ensureReturnProductOrderColumns(pool);
 
     // Check which columns exist in return_products
     const [rpColumns] = await pool.query(`SHOW COLUMNS FROM return_products`);
@@ -21,24 +27,23 @@ export async function GET(request) {
 
     // Build main query with explicit columns (avoid rp.* to prevent serialization issues)
     const rpFields = [
+      'rp.order_id',
       'rp.id', 'rp.quotation_no', 'rp.invoice_no', 'rp.model_no', 'rp.serial_no',
       'rp.pricing_total', 'rp.tracking_no', 'rp.return_type', 'rp.return_status',
-      'rp.reason', 'rp.return_image', 'rp.created_by', 'rp.customer_id',
-      'rp.created_at', 'rp.updated_at',
+      'rp.reason', 'rp.return_image', 'rp.order_created_by', 'rp.created_by AS return_created_by',
+      'rp.customer_id', 'rp.created_at', 'rp.updated_at',
       'c.first_name', 'c.last_name', 'c.company',
-      'e.username AS created_by_username',
     ];
     if (hasRpUpdatedBy) {
-      rpFields.push('rp.updated_by', 'eu.username AS updated_by_username');
+      rpFields.push('rp.updated_by', RETURN_PRODUCTS_UPDATED_BY_LABEL_SQL);
     }
 
     let fromClause = `
       FROM return_products rp
       LEFT JOIN customers c ON rp.customer_id = c.customer_id
-      LEFT JOIN rep_list e ON rp.created_by = e.username
     `;
     if (hasRpUpdatedBy) {
-      fromClause += '\n      LEFT JOIN rep_list eu ON rp.updated_by = eu.username';
+      fromClause += RETURN_PRODUCTS_UPDATED_BY_JOIN;
     }
 
     const query = `SELECT ${rpFields.join(', ')} ${fromClause} ORDER BY rp.created_at DESC`;
@@ -80,10 +85,12 @@ export async function GET(request) {
     }
 
     // Build plain objects to avoid RowDataPacket serialization issues
-    const data = rows.map(row => ({
+    let data = rows.map((row) => ({
       ...row,
       items: itemsByReturnId[row.id] || [],
     }));
+
+    data = await enrichReturnProductsList(pool, data);
 
     return Response.json({
       success: true,
@@ -101,20 +108,17 @@ export async function GET(request) {
 // POST - नया return product create करें
 export async function POST(request) {
   try {
-    const token = request.headers.get('authorization')?.split(' ')[1];
-    let userId = 1;
-
-    if (token) {
-      try {
-        const decoded = verify(token, SECRET);
-        userId = decoded.username || decoded.empId || decoded.id || decoded.userId || decoded.client_index || 1;
-      } catch (err) {
-        console.error('Token verification failed:', err);
-      }
+    const actorUsername = await getReturnProductActorUsername();
+    if (!actorUsername) {
+      return Response.json(
+        { success: false, message: 'Unauthorized' },
+        { status: 401 },
+      );
     }
 
     const body = await request.json();
     const {
+      order_id,
       quotation_no,
       invoice_no,
       model_no,
@@ -141,6 +145,13 @@ export async function POST(request) {
     
     try {
       await connection.beginTransaction();
+      await ensureReturnProductOrderColumns(connection);
+
+      const orderMeta = await resolveOrderMetaForReturn(connection, {
+        order_id,
+        quotation_no,
+        invoice_no,
+      });
 
       // First, check if updated_by column exists in return_products
       const [columns] = await connection.query(`
@@ -150,6 +161,8 @@ export async function POST(request) {
 
       // Build insert query dynamically based on whether updated_by exists
       let insertFields = [
+        'order_id',
+        'order_created_by',
         'quotation_no',
         'invoice_no',
         'model_no',
@@ -160,9 +173,11 @@ export async function POST(request) {
         'return_status',
         'reason',
         'created_by',
-        'customer_id'
+        'customer_id',
       ];
       let insertValues = [
+        orderMeta?.order_id || (order_id ? String(order_id).trim() : null),
+        orderMeta?.created_by || null,
         quotation_no,
         invoice_no,
         model_no || (items && items.length > 0 ? items.map(i => i.item_code).join(', ') : ''),
@@ -172,13 +187,13 @@ export async function POST(request) {
         return_type || 'partial',
         'return_booking',
         reason || null,
-        userId,
-        customer_id || null
+        actorUsername,
+        customer_id || null,
       ];
 
       if (hasUpdatedBy) {
-        insertFields.splice(10, 0, 'updated_by'); // Insert after created_by
-        insertValues.splice(10, 0, userId); // Add userId as updated_by
+        insertFields.splice(12, 0, 'updated_by');
+        insertValues.splice(12, 0, actorUsername);
       }
 
       // Add created_at and updated_at as NOW() directly (not parameters)

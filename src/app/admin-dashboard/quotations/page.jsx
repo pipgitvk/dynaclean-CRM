@@ -1,7 +1,9 @@
 // src/app/admin-dashboard/quotations/page.jsx
+import Link from "next/link";
 import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 import QuotationTableClient from "./QuotationClientTable";
+import { userHasModuleKey } from "@/lib/userModuleAccessServer";
 
 export const dynamic = "force-dynamic";
 
@@ -22,27 +24,39 @@ export default async function QuotationPage({ searchParams }) {
 
   const sp = await searchParams;
   const customerId = sp?.customer_id ? String(sp.customer_id).trim() : "";
+  const serviceSupportOnly = String(sp?.ss || "") === "1";
+  const canPerformaInvoice = await userHasModuleKey(username, role, "performa-invoices");
 
   return (
     <div className="w-full p-6">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-800">
-          Quotation Management
+          Quotation Management{serviceSupportOnly ? " · Service Support" : ""}
         </h1>
-        <a
-          href={
-            customerId
-              ? `/admin-dashboard/quotations/new?customerId=${encodeURIComponent(customerId)}`
-              : "/admin-dashboard/quotations/new"
-          }
-          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-        >
-          New Quotation
-        </a>
+        <div className="flex items-center gap-3">
+          <a
+            href={
+              customerId
+                ? `/admin-dashboard/quotations/new?customerId=${encodeURIComponent(customerId)}`
+                : "/admin-dashboard/quotations/new"
+            }
+            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+          >
+            New Quotation
+          </a>
+          {canPerformaInvoice ? (
+            <Link
+              href="/admin-dashboard/invoices/performa"
+              className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
+            >
+              Performa Invoice
+            </Link>
+          ) : null}
+        </div>
       </div>
 
       {/* Send username to client component */}
-      <QuotationTableClient username={username} customerId={customerId} role={role} />
+      <QuotationTableClient username={username} customerId={customerId} role={role} serviceSupportOnly={serviceSupportOnly} />
     </div>
   );
 }

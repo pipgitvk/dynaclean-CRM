@@ -1,5 +1,6 @@
 'use client';
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
@@ -135,21 +136,11 @@ export default function MetaLogsPage() {
           </div>
           <div className="flex items-center gap-2">
             <label className="text-sm font-medium text-gray-500">From:</label>
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
+            <TypeableDateFilterInput value={startDate} onChange={setStartDate} className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"/>
           </div>
           <div className="flex items-center gap-2">
             <label className="text-sm font-medium text-gray-500">To:</label>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
+            <TypeableDateFilterInput value={endDate} onChange={setEndDate} className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"/>
           </div>
         </div>
       </div>

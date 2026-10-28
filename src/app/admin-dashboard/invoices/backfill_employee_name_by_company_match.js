@@ -3,10 +3,10 @@ const mysql = require('mysql2/promise');
 
 async function backfillEmployeeNameByCompanyMatch() {
   const conn = await mysql.createConnection({
-    host: process.env.DB_HOTS || 'localhost',
+    host: process.env.DB_HOST || 'localhost',
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || '',
-    database: process.env.DB_NAMES || 'dynaclean_crm',
+    database: process.env.DB_NAME || 'dynaclean_crm',
   });
   
   try {

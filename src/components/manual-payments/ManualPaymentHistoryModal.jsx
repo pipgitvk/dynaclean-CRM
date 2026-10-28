@@ -7,7 +7,7 @@ import { Loader2, X } from "lucide-react";
 function formatDateTime(value) {
   if (!value) return "-";
   const parsed = dayjs(value);
-  return parsed.isValid() ? parsed.format("DD MMM, YYYY hh:mm A") : "-";
+  return parsed.isValid() ? parsed.format("DD-MM-YYYY hh:mm A") : "-";
 }
 
 function getFollowedByRowColors(followups) {

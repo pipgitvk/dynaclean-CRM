@@ -1,5 +1,6 @@
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useTransition, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -9,10 +10,13 @@ import {
   Eye,
   RefreshCw,
   Loader2,
-  MoreHorizontal,
   Shield,
+  FileSpreadsheet,
+  FileText,
 } from "lucide-react";
+import { applyTLCustomersChipFilter } from "@/lib/tlCustomersChipFilter";
 import Link from "next/link";
+import { NOTES_LANGUAGE_OPTIONS } from "@/constants/notesLanguageOptions";
 import dayjs from "dayjs";
 import {
   getTlCustomersTableTagOptions,
@@ -60,12 +64,16 @@ export default function TLCustomersTable({
     searchParams?.nextFromDate || "",
   );
   const [nextToDate, setNextToDate] = useState(searchParams?.nextToDate || "");
+  const [selectedNotesLanguage, setSelectedNotesLanguage] = useState(
+    searchParams?.notes_language || "",
+  );
   const [assigningLead, setAssigningLead] = useState(null);
   const [latestquote, setLatestquote] = useState([]);
   const [selectedEmpForAssign, setSelectedEmpForAssign] = useState("");
   const [activeFilter, setActiveFilter] = useState("all");
   const [showQuotePopup, setShowQuotePopup] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [exportingFormat, setExportingFormat] = useState(null);
   const [products, setProducts] = useState(productsList);
   const [showProductsDropdown, setShowProductsDropdown] = useState(false);
   const [productSearch, setProductSearch] = useState("");
@@ -78,7 +86,7 @@ export default function TLCustomersTable({
   // Fetch products if not provided via props
   useEffect(() => {
     if (productsList.length === 0 && isAdmin) {
-      fetch("/api/products/-list")
+      fetch("/api/products/list")
         .then((res) => res.json())
         .then((data) => {
           if (Array.isArray(data)) {
@@ -107,58 +115,44 @@ export default function TLCustomersTable({
     ? "/admin-dashboard/tl-customers"
     : "/user-dashboard/tl-customers";
 
+  const buildFilterParams = (overrides = {}) => {
+    const values = {
+      search: searchTerm,
+      employee: selectedEmployee,
+      status: selectedStatus,
+      stage: selectedStage,
+      tag: selectedTag,
+      model: selectedModel,
+      nextFromDate,
+      nextToDate,
+      notes_language: selectedNotesLanguage,
+      ...overrides,
+    };
+    const params = new URLSearchParams();
+    Object.entries(values).forEach(([key, val]) => {
+      if (val) params.set(key, val);
+    });
+    params.set("tlOnly", tlOnly ? "true" : "false");
+    if (preBookingOnly) params.set("preBookingOnly", "true");
+    return params;
+  };
+
   // Use allCustomersForKPI for counts, or fallback to customers if not provided
   const customersForKPI =
     allCustomersForKPI.length > 0 ? allCustomersForKPI : customers;
 
-  const getFilteredCustomers = () => {
-    const now = dayjs();
-    
-    // If pre-booking toggle is ON, show only customers with pre-booking data
-    let baseCustomers = customers;
-    if (preBookingOnly) {
-      baseCustomers = customers.filter((customer) => customer.has_pre_booking);
-    }
+  const chipFilterContext = useMemo(
+    () => ({
+      tlOnly,
+      isSuperAdmin,
+      statusFilter: selectedStatus,
+      preBookingOnly,
+    }),
+    [tlOnly, isSuperAdmin, selectedStatus, preBookingOnly],
+  );
 
-    switch (activeFilter) {
-      case "upcoming":
-        return baseCustomers.filter(
-          (customer) =>
-            allowCustomerByStatus(customer) &&
-            customer.multi_tag &&
-            customer.multi_tag.toLowerCase().includes("strong followup"),
-        );
-
-      case "due":
-        return baseCustomers.filter((customer) => {
-          if (!allowCustomerByStatus(customer)) return false;
-
-          // Exclude closed stages
-          const excludedStages = [
-            "Won (Order Received)",
-            "Lost",
-            "Disqualified / Invalid Lead",
-          ];
-          if (excludedStages.includes(customer.stage)) return false;  
-
-          const followupTime = pickEffectiveNextFollowup(customer);
-          if (!followupTime) return false;
-
-          return followupTime.isBefore(now); // Overdue
-        });
-
-      case "prime":
-        return baseCustomers.filter(
-          (customer) =>
-            allowCustomerByStatus(customer) &&
-            customer.multi_tag &&
-            customer.multi_tag.toLowerCase().includes("prime"),
-        );
-
-      default:
-        return baseCustomers.filter((customer) => allowCustomerByStatus(customer));
-    }
-  };
+  const getFilteredCustomers = () =>
+    applyTLCustomersChipFilter(customers, activeFilter, chipFilterContext);
 
   // Get counts for each filter using KPI data (all customers)
   const getFilterCounts = () => {
@@ -348,18 +342,42 @@ export default function TLCustomersTable({
   const handleSearch = (e) => {
     e.preventDefault();
     startTransition(() => {
-      const params = new URLSearchParams();
-      if (searchTerm) params.set("search", searchTerm);
-      if (selectedEmployee) params.set("employee", selectedEmployee);
-      if (selectedStatus) params.set("status", selectedStatus);
-      if (selectedStage) params.set("stage", selectedStage);
-      if (selectedTag) params.set("tag", selectedTag);
-      if (selectedModel) params.set("model", selectedModel);
-      if (nextFromDate) params.set("nextFromDate", nextFromDate);
-      if (nextToDate) params.set("nextToDate", nextToDate);
-      params.set("tlOnly", tlOnly ? "true" : "false");
-      router.push(`${basePath}?${params.toString()}`);
+      router.push(`${basePath}?${buildFilterParams().toString()}`);
     });
+  };
+
+  const handleExport = async (format) => {
+    if (!isAdmin) return;
+    setExportingFormat(format);
+    try {
+      const params = buildFilterParams();
+      params.set("activeFilter", activeFilter);
+      params.set("format", format);
+      const res = await fetch(`/api/tl-customers/export?${params.toString()}`);
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.message || "Export failed");
+      }
+      const blob = await res.blob();
+      const disposition = res.headers.get("Content-Disposition") || "";
+      const match = disposition.match(/filename="([^"]+)"/);
+      const fallback =
+        format === "excel" ? "tl-customers.xlsx" : "tl-customers.pdf";
+      const fileName = match?.[1] || fallback;
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = fileName;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      alert(err.message || "Could not download file.");
+    } finally {
+      setExportingFormat(null);
+    }
   };
 
   const handleReset = () => {
@@ -372,41 +390,21 @@ export default function TLCustomersTable({
       setSelectedModel("");
       setNextFromDate("");
       setNextToDate("");
+      setSelectedNotesLanguage("");
       router.push(basePath);
     });
   };
 
   const handlePageChange = (newPage) => {
     startTransition(() => {
-      const params = new URLSearchParams();
-      if (searchTerm) params.set("search", searchTerm);
-      if (selectedEmployee) params.set("employee", selectedEmployee);
-      if (selectedStatus) params.set("status", selectedStatus);
-      if (selectedStage) params.set("stage", selectedStage);
-      if (selectedTag) params.set("tag", selectedTag);
-      if (selectedModel) params.set("model", selectedModel);
-      if (nextFromDate) params.set("nextFromDate", nextFromDate);
-      if (nextToDate) params.set("nextToDate", nextToDate);
-
-      params.set("page", newPage.toString());
-      router.push(`${basePath}?${params.toString()}`);
+      router.push(
+        `${basePath}?${buildFilterParams({ page: newPage.toString() }).toString()}`
+      );
     });
   };
 
   // store back functionality
-  const currentQuery = new URLSearchParams();
-
-  if (searchTerm) currentQuery.set("search", searchTerm);
-  if (selectedEmployee) currentQuery.set("employee", selectedEmployee);
-  if (selectedStatus) currentQuery.set("status", selectedStatus);
-  if (selectedStage) currentQuery.set("stage", selectedStage);
-  if (selectedTag) currentQuery.set("tag", selectedTag);
-  if (selectedModel) currentQuery.set("model", selectedModel);
-  if (nextFromDate) currentQuery.set("nextFromDate", nextFromDate);
-  if (nextToDate) currentQuery.set("nextToDate", nextToDate);
-  if (tlOnly !== undefined)
-    currentQuery.set("tlOnly", tlOnly ? "true" : "false");
-
+  const currentQuery = buildFilterParams();
   const queryString = currentQuery.toString();
 
   const handleAssignLead = async (customerId) => {
@@ -530,10 +528,10 @@ export default function TLCustomersTable({
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
           {/* Left side - Search filters */}
           <div className="w-full flex-1">
-            <form onSubmit={handleSearch} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            <form onSubmit={handleSearch}>
+              <div className="flex flex-wrap items-end gap-3">
                 {/* Search */}
-                <div className="md:col-span-2">
+                <div className="min-w-[14rem] flex-1 sm:max-w-md">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Search (ID, Phone, Name, Company)
                   </label>
@@ -582,18 +580,9 @@ export default function TLCustomersTable({
                       const status = e.target.value;
                       setSelectedStatus(status);
                       startTransition(() => {
-                        const params = new URLSearchParams();
-                        if (searchTerm) params.set("search", searchTerm);
-                        if (selectedEmployee)
-                          params.set("employee", selectedEmployee);
-                        if (status) params.set("status", status);
-                        if (selectedStage) params.set("stage", selectedStage);
-                        if (selectedTag) params.set("tag", selectedTag);
-                        if (selectedModel) params.set("model", selectedModel);
-                        if (nextFromDate)
-                          params.set("nextFromDate", nextFromDate);
-                        if (nextToDate) params.set("nextToDate", nextToDate);
-                        router.push(`${basePath}?${params.toString()}`);
+                        router.push(
+                          `${basePath}?${buildFilterParams({ status }).toString()}`
+                        );
                       });
                     }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -629,19 +618,9 @@ export default function TLCustomersTable({
                       const stage = e.target.value;
                       setSelectedStage(stage);
                       startTransition(() => {
-                        const params = new URLSearchParams();
-                        if (searchTerm) params.set("search", searchTerm);
-                        if (selectedEmployee)
-                          params.set("employee", selectedEmployee);
-                        if (selectedStatus)
-                          params.set("status", selectedStatus);
-                        if (stage) params.set("stage", stage);
-                        if (selectedTag) params.set("tag", selectedTag);
-                        if (selectedModel) params.set("model", selectedModel);
-                        if (nextFromDate)
-                          params.set("nextFromDate", nextFromDate);
-                        if (nextToDate) params.set("nextToDate", nextToDate);
-                        router.push(`${basePath}?${params.toString()}`);
+                        router.push(
+                          `${basePath}?${buildFilterParams({ stage }).toString()}`
+                        );
                       });
                     }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -684,19 +663,9 @@ export default function TLCustomersTable({
                       const tag = e.target.value;
                       setSelectedTag(tag);
                       startTransition(() => {
-                        const params = new URLSearchParams();
-                        if (searchTerm) params.set("search", searchTerm);
-                        if (selectedEmployee)
-                          params.set("employee", selectedEmployee);
-                        if (selectedStatus)
-                          params.set("status", selectedStatus);
-                        if (selectedStage) params.set("stage", selectedStage);
-                        if (tag) params.set("tag", tag);
-                        if (selectedModel) params.set("model", selectedModel);
-                        if (nextFromDate)
-                          params.set("nextFromDate", nextFromDate);
-                        if (nextToDate) params.set("nextToDate", nextToDate);
-                        router.push(`${basePath}?${params.toString()}`);
+                        router.push(
+                          `${basePath}?${buildFilterParams({ tag }).toString()}`
+                        );
                       });
                     }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -713,31 +682,46 @@ export default function TLCustomersTable({
                   </select>
                 </div>
 
+                {/* Notes language */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Notes Language
+                  </label>
+                  <select
+                    value={selectedNotesLanguage}
+                    onChange={(e) => {
+                      const notes_language = e.target.value;
+                      setSelectedNotesLanguage(notes_language);
+                      startTransition(() => {
+                        router.push(
+                          `${basePath}?${buildFilterParams({ notes_language }).toString()}`
+                        );
+                      });
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">All Language</option>
+                    {NOTES_LANGUAGE_OPTIONS.map((lang) => (
+                      <option key={lang.code} value={lang.code}>
+                        {lang.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 {/* Next Followup (same value as table column "Next Followup") */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Next Followup from
                   </label>
-                  <input
-                    type="date"
-                    placeholder="dd/mm/yyyy"
-                    value={nextFromDate}
-                    onChange={(e) => setNextFromDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                  <TypeableDateFilterInput value={nextFromDate} onChange={setNextFromDate} placeholder="dd/mm/yyyy" className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"/>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Next Followup to
                   </label>
-                  <input
-                    type="date"
-                    placeholder="dd/mm/yyyy"
-                    value={nextToDate}
-                    onChange={(e) => setNextToDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                  <TypeableDateFilterInput value={nextToDate} onChange={setNextToDate} placeholder="dd/mm/yyyy" className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"/>
                 </div>
 
                 {/* Products / Models filter - Dropdown */}
@@ -866,10 +850,8 @@ export default function TLCustomersTable({
                     </div>
                   )}
                 </div>
-              </div>
 
-              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                <div className="flex flex-wrap gap-2">
+                <div className="flex shrink-0 flex-wrap items-center gap-2 pb-0.5">
                   <button
                     type="submit"
                     disabled={isPending}
@@ -895,9 +877,39 @@ export default function TLCustomersTable({
                     )}
                     Reset
                   </button>
-                </div>
 
-                <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 sm:ml-4 sm:pl-4 sm:border-l border-gray-200 border-t sm:border-t-0 pt-3 sm:pt-0">
+                  {isAdmin && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => handleExport("excel")}
+                        disabled={Boolean(exportingFormat) || isPending}
+                        className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {exportingFormat === "excel" ? (
+                          <Loader2 size={18} className="animate-spin" />
+                        ) : (
+                          <FileSpreadsheet size={18} />
+                        )}
+                        Excel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleExport("pdf")}
+                        disabled={Boolean(exportingFormat) || isPending}
+                        className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {exportingFormat === "pdf" ? (
+                          <Loader2 size={18} className="animate-spin" />
+                        ) : (
+                          <FileText size={18} />
+                        )}
+                        PDF
+                      </button>
+                    </>
+                  )}
+
+                  <div className="flex flex-wrap items-center gap-3 sm:gap-4 sm:ml-2 sm:pl-4 sm:border-l border-gray-200">
                   <div className="flex items-center gap-2">
                     <label className="text-sm font-medium text-gray-700">
                       Show TL Entries Only:
@@ -991,6 +1003,7 @@ export default function TLCustomersTable({
                       </span>
                     </div>
                   )}
+                  </div>
                 </div>
               </div>
             </form>
@@ -1232,7 +1245,7 @@ export default function TLCustomersTable({
                       {customer.followup_start_at
                         ? formatCrmDatetimeForISTDisplay(
                             customer.followup_start_at,
-                            "DD MMM, YYYY HH:mm",
+                            "DD-MM-YYYY HH:mm",
                           ) || "N/A"
                         : "N/A"}
                     </td>
@@ -1291,18 +1304,18 @@ export default function TLCustomersTable({
                     {tlOnly
                       ? formatCrmDatetimeForISTDisplay(
                           customer.tl_next_followup,
-                          "DD MMM, YYYY HH:mm",
+                          "DD-MM-YYYY HH:mm",
                         ) || "N/A"
                       : formatCrmDayjsForISTDisplay(
                           pickEffectiveNextFollowup(customer),
-                          "DD MMM, YYYY HH:mm",
+                          "DD-MM-YYYY HH:mm",
                         ) || "N/A"}
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
                     {customer.estimated_order_date
                       ? formatCrmDatetimeForISTDisplay(
                           customer.estimated_order_date,
-                          "DD MMM, YYYY HH:mm",
+                          "DD-MM-YYYY HH:mm",
                         ) || "N/A"
                       : "N/A"}
                   </td>
@@ -1368,7 +1381,7 @@ export default function TLCustomersTable({
 
                     {/* Assign Modal */}
                     {assigningLead === customer.customer_id && (
-                      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                      <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/20 backdrop-blur-sm p-4">
                         <div className="bg-white rounded-lg p-6 max-w-md w-full">
                           <h3 className="text-lg font-semibold mb-4">
                             Assign Lead
@@ -1412,7 +1425,7 @@ export default function TLCustomersTable({
 
                     {/* // here another model  */}
                     {showQuotePopup && latestquote && (
-                      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+                      <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/20 backdrop-blur-sm p-4">
                         <div className="bg-white rounded-lg shadow-lg w-full max-w-md p-5 relative">
                           {/* Header */}
                           <div className="flex justify-between items-center mb-4">
@@ -1443,7 +1456,7 @@ export default function TLCustomersTable({
                               <p>
                                 <b>Date:</b>{" "}
                                 {dayjs(latestquote.quote_date).format(
-                                  "DD MMM YYYY",
+                                  "DD-MM-YYYY",
                                 )}
                               </p>
                               <p>

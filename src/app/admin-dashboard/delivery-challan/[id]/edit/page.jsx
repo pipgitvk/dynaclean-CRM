@@ -1,5 +1,6 @@
 "use client";
 
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import React, { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { ArrowLeft, Save, X } from "lucide-react";
@@ -475,13 +476,7 @@ export default function EditDeliveryChallanPage() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Expected Delivery Date
               </label>
-              <input
-                type="date"
-                name="expected_delivery_date"
-                value={formData.expected_delivery_date}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
-              />
+              <TypeableDateFilterInput value={formData.expected_delivery_date} onChange={(v) => handleChange({ target: { name: "expected_delivery_date", value: v } })} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"/>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -525,14 +520,8 @@ export default function EditDeliveryChallanPage() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Challan Date *
               </label>
-              <input
-                type="date"
-                name="challan_date"
-                value={formData.challan_date}
-                onChange={handleChange}
-                required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
-              />
+              <TypeableDateFilterInput value={formData.challan_date} onChange={(v) => handleChange({ target: { name: "challan_date", value: v } })} required
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"/>
             </div>
 
             <div>
@@ -622,7 +611,17 @@ export default function EditDeliveryChallanPage() {
                           )}
                         </div>
                       </td>
-                      <td className="border px-2 py-2">{item.hsn || "-"}</td>
+                      <td className="border px-2 py-2">
+                        <input
+                          type="text"
+                          value={item.hsn || ""}
+                          onChange={(e) =>
+                            handleItemChange(idx, "hsn", e.target.value)
+                          }
+                          className="border p-1 w-20 text-xs rounded"
+                          placeholder="HSN"
+                        />
+                      </td>
                       <td className="border px-2 py-2 align-top">
                         <textarea
                           value={item.specification || ""}
