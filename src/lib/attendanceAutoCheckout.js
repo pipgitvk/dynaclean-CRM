@@ -13,8 +13,10 @@ import {
 } from "@/lib/attendanceAutoCheckoutLeave";
 import {
   insertAutoMachineCheckoutPunch,
+  isMachineOnlyCheckinAttendanceDay,
   loadMachineCodeMaps,
   loadMachineDailyByUsername,
+  machineCheckoutIsBeforeNinePm,
   mergeCrmAndMachineDay,
   mergedHasCheckout,
 } from "@/lib/attendanceMachineMerge";
@@ -68,6 +70,47 @@ function autoCheckoutDateTimeForDate(dateYmd, wallTime = AUTO_CHECKOUT_WALL_TIME
   const t = String(wallTime || AUTO_CHECKOUT_WALL_TIME).trim();
   const normalized = t.length === 5 ? `${t}:00` : t;
   return `${dateYmd} ${normalized}`;
+}
+
+async function revertCrmAutomaticCheckoutForMachinePreference(
+  conn,
+  { username, dateYmd, machineDay, machineOnlyCheckin },
+) {
+  const macIn = machineDay?.machine_checkin ?? null;
+  const [revertResult] = await conn.query(
+    `UPDATE attendance_logs
+     SET checkout_time = NULL,
+         checkout_latitude = NULL,
+         checkout_longitude = NULL,
+         checkout_address = NULL,
+         checkin_time = CASE
+           WHEN ? = 1
+             AND ? IS NOT NULL
+             AND checkin_time IS NOT NULL
+             AND TIME(checkin_time) = TIME(?)
+           THEN NULL
+           ELSE checkin_time
+         END
+     WHERE username = ?
+       AND date = ?
+       AND TRIM(COALESCE(checkout_address, '')) = ?`,
+    [
+      machineOnlyCheckin ? 1 : 0,
+      macIn,
+      macIn,
+      username,
+      dateYmd,
+      AUTO_CHECKOUT_ATTENDANCE_ADDRESS,
+    ]
+  );
+
+  await conn.query(
+    `DELETE FROM attendance_auto_checkout_approvals
+     WHERE username = ? AND log_date = ?`,
+    [username, dateYmd]
+  );
+
+  return Number(revertResult?.affectedRows ?? 0);
 }
 
 /**
@@ -181,6 +224,33 @@ async function applyAutomaticCheckoutsOnConn(conn, options = {}) {
 
     for (const cand of candidates) {
       const { username, dateYmd, crm, machineDay } = cand;
+      const machineOnlyCheckin = isMachineOnlyCheckinAttendanceDay(crm, machineDay);
+      const macOut = machineDay?.machine_checkout ?? null;
+
+      const shouldRevertExistingAuto =
+        crm &&
+        isAutomaticCheckoutAddress(crm.checkout_address) &&
+        (machineOnlyCheckin ||
+          machineCheckoutIsBeforeNinePm(macOut, dateYmd));
+
+      if (shouldRevertExistingAuto) {
+        const n = await revertCrmAutomaticCheckoutForMachinePreference(conn, {
+          username,
+          dateYmd,
+          machineDay,
+          machineOnlyCheckin,
+        });
+        if (n > 0) {
+          updated += n;
+          crm.checkout_time = null;
+          crm.checkout_address = null;
+        }
+      }
+
+      if (machineOnlyCheckin) {
+        continue;
+      }
+
       const merged = mergeCrmAndMachineDay(
         crm || { username, date: dateYmd },
         machineDay

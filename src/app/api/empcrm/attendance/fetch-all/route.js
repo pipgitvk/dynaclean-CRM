@@ -14,6 +14,7 @@ import {
   mergeAttendanceListWithMachine,
 } from "@/lib/attendanceMachineMerge";
 import { ensureAttendanceLogsEmployeeColumns } from "@/lib/ensureAttendanceLogsEmployeeColumns";
+import { applyAutomaticCheckouts } from "@/lib/attendanceAutoCheckout";
 import { attendanceDateKey } from "@/lib/leaveDateRange";
 export const dynamic = 'force-dynamic';
 
@@ -25,6 +26,7 @@ function normalizeUserKey(value) {
 
 export async function GET(request) {
   try {
+    await applyAutomaticCheckouts();
 
     const db = await getDbConnection();
     await ensureAttendanceEditHistoryTable(db);

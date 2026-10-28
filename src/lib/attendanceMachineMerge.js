@@ -3,6 +3,10 @@ import { parseAttendanceDateTime } from "@/lib/istDateTime";
 import { attendanceDateKey } from "@/lib/leaveDateRange";
 import { ensureRepListMachineCodeColumn } from "@/lib/ensureRepListMachineCode";
 import { ensureMachineAttendancePunchesTable } from "@/lib/ensureMachineAttendancePunchesTable";
+import {
+  AUTO_CHECKOUT_WALL_TIME,
+  isAutomaticCheckoutAddress,
+} from "@/lib/attendanceAutoCheckoutConstants";
 export const MACHINE_ATTENDANCE_ADDRESS = "Machine";
 
 /** Raw check-in/out stored on attendance_logs (not merged display times). */
@@ -16,6 +20,31 @@ export function extractCrmPunchesFromAttendanceLogRow(crmRow) {
     checkin: isMeaningfulAttendancePunch(checkin) ? checkin : null,
     checkout: isMeaningfulAttendancePunch(checkout) ? checkout : null,
   };
+}
+
+/** CRM app check-in missing, but biometric/machine recorded check-in. */
+export function isMachineOnlyCheckinAttendanceDay(crmRow, machineDay) {
+  const { checkin: crmIn } = extractCrmPunchesFromAttendanceLogRow(crmRow);
+  const macIn = machineDay?.machine_checkin ?? null;
+  return (
+    !isMeaningfulAttendancePunch(crmIn) &&
+    isMeaningfulAttendancePunch(macIn)
+  );
+}
+
+/** Machine recorded check-out strictly before 9:00 PM IST on that date. */
+export function machineCheckoutIsBeforeNinePm(
+  machineCheckout,
+  dateYmd,
+  wallTime = AUTO_CHECKOUT_WALL_TIME,
+) {
+  if (!dateYmd || !isMeaningfulAttendancePunch(machineCheckout)) return false;
+  const t = String(wallTime || AUTO_CHECKOUT_WALL_TIME).trim();
+  const normalized = t.length === 5 ? `${t}:00` : t;
+  const cutoff = parseAttendanceDateTime(`${dateYmd} ${normalized}`);
+  const mac = parseAttendanceDateTime(machineCheckout);
+  if (!cutoff || !mac) return false;
+  return mac.getTime() < cutoff.getTime();
 }
 
 export function getAttendanceSourcesDetailFromLog(log) {
@@ -142,8 +171,19 @@ export function mergeCrmAndMachineDay(crmRow, machineDay) {
   const macIn = machineDay?.machine_checkin ?? null;
   const macOut = machineDay?.machine_checkout ?? null;
 
+  const machineOnlyCheckin = isMachineOnlyCheckinAttendanceDay(crmRow, machineDay);
+  const dateYmdForRow = attendanceDateKey(crmRow?.date) || machineDay?.punch_date || "";
+  let crmOutForMerge = crmOut;
+  if (
+    isAutomaticCheckoutAddress(crmRow?.checkout_address) &&
+    (machineOnlyCheckin ||
+      machineCheckoutIsBeforeNinePm(macOut, dateYmdForRow))
+  ) {
+    crmOutForMerge = null;
+  }
+
   const checkinPick = pickEarlierCheckin(crmIn, macIn);
-  const checkoutPick = pickLaterCheckout(crmOut, macOut);
+  const checkoutPick = pickLaterCheckout(crmOutForMerge, macOut);
 
   const merged = {
     ...(crmRow || {}),
@@ -182,6 +222,32 @@ export function mergeCrmAndMachineDay(crmRow, machineDay) {
 
   if (checkinPick.source === "machine" && !isMeaningfulAttendancePunch(crmIn)) {
     if (!merged.checkin_address) merged.checkin_address = MACHINE_ATTENDANCE_ADDRESS;
+  }
+
+  if (
+    machineOnlyCheckin &&
+    isAutomaticCheckoutAddress(merged.checkout_address)
+  ) {
+    merged.checkout_address = isMeaningfulAttendancePunch(macOut)
+      ? MACHINE_ATTENDANCE_ADDRESS
+      : null;
+    merged.checkout_latitude = null;
+    merged.checkout_longitude = null;
+    if (merged.auto_checkout_approval_status != null) {
+      merged.auto_checkout_approval_status = null;
+    }
+  } else if (
+    isAutomaticCheckoutAddress(merged.checkout_address) &&
+    machineCheckoutIsBeforeNinePm(macOut, dateYmdForRow)
+  ) {
+    merged.checkout_address = isMeaningfulAttendancePunch(macOut)
+      ? MACHINE_ATTENDANCE_ADDRESS
+      : null;
+    merged.checkout_latitude = null;
+    merged.checkout_longitude = null;
+    if (merged.auto_checkout_approval_status != null) {
+      merged.auto_checkout_approval_status = null;
+    }
   }
 
   return merged;
