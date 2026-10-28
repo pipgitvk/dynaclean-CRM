@@ -53,8 +53,12 @@ export async function GET(request) {
     await applyAutomaticCheckouts(db, { username });
     await ensureAttendanceAutoCheckoutApprovalsTable(db);
 
-    const { machineCodeToUsername, canonicalMaps, resolveCanonicalUsername: resolveCanon } =
-      await loadMachineCodeMaps(db);
+    const {
+      usernameToMachineCode,
+      machineCodeToUsername,
+      canonicalMaps,
+      resolveCanonicalUsername: resolveCanon,
+    } = await loadMachineCodeMaps(db);
     const canonicalLogin = resolveCanon(username, canonicalMaps);
     const loginAliases = await usernamesForSameEmployee(db, username);
     const placeholders = loginAliases.map(() => "?").join(", ");
@@ -96,10 +100,6 @@ export async function GET(request) {
       applyCanonicalUsernameToRow(row, canonicalMaps);
     }
 
-    const machineByUserDate = await loadMachineDailyByUsername(
-      db,
-      machineCodeToUsername,
-    );
     // Personal attendance must not pick up another employee's machine day.
     // The page indexes rows by date only, so a leaked punch shows on that date for everyone.
     const allowedUserKeys = new Set();
@@ -113,6 +113,17 @@ export async function GET(request) {
     }
     allowUser(canonicalLogin);
     for (const row of rows) allowUser(row.username);
+
+    const empCodes = [];
+    for (const [user, code] of usernameToMachineCode) {
+      if (!code || !allowedUserKeys.has(normalizeUsernameKey(user))) continue;
+      empCodes.push(code);
+    }
+    const machineByUserDate = await loadMachineDailyByUsername(
+      db,
+      machineCodeToUsername,
+      { empCodes },
+    );
 
     const machineForUser = new Map();
     for (const [key, val] of machineByUserDate.entries()) {

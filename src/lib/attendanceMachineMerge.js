@@ -319,17 +319,29 @@ export function repListInfoForEmpCode(byCode, empCode) {
   return byCode.get(code) || { userRole: null, userDepartment: null };
 }
 
-export async function loadMachineDailyByUsername(conn, machineCodeToUsername) {
+export async function loadMachineDailyByUsername(conn, machineCodeToUsername, options = {}) {
   await ensureMachineAttendancePunchesTable(conn);
-  const [rows] = await conn.query(
-    `SELECT
-       emp_code,
-       DATE(punch_datetime) AS punch_date,
-       MIN(CASE WHEN HOUR(punch_datetime) < 12 THEN punch_datetime END) AS machine_checkin,
-       MAX(CASE WHEN HOUR(punch_datetime) >= 12 THEN punch_datetime END) AS machine_checkout
-     FROM machine_attendance_punches
-     GROUP BY emp_code, DATE(punch_datetime)`
-  );
+  const empCodes = [
+    ...new Set(
+      (options.empCodes || []).map((code) => String(code || "").trim()).filter(Boolean),
+    ),
+  ];
+  if (options.empCodes && empCodes.length === 0) return new Map();
+
+  let sql = `
+    SELECT
+      emp_code,
+      DATE(punch_datetime) AS punch_date,
+      MIN(CASE WHEN HOUR(punch_datetime) < 12 THEN punch_datetime END) AS machine_checkin,
+      MAX(CASE WHEN HOUR(punch_datetime) >= 12 THEN punch_datetime END) AS machine_checkout
+    FROM machine_attendance_punches`;
+  const params = [];
+  if (empCodes.length) {
+    sql += ` WHERE emp_code IN (${empCodes.map(() => "?").join(", ")})`;
+    params.push(...empCodes);
+  }
+  sql += ` GROUP BY emp_code, DATE(punch_datetime)`;
+  const [rows] = await conn.query(sql, params);
   const byUserDate = new Map();
   for (const row of rows || []) {
     const empCode = String(row.emp_code || "").trim();

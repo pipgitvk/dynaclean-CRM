@@ -16,10 +16,14 @@ CREATE TABLE IF NOT EXISTS attendance_auto_checkout_approvals (
   INDEX idx_auto_co_log_date (log_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`;
 
+const GLOBAL_KEY = "__attendanceAutoCheckoutApprovalsTable__";
+
 export async function ensureAttendanceAutoCheckoutApprovalsTable(conn) {
+  if (globalThis[GLOBAL_KEY]) return;
   const db = conn || (await getDbConnection());
   try {
     await db.execute(CREATE_TABLE);
+    globalThis[GLOBAL_KEY] = true;
   } catch (e) {
     console.error("ensureAttendanceAutoCheckoutApprovalsTable:", e?.message);
     throw e;

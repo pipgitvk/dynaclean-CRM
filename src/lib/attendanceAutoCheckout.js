@@ -23,7 +23,22 @@ import {
 import { lookupAttendanceEmployeeIds } from "@/lib/ensureAttendanceLogsEmployeeColumns";
 
 const MYSQL_AUTO_CHECKOUT_LOCK = "crm_attendance_auto_checkout";
+const USER_AUTO_CHECKOUT_TTL_MS = 20000;
+const recentUserAutoCheckout = new Map();
 let autoCheckoutChain = Promise.resolve();
+
+function clockHms(value) {
+  if (value == null || value === "") return "";
+  const match = String(value).trim().match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if (!match) return "";
+  return `${match[1].padStart(2, "0")}:${match[2]}:${(match[3] || "00").padStart(2, "0")}`;
+}
+
+function automaticCheckoutTimeAlreadyMatches(checkoutValue, wallTime) {
+  const stored = clockHms(checkoutValue);
+  const target = clockHms(wallTime);
+  return Boolean(stored && target && stored === target);
+}
 
 function isDeadlockError(err) {
   return err?.code === "ER_LOCK_DEADLOCK" || err?.errno === 1213;
@@ -127,6 +142,12 @@ export async function applyAutomaticCheckouts(_connIgnored, options = {}) {
 }
 
 async function applyAutomaticCheckoutsOnConn(conn, options = {}) {
+  const { username: filterUsername } = options;
+  if (filterUsername) {
+    const last = recentUserAutoCheckout.get(filterUsername) || 0;
+    if (Date.now() - last < USER_AUTO_CHECKOUT_TTL_MS) return 0;
+  }
+
   const [[lockRow]] = await conn.query(
     `SELECT GET_LOCK(?, 2) AS got`,
     [MYSQL_AUTO_CHECKOUT_LOCK]
@@ -140,8 +161,6 @@ async function applyAutomaticCheckoutsOnConn(conn, options = {}) {
 
     const nowIst = getISTDateTimeString();
     const todayIst = getISTDateString();
-    const { username: filterUsername } = options;
-    const autoAddrLit = conn.escape(AUTO_CHECKOUT_ATTENDANCE_ADDRESS);
 
     const [leaves] = await conn.query(
       `SELECT username, from_date, to_date, leave_type, is_half_day, half_day_type,
@@ -164,9 +183,20 @@ async function applyAutomaticCheckoutsOnConn(conn, options = {}) {
 
     const { usernameToMachineCode, machineCodeToUsername } =
       await loadMachineCodeMaps(conn);
+    let empCodes;
+    if (filterUsername) {
+      const codes = new Set();
+      const direct = usernameToMachineCode.get(filterUsername);
+      if (direct) codes.add(direct);
+      for (const [code, user] of machineCodeToUsername) {
+        if (user === filterUsername) codes.add(code);
+      }
+      empCodes = [...codes];
+    }
     const machineByUserDate = await loadMachineDailyByUsername(
       conn,
-      machineCodeToUsername
+      machineCodeToUsername,
+      empCodes ? { empCodes } : {},
     );
 
     let sql = `
@@ -294,7 +324,8 @@ async function applyAutomaticCheckoutsOnConn(conn, options = {}) {
       if (mergedHasCheckout(crmCheckout, machineCheckout)) {
         if (
           isAutomaticCheckoutAddress(crm?.checkout_address) &&
-          isMeaningfulAttendancePunch(crmCheckout)
+          isMeaningfulAttendancePunch(crmCheckout) &&
+          !automaticCheckoutTimeAlreadyMatches(crmCheckout, wallTime)
         ) {
           const [fixResult] = await conn.query(
             `UPDATE attendance_logs
@@ -383,6 +414,7 @@ async function applyAutomaticCheckoutsOnConn(conn, options = {}) {
       }
     }
 
+    if (filterUsername) recentUserAutoCheckout.set(filterUsername, Date.now());
     return updated;
   } finally {
     try {

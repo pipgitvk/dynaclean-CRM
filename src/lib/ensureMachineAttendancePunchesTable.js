@@ -29,7 +29,11 @@ CREATE TABLE IF NOT EXISTS machine_attendance_sync_meta (
   skipped INT NOT NULL DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`;
 
+const GLOBAL_KEY = "__machineAttendancePunchesTable__";
+
 export async function ensureMachineAttendancePunchesTable(conn) {
+  if (globalThis[GLOBAL_KEY]) return;
   await conn.execute(CREATE_TABLE);
   await conn.execute(CREATE_SYNC_META);
+  globalThis[GLOBAL_KEY] = true;
 }
