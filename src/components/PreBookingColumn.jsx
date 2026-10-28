@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { Loader2 } from "lucide-react";
 import dayjs from "dayjs";
 
@@ -10,15 +10,8 @@ export default function PreBookingColumn({ customerId }) {
   const [showTooltip, setShowTooltip] = useState(false);
   const [hasChecked, setHasChecked] = useState(false);
 
-  useEffect(() => {
-    // Fetch data on component mount
-    if (!hasChecked) {
-      fetchBookings();
-    }
-  }, [customerId]);
-
-  const fetchBookings = async () => {
-    if (!customerId || hasChecked) return;
+  const fetchBookings = useCallback(async () => {
+    if (!customerId || hasChecked || loading) return;
 
     try {
       setLoading(true);
@@ -29,32 +22,62 @@ export default function PreBookingColumn({ customerId }) {
 
       if (data.success) {
         setBookings(data.bookings || []);
-        setHasChecked(true);
+      } else {
+        setBookings([]);
       }
-    } catch (error) {
-      console.error("Error fetching pre-bookings:", error);
+      setHasChecked(true);
+    } catch {
       setBookings([]);
       setHasChecked(true);
     } finally {
       setLoading(false);
     }
+  }, [customerId, hasChecked, loading]);
+
+  const handleMouseEnter = () => {
+    setShowTooltip(true);
+    if (!hasChecked && !loading) {
+      fetchBookings();
+    }
   };
 
-  // Calculate total quantity
   const totalQuantity = bookings.reduce((sum, b) => sum + (b.quantity || 0), 0);
 
-  // Show circle if we have bookings or if we've checked and found none
-  if (totalQuantity === 0 && hasChecked) {
+  if (!hasChecked && !loading) {
     return (
-      <span className="text-gray-400 text-sm">-</span>
+      <span
+        className="cursor-default text-gray-400 text-sm"
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={() => setShowTooltip(false)}
+      >
+        -
+      </span>
+    );
+  }
+
+    if (totalQuantity === 0 && hasChecked) {
+    return (
+      <div
+        className="relative inline-block"
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={() => setShowTooltip(false)}
+      >
+        <span className="text-gray-400 text-sm">-</span>
+        {showTooltip && (
+          <div className="absolute bottom-full left-1/2 z-50 mb-2 min-w-max -translate-x-1/2 transform rounded-lg bg-gray-900 px-4 py-2 text-xs text-white shadow-xl">
+            <div className="absolute top-full left-1/2 -translate-x-1/2 transform border-4 border-transparent border-t-gray-900" />
+            No pre-bookings
+          </div>
+        )}
+      </div>
     );
   }
 
   return (
     <div className="relative inline-block">
-      {/* Circle with Quantity - always show if bookings exist or loading */}
       <button
-        onMouseEnter={() => setShowTooltip(true)}
+        type="button"
+        onMouseEnter={handleMouseEnter}
         onMouseLeave={() => setShowTooltip(false)}
         className="w-10 h-10 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold flex items-center justify-center hover:shadow-lg transition-shadow duration-200 cursor-pointer"
       >

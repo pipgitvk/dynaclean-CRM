@@ -288,7 +288,6 @@ console.log('✅ User ',user);
     if (conn) {
       try {
         await conn.release();
-        console.log("✅ Login connection released back to pool");
       } catch (releaseError) {
         console.error("❌ Error releasing login connection:", releaseError);
       }

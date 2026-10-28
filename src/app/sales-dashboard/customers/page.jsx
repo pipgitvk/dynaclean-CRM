@@ -276,9 +276,6 @@ export default async function CustomersPage({ searchParams }) {
   // Combine all parameters for the execute function
   const allParams = [...customerParams, ...followupParams];
 
-  console.log("SQL Query (with JOIN):", sql);
-  console.log("SQL Params (with JOIN):", allParams);
-
   try {
     // Get total count for pagination
     let countSql = `

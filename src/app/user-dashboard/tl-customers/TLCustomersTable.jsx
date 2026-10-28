@@ -109,8 +109,6 @@ export default function TLCustomersTable({
     });
   }, [products, productSearch]);
 
-  console.log("customer data ", customers);
-
   const basePath = isAdmin
     ? "/admin-dashboard/tl-customers"
     : "/user-dashboard/tl-customers";
@@ -210,7 +208,6 @@ export default function TLCustomersTable({
         throw new Error(`HTTP error! status: ${res.status}`);
       }
       const data = await res.json();
-      console.log("quotation data", data);
       setLatestquote(Array.isArray(data) ? data[0] : data);
       setShowQuotePopup(true);
       // setFiltered(data); // set filtered too

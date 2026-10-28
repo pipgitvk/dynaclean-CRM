@@ -117,11 +117,6 @@ export default function CustomerTable({
   };
 
   useEffect(() => {
-    console.log("ROWS:", rows);
-    console.log("SearchParams:", searchParams);
-  }, [rows, searchParams]);
-
-  useEffect(() => {
     setFilters((prev) => ({
       ...prev,
       search: searchParams.search ?? "",

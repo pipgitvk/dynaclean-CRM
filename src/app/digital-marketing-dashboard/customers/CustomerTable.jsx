@@ -47,11 +47,6 @@ export default function CustomerTable({
   const [isInputVisible, setIsInputVisible] = useState(false);
 
   useEffect(() => {
-    console.log("ROWS:", rows);
-    console.log("SearchParams:", searchParams);
-  }, [rows, searchParams]);
-
-  useEffect(() => {
     setFilters((prev) => ({
       ...prev,
       search: searchParams.search ?? "",

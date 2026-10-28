@@ -82,7 +82,6 @@ export default async function CustomersPage({ searchParams }) {
   if (!bidsExistingColumns.includes('customer_id')) {
     try {
       await conn.execute(`ALTER TABLE bids ADD COLUMN customer_id VARCHAR(255) NULL`);
-      console.log(`✅ Added column customer_id to bids table`);
     } catch (alterError) {
       console.error(`❌ Failed to add column customer_id to bids table:`, alterError.message);
     }
@@ -209,9 +208,6 @@ export default async function CustomersPage({ searchParams }) {
   // Combine all parameters for the execute function
   const allParams = [...customerParams, ...followupParams];
 
-  console.log("SQL Query (with JOIN):", sql);
-  console.log("SQL Params (with JOIN):", allParams);
-
   try {
     // Get total count for pagination
     let countSql = `
@@ -227,9 +223,6 @@ export default async function CustomersPage({ searchParams }) {
     // Add ORDER BY and pagination
     sql += ` ORDER BY ${orderBy} LIMIT ? OFFSET ?`;
     const paginatedParams = [...allParams, pageSize, offset];
-    // Log the query and data to debug
-    console.log("Customers page final SQL:", sql);
-    console.log("Customers page params:", paginatedParams);
 
     const [rows] = await conn.execute(sql, paginatedParams);
 

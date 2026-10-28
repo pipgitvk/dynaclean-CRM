@@ -1,5 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  logging: {
+    incomingRequests: false,
+  },
   serverExternalPackages: ["face-api.js", "@tensorflow/tfjs", "node-cron"],
   images: {
     remotePatterns: [

@@ -68,16 +68,22 @@ function createMysqlPool() {
 
   console.log(`✅ [DB] MySQL pool created — host: ${DB_HOST}, db: ${DB_NAME}`);
 
-  // Verbose pool tracing — set DB_DEBUG=true when diagnosing connection issues
-  if (process.env.DB_DEBUG === "true") {
-    pool.on("connection", () => {
-      console.log("[DB] NEW CONNECTION CREATED");
-    });
+  const tracePool =
+    process.env.NODE_ENV !== "production" ||
+    process.env.DB_DEBUG === "true";
+
+  if (tracePool) {
     pool.on("acquire", () => {
       console.log("[DB] CONNECTION ACQUIRED");
     });
     pool.on("release", () => {
       console.log("[DB] CONNECTION RELEASED");
+    });
+  }
+
+  if (process.env.DB_DEBUG === "true") {
+    pool.on("connection", () => {
+      console.log("[DB] NEW CONNECTION CREATED");
     });
     pool.on("enqueue", () => {
       console.log("[DB] REQUEST QUEUED");

@@ -57,7 +57,6 @@ export default async function HomePage({ searchParams }) {
     if (!bidsExistingColumns.includes('customer_id')) {
       try {
         await connection.execute(`ALTER TABLE bids ADD COLUMN customer_id VARCHAR(255) NULL`);
-        console.log(`✅ Added column customer_id to bids table`);
       } catch (alterError) {
         console.error(`❌ Failed to add column customer_id to bids table:`, alterError.message);
       }
