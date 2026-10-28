@@ -25,6 +25,8 @@ import {
 import { weeklyOffSundayCountsAsPaid } from "@/lib/salaryPayDaysFromAttendance";
 import { formatAttendanceTimeForDisplay as formatTime } from "@/lib/istDateTime";
 import AttendanceRegularizeModal from "@/app/user-dashboard/attendance/AttendanceRegularizeModal";
+import AttendanceSourceInfo from "@/components/AttendanceSourceInfo";
+import CheckinPhotoCell from "@/components/CheckinPhotoCell";
 import AttendanceBulkImportPanel from "@/components/AttendanceBulkImportPanel";
 import AttendanceAddressMapModal, {
   ViewAddressLink,
@@ -67,117 +69,6 @@ function isMachineAttendanceAddress(address) {
   return (
     String(address || "").trim().toLowerCase() ===
     MACHINE_ATTENDANCE_ADDRESS.toLowerCase()
-  );
-}
-
-function getAttendanceSourcesDetail(log) {
-  if (log?.attendance_sources_detail) return log.attendance_sources_detail;
-  const md = log?.machine_day;
-  const sources = log?.merge_sources;
-  const detail = {
-    crm: {
-      checkin: log?.crm_checkin_time ?? null,
-      checkout: log?.crm_checkout_time ?? null,
-    },
-    machine: {
-      checkin: md?.machine_checkin ?? null,
-      checkout: md?.machine_checkout ?? null,
-    },
-  };
-  if (!detail.crm.checkin && sources?.checkin === "crm") {
-    detail.crm.checkin = log?.checkin_time ?? null;
-  }
-  if (!detail.crm.checkout && sources?.checkout === "crm") {
-    detail.crm.checkout = log?.checkout_time ?? null;
-  }
-  if (!detail.machine.checkin && sources?.checkin === "machine") {
-    detail.machine.checkin = log?.checkin_time ?? null;
-  }
-  if (!detail.machine.checkout && sources?.checkout === "machine") {
-    detail.machine.checkout = log?.checkout_time ?? null;
-  }
-  if (
-    isMachineAttendanceAddress(log?.checkout_address) &&
-    !isMeaningfulAttendancePunch(detail.machine.checkout)
-  ) {
-    detail.machine.checkout = log?.checkout_time ?? null;
-  }
-  const hasAny =
-    isMeaningfulAttendancePunch(detail.crm.checkin) ||
-    isMeaningfulAttendancePunch(detail.crm.checkout) ||
-    isMeaningfulAttendancePunch(detail.machine.checkin) ||
-    isMeaningfulAttendancePunch(detail.machine.checkout);
-  return hasAny ? detail : null;
-}
-
-function logHasMachineAttendanceData(log) {
-  if (!log) return false;
-  if (isMachineAttendanceAddress(log.checkout_address)) return true;
-  if (isMachineAttendanceAddress(log.checkin_address)) return true;
-  if (log.merge_sources?.checkin === "machine" || log.merge_sources?.checkout === "machine") {
-    return true;
-  }
-  const detail = getAttendanceSourcesDetail(log);
-  if (!detail) return false;
-  return (
-    isMeaningfulAttendancePunch(detail.machine?.checkin) ||
-    isMeaningfulAttendancePunch(detail.machine?.checkout)
-  );
-}
-
-function formatSourceTime(value) {
-  return isMeaningfulAttendancePunch(value) ? formatTime(value) : "—";
-}
-
-/** Info icon — hover shows CRM vs machine check-in and check-out. */
-function AttendanceSourceInfo({ log }) {
-  if (!logHasMachineAttendanceData(log)) return null;
-
-  const detail = getAttendanceSourcesDetail(log);
-  if (!detail) return null;
-
-  const titleText = [
-    `CRM in: ${formatSourceTime(detail.crm?.checkin)}`,
-    `CRM out: ${formatSourceTime(detail.crm?.checkout)}`,
-    `Machine in: ${formatSourceTime(detail.machine?.checkin)}`,
-    `Machine out: ${formatSourceTime(detail.machine?.checkout)}`,
-  ].join(" · ");
-
-  return (
-    <span
-      className="relative ml-1 inline-flex shrink-0 align-middle group/attmerge"
-      title={titleText}
-    >
-      <Info
-        className="h-4 w-4 cursor-help text-indigo-600"
-        aria-label="CRM and machine attendance details"
-      />
-      <span
-        className="pointer-events-none absolute right-0 bottom-full z-[200] mb-1 w-56 rounded-md bg-gray-900 px-3 py-2 text-left text-xs text-white opacity-0 shadow-xl transition-opacity invisible group-hover/attmerge:visible group-hover/attmerge:opacity-100"
-      >
-        <p className="mb-1.5 font-semibold text-gray-200">CRM vs machine</p>
-        <p>
-          <span className="text-gray-400">CRM check-in:</span>{" "}
-          {formatSourceTime(detail.crm?.checkin)}
-        </p>
-        <p>
-          <span className="text-gray-400">CRM check-out:</span>{" "}
-          {formatSourceTime(detail.crm?.checkout)}
-        </p>
-        <p className="mt-1.5 border-t border-gray-700 pt-1.5">
-          <span className="text-gray-400">Machine check-in:</span>{" "}
-          {formatSourceTime(detail.machine?.checkin)}
-        </p>
-        <p>
-          <span className="text-gray-400">Machine check-out:</span>{" "}
-          {formatSourceTime(detail.machine?.checkout)}
-        </p>
-        <p className="mt-1.5 border-t border-gray-700 pt-1.5 text-[10px] text-gray-400">
-          Table: in {formatTime(log.checkin_time) || "—"} · out{" "}
-          {formatTime(log.checkout_time) || "—"}
-        </p>
-      </span>
-    </span>
   );
 }
 
@@ -1047,7 +938,7 @@ const AttendancePage = () => {
           MachineCode: log.machine_code || "",
           Type: log.type === "present" ? "Present" : log.type === "absent" ? "Absent" : log.type === "leave" ? "Leave" : "Holiday",
           Checkin: log.checkin_time ? formatTime(log.checkin_time) : "",
-          CheckinPhoto: log.checkin_photo || "",
+          CheckinPhoto: log.has_checkin_photo ? "Yes" : "",
           Checkout: log.checkout_time ? formatTime(log.checkout_time) : "",
           MorningBreak: log.break_morning_start
             ? `${formatTime(log.break_morning_start)} - ${formatTime(log.break_morning_end)}`
@@ -1414,23 +1305,12 @@ const AttendancePage = () => {
                         <span className="text-sm font-semibold text-gray-900">
                           Check-in Photo:
                         </span>
-                        {log.checkin_photo ? (
-                          <a
-                            href={log.checkin_photo}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-block"
-                          >
-                            <img
-                              src={log.checkin_photo}
-                              alt="Checkin Photo"
-                              className="h-12 w-12 object-cover rounded border border-gray-300 cursor-pointer hover:opacity-80 transition-opacity"
-                              title="Click to view full image"
-                            />
-                          </a>
-                        ) : (
-                          <span className="text-gray-400 text-sm italic">No photo</span>
-                        )}
+                        <CheckinPhotoCell
+                          username={log.username}
+                          dateYmd={attendanceDateYmd(log.date)}
+                          hasPhoto={Boolean(log.has_checkin_photo)}
+                          thumbClassName="h-12 w-12"
+                        />
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-semibold text-gray-900">
@@ -1751,23 +1631,11 @@ const AttendancePage = () => {
                             </span>
                           </td>
                           <td className="px-6 py-4 text-sm text-gray-500">
-                            {log.checkin_photo ? (
-                              <a
-                                href={log.checkin_photo}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-block"
-                              >
-                                <img
-                                  src={log.checkin_photo}
-                                  alt="Checkin Photo"
-                                  className="h-16 w-16 object-cover rounded border border-gray-300 cursor-pointer hover:opacity-80 transition-opacity"
-                                  title="Click to view full image"
-                                />
-                              </a>
-                            ) : (
-                              <span className="text-gray-400 italic">No photo</span>
-                            )}
+                            <CheckinPhotoCell
+                              username={log.username}
+                              dateYmd={attendanceDateYmd(log.date)}
+                              hasPhoto={Boolean(log.has_checkin_photo)}
+                            />
                           </td>
                           <td className="px-6 py-4 text-sm text-gray-500">
                             {isMachineAttendanceAddress(log.checkin_address) ? (

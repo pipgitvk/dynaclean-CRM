@@ -1,20 +1,95 @@
 import { isMeaningfulAttendancePunch } from "@/lib/attendanceMeaningfulPunch";
 import { parseAttendanceDateTime } from "@/lib/istDateTime";
+import { attendanceDateKey } from "@/lib/leaveDateRange";
 import { ensureRepListMachineCodeColumn } from "@/lib/ensureRepListMachineCode";
 import { ensureMachineAttendancePunchesTable } from "@/lib/ensureMachineAttendancePunchesTable";
 export const MACHINE_ATTENDANCE_ADDRESS = "Machine";
 
-function attendanceDateKey(value) {
-  if (value == null || value === "") return "";
-  if (typeof value === "string") {
-    const s = value.trim();
-    if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+/** Raw check-in/out stored on attendance_logs (not merged display times). */
+export function extractCrmPunchesFromAttendanceLogRow(crmRow) {
+  if (!crmRow || crmRow._syntheticMachineOnly) {
+    return { checkin: null, checkout: null };
   }
-  if (value instanceof Date && !Number.isNaN(value.getTime())) {
-    return value.toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+  const checkin = crmRow.checkin_time ?? null;
+  const checkout = crmRow.checkout_time ?? null;
+  return {
+    checkin: isMeaningfulAttendancePunch(checkin) ? checkin : null,
+    checkout: isMeaningfulAttendancePunch(checkout) ? checkout : null,
+  };
+}
+
+export function getAttendanceSourcesDetailFromLog(log) {
+  if (!log) return null;
+
+  const crm = {
+    checkin: isMeaningfulAttendancePunch(log.crm_checkin_time)
+      ? log.crm_checkin_time
+      : null,
+    checkout: isMeaningfulAttendancePunch(log.crm_checkout_time)
+      ? log.crm_checkout_time
+      : null,
+  };
+
+  const md = log.machine_day;
+  const machine = {
+    checkin: isMeaningfulAttendancePunch(md?.machine_checkin)
+      ? md.machine_checkin
+      : null,
+    checkout: isMeaningfulAttendancePunch(md?.machine_checkout)
+      ? md.machine_checkout
+      : null,
+  };
+
+  const embedded = log.attendance_sources_detail;
+  if (!crm.checkin && isMeaningfulAttendancePunch(embedded?.crm?.checkin)) {
+    crm.checkin = embedded.crm.checkin;
   }
-  const s = String(value);
-  return s.length >= 10 ? s.slice(0, 10) : s;
+  if (!crm.checkout && isMeaningfulAttendancePunch(embedded?.crm?.checkout)) {
+    crm.checkout = embedded.crm.checkout;
+  }
+  if (!machine.checkin && isMeaningfulAttendancePunch(embedded?.machine?.checkin)) {
+    machine.checkin = embedded.machine.checkin;
+  }
+  if (!machine.checkout && isMeaningfulAttendancePunch(embedded?.machine?.checkout)) {
+    machine.checkout = embedded.machine.checkout;
+  }
+
+  const sources = log.merge_sources;
+  if (
+    !crm.checkin &&
+    sources?.checkin === "crm" &&
+    isMeaningfulAttendancePunch(log.checkin_time)
+  ) {
+    crm.checkin = log.checkin_time;
+  }
+  if (
+    !crm.checkout &&
+    sources?.checkout === "crm" &&
+    isMeaningfulAttendancePunch(log.checkout_time)
+  ) {
+    crm.checkout = log.checkout_time;
+  }
+  if (
+    !machine.checkin &&
+    sources?.checkin === "machine" &&
+    isMeaningfulAttendancePunch(log.checkin_time)
+  ) {
+    machine.checkin = log.checkin_time;
+  }
+  if (
+    !machine.checkout &&
+    sources?.checkout === "machine" &&
+    isMeaningfulAttendancePunch(log.checkout_time)
+  ) {
+    machine.checkout = log.checkout_time;
+  }
+
+  const hasAny =
+    isMeaningfulAttendancePunch(crm.checkin) ||
+    isMeaningfulAttendancePunch(crm.checkout) ||
+    isMeaningfulAttendancePunch(machine.checkin) ||
+    isMeaningfulAttendancePunch(machine.checkout);
+  return hasAny ? { crm, machine } : null;
 }
 
 function compareInstants(a, b) {
@@ -62,8 +137,8 @@ export function mergedHasCheckout(crmCheckout, machineCheckout) {
 }
 
 export function mergeCrmAndMachineDay(crmRow, machineDay) {
-  const crmIn = crmRow?.checkin_time ?? null;
-  const crmOut = crmRow?.checkout_time ?? null;
+  const { checkin: crmIn, checkout: crmOut } =
+    extractCrmPunchesFromAttendanceLogRow(crmRow);
   const macIn = machineDay?.machine_checkin ?? null;
   const macOut = machineDay?.machine_checkout ?? null;
 
@@ -224,6 +299,7 @@ export function mergeAttendanceListWithMachine(crmRows, machineByUserDate) {
       checkin_address: null,
       checkout_address: null,
       admin_time_edit_remark: null,
+      _syntheticMachineOnly: true,
     };
     merged.push(mergeCrmAndMachineDay(synthetic, machineDay));
   }

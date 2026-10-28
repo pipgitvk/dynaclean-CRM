@@ -15,10 +15,14 @@ import {
   isHalfDayByRules,
   classifyAttendanceDay,
 } from "@/lib/attendanceRulesEngine";
-import { rowHasMeaningfulCheckinOrCheckout } from "@/lib/attendanceMeaningfulPunch";
+import {
+  rowHasMeaningfulCheckinOrCheckout,
+  isMeaningfulAttendancePunch,
+} from "@/lib/attendanceMeaningfulPunch";
 import { formatAttendanceTimeForDisplay as formatTime } from "@/lib/istDateTime";
 import { getAttendanceRegularizationAttachmentHref } from "@/lib/attendanceRegularizationAttachmentHref";
 import AttendanceRegularizeModal from "@/app/user-dashboard/attendance/AttendanceRegularizeModal";
+import AttendanceSourceInfo from "@/components/AttendanceSourceInfo";
 import {
   AUTO_CHECKOUT_ATTENDANCE_ADDRESS,
   isAutomaticCheckoutAddress,
@@ -415,9 +419,31 @@ const AttendancePage = () => {
   }
   if (!startDay.isValid()) startDay = endDay.subtract(30, "day");
 
-  const dateMap = new Map(
-    logs.map((log) => [attendanceDateYmd(log.date), log])
-  );
+  const dateMap = new Map();
+  for (const log of logs) {
+    const key = attendanceDateYmd(log.date);
+    if (!key) continue;
+    const prev = dateMap.get(key);
+    if (!prev) {
+      dateMap.set(key, log);
+      continue;
+    }
+    const prevHasCrm =
+      isMeaningfulAttendancePunch(prev.crm_checkin_time) ||
+      isMeaningfulAttendancePunch(prev.crm_checkout_time);
+    const nextHasCrm =
+      isMeaningfulAttendancePunch(log.crm_checkin_time) ||
+      isMeaningfulAttendancePunch(log.crm_checkout_time);
+    if (nextHasCrm && !prevHasCrm) {
+      dateMap.set(key, log);
+    } else if (
+      rowHasMeaningfulCheckinOrCheckout(log) &&
+      !rowHasMeaningfulCheckinOrCheckout(prev) &&
+      !prevHasCrm
+    ) {
+      dateMap.set(key, log);
+    }
+  }
 
   // Create a map of holiday dates for quick lookup
   const holidayMap = new Map(
@@ -883,7 +909,13 @@ const AttendancePage = () => {
                         })()
                           }`}
                       >
-                        {formatTime(log.checkin_time)}
+                        <span className="inline-flex items-center gap-0.5">
+                          {formatTime(log.checkin_time)}
+                          <AttendanceSourceInfo
+                            log={log}
+                            showOnlyIfMachine={false}
+                          />
+                        </span>
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
@@ -1167,7 +1199,13 @@ const AttendancePage = () => {
                           })()
                             }`}
                         >
-                          {formatTime(log.checkin_time)}
+                          <span className="inline-flex items-center gap-0.5">
+                            {formatTime(log.checkin_time)}
+                            <AttendanceSourceInfo
+                              log={log}
+                              showOnlyIfMachine={false}
+                            />
+                          </span>
                         </td>
                         <td
                           className={`px-6 py-4 whitespace-nowrap text-sm text-gray-500 ${(() => {

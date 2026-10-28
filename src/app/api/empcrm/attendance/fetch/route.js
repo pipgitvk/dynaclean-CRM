@@ -4,6 +4,11 @@ import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { applyAutomaticCheckouts } from "@/lib/attendanceAutoCheckout";
 import { ensureAttendanceAutoCheckoutApprovalsTable } from "@/lib/ensureAttendanceAutoCheckoutApprovalsTable";
+import {
+  loadMachineCodeMaps,
+  loadMachineDailyByUsername,
+  mergeAttendanceListWithMachine,
+} from "@/lib/attendanceMachineMerge";
 
 export const dynamic = 'force-dynamic';
 
@@ -19,25 +24,29 @@ export async function GET(request) {
       );
     }
     username = payload.username;
-    console.log(`Fetching attendance logs for username: ${username}`);
 
     const db = await getDbConnection();
     await applyAutomaticCheckouts(db, { username });
     await ensureAttendanceAutoCheckoutApprovalsTable(db);
-    console.log("Database connection established.");
 
     const [rows] = await db.query(
       `SELECT
+        a.username,
         a.date,
         a.checkin_time,
         a.checkout_time,
+        a.checkin_address,
+        a.checkout_address,
+        a.checkin_latitude,
+        a.checkin_longitude,
+        a.checkout_latitude,
+        a.checkout_longitude,
         a.break_morning_start,
         a.break_morning_end,
         a.break_lunch_start,
         a.break_lunch_end,
         a.break_evening_start,
         a.break_evening_end,
-        a.checkout_address,
         a.checkin_photo,
         ap.status AS auto_checkout_approval_status
       FROM attendance_logs a
@@ -47,6 +56,13 @@ export async function GET(request) {
       ORDER BY a.date DESC`,
       [username]
     );
+
+    const { machineCodeToUsername } = await loadMachineCodeMaps(db);
+    const machineByUserDate = await loadMachineDailyByUsername(
+      db,
+      machineCodeToUsername,
+    );
+    const mergedRows = mergeAttendanceListWithMachine(rows, machineByUserDate);
 
     const [holidays] = await db.query(
       `SELECT holiday_date, title, description
@@ -64,13 +80,12 @@ export async function GET(request) {
       [username]
     );
 
-    // db.end();
-    console.log("Database connection closed.");
-    console.log("this is the attendance logs", rows);
-    console.log("this is the holidays", holidays);
-    console.log("this is the approved leaves", leaves);
-
-    return NextResponse.json({ username, attendance: rows, holidays, leaves });
+    return NextResponse.json({
+      username,
+      attendance: mergedRows,
+      holidays,
+      leaves,
+    });
   } catch (error) {
     console.error("Error fetching attendance logs:", error);
     return NextResponse.json(

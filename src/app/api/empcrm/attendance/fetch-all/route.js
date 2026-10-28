@@ -26,12 +26,9 @@ function normalizeUserKey(value) {
 export async function GET(request) {
   try {
 
-    console.log(`Fetching all attendance logs for admin view.`);
-
     const db = await getDbConnection();
     await ensureAttendanceEditHistoryTable(db);
     await ensureAttendanceLogsEmployeeColumns(db);
-    console.log("Database connection established.");
 
     // Query to fetch all attendance logs
     const [rows] = await db.query(
@@ -55,7 +52,10 @@ export async function GET(request) {
       a.checkout_address,
       a.checkout_latitude,
       a.checkout_longitude,
-      a.checkin_photo
+      (CASE
+         WHEN a.checkin_photo IS NOT NULL AND TRIM(a.checkin_photo) <> ''
+         THEN 1 ELSE 0
+       END) AS has_checkin_photo
    FROM attendance_logs a
    INNER JOIN rep_list r
       ON a.username COLLATE utf8mb4_unicode_ci = r.username COLLATE utf8mb4_unicode_ci
@@ -78,13 +78,6 @@ export async function GET(request) {
        WHERE status = 'approved'
        ORDER BY from_date DESC`
     );
-
-    // db.end();
-    console.log("Database connection closed.");
-    console.log("Fetched all attendance logs for admin view.");
-    console.log(`this is the rows: ${JSON.stringify(rows)}`);
-    console.log("this is the holidays", holidays);
-    console.log("this is the approved leaves", leaves);
 
     const globalRow = await loadGlobalAttendanceRulesRow(db);
     const globalRules = rowToAttendanceRulesShape(globalRow);

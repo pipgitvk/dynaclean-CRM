@@ -1,5 +1,7 @@
 import { getDbConnection } from "@/lib/db";
 
+const ENSURED_KEY = "__attendanceEditHistoryTableEnsured__";
+
 const CREATE_TABLE = `
 CREATE TABLE IF NOT EXISTS attendance_log_edit_history (
   id INT AUTO_INCREMENT PRIMARY KEY,
@@ -14,6 +16,7 @@ CREATE TABLE IF NOT EXISTS attendance_log_edit_history (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`;
 
 export async function ensureAttendanceEditHistoryTable(conn) {
+  if (globalThis[ENSURED_KEY]) return;
   const db = conn || (await getDbConnection());
   try {
     await db.execute(CREATE_TABLE);
@@ -33,6 +36,7 @@ export async function ensureAttendanceEditHistoryTable(conn) {
     } catch (e) {
       if (e?.code !== "ER_DUP_FIELDNAME") throw e;
     }
+    globalThis[ENSURED_KEY] = true;
   } catch (e) {
     console.error("ensureAttendanceEditHistoryTable:", e?.message);
   }
