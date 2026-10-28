@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getDbConnection } from '@/lib/db';
+import { ensureProductListPurchasePriceColumn } from '@/lib/productsListSchema';
 import { jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
 
@@ -36,12 +37,13 @@ export async function POST(request) {
         }
 
         // Validate field
-        const allowedFields = ['gem_price', 'gem_last_negotiation_price', 'dealer_price', 'dp_no_warranty', 'dp'];
+        const allowedFields = ['gem_price', 'gem_last_negotiation_price', 'dealer_price', 'dp_no_warranty', 'dp', 'purchase_price'];
         if (!allowedFields.includes(field)) {
             return NextResponse.json({ error: 'Invalid field' }, { status: 400 });
         }
 
         const db = await getDbConnection();
+        await ensureProductListPurchasePriceColumn(db);
 
         // Update the field
         await db.execute(

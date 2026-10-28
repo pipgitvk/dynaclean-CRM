@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
 import { getDbConnection } from '@/lib/db';
+import { ensureProductListPurchasePriceColumn } from '@/lib/productsListSchema';
 
 export async function GET() {
     try {
         const db = await getDbConnection();
+        await ensureProductListPurchasePriceColumn(db);
         
         // First, get all products
         const [products] = await db.execute(
@@ -15,6 +17,7 @@ export async function GET() {
          p.product_number,
          p.min_qty,
          p.price_per_unit,
+         p.purchase_price,
          p.gem_price,
          p.gem_last_negotiation_price,
          p.dealer_price,

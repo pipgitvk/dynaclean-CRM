@@ -65,6 +65,7 @@
 import { NextResponse } from 'next/server';
 import { getDbConnection } from '@/lib/db';
 import { getSessionPayload } from "@/lib/auth";
+import { ensureProductListPurchasePriceColumn } from '@/lib/productsListSchema';
 import fs from 'fs/promises';
 import path from 'path';
 import heicConvert from 'heic-convert';
@@ -178,7 +179,7 @@ export async function POST(request) {
 
     const {
         item_name, item_code, category, specification, gst_rate, hsn_sac,
-        unit, price_per_unit, last_negotiation_price, gem_price, gem_last_negotiation_price, dealer_price
+        unit, price_per_unit, purchase_price, last_negotiation_price, gem_price, gem_last_negotiation_price, dealer_price
     } = data;
 
     // Basic validation
@@ -203,6 +204,7 @@ export async function POST(request) {
         }
 
         const db = await getDbConnection();
+        await ensureProductListPurchasePriceColumn(db);
 
         // Check for duplicate item_code (case-insensitive) BEFORE inserting
         const [existingProducts] = await db.execute(
@@ -223,15 +225,15 @@ export async function POST(request) {
             const productQuery = `
                 INSERT INTO products_list 
                 (item_name, item_code, category, specification, gst_rate, hsn_sac, product_image, 
-                img_1, img_2, img_3, img_4, img_5, unit, price_per_unit, last_negotiation_price, gem_price, gem_last_negotiation_price, dealer_price, created_by) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                img_1, img_2, img_3, img_4, img_5, unit, price_per_unit, purchase_price, last_negotiation_price, gem_price, gem_last_negotiation_price, dealer_price, created_by) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `;
 
             const productValues = [
                 item_name, item_code, category, specification, gst_rate, hsn_sac,
                 imagePaths.product_image, imagePaths.img_1, imagePaths.img_2,
                 imagePaths.img_3, imagePaths.img_4, imagePaths.img_5,
-                unit, price_per_unit, last_negotiation_price || null, gem_price || null, gem_last_negotiation_price || null, dealer_price || null, username
+                unit, price_per_unit, purchase_price || null, last_negotiation_price || null, gem_price || null, gem_last_negotiation_price || null, dealer_price || null, username
             ];
 
             await db.execute(productQuery, productValues);

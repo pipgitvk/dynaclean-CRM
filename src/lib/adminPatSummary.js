@@ -606,13 +606,13 @@ const PAT_PRODUCT_MASTER_UNIT_PRICE_SQL = `
   FROM (
     SELECT
       CONCAT('product:', LOWER(TRIM(pl.item_code))) AS inventory_key,
-      COALESCE(pl.price_per_unit, 0) AS unit_price
+      COALESCE(NULLIF(pl.purchase_price, 0), pl.price_per_unit, 0) AS unit_price
     FROM products_list pl
     WHERE TRIM(COALESCE(pl.item_code, '')) <> ''
     UNION ALL
     SELECT
       CONCAT('product:', LOWER(TRIM(pl.product_number))) AS inventory_key,
-      COALESCE(pl.price_per_unit, 0) AS unit_price
+      COALESCE(NULLIF(pl.purchase_price, 0), pl.price_per_unit, 0) AS unit_price
     FROM products_list pl
     WHERE TRIM(COALESCE(pl.product_number, '')) <> ''
       AND LOWER(TRIM(pl.product_number)) <> LOWER(TRIM(pl.item_code))
@@ -866,7 +866,7 @@ export async function buildAdminPatSummary(
     periodLabel,
     dateFrom,
     dateTo,
-    note: "All amounts ex-GST. Order-based lines (A, B, D) include only orders with invoice/report uploaded; cancelled, rejected, and returned orders are excluded. Line D: sold qty × latest purchase price_per_unit from Purchases; if no purchase, product price_per_unit (Product stock) or spare purchase_price (Spare list) is used. Salary from monthly_salary_records; operating expenses from client_expenses (by entry date). Tax & interest are zero until configured.",
+    note: "All amounts ex-GST. Order-based lines (A, B, D) include only orders with invoice/report uploaded; cancelled, rejected, and returned orders are excluded. Line D: sold qty × latest purchase price_per_unit from Purchases; if no purchase, product purchase_price (or sale price_per_unit) from Product stock, or spare purchase_price from Spare list. Salary from monthly_salary_records; operating expenses from client_expenses (by entry date). Tax & interest are zero until configured.",
     lines: {
       revenueSales: {
         id: "A",

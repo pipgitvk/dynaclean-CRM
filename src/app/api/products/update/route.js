@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getDbConnection } from '@/lib/db';
+import { ensureProductListPurchasePriceColumn } from '@/lib/productsListSchema';
 import { jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
 import fs from 'fs/promises';
@@ -116,6 +117,7 @@ export async function POST(request) {
         const product_number = formData.get('product_number');
         const min_qty = formData.get('min_qty');
         const price_per_unit = formData.get('price_per_unit');
+        const purchase_price = formData.get('purchase_price');
         const gem_price = formData.get('gem_price');
         const gem_last_negotiation_price = formData.get('gem_last_negotiation_price');
         const dealer_price = formData.get('dealer_price');
@@ -132,6 +134,7 @@ export async function POST(request) {
         }
 
         const db = await getDbConnection();
+        await ensureProductListPurchasePriceColumn(db);
 
         // Handle image upload if provided
         let imagePath = null;
@@ -161,6 +164,10 @@ export async function POST(request) {
         if (price_per_unit !== null && price_per_unit !== undefined) {
             updates.push('price_per_unit = ?');
             values.push(price_per_unit);
+        }
+        if (purchase_price !== null && purchase_price !== undefined) {
+            updates.push('purchase_price = ?');
+            values.push(purchase_price);
         }
         if (gem_price !== null && gem_price !== undefined) {
             updates.push('gem_price = ?');
@@ -212,7 +219,7 @@ export async function POST(request) {
 
         // Get old values BEFORE update for logging
         const [oldProduct] = await db.execute(
-          'SELECT item_name, product_number, min_qty, price_per_unit, gst_rate, hsn_sac, specification FROM products_list WHERE item_code = ?',
+          'SELECT item_name, product_number, min_qty, price_per_unit, purchase_price, gst_rate, hsn_sac, specification FROM products_list WHERE item_code = ?',
           [item_code]
         );
         const oldData = oldProduct[0] || {};
@@ -243,6 +250,9 @@ export async function POST(request) {
           }
           if (price_per_unit !== null && price_per_unit !== undefined && Number(oldData.price_per_unit) !== Number(price_per_unit)) {
             changes.push(`Price: ${oldData.price_per_unit} → ${price_per_unit}`);
+          }
+          if (purchase_price !== null && purchase_price !== undefined && Number(oldData.purchase_price) !== Number(purchase_price)) {
+            changes.push(`Purchase Price: ${oldData.purchase_price ?? ''} → ${purchase_price}`);
           }
           if (gst_rate !== null && gst_rate !== undefined && Number(oldData.gst_rate) !== Number(gst_rate)) {
             changes.push(`GST Rate: ${oldData.gst_rate} → ${gst_rate}`);

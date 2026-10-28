@@ -39,6 +39,7 @@ function ProductAndSpareLists({ type, onOpenHistory }) {
     product_number: '',
     min_qty: '',
     price_per_unit: '',
+    purchase_price: '',
     gem_price: '',
     gem_last_negotiation_price: '',
     dealer_price: '',
@@ -278,6 +279,7 @@ function ProductAndSpareLists({ type, onOpenHistory }) {
       product_number: row.product_number || '',
       min_qty: row.min_qty || '',
       price_per_unit: row.price_per_unit || row.price || '',
+      purchase_price: row.purchase_price ?? '',
       gem_price: row.gem_price || '',
       gem_last_negotiation_price: row.gem_last_negotiation_price || '',
       dealer_price: row.dealer_price || '',
@@ -401,6 +403,7 @@ function ProductAndSpareLists({ type, onOpenHistory }) {
       formData.append('product_number', editFormData.product_number);
       formData.append('min_qty', editFormData.min_qty);
       formData.append('price_per_unit', editFormData.price_per_unit);
+      formData.append('purchase_price', editFormData.purchase_price);
       formData.append('gem_price', editFormData.gem_price);
       formData.append('gem_last_negotiation_price', editFormData.gem_last_negotiation_price);
       formData.append('dealer_price', editFormData.dealer_price);
@@ -586,6 +589,22 @@ function ProductAndSpareLists({ type, onOpenHistory }) {
                                 <div className="flex items-center gap-1 group/p">
                                   <span className="font-medium">{r.price_per_unit || 0}</span>
                                   <Pencil className="w-3 h-3 text-gray-400 cursor-pointer opacity-0 group-hover/p:opacity-100" onClick={() => setEditingPrice({ key: r.item_code, field: 'price', value: r.price_per_unit || 0 })} />
+                                </div>
+                              )}
+                            </div>
+                            {/* Purchase Price */}
+                            <div className="flex items-center justify-between gap-2 group">
+                              <span className="text-gray-500 text-xs w-28 shrink-0">Purchase Price</span>
+                              {editingField.key === r.item_code && editingField.field === 'purchase_price' ? (
+                                <div className="flex gap-1 items-center">
+                                  <input type="number" className="w-20 border rounded px-1 text-xs" value={editingField.value} onChange={(e) => setEditingField(prev => ({ ...prev, value: e.target.value }))} />
+                                  <button disabled={savingField} onClick={() => handleSaveField(r, 'purchase_price')} className="text-green-600 text-xs">Save</button>
+                                  <button disabled={savingField} onClick={() => setEditingField({ key: null, field: null, value: "" })} className="text-gray-500 text-xs">X</button>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-1 group/p">
+                                  <span className="font-medium">{parseFloat(r.purchase_price) || 0}</span>
+                                  <Pencil className="w-3 h-3 text-gray-400 cursor-pointer opacity-0 group-hover/p:opacity-100" onClick={() => setEditingField({ key: r.item_code, field: 'purchase_price', value: r.purchase_price ?? '' })} />
                                 </div>
                               )}
                             </div>
@@ -1171,6 +1190,20 @@ function ProductAndSpareLists({ type, onOpenHistory }) {
                   className="w-full border rounded p-2 text-sm"
                 />
               </div>
+
+              {/* Purchase Price */}
+              {type === 'product' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Purchase Price</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={editFormData.purchase_price}
+                  onChange={(e) => setEditFormData({ ...editFormData, purchase_price: e.target.value })}
+                  className="w-full border rounded p-2 text-sm"
+                />
+              </div>
+              )}
 
               {/* GEM Price */}
               <div>

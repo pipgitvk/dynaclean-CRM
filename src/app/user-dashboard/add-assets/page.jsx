@@ -15,6 +15,7 @@ export default function AddProductPage() {
     hsn_sac: "",
     unit: "",
     price_per_unit: "",
+    purchase_price: "",
     last_negotiation_price: "",
     gem_price: "",
     gem_last_negotiation_price: "",
@@ -164,6 +165,7 @@ export default function AddProductPage() {
         hsn_sac: "",
         unit: "",
         price_per_unit: "",
+        purchase_price: "",
         last_negotiation_price: "",
         gem_price: "",
         gem_last_negotiation_price: "",
@@ -233,6 +235,12 @@ export default function AddProductPage() {
       type: "number",
       required: true,
       placeholder: "e.g., 999.99",
+    },
+    {
+      label: "Purchase Price",
+      name: "purchase_price",
+      type: "number",
+      placeholder: "e.g., 750.00",
     },
     {
       label: "Last Negotiation Price",
