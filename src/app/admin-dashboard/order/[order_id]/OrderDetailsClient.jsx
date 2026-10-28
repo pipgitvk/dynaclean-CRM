@@ -10,6 +10,10 @@ import {
   deriveOrderPipelineProgress,
 } from "@/lib/orderPipelineStage";
 import OrderShipmentTrackingList from "@/components/orders/OrderShipmentTrackingList";
+import {
+  formatOrderPaymentAmountInr,
+  formatOrderRequestedAmountInr,
+} from "@/lib/orderPaymentHistory";
 
 const DOCUMENT_FIELDS = [
   { label: "E-way Bill", key: "ewaybill_file" },
@@ -131,7 +135,14 @@ export default function OrderDetailsClient({
         <Input label="PO Number / Gem Order Number" value={orderDetails.po_number} />
         <Input label="Payment Date" value={formatDate(orderDetails.payment_date)} />
         <Input label="Transaction ID" value={orderDetails.transaction_id} />
-        <Input label="Payment Amount" value={orderDetails.payment_amount ? `₹${Number(orderDetails.payment_amount).toFixed(2)}` : ""} />
+        <Input
+          label="Requested Amount"
+          value={formatOrderRequestedAmountInr(orderDetails)}
+        />
+        <Input
+          label="Payment Amount"
+          value={formatOrderPaymentAmountInr(orderDetails)}
+        />
         <TextArea label="Remark" value={orderDetails.sales_remark} />
       </div>
 

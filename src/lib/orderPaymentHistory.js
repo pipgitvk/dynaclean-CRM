@@ -2,6 +2,7 @@ import {
   orderInvoiceHasPaymentLink,
   parseOrderLinkedPayments,
   sumStatementLinkedOrderPayments,
+  getOrderPaymentsLinkedToInvoice,
 } from "@/lib/orderLinkedPaymentsDisplay";
 
 /** Without invoice link, neworder.payment_amount counts only for orders before this date. */
@@ -154,6 +155,77 @@ export function sumOrderPaymentAmounts(order) {
     .map((r) => Number(r.amount))
     .filter((n) => !Number.isNaN(n))
     .reduce((sum, n) => sum + n, 0);
+}
+
+const inrAmountOptions = {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+};
+
+function formatInrNumber(n) {
+  return `₹${n.toLocaleString("en-IN", inrAmountOptions)}`;
+}
+
+/** Display on order view: booking advance (`advance_requested` only). */
+export function formatOrderRequestedAmountInr(order) {
+  const adv = order?.advance_requested;
+  if (adv != null && String(adv).trim() !== "") {
+    const n = Number(adv);
+    if (Number.isFinite(n)) {
+      return formatInrNumber(n);
+    }
+  }
+  return "";
+}
+
+/** Display on order view: recorded payments (`payment_amount`, or invoice Link Payment). */
+export function formatOrderPaymentAmountInr(order) {
+  if (orderInvoiceHasPaymentLink(order)) {
+    const linked = getOrderPaymentsLinkedToInvoice(order);
+    const formattedLinked = linked
+      .map((p) => Number(p.amount))
+      .filter((n) => Number.isFinite(n) && n > 0)
+      .map((n) => formatInrNumber(n));
+    if (formattedLinked.length) {
+      return formattedLinked.join(", ");
+    }
+    const invPaid = Number(order?.invoice_amount_paid);
+    if (Number.isFinite(invPaid) && invPaid > 0) {
+      return formatInrNumber(invPaid);
+    }
+  }
+
+  const raw = order?.payment_amount;
+  if (raw == null || String(raw).trim() === "") return "";
+  const parts = String(raw)
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (!parts.length) return "";
+  return parts
+    .map((p) => {
+      const n = Number(p);
+      return Number.isFinite(n) ? formatInrNumber(n) : p;
+    })
+    .join(", ");
+}
+
+/** Sales order view: requested until `payment_amount` is set, then payment (label always Payment Amount). */
+export function getSalesOrderAmountFieldDisplay(order) {
+  const paymentValue = formatOrderPaymentAmountInr(order);
+  if (paymentValue) {
+    return { label: "Payment Amount", value: paymentValue };
+  }
+  return {
+    label: "Payment Amount",
+    value: formatOrderRequestedAmountInr(order),
+  };
+}
+
+/** Accountant / superadmin: separate requested + recorded payment on order view. */
+export function roleShowsDualOrderAmountFields(userRole) {
+  const role = String(userRole || "").toUpperCase();
+  return role.includes("ACCOUNTANT") || role.includes("SUPERADMIN");
 }
 
 /** Booking advance from new order form (`advance_requested`, else legacy payment_amount). */

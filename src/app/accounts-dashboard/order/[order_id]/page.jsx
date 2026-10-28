@@ -4,6 +4,7 @@ import OrderDetailsClient from "./OrderDetailsClient";
 import dayjs from "dayjs";
 import { getSessionPayload } from "@/lib/auth";
 import { isOrderVisibleToViewer } from "@/lib/orderApprovalVisibility";
+import { attachActiveInvoiceFieldsToOrder } from "@/lib/activeInvoiceForOrder";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +18,8 @@ async function fetchOrderData(orderId) {
 
   if (orderRows.length === 0) return { orderDetails: null };
 
-  const orderDetails = orderRows[0];
+  let orderDetails = orderRows[0];
+  orderDetails = await attachActiveInvoiceFieldsToOrder(conn, orderDetails);
 
   const [items] = await conn.execute(
     "SELECT * FROM quotation_items WHERE quote_number = ?",

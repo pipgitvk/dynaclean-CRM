@@ -125,3 +125,10 @@ export async function attachActiveInvoiceFields(conn, orders) {
     };
   });
 }
+
+/** Enrich a single order row with active invoice payment-link fields (order detail pages). */
+export async function attachActiveInvoiceFieldsToOrder(conn, order) {
+  if (!order) return order;
+  const [enriched] = await attachActiveInvoiceFields(conn, [order]);
+  return enriched || order;
+}

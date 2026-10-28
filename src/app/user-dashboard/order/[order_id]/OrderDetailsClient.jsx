@@ -8,6 +8,11 @@ import {
   ORDER_PIPELINE_STAGES,
   deriveOrderPipelineProgress,
 } from "@/lib/orderPipelineStage";
+import {
+  formatOrderPaymentAmountInr,
+  formatOrderRequestedAmountInr,
+  getSalesOrderAmountFieldDisplay,
+} from "@/lib/orderPaymentHistory";
 
 const DOCUMENT_FIELDS = [
   { label: "E-way Bill", key: "ewaybill_file" },
@@ -30,6 +35,7 @@ export default function OrderDetailsClient({
   quoteCustomerId,
   orderListPath = "/user-dashboard/order",
   canUploadDocuments = false,
+  showDualPaymentAmountFields = false,
 }) {
   const formatDate = (value) => {
     if (!value) return "";
@@ -58,6 +64,11 @@ export default function OrderDetailsClient({
   const { progressPercent, stepCompleted } = useMemo(
     () => deriveOrderPipelineProgress(orderDetails, statuses),
     [orderDetails, statuses],
+  );
+
+  const salesAmountField = useMemo(
+    () => getSalesOrderAmountFieldDisplay(orderDetails),
+    [orderDetails],
   );
 
   const [fileValues, setFileValues] = useState(() => {
@@ -128,7 +139,23 @@ export default function OrderDetailsClient({
         <Input label="PO Number / Gem Order Number" value={orderDetails.po_number} />
         <Input label="Payment Date" value={formatDate(orderDetails.payment_date)} />
         <Input label="Transaction ID" value={orderDetails.transaction_id} />
-        <Input label="Payment Amount" value={orderDetails.payment_amount ? `₹${Number(orderDetails.payment_amount).toFixed(2)}` : ""} />
+        {showDualPaymentAmountFields ? (
+          <>
+            <Input
+              label="Requested Amount"
+              value={formatOrderRequestedAmountInr(orderDetails)}
+            />
+            <Input
+              label="Payment Amount"
+              value={formatOrderPaymentAmountInr(orderDetails)}
+            />
+          </>
+        ) : (
+          <Input
+            label={salesAmountField.label}
+            value={salesAmountField.value}
+          />
+        )}
         <TextArea label="Remark" value={orderDetails.sales_remark} />
       </div>
 

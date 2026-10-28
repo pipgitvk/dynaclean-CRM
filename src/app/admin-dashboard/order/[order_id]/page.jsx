@@ -7,6 +7,7 @@ import { isOrderVisibleToViewer } from "@/lib/orderApprovalVisibility";
 import { ensureOrderShipmentTrackingColumns } from "@/lib/ensureOrderShipmentTrackingColumns";
 import { fetchBookingBatchesForOrder } from "@/lib/orderBookingBatches";
 import { collectOrderShipmentTracks } from "@/lib/orderShipmentTracking";
+import { attachActiveInvoiceFieldsToOrder } from "@/lib/activeInvoiceForOrder";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +23,8 @@ async function fetchOrderData(orderId) {
 
   if (orderRows.length === 0) return { orderDetails: null };
 
-  const orderDetails = orderRows[0];
+  let orderDetails = orderRows[0];
+  orderDetails = await attachActiveInvoiceFieldsToOrder(conn, orderDetails);
 
   const [items] = await conn.execute(
     "SELECT * FROM quotation_items WHERE quote_number = ?",

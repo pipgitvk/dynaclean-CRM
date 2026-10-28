@@ -7,6 +7,7 @@ import {
   ORDER_PIPELINE_STAGES,
   deriveOrderPipelineProgress,
 } from "@/lib/orderPipelineStage";
+import { getSalesOrderAmountFieldDisplay } from "@/lib/orderPaymentHistory";
 
 const stages = ORDER_PIPELINE_STAGES;
 
@@ -45,6 +46,11 @@ export default function OrderDetailsClient({
   const { progressPercent, stepCompleted } = useMemo(
     () => deriveOrderPipelineProgress(orderDetails, statuses),
     [orderDetails, statuses],
+  );
+
+  const salesAmountField = useMemo(
+    () => getSalesOrderAmountFieldDisplay(orderDetails),
+    [orderDetails],
   );
 
   return (
@@ -90,7 +96,10 @@ export default function OrderDetailsClient({
         <Input label="PO Number / Gem Order Number" value={orderDetails.po_number} />
         <Input label="Payment Date" value={formatDate(orderDetails.payment_date)} />
         <Input label="Transaction ID" value={orderDetails.transaction_id} />
-        <Input label="Payment Amount" value={orderDetails.payment_amount ? `₹${Number(orderDetails.payment_amount).toFixed(2)}` : ""} />
+        <Input
+          label={salesAmountField.label}
+          value={salesAmountField.value}
+        />
         <TextArea label="Remark" value={orderDetails.sales_remark} />
       </div>
 
