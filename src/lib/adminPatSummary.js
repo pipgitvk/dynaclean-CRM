@@ -1,5 +1,6 @@
 import dayjs from "dayjs";
 import { sqlHasInvoiceReportClause } from "@/lib/orderReportVisibility";
+import { ensureProductListPurchasePriceColumn } from "@/lib/productsListSchema";
 
 const ORDER_APPROVED_SQL = `
   (
@@ -600,19 +601,28 @@ const PAT_SPARE_MASTER_UNIT_PRICE_SQL = `
   FROM spare_list sl
 `;
 
-/** Fallback unit cost from Product master (admin-dashboard/product-stock price_per_unit). */
+/**
+ * Product master COGS from products_list.purchase_price only.
+ * Never use price_per_unit (sale) — product-stock shows NULL as 0, so sale fallback
+ * looked like "purchase 0 → still 99L COGS".
+ */
 const PAT_PRODUCT_MASTER_UNIT_PRICE_SQL = `
-  SELECT inventory_key, MAX(unit_price) AS unit_price
+  SELECT inventory_key,
+    MAX(COALESCE(product_purchase_price, 0)) AS unit_price,
+    MAX(product_purchase_price) AS product_purchase_price,
+    MAX(purchase_price_is_set) AS purchase_price_is_set
   FROM (
     SELECT
       CONCAT('product:', LOWER(TRIM(pl.item_code))) AS inventory_key,
-      COALESCE(NULLIF(pl.purchase_price, 0), pl.price_per_unit, 0) AS unit_price
+      pl.purchase_price AS product_purchase_price,
+      CASE WHEN pl.purchase_price IS NOT NULL THEN 1 ELSE 0 END AS purchase_price_is_set
     FROM products_list pl
     WHERE TRIM(COALESCE(pl.item_code, '')) <> ''
     UNION ALL
     SELECT
       CONCAT('product:', LOWER(TRIM(pl.product_number))) AS inventory_key,
-      COALESCE(NULLIF(pl.purchase_price, 0), pl.price_per_unit, 0) AS unit_price
+      pl.purchase_price AS product_purchase_price,
+      CASE WHEN pl.purchase_price IS NOT NULL THEN 1 ELSE 0 END AS purchase_price_is_set
     FROM products_list pl
     WHERE TRIM(COALESCE(pl.product_number, '')) <> ''
       AND LOWER(TRIM(pl.product_number)) <> LOWER(TRIM(pl.item_code))
@@ -620,11 +630,22 @@ const PAT_PRODUCT_MASTER_UNIT_PRICE_SQL = `
   GROUP BY inventory_key
 `;
 
+/**
+ * COGS unit cost priority:
+ * 1) Latest purchase (product_stock_request / spare_stock_request) when price > 0
+ * 2) Else product stock purchase_price (including explicit 0; NULL → treat as unset)
+ * 3) Else spare master purchase_price
+ * 4) 0 — never product sale price_per_unit
+ */
 const PAT_COGS_UNIT_PRICE_EXPR = `
   COALESCE(
-    latest.latest_price,
-    spare_master.unit_price,
-    product_master.unit_price,
+    NULLIF(latest.latest_price, 0),
+    CASE
+      WHEN product_master.purchase_price_is_set = 1
+      THEN product_master.product_purchase_price
+      ELSE NULL
+    END,
+    NULLIF(spare_master.unit_price, 0),
     0
   )
 `;
@@ -656,6 +677,7 @@ export async function fetchPurchaseCogsFromSalesLatestPurchasePrice(
   dateTo,
 ) {
   try {
+    await ensureProductListPurchasePriceColumn(conn);
     const [rows] = await conn.execute(
       `
         SELECT COALESCE(SUM(sold.qty_sold * ${PAT_COGS_UNIT_PRICE_EXPR}), 0) AS total
@@ -866,7 +888,7 @@ export async function buildAdminPatSummary(
     periodLabel,
     dateFrom,
     dateTo,
-    note: "All amounts ex-GST. Order-based lines (A, B, D) include only orders with invoice/report uploaded; cancelled, rejected, and returned orders are excluded. Line D: sold qty × latest purchase price_per_unit from Purchases; if no purchase, product purchase_price (or sale price_per_unit) from Product stock, or spare purchase_price from Spare list. Salary from monthly_salary_records; operating expenses from client_expenses (by entry date). Tax & interest are zero until configured.",
+    note: "All amounts ex-GST. Order-based lines (A, B, D) include only orders with invoice/report uploaded; cancelled, rejected, and returned orders are excluded. Line D COGS: latest purchase price first; if no purchase, product stock purchase_price (including 0); else spare purchase_price. Sale price is never used as COGS. Salary from monthly_salary_records; operating expenses from client_expenses (by entry date). Tax & interest are zero until configured.",
     lines: {
       revenueSales: {
         id: "A",
@@ -917,6 +939,7 @@ export async function buildAdminPatSummary(
 export async function fetchPatDrillRows(conn, section, dateFrom, dateTo) {
   if (section === "purchase_cogs") {
     try {
+      await ensureProductListPurchasePriceColumn(conn);
       const [rows] = await conn.execute(
         `
           SELECT
@@ -926,8 +949,10 @@ export async function fetchPatDrillRows(conn, section, dateFrom, dateTo) {
             latest.purchase_date,
             latest.purchase_kind,
             ${PAT_COGS_UNIT_PRICE_EXPR} AS unit_price,
+            latest.latest_price AS latest_purchase_unit_price,
             spare_master.unit_price AS spare_master_unit_price,
-            product_master.unit_price AS product_master_unit_price,
+            product_master.product_purchase_price,
+            product_master.purchase_price_is_set,
             sold.qty_sold * ${PAT_COGS_UNIT_PRICE_EXPR} AS line_total
           FROM (${PAT_SOLD_LINES_BY_INVENTORY_SQL}) sold
           LEFT JOIN (${PAT_LATEST_PURCHASE_BY_INVENTORY_SQL}) latest
@@ -943,24 +968,38 @@ export async function fetchPatDrillRows(conn, section, dateFrom, dateTo) {
       return rows.map((r) => {
         const qty = Number(r.qty_sold) || 0;
         const unit = Number(r.unit_price) || 0;
+        // Match product-stock UI: NULL purchase_price displays as 0
+        const productPurchasePrice =
+          r.product_purchase_price != null
+            ? Number(r.product_purchase_price)
+            : 0;
         const purchaseId = r.purchase_id;
         const purchaseDate = r.purchase_date
           ? dayjs(r.purchase_date).format("D MMM YYYY")
           : "—";
         const purchaseLabel =
           r.purchase_kind === "SP" ? "Spare purchase" : "Purchase";
-        const purchaseRef = purchaseId
-          ? `${purchaseLabel} #${purchaseId} · ${purchaseDate} · ₹${unit.toLocaleString("en-IN")}/unit`
-          : Number(r.spare_master_unit_price) > 0
-            ? `Spare master · ₹${Number(r.spare_master_unit_price).toLocaleString("en-IN")}/unit`
-            : Number(r.product_master_unit_price) > 0
-              ? `Product stock · ₹${Number(r.product_master_unit_price).toLocaleString("en-IN")}/unit`
-              : "No matching purchase";
+
+        const latestUnit = Number(r.latest_purchase_unit_price) || 0;
+        const purchasePriceIsSet = Number(r.purchase_price_is_set) === 1;
+        let costSourceRef;
+        if (purchaseId && latestUnit > 0) {
+          costSourceRef = `${purchaseLabel} #${purchaseId} · ${purchaseDate} · ₹${latestUnit.toLocaleString("en-IN")}/unit (used for COGS)`;
+        } else if (purchasePriceIsSet) {
+          costSourceRef = `Product stock · purchase price · ₹${productPurchasePrice.toLocaleString("en-IN")}/unit (used for COGS)`;
+        } else if (Number(r.spare_master_unit_price) > 0) {
+          costSourceRef = `Spare master · ₹${Number(r.spare_master_unit_price).toLocaleString("en-IN")}/unit (used for COGS)`;
+        } else {
+          costSourceRef =
+            "No purchase found & no product purchase price (COGS ₹0 — sale price not used)";
+        }
         return {
           id: r.item_code_display,
           col1: r.item_code_display,
           col2: String(qty),
-          col3: purchaseRef,
+          col3: costSourceRef,
+          productPurchasePrice,
+          purchasePriceIsSet: true,
           amount: Number(r.line_total) || qty * unit,
           purchaseId: purchaseId ?? null,
         };

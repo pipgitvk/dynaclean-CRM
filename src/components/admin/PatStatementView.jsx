@@ -484,7 +484,10 @@ function PatRow({
                         <>
                           <th className="px-2 py-1.5">Product code</th>
                           <th className="px-2 py-1.5 text-right">Qty sold</th>
-                          <th className="px-2 py-1.5">Latest purchase (price/unit)</th>
+                          <th className="px-2 py-1.5 text-right">
+                            Product purchase price
+                          </th>
+                          <th className="px-2 py-1.5">COGS unit cost (source)</th>
                           <th className="px-2 py-1.5 text-right">COGS total</th>
                         </>
                       ) : (
@@ -525,6 +528,13 @@ function PatRow({
                           >
                             {d.col2}
                           </td>
+                          {row.drillSection === "purchase_cogs" ? (
+                            <td className="px-2 py-1.5 text-right tabular-nums text-slate-800">
+                              {d.purchasePriceIsSet
+                                ? `${formatPatInr(d.productPurchasePrice ?? 0)}/unit`
+                                : "—"}
+                            </td>
+                          ) : null}
                           <td className="px-2 py-1.5">{d.col3}</td>
                           <td className="px-2 py-1.5 text-right tabular-nums">
                             {formatPatInr(d.amount)}
@@ -534,7 +544,7 @@ function PatRow({
                     ) : (
                       <tr className="border-t border-slate-100">
                         <td
-                          colSpan={4}
+                          colSpan={row.drillSection === "purchase_cogs" ? 5 : 4}
                           className="px-2 py-3 text-center text-slate-500"
                         >
                           {row.drillSection === "purchase_cogs"
@@ -547,7 +557,7 @@ function PatRow({
                   {row.drillSection === "purchase_cogs" && drillRows.length > 0 ? (
                     <tfoot className="border-t-2 border-slate-200 bg-slate-50 font-semibold text-slate-800">
                       <tr>
-                        <td colSpan={3} className="px-2 py-2 text-right text-xs uppercase tracking-wide">
+                        <td colSpan={4} className="px-2 py-2 text-right text-xs uppercase tracking-wide">
                           Total (D)
                         </td>
                         <td className="px-2 py-2 text-right tabular-nums">
