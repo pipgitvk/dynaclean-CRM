@@ -1,4 +1,21 @@
-import { parseOrderLinkedPayments } from "@/lib/orderLinkedPaymentsDisplay";
+import {
+  orderHasInvoiceNumber,
+  orderInvoiceHasPaymentLink,
+  parseOrderLinkedPayments,
+  sumStatementLinkedOrderPayments,
+} from "@/lib/orderLinkedPaymentsDisplay";
+
+function orderTotalForPaidCap(order) {
+  const invGrand = Number(order?.invoice_grand_total);
+  if (Number.isFinite(invGrand) && invGrand > 0) return invGrand;
+  const quotationTotal = Number(order?.quotation_grand_total) || 0;
+  if (quotationTotal > 0) return quotationTotal;
+  const total = Number(order?.totalamt) || 0;
+  if (total > 0) return total;
+  const base = Number(order?.baseAmount) || 0;
+  const tax = Number(order?.taxamt) || 0;
+  return Math.max(total, base + tax);
+}
 
 /**
  * Order payments are stored as comma-separated CSV on neworder:
@@ -106,21 +123,40 @@ export function sumOrderPaymentAmounts(order) {
     .reduce((sum, n) => sum + n, 0);
 }
 
-/** Order list Paid column: CSV + amount_received + linked_payments_json (capped at order total). */
+/**
+ * Order list Paid / Balance column.
+ * Invoice without payment link → paid 0 (booking advance hidden).
+ * Invoice with payment link → invoice amount_paid / statement-linked sum.
+ * No invoice → booking CSV / amount_received as before.
+ */
 export function getOrderPaidAmountForDisplay(order) {
-  const orderTotal = Number(order?.totalamt) || 0;
-  const fromCsv = sumOrderPaymentAmounts(order);
-  const fromReceived = Number(order?.amount_received);
-  const fromLinked = parseOrderLinkedPayments(order).reduce(
-    (s, p) => s + (Number(p.amount) || 0),
-    0,
-  );
-  let paid = fromCsv;
-  if (Number.isFinite(fromReceived) && fromReceived > 0) {
-    paid = Math.max(paid, fromReceived);
-  }
-  if (fromLinked > 0) {
-    paid = Math.max(paid, fromLinked);
+  const orderTotal = orderTotalForPaidCap(order);
+  let paid;
+  if (orderHasInvoiceNumber(order)) {
+    if (!orderInvoiceHasPaymentLink(order)) {
+      paid = 0;
+    } else {
+      const invPaid = Number(order?.invoice_amount_paid);
+      if (Number.isFinite(invPaid) && invPaid >= 0) {
+        paid = invPaid;
+      } else {
+        paid = sumStatementLinkedOrderPayments(order);
+      }
+    }
+  } else {
+    const fromCsv = sumOrderPaymentAmounts(order);
+    const fromReceived = Number(order?.amount_received);
+    const fromLinked = parseOrderLinkedPayments(order).reduce(
+      (s, p) => s + (Number(p.amount) || 0),
+      0,
+    );
+    paid = fromCsv;
+    if (Number.isFinite(fromReceived) && fromReceived > 0) {
+      paid = Math.max(paid, fromReceived);
+    }
+    if (fromLinked > 0) {
+      paid = Math.max(paid, fromLinked);
+    }
   }
   if (orderTotal > 0) {
     paid = Math.min(paid, orderTotal);

@@ -59,11 +59,22 @@ export async function attachActiveInvoiceFields(conn, orders) {
     if (inv) invNums.add(inv);
   }
 
+  const invoiceSelect = `
+    id,
+    TRIM(invoice_number) AS invoice_number,
+    amount_paid,
+    balance_amount,
+    grand_total,
+    linked_trans_ids,
+    payment_status,
+    status
+  `;
+
   if (invNums.size > 0) {
     const nums = [...invNums];
     const ph = nums.map(() => "?").join(",");
     const [rows] = await conn.execute(
-      `SELECT id, TRIM(invoice_number) AS invoice_number
+      `SELECT ${invoiceSelect}
        FROM invoices
        WHERE TRIM(invoice_number) IN (${ph})
          AND ${ACTIVE_INVOICE_SQL}
@@ -81,7 +92,7 @@ export async function attachActiveInvoiceFields(conn, orders) {
   if (orderIds.length > 0) {
     const ph = orderIds.map(() => "?").join(",");
     const [rows] = await conn.execute(
-      `SELECT id, TRIM(invoice_number) AS invoice_number,
+      `SELECT ${invoiceSelect},
               TRIM(COALESCE(buyers_order_no, '')) AS buyers_order_no
        FROM invoices
        WHERE TRIM(COALESCE(buyers_order_no, '')) IN (${ph})
@@ -106,6 +117,11 @@ export async function attachActiveInvoiceFields(conn, orders) {
       ...order,
       active_invoice_number: inv?.invoice_number || null,
       active_invoice_id: inv?.id || null,
+      invoice_amount_paid: inv?.amount_paid ?? null,
+      invoice_balance_amount: inv?.balance_amount ?? null,
+      invoice_grand_total: inv?.grand_total ?? null,
+      invoice_linked_trans_ids: inv?.linked_trans_ids ?? null,
+      invoice_payment_status: inv?.payment_status ?? null,
     };
   });
 }

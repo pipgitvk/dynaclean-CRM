@@ -100,6 +100,8 @@ function orderListPaymentStatusKey(order) {
 }
 
 function getOrderTotalAmount(order) {
+  const invGrand = Number(order?.invoice_grand_total);
+  if (Number.isFinite(invGrand) && invGrand > 0) return invGrand;
   return getOrderTotalForPayment(order);
 }
 
