@@ -15,7 +15,7 @@ function bookingTransId(order) {
   return String(order?.transaction_id || "").trim();
 }
 
-function parseInvoiceLinkedTransIds(raw) {
+export function parseInvoiceLinkedTransIds(raw) {
   if (!raw) return [];
   if (Array.isArray(raw)) {
     return raw.map((v) => String(v).trim()).filter(Boolean);
@@ -49,28 +49,45 @@ export function orderHasInvoiceNumber(order) {
 }
 
 /**
- * True only when invoice has real payment links (Link Payment / statements).
- * Booking amounts on the order alone do not count.
+ * True only when invoice.linked_trans_ids has payment links (Link Payment).
+ * Booking / order statement_id alone does not count.
  */
 export function orderInvoiceHasPaymentLink(order) {
   if (!orderHasInvoiceNumber(order)) return false;
-  if (parseInvoiceLinkedTransIds(order?.invoice_linked_trans_ids).length > 0) {
-    return true;
-  }
-  return parseOrderLinkedPayments(order).some(isStatementLinkedOrderPayment);
+  return parseInvoiceLinkedTransIds(order?.invoice_linked_trans_ids).length > 0;
 }
 
 /**
- * Payments to show on order list / balance.
- * Invoice without payment link → hide booking/received amounts.
- * Invoice with payment link → statement-linked lines only.
- * No invoice yet → booking advances as before.
+ * Hover / linked-payment cell: only rows whose trans_id is on the invoice link.
+ */
+export function getOrderPaymentsLinkedToInvoice(order) {
+  const linkedIds = parseInvoiceLinkedTransIds(order?.invoice_linked_trans_ids);
+  if (!linkedIds.length) return [];
+
+  const idSet = new Set(linkedIds.map((id) => id.toLowerCase()));
+  const fromOrder = parseOrderLinkedPayments(order).filter((p) => {
+    const tid = String(p.trans_id || "").trim();
+    return tid && idSet.has(tid.toLowerCase());
+  });
+
+  if (fromOrder.length) return fromOrder;
+
+  // Invoice has linked trans_ids but order JSON missing rows — still show those IDs
+  return linkedIds.map((trans_id) => ({
+    trans_id,
+    date: null,
+    amount: null,
+    statement_id: null,
+  }));
+}
+
+/**
+ * Payments to show on order list / balance / hover.
+ * Only after invoice Link Payment — booking advance never shown alone.
  */
 export function getOrderPaymentsForDisplay(order) {
-  const all = parseOrderLinkedPayments(order);
-  if (!orderHasInvoiceNumber(order)) return all;
   if (!orderInvoiceHasPaymentLink(order)) return [];
-  return all.filter(isStatementLinkedOrderPayment);
+  return getOrderPaymentsLinkedToInvoice(order);
 }
 
 export function sumStatementLinkedOrderPayments(order) {

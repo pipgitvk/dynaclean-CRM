@@ -2,8 +2,12 @@
  * Shared helpers for payment-pending reports and deduction updates.
  */
 
-import { sumOrderPaymentAmounts } from "@/lib/orderPaymentHistory";
+import {
+  getOrderPaidAmountForDisplay,
+  sumOrderPaymentAmounts,
+} from "@/lib/orderPaymentHistory";
 import { hasOrderInvoiceReport } from "@/lib/orderDocumentEditRules";
+import { orderInvoiceHasPaymentLink } from "@/lib/orderLinkedPaymentsDisplay";
 
 /** Paise/rounding drift (e.g. ₹0.40 on ₹802.40) — treat as fully settled in reports. */
 export const PAYMENT_REMAINING_TOLERANCE_INR = 1;
@@ -46,11 +50,14 @@ export function getOrderTotalForPayment(order) {
 }
 
 /**
- * Order list Payment column: until accountant uploads invoice report,
- * do not treat booking advance / quotation total as "Paid".
+ * Order list Payment column: booking advance never counts as Paid.
+ * Status stays pending until invoice has Link Payment.
  */
 export function deriveOrderListPaymentStatus(order) {
   if (!hasOrderInvoiceReport(order)) {
+    return "pending";
+  }
+  if (!orderInvoiceHasPaymentLink(order)) {
     return "pending";
   }
   return deriveOrderPaymentStatus(order);
@@ -64,8 +71,12 @@ export function getOrderListRemainingPayment(order) {
   if (!hasOrderInvoiceReport(order)) {
     return null;
   }
-  const total = getOrderTotalForPayment(order);
-  const paidAmount = sumOrderPaymentAmounts(order);
+  const invGrand = Number(order?.invoice_grand_total);
+  const total =
+    Number.isFinite(invGrand) && invGrand > 0
+      ? invGrand
+      : getOrderTotalForPayment(order);
+  const paidAmount = getOrderPaidAmountForDisplay(order);
   const { remaining } = computeOrderPaymentRemaining(total, paidAmount, 0);
   const statusKey = (deriveOrderListPaymentStatus(order) || "")
     .toString()
@@ -79,10 +90,14 @@ export function getOrderListRemainingPayment(order) {
   return remaining;
 }
 
-/** Status from paid vs total (booking advance before payment_status is updated). */
+/** Status from paid vs total (uses invoice-link-aware paid when invoice exists). */
 export function deriveOrderPaymentStatus(order) {
-  const total = getOrderTotalForPayment(order);
-  const paidAmount = sumOrderPaymentAmounts(order);
+  const invGrand = Number(order?.invoice_grand_total);
+  const total =
+    Number.isFinite(invGrand) && invGrand > 0
+      ? invGrand
+      : getOrderTotalForPayment(order);
+  const paidAmount = getOrderPaidAmountForDisplay(order);
   const stored = (order?.payment_status || "")
     .toString()
     .trim()

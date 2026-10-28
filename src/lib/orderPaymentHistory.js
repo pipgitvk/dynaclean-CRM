@@ -1,5 +1,4 @@
 import {
-  orderHasInvoiceNumber,
   orderInvoiceHasPaymentLink,
   parseOrderLinkedPayments,
   sumStatementLinkedOrderPayments,
@@ -124,38 +123,19 @@ export function sumOrderPaymentAmounts(order) {
 }
 
 /**
- * Order list Paid / Balance column.
- * Invoice without payment link → paid 0 (booking advance hidden).
- * Invoice with payment link → invoice amount_paid / statement-linked sum.
- * No invoice → booking CSV / amount_received as before.
+ * Order list Paid / Balance (admin / accounts / superadmin).
+ * Only invoice Link Payment amounts count. Booking advance stays hidden
+ * until payment is linked on the invoice.
  */
 export function getOrderPaidAmountForDisplay(order) {
   const orderTotal = orderTotalForPaidCap(order);
-  let paid;
-  if (orderHasInvoiceNumber(order)) {
-    if (!orderInvoiceHasPaymentLink(order)) {
-      paid = 0;
+  let paid = 0;
+  if (orderInvoiceHasPaymentLink(order)) {
+    const invPaid = Number(order?.invoice_amount_paid);
+    if (Number.isFinite(invPaid) && invPaid >= 0) {
+      paid = invPaid;
     } else {
-      const invPaid = Number(order?.invoice_amount_paid);
-      if (Number.isFinite(invPaid) && invPaid >= 0) {
-        paid = invPaid;
-      } else {
-        paid = sumStatementLinkedOrderPayments(order);
-      }
-    }
-  } else {
-    const fromCsv = sumOrderPaymentAmounts(order);
-    const fromReceived = Number(order?.amount_received);
-    const fromLinked = parseOrderLinkedPayments(order).reduce(
-      (s, p) => s + (Number(p.amount) || 0),
-      0,
-    );
-    paid = fromCsv;
-    if (Number.isFinite(fromReceived) && fromReceived > 0) {
-      paid = Math.max(paid, fromReceived);
-    }
-    if (fromLinked > 0) {
-      paid = Math.max(paid, fromLinked);
+      paid = sumStatementLinkedOrderPayments(order);
     }
   }
   if (orderTotal > 0) {

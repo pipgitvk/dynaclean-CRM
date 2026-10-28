@@ -84,6 +84,7 @@ import OrderBookingViewMenuLinks from "@/components/orders/OrderBookingViewMenuL
 import OrderDeliveryMenuLinks from "@/components/orders/OrderDeliveryMenuLinks";
 import toast from "react-hot-toast";
 import LinkedStatementPaymentCell from "@/components/orders/LinkedStatementPaymentCell";
+import { orderInvoiceHasPaymentLink } from "@/lib/orderLinkedPaymentsDisplay";
 import { normalizeOrderListDateRange } from "@/lib/orderTableDateDefaults";
 
 ChartJS.register(ArcElement, Tooltip, Legend);
@@ -458,16 +459,14 @@ function getTotalPaidAmount(order) {
   return getOrderPaidAmountForDisplay(order);
 }
 
-/** Stat cards / totals: only accountant order-report payment (not grey booking advance). */
+/** Stat cards / totals: only invoice-linked paid (same as Paid column). */
 function getAccountantReportPaidAmount(order) {
-  if (!hasOrderInvoiceReport(order)) return 0;
-  return sumOrderPaymentAmounts(order);
+  return getOrderPaidAmountForDisplay(order);
 }
 
-/** Booking advance before accountant invoice report — grey; after report — green. */
+/** Green only after invoice Link Payment; otherwise grey (no booking advance count). */
 function getOrderPaidAmountUiClasses(order) {
-  const advanceOnly = !hasOrderInvoiceReport(order);
-  if (advanceOnly) {
+  if (!orderInvoiceHasPaymentLink(order)) {
     return {
       label: "font-semibold text-gray-500",
       value:
