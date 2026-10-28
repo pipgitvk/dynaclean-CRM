@@ -240,3 +240,25 @@ export async function fetchAdminOrderListPage(
     limit,
   };
 }
+
+const STATS_FETCH_PAGE_SIZE = 250;
+const STATS_FETCH_MAX_ORDERS = 15000;
+
+/** All orders matching list filters (for stat cards — not paginated to UI page size). */
+export async function fetchAdminOrderListAllForStats(conn, options = {}) {
+  let page = 1;
+  const all = [];
+
+  for (;;) {
+    const result = await fetchAdminOrderListPage(conn, {
+      ...options,
+      page,
+      limit: STATS_FETCH_PAGE_SIZE,
+    });
+    all.push(...result.orders);
+    if (!result.hasMore || all.length >= STATS_FETCH_MAX_ORDERS) break;
+    page += 1;
+  }
+
+  return all;
+}

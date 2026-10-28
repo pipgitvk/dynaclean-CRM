@@ -29,6 +29,7 @@ import {
   getOrderPaidAmountForDisplay,
   sumOrderPaymentAmounts,
 } from "@/lib/orderPaymentHistory";
+import { EMPTY_ORDER_STATS } from "@/lib/adminOrderListStatCards";
 import { OrderPaymentHistoryTrigger } from "@/components/orders/OrderPaymentHistoryModal";
 import {
   deriveOrderPaymentStatus,
@@ -778,6 +779,8 @@ export default function OrderTable({
   const [hasMore, setHasMore] = useState(true);
   const [scrollLoadEnabled, setScrollLoadEnabled] = useState(false);
   const [fetchError, setFetchError] = useState(null);
+  const [cardStats, setCardStats] = useState(null);
+  const [cardStatsLoading, setCardStatsLoading] = useState(false);
   const pageRef = useRef(1);
   const fetchAbortRef = useRef(null);
   const tableScrollRef = useRef(null);
@@ -983,6 +986,55 @@ export default function OrderTable({
     ],
   );
 
+  const fetchCardStats = useCallback(
+    async (filters) => {
+      const f = filters || {
+        search: appliedSearchQuery,
+        dateFrom: appliedDateFrom,
+        dateTo: appliedDateTo,
+        createdBy: appliedCreatedByFilter,
+        leadCampaign: appliedLeadCampaignFilter,
+        approvalStatus: appliedApprovalStatusFilter,
+      };
+
+      setCardStatsLoading(true);
+      try {
+        const params = new URLSearchParams();
+        if (serviceSupportOnly) params.set("serviceSupport", "1");
+        if (f.search) params.set("search", f.search);
+        if (f.dateFrom) params.set("dateFrom", f.dateFrom);
+        if (f.dateTo) params.set("dateTo", f.dateTo);
+        if (f.createdBy) params.set("createdBy", f.createdBy);
+        if (f.leadCampaign) params.set("leadCampaign", f.leadCampaign);
+        if (f.approvalStatus) params.set("approvalStatus", f.approvalStatus);
+
+        const res = await fetch(
+          `/api/admin/orders/stats?${params.toString()}`,
+          { cache: "no-store" },
+        );
+        const json = await res.json();
+        if (!res.ok || !json.success) {
+          throw new Error(json.detail || json.error || "Failed to load stats");
+        }
+        setCardStats(json.data);
+      } catch (err) {
+        console.error("Admin order stat cards fetch failed:", err);
+        setCardStats(null);
+      } finally {
+        setCardStatsLoading(false);
+      }
+    },
+    [
+      appliedSearchQuery,
+      appliedDateFrom,
+      appliedDateTo,
+      appliedCreatedByFilter,
+      appliedLeadCampaignFilter,
+      appliedApprovalStatusFilter,
+      serviceSupportOnly,
+    ],
+  );
+
   const loadMoreOrders = useCallback(() => {
     if (listLoading || loadingMore || !hasMore) return;
     fetchOrdersPage({ page: pageRef.current + 1, append: true });
@@ -1032,6 +1084,14 @@ export default function OrderTable({
           approvalStatus: approvalStatusFilter,
         },
       });
+      fetchCardStats({
+        search: searchQuery,
+        dateFrom: nextFrom,
+        dateTo: nextTo,
+        createdBy: createdByFilter,
+        leadCampaign: leadCampaignFilter,
+        approvalStatus: approvalStatusFilter,
+      });
     }
   }, [
     searchQuery,
@@ -1044,6 +1104,7 @@ export default function OrderTable({
     approvalStatusFilter,
     paymentStatusFilter,
     fetchOrdersPage,
+    fetchCardStats,
     clientFetch,
   ]);
 
@@ -1052,6 +1113,20 @@ export default function OrderTable({
     fetchOrdersPage({ page: 1, append: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serviceSupportOnly, clientFetch]);
+
+  useEffect(() => {
+    if (!clientFetch) return;
+    fetchCardStats();
+  }, [
+    clientFetch,
+    appliedSearchQuery,
+    appliedDateFrom,
+    appliedDateTo,
+    appliedCreatedByFilter,
+    appliedLeadCampaignFilter,
+    appliedApprovalStatusFilter,
+    fetchCardStats,
+  ]);
 
   useEffect(() => {
     if (!clientFetch || !scrollLoadEnabled) return;
@@ -1503,10 +1578,10 @@ export default function OrderTable({
   const isRejectedOnlyView =
     appliedApprovalStatusFilter.toString().trim().toLowerCase() === "rejected";
 
-  const ordersForStatCards = useMemo(() => {
-    if (isRejectedOnlyView) return [];
-    return filteredOrders.filter((order) => !isOrderExcludedFromStatCards(order));
-  }, [filteredOrders, isRejectedOnlyView]);
+  const orderStats = cardStats?.orderStats ?? EMPTY_ORDER_STATS;
+
+  const rejectedOrderStats =
+    cardStats?.rejectedOrderStats ?? { rejected: 0, rejectedAmount: 0 };
 
   const leadCampaignFilterOptions = useMemo(() => {
     const keys = new Set(LEAD_CAMPAIGN_OPTIONS.map((o) => o.value));
@@ -1519,102 +1594,35 @@ export default function OrderTable({
     );
   }, [orders]);
 
-  const orderStats = useMemo(() => {
-    const stats = ordersForStatCards.reduce(
-      (acc, order) => {
-        const taxable = getPaymentColumnAmount(order);
-        const paidOrder = getAccountantReportPaidAmount(order);
-        const approval = (order.approval_status || "")
-          .toString()
-          .trim()
-          .toLowerCase();
-        const isPendingApproval = approval === "pending";
-        const isApproved = approval === "approved";
-
-        if (isPendingApproval) {
-          acc.pending += 1;
-          acc.pendingAmount += taxable;
-        }
-
-        if (isApproved) {
-          acc.total += 1;
-          acc.totalAmount += taxable;
-          acc.approved += 1;
-          acc.approvedAmount += taxable;
-
-          if (isOrderDispatchedForStats(order)) {
-            acc.dispatched += 1;
-            acc.dispatchedAmount += taxable;
-          }
-          if (isOrderPendingDispatchForStats(order)) {
-            acc.pendingDispatch += 1;
-            acc.pendingDispatchAmount += taxable;
-          }
-
-          const pmtStatus = deriveOrderListPaymentStatus(order)
-            .toString()
-            .trim()
-            .toLowerCase()
-            .replace(/\s+/g, "");
-
-          if (pmtStatus === "paid") {
-            acc.paid += 1;
-          } else {
-            acc.unpaid += 1;
-          }
-
-          acc.paidAmount += paidOrder;
-        }
-
-        return acc;
-      },
-      {
-        total: 0,
-        pending: 0,
-        approved: 0,
-        dispatched: 0,
-        pendingDispatch: 0,
-        paid: 0,
-        unpaid: 0,
-        totalAmount: 0,
-        pendingAmount: 0,
-        approvedAmount: 0,
-        dispatchedAmount: 0,
-        pendingDispatchAmount: 0,
-        paidAmount: 0,
-        unpaidAmount: 0,
-      },
-    );
+  const leadCampaignPieChartData = useMemo(() => {
+    const counts = cardStats?.leadCampaignCounts || {};
+    const entries = Object.entries(counts)
+      .map(([key, value]) => ({
+        key,
+        label: key === "__none__" ? "No campaign" : formatLeadCampaignLabel(key),
+        value: Number(value) || 0,
+        color:
+          key === "__none__"
+            ? "rgba(148, 163, 184, 0.85)"
+            : leadCampaignColor(key),
+      }))
+      .filter((entry) => entry.value > 0)
+      .sort((a, b) => b.value - a.value);
 
     return {
-      ...stats,
-      unpaidAmount: Math.max(0, stats.totalAmount - stats.paidAmount),
+      labels: entries.map((entry) => entry.label),
+      keys: entries.map((entry) => entry.key),
+      datasets: [
+        {
+          data: entries.map((entry) => entry.value),
+          backgroundColor: entries.map((entry) => entry.color),
+          borderWidth: 2,
+          borderColor: "#ffffff",
+          hoverOffset: 8,
+        },
+      ],
     };
-  }, [ordersForStatCards]);
-
-  const rejectedOrderStats = useMemo(() => {
-    return filteredOrders.reduce(
-      (acc, order) => {
-        if (!isRejectedApprovalOrder(order)) return acc;
-        acc.rejected += 1;
-        acc.rejectedAmount += getPaymentColumnAmount(order);
-        return acc;
-      },
-      { rejected: 0, rejectedAmount: 0 },
-    );
-  }, [filteredOrders]);
-
-  const rejectedFilteredTotals = useMemo(() => {
-    return filteredOrders.reduce(
-      (acc, order) => {
-        if (!isRejectedApprovalOrder(order)) return acc;
-        acc.taxableAmount += getPaymentColumnAmount(order);
-        acc.totalAmount += getTotalAmount(order);
-        return acc;
-      },
-      { taxableAmount: 0, totalAmount: 0 },
-    );
-  }, [filteredOrders]);
+  }, [cardStats?.leadCampaignCounts]);
 
   const activeStatCard = useMemo(() => {
     if (appliedPaymentStatusFilter === "paid") return "paid";
@@ -1728,40 +1736,6 @@ export default function OrderTable({
     [handleStatCardClick, orderStats.total],
   );
 
-  const leadCampaignPieChartData = useMemo(() => {
-    const counts = {};
-    ordersForStatCards.forEach((order) => {
-      const key = normalizeLeadCampaignKey(order.lead_campaign) || "__none__";
-      counts[key] = (counts[key] || 0) + 1;
-    });
-    const entries = Object.entries(counts)
-      .map(([key, value]) => ({
-        key,
-        label: key === "__none__" ? "No campaign" : formatLeadCampaignLabel(key),
-        value,
-        color:
-          key === "__none__"
-            ? "rgba(148, 163, 184, 0.85)"
-            : leadCampaignColor(key),
-      }))
-      .filter((entry) => entry.value > 0)
-      .sort((a, b) => b.value - a.value);
-
-    return {
-      labels: entries.map((entry) => entry.label),
-      keys: entries.map((entry) => entry.key),
-      datasets: [
-        {
-          data: entries.map((entry) => entry.value),
-          backgroundColor: entries.map((entry) => entry.color),
-          borderWidth: 2,
-          borderColor: "#ffffff",
-          hoverOffset: 8,
-        },
-      ],
-    };
-  }, [ordersForStatCards]);
-
   const leadCampaignPieTotal = useMemo(() => {
     const data = leadCampaignPieChartData.datasets[0]?.data || [];
     return data.reduce((sum, n) => sum + Number(n || 0), 0);
@@ -1853,36 +1827,32 @@ export default function OrderTable({
     );
   }, [filteredOrders]);
 
-  const filteredAmountTotals = useMemo(() => {
-    if (!filteredOrders?.length) {
-      return { totalAmount: 0, paidAmount: 0, taxableAmount: 0, balanceAmount: 0 };
-    }
-    return filteredOrders.reduce(
-      (acc, o) => {
-        if (normalizeApprovalStatus(o.approval_status) !== "approved") return acc;
-        if (isOrderExcludedFromStatCards(o)) return acc;
-        acc.totalAmount += getTotalAmount(o);
-        acc.paidAmount += getAccountantReportPaidAmount(o);
-        acc.taxableAmount += getPaymentColumnAmount(o);
-        acc.balanceAmount += getBalanceAmount(o);
-        return acc;
-      },
-      { totalAmount: 0, paidAmount: 0, taxableAmount: 0, balanceAmount: 0 },
-    );
-  }, [filteredOrders]);
-
   const displayAmountTotals = isRejectedOnlyView
     ? {
-        totalAmount: rejectedFilteredTotals.totalAmount,
+        totalAmount: cardStats?.rejectedAmountTotals?.totalAmount ?? 0,
         paidAmount: 0,
-        taxableAmount: rejectedFilteredTotals.taxableAmount,
+        taxableAmount: cardStats?.rejectedAmountTotals?.taxableAmount ?? 0,
         balanceAmount: 0,
       }
-    : filteredAmountTotals;
+    : (cardStats?.amountTotals ?? {
+        totalAmount: 0,
+        paidAmount: 0,
+        taxableAmount: 0,
+        balanceAmount: 0,
+      });
+
+  const statCardsDateLabel = useMemo(() => {
+    const from = cardStats?.dateFrom || appliedDateFrom;
+    const to = cardStats?.dateTo || appliedDateTo;
+    if (from && to) return `${from} to ${to}`;
+    if (from) return `From ${from}`;
+    if (to) return `Until ${to}`;
+    return "All dates";
+  }, [cardStats?.dateFrom, cardStats?.dateTo, appliedDateFrom, appliedDateTo]);
 
   const amountSummaryScopeLabel = isRejectedOnlyView
     ? "Rejected orders only"
-    : "Approved orders only (excludes rejected & cancelled)";
+    : `Approved orders · ${statCardsDateLabel}`;
 
   const getPaymentBadge = (paymentStatusRaw) => {
     const s = (paymentStatusRaw || "").toString().trim().toLowerCase();
@@ -2129,6 +2099,15 @@ export default function OrderTable({
 
   return (
     <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm text-gray-600">
+          Stat cards for order date range:{" "}
+          <span className="font-semibold text-gray-900">{statCardsDateLabel}</span>
+          {cardStatsLoading ? (
+            <span className="ml-2 text-xs text-blue-600">Updating…</span>
+          ) : null}
+        </p>
+      </div>
       {/* Mobile / tablet: all cards in grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 lg:hidden">
         {statCards.map((card) => renderStatCard(card))}
