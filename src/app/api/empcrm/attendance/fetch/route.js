@@ -100,7 +100,32 @@ export async function GET(request) {
       db,
       machineCodeToUsername,
     );
-    let mergedRows = mergeAttendanceListWithMachine(rows, machineByUserDate);
+    // Personal attendance must not pick up another employee's machine day.
+    // The page indexes rows by date only, so a leaked punch shows on that date for everyone.
+    const allowedUserKeys = new Set();
+    const allowUser = (name) => {
+      const key = normalizeUsernameKey(name);
+      if (key) allowedUserKeys.add(key);
+    };
+    for (const alias of loginAliases) {
+      allowUser(alias);
+      allowUser(resolveCanon(alias));
+    }
+    allowUser(canonicalLogin);
+    for (const row of rows) allowUser(row.username);
+
+    const machineForUser = new Map();
+    for (const [key, val] of machineByUserDate.entries()) {
+      const pipe = key.indexOf("|");
+      if (pipe < 0) continue;
+      if (!allowedUserKeys.has(normalizeUsernameKey(key.slice(0, pipe)))) continue;
+      machineForUser.set(key, val);
+    }
+
+    let mergedRows = mergeAttendanceListWithMachine(rows, machineForUser);
+    mergedRows = mergedRows.filter((row) =>
+      allowedUserKeys.has(normalizeUsernameKey(row.username)),
+    );
     const byKey = new Map();
     for (const row of mergedRows) {
       const dk =
