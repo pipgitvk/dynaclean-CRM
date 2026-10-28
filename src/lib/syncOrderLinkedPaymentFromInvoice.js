@@ -158,7 +158,9 @@ export async function syncOrderLinkedPaymentFromInvoice(conn, order) {
   const invGrandTotal = Number(invMeta?.grand_total) || 0;
   const invStatus = String(invMeta?.payment_status || "").trim().toUpperCase();
   const tids = parseLinkedTransIds(invMeta?.linked_trans_ids);
-  if (invAmountPaid > 0) {
+  // Only trust invoice amount_paid when payment links (trans ids) exist.
+  // Booking advance copied onto invoice without a link must not feed back into the order.
+  if (invAmountPaid > 0 && tids.length > 0) {
     amount = Math.max(amount || 0, invAmountPaid);
   }
   if (orderTotal > 0 && amount > orderTotal) {
@@ -167,6 +169,7 @@ export async function syncOrderLinkedPaymentFromInvoice(conn, order) {
 
   const invoiceSettlesOrder =
     invAmountPaid > 0 &&
+    tids.length > 0 &&
     orderTotal > 0 &&
     (invStatus === "PAID" ||
       invAmountPaid >= orderTotal - 0.01 ||
@@ -183,7 +186,10 @@ export async function syncOrderLinkedPaymentFromInvoice(conn, order) {
     const allocated = allocateStatementPaymentsForInvoice(stmtLike, allocCap);
     payments = allocated.payments;
     if (allocated.total > 0) {
-      amount = Math.max(allocated.total, invAmountPaid);
+      amount = Math.max(
+        allocated.total,
+        tids.length > 0 ? invAmountPaid : 0,
+      );
       if (orderTotal > 0) amount = Math.min(amount, orderTotal);
     }
   }
@@ -216,7 +222,7 @@ export async function syncOrderLinkedPaymentFromInvoice(conn, order) {
   let incomingPaid = Math.max(
     sumPaymentAmountCsv(invoiceCsv.payment_amount) || 0,
     amountVal || 0,
-    invAmountPaid,
+    tids.length > 0 ? invAmountPaid : 0,
   );
   if (orderTotal > 0) incomingPaid = Math.min(incomingPaid, orderTotal);
 

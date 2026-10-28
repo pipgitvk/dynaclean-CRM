@@ -4,7 +4,6 @@ import {
   syncOrderLinkedPaymentFromInvoice,
   syncOrdersForInvoiceNumbers,
 } from "@/lib/syncOrderLinkedPaymentFromInvoice";
-import { sumPaymentAmountCsv } from "@/lib/orderPaymentHistory";
 
 /**
  * Keep invoice payment link and order linked-payment snapshot aligned.
@@ -46,12 +45,14 @@ export async function syncInvoiceAndOrderPaymentLink(
     // Invoice → order first (so Link Payment amount lands on neworder).
     const synced = await syncOrderLinkedPaymentFromInvoice(conn, rows[0]);
 
-    const paid =
-      sumPaymentAmountCsv(synced?.payment_amount) ||
-      Number(synced?.amount_received) ||
-      0;
-    // Only push order → invoice when order actually has money (avoid wiping invoice).
-    if (paid > 0) {
+    // Always re-sync invoice from order when an invoice exists:
+    // - applies only statement-linked payments to amount_paid
+    // - clears booking-only amount_paid (no payment link) so refresh
+    //   on accounts-dashboard/order does not keep deducting balance
+    const invoiceNum = String(
+      synced?.invoice_number || rows[0]?.invoice_number || "",
+    ).trim();
+    if (invoiceNum) {
       await syncInvoicePaymentFromOrder(conn, orderId);
     }
   }

@@ -51,8 +51,10 @@ const ORDER_PAYMENT_SELECT = `SELECT order_id, quote_number, invoice_number, tot
   FROM neworder WHERE order_id = ? LIMIT 1`;
 
 /**
- * Push order payment snapshot onto invoices (+ statement invoice_number where safe).
- * Merges linked_trans_ids; does not clear existing invoice links or reduce amount_paid.
+ * Push order → invoice payment snapshot.
+ * Only statement-linked payments (payment link) increase amount_paid.
+ * Booking UTR / amount_received without statement_id does not deduct invoice balance.
+ * Clears booking-only amount_paid when invoice has no linked_trans_ids.
  */
 export async function syncInvoicePaymentFromOrder(conn, orderOrOrderId) {
   let order = orderOrOrderId;
