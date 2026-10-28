@@ -44,10 +44,14 @@ export async function GET(request) {
     }
 
     const conn = await getDbConnection();
+    const { ensureProductListPurchasePriceColumn } = await import(
+      "@/lib/productsListSchema"
+    );
+    await ensureProductListPurchasePriceColumn(conn);
     const [[product]] = await conn.execute(
       `SELECT item_code, item_name, product_number, gst_rate, gem_price,
               gem_last_negotiation_price, dealer_price, last_negotiation_price,
-              dp_no_warranty, dp, min_qty
+              dp_no_warranty, dp, min_qty, price_per_unit, purchase_price
        FROM products_list
        WHERE ${sqlTrimUtf8Eq("item_code")}
        LIMIT 1`,
@@ -213,6 +217,7 @@ export async function GET(request) {
       product,
       combined,
       purchasePricePerUnit,
+      masterPurchasePrice: Number(product?.purchase_price) || 0,
       salePricePerUnit,
       stock,
     });

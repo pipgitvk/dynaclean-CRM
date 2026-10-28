@@ -5,6 +5,7 @@ import { MoreVertical } from "lucide-react";
 
 const emptyProductForm = () => ({
   price_per_unit: "",
+  purchase_price: "",
   last_negotiation_price: "",
   gem_price: "",
   gem_last_negotiation_price: "",
@@ -22,6 +23,7 @@ const emptySpareForm = () => ({
 function productFormFromRow(row) {
   return {
     price_per_unit: row.price_per_unit ?? row.price ?? "",
+    purchase_price: row.purchase_price ?? "",
     last_negotiation_price: row.last_negotiation_price ?? "",
     gem_price: row.gem_price ?? "",
     gem_last_negotiation_price: row.gem_last_negotiation_price ?? "",
@@ -87,6 +89,7 @@ export default function InventoryPriceEditMenu({
         fd.append("product_number", row.product_number || "");
         fd.append("min_qty", row.min_qty ?? "");
         fd.append("price_per_unit", form.price_per_unit);
+        fd.append("purchase_price", form.purchase_price);
         fd.append("gem_price", form.gem_price);
         fd.append("gem_last_negotiation_price", form.gem_last_negotiation_price);
         fd.append("dealer_price", form.dealer_price);
@@ -106,6 +109,7 @@ export default function InventoryPriceEditMenu({
         onSaved?.({
           ...row,
           price_per_unit: form.price_per_unit,
+          purchase_price: form.purchase_price,
           last_negotiation_price: form.last_negotiation_price,
           gem_price: form.gem_price,
           gem_last_negotiation_price: form.gem_last_negotiation_price,
@@ -251,6 +255,13 @@ export default function InventoryPriceEditMenu({
                     value={form.price_per_unit}
                     onChange={(v) =>
                       setForm((f) => ({ ...f, price_per_unit: v }))
+                    }
+                  />
+                  <Field
+                    label="Purchase Price"
+                    value={form.purchase_price}
+                    onChange={(v) =>
+                      setForm((f) => ({ ...f, purchase_price: v }))
                     }
                   />
                   <Field

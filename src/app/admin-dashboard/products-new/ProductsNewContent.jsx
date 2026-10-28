@@ -37,6 +37,7 @@ export default function ProductsNewContent() {
   const [combinedData, setCombinedData] = useState([]);
   const [selectedStock, setSelectedStock] = useState(null);
   const [purchasePricePerUnit, setPurchasePricePerUnit] = useState(0);
+  const [masterPurchasePrice, setMasterPurchasePrice] = useState(0);
   const [salePricePerUnit, setSalePricePerUnit] = useState(0);
   const [combinedSearch, setCombinedSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
@@ -89,6 +90,7 @@ export default function ProductsNewContent() {
       setCombinedData([]);
       setSelectedStock(null);
       setPurchasePricePerUnit(0);
+      setMasterPurchasePrice(0);
       setSalePricePerUnit(0);
       setDetailError("");
       return;
@@ -115,6 +117,9 @@ export default function ProductsNewContent() {
         setCombinedData(Array.isArray(data.combined) ? data.combined : []);
         setSelectedStock(data.stock || null);
         setPurchasePricePerUnit(Number(data.purchasePricePerUnit) || 0);
+        setMasterPurchasePrice(
+          Number(data.masterPurchasePrice ?? data.product?.purchase_price) || 0,
+        );
         setSalePricePerUnit(Number(data.salePricePerUnit) || 0);
       } catch (err) {
         if (!cancelled) {
@@ -149,6 +154,9 @@ export default function ProductsNewContent() {
     setSelectedProduct((prev) =>
       prev?.item_code === updated.item_code ? { ...prev, ...updated } : prev,
     );
+    if (Number(updated.purchase_price) > 0) {
+      setMasterPurchasePrice(Number(updated.purchase_price));
+    }
     const listPrice = Number(updated.price_per_unit);
     if (Number.isFinite(listPrice) && listPrice > 0) {
       setSalePricePerUnit(listPrice);
@@ -411,7 +419,20 @@ export default function ProductsNewContent() {
                 />
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
-                <PriceRow label="Purchase Price" value={purchasePricePerUnit} hint="latest purchase" />
+                <PriceRow
+                  label="Purchase Price"
+                  value={
+                    parseFloat(selectedProduct.purchase_price) ||
+                    masterPurchasePrice ||
+                    0
+                  }
+                  hint="product master (editable)"
+                />
+                <PriceRow
+                  label="Latest Purchase"
+                  value={purchasePricePerUnit}
+                  hint="from purchase records"
+                />
                 <PriceRow
                   label="Sales Price"
                   value={
@@ -509,7 +530,7 @@ export default function ProductsNewContent() {
                   </div>
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-gray-500 text-xs font-medium">Stock Value: <span className="text-lg font-bold text-gray-900">₹{(getAvailableQty(selectedProduct.item_code).total * purchasePricePerUnit).toLocaleString("en-IN", { maximumFractionDigits: 0 })}</span></p>
+                      <p className="text-gray-500 text-xs font-medium">Stock Value: <span className="text-lg font-bold text-gray-900">₹{(getAvailableQty(selectedProduct.item_code).total * (parseFloat(selectedProduct.purchase_price) || masterPurchasePrice || purchasePricePerUnit || 0)).toLocaleString("en-IN", { maximumFractionDigits: 0 })}</span></p>
                     </div>
                     <div className="p-2 bg-orange-100 rounded-lg">
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
