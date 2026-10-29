@@ -4,6 +4,7 @@ import { canViewAllOrders } from "@/lib/dataScope";
 import { isJwtAccountingRole, normalizeRoleKey } from "@/lib/roleKeyUtils";
 import { ensureOrderLinkedPaymentColumns } from "@/lib/ensureOrderLinkedPaymentColumns";
 import { attachActiveInvoiceFields } from "@/lib/activeInvoiceForOrder";
+import { attachStatementPaymentsToOrders } from "@/lib/statementPaymentByTransId";
 import {
   ORDER_LIST_DISPATCHED_STOCK_COUNT_SELECT,
   ORDER_LIST_PENDING_DISPATCH_UNITS_SELECT,
@@ -251,6 +252,7 @@ export async function fetchAccountsOrderListPage(
 
   let enrichedOrders = [...pageRows];
   enrichedOrders = await attachActiveInvoiceFields(conn, enrichedOrders);
+  enrichedOrders = await attachStatementPaymentsToOrders(conn, enrichedOrders);
   enrichedOrders = await attachBookingBatchesToOrders(conn, enrichedOrders);
   enrichedOrders = await attachBookingPendingToOrders(conn, enrichedOrders);
   if (!lightList) {

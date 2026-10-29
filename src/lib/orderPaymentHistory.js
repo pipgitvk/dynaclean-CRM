@@ -3,6 +3,8 @@ import {
   parseOrderLinkedPayments,
   sumStatementLinkedOrderPayments,
   getOrderPaymentsLinkedToInvoice,
+  orderHasInvoiceNumber,
+  parseInvoiceLinkedTransIds,
 } from "@/lib/orderLinkedPaymentsDisplay";
 
 /** Without invoice link, neworder.payment_amount counts only for orders before this date. */
@@ -64,6 +66,32 @@ function splitCsv(value) {
     .map((s) => s.trim());
 }
 
+function lookupStatementPaymentForTransId(order, transId) {
+  const map = order?.statement_payments_by_trans_id;
+  if (!map || typeof map !== "object" || !transId) return null;
+  const key = String(transId).trim();
+  if (map[key]) return map[key];
+  const lower = key.toLowerCase();
+  for (const [k, v] of Object.entries(map)) {
+    if (String(k).trim().toLowerCase() === lower) return v;
+  }
+  return null;
+}
+
+/** Amounts from `statements` table (attached on server as statement_payments_by_trans_id). */
+function applyStatementAmountsToPaymentRows(order, rows) {
+  if (!order?.statement_payments_by_trans_id) return rows;
+  return rows.map((row) => {
+    const stmt = lookupStatementPaymentForTransId(order, row.id);
+    if (!stmt || !(Number(stmt.amount) > 0)) return row;
+    return {
+      ...row,
+      amount: String(stmt.amount),
+      date: stmt.date || row.date,
+    };
+  });
+}
+
 export function buildOrderPaymentRows(order) {
   const amounts = splitCsv(order?.payment_amount).filter(Boolean);
   if (!amounts.length) return [];
@@ -84,10 +112,108 @@ export function buildOrderPaymentRows(order) {
   });
 
   rows = collapseDuplicateAdvanceEntry(rows);
+  rows = applyStatementAmountsToPaymentRows(order, rows);
   return rows.filter((r) => {
     const amt = Number(r.amount);
     return !Number.isNaN(amt) && amt !== 0;
   });
+}
+
+/** Payment history modal: rows with statement amounts when available. */
+export function buildOrderPaymentHistoryRows(order) {
+  const rows = buildOrderPaymentRows(order);
+  const map = order?.statement_payments_by_trans_id;
+  if (!map || typeof map !== "object") {
+    return rows;
+  }
+
+  const seen = new Set(
+    rows.map((r) => String(r.id || "").trim().toLowerCase()).filter(Boolean),
+  );
+  const merged = [...rows];
+
+  for (const stmt of Object.values(map)) {
+    const tid = String(stmt?.trans_id ?? "").trim();
+    const amt = Number(stmt?.amount);
+    if (!tid || !(amt > 0) || seen.has(tid.toLowerCase())) continue;
+    merged.push({
+      id: tid,
+      date: stmt.date || "",
+      amount: String(amt),
+    });
+    seen.add(tid.toLowerCase());
+  }
+
+  return merged.filter((r) => Number(r.amount) > 0);
+}
+
+export function sumOrderPaymentHistoryAmount(order) {
+  return buildOrderPaymentHistoryRows(order).reduce(
+    (sum, r) => sum + (Number(r.amount) || 0),
+    0,
+  );
+}
+
+/**
+ * Invoice / approval column hover: one row per trans_id, amount from `statements` when attached.
+ */
+export function getOrderPaymentHoverLines(order) {
+  const invoiceLinked =
+    orderHasInvoiceNumber(order) && orderInvoiceHasPaymentLink(order);
+  const linkedIds = invoiceLinked
+    ? parseInvoiceLinkedTransIds(order?.invoice_linked_trans_ids)
+    : [];
+  const linkedIdSet =
+    invoiceLinked && linkedIds.length
+      ? new Set(linkedIds.map((id) => id.toLowerCase()))
+      : null;
+
+  let lines = buildOrderPaymentHistoryRows(order)
+    .map((r) => ({
+      trans_id: String(r.id || "").trim(),
+      date: (r.date || "").trim() || null,
+      amount: Number(r.amount) || 0,
+    }))
+    .filter((l) => l.trans_id && l.amount > 0);
+
+  if (linkedIdSet?.size) {
+    lines = lines.filter((l) => linkedIdSet.has(l.trans_id.toLowerCase()));
+  }
+
+  if (!lines.length && invoiceLinked) {
+    lines = getOrderPaymentsLinkedToInvoice(order)
+      .map((p) => {
+        const tid = String(p.trans_id || "").trim();
+        const stmt = lookupStatementPaymentForTransId(order, tid);
+        const amount =
+          Number(stmt?.amount) > 0
+            ? Number(stmt.amount)
+            : Number(p.amount) || 0;
+        return {
+          trans_id: tid,
+          date: p.date || stmt?.date || null,
+          amount,
+        };
+      })
+      .filter((l) => l.trans_id && l.amount > 0);
+  }
+
+  const deduped = new Map();
+  for (const line of lines) {
+    const key = line.trans_id.toLowerCase();
+    if (!deduped.has(key)) {
+      deduped.set(key, line);
+    }
+  }
+
+  return [...deduped.values()];
+}
+
+export function sumOrderPaymentHoverLines(order) {
+  return getOrderPaymentHoverLines(order).reduce(
+    (s, p) => s + (Number(p.amount) || 0),
+    0,
+  );
 }
 
 /** Same advance recorded at booking and again via Edit Payment (amount CSV doubled). */
@@ -132,22 +258,52 @@ export function buildPaymentLinesForDisplay(order) {
 
   const linkedHasMeta = fromLinked.some((l) => l.date || l.ref);
   if (fromLinked.length === csvLines.length) {
-    return csvLines.map((line, i) => ({
-      amount: line.amount || fromLinked[i]?.amount || 0,
-      date: line.date || fromLinked[i]?.date || null,
-      ref: line.ref || fromLinked[i]?.ref || null,
-    }));
+    return csvLines.map((line, i) => {
+      const linkedLine =
+        fromLinked.find(
+          (l) =>
+            l.ref &&
+            line.ref &&
+            l.ref.toLowerCase() === line.ref.toLowerCase(),
+        ) ?? fromLinked[i];
+      const stmt = lookupStatementPaymentForTransId(order, line.ref);
+      const stmtAmt = Number(stmt?.amount);
+      const linkedAmt = Number(linkedLine?.amount);
+      const csvAmt = Number(line.amount);
+      let amount = csvAmt || 0;
+      if (Number.isFinite(linkedAmt) && linkedAmt > 0) amount = linkedAmt;
+      if (Number.isFinite(stmtAmt) && stmtAmt > 0) amount = stmtAmt;
+      return {
+        amount,
+        date: line.date || linkedLine?.date || stmt?.date || null,
+        ref: line.ref || linkedLine?.ref || null,
+      };
+    });
   }
 
   if (linkedHasMeta && fromLinked.length >= csvLines.length) {
     return fromLinked;
   }
 
-  return csvLines.map((line, i) => ({
-    ...line,
-    date: line.date || fromLinked[i]?.date || null,
-    ref: line.ref || fromLinked[i]?.ref || null,
-  }));
+  return csvLines.map((line, i) => {
+    const linkedLine =
+      fromLinked.find(
+        (l) =>
+          l.ref && line.ref && l.ref.toLowerCase() === line.ref.toLowerCase(),
+      ) ?? fromLinked[i];
+    const stmt = lookupStatementPaymentForTransId(order, line.ref);
+    const stmtAmt = Number(stmt?.amount);
+    const linkedAmt = Number(linkedLine?.amount);
+    const csvAmt = Number(line.amount);
+    let amount = csvAmt || 0;
+    if (Number.isFinite(linkedAmt) && linkedAmt > 0) amount = linkedAmt;
+    if (Number.isFinite(stmtAmt) && stmtAmt > 0) amount = stmtAmt;
+    return {
+      amount,
+      date: line.date || linkedLine?.date || stmt?.date || null,
+      ref: line.ref || linkedLine?.ref || null,
+    };
+  });
 }
 
 export function sumOrderPaymentAmounts(order) {

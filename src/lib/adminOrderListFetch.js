@@ -3,6 +3,7 @@ import { orderListApprovalWhereSql } from "@/lib/orderApprovalVisibility";
 import { orderListReportWhereSql } from "@/lib/orderReportVisibility";
 import { ensureOrderLinkedPaymentColumns } from "@/lib/ensureOrderLinkedPaymentColumns";
 import { attachActiveInvoiceFields } from "@/lib/activeInvoiceForOrder";
+import { attachStatementPaymentsToOrders } from "@/lib/statementPaymentByTransId";
 import {
   attachBookingBatchesToOrders,
   attachBookingPendingToOrders,
@@ -226,6 +227,7 @@ export async function fetchAdminOrderListPage(
   }));
 
   enrichedOrders = await attachActiveInvoiceFields(conn, enrichedOrders);
+  enrichedOrders = await attachStatementPaymentsToOrders(conn, enrichedOrders);
   enrichedOrders = await attachBookingBatchesToOrders(conn, enrichedOrders);
   enrichedOrders = await attachBookingPendingToOrders(conn, enrichedOrders);
   enrichedOrders = await attachDispatchPendingToOrders(conn, enrichedOrders, {

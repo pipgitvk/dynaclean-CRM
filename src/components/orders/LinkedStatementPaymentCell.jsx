@@ -2,13 +2,14 @@
 
 import dayjs from "dayjs";
 import {
-  getOrderPaymentsLinkedToInvoice,
   orderHasInvoiceNumber,
   orderInvoiceHasPaymentLink,
 } from "@/lib/orderLinkedPaymentsDisplay";
 import {
   allowNeworderPaymentAmountWithoutInvoiceLink,
+  getOrderPaymentHoverLines,
   sumAdvanceRequestedForDisplay,
+  sumOrderPaymentHoverLines,
 } from "@/lib/orderPaymentHistory";
 
 export default function LinkedStatementPaymentCell({ order }) {
@@ -16,15 +17,11 @@ export default function LinkedStatementPaymentCell({ order }) {
     order.invoice_number || order.active_invoice_number || "",
   ).trim();
 
-  const lines =
-    orderHasInvoiceNumber(order) && orderInvoiceHasPaymentLink(order)
-      ? getOrderPaymentsLinkedToInvoice(order)
-      : [];
+  const invoiceLinked =
+    orderHasInvoiceNumber(order) && orderInvoiceHasPaymentLink(order);
+  const lines = invoiceLinked ? getOrderPaymentHoverLines(order) : [];
 
-  const total = lines.reduce((s, p) => {
-    const n = Number(p.amount);
-    return s + (Number.isFinite(n) && n > 0 ? n : 0);
-  }, 0);
+  const total = sumOrderPaymentHoverLines(order);
 
   const formatAmt = (n) =>
     `₹${Number(n).toLocaleString("en-IN", {
@@ -119,7 +116,7 @@ export default function LinkedStatementPaymentCell({ order }) {
                   {formatAmt(bookingPaid)}
                 </div>
               )}
-              {lines.length > 1 && total > 0 ? (
+              {lines.length > 0 && total > 0 ? (
                 <div className="pt-1 border-t border-gray-200 font-semibold text-emerald-700">
                   Total: {formatAmt(total)}
                 </div>

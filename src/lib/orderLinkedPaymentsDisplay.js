@@ -70,7 +70,17 @@ export function getOrderPaymentsLinkedToInvoice(order) {
     return tid && idSet.has(tid.toLowerCase());
   });
 
-  if (fromOrder.length) return fromOrder;
+  if (fromOrder.length) {
+    const deduped = new Map();
+    for (const p of fromOrder) {
+      const tid = String(p.trans_id || "").trim();
+      if (!tid) continue;
+      const key = tid.toLowerCase();
+      if (deduped.has(key)) continue;
+      deduped.set(key, p);
+    }
+    return [...deduped.values()];
+  }
 
   // Invoice has linked trans_ids but order JSON missing rows — still show those IDs
   return linkedIds.map((trans_id) => ({
@@ -117,6 +127,32 @@ export function parseOrderLinkedPayments(order) {
         amount: received,
       },
     ];
+  }
+
+  const amountParts = String(order?.payment_amount ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (amountParts.length > 1) {
+    const ids = String(order?.payment_id ?? "")
+      .split(",")
+      .map((s) => s.trim());
+    const txn = bookingTransId(order);
+    const dates = String(order?.payment_date ?? "")
+      .split(",")
+      .map((s) => s.trim());
+    return amountParts
+      .map((part, i) => {
+        const amount = Number(part);
+        if (!Number.isFinite(amount) || amount <= 0) return null;
+        return {
+          trans_id: ids[i] || (i === 0 ? txn : "") || "",
+          date: dates[i] || dates[0] || null,
+          amount,
+          statement_id: null,
+        };
+      })
+      .filter(Boolean);
   }
 
   const bookingPaid = sumBookingPaymentCsv(order?.payment_amount);

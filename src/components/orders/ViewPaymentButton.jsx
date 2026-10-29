@@ -6,7 +6,9 @@ import { CreditCard } from "lucide-react";
 import {
   allowNeworderPaymentAmountWithoutInvoiceLink,
   buildOrderOnlyPaymentLinesForDisplay,
+  buildOrderPaymentHistoryRows,
   getOrderPaidAmountForDisplay,
+  sumOrderPaymentHistoryAmount,
 } from "@/lib/orderPaymentHistory";
 import {
   getOrderPaymentsLinkedToInvoice,
@@ -34,20 +36,30 @@ function formatInr(n) {
 export default function ViewPaymentButton({ order, className }) {
   const [open, setOpen] = useState(false);
   const total = getOrderTotalForPayment(order);
-  const totalPaid = getOrderPaidAmountForDisplay(order);
+  const historySum = sumOrderPaymentHistoryAmount(order);
+  const totalPaid =
+    historySum > 0 ? historySum : getOrderPaidAmountForDisplay(order);
   const balance = Math.max(0, total - totalPaid);
   const invoiceLinked = orderInvoiceHasPaymentLink(order);
   const csvLines = buildOrderOnlyPaymentLinesForDisplay(order);
   const linkedLines = invoiceLinked
     ? getOrderPaymentsLinkedToInvoice(order)
     : [];
-  const displayLines = invoiceLinked
-    ? linkedLines.map((p) => ({
-        ref: p.trans_id || "",
-        date: p.date,
-        amount: p.amount,
-      }))
-    : csvLines;
+  const historyRows = buildOrderPaymentHistoryRows(order);
+  const displayLines =
+    order?.statement_payments_by_trans_id && historyRows.length
+      ? historyRows.map((r) => ({
+          ref: r.id || "",
+          date: r.date,
+          amount: Number(r.amount) || 0,
+        }))
+      : invoiceLinked
+        ? linkedLines.map((p) => ({
+            ref: p.trans_id || "",
+            date: p.date,
+            amount: p.amount,
+          }))
+        : csvLines;
 
   const buttonClass =
     className ||
