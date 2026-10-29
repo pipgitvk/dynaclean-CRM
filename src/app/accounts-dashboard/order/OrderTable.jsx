@@ -28,7 +28,17 @@ import {
   deriveOrderListPaymentStatus,
   getOrderTotalForPayment,
 } from "@/lib/paymentOrderStatus";
-import { isBookingAllowedForOrder } from "@/lib/orderBookingEligibility";
+import {
+  canManageReturnBookingRole,
+  canManageAnyOrderDeliveryRole,
+  canViewOrderDeliveryDetailsRole,
+  isAccountantOnlyMenuRole,
+  isSuperAdminRole,
+} from "@/lib/roleKeyUtils";
+import {
+  blocksNewReturnInitiate,
+  isReturnInitiatedStatus,
+} from "@/lib/orderReturnStatus";
 import {
   canCreateAdditionalBooking,
   canOpenFirstDispatchForOrder,
@@ -37,6 +47,7 @@ import {
   canShowOrderDeliveryActions,
   orderHasDispatchedStock,
 } from "@/lib/orderDeliveryEligibility";
+import { isBookingAllowedForOrder } from "@/lib/orderBookingEligibility";
 import {
   isOrderFullyDelivered,
   isOrderPartialDelivery,
@@ -57,12 +68,6 @@ import {
   OrderListSearchApplyButton,
   OrderListSearchResetButton,
 } from "@/components/orders/OrderListSearchFilterControls";
-import {
-  canManageAnyOrderDeliveryRole,
-  canViewOrderDeliveryDetailsRole,
-  isAccountantOnlyMenuRole,
-  isSuperAdminRole,
-} from "@/lib/roleKeyUtils";
 
 import DeleteButton from "@/components/accounts/DeleteButton";
 import ReturnInitiateMenuItem from "@/components/orders/ReturnInitiateMenuItem";
@@ -390,6 +395,22 @@ export default function OrderTable({ userRole }) {
 
   const getStatusText = (order) => {
     // Check for return status first (highest priority)
+    if (Number(order.is_returned) === 4) {
+      if (Number(order.return_booking_done) === 1) {
+        return {
+          text: "Return Booking Done",
+          bg: "bg-indigo-100",
+          textCol: "text-indigo-800",
+          icon: <ArrowUp size={14} className="mr-1" />,
+        };
+      }
+      return {
+        text: "Partial Return Initiated",
+        bg: "bg-amber-100",
+        textCol: "text-amber-900",
+        icon: <ArrowUp size={14} className="mr-1" />,
+      };
+    }
     if (Number(order.is_returned) === 3) {
       if (Number(order.return_booking_done) === 1) {
         return {
@@ -685,6 +706,7 @@ export default function OrderTable({ userRole }) {
             <option value="installed">Installed</option>
             <option value="canceled">Canceled</option>
             <option value="returninitiated">Return Initiated</option>
+            <option value="partialreturninitiated">Partial Return Initiated</option>
             <option value="returnbookingdone">Return Booking Done</option>
             <option value="partiallyreturned">Partially Returned</option>
             <option value="fullyreturned">Fully Returned</option>
@@ -1045,6 +1067,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
   const canManageInvoiceDocs =
     isSuperAdmin || isAdmin || isAccountant || isTeamLeader;
   const canManageReturns = isSuperAdmin || isTeamLeader;
+  const canReturnBooking = canManageReturnBookingRole(userRole);
   const accountantOnlyMenu = isAccountantOnlyMenuRole(userRole);
   const canEditBooking = isSuperAdmin || isAdmin;
   const reportUploaded = isBookingAllowedForOrder(r);
@@ -1162,7 +1185,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                   DeliveryMenuItem={UpdateDeliveryMenuItem}
                 />
                 {dispatchStatus === 1 &&
-                  ![1, 2, 3].includes(Number(r.is_returned || 0)) && (
+                  !blocksNewReturnInitiate(r.is_returned) && (
                     <div
                       className="border-t border-gray-100 mt-1 pt-1"
                       onClick={(e) => e.stopPropagation()}
@@ -1333,7 +1356,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
             />
             {canManageReturns &&
               dispatchStatus === 1 &&
-              ![1, 2, 3].includes(Number(r.is_returned || 0)) && (
+              !blocksNewReturnInitiate(r.is_returned) && (
               <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>
                 <ReturnInitiateMenuItem
                   order={r}
@@ -1341,7 +1364,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                 />
               </div>
             )}
-            {(canManageReturns || isAdmin) && Number(r.is_returned) === 3 && (
+            {canReturnBooking && isReturnInitiatedStatus(r.is_returned) && (
               <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>
                 <ReturnBookingMenuItem order={r} />
               </div>
@@ -1365,7 +1388,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
               </div>
             )}
             {(isWarehouse || isAdmin) &&
-              Number(r.is_returned) === 3 &&
+              isReturnInitiatedStatus(r.is_returned) &&
               Number(r.return_booking_done) === 1 &&
               Number(r.warehouse_in_done) !== 1 && (
               <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>

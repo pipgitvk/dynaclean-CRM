@@ -1,6 +1,40 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
+import {
+  initiatedStatusForReturnType,
+  IS_RETURNED,
+} from "@/lib/orderReturnStatus";
+
+async function applyReturnInitiatedOrderStatus(conn, order_id, return_type) {
+  const orderIdKey = String(order_id ?? "").trim();
+  if (!orderIdKey) return;
+  const [checkOrder] = await conn.execute(
+    "SELECT is_returned FROM neworder WHERE order_id = ?",
+    [orderIdKey],
+  );
+  if (!checkOrder.length) {
+    console.warn(
+      `[credit-notes] order not found for is_returned update: ${orderIdKey}`,
+    );
+    return;
+  }
+  const currentReturnStatus = Number(checkOrder[0].is_returned || 0);
+  if (
+    currentReturnStatus === IS_RETURNED.FULLY_RETURNED ||
+    currentReturnStatus === IS_RETURNED.PARTIALLY_RETURNED
+  ) {
+    return;
+  }
+  const nextStatus = initiatedStatusForReturnType(return_type || "partial");
+  const [updateResult] = await conn.execute(
+    "UPDATE neworder SET is_returned = ? WHERE order_id = ?",
+    [nextStatus, orderIdKey],
+  );
+  console.log(
+    `[credit-notes] is_returned=${nextStatus} for order_id=${orderIdKey}, affectedRows=${updateResult.affectedRows}`,
+  );
+}
 
 export async function POST(request) {
   try {
@@ -75,6 +109,7 @@ export async function POST(request) {
         [return_id]
       );
       if (existing.length > 0) {
+        await applyReturnInitiatedOrderStatus(conn, order_id, return_type);
         return NextResponse.json({
           success: true,
           credit_note_id: existing[0].id,
@@ -125,30 +160,7 @@ export async function POST(request) {
       ]
     );
 
-    // ── Set order status to "Return Initiated" (is_returned = 3) ────────────
-    // Only set if not already in a return state (1, 2, or 3)
-    try {
-      const [checkOrder] = await conn.execute(
-        "SELECT is_returned FROM neworder WHERE order_id = ?",
-        [Number(order_id)]
-      );
-      
-      if (checkOrder.length > 0) {
-        const currentReturnStatus = Number(checkOrder[0].is_returned || 0);
-        // Only update if not already marked as returned (1, 2) or return initiated (3)
-        if (currentReturnStatus !== 1 && currentReturnStatus !== 2 && currentReturnStatus !== 3) {
-          const [updateResult] = await conn.execute(
-            "UPDATE neworder SET is_returned = 3 WHERE order_id = ?",
-            [Number(order_id)]
-          );
-          console.log(`[credit-notes] is_returned=3 updated for order_id=${order_id}, affectedRows=${updateResult.affectedRows}`);
-        } else {
-          console.log(`[credit-notes] order_id=${order_id} already has is_returned=${currentReturnStatus}, skipping update`);
-        }
-      }
-    } catch (updateErr) {
-      console.error("[credit-notes] Failed to update is_returned:", updateErr);
-    }
+    await applyReturnInitiatedOrderStatus(conn, order_id, return_type);
 
     return NextResponse.json({
       success: true,

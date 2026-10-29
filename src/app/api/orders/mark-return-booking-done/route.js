@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
+import { isReturnInitiatedStatus } from "@/lib/orderReturnStatus";
 
 export async function POST(request) {
   try {
@@ -35,10 +36,10 @@ export async function POST(request) {
     const order = orderRows[0];
 
     // Check if is_returned is 3 (Return Initiated)
-    if (Number(order.is_returned) !== 3) {
+    if (!isReturnInitiatedStatus(order.is_returned)) {
       return NextResponse.json(
         { error: "Return must be initiated before marking as done" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 

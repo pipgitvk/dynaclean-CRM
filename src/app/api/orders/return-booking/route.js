@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
+import { isReturnInitiatedStatus } from "@/lib/orderReturnStatus";
 
 export async function POST(request) {
   try {
@@ -63,10 +64,14 @@ export async function POST(request) {
 
     const order = orderRows[0];
 
-    if (Number(order.is_returned) !== 3) {
+    if (!isReturnInitiatedStatus(order.is_returned)) {
       return NextResponse.json(
-        { success: false, error: "Return booking can only be created for orders with 'Return Initiated' status" },
-        { status: 400 }
+        {
+          success: false,
+          error:
+            "Return booking can only be created for orders with Return Initiated or Partial Return Initiated status",
+        },
+        { status: 400 },
       );
     }
 

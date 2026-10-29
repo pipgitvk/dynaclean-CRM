@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
+import {
+  classifyReturnType,
+  IS_RETURNED,
+} from "@/lib/orderReturnStatus";
 
 export async function POST(request) {
   try {
@@ -44,7 +48,12 @@ export async function POST(request) {
     // If order is already marked as returned (1), partially returned (2), or 
     // return initiated (3), don't allow another return initiation
     const currentReturnStatus = Number(order.is_returned || 0);
-    if (currentReturnStatus === 1 || currentReturnStatus === 2 || currentReturnStatus === 3) {
+    if (
+      currentReturnStatus === IS_RETURNED.FULLY_RETURNED ||
+      currentReturnStatus === IS_RETURNED.PARTIALLY_RETURNED ||
+      currentReturnStatus === IS_RETURNED.RETURN_INITIATED ||
+      currentReturnStatus === IS_RETURNED.PARTIAL_RETURN_INITIATED
+    ) {
       return NextResponse.json(
         { success: false, error: `Return already initiated or completed for this order (status: ${currentReturnStatus})` },
         { status: 400 }
@@ -78,47 +87,62 @@ export async function POST(request) {
       fullItems = itemRows;
     }
 
-    // Fetch all items to determine full vs partial
-    const [allItems] = await conn.execute(
-      "SELECT id FROM quotation_items WHERE quote_number = ?",
-      [quote_number]
+    const qtyById = new Map(
+      items.map((i) => [i.id, Math.max(1, Math.floor(Number(i.qty) || 1))]),
     );
 
-    const allItemIds = new Set(allItems.map((i) => i.id));
-    const returnItemIds = new Set(items.map((i) => i.id));
-    const isFullReturn =
-      allItemIds.size > 0 && [...allItemIds].every((id) => returnItemIds.has(id));
-    const returnType = isFullReturn ? "full" : "partial";
+    // Fetch all items to determine full vs partial
+    const [allItems] = await conn.execute(
+      "SELECT id, quantity FROM quotation_items WHERE quote_number = ?",
+      [quote_number],
+    );
 
-    // Calculate totals
+    const returnType = classifyReturnType(allItems, items);
+
+    // Calculate totals (pro‑rated by return qty)
     let taxableAmount = 0;
     let cgstAmount = 0;
     let sgstAmount = 0;
     let igstAmount = 0;
 
     const enrichedItems = fullItems.map((fi) => {
-      taxableAmount += Number(fi.total_taxable_amt || fi.taxable_price || 0);
-      cgstAmount += Number(fi.cgsttxamt || 0);
-      sgstAmount += Number(fi.sgstxamt || 0);
-      igstAmount += Number(fi.igsttamt || 0);
+      const orderQty = Math.max(1, Math.floor(Number(fi.quantity) || 1));
+      const returnQty = Math.min(
+        orderQty,
+        qtyById.get(fi.id) ?? orderQty,
+      );
+      const ratio = returnQty / orderQty;
+
+      const lineTaxable = Number(fi.total_taxable_amt || fi.taxable_price || 0) * ratio;
+      const lineCgst = Number(fi.cgsttxamt || 0) * ratio;
+      const lineSgst = Number(fi.sgstxamt || 0) * ratio;
+      const lineIgst = Number(fi.igsttamt || 0) * ratio;
+      const lineTotal = Number(fi.total_price || 0) * ratio;
+
+      taxableAmount += lineTaxable;
+      cgstAmount += lineCgst;
+      sgstAmount += lineSgst;
+      igstAmount += lineIgst;
+
       return {
         id: fi.id,
         item_name: fi.item_name,
         item_code: fi.item_code,
         hsn_sac: fi.hsn_sac,
         specification: fi.specification,
-        quantity: fi.quantity,
+        quantity: returnQty,
+        order_quantity: orderQty,
         unit: fi.unit,
         price_per_unit: Number(fi.price_per_unit || 0),
-        taxable_price: Number(fi.total_taxable_amt || fi.taxable_price || 0),
+        taxable_price: lineTaxable,
         gst_rate: Number(fi.gst || 0),
         cgst_rate: Number(fi.cgsttax || 0),
-        cgst_amount: Number(fi.cgsttxamt || 0),
+        cgst_amount: lineCgst,
         sgst_rate: Number(fi.sgsttax || 0),
-        sgst_amount: Number(fi.sgstxamt || 0),
+        sgst_amount: lineSgst,
         igst_rate: Number(fi.igsttax || 0),
-        igst_amount: Number(fi.igsttamt || 0),
-        total_price: Number(fi.total_price || 0),
+        igst_amount: lineIgst,
+        total_price: lineTotal,
       };
     });
 
@@ -159,7 +183,7 @@ export async function POST(request) {
           it.item_code || "",
           it.item_name || "",
           it.quantity || 1,
-          it.price_per_unit || 0,
+          it.quantity > 0 ? Number(it.total_price || 0) / it.quantity : 0,
           it.total_price || 0,
         ]
       );

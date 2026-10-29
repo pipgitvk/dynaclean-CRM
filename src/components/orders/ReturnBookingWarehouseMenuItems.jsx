@@ -4,6 +4,7 @@ import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { FileCheck, UploadCloud, CheckCircle } from "lucide-react";
+import { isReturnInitiatedStatus } from "@/lib/orderReturnStatus";
 
 export function ViewReturnBookingMenuItem({ order }) {
   const [open, setOpen] = useState(false);
@@ -117,6 +118,7 @@ export function ReturnBookingMenuItem({ order }) {
   const [success, setSuccess] = useState("");
 
   const hasReturnBooking = Number(order.return_booking_done) === 1;
+  if (!isReturnInitiatedStatus(order.is_returned)) return null;
   if (hasReturnBooking) return null;
 
   const handleChange = (e) => {

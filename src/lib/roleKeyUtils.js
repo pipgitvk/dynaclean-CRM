@@ -62,6 +62,15 @@ export function canMutateDispatchRole(role) {
   );
 }
 
+/** Return booking on order list — admin, superadmin, team leader. */
+export function canManageReturnBookingRole(role) {
+  const k = normalizeRoleKey(role || "");
+  if (isSuperAdminRoleKey(k)) return true;
+  if (k === "ADMIN") return true;
+  if (k === "TEAM LEADER") return true;
+  return false;
+}
+
 /** View Credit Note on order list — superadmin, admin, and accountant roles. */
 export function canViewOrderCreditNoteRole(role) {
   const k = normalizeRoleKey(role || "");

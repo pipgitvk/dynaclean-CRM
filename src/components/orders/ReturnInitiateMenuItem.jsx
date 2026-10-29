@@ -15,16 +15,43 @@ export default function ReturnInitiateMenuItem({
   const [items, setItems] = useState([]);
   const [loadingItems, setLoadingItems] = useState(false);
   const [selectedItems, setSelectedItems] = useState({});
+  const [returnQtyById, setReturnQtyById] = useState({});
   const [submitting, setSubmitting] = useState(false);
 
   const dispatchDone = Number(order.dispatch_status) === 1;
   if (!dispatchDone) return null;
 
+  const lineMaxQty = (item) =>
+    Math.max(1, Math.floor(Number(item.quantity) || 1));
+
+  const lineOrderAmount = (item) =>
+    Number(
+      item.total_taxable_amt || item.taxable_price || item.total_price || 0,
+    );
+
+  /** Credit-note line total (incl. tax when total_price present). */
+  const lineReturnAmount = (item, returnQty) => {
+    const max = lineMaxQty(item);
+    const rq = Math.min(max, Math.max(1, Math.floor(Number(returnQty) || max)));
+    const ratio = rq / max;
+    const lineTotal = Number(item.total_price || 0);
+    if (lineTotal > 0) return lineTotal * ratio;
+    return lineOrderAmount(item) * ratio;
+  };
+
+  const selectedReturnTotal = items
+    .filter((it) => selectedItems[it.id])
+    .reduce((sum, it) => {
+      const max = lineMaxQty(it);
+      const rq = returnQtyById[it.id] ?? max;
+      return sum + lineReturnAmount(it, rq);
+    }, 0);
+
   const fetchItems = async () => {
     setLoadingItems(true);
     try {
       const res = await fetch(
-        `/api/orders/items?quote_number=${encodeURIComponent(order.quote_number)}`
+        `/api/orders/items?quote_number=${encodeURIComponent(order.quote_number)}`,
       );
       const json = await res.json();
       if (json.success) {
@@ -44,19 +71,36 @@ export default function ReturnInitiateMenuItem({
     e.stopPropagation();
     setOpen(true);
     setSelectedItems({});
+    setReturnQtyById({});
     fetchItems();
   };
 
-  const toggleItem = (itemId) => {
+  const toggleItem = (item) => {
+    const id = item.id;
+    const max = lineMaxQty(item);
     setSelectedItems((prev) => {
+      const isOn = !!prev[id];
       const next = { ...prev };
-      if (next[itemId]) {
-        delete next[itemId];
+      if (isOn) {
+        delete next[id];
+        setReturnQtyById((q) => {
+          const nq = { ...q };
+          delete nq[id];
+          return nq;
+        });
       } else {
-        next[itemId] = true;
+        next[id] = true;
+        setReturnQtyById((q) => ({ ...q, [id]: max }));
       }
       return next;
     });
+  };
+
+  const setReturnQty = (itemId, raw, maxQty) => {
+    let n = Math.floor(Number(raw));
+    if (!Number.isFinite(n) || n < 1) n = 1;
+    if (n > maxQty) n = maxQty;
+    setReturnQtyById((prev) => ({ ...prev, [itemId]: n }));
   };
 
   const selectedCount = Object.keys(selectedItems).length;
@@ -66,7 +110,21 @@ export default function ReturnInitiateMenuItem({
       toast.error("Please select at least one product to return");
       return;
     }
-    const returnItems = items.filter((it) => selectedItems[it.id]);
+    const returnItems = items
+      .filter((it) => selectedItems[it.id])
+      .map((it) => {
+        const max = lineMaxQty(it);
+        const qty = Math.min(max, returnQtyById[it.id] ?? max);
+        return { it, qty, max };
+      });
+
+    for (const { it, qty, max } of returnItems) {
+      if (qty < 1 || qty > max) {
+        toast.error(`Invalid return quantity for ${it.item_name || it.item_code}`);
+        return;
+      }
+    }
+
     setSubmitting(true);
     try {
       const res = await fetch("/api/orders/return-initiate", {
@@ -75,11 +133,11 @@ export default function ReturnInitiateMenuItem({
         body: JSON.stringify({
           order_id: order.order_id,
           quote_number: order.quote_number,
-          items: returnItems.map((it) => ({
+          items: returnItems.map(({ it, qty }) => ({
             id: it.id,
             item_name: it.item_name,
             item_code: it.item_code,
-            qty: it.quantity || 1,
+            qty,
             price: it.total_taxable_amt || it.taxable_price || it.total_price || 0,
           })),
         }),
@@ -119,7 +177,7 @@ export default function ReturnInitiateMenuItem({
           onClick={(e) => e.target === e.currentTarget && setOpen(false)}
         >
           <div
-            className="bg-white rounded-xl shadow-xl p-6 w-full max-w-lg mx-4"
+            className="bg-white rounded-xl shadow-xl p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-4">
@@ -147,8 +205,9 @@ export default function ReturnInitiateMenuItem({
             </div>
 
             <p className="text-sm text-gray-600 mb-4">
-              Select the products to include in the return. A credit note will be
-              created for the selected items.
+              Select products and return quantity. Partial quantity or partial
+              lines will set status to{" "}
+              <span className="font-medium">Partial Return Initiated</span>.
             </p>
 
             <div className="border border-gray-200 rounded-lg overflow-hidden mb-5">
@@ -172,7 +231,10 @@ export default function ReturnInitiateMenuItem({
                         Code
                       </th>
                       <th className="px-3 py-2 text-right font-medium text-gray-600">
-                        Qty
+                        Order Qty
+                      </th>
+                      <th className="px-3 py-2 text-right font-medium text-gray-600">
+                        Return Qty
                       </th>
                       <th className="px-3 py-2 text-right font-medium text-gray-600">
                         Amount
@@ -180,55 +242,93 @@ export default function ReturnInitiateMenuItem({
                     </tr>
                   </thead>
                   <tbody>
-                    {items.map((item) => (
-                      <tr
-                        key={item.id}
-                        onClick={() => toggleItem(item.id)}
-                        className={`border-t border-gray-100 cursor-pointer transition-colors ${
-                          selectedItems[item.id]
-                            ? "bg-orange-50"
-                            : "hover:bg-gray-50"
-                        }`}
-                      >
-                        <td className="px-3 py-2 text-center">
-                          <input
-                            type="checkbox"
-                            checked={!!selectedItems[item.id]}
-                            onChange={() => toggleItem(item.id)}
+                    {items.map((item) => {
+                      const max = lineMaxQty(item);
+                      const selected = !!selectedItems[item.id];
+                      const returnQty = selected
+                        ? (returnQtyById[item.id] ?? max)
+                        : max;
+                      const displayAmount = selected
+                        ? lineReturnAmount(item, returnQty)
+                        : lineReturnAmount(item, max);
+                      return (
+                        <tr
+                          key={item.id}
+                          onClick={() => toggleItem(item)}
+                          className={`border-t border-gray-100 cursor-pointer transition-colors ${
+                            selected ? "bg-orange-50" : "hover:bg-gray-50"
+                          }`}
+                        >
+                          <td className="px-3 py-2 text-center">
+                            <input
+                              type="checkbox"
+                              checked={selected}
+                              onChange={() => toggleItem(item)}
+                              onClick={(e) => e.stopPropagation()}
+                              className="w-4 h-4 accent-orange-500 cursor-pointer"
+                            />
+                          </td>
+                          <td className="px-3 py-2 font-medium text-gray-800">
+                            {item.item_name || "-"}
+                          </td>
+                          <td className="px-3 py-2 text-gray-500 font-mono text-xs">
+                            {item.item_code || "-"}
+                          </td>
+                          <td className="px-3 py-2 text-right text-gray-700">
+                            {max}
+                          </td>
+                          <td
+                            className="px-3 py-2 text-right"
                             onClick={(e) => e.stopPropagation()}
-                            className="w-4 h-4 accent-orange-500 cursor-pointer"
-                          />
-                        </td>
-                        <td className="px-3 py-2 font-medium text-gray-800">
-                          {item.item_name || "-"}
-                        </td>
-                        <td className="px-3 py-2 text-gray-500 font-mono text-xs">
-                          {item.item_code || "-"}
-                        </td>
-                        <td className="px-3 py-2 text-right text-gray-700">
-                          {item.quantity || 1}
-                        </td>
-                        <td className="px-3 py-2 text-right text-gray-700">
-                          ₹
-                          {Number(
-                            item.total_taxable_amt ||
-                              item.taxable_price ||
-                              item.total_price ||
-                              0
-                          ).toLocaleString("en-IN")}
-                        </td>
-                      </tr>
-                    ))}
+                          >
+                            {selected ? (
+                              <input
+                                type="number"
+                                min={1}
+                                max={max}
+                                value={returnQtyById[item.id] ?? max}
+                                onChange={(e) =>
+                                  setReturnQty(item.id, e.target.value, max)
+                                }
+                                className="w-16 rounded border border-gray-300 px-2 py-1 text-right text-sm"
+                              />
+                            ) : (
+                              <span className="text-gray-400">—</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2 text-right text-gray-700">
+                            ₹
+                            {Math.round(displayAmount).toLocaleString("en-IN")}
+                            {selected && returnQty < max ? (
+                              <span className="block text-[10px] text-gray-500 font-normal">
+                                of ₹
+                                {Math.round(lineReturnAmount(item, max)).toLocaleString(
+                                  "en-IN",
+                                )}
+                              </span>
+                            ) : null}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               )}
             </div>
 
             {selectedCount > 0 && (
-              <p className="text-sm text-orange-700 font-medium mb-4">
-                {selectedCount} product{selectedCount > 1 ? "s" : ""} selected for
-                return
-              </p>
+              <div className="text-sm text-orange-700 font-medium mb-4 space-y-1">
+                <p>
+                  {selectedCount} product{selectedCount > 1 ? "s" : ""} selected
+                  for return
+                </p>
+                <p>
+                  Return amount (est.):{" "}
+                  <span className="font-semibold">
+                    ₹{Math.round(selectedReturnTotal).toLocaleString("en-IN")}
+                  </span>
+                </p>
+              </div>
             )}
 
             <div className="flex justify-end gap-3">

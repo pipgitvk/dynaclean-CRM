@@ -34,7 +34,18 @@ import {
 import DeleteButton from "@/components/accounts/DeleteButton";
 import toast from "react-hot-toast";
 import ReturnInitiateMenuItem from "@/components/orders/ReturnInitiateMenuItem";
-import { isSalesRole } from "@/lib/isSalesRole";
+import {
+  blocksNewReturnInitiate,
+  isReturnInitiatedStatus,
+} from "@/lib/orderReturnStatus";
+import {
+  canManageReturnBookingRole,
+  canManageAnyOrderDeliveryRole,
+  canViewOrderDeliveryDetailsRole,
+  isAccountantOnlyMenuRole,
+  isSuperAdminRole,
+} from "@/lib/roleKeyUtils";
+import { isPostAccountPipelineRole } from "@/lib/orderReportVisibility";
 import { isBookingAllowedForOrder } from "@/lib/orderBookingEligibility";
 import {
   canCreateAdditionalBooking,
@@ -59,13 +70,7 @@ import DispatchProductSelectModal from "@/components/orders/DispatchProductSelec
 import OrderBookingViewMenuLinks from "@/components/orders/OrderBookingViewMenuLinks";
 import OrderDeliveryMenuLinks from "@/components/orders/OrderDeliveryMenuLinks";
 import AccountantReportActionLinks from "@/components/orders/AccountantReportActionLinks";
-import {
-  canManageAnyOrderDeliveryRole,
-  canViewOrderDeliveryDetailsRole,
-  isAccountantOnlyMenuRole,
-  isSuperAdminRole,
-} from "@/lib/roleKeyUtils";
-import { isPostAccountPipelineRole } from "@/lib/orderReportVisibility";
+import { isSalesRole } from "@/lib/isSalesRole";
 import ViewCreditNoteMenuLink from "@/components/orders/ViewCreditNoteMenuLink";
 import AccountantReturnViewMenuItems from "@/components/orders/AccountantReturnViewMenuItems";
 
@@ -181,6 +186,22 @@ export default function OrderTable({ orders, userRole }) {
         bg: "bg-orange-100",
         textCol: "text-orange-800",
         icon: <XCircle size={14} className="mr-1" />,
+      };
+    }
+    if (Number(order.is_returned) === 4) {
+      if (Number(order.return_booking_done) === 1) {
+        return {
+          text: "Return Booking Done",
+          bg: "bg-indigo-100",
+          textCol: "text-indigo-800",
+          icon: <ArrowUp size={14} className="mr-1" />,
+        };
+      }
+      return {
+        text: "Partial Return Initiated",
+        bg: "bg-amber-100",
+        textCol: "text-amber-900",
+        icon: <ArrowUp size={14} className="mr-1" />,
       };
     }
     if (Number(order.is_returned) === 3) {
@@ -429,6 +450,7 @@ export default function OrderTable({ orders, userRole }) {
             <option value="installed">Installed</option>
             <option value="canceled">Canceled</option>
             <option value="returninitiated">Return Initiated</option>
+            <option value="partialreturninitiated">Partial Return Initiated</option>
             <option value="returnbookingdone">Return Booking Done</option>
             <option value="partiallyreturned">Partially Returned</option>
             <option value="fullyreturned">Fully Returned</option>
@@ -807,6 +829,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
   const canManageInvoiceDocs =
     isSuperAdmin || isAdmin || isAccountant || isTeamLeader;
   const canManageReturns = isSuperAdmin || isTeamLeader;
+  const canReturnBooking = canManageReturnBookingRole(userRole);
   const accountantOnlyMenu = isAccountantOnlyMenuRole(userRole);
   const canEditBooking = isSuperAdmin || isAdmin;
   const reportUploaded = isBookingAllowedForOrder(r);
@@ -926,7 +949,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                   DeliveryMenuItem={UpdateDeliveryMenuItem}
                 />
                 {dispatchStatus === 1 &&
-                  ![1, 2, 3].includes(Number(r.is_returned || 0)) && (
+                  !blocksNewReturnInitiate(r.is_returned) && (
                     <div
                       className="border-t border-gray-100 mt-1 pt-1"
                       onClick={(e) => e.stopPropagation()}
@@ -1120,7 +1143,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                 />
                 {canManageReturns &&
                   dispatchStatus === 1 &&
-                  ![1, 2, 3].includes(Number(r.is_returned || 0)) && (
+                  !blocksNewReturnInitiate(r.is_returned) && (
                   <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>
                     <ReturnInitiateMenuItem
                       order={r}
@@ -1128,13 +1151,13 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                     />
                   </div>
                 )}
-                {(canManageReturns || isAdmin) && Number(r.is_returned) === 3 && (
+                {canReturnBooking && isReturnInitiatedStatus(r.is_returned) && (
                   <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>
                     <ReturnBookingMenuItem order={r} />
                   </div>
                 )}
                 {(isWarehouse || isSuperAdmin) &&
-                  Number(r.is_returned) === 3 &&
+                  isReturnInitiatedStatus(r.is_returned) &&
                   Number(r.return_booking_done) !== 1 && (
                   <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>
                     <MarkReturnBookingDoneMenuItem order={r} />
@@ -1154,7 +1177,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                   onClick={(e) => e.stopPropagation()}
                 />
                 {(isWarehouse || isAdmin || isSuperAdmin) &&
-                  Number(r.is_returned) === 3 &&
+                  isReturnInitiatedStatus(r.is_returned) &&
                   Number(r.return_booking_done) === 1 &&
                   Number(r.warehouse_in_done) !== 1 && (
                   <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>
@@ -1793,7 +1816,7 @@ function MarkReturnBookingDoneMenuItem({ order }) {
 
   // Show only if status is "Return Initiated" and not already marked as done
   const shouldShow = () => {
-    if (Number(order.is_returned) !== 3) return false;
+    if (!isReturnInitiatedStatus(order.is_returned)) return false;
     if (Number(order.return_booking_done) === 1) return false;
     return true;
   };
