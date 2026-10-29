@@ -9,6 +9,7 @@ import {
   ensureBatch1SnapshotBeforeFollowUp,
   persistOrderBookingBatch,
 } from "@/lib/orderBookingBatches";
+import { persistOrderTrackingFromBooking } from "@/lib/orderTrackingIdPersist";
 
 export async function POST(req) {
   try {
@@ -157,7 +158,7 @@ export async function POST(req) {
       ]
     );
 
-    await persistOrderBookingBatch(
+    const batchSequenceNo = await persistOrderBookingBatch(
       conn,
       orderId,
       order.quote_number,
@@ -171,6 +172,12 @@ export async function POST(req) {
       },
       { isFollowUp: followUpBooking },
     );
+
+    await persistOrderTrackingFromBooking(conn, orderId, {
+      bookingId: booking_id,
+      bookingUrl: booking_url,
+      batchSequenceNo,
+    });
 
     // ✅ Step 3: Send email with custom template (not from database)
     try {

@@ -49,14 +49,16 @@ export async function fetchDelhiveryLrForOrder(
       [id],
     );
     const row = rows?.[0];
-    if (row?.lr_number && /^\d+$/.test(String(row.lr_number).trim())) {
-      return String(row.lr_number).trim();
-    }
+    const fromLr = String(row?.lr_number ?? "").trim();
+    if (fromLr) return fromLr;
     const fromRowUrl = parseDelhiveryLrFromUrl(row?.booking_url);
     if (fromRowUrl) return fromRowUrl;
   } catch {
     /* table may be missing in some envs */
   }
+
+  const fromOrderBooking = String(order?.booking_id ?? "").trim();
+  if (fromOrderBooking) return fromOrderBooking;
 
   for (const url of collectBookingUrls(order, bookingBatches)) {
     const lr = parseDelhiveryLrFromUrl(url);
