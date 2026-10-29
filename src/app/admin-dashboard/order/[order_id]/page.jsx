@@ -8,6 +8,7 @@ import { ensureOrderShipmentTrackingColumns } from "@/lib/ensureOrderShipmentTra
 import { fetchBookingBatchesForOrder } from "@/lib/orderBookingBatches";
 import { collectOrderShipmentTracks } from "@/lib/orderShipmentTracking";
 import { attachActiveInvoiceFieldsToOrder } from "@/lib/activeInvoiceForOrder";
+import { fetchDelhiveryLrForOrder } from "@/lib/resolveOrderDelhiveryLr";
 
 export const dynamic = "force-dynamic";
 
@@ -52,6 +53,12 @@ async function fetchOrderData(orderId) {
 
   const bookingBatches = await fetchBookingBatchesForOrder(conn, orderId);
   const shipmentTracks = collectOrderShipmentTracks(orderDetails, bookingBatches);
+  const delhiveryLr = await fetchDelhiveryLrForOrder(
+    conn,
+    orderDetails.order_id ?? orderId,
+    orderDetails,
+    bookingBatches,
+  );
 
   return {
     orderDetails,
@@ -59,6 +66,7 @@ async function fetchOrderData(orderId) {
     statuses,
     gstin,
     shipmentTracks,
+    delhiveryLr,
   };
 }
 
@@ -79,7 +87,7 @@ export default async function Page({ params }) {
     userRole = roleRows[0]?.userRole || "";
   }
 
-  const { orderDetails, items, statuses, gstin, shipmentTracks } =
+  const { orderDetails, items, statuses, gstin, shipmentTracks, delhiveryLr } =
     await fetchOrderData(orderId);
 
   if (
@@ -94,20 +102,22 @@ export default async function Page({ params }) {
   }
 
   return (
-    <div className="container mx-auto px-4 py-6">
-      <h1 className="text-2xl font-bold mb-4">View Order by Quotation</h1>
-      <div className="mb-4 space-y-2">
-        <div>
-          <span className="font-medium">Client Delivery Date: </span>
-          <span>
+    <div className="w-full max-w-none overflow-x-hidden px-1 py-4 sm:px-2 lg:px-4 lg:py-6">
+      <h1 className="mb-3 text-xl font-bold sm:mb-4 sm:text-2xl">
+        View Order by Quotation
+      </h1>
+      <div className="mb-4 space-y-2 text-sm sm:text-base">
+        <div className="flex flex-col gap-0.5 sm:flex-row sm:flex-wrap sm:gap-x-1">
+          <span className="font-medium shrink-0">Client Delivery Date:</span>
+          <span className="text-gray-800">
             {orderDetails.client_delivery_date
               ? dayjs(orderDetails.client_delivery_date).format("DD-MM-YYYY")
               : "NA"}
           </span>
         </div>
-        <div>
-          <span className="font-medium">Expected Delivery Date: </span>
-          <span>
+        <div className="flex flex-col gap-0.5 sm:flex-row sm:flex-wrap sm:gap-x-1">
+          <span className="font-medium shrink-0">Expected Delivery Date:</span>
+          <span className="text-gray-800">
             {orderDetails.delivery_date
               ? dayjs(orderDetails.delivery_date).format("DD-MM-YYYY")
               : "NA"}
@@ -122,6 +132,7 @@ export default async function Page({ params }) {
         gstin={gstin}
         userRole={userRole}
         shipmentTracks={shipmentTracks}
+        delhiveryLr={delhiveryLr}
       />
     </div>
   );

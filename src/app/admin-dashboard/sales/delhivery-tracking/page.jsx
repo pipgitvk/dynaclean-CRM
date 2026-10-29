@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   PackageSearch,
   Search,
@@ -40,6 +41,7 @@ function CopyLine({ label, value }) {
 }
 
 export default function DelhiveryTrackingPage() {
+  const searchParams = useSearchParams();
   const [trackingInput, setTrackingInput] = useState("");
   const [activeId, setActiveId] = useState("");
   const [result, setResult] = useState(null);
@@ -50,6 +52,7 @@ export default function DelhiveryTrackingPage() {
   const [lrSuggestLoading, setLrSuggestLoading] = useState(false);
   const [lrDropdownOpen, setLrDropdownOpen] = useState(false);
   const searchWrapRef = useRef(null);
+  const lrUrlBootstrapped = useRef(false);
 
   const fetchLrSuggestions = useCallback(async (query) => {
     setLrSuggestLoading(true);
@@ -100,7 +103,7 @@ export default function DelhiveryTrackingPage() {
     setLrDropdownOpen(false);
   };
 
-  const runTrack = async (idOverride) => {
+  const runTrack = useCallback(async (idOverride) => {
     const id = String(idOverride ?? trackingInput).trim();
     if (!id) {
       setError("Please enter a tracking ID.");
@@ -128,7 +131,16 @@ export default function DelhiveryTrackingPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [trackingInput]);
+
+  const lrFromUrl = String(searchParams?.get("lr") || "").trim();
+
+  useEffect(() => {
+    if (!lrFromUrl || lrUrlBootstrapped.current) return;
+    lrUrlBootstrapped.current = true;
+    setTrackingInput(lrFromUrl);
+    runTrack(lrFromUrl);
+  }, [lrFromUrl, runTrack]);
 
   const onSubmit = (e) => {
     e.preventDefault();
