@@ -8,10 +8,14 @@ import DelhiveryTrackingTimeline, {
 import DelhiveryShipmentDetailsHover from "@/components/orders/DelhiveryShipmentDetailsHover";
 import { orderStatusHeadline } from "@/lib/delhiveryB2bTrackingUi";
 
+const DELIVERY_ACCENT = "#3B966F";
+const RETURN_ACCENT = "#DC2626";
+
 export default function OrderDelhiveryTrackingPanel({
   lrNumber,
   orderId,
   shipmentLabel = "Delhivery shipment",
+  variant = "delivery",
 }) {
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
@@ -72,10 +76,18 @@ export default function OrderDelhiveryTrackingPanel({
     .toUpperCase()
     .includes("DELIVER");
   const awb = result?.mwbn || "";
+  const isReturn = variant === "return";
+  const accent = isReturn ? RETURN_ACCENT : DELIVERY_ACCENT;
+  const headerBg = isReturn ? "bg-red-600" : "bg-[#3B966F]";
+  const borderClass = isReturn ? "border-red-200" : "border-slate-200";
 
   return (
-    <div className="min-w-0 overflow-visible rounded-xl border border-slate-200 bg-white shadow-sm">
-      <div className="relative overflow-visible rounded-t-xl bg-[#3B966F] px-3 py-3 text-white sm:px-5">
+    <div
+      className={`min-w-0 overflow-visible rounded-xl border bg-white shadow-sm ${borderClass}`}
+    >
+      <div
+        className={`relative overflow-visible rounded-t-xl px-3 py-3 text-white sm:px-5 ${headerBg}`}
+      >
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between sm:gap-3">
           <div className="flex min-w-0 items-start gap-2">
             <h2 className="text-sm font-bold leading-snug sm:text-lg">{headline}</h2>
@@ -107,7 +119,10 @@ export default function OrderDelhiveryTrackingPanel({
       <div className="min-w-0 px-2 py-3 sm:px-5 sm:py-5">
         {loading ? (
           <div className="flex items-center justify-center gap-2 py-6 text-sm text-gray-500">
-            <Loader2 className="h-5 w-5 animate-spin text-[#3B966F]" />
+            <Loader2
+              className="h-5 w-5 animate-spin"
+              style={{ color: accent }}
+            />
             Loading live tracking…
           </div>
         ) : error ? (
@@ -118,10 +133,18 @@ export default function OrderDelhiveryTrackingPanel({
         ) : (
           <>
             <div className="md:hidden">
-              <DelhiveryTrackingTimeline steps={timeline} layout="vertical" />
+              <DelhiveryTrackingTimeline
+                steps={timeline}
+                layout="vertical"
+                accentColor={accent}
+              />
             </div>
             <div className="hidden md:block">
-              <DelhiveryTrackingTimeline steps={timeline} layout="horizontal" />
+              <DelhiveryTrackingTimeline
+                steps={timeline}
+                layout="horizontal"
+                accentColor={accent}
+              />
             </div>
           </>
         )}

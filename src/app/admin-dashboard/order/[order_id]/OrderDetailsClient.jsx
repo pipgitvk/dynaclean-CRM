@@ -105,6 +105,7 @@ export default function OrderDetailsClient({
           lrNumber={returnDelhiveryLr}
           orderId={orderDetails.order_id ?? orderId}
           shipmentLabel="Return shipment"
+          variant="return"
         />
       ) : null}
 

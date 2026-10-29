@@ -6,6 +6,8 @@ import {
   formatDelhiveryTimelineDate,
 } from "@/lib/delhiveryB2bTrackingUi";
 
+const DEFAULT_ACCENT = "#3B966F";
+
 /**
  * Delhivery milestone timeline (vertical = sales page, horizontal = order detail row).
  */
@@ -13,7 +15,10 @@ export default function DelhiveryTrackingTimeline({
   steps = [],
   layout = "vertical",
   className = "",
+  accentColor = DEFAULT_ACCENT,
 }) {
+  const accent = accentColor || DEFAULT_ACCENT;
+
   if (!steps.length) {
     return (
       <p className="text-center text-sm text-gray-500">
@@ -42,29 +47,34 @@ export default function DelhiveryTrackingTimeline({
             >
               <div className="flex w-full items-center">
                 <span
-                  className={`h-0.5 min-w-[0.25rem] flex-1 ${
-                    isFirst ? "bg-transparent" : "bg-[#3B966F]"
-                  }`}
+                  className="h-0.5 min-w-[0.25rem] flex-1"
+                  style={{
+                    backgroundColor: isFirst ? "transparent" : accent,
+                  }}
                   aria-hidden
                 />
                 <span
-                  className={`box-border h-4 w-4 shrink-0 rounded-full border-2 border-[#3B966F] ${
-                    dotFilled ? "bg-[#3B966F]" : "bg-white"
-                  }`}
+                  className="box-border h-4 w-4 shrink-0 rounded-full border-2 bg-white"
+                  style={{
+                    borderColor: accent,
+                    backgroundColor: dotFilled ? accent : "#fff",
+                  }}
                   aria-hidden
                 />
                 <span
-                  className={`h-0.5 min-w-[0.25rem] flex-1 ${
-                    isLast ? "bg-transparent" : "bg-[#3B966F]"
-                  }`}
+                  className="h-0.5 min-w-[0.25rem] flex-1"
+                  style={{
+                    backgroundColor: isLast ? "transparent" : accent,
+                  }}
                   aria-hidden
                 />
               </div>
               <div className="mt-2 min-w-0 px-0.5">
                 <p
                   className={`inline-flex flex-wrap items-center justify-center gap-1 text-xs font-semibold leading-snug sm:text-[13px] ${
-                    highlight ? "text-[#3B966F]" : "text-gray-800"
+                    highlight ? "" : "text-gray-800"
                   }`}
+                  style={highlight ? { color: accent } : undefined}
                 >
                   <span>{step.label}</span>
                   {isDelivered && highlight ? (
@@ -103,27 +113,32 @@ export default function DelhiveryTrackingTimeline({
           >
             {!isLast ? (
               <span
-                className="absolute left-[7px] top-[1.125rem] bottom-0 w-0.5 bg-[#3B966F]"
+                className="absolute left-[7px] top-[1.125rem] bottom-0 w-0.5"
+                style={{ backgroundColor: accent }}
                 aria-hidden
               />
             ) : null}
             <span
-              className={`absolute left-0 top-0.5 box-border h-4 w-4 shrink-0 rounded-full border-2 border-[#3B966F] ${
-                dotFilled ? "bg-[#3B966F]" : "bg-white"
-              }`}
+              className="absolute left-0 top-0.5 box-border h-4 w-4 shrink-0 rounded-full border-2 bg-white"
+              style={{
+                borderColor: accent,
+                backgroundColor: dotFilled ? accent : "#fff",
+              }}
               aria-hidden
             />
             <div className="min-w-0">
               <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[15px] leading-snug">
                 <span
                   className={`inline-flex items-center gap-1.5 font-semibold ${
-                    highlight ? "text-[#3B966F]" : "text-gray-800"
+                    highlight ? "" : "text-gray-800"
                   }`}
+                  style={highlight ? { color: accent } : undefined}
                 >
                   {step.label}
                   {isDelivered && highlight ? (
                     <CheckCircle2
-                      className="h-4 w-4 text-[#3B966F]"
+                      className="h-4 w-4"
+                      style={{ color: accent }}
                       strokeWidth={2.5}
                     />
                   ) : null}
