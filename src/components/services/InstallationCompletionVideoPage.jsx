@@ -4,46 +4,13 @@ import { useCallback, useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import { ChevronLeft, Download, FileUp, Play, Square, Video } from "lucide-react";
-import dayjs from "dayjs";
 import { generateServiceReportPDF, downloadPDF } from "@/utils/pdfGenerator";
-import { isInstallationReportLayout } from "@/utils/reportLayout";
+import {
+  buildPrefilledInstallationReportPdfPayload,
+  installationReportPdfFilename,
+} from "@/lib/buildServiceReportPdfPayload";
 
 const RECORDING_DURATION = 45;
-
-const EMPTY_PRODUCT = {
-  product_name: "",
-  model: "",
-  customer_name: "",
-  email: "",
-  contact: "",
-  customer_address: "",
-  installed_address: "",
-  installation_date: "",
-  invoice_number: "",
-  invoice_date: "",
-  contact_person: "",
-  site_person: "",
-};
-
-/** Prefill PDF header from warranty product; leave installation date blank for on-site entry. */
-function productDataForBlankPdf(service, product) {
-  if (!product) return { ...EMPTY_PRODUCT };
-  return {
-    product_name: product.product_name || "",
-    model: product.model || "",
-    customer_name: product.customer_name || "",
-    email: product.email || "",
-    contact: product.contact || "",
-    customer_address: product.customer_address || "",
-    installed_address: product.installed_address || "",
-    installation_date: "",
-    invoice_number: product.invoice_number || "",
-    invoice_date: product.invoice_date || "",
-    contact_person:
-      product.contact_person || product.site_person || "",
-    site_person: product.site_person || "",
-  };
-}
 
 function uploadWithProgress(url, formData, onProgress) {
   return new Promise((resolve, reject) => {
@@ -148,33 +115,24 @@ export default function InstallationCompletionVideoPage() {
     setDownloadingBlank(true);
     setError("");
     try {
-      const pdfInstallationLayout =
-        isInstallationReportLayout(data.service.complaint_summary) ||
-        String(data.service.service_type || "").toUpperCase() === "INSTALLATION";
-      const reportData = {
-        service_id: data.service.service_id,
-        serial_number: data.service.serial_number || "",
-      };
-      const productData = productDataForBlankPdf(data.service, data.product);
-      const installData = pdfInstallationLayout
-        ? {
-            installation_date: "",
-            defects_on_inspection: "",
-            engineer_remarks: "",
-            service_rating: "",
-            customer_feedback: "",
-          }
-        : null;
+      const { pdfData, productData, installData, trainees, isInstallationLayout } =
+        buildPrefilledInstallationReportPdfPayload(
+          data.service,
+          data.product,
+        );
       const pdf = await generateServiceReportPDF(
-        reportData,
+        pdfData,
         productData,
         installData,
-        [],
-        { isInstallationLayout: pdfInstallationLayout },
+        trainees,
+        { isInstallationLayout },
       );
       downloadPDF(
         pdf,
-        `Blank_Installation_Report_${data.service.service_id}_${dayjs().format("YYYY-MM-DD")}.pdf`,
+        installationReportPdfFilename(
+          data.service.service_id,
+          isInstallationLayout,
+        ),
       );
     } catch (err) {
       setError(err.message || "Could not generate blank report.");
@@ -487,7 +445,7 @@ export default function InstallationCompletionVideoPage() {
       <div className="rounded-xl border border-amber-200 bg-white p-4 shadow-sm sm:p-6">
         <h2 className="text-lg font-semibold text-gray-900">Print &amp; fill report</h2>
         <p className="mt-1 text-sm text-gray-600">
-          Download blank PDF, fill on site, upload scan/photo — report form will open (same as after video).
+          Download the same installation report PDF as complete-service (customer &amp; product prefilled), fill on site, then upload scan/photo.
         </p>
         <div className="mt-4 space-y-3">
           <button
@@ -497,7 +455,7 @@ export default function InstallationCompletionVideoPage() {
             className="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm font-medium hover:bg-gray-50 disabled:opacity-60"
           >
             <Download className="h-5 w-5" />
-            {downloadingBlank ? "Preparing PDF…" : "Download blank report (PDF)"}
+            {downloadingBlank ? "Preparing PDF…" : "Download installation report (PDF)"}
           </button>
           <label className="flex w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-amber-300 bg-amber-50 px-3 py-5 text-sm text-amber-900 hover:bg-amber-100">
             <FileUp className="h-5 w-5" />

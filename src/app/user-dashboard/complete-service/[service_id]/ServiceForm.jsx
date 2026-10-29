@@ -79,6 +79,8 @@ export default function ServiceForm({ service }) {
 
   const [trainees, setTrainees] = useState([
     { id: 1, name: "", designation: "", contact: "" },
+    { id: 2, name: "", designation: "", contact: "" },
+    { id: 3, name: "", designation: "", contact: "" },
   ]);
 
   const addTrainee = () => {

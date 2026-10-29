@@ -6,7 +6,10 @@ import { useRouter } from "next/navigation";
 import SignaturePad from "signature_pad";
 import dayjs from "dayjs";
 import { generateServiceReportPDF, downloadPDF } from "@/utils/pdfGenerator";
-import { isInstallationReportLayout } from "@/utils/reportLayout";
+import {
+  buildServiceReportPdfPayload,
+  installationReportPdfFilename,
+} from "@/lib/buildServiceReportPdfPayload";
 
 const CHECKLIST_ITEMS = [
   "Voltage (V)",
@@ -79,6 +82,8 @@ export default function ServiceForm({ service }) {
 
   const [trainees, setTrainees] = useState([
     { id: 1, name: "", designation: "", contact: "" },
+    { id: 2, name: "", designation: "", contact: "" },
+    { id: 3, name: "", designation: "", contact: "" },
   ]);
 
   const addTrainee = () => {
@@ -559,7 +564,6 @@ export default function ServiceForm({ service }) {
 
       // Generate PDF after successful save
       try {
-        // Get signature data URLs
         let engineerSignatureData = null;
         let customerSignatureData = null;
         
@@ -578,73 +582,18 @@ export default function ServiceForm({ service }) {
             customerSignatureData = customerSignaturePadRef.current.toDataURL();
           }
         }
-        
-        const pdfData = {
-          service_id: formData.service_id,
-          serial_number: formData.serial_number,
-          status: formData.status,
-          complaint_date: reportServiceDate,
-          complaint_number: service.complaint_number,
-          service_type: service.service_type,
-          reg_date: service.reg_date,
-          completed_date: formData.completed_date,
-          checklist: (formData.checklist || []).join(","),
-          nature_of_complaints: formData.nature_of_complaint,
-          observation: formData.observation,
-          action_taken: formData.action_taken,
-          complaint_summary:
-            service.complaint_summary || formData.complaint_summary,
-          completion_remark: formData.completion_remark,
-          replaced: spareParts.map((p) => p.replaced).join(","),
-          to_be_replaced: spareParts.map((p) => p.tobereplaced).join(","),
-          service_rate: formData.service_rating,
-          feedback: formData.customer_feedback,
-          authorised_person_name: formData.status === "COMPLETED" ? formData.completion_engineer_name : formData.authorized_person_name,
-          authorised_person_designation: formData.status === "COMPLETED" ? formData.completion_engineer_designation : formData.authorized_person_designation,
-          authorised_person_mobile: formData.status === "COMPLETED" ? formData.completion_engineer_mobile : formData.authorized_person_mobile,
-          customer_name: formData.status === "COMPLETED" ? formData.completion_customer_name : formData.customer_name,
-          customer_designation: formData.status === "COMPLETED" ? formData.completion_customer_designation : formData.customer_designation,
-          customer_mobile: formData.status === "COMPLETED" ? formData.completion_customer_mobile : formData.customer_mobile,
-          authorised_person_sign_data: engineerSignatureData,
-          customer_sign_data: customerSignatureData,
-        };
 
-        const productData = {
-          product_name: service.product?.product_name,
-          model: service.product?.model,
-          customer_name: service.product?.customer_name,
-          email: service.product?.email,
-          contact: service.product?.contact,
-          customer_address: service.product?.customer_address,
-          installed_address: service.product?.installed_address,
-          installation_date: service.product?.installation_date,
-          invoice_number: service.product?.invoice_number,
-          invoice_date: service.product?.invoice_date,
-          contact_person:
-            service.product?.contact_person ||
-            service.product?.site_person ||
-            "",
-          site_person: service.product?.site_person || "",
-        };
-
-        const pdfInstallationLayout = isInstallationReportLayout(
-          service.complaint_summary || formData.complaint_summary
-        );
-        let installData = null;
-        if (pdfInstallationLayout) {
-          installData = {
-            installation_date: reportServiceDate,
-            defects_on_inspection: formData.defects_found,
-            engineer_remarks: formData.engineers_remark,
-            service_rating: formData.service_rating,
-            customer_feedback: formData.customer_feedback,
-          };
-        } else if (service.service_type === "INSTALLATION") {
-          installData = {
-            defects_on_inspection: formData.defects_found,
-            engineer_remarks: formData.engineers_remark,
-          };
-        }
+        const { pdfData, productData, installData, isInstallationLayout: pdfInstallationLayout } =
+          buildServiceReportPdfPayload(service, {
+            product: service.product,
+            form: {
+              ...formData,
+              engineerSignatureData,
+              customerSignatureData,
+            },
+            spareParts,
+            trainees,
+          });
 
         console.log("🔍 PDF Data Debug:", {
           pdfData,
@@ -666,9 +615,10 @@ export default function ServiceForm({ service }) {
           trainees,
           { isInstallationLayout: pdfInstallationLayout }
         );
-        const filename = pdfInstallationLayout
-          ? `Installation_Report_${formData.service_id}_${dayjs().format("YYYY-MM-DD")}.pdf`
-          : `Service_Report_${formData.service_id}_${dayjs().format("YYYY-MM-DD")}.pdf`;
+        const filename = installationReportPdfFilename(
+          formData.service_id,
+          pdfInstallationLayout,
+        );
         
         // Save PDF to server
         const pdfBlob = pdf.output('blob');

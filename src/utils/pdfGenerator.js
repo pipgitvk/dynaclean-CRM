@@ -6,6 +6,7 @@ import {
   getPdfSignatureOrigin,
   signatureSrcForInstallationPdf,
 } from '@/utils/pdfCloudinaryAssets';
+import { padTraineesForInstallationPdf } from '@/lib/buildServiceReportPdfPayload';
 
 const CHECKLIST_ITEMS = [
   "Voltage (V)",
@@ -297,6 +298,12 @@ const generateInstallationHTMLTemplate = (
 ) => {
   const logoUrl = assetOptions.logoUrl || '/images/logo.png';
   const origin = assetOptions.origin || '';
+  const checklistArray = reportData.checklist
+    ? String(reportData.checklist)
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+    : [];
   const instDate = formatDate(
     installData?.installation_date ||
       productData?.installation_date ||
@@ -312,20 +319,17 @@ const generateInstallationHTMLTemplate = (
   const installationComplete = statusUpper === "COMPLETED";
   const installationIncomplete = statusUpper === "INCOMPLETE";
 
-  const traineeRows =
-    trainees && trainees.length > 0
-      ? trainees
-          .map(
-            (t, i) => `
+  const traineeRows = padTraineesForInstallationPdf(trainees)
+    .map(
+      (t, i) => `
                         <tr>
                             <td>${i + 1}</td>
                             <td>${t.name || ""}</td>
                             <td>${t.designation || ""}</td>
                             <td>${t.contact || ""}</td>
-                        </tr>`
-          )
-          .join("")
-      : `<tr><td colspan="4" style="text-align:center">—</td></tr>`;
+                        </tr>`,
+    )
+    .join("");
 
   const engineerSrc = signatureSrcForInstallationPdf(
     reportData,
@@ -420,6 +424,34 @@ const generateInstallationHTMLTemplate = (
                     <td>${productData.email || ""}</td>
                 </tr>
             </table>
+
+            <div class="service-group">
+                <h3><strong>CHECKLIST</strong></h3>
+                <div class="checkbox-group">
+                    ${CHECKLIST_ITEMS.map(item => `
+                        <div class="checkbox-item">
+                            <input type="checkbox" ${checklistArray.includes(item) ? 'checked' : ''} disabled>
+                            <span>${item}</span>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+
+            <div class="service-group">
+                <h3><strong>SERVICE RENDERED</strong></h3>
+                <div class="form-group">
+                    <label>Nature of Complaint:</label>
+                    <span>${reportData.nature_of_complaints || ''}</span>
+                </div>
+                <div class="form-group">
+                    <label>Observation:</label>
+                    <span>${reportData.observation || ''}</span>
+                </div>
+                <div class="form-group">
+                    <label>Action Taken:</label>
+                    <span>${reportData.action_taken || ''}</span>
+                </div>
+            </div>
 
             <div class="service-group">
                 <h3><strong>SERVICE RENDERED: INSTALLATION AND DEMONSTRATION</strong></h3>
