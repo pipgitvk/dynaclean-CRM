@@ -451,6 +451,13 @@ const allMenuItems = [
         icon: "Receipt",
       },
       {
+        path: "/admin-dashboard/credit-notes",
+        name: "Credit Notes",
+        moduleKey: "credit-notes",
+        roles: ["SUPERADMIN"],
+        icon: "FileText",
+      },
+      {
         path: "/admin-dashboard/sales/delhivery-tracking",
         name: "Delhivery Tracking",
         roles: ["SUPERADMIN"],

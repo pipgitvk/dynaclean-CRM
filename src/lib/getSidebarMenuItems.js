@@ -153,6 +153,8 @@ function transformMenuItemPaths(item, roleKey) {
       "attendance-sheet": "/accounts-dashboard/attendance-sheet",
       "add-paid-leaves": "/accounts-dashboard/add-paid-leave",
       "party-payments": "/accounts-dashboard/party-payments",
+      "credit-notes": "/accounts-dashboard/credit-notes",
+      "orders-process": "/accounts-dashboard/order",
     };
     if (item.moduleKey && accountantModulePaths[item.moduleKey]) {
       return { ...item, path: accountantModulePaths[item.moduleKey] };
@@ -534,6 +536,13 @@ const allMenuItems = [
         moduleKey: "party-payments",
         roles: ["ALL"],
         icon: "Receipt",
+      },
+      {
+        path: "/accounts-dashboard/credit-notes",
+        name: "Credit Notes",
+        moduleKey: "credit-notes",
+        roles: ["ALL"],
+        icon: "FileText",
       },
     ],
   },
@@ -1294,9 +1303,13 @@ export default async function getSidebarMenuItems() {
         "salary-sheet",
         "attendance-sheet",
         "payment-deductions",
+        "credit-notes",
       ]) {
         if (!allowedModules.includes(key)) allowedModules.push(key);
       }
+    }
+    if (/\bACCOUNTANT\b/.test(roleKey) && roleKey !== "ACCOUNTANT" && Array.isArray(allowedModules)) {
+      if (!allowedModules.includes("credit-notes")) allowedModules.push("credit-notes");
     }
 
     const empCrmUserPathAllowed = (path) => {

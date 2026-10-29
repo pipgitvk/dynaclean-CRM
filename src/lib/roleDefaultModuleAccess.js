@@ -133,6 +133,7 @@ export const ROLE_DEFAULT_MODULE_KEYS = {
     "demo-details",
     "quotations",
     "orders-process",
+    "credit-notes",
     "invoices",
     "product-stock",
     "product-accessories",

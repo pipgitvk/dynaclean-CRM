@@ -1,10 +1,48 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
+import { canListAllCreditNotesRole } from "@/lib/roleKeyUtils";
 import {
   initiatedStatusForReturnType,
   IS_RETURNED,
 } from "@/lib/orderReturnStatus";
+
+export async function GET() {
+  try {
+    const payload = await getSessionPayload();
+    if (!payload) {
+      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+    }
+    const role = payload.role ?? payload.userRole ?? "";
+    if (!canListAllCreditNotesRole(role)) {
+      return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+    }
+
+    const conn = await getDbConnection();
+    try {
+      await conn.execute(
+        `ALTER TABLE credit_notes ADD COLUMN IF NOT EXISTS is_saved TINYINT(1) NOT NULL DEFAULT 0`,
+      );
+    } catch (_) {}
+
+    const [rows] = await conn.execute(
+      `SELECT id, credit_note_number, order_id, quote_number, invoice_no,
+              company_name, credit_note_date, invoice_date, grand_total,
+              return_type, is_saved, saved_at, created_by, created_at
+       FROM credit_notes
+       WHERE is_saved = 1
+       ORDER BY COALESCE(saved_at, created_at) DESC, id DESC`,
+    );
+
+    return NextResponse.json({ success: true, data: rows });
+  } catch (err) {
+    console.error("GET /api/credit-notes error:", err);
+    return NextResponse.json(
+      { success: false, error: "Internal server error" },
+      { status: 500 },
+    );
+  }
+}
 
 async function applyReturnInitiatedOrderStatus(conn, order_id, return_type) {
   const orderIdKey = String(order_id ?? "").trim();

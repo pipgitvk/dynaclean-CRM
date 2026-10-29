@@ -1199,7 +1199,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                 <ViewCreditNoteMenuLink
                   order={r}
                   userRole={userRole}
-                  hrefBase="/admin-dashboard"
+                  hrefBase="/accounts-dashboard"
                   onClick={(e) => e.stopPropagation()}
                 />
                 <AccountantReturnViewMenuItems
@@ -1378,7 +1378,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
             <ViewCreditNoteMenuLink
               order={r}
               userRole={userRole}
-              hrefBase="/admin-dashboard"
+              hrefBase="/accounts-dashboard"
               onClick={(e) => e.stopPropagation()}
             />
             {(isSuperAdmin || isAdmin || isAccountant || isWarehouse) &&

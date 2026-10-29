@@ -77,3 +77,10 @@ export function canViewOrderCreditNoteRole(role) {
   if (k === "SUPERADMIN" || k === "ADMIN") return true;
   return /\bACCOUNTANT\b/.test(k) || k === "ACCOUNTANT";
 }
+
+/** All credit notes list page — superadmin and accountant roles. */
+export function canListAllCreditNotesRole(role) {
+  const k = normalizeRoleKey(role || "");
+  if (isSuperAdminRoleKey(k)) return true;
+  return /\bACCOUNTANT\b/.test(k) || k === "ACCOUNTANT";
+}

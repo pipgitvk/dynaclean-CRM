@@ -62,6 +62,7 @@ export const MODULE_TREE = [
       { key: "quotations", label: "Quotations" },
       { key: "invoices", label: "Invoices" },
       { key: "performa-invoices", label: "Performa Invoices" },
+      { key: "credit-notes", label: "Credit Notes" },
       { key: "ads-management", label: "Ads Management" },
     ],
   },
@@ -325,6 +326,7 @@ export const SUPERADMIN_MODULE_UI_NODES = [
       { kind: "leaf", key: "orders-delay", label: "Delay Delivery" },
       { kind: "leaf", key: "estimate-delivery", label: "Estimate Delivery" },
       { kind: "leaf", key: "party-payments", label: "Party Payments" },
+      { kind: "leaf", key: "credit-notes", label: "Credit Notes" },
     ],
   },
   {
