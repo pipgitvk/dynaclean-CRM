@@ -65,3 +65,12 @@ export async function fetchDelhiveryLrForOrder(
 
   return null;
 }
+
+const DELHIVERY_TRACKING_ROLES = new Set(["SUPERADMIN", "ADMIN"]);
+
+/** Live Delhivery timeline on order detail — SUPERADMIN & ADMIN only. */
+export function canViewOrderDelhiveryTracking(...roles) {
+  return roles.some((r) =>
+    DELHIVERY_TRACKING_ROLES.has(String(r ?? "").trim().toUpperCase()),
+  );
+}

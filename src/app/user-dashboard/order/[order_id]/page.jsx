@@ -6,6 +6,12 @@ import { getSessionPayload } from "@/lib/auth";
 import { isOrderVisibleToViewer } from "@/lib/orderApprovalVisibility";
 import { roleShowsDualOrderAmountFields } from "@/lib/orderPaymentHistory";
 import { attachActiveInvoiceFieldsToOrder } from "@/lib/activeInvoiceForOrder";
+import { ensureOrderShipmentTrackingColumns } from "@/lib/ensureOrderShipmentTrackingColumns";
+import { fetchBookingBatchesForOrder } from "@/lib/orderBookingBatches";
+import {
+  fetchDelhiveryLrForOrder,
+  canViewOrderDelhiveryTracking,
+} from "@/lib/resolveOrderDelhiveryLr";
 
 export const dynamic = "force-dynamic";
 
@@ -16,8 +22,11 @@ function getOrderListPath(userRole) {
   return "/user-dashboard/order";
 }
 
-async function fetchOrderData(orderId) {
+async function fetchOrderData(orderId, { withDelhiveryTracking = false } = {}) {
   const conn = await getDbConnection();
+  if (withDelhiveryTracking) {
+    await ensureOrderShipmentTrackingColumns(conn);
+  }
 
   const [orderRows] = await conn.execute(
     "SELECT * FROM neworder WHERE order_id = ?",
@@ -57,12 +66,24 @@ async function fetchOrderData(orderId) {
 
   // await conn.end();
 
+  let delhiveryLr = null;
+  if (withDelhiveryTracking && orderDetails) {
+    const bookingBatches = await fetchBookingBatchesForOrder(conn, orderId);
+    delhiveryLr = await fetchDelhiveryLrForOrder(
+      conn,
+      orderDetails.order_id ?? orderId,
+      orderDetails,
+      bookingBatches,
+    );
+  }
+
   return {
     orderDetails,
     items,
     statuses,
     gstin,
     quoteCustomerId,
+    delhiveryLr,
   };
 }
 
@@ -76,6 +97,7 @@ export default async function Page({ params }) {
   let canUploadDocuments = false;
   let showDualPaymentAmountFields = false;
   let userRole = payload?.role || payload?.userRole || "";
+  let empRole = "";
   if (payload?.username) {
     const connAuth = await getDbConnection();
     const [roleRows] = await connAuth.execute(
@@ -83,14 +105,34 @@ export default async function Page({ params }) {
       [payload.username],
     );
     userRole = roleRows[0]?.userRole || userRole;
+    const [empRows] = await connAuth.execute(
+      "SELECT userRole FROM emplist WHERE username = ?",
+      [payload.username],
+    );
+    empRole = empRows[0]?.userRole || "";
     orderListPath = getOrderListPath(userRole);
     const roleUpper = String(userRole).toUpperCase();
     canUploadDocuments = roleUpper.includes("ACCOUNTANT");
     showDualPaymentAmountFields = roleShowsDualOrderAmountFields(userRole);
   }
 
-  const { orderDetails, items, statuses, gstin, quoteCustomerId } =
-    await fetchOrderData(orderId);
+  const showDelhiveryTracking = canViewOrderDelhiveryTracking(
+    userRole,
+    empRole,
+    payload?.role,
+    payload?.userRole,
+  );
+
+  const {
+    orderDetails,
+    items,
+    statuses,
+    gstin,
+    quoteCustomerId,
+    delhiveryLr,
+  } = await fetchOrderData(orderId, {
+    withDelhiveryTracking: showDelhiveryTracking,
+  });
 
   if (
     !orderDetails ||
@@ -130,6 +172,7 @@ export default async function Page({ params }) {
         orderListPath={orderListPath}
         canUploadDocuments={canUploadDocuments}
         showDualPaymentAmountFields={showDualPaymentAmountFields}
+        delhiveryLr={delhiveryLr}
       />
     </div>
   );

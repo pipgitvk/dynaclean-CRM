@@ -6,13 +6,12 @@ import { getSessionPayload } from "@/lib/auth";
 import { isOrderVisibleToViewer } from "@/lib/orderApprovalVisibility";
 import { ensureOrderShipmentTrackingColumns } from "@/lib/ensureOrderShipmentTrackingColumns";
 import { fetchBookingBatchesForOrder } from "@/lib/orderBookingBatches";
-import { collectOrderShipmentTracks } from "@/lib/orderShipmentTracking";
 import { attachActiveInvoiceFieldsToOrder } from "@/lib/activeInvoiceForOrder";
-import { fetchDelhiveryLrForOrder } from "@/lib/resolveOrderDelhiveryLr";
+import { fetchDelhiveryLrForOrder, canViewOrderDelhiveryTracking } from "@/lib/resolveOrderDelhiveryLr";
 
 export const dynamic = "force-dynamic";
 
-async function fetchOrderData(orderId) {
+async function fetchOrderData(orderId, { withDelhiveryTracking = false } = {}) {
   console.log("order id", orderId);
   const conn = await getDbConnection();
   await ensureOrderShipmentTrackingColumns(conn);
@@ -51,21 +50,23 @@ async function fetchOrderData(orderId) {
     gstin = null;
   }
 
-  const bookingBatches = await fetchBookingBatchesForOrder(conn, orderId);
-  const shipmentTracks = collectOrderShipmentTracks(orderDetails, bookingBatches);
-  const delhiveryLr = await fetchDelhiveryLrForOrder(
-    conn,
-    orderDetails.order_id ?? orderId,
-    orderDetails,
-    bookingBatches,
-  );
+  const bookingBatches = withDelhiveryTracking
+    ? await fetchBookingBatchesForOrder(conn, orderId)
+    : [];
+  const delhiveryLr = withDelhiveryTracking
+    ? await fetchDelhiveryLrForOrder(
+        conn,
+        orderDetails.order_id ?? orderId,
+        orderDetails,
+        bookingBatches,
+      )
+    : null;
 
   return {
     orderDetails,
     items,
     statuses,
     gstin,
-    shipmentTracks,
     delhiveryLr,
   };
 }
@@ -87,8 +88,16 @@ export default async function Page({ params }) {
     userRole = roleRows[0]?.userRole || "";
   }
 
-  const { orderDetails, items, statuses, gstin, shipmentTracks, delhiveryLr } =
-    await fetchOrderData(orderId);
+  const showDelhiveryTracking = canViewOrderDelhiveryTracking(
+    userRole,
+    payload?.role,
+    payload?.userRole,
+  );
+
+  const { orderDetails, items, statuses, gstin, delhiveryLr } =
+    await fetchOrderData(orderId, {
+      withDelhiveryTracking: showDelhiveryTracking,
+    });
 
   if (
     !orderDetails ||
@@ -131,7 +140,6 @@ export default async function Page({ params }) {
         orderId={orderId}
         gstin={gstin}
         userRole={userRole}
-        shipmentTracks={shipmentTracks}
         delhiveryLr={delhiveryLr}
       />
     </div>

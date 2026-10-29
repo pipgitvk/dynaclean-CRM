@@ -13,6 +13,7 @@ import {
   formatOrderRequestedAmountInr,
   getSalesOrderAmountFieldDisplay,
 } from "@/lib/orderPaymentHistory";
+import OrderDelhiveryTrackingPanel from "@/components/orders/OrderDelhiveryTrackingPanel";
 
 const DOCUMENT_FIELDS = [
   { label: "E-way Bill", key: "ewaybill_file" },
@@ -36,6 +37,7 @@ export default function OrderDetailsClient({
   orderListPath = "/user-dashboard/order",
   canUploadDocuments = false,
   showDualPaymentAmountFields = false,
+  delhiveryLr = null,
 }) {
   const formatDate = (value) => {
     if (!value) return "";
@@ -98,6 +100,13 @@ export default function OrderDetailsClient({
 
   return (
     <div className="p-4 space-y-6">
+      {delhiveryLr ? (
+        <OrderDelhiveryTrackingPanel
+          lrNumber={delhiveryLr}
+          orderId={orderDetails.order_id ?? orderId}
+        />
+      ) : null}
+
       {/* Progress Bar */}
       <div className="space-y-2">
         <div className="relative w-full h-3 bg-gray-300 rounded-full">

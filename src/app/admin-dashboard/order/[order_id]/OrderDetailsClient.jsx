@@ -9,7 +9,6 @@ import {
   ORDER_PIPELINE_STAGES,
   deriveOrderPipelineProgress,
 } from "@/lib/orderPipelineStage";
-import OrderShipmentTrackingList from "@/components/orders/OrderShipmentTrackingList";
 import OrderDelhiveryTrackingPanel from "@/components/orders/OrderDelhiveryTrackingPanel";
 import {
   formatOrderPaymentAmountInr,
@@ -35,7 +34,6 @@ export default function OrderDetailsClient({
   orderId,
   gstin,
   userRole,
-  shipmentTracks = [],
   delhiveryLr = null,
 }) {
   const formatDate = (value) => {
@@ -100,8 +98,6 @@ export default function OrderDetailsClient({
           orderId={orderDetails.order_id ?? orderId}
         />
       ) : null}
-
-      <OrderShipmentTrackingList tracks={shipmentTracks} />
 
       {/* Progress Bar */}
       <div className="min-w-0 space-y-2">
