@@ -450,6 +450,12 @@ const allMenuItems = [
         roles: ["ALL"],
         icon: "Receipt",
       },
+      {
+        path: "/admin-dashboard/sales/delhivery-tracking",
+        name: "Delhivery Tracking",
+        roles: ["SUPERADMIN"],
+        icon: "Truck",
+      },
     ],
   },
   {
