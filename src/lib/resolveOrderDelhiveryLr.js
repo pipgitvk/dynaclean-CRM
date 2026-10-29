@@ -2,6 +2,11 @@
  * Resolve Delhivery B2B LR number for an order (tracking_id table + booking URLs).
  */
 
+import {
+  TRACKING_TYPE_DELIVERY,
+  TRACKING_TYPE_RETURN,
+} from "@/lib/orderTrackingIdPersist";
+
 const LR_URL_RE = /\/lr\/(\d+)/i;
 
 export function parseDelhiveryLrFromUrl(url) {
@@ -29,24 +34,57 @@ function collectBookingUrls(order, bookingBatches = []) {
  * @param {string|number} orderId
  * @param {object} [order] neworder row
  * @param {Array} [bookingBatches]
+ * @param {{ shipmentKind?: 'outbound' | 'return' }} [options]
  */
 export async function fetchDelhiveryLrForOrder(
   conn,
   orderId,
   order = null,
   bookingBatches = [],
+  options = {},
 ) {
+  const shipmentKind = options.shipmentKind === "return" ? "return" : "outbound";
   const id = String(orderId ?? "").trim();
   if (!id) return null;
+
+  if (shipmentKind === "return") {
+    try {
+      const [rows] = await conn.execute(
+        `SELECT lr_number, booking_url
+         FROM tracking_id
+         WHERE order_id = ?
+           AND type = ?
+         ORDER BY id DESC
+         LIMIT 1`,
+        [id, TRACKING_TYPE_RETURN],
+      );
+      const row = rows?.[0];
+      const fromLr = String(row?.lr_number ?? "").trim();
+      if (fromLr) return fromLr;
+      const fromRowUrl = parseDelhiveryLrFromUrl(row?.booking_url);
+      if (fromRowUrl) return fromRowUrl;
+    } catch {
+      /* table may be missing */
+    }
+
+    const fromRef = String(order?.return_booking_ref ?? "").trim();
+    if (fromRef) return fromRef;
+
+    const fromReturnUrl = parseDelhiveryLrFromUrl(order?.return_booking_url);
+    if (fromReturnUrl) return fromReturnUrl;
+
+    return null;
+  }
 
   try {
     const [rows] = await conn.execute(
       `SELECT lr_number, booking_url
        FROM tracking_id
        WHERE order_id = ?
-       ORDER BY id DESC
+         AND type = ?
+       ORDER BY batch_sequence_no DESC, id DESC
        LIMIT 1`,
-      [id],
+      [id, TRACKING_TYPE_DELIVERY],
     );
     const row = rows?.[0];
     const fromLr = String(row?.lr_number ?? "").trim();

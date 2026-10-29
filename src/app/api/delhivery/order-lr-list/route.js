@@ -25,7 +25,7 @@ export async function GET(req) {
     if (q) {
       const like = `%${q}%`;
       [rows] = await conn.query(
-        `SELECT order_id, lr_number, booking_url, source, batch_sequence_no, created_at
+        `SELECT order_id, lr_number, booking_url, source, batch_sequence_no, type, created_at
          FROM tracking_id
          WHERE order_id LIKE ? OR lr_number LIKE ?
          ORDER BY created_at DESC, id DESC
@@ -34,7 +34,7 @@ export async function GET(req) {
       );
     } else {
       [rows] = await conn.query(
-        `SELECT order_id, lr_number, booking_url, source, batch_sequence_no, created_at
+        `SELECT order_id, lr_number, booking_url, source, batch_sequence_no, type, created_at
          FROM tracking_id
          ORDER BY created_at DESC, id DESC
          LIMIT ?`,

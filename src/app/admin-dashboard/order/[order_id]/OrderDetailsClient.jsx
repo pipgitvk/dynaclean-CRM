@@ -35,6 +35,7 @@ export default function OrderDetailsClient({
   gstin,
   userRole,
   delhiveryLr = null,
+  returnDelhiveryLr = null,
 }) {
   const formatDate = (value) => {
     if (!value) return "";
@@ -96,6 +97,14 @@ export default function OrderDetailsClient({
         <OrderDelhiveryTrackingPanel
           lrNumber={delhiveryLr}
           orderId={orderDetails.order_id ?? orderId}
+          shipmentLabel="Outbound shipment"
+        />
+      ) : null}
+      {returnDelhiveryLr ? (
+        <OrderDelhiveryTrackingPanel
+          lrNumber={returnDelhiveryLr}
+          orderId={orderDetails.order_id ?? orderId}
+          shipmentLabel="Return shipment"
         />
       ) : null}
 
@@ -347,6 +356,46 @@ export default function OrderDetailsClient({
                 </a>
               ) : (
                 <span className="text-gray-500 italic">No booking URL</span>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {(String(orderDetails.return_booking_ref || "").trim() ||
+        Number(orderDetails.return_booking_done) === 1) && (
+        <div className="rounded border bg-white p-4">
+          <h3 className="mb-3 font-semibold">Return Booking Details</h3>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <Input
+              label="Return Booking Ref (LR)"
+              value={orderDetails.return_booking_ref}
+            />
+            <Input
+              label="Return Booking Date"
+              value={formatDate(orderDetails.return_booking_date)}
+            />
+            <Input
+              label="Expected Pickup Date"
+              value={formatDate(orderDetails.expected_pickup_date)}
+            />
+            <Input label="Return Booking By" value={orderDetails.return_booking_by} />
+            <TextArea
+              label="Return Booking Remarks"
+              value={orderDetails.return_booking_remarks}
+            />
+            <div className="col-span-full">
+              {orderDetails.return_booking_url ? (
+                <a
+                  href={orderDetails.return_booking_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 underline"
+                >
+                  View Return Booking
+                </a>
+              ) : (
+                <span className="text-gray-500 italic">No return booking URL</span>
               )}
             </div>
           </div>

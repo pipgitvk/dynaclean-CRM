@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { isReturnInitiatedStatus } from "@/lib/orderReturnStatus";
+import { persistOrderTrackingFromReturnBooking } from "@/lib/orderTrackingIdPersist";
 
 export async function POST(request) {
   try {
@@ -115,6 +116,11 @@ export async function POST(request) {
         { status: 500 }
       );
     }
+
+    await persistOrderTrackingFromReturnBooking(conn, order_id, {
+      returnBookingRef: return_booking_ref,
+      returnBookingUrl: return_booking_url,
+    });
 
     const [updatedRows] = await conn.execute(
       `SELECT 

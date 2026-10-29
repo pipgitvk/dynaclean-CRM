@@ -8,7 +8,11 @@ import DelhiveryTrackingTimeline, {
 import DelhiveryShipmentDetailsHover from "@/components/orders/DelhiveryShipmentDetailsHover";
 import { orderStatusHeadline } from "@/lib/delhiveryB2bTrackingUi";
 
-export default function OrderDelhiveryTrackingPanel({ lrNumber, orderId }) {
+export default function OrderDelhiveryTrackingPanel({
+  lrNumber,
+  orderId,
+  shipmentLabel = "Delhivery shipment",
+}) {
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(Boolean(lrNumber));
@@ -61,7 +65,9 @@ export default function OrderDelhiveryTrackingPanel({ lrNumber, orderId }) {
   const lr = String(lrNumber || "").trim();
   if (!lr) return null;
 
-  const headline = result ? orderStatusHeadline(result.status) : "Delhivery shipment";
+  const headline = result
+    ? orderStatusHeadline(result.status)
+    : shipmentLabel;
   const delivered = String(result?.status || "")
     .toUpperCase()
     .includes("DELIVER");
@@ -91,7 +97,10 @@ export default function OrderDelhiveryTrackingPanel({ lrNumber, orderId }) {
           </div>
         </div>
         {orderId ? (
-          <p className="mt-1.5 text-[11px] text-white/80 sm:text-xs">Order {orderId}</p>
+          <p className="mt-1.5 text-[11px] text-white/80 sm:text-xs">
+            Order {orderId}
+            {shipmentLabel ? ` · ${shipmentLabel}` : ""}
+          </p>
         ) : null}
       </div>
 

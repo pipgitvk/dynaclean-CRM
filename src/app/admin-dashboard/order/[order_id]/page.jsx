@@ -8,6 +8,7 @@ import { ensureOrderShipmentTrackingColumns } from "@/lib/ensureOrderShipmentTra
 import { fetchBookingBatchesForOrder } from "@/lib/orderBookingBatches";
 import { attachActiveInvoiceFieldsToOrder } from "@/lib/activeInvoiceForOrder";
 import { fetchDelhiveryLrForOrder, canViewOrderDelhiveryTracking } from "@/lib/resolveOrderDelhiveryLr";
+import { persistOrderTrackingFromReturnBooking } from "@/lib/orderTrackingIdPersist";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,18 @@ async function fetchOrderData(orderId, { withDelhiveryTracking = false } = {}) {
 
   let orderDetails = orderRows[0];
   orderDetails = await attachActiveInvoiceFieldsToOrder(conn, orderDetails);
+
+  const returnBookingRef = String(orderDetails.return_booking_ref ?? "").trim();
+  if (returnBookingRef) {
+    try {
+      await persistOrderTrackingFromReturnBooking(conn, orderDetails.order_id ?? orderId, {
+        returnBookingRef,
+        returnBookingUrl: orderDetails.return_booking_url,
+      });
+    } catch {
+      /* non-fatal */
+    }
+  }
 
   const [items] = await conn.execute(
     "SELECT * FROM quotation_items WHERE quote_number = ?",
@@ -59,6 +72,17 @@ async function fetchOrderData(orderId, { withDelhiveryTracking = false } = {}) {
         orderDetails.order_id ?? orderId,
         orderDetails,
         bookingBatches,
+        { shipmentKind: "outbound" },
+      )
+    : null;
+
+  const returnDelhiveryLr = withDelhiveryTracking
+    ? await fetchDelhiveryLrForOrder(
+        conn,
+        orderDetails.order_id ?? orderId,
+        orderDetails,
+        bookingBatches,
+        { shipmentKind: "return" },
       )
     : null;
 
@@ -68,14 +92,14 @@ async function fetchOrderData(orderId, { withDelhiveryTracking = false } = {}) {
     statuses,
     gstin,
     delhiveryLr,
+    returnDelhiveryLr,
   };
 }
 
 export default async function Page({ params }) {
   const { order_id } = await params;
-  // console.log("par:", order_id);
-  const orderId = parseInt(order_id);
-  if (isNaN(orderId)) notFound();
+  const orderId = String(order_id ?? "").trim();
+  if (!orderId) notFound();
 
   let userRole = "";
   const payload = await getSessionPayload();
@@ -94,7 +118,7 @@ export default async function Page({ params }) {
     payload?.userRole,
   );
 
-  const { orderDetails, items, statuses, gstin, delhiveryLr } =
+  const { orderDetails, items, statuses, gstin, delhiveryLr, returnDelhiveryLr } =
     await fetchOrderData(orderId, {
       withDelhiveryTracking: showDelhiveryTracking,
     });
@@ -141,6 +165,7 @@ export default async function Page({ params }) {
         gstin={gstin}
         userRole={userRole}
         delhiveryLr={delhiveryLr}
+        returnDelhiveryLr={returnDelhiveryLr}
       />
     </div>
   );
