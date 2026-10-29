@@ -50,6 +50,22 @@ function getDefaultAttendanceMonthRange() {
   };
 }
 
+function halfDayLeaveBadge(log) {
+  if (log?.approvedHalfDay) return log.approvedHalfDay;
+  if (log?.is_half_day == 1) {
+    return { half_day_type: log.half_day_type };
+  }
+  return null;
+}
+
+function rowShowsAttendanceLogColumns(log) {
+  if (log?.type === "present") return true;
+  return (
+    log?.has_punch_on_leave == 1 &&
+    rowHasMeaningfulCheckinOrCheckout(log)
+  );
+}
+
 function CheckoutTimeDisplay({ log }) {
   const time = formatTime(log.checkout_time);
   if (!isAutomaticCheckoutAddress(log.checkout_address)) return time;
@@ -519,16 +535,41 @@ const AttendancePage = () => {
       const treatAsHalfDay = hasRealPunch || leaveIsHalfDay;
       const derivedType = deriveHalfDayType(approvedPaidLeave.start_time, approvedPaidLeave.end_time);
       const finalHalfType = approvedPaidLeave.half_day_type || derivedType || (hasRealPunch ? "1st_half" : "1st_half");
-      allDates.push({
-        date: dateString,
-        type: "paidleave",
-        leaveType: "Paid",
-        leaveReason: approvedPaidLeave.reason || null,
-        is_half_day: treatAsHalfDay ? 1 : 0,
-        half_day_type: treatAsHalfDay ? finalHalfType : null,
-        has_punch_on_leave: hasRealPunch ? 1 : 0,
-        isSunday: isWeekend,
-      });
+      const halfDayMeta = treatAsHalfDay
+        ? {
+            half_day_type: finalHalfType,
+            leave_type: "paid",
+            reason: approvedPaidLeave.reason,
+          }
+        : null;
+
+      if (hasRealPunch) {
+        allDates.push({
+          ...existingLog,
+          date: dateString,
+          type: "present",
+          workedSunday: isWeekend,
+          approvedHalfDay: halfDayMeta,
+          leaveType: "Paid",
+          leaveReason: approvedPaidLeave.reason || null,
+          is_half_day: treatAsHalfDay ? 1 : 0,
+          half_day_type: treatAsHalfDay ? finalHalfType : null,
+          has_punch_on_leave: 1,
+          isSunday: isWeekend,
+        });
+      } else {
+        allDates.push({
+          date: dateString,
+          type: "paidleave",
+          leaveType: "Paid",
+          leaveReason: approvedPaidLeave.reason || null,
+          is_half_day: treatAsHalfDay ? 1 : 0,
+          half_day_type: treatAsHalfDay ? finalHalfType : null,
+          has_punch_on_leave: 0,
+          isSunday: isWeekend,
+          approvedHalfDay: halfDayMeta,
+        });
+      }
     } else if (hasRealPunch) {
       allDates.push({ ...existingLog, type: "present", workedSunday: isWeekend, approvedHalfDay });
     } else {
@@ -880,15 +921,21 @@ const AttendancePage = () => {
                         </span>
                       )}
                     </span>
-                    {log.approvedHalfDay && (
+                    {halfDayLeaveBadge(log) && (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-orange-100 text-orange-700 border border-orange-200">
                         <Sun className="w-3 h-3" />
-                        Half-Day · {log.approvedHalfDay.half_day_type === "1st_half" ? "1st Half" : "2nd Half"}
+                        Half-Day · {halfDayLeaveBadge(log).half_day_type === "1st_half" ? "1st Half" : "2nd Half"}
+                      </span>
+                    )}
+                    {(log.leaveType === "Paid" || log.type === "paidleave") && (
+                      <span className="text-[11px] text-gray-600 capitalize">
+                        Paid leave
+                        {log.leaveReason ? ` · ${log.leaveReason}` : ""}
                       </span>
                     )}
                   </span>
                 </div>
-                {log.type === "present" ? (
+                {rowShowsAttendanceLogColumns(log) ? (
                   <>
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-semibold text-gray-900">
@@ -974,16 +1021,10 @@ const AttendancePage = () => {
                   <div className="text-center py-4">
                     {(log.type === "leave" || log.type === "paidleave") ? (
                       <>
-                        <p className={`text-lg font-bold ${log.is_half_day == 1 ? "text-orange-600" : ""}`}>
-                          {log.is_half_day == 1 ? "Half Day" : "Leave"}
+                        <p className="text-lg font-bold">
+                          {log.is_half_day == 1 ? "Leave" : log.type === "paidleave" ? "Paid Leave" : "Leave"}
                         </p>
-                        {log.is_half_day == 1 && (
-                          <span className="inline-flex items-center gap-1 mt-2 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-orange-100 text-orange-700 border border-orange-200">
-                            <Sun className="w-3 h-3" />
-                            {log.half_day_type === "2nd_half" ? "2nd Half" : "1st Half"}
-                          </span>
-                        )}
-                        {log.leaveType && (
+                        {log.leaveType && log.type !== "paidleave" && (
                           <p className="text-sm text-gray-600 mt-2 capitalize">{log.leaveType} Leave</p>
                         )}
                         {log.isSunday && (
@@ -1169,21 +1210,39 @@ const AttendancePage = () => {
                     key={index}
                     className={`transition-colors duration-150 ${log.workedSunday ? "bg-pink-200 hover:bg-pink-300" : "hover:bg-gray-50"}`}
                   >
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {formatCrmDateOnly(log.date)}
-                      {log.workedSunday && (
-                        <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-purple-100 text-purple-700 border border-purple-200">
-                          Working Sunday
-                        </span>
-                      )}
-                      {log.approvedHalfDay && (
-                        <span className="ml-2 mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-orange-100 text-orange-700 border border-orange-200">
-                          <Sun className="w-3 h-3" />
-                          Half-Day · {log.approvedHalfDay.half_day_type === "1st_half" ? "1st Half" : "2nd Half"}
-                        </span>
-                      )}
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900 align-top">
+                      <div className="flex flex-col gap-1">
+                        <div className="whitespace-nowrap">
+                          {formatCrmDateOnly(log.date)}
+                          {log.workedSunday && (
+                            <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-purple-100 text-purple-700 border border-purple-200">
+                              Working Sunday
+                            </span>
+                          )}
+                        </div>
+                        {halfDayLeaveBadge(log) && (
+                          <span className="inline-flex w-fit items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-orange-100 text-orange-700 border border-orange-200">
+                            <Sun className="w-3 h-3 shrink-0" />
+                            Half-Day ·{" "}
+                            {halfDayLeaveBadge(log).half_day_type === "1st_half"
+                              ? "1st Half"
+                              : "2nd Half"}
+                          </span>
+                        )}
+                        {(log.type === "paidleave" || log.leaveType === "Paid") && (
+                          <span className="text-[11px] text-gray-600 leading-snug">
+                            Paid leave
+                            {log.leaveReason ? (
+                              <>
+                                <br />
+                                <span className="text-gray-500">{log.leaveReason}</span>
+                              </>
+                            ) : null}
+                          </span>
+                        )}
+                      </div>
                     </td>
-                    {log.type === "present" ? (
+                    {rowShowsAttendanceLogColumns(log) ? (
                       <>
                         <td
                           className={`px-6 py-4 whitespace-nowrap text-sm text-gray-500 ${(() => {
@@ -1377,22 +1436,16 @@ const AttendancePage = () => {
                             ? "Absent"
                             : (log.type === "leave" || log.type === "paidleave")
                               ? log.is_half_day == 1
-                                ? <span className="text-orange-600">Half Day</span>
-                                : "Leave"
+                                ? "Leave"
+                                : log.type === "paidleave"
+                                  ? "Paid Leave"
+                                  : "Leave"
                               : log.type === "sunday"
                                 ? "Sunday"
                                 : "Holiday"}
                         </p>
-                        {(log.type === "leave" || log.type === "paidleave") && log.is_half_day == 1 && (
-                          <span className="inline-flex items-center gap-1 mt-2 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-orange-100 text-orange-700 border border-orange-200">
-                            <Sun className="w-3 h-3" />
-                            {log.half_day_type === "2nd_half" ? "2nd Half" : "1st Half"}
-                          </span>
-                        )}
-                        {log.leaveType && (
-                          <p className={`text-sm mt-2 capitalize ${log.is_half_day == 1 ? "text-gray-600" : "mt-1"}`}>
-                            {log.leaveType} Leave
-                          </p>
+                        {log.leaveType && log.type !== "paidleave" && (
+                          <p className="text-sm mt-2 capitalize">{log.leaveType} Leave</p>
                         )}
                         {log.isSunday && (
                           <span className="inline-flex items-center gap-1 mt-2 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-purple-100 text-purple-800 border border-purple-200">
