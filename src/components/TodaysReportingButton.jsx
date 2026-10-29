@@ -48,7 +48,7 @@ export default function TodaysReportingButton({ variant = "default" }) {
     return (
       <SummaryStatCard
         href="/sales-dashboard/customers?filter=today_reporting"
-        label="TL Followup"
+        label="TL Report"
         count={count}
         suffix="Reports"
         icon={Calendar}
