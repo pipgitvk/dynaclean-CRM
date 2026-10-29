@@ -6,6 +6,7 @@ import {
   TRACKING_TYPE_DELIVERY,
   TRACKING_TYPE_RETURN,
 } from "@/lib/orderTrackingIdPersist";
+import { normalizeRoleKey, isSuperAdminRole } from "@/lib/roleKeyUtils";
 
 const LR_URL_RE = /\/lr\/(\d+)/i;
 
@@ -108,9 +109,20 @@ export async function fetchDelhiveryLrForOrder(
 
 const DELHIVERY_TRACKING_ROLES = new Set(["SUPERADMIN", "ADMIN"]);
 
-/** Live Delhivery timeline on order detail — SUPERADMIN & ADMIN only. */
+/** Outbound Delhivery timeline — SUPERADMIN & ADMIN. */
 export function canViewOrderDelhiveryTracking(...roles) {
-  return roles.some((r) =>
-    DELHIVERY_TRACKING_ROLES.has(String(r ?? "").trim().toUpperCase()),
-  );
+  return roles.some((r) => {
+    const k = normalizeRoleKey(r || "");
+    if (isSuperAdminRole(r)) return true;
+    return k === "ADMIN" || DELHIVERY_TRACKING_ROLES.has(k);
+  });
+}
+
+/** Return shipment Delhivery timeline — SUPERADMIN & ADMIN only. */
+export function canViewReturnShipmentTracking(...roles) {
+  return roles.some((r) => {
+    const k = normalizeRoleKey(r || "");
+    if (isSuperAdminRole(r)) return true;
+    return k === "ADMIN";
+  });
 }

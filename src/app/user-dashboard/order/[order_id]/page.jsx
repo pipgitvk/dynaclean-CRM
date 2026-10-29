@@ -11,7 +11,9 @@ import { fetchBookingBatchesForOrder } from "@/lib/orderBookingBatches";
 import {
   fetchDelhiveryLrForOrder,
   canViewOrderDelhiveryTracking,
+  canViewReturnShipmentTracking,
 } from "@/lib/resolveOrderDelhiveryLr";
+import { persistOrderTrackingFromReturnBooking } from "@/lib/orderTrackingIdPersist";
 
 export const dynamic = "force-dynamic";
 
@@ -22,9 +24,13 @@ function getOrderListPath(userRole) {
   return "/user-dashboard/order";
 }
 
-async function fetchOrderData(orderId, { withDelhiveryTracking = false } = {}) {
+async function fetchOrderData(
+  orderId,
+  { withOutboundTracking = false, withReturnTracking = false } = {},
+) {
   const conn = await getDbConnection();
-  if (withDelhiveryTracking) {
+  const needTracking = withOutboundTracking || withReturnTracking;
+  if (needTracking) {
     await ensureOrderShipmentTrackingColumns(conn);
   }
 
@@ -37,6 +43,18 @@ async function fetchOrderData(orderId, { withDelhiveryTracking = false } = {}) {
 
   let orderDetails = orderRows[0];
   orderDetails = await attachActiveInvoiceFieldsToOrder(conn, orderDetails);
+
+  const returnBookingRef = String(orderDetails.return_booking_ref ?? "").trim();
+  if (returnBookingRef) {
+    try {
+      await persistOrderTrackingFromReturnBooking(conn, orderDetails.order_id ?? orderId, {
+        returnBookingRef,
+        returnBookingUrl: orderDetails.return_booking_url,
+      });
+    } catch {
+      /* non-fatal */
+    }
+  }
 
   const [items] = await conn.execute(
     "SELECT * FROM quotation_items WHERE quote_number = ?",
@@ -66,16 +84,32 @@ async function fetchOrderData(orderId, { withDelhiveryTracking = false } = {}) {
 
   // await conn.end();
 
-  let delhiveryLr = null;
-  if (withDelhiveryTracking && orderDetails) {
-    const bookingBatches = await fetchBookingBatchesForOrder(conn, orderId);
-    delhiveryLr = await fetchDelhiveryLrForOrder(
-      conn,
-      orderDetails.order_id ?? orderId,
-      orderDetails,
-      bookingBatches,
-    );
-  }
+  const bookingBatches =
+    needTracking && orderDetails
+      ? await fetchBookingBatchesForOrder(conn, orderId)
+      : [];
+
+  const delhiveryLr =
+    withOutboundTracking && orderDetails
+      ? await fetchDelhiveryLrForOrder(
+          conn,
+          orderDetails.order_id ?? orderId,
+          orderDetails,
+          bookingBatches,
+          { shipmentKind: "outbound" },
+        )
+      : null;
+
+  const returnDelhiveryLr =
+    withReturnTracking && orderDetails
+      ? await fetchDelhiveryLrForOrder(
+          conn,
+          orderDetails.order_id ?? orderId,
+          orderDetails,
+          bookingBatches,
+          { shipmentKind: "return" },
+        )
+      : null;
 
   return {
     orderDetails,
@@ -84,13 +118,14 @@ async function fetchOrderData(orderId, { withDelhiveryTracking = false } = {}) {
     gstin,
     quoteCustomerId,
     delhiveryLr,
+    returnDelhiveryLr,
   };
 }
 
 export default async function Page({ params }) {
   const { order_id } = await params;
-  const orderId = parseInt(order_id);
-  if (isNaN(orderId)) notFound();
+  const orderId = String(order_id ?? "").trim();
+  if (!orderId) notFound();
 
   const payload = await getSessionPayload();
   let orderListPath = "/user-dashboard/order";
@@ -116,12 +151,9 @@ export default async function Page({ params }) {
     showDualPaymentAmountFields = roleShowsDualOrderAmountFields(userRole);
   }
 
-  const showDelhiveryTracking = canViewOrderDelhiveryTracking(
-    userRole,
-    empRole,
-    payload?.role,
-    payload?.userRole,
-  );
+  const roleCandidates = [userRole, empRole, payload?.role, payload?.userRole];
+  const showOutboundTracking = canViewOrderDelhiveryTracking(...roleCandidates);
+  const showReturnTracking = canViewReturnShipmentTracking(...roleCandidates);
 
   const {
     orderDetails,
@@ -130,8 +162,10 @@ export default async function Page({ params }) {
     gstin,
     quoteCustomerId,
     delhiveryLr,
+    returnDelhiveryLr,
   } = await fetchOrderData(orderId, {
-    withDelhiveryTracking: showDelhiveryTracking,
+    withOutboundTracking: showOutboundTracking,
+    withReturnTracking: showReturnTracking,
   });
 
   if (
@@ -173,6 +207,8 @@ export default async function Page({ params }) {
         canUploadDocuments={canUploadDocuments}
         showDualPaymentAmountFields={showDualPaymentAmountFields}
         delhiveryLr={delhiveryLr}
+        returnDelhiveryLr={returnDelhiveryLr}
+        showReturnTracking={showReturnTracking}
       />
     </div>
   );
