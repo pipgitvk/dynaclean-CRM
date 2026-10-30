@@ -5,7 +5,10 @@ import dayjs from "dayjs";
 import { getSessionPayload } from "@/lib/auth";
 import { isOrderVisibleToViewer } from "@/lib/orderApprovalVisibility";
 import { ensureOrderShipmentTrackingColumns } from "@/lib/ensureOrderShipmentTrackingColumns";
-import { fetchBookingBatchesForOrder } from "@/lib/orderBookingBatches";
+import {
+  attachBookingBatchesToOrders,
+  fetchBookingBatchesForOrder,
+} from "@/lib/orderBookingBatches";
 import { attachActiveInvoiceFieldsToOrder } from "@/lib/activeInvoiceForOrder";
 import {
   fetchDelhiveryLrForOrder,
@@ -30,6 +33,7 @@ async function fetchOrderData(orderId, { withDelhiveryTracking = false } = {}) {
 
   let orderDetails = orderRows[0];
   orderDetails = await attachActiveInvoiceFieldsToOrder(conn, orderDetails);
+  [orderDetails] = await attachBookingBatchesToOrders(conn, [orderDetails]);
 
   const returnBookingRef = String(orderDetails.return_booking_ref ?? "").trim();
   if (returnBookingRef) {
@@ -168,7 +172,7 @@ export default async function Page({ params }) {
         statuses={statuses}
         orderId={orderId}
         gstin={gstin}
-        userRole={userRole}
+        userRole={userRole || payload?.role || payload?.userRole || ""}
         showDualPaymentAmountFields={showDualPaymentAmountFields}
         delhiveryLr={delhiveryLr}
         returnDelhiveryLr={returnDelhiveryLr}

@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import dayjs from "dayjs";
 import OrderApprovalActions from "../OrderApprovalActions";
+import OrderBookingDetailLinks from "@/components/orders/OrderBookingDetailLinks";
 import OrderDocumentFileCard from "@/components/orders/OrderDocumentFileCard";
 import {
   ORDER_PIPELINE_STAGES,
@@ -99,6 +100,7 @@ export default function OrderDetailsClient({
 
   return (
     <div className="p-4 space-y-6">
+      <OrderBookingDetailLinks order={orderDetails} userRole={userRole} />
       {delhiveryLr ? (
         <OrderDelhiveryTrackingPanel
           lrNumber={delhiveryLr}
