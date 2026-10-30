@@ -29,27 +29,79 @@ export function orderStatusHeadline(status) {
   if (!raw) return "Order status";
   const upper = raw.toUpperCase();
   if (upper === "DELIVERED") return "Order Delivered";
+  if (/\bOUT\s+FOR\s+DELIVERY\b/i.test(upper)) return "Order Out for Delivery";
   if (upper.includes("TRANSIT")) return "Order In Transit";
   if (upper.includes("DISPATCH")) return "Order Dispatched";
   return `Order ${raw.charAt(0).toUpperCase()}${raw.slice(1).toLowerCase()}`;
 }
 
-/** Milestones for Tracking tab from B2B track API payload. */
+/** Normalize Delhivery status strings (LEFT_ORIGIN → LEFT ORIGIN). */
+export function normalizeDelhiveryStatus(status) {
+  return String(status || "")
+    .trim()
+    .toUpperCase()
+    .replace(/_/g, " ");
+}
+
+export function isDelhiveryOutForDelivery(status, scanRemark = "") {
+  const upper = normalizeDelhiveryStatus(status);
+  const remark = String(scanRemark || "").toLowerCase();
+  if (/\bOUT\s+FOR\s+DELIVERY\b/.test(upper)) return true;
+  if (remark.includes("out for delivery")) return true;
+  if (remark.includes("out for") && !remark.includes("not out for")) return true;
+  return false;
+}
+
+/** True only when shipment is actually delivered — not “out for delivery” / “undelivered”. */
+export function isDelhiveryShipmentDelivered(status, deliveredDate) {
+  if (toValidIso(deliveredDate)) return true;
+  const upper = normalizeDelhiveryStatus(status);
+  if (!upper) return false;
+  if (/\b(NOT|UN|NON)\s*DELIVERED\b/.test(upper)) return false;
+  if (/\bUNDELIVERED\b/.test(upper)) return false;
+  if (isDelhiveryOutForDelivery(status)) return false;
+  if (upper === "DELIVERED") return true;
+  return /\bDELIVERED\b/.test(upper);
+}
+
+/** Fixed shipment milestones (always show exactly these four). */
+export const DELHIVERY_TRACKING_MILESTONES = [
+  { key: "pickup", label: "Picked Up" },
+  { key: "transit", label: "On the Way" },
+  { key: "ofd", label: "Out for Delivery" },
+  { key: "delivered", label: "Delivered" },
+];
+
+function toValidIso(value) {
+  if (value == null || value === "") return null;
+  const t = dayjs(value);
+  return t.isValid() ? t.toISOString() : null;
+}
+
+/** Milestones for Tracking tab from B2B track API payload — always 4 steps. */
 export function buildDelhiveryTrackingTimeline(data) {
-  if (!data || typeof data !== "object") return [];
+  const empty = () =>
+    DELHIVERY_TRACKING_MILESTONES.map((m) => ({
+      ...m,
+      at: null,
+      state: "pending",
+      footnote: null,
+      highlight: false,
+    }));
+
+  if (!data || typeof data !== "object") return empty();
 
   const status = String(data.status || "").toUpperCase();
-  const delivered = status.includes("DELIVER");
-  const steps = [];
+  const delivered = isDelhiveryShipmentDelivered(data.status, data.delivered_date);
+  const remark = String(data.scan_remark || "").trim();
+  const lastScan = data.timestamp;
 
-  const push = (label, at, extra = {}) => {
-    if (!at) return;
-    const t = dayjs(at);
-    if (!t.isValid()) return;
-    steps.push({ label, at: t.toISOString(), ...extra });
+  const dates = {
+    pickup: toValidIso(data.pickup_date),
+    transit: null,
+    ofd: null,
+    delivered: null,
   };
-
-  push("Picked Up", data.pickup_date, { key: "pickup" });
 
   if (data.manifested_date) {
     const manifest = dayjs(data.manifested_date);
@@ -59,56 +111,77 @@ export function buildDelhiveryTrackingTimeline(data) {
       manifest.isAfter(pickup) ||
       manifest.isSame(pickup, "day")
     ) {
-      push("On the Way", data.manifested_date, { key: "transit" });
+      dates.transit = toValidIso(data.manifested_date);
     }
   }
 
-  const lastScan = data.timestamp;
   const deliveredAt = data.delivered_date || (delivered ? lastScan : null);
 
   if (delivered && lastScan && deliveredAt) {
     const scanT = dayjs(lastScan);
     const delT = dayjs(deliveredAt);
     if (scanT.isValid() && delT.isValid() && scanT.isBefore(delT.subtract(5, "minute"))) {
-      push("Out for Delivery", lastScan, { key: "ofd" });
+      dates.ofd = toValidIso(lastScan);
     } else if (delT.isValid()) {
-      push("Out for Delivery", delT.subtract(4, "hour"), { key: "ofd" });
+      dates.ofd = toValidIso(delT.subtract(4, "hour"));
     }
+    dates.delivered = toValidIso(deliveredAt || lastScan);
   } else if (!delivered && lastScan) {
-    const remark = String(data.scan_remark || "").toLowerCase();
-    if (remark.includes("out for") || remark.includes("dispatch")) {
-      push("Out for Delivery", lastScan, { key: "ofd" });
+    if (isDelhiveryOutForDelivery(data.status, remark)) {
+      dates.ofd = toValidIso(lastScan);
     } else {
-      push("On the Way", lastScan, { key: "transit" });
+      dates.transit = dates.transit || toValidIso(lastScan);
     }
   }
 
+  if (delivered && !dates.delivered) {
+    dates.delivered = toValidIso(deliveredAt || lastScan);
+  }
+
+  let activeIndex = 0;
   if (delivered) {
-    push("Delivered", deliveredAt || lastScan, {
-      key: "delivered",
-      footnote: "Your order has been delivered",
-      highlight: true,
-    });
-  } else if (status) {
-    push(
-      String(data.status).replace(/_/g, " "),
-      lastScan || data.estimated_date,
-      { key: "current", highlight: true },
-    );
+    activeIndex = 3;
+  } else if (dates.ofd || isDelhiveryOutForDelivery(data.status, remark)) {
+    activeIndex = 2;
+  } else if (dates.transit || lastScan) {
+    activeIndex = 1;
+  } else if (dates.pickup) {
+    activeIndex = 1;
   }
 
-  const seen = new Set();
-  const unique = [];
-  for (const step of steps.sort(
-    (a, b) => dayjs(a.at).valueOf() - dayjs(b.at).valueOf(),
-  )) {
-    const dedupeKey = `${step.label}|${dayjs(step.at).format("YYYY-MM-DD HH:mm")}`;
-    if (seen.has(dedupeKey)) continue;
-    seen.add(dedupeKey);
-    unique.push(step);
-  }
+  return DELHIVERY_TRACKING_MILESTONES.map((m, idx) => {
+    let state = "pending";
+    if (delivered) {
+      state = idx < 3 ? "completed" : "active";
+    } else if (idx < activeIndex) {
+      state = "completed";
+    } else if (idx === activeIndex) {
+      state = "active";
+    }
 
-  return unique;
+    let at = dates[m.key];
+    if (state === "active" && !at && (m.key === "transit" || m.key === "ofd")) {
+      at = toValidIso(lastScan);
+    }
+    if (state === "pending") at = null;
+
+    let footnote = null;
+    if (state === "active") {
+      if (m.key === "delivered" && delivered) {
+        footnote = "Your order has been delivered";
+      } else if (remark && (m.key === "transit" || m.key === "ofd")) {
+        footnote = remark;
+      }
+    }
+
+    return {
+      ...m,
+      at,
+      state,
+      footnote,
+      highlight: state === "active",
+    };
+  });
 }
 
 export const DELHIVERY_ORDER_DETAIL_FIELDS = [
@@ -192,13 +265,14 @@ export const DELHIVERY_ORDER_DETAIL_SECTIONS = [
 ];
 
 export function delhiveryStatusBadgeClass(status) {
-  const upper = String(status || "")
-    .trim()
-    .toUpperCase();
-  if (upper.includes("DELIVER")) {
+  const upper = normalizeDelhiveryStatus(status);
+  if (isDelhiveryShipmentDelivered(status, null)) {
     return "bg-emerald-100 text-emerald-800 ring-emerald-200";
   }
-  if (upper.includes("TRANSIT") || upper.includes("DISPATCH")) {
+  if (isDelhiveryOutForDelivery(status)) {
+    return "bg-amber-100 text-amber-900 ring-amber-200";
+  }
+  if (upper.includes("TRANSIT") || upper.includes("DISPATCH") || upper.includes("ORIGIN")) {
     return "bg-amber-100 text-amber-900 ring-amber-200";
   }
   if (upper.includes("RTO") || upper.includes("CANCEL")) {

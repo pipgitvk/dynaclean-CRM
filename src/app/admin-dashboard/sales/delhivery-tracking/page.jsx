@@ -14,6 +14,7 @@ import {
   buildDelhiveryTrackingTimeline,
   formatDelhiveryTimelineDate,
   orderStatusHeadline,
+  isDelhiveryShipmentDelivered,
 } from "@/lib/delhiveryB2bTrackingUi";
 import DelhiveryOrderDetailsPanel from "./DelhiveryOrderDetailsPanel";
 
@@ -265,9 +266,7 @@ export default function DelhiveryTrackingPage() {
               <h2 className="text-xl font-bold tracking-tight">
                 {orderStatusHeadline(result.status)}
               </h2>
-              {String(result.status || "")
-                .toUpperCase()
-                .includes("DELIVER") && (
+              {isDelhiveryShipmentDelivered(result.status, result.delivered_date) && (
                 <CheckCircle2 className="h-6 w-6 shrink-0" strokeWidth={2.5} />
               )}
             </div>

@@ -6,7 +6,7 @@ import DelhiveryTrackingTimeline, {
   delhiveryTimelineFromTrackPayload,
 } from "@/components/orders/DelhiveryTrackingTimeline";
 import DelhiveryShipmentDetailsHover from "@/components/orders/DelhiveryShipmentDetailsHover";
-import { orderStatusHeadline } from "@/lib/delhiveryB2bTrackingUi";
+import { orderStatusHeadline, isDelhiveryShipmentDelivered } from "@/lib/delhiveryB2bTrackingUi";
 
 const DELIVERY_ACCENT = "#3B966F";
 const RETURN_ACCENT = "#DC2626";
@@ -72,9 +72,10 @@ export default function OrderDelhiveryTrackingPanel({
   const headline = result
     ? orderStatusHeadline(result.status)
     : shipmentLabel;
-  const delivered = String(result?.status || "")
-    .toUpperCase()
-    .includes("DELIVER");
+  const delivered = isDelhiveryShipmentDelivered(
+    result?.status,
+    result?.delivered_date,
+  );
   const awb = result?.mwbn || "";
   const isReturn = variant === "return";
   const accent = isReturn ? RETURN_ACCENT : DELIVERY_ACCENT;
