@@ -14,6 +14,7 @@ import toast from "react-hot-toast";
 import {
   buildDelhiveryTrackingTimeline,
   formatDelhiveryTimelineDate,
+  formatDelhiveryDateTime,
   orderStatusHeadline,
   isDelhiveryShipmentDelivered,
 } from "@/lib/delhiveryB2bTrackingUi";
@@ -394,29 +395,50 @@ export default function DelhiveryTrackingPage() {
           </p>
         ) : null}
         <div className="overflow-x-auto rounded-xl border border-slate-100">
-          <table className="min-w-[72rem] w-full text-left text-sm">
+          <table className="w-full min-w-[96rem] table-auto text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-gray-600">
               <tr>
-                <th className="px-3 py-2.5 font-semibold">Tracking ID (LR)</th>
-                <th className="px-3 py-2.5 font-semibold">Order</th>
-                <th className="px-3 py-2.5 font-semibold">Type</th>
-                <th className="px-3 py-2.5 font-semibold">Status</th>
-                <th className="px-3 py-2.5 font-semibold">Latest remark</th>
-                <th className="px-3 py-2.5 font-semibold">Location</th>
-                <th className="px-3 py-2.5 font-semibold">Fetched</th>
-                <th className="min-w-[22rem] px-3 py-2.5 font-semibold">Error</th>
+                <th className="whitespace-nowrap px-3 py-2.5 font-semibold">
+                  Tracking ID (LR)
+                </th>
+                <th className="whitespace-nowrap px-3 py-2.5 font-semibold">
+                  Order
+                </th>
+                <th className="whitespace-nowrap px-3 py-2.5 font-semibold">
+                  Type
+                </th>
+                <th className="min-w-[8rem] px-3 py-2.5 font-semibold">Status</th>
+                <th className="whitespace-nowrap px-3 py-2.5 font-semibold">
+                  Pickup date
+                </th>
+                <th className="whitespace-nowrap px-3 py-2.5 font-semibold">
+                  Est. delivery
+                </th>
+                <th className="whitespace-nowrap px-3 py-2.5 font-semibold">
+                  Delivery date
+                </th>
+                <th className="min-w-[14rem] px-3 py-2.5 font-semibold">
+                  Latest remark
+                </th>
+                <th className="min-w-[12rem] px-3 py-2.5 font-semibold">
+                  Location
+                </th>
+                <th className="whitespace-nowrap px-3 py-2.5 font-semibold">
+                  Fetched
+                </th>
+                <th className="min-w-[16rem] px-3 py-2.5 font-semibold">Error</th>
               </tr>
             </thead>
             <tbody>
               {storedLoading ? (
                 <tr>
-                  <td colSpan={8} className="px-3 py-8 text-center text-gray-500">
+                  <td colSpan={11} className="px-3 py-8 text-center text-gray-500">
                     Loading saved data…
                   </td>
                 </tr>
               ) : storedRows.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-3 py-8 text-center text-gray-500">
+                  <td colSpan={11} className="px-3 py-8 text-center text-gray-500">
                     No rows yet. Click &quot;Fetch all tracking data&quot; to pull
                     Delhivery status for every LR in tracking_id.
                   </td>
@@ -427,7 +449,7 @@ export default function DelhiveryTrackingPage() {
                     key={row.id}
                     className="border-t border-slate-100 hover:bg-slate-50/80"
                   >
-                    <td className="px-3 py-2 font-medium text-gray-900">
+                    <td className="whitespace-nowrap px-3 py-2 align-top font-medium text-gray-900">
                       <button
                         type="button"
                         className="text-[#3B966F] hover:underline"
@@ -439,25 +461,34 @@ export default function DelhiveryTrackingPage() {
                         {row.tracking_id}
                       </button>
                     </td>
-                    <td className="px-3 py-2 text-gray-700">
+                    <td className="whitespace-normal break-words px-3 py-2 align-top text-gray-700">
                       {row.order_id || "—"}
                     </td>
-                    <td className="px-3 py-2 capitalize text-gray-600">
+                    <td className="whitespace-normal break-words px-3 py-2 align-top capitalize text-gray-600">
                       {row.shipment_type || "—"}
                     </td>
-                    <td className="px-3 py-2 text-gray-800">
+                    <td className="whitespace-normal break-words px-3 py-2 align-top text-gray-800">
                       {row.status || "—"}
                     </td>
-                    <td className="max-w-[12rem] truncate px-3 py-2 text-gray-600">
+                    <td className="whitespace-nowrap px-3 py-2 align-top text-gray-700">
+                      {formatDelhiveryDateTime(row.pickup_date)}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2 align-top text-gray-700">
+                      {formatDelhiveryDateTime(row.estimated_delivery_date)}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2 align-top text-gray-700">
+                      {formatDelhiveryDateTime(row.delivered_date)}
+                    </td>
+                    <td className="whitespace-normal break-words px-3 py-2 align-top text-gray-600">
                       {row.scan_remark || "—"}
                     </td>
-                    <td className="max-w-[10rem] truncate px-3 py-2 text-gray-600">
+                    <td className="whitespace-normal break-words px-3 py-2 align-top text-gray-600">
                       {row.location || "—"}
                     </td>
-                    <td className="whitespace-nowrap px-3 py-2 text-gray-500">
+                    <td className="whitespace-nowrap px-3 py-2 align-top text-gray-500">
                       {formatFetchedAt(row.fetched_at)}
                     </td>
-                    <td className="min-w-[22rem] max-w-[36rem] px-3 py-2 text-sm leading-snug text-red-700 whitespace-normal break-words align-top">
+                    <td className="whitespace-normal break-words px-3 py-2 align-top text-sm leading-snug text-red-700">
                       {row.fetch_error || "—"}
                     </td>
                   </tr>

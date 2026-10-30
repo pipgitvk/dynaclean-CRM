@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { ensureTrackingDataTable } from "@/lib/ensureTrackingDataTable";
+import { shouldShowDelhiveryTrackingRow } from "@/lib/delhiveryLrValidation";
+import { enrichTrackingDataRow } from "@/lib/delhiveryTrackingDataMeta";
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 500;
@@ -29,7 +31,8 @@ export async function GET(req) {
       const like = `%${q}%`;
       [rows] = await conn.query(
         `SELECT id, tracking_id, order_id, shipment_type, status, mwbn,
-                scan_remark, location, fetch_error, fetched_at
+                scan_remark, location, pickup_date, estimated_delivery_date,
+                delivered_date, fetch_error, fetched_at, payload
          FROM tracking_data
          WHERE tracking_id LIKE ? OR order_id LIKE ? OR status LIKE ?
          ORDER BY fetched_at DESC, id DESC
@@ -39,7 +42,8 @@ export async function GET(req) {
     } else {
       [rows] = await conn.query(
         `SELECT id, tracking_id, order_id, shipment_type, status, mwbn,
-                scan_remark, location, fetch_error, fetched_at
+                scan_remark, location, pickup_date, estimated_delivery_date,
+                delivered_date, fetch_error, fetched_at, payload
          FROM tracking_data
          ORDER BY fetched_at DESC, id DESC
          LIMIT ?`,
@@ -47,9 +51,14 @@ export async function GET(req) {
       );
     }
 
+    const list = Array.isArray(rows) ? rows : [];
+    const data = list
+      .filter(shouldShowDelhiveryTrackingRow)
+      .map(enrichTrackingDataRow);
+
     return NextResponse.json({
       success: true,
-      data: Array.isArray(rows) ? rows : [],
+      data,
     });
   } catch (err) {
     console.error("[delhivery/tracking-data GET]", err);

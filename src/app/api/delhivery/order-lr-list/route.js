@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
+import { shouldShowDelhiveryTrackingRow } from "@/lib/delhiveryLrValidation";
 
 const DEFAULT_LIMIT = 25;
 const MAX_LIMIT = 100;
@@ -42,9 +43,12 @@ export async function GET(req) {
       );
     }
 
+    const list = Array.isArray(rows) ? rows : [];
+    const data = list.filter(shouldShowDelhiveryTrackingRow);
+
     return NextResponse.json({
       success: true,
-      data: Array.isArray(rows) ? rows : [],
+      data,
     });
   } catch (err) {
     console.error("[delhivery/order-lr-list]", err);

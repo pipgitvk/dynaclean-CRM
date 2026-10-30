@@ -15,6 +15,9 @@ export async function ensureTrackingDataTable(conn) {
       mwbn VARCHAR(64) NULL,
       scan_remark VARCHAR(512) NULL,
       location VARCHAR(255) NULL,
+      pickup_date DATETIME NULL,
+      estimated_delivery_date DATETIME NULL,
+      delivered_date DATETIME NULL,
       payload LONGTEXT NOT NULL COMMENT 'Delhivery API JSON response',
       fetch_error TEXT NULL,
       fetched_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -41,6 +44,17 @@ export async function ensureTrackingDataTable(conn) {
     `);
   } catch {
     /* table new or already LONGTEXT */
+  }
+  for (const sql of [
+    `ALTER TABLE tracking_data ADD COLUMN pickup_date DATETIME NULL AFTER location`,
+    `ALTER TABLE tracking_data ADD COLUMN estimated_delivery_date DATETIME NULL AFTER pickup_date`,
+    `ALTER TABLE tracking_data ADD COLUMN delivered_date DATETIME NULL AFTER estimated_delivery_date`,
+  ]) {
+    try {
+      await conn.execute(sql);
+    } catch {
+      /* column exists */
+    }
   }
   trackingDataTableReady = true;
 }

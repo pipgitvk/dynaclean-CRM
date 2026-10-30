@@ -7,6 +7,11 @@ import {
   defaultDelhiveryTrackDelayMs,
   fetchDelhiveryB2bTrackWithRetry,
 } from "@/lib/delhiveryB2bTrackFetch";
+import {
+  isDelhiveryB2bLrNumber,
+  isDelhiveryInvalidLrnFetchError,
+} from "@/lib/delhiveryLrValidation";
+import { pickDelhiveryTrackingDates } from "@/lib/delhiveryTrackingDataMeta";
 
 export const maxDuration = 120;
 
@@ -17,14 +22,21 @@ function pickMetaFromPayload(data) {
       mwbn: null,
       scan_remark: null,
       location: null,
+      pickup_date: null,
+      estimated_delivery_date: null,
+      delivered_date: null,
     };
   }
+  const dates = pickDelhiveryTrackingDates(data);
   return {
     status: data.status != null ? String(data.status).slice(0, 128) : null,
     mwbn: data.mwbn != null ? String(data.mwbn).slice(0, 64) : null,
     scan_remark:
       data.scan_remark != null ? String(data.scan_remark).slice(0, 512) : null,
     location: data.location != null ? String(data.location).slice(0, 255) : null,
+    pickup_date: dates.pickup_date,
+    estimated_delivery_date: dates.estimated_delivery_date,
+    delivered_date: dates.delivered_date,
   };
 }
 
@@ -37,8 +49,8 @@ async function upsertTrackingRow(conn, row, fetchResult) {
     const meta = pickMetaFromPayload(fetchResult.data);
     await conn.execute(
       `INSERT INTO tracking_data
-        (tracking_id, order_id, shipment_type, status, mwbn, scan_remark, location, payload, fetch_error)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)
+        (tracking_id, order_id, shipment_type, status, mwbn, scan_remark, location, pickup_date, estimated_delivery_date, delivered_date, payload, fetch_error)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
        ON DUPLICATE KEY UPDATE
          order_id = VALUES(order_id),
          shipment_type = VALUES(shipment_type),
@@ -46,6 +58,9 @@ async function upsertTrackingRow(conn, row, fetchResult) {
          mwbn = VALUES(mwbn),
          scan_remark = VALUES(scan_remark),
          location = VALUES(location),
+         pickup_date = VALUES(pickup_date),
+         estimated_delivery_date = VALUES(estimated_delivery_date),
+         delivered_date = VALUES(delivered_date),
          payload = VALUES(payload),
          fetch_error = NULL,
          fetched_at = CURRENT_TIMESTAMP`,
@@ -57,6 +72,9 @@ async function upsertTrackingRow(conn, row, fetchResult) {
         meta.mwbn,
         meta.scan_remark,
         meta.location,
+        meta.pickup_date,
+        meta.estimated_delivery_date,
+        meta.delivered_date,
         JSON.stringify(fetchResult.data),
       ],
     );
@@ -105,6 +123,8 @@ async function loadEligibleJobs(conn, { force, retryErrorsOnly, freshHours }) {
   for (const row of rows || []) {
     const lr = String(row.lr_number || "").trim();
     if (!lr || seen.has(lr)) continue;
+    if (!isDelhiveryB2bLrNumber(lr)) continue;
+    if (isDelhiveryInvalidLrnFetchError(row.cached_error)) continue;
     seen.add(lr);
 
     if (retryErrorsOnly) {
