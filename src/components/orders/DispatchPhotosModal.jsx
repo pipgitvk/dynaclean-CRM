@@ -6,10 +6,12 @@ import { Images, X } from "lucide-react";
 const PHOTO_LABELS = ["Front", "Back", "Right", "Left"];
 
 function splitPhotos(value) {
-  return String(value || "")
+  const urls = String(value || "")
     .split(",")
     .map((part) => part.trim())
     .filter(Boolean);
+  const unique = [...new Set(urls)];
+  return unique.length > 4 ? unique.slice(0, 4) : unique;
 }
 
 export function DispatchPhotosModal({ orderId, onClose }) {

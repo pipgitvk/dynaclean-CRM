@@ -9,6 +9,7 @@ import {
   isDelhiGodown,
   pickRowColumn,
 } from "@/lib/godownStock";
+import { normalizeDispatchPhotoUrls } from "@/lib/dispatchRowPersist";
 import { v2 as cloudinary } from "cloudinary";
 
 cloudinary.config({
@@ -93,16 +94,11 @@ export async function POST(req) {
     const accessoriesStockAlreadyDeducted =
       rows && rows[0] && rows[0].accessories_stock_deducted === 1;
 
-    let newPhotos = null;
-    if (photoUrls.length) {
-      if (prevPhotos) {
-        newPhotos = prevPhotos + "," + photoUrls.join(",");
-      } else {
-        newPhotos = photoUrls.join(",");
-      }
-    } else {
-      newPhotos = prevPhotos; // keep existing if none uploaded
-    }
+    const newPhotos = normalizeDispatchPhotoUrls(
+      prevPhotos,
+      photoUrls,
+      stockAlreadyDeducted,
+    );
 
     // Fetch dispatch row to know what item to deduct and quote link
     const [dispatchRows] = await conn.execute(

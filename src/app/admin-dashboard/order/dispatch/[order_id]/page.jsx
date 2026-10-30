@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useAsyncClick } from "@/lib/useAsyncClick";
 import { buildChecklistAccessoriesUrl } from "@/lib/dispatchChecklistAccessories";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -11,6 +11,10 @@ import {
   isProductItem,
   isServiceCharge,
 } from "@/lib/dispatchSerialRules";
+import {
+  afterDispatchRowSaved,
+  shouldSkipDispatchUploadForRow,
+} from "@/lib/dispatchRowPersist";
 
 export default function DispatchFormPage({ params }) {
   const router = useRouter();
@@ -22,6 +26,7 @@ export default function DispatchFormPage({ params }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savedIds, setSavedIds] = useState(new Set());
+  const persistedRowIdsRef = useRef(new Set());
   const [initialSerialNos, setInitialSerialNos] = useState(new Set());
   const [stockInfo, setStockInfo] = useState({});
   const [lowStockWarnings, setLowStockWarnings] = useState({});
@@ -236,7 +241,7 @@ export default function DispatchFormPage({ params }) {
       }
       throw new Error(json.error || "Failed to update");
     }
-    setSavedIds((prev) => new Set(prev).add(row.id));
+    afterDispatchRowSaved(row.id, setSavedIds, setRows, persistedRowIdsRef);
   };
 
   const completeAll = async () => {
@@ -260,9 +265,17 @@ export default function DispatchFormPage({ params }) {
       }
 
       for (const row of rows) {
-        if (!initialSerialNos.has(row.id)) {
-          await uploadForRow(row);
+        if (
+          shouldSkipDispatchUploadForRow(
+            row,
+            initialSerialNos,
+            savedIds,
+            persistedRowIdsRef,
+          )
+        ) {
+          continue;
         }
+        await uploadForRow(row);
       }
 
       // mark order dispatch complete

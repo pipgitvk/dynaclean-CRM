@@ -6,10 +6,11 @@ import { useParams } from "next/navigation";
 const PHOTO_LABELS = ["Front", "Back", "Right", "Left"];
 
 function parsePhotos(value) {
-  return String(value || "")
+  const urls = String(value || "")
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
+  return [...new Set(urls)];
 }
 
 function parseAccessories(value) {
@@ -57,7 +58,10 @@ export default function DispatchViewContent() {
       ) : (
         <div className="space-y-6">
           {rows.map((r) => {
-            const photos = parsePhotos(r.photos);
+            let photos = parsePhotos(r.photos);
+            if (photos.length > 4) {
+              photos = photos.slice(0, 4);
+            }
             const accessories = parseAccessories(r.accessories_checklist);
 
             return (
