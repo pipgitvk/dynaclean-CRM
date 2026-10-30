@@ -212,9 +212,7 @@ export default function HROperationsPage() {
     return 0;
   };
 
-  const formatDate = (dateString) => {
-    return new formatCrmDateOnly(Date(dateString));
-  };
+  const formatDate = (dateString) => formatCrmDateOnly(dateString, "-");
 
   const selectedEmpName = selectedEmployee
     ? employees.find(e => e.username === selectedEmployee)?.full_name || selectedEmployee
