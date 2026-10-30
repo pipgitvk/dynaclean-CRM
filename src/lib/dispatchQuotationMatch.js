@@ -98,7 +98,7 @@ export function computeDispatchPendingFromRows(quotationItems, dispatchRows) {
       if (dispatchRowAllocatesUnit(d, rows)) allocated += 1;
     }
     shippedUnits += Math.min(orderQty, deducted);
-    pendingUnits += Math.max(0, orderQty - allocated);
+    pendingUnits += Math.max(0, orderQty - deducted);
   }
 
   // Prefer quotation-matched shipped; fall back to raw if match missed

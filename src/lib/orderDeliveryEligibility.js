@@ -105,9 +105,10 @@ export function canViewDispatchPanelForOrder(order) {
 /** Pehli booking complete + batch 1 ke products dispatch pending (doosri booking optional). */
 export function canOpenFirstDispatchForOrder(order) {
   if (!orderHasBookingId(order)) return false;
-  if (orderIsFullyDispatched(order)) return false;
   const batch1 = Number(order.batch1_dispatch_pending);
-  if (Number.isFinite(batch1)) return batch1 > 0;
+  if (Number.isFinite(batch1) && batch1 > 0) return true;
+  if (orderIsFullyDispatched(order)) return false;
+  if (Number.isFinite(batch1)) return false;
   if (orderHasDispatchedStock(order)) return false;
   return (
     orderHasPendingDispatchUnits(order) || Number(order?.dispatch_status) === 0
