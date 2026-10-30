@@ -6,14 +6,7 @@ import { getSessionPayload } from "@/lib/auth";
 import { isOrderVisibleToViewer } from "@/lib/orderApprovalVisibility";
 import { roleShowsDualOrderAmountFields } from "@/lib/orderPaymentHistory";
 import { attachActiveInvoiceFieldsToOrder } from "@/lib/activeInvoiceForOrder";
-import { ensureOrderShipmentTrackingColumns } from "@/lib/ensureOrderShipmentTrackingColumns";
-import { fetchBookingBatchesForOrder } from "@/lib/orderBookingBatches";
-import {
-  fetchDelhiveryLrForOrder,
-  canViewOrderDelhiveryTracking,
-  canViewReturnShipmentTracking,
-} from "@/lib/resolveOrderDelhiveryLr";
-import { persistOrderTrackingFromReturnBooking } from "@/lib/orderTrackingIdPersist";
+import { fetchOrderDelhiveryLrs } from "@/lib/fetchOrderDelhiveryLrs";
 
 export const dynamic = "force-dynamic";
 
@@ -24,15 +17,8 @@ function getOrderListPath(userRole) {
   return "/user-dashboard/order";
 }
 
-async function fetchOrderData(
-  orderId,
-  { withOutboundTracking = false, withReturnTracking = false } = {},
-) {
+async function fetchOrderData(orderId, { withDelhiveryTracking = true } = {}) {
   const conn = await getDbConnection();
-  const needTracking = withOutboundTracking || withReturnTracking;
-  if (needTracking) {
-    await ensureOrderShipmentTrackingColumns(conn);
-  }
 
   const [orderRows] = await conn.execute(
     "SELECT * FROM neworder WHERE order_id = ?",
@@ -43,18 +29,6 @@ async function fetchOrderData(
 
   let orderDetails = orderRows[0];
   orderDetails = await attachActiveInvoiceFieldsToOrder(conn, orderDetails);
-
-  const returnBookingRef = String(orderDetails.return_booking_ref ?? "").trim();
-  if (returnBookingRef) {
-    try {
-      await persistOrderTrackingFromReturnBooking(conn, orderDetails.order_id ?? orderId, {
-        returnBookingRef,
-        returnBookingUrl: orderDetails.return_booking_url,
-      });
-    } catch {
-      /* non-fatal */
-    }
-  }
 
   const [items] = await conn.execute(
     "SELECT * FROM quotation_items WHERE quote_number = ?",
@@ -84,32 +58,9 @@ async function fetchOrderData(
 
   // await conn.end();
 
-  const bookingBatches =
-    needTracking && orderDetails
-      ? await fetchBookingBatchesForOrder(conn, orderId)
-      : [];
-
-  const delhiveryLr =
-    withOutboundTracking && orderDetails
-      ? await fetchDelhiveryLrForOrder(
-          conn,
-          orderDetails.order_id ?? orderId,
-          orderDetails,
-          bookingBatches,
-          { shipmentKind: "outbound" },
-        )
-      : null;
-
-  const returnDelhiveryLr =
-    withReturnTracking && orderDetails
-      ? await fetchDelhiveryLrForOrder(
-          conn,
-          orderDetails.order_id ?? orderId,
-          orderDetails,
-          bookingBatches,
-          { shipmentKind: "return" },
-        )
-      : null;
+  const { delhiveryLr, returnDelhiveryLr } = withDelhiveryTracking
+    ? await fetchOrderDelhiveryLrs(conn, orderId, orderDetails)
+    : { delhiveryLr: null, returnDelhiveryLr: null };
 
   return {
     orderDetails,
@@ -151,10 +102,6 @@ export default async function Page({ params }) {
     showDualPaymentAmountFields = roleShowsDualOrderAmountFields(userRole);
   }
 
-  const roleCandidates = [userRole, empRole, payload?.role, payload?.userRole];
-  const showOutboundTracking = canViewOrderDelhiveryTracking(...roleCandidates);
-  const showReturnTracking = canViewReturnShipmentTracking(...roleCandidates);
-
   const {
     orderDetails,
     items,
@@ -163,10 +110,7 @@ export default async function Page({ params }) {
     quoteCustomerId,
     delhiveryLr,
     returnDelhiveryLr,
-  } = await fetchOrderData(orderId, {
-    withOutboundTracking: showOutboundTracking,
-    withReturnTracking: showReturnTracking,
-  });
+  } = await fetchOrderData(orderId, { withDelhiveryTracking: true });
 
   if (
     !orderDetails ||
@@ -208,7 +152,6 @@ export default async function Page({ params }) {
         showDualPaymentAmountFields={showDualPaymentAmountFields}
         delhiveryLr={delhiveryLr}
         returnDelhiveryLr={returnDelhiveryLr}
-        showReturnTracking={showReturnTracking}
       />
     </div>
   );

@@ -13,7 +13,7 @@ import {
   formatOrderRequestedAmountInr,
   getSalesOrderAmountFieldDisplay,
 } from "@/lib/orderPaymentHistory";
-import OrderDelhiveryTrackingPanel from "@/components/orders/OrderDelhiveryTrackingPanel";
+import OrderDelhiveryTrackingSection from "@/components/orders/OrderDelhiveryTrackingSection";
 
 const DOCUMENT_FIELDS = [
   { label: "E-way Bill", key: "ewaybill_file" },
@@ -39,7 +39,6 @@ export default function OrderDetailsClient({
   showDualPaymentAmountFields = false,
   delhiveryLr = null,
   returnDelhiveryLr = null,
-  showReturnTracking = false,
 }) {
   const formatDate = (value) => {
     if (!value) return "";
@@ -102,21 +101,11 @@ export default function OrderDetailsClient({
 
   return (
     <div className="p-4 space-y-6">
-      {delhiveryLr ? (
-        <OrderDelhiveryTrackingPanel
-          lrNumber={delhiveryLr}
-          orderId={orderDetails.order_id ?? orderId}
-          shipmentLabel="Outbound shipment"
-        />
-      ) : null}
-      {showReturnTracking && returnDelhiveryLr ? (
-        <OrderDelhiveryTrackingPanel
-          lrNumber={returnDelhiveryLr}
-          orderId={orderDetails.order_id ?? orderId}
-          shipmentLabel="Return shipment"
-          variant="return"
-        />
-      ) : null}
+      <OrderDelhiveryTrackingSection
+        orderId={orderDetails.order_id ?? orderId}
+        delhiveryLr={delhiveryLr}
+        returnDelhiveryLr={returnDelhiveryLr}
+      />
 
       {/* Progress Bar */}
       <div className="space-y-2">
@@ -379,9 +368,8 @@ export default function OrderDetailsClient({
         </div>
       )}
 
-      {showReturnTracking &&
-        (String(orderDetails.return_booking_ref || "").trim() ||
-          Number(orderDetails.return_booking_done) === 1) && (
+      {(String(orderDetails.return_booking_ref || "").trim() ||
+        Number(orderDetails.return_booking_done) === 1) && (
         <div className="border rounded p-4 bg-white">
           <h3 className="font-semibold mb-3">Return Booking Details</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

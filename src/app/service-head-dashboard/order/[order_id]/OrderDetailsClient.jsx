@@ -8,6 +8,7 @@ import {
   deriveOrderPipelineProgress,
 } from "@/lib/orderPipelineStage";
 import { getSalesOrderAmountFieldDisplay } from "@/lib/orderPaymentHistory";
+import OrderDelhiveryTrackingSection from "@/components/orders/OrderDelhiveryTrackingSection";
 
 const stages = ORDER_PIPELINE_STAGES;
 
@@ -18,6 +19,8 @@ export default function OrderDetailsClient({
   orderId,
   gstin,
   quoteCustomerId,
+  delhiveryLr = null,
+  returnDelhiveryLr = null,
 }) {
   const formatDate = (value) => {
     if (!value) return "";
@@ -55,6 +58,11 @@ export default function OrderDetailsClient({
 
   return (
     <div className="p-4 space-y-6">
+      <OrderDelhiveryTrackingSection
+        orderId={orderDetails.order_id ?? orderId}
+        delhiveryLr={delhiveryLr}
+        returnDelhiveryLr={returnDelhiveryLr}
+      />
       {/* Progress Bar */}
       <div className="space-y-2">
         <div className="relative w-full h-3 bg-gray-300 rounded-full">

@@ -5,6 +5,7 @@ import dayjs from "dayjs";
 import { getSessionPayload } from "@/lib/auth";
 import { isOrderVisibleToViewer } from "@/lib/orderApprovalVisibility";
 import { attachActiveInvoiceFieldsToOrder } from "@/lib/activeInvoiceForOrder";
+import { fetchOrderDelhiveryLrs } from "@/lib/fetchOrderDelhiveryLrs";
 
 export const dynamic = "force-dynamic";
 
@@ -49,12 +50,20 @@ async function fetchOrderData(orderId) {
 
   // await conn.end();
 
+  const { delhiveryLr, returnDelhiveryLr } = await fetchOrderDelhiveryLrs(
+    conn,
+    orderId,
+    orderDetails,
+  );
+
   return {
     orderDetails,
     items,
     statuses,
     gstin,
     quoteCustomerId,
+    delhiveryLr,
+    returnDelhiveryLr,
   };
 }
 
@@ -74,7 +83,7 @@ export default async function Page({ params }) {
     userRole = roleRows[0]?.userRole || userRole;
   }
 
-  const { orderDetails, items, statuses, gstin, quoteCustomerId } =
+  const { orderDetails, items, statuses, gstin, quoteCustomerId, delhiveryLr, returnDelhiveryLr } =
     await fetchOrderData(orderId);
 
   if (
@@ -112,6 +121,8 @@ export default async function Page({ params }) {
         orderId={orderId}
         gstin={gstin}
         quoteCustomerId={quoteCustomerId}
+        delhiveryLr={delhiveryLr}
+        returnDelhiveryLr={returnDelhiveryLr}
       />
     </div>
   );

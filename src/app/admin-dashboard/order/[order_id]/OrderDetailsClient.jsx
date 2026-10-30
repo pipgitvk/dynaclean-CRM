@@ -5,11 +5,11 @@ import dayjs from "dayjs";
 import OrderApprovalActions from "../OrderApprovalActions";
 import OrderBookingDetailLinks from "@/components/orders/OrderBookingDetailLinks";
 import OrderDocumentFileCard from "@/components/orders/OrderDocumentFileCard";
+import OrderDelhiveryTrackingSection from "@/components/orders/OrderDelhiveryTrackingSection";
 import {
   ORDER_PIPELINE_STAGES,
   deriveOrderPipelineProgress,
 } from "@/lib/orderPipelineStage";
-import OrderDelhiveryTrackingPanel from "@/components/orders/OrderDelhiveryTrackingPanel";
 import {
   formatOrderPaymentAmountInr,
   formatOrderRequestedAmountInr,
@@ -101,21 +101,11 @@ export default function OrderDetailsClient({
   return (
     <div className="p-4 space-y-6">
       <OrderBookingDetailLinks order={orderDetails} userRole={userRole} />
-      {delhiveryLr ? (
-        <OrderDelhiveryTrackingPanel
-          lrNumber={delhiveryLr}
-          orderId={orderDetails.order_id ?? orderId}
-          shipmentLabel="Outbound shipment"
-        />
-      ) : null}
-      {returnDelhiveryLr ? (
-        <OrderDelhiveryTrackingPanel
-          lrNumber={returnDelhiveryLr}
-          orderId={orderDetails.order_id ?? orderId}
-          shipmentLabel="Return shipment"
-          variant="return"
-        />
-      ) : null}
+      <OrderDelhiveryTrackingSection
+        orderId={orderDetails.order_id ?? orderId}
+        delhiveryLr={delhiveryLr}
+        returnDelhiveryLr={returnDelhiveryLr}
+      />
 
       {/* Progress Bar */}
       <div className="space-y-2">

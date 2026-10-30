@@ -5,17 +5,12 @@ import dayjs from "dayjs";
 import { getSessionPayload } from "@/lib/auth";
 import { isOrderVisibleToViewer } from "@/lib/orderApprovalVisibility";
 import { ensureOrderShipmentTrackingColumns } from "@/lib/ensureOrderShipmentTrackingColumns";
-import {
-  attachBookingBatchesToOrders,
-  fetchBookingBatchesForOrder,
-} from "@/lib/orderBookingBatches";
 import { attachActiveInvoiceFieldsToOrder } from "@/lib/activeInvoiceForOrder";
 import {
-  fetchDelhiveryLrForOrder,
-  canViewOrderDelhiveryTracking,
-} from "@/lib/resolveOrderDelhiveryLr";
+  attachBookingBatchesToOrders,
+} from "@/lib/orderBookingBatches";
+import { fetchOrderDelhiveryLrs } from "@/lib/fetchOrderDelhiveryLrs";
 import { roleShowsDualOrderAmountFields } from "@/lib/orderPaymentHistory";
-import { persistOrderTrackingFromReturnBooking } from "@/lib/orderTrackingIdPersist";
 
 export const dynamic = "force-dynamic";
 
@@ -34,18 +29,6 @@ async function fetchOrderData(orderId, { withDelhiveryTracking = false } = {}) {
   let orderDetails = orderRows[0];
   orderDetails = await attachActiveInvoiceFieldsToOrder(conn, orderDetails);
   [orderDetails] = await attachBookingBatchesToOrders(conn, [orderDetails]);
-
-  const returnBookingRef = String(orderDetails.return_booking_ref ?? "").trim();
-  if (returnBookingRef) {
-    try {
-      await persistOrderTrackingFromReturnBooking(conn, orderDetails.order_id ?? orderId, {
-        returnBookingRef,
-        returnBookingUrl: orderDetails.return_booking_url,
-      });
-    } catch {
-      /* non-fatal */
-    }
-  }
 
   const [items] = await conn.execute(
     "SELECT * FROM quotation_items WHERE quote_number = ?",
@@ -71,28 +54,9 @@ async function fetchOrderData(orderId, { withDelhiveryTracking = false } = {}) {
     gstin = null;
   }
 
-  const bookingBatches = withDelhiveryTracking
-    ? await fetchBookingBatchesForOrder(conn, orderId)
-    : [];
-  const delhiveryLr = withDelhiveryTracking
-    ? await fetchDelhiveryLrForOrder(
-        conn,
-        orderDetails.order_id ?? orderId,
-        orderDetails,
-        bookingBatches,
-        { shipmentKind: "outbound" },
-      )
-    : null;
-
-  const returnDelhiveryLr = withDelhiveryTracking
-    ? await fetchDelhiveryLrForOrder(
-        conn,
-        orderDetails.order_id ?? orderId,
-        orderDetails,
-        bookingBatches,
-        { shipmentKind: "return" },
-      )
-    : null;
+  const { delhiveryLr, returnDelhiveryLr } = withDelhiveryTracking
+    ? await fetchOrderDelhiveryLrs(conn, orderId, orderDetails)
+    : { delhiveryLr: null, returnDelhiveryLr: null };
 
   return {
     orderDetails,
@@ -120,18 +84,13 @@ export default async function Page({ params }) {
     userRole = roleRows[0]?.userRole || "";
   }
 
-  const showDelhiveryTracking = canViewOrderDelhiveryTracking(
-    userRole,
-    payload?.role,
-    payload?.userRole,
-  );
   const showDualPaymentAmountFields = roleShowsDualOrderAmountFields(
     userRole || payload?.role || payload?.userRole,
   );
 
   const { orderDetails, items, statuses, gstin, delhiveryLr, returnDelhiveryLr } =
     await fetchOrderData(orderId, {
-      withDelhiveryTracking: showDelhiveryTracking,
+      withDelhiveryTracking: true,
     });
 
   if (
