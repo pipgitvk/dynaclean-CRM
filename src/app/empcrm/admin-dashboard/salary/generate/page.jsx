@@ -973,14 +973,14 @@ const GenerateSalaryPage = () => {
                         </p>
                         {attendanceBreakdown.offDayWorkPolicy && (
                             <p className="mb-3 text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
-                                Sunday ya company <strong>holiday</strong> par extra +1 pay day tabhi
-                                jab us din ki attendance <strong>location</strong> profile{" "}
-                                <strong>work location</strong> se match kare (
-                                {attendanceBreakdown.offDayWorkPolicy.workLocation || "profile me set karein"}
+                                An extra +1 pay day on a Sunday or company <strong>holiday</strong> is added only
+                                when that day's attendance <strong>location</strong> matches the profile{" "}
+                                <strong>work location</strong> (
+                                {attendanceBreakdown.offDayWorkPolicy.workLocation || "set it on the profile"}
                                 ).
                                 {attendanceBreakdown.offDayWorkPolicy.offDayWorkEnabled
-                                    ? " Is month me qualifying Sun/Hol work pay days count ho chuke hain."
-                                    : " Is month koi qualifying Sun/Hol extra pay day nahi."}
+                                    ? " Qualifying Sunday/holiday work pay days have been counted this month."
+                                    : " There is no qualifying Sunday/holiday extra pay day this month."}
                             </p>
                         )}
                         {attendanceBreakdown.payCalc && (
