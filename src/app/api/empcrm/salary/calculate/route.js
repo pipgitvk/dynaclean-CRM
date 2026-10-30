@@ -21,7 +21,7 @@ export async function POST(request) {
     }
 
     const body = await request.json();
-    const { username, salary_month, working_days, present_days, overtime_hours, status } = body;
+    const { username, salary_month, present_days, overtime_hours, status } = body;
 
     const db = await getDbConnection();
 
@@ -57,7 +57,9 @@ export async function POST(request) {
       AND (esd.effective_from <= ? AND (esd.effective_to IS NULL OR esd.effective_to >= ?))
     `, [username, salary_month + '-31', salary_month + '-01']);
 
-    const workingDays = Math.max(1, Number(working_days) || 30);
+    // Amount is always ÷ 30. Pay days already include the month-length absence
+    // (31-day month, 30 credited → pay days 29).
+    const workingDays = 30;
     const presentDays = Number(present_days) || 0;
     const overtimeHours = Number(overtime_hours) || 0;
 

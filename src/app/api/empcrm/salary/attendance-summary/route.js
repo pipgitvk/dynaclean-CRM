@@ -90,6 +90,11 @@ function mapOneEmployeeSummary(emp, logs, holidays, leaves, globalRules, schedul
       stats.deduction_days != null ? Number(stats.deduction_days) : null,
     pay_days_base:
       stats.pay_days_base != null ? Number(stats.pay_days_base) : null,
+    pay_calendar_days:
+      stats.calendar_days != null ? Number(stats.calendar_days) : null,
+    pay_credited_days:
+      stats.credited_days != null ? Number(stats.credited_days) : null,
+    pay_absent_days: stats.absent_days != null ? Number(stats.absent_days) : null,
     pay_sundays_unpaid_whole_week_off:
       stats.sundays_unpaid_whole_week_off != null
         ? Number(stats.sundays_unpaid_whole_week_off)

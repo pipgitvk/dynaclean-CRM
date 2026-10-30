@@ -52,6 +52,20 @@ function ymdKey(year, month1to12, day) {
 /** Monthly salary amount is always pro-rated on this many days (even in 31-day months). */
 export const SALARY_PAY_DAYS_DENOMINATOR = 30;
 
+/**
+ * Salary is always on a 30-day month.
+ * Absent = calendar days in the month − days credited.
+ * Pay days = 30 − absent.
+ * Example: 31-day month, 30 days credited → absent 1 → pay days 29.
+ * Extra credits above the calendar (Sunday/holiday work) increase pay days.
+ */
+export function payDaysOnThirtyDaySalary(creditedDays, calendarDaysInMonth) {
+  const credited = Number(creditedDays) || 0;
+  const calendar = Number(calendarDaysInMonth) || SALARY_PAY_DAYS_DENOMINATOR;
+  const absent = calendar - credited;
+  return Math.max(0, SALARY_PAY_DAYS_DENOMINATOR - absent);
+}
+
 /** Actual calendar days in month (28–31). Attendance period uses this; salary amount divisor stays 30. */
 export function getCalendarDaysInMonth(year, month1to12) {
   return new Date(year, month1to12, 0).getDate();
@@ -384,11 +398,16 @@ export function computeSalaryPayDaysForUser(p) {
     }
   }
 
-  const payDays =
-    payDaysBase -
+  /** Days in the elapsed period that are paid (not capped at 30). */
+  const creditedDays =
+    periodDays -
+    deductionDays -
     sundaysUnpaidNoWeekPresence +
     sundayWorkPayCredits +
     holidayWorkPayCredits;
+  /** 31-day month and 30 credited → absent 1 → pay days 29. Amount is still ÷ 30. */
+  const absentDays = daysInMonth - creditedDays;
+  const payDays = payDaysOnThirtyDaySalary(creditedDays, daysInMonth);
 
   /** Every day with a meaningful punch is either `present` (regular) or `late_days` (salary classifier). Sum matches attendance “Present” when ranges align. */
   const total_punched_days = present + late_days;
@@ -408,6 +427,9 @@ export function computeSalaryPayDaysForUser(p) {
     pay_days: payDays,
     pay_days_raw: payDays,
     pay_days_base: payDaysBase,
+    calendar_days: daysInMonth,
+    credited_days: creditedDays,
+    absent_days: absentDays,
     sundays_unpaid_whole_week_off: sundaysUnpaidNoWeekPresence,
     sunday_worked_dates: sundayWorkedDates,
     holiday_worked_dates: holidayWorkedDates,
