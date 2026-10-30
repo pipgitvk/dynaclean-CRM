@@ -53,3 +53,49 @@ export function enrichTrackingDataRow(row) {
     delivered_date: delivered,
   };
 }
+
+/** Persist date columns from payload for rows synced before date columns existed. */
+export async function backfillTrackingDataDates(conn, { limit = 150 } = {}) {
+  const [rows] = await conn.query(
+    `SELECT id, payload, pickup_date, estimated_delivery_date, delivered_date
+     FROM tracking_data
+     WHERE payload IS NOT NULL AND payload <> ''
+       AND (
+         pickup_date IS NULL
+         OR estimated_delivery_date IS NULL
+         OR delivered_date IS NULL
+       )
+     LIMIT ?`,
+    [limit],
+  );
+
+  let updated = 0;
+  for (const row of rows || []) {
+    let data;
+    try {
+      data = JSON.parse(row.payload);
+    } catch {
+      continue;
+    }
+    const dates = pickDelhiveryTrackingDates(data);
+    const pickup = row.pickup_date || dates.pickup_date;
+    const estimated = row.estimated_delivery_date || dates.estimated_delivery_date;
+    const delivered = row.delivered_date || dates.delivered_date;
+    if (!pickup && !estimated && !delivered) continue;
+    if (
+      pickup === row.pickup_date &&
+      estimated === row.estimated_delivery_date &&
+      delivered === row.delivered_date
+    ) {
+      continue;
+    }
+    await conn.execute(
+      `UPDATE tracking_data
+       SET pickup_date = ?, estimated_delivery_date = ?, delivered_date = ?
+       WHERE id = ?`,
+      [pickup, estimated, delivered, row.id],
+    );
+    updated += 1;
+  }
+  return { processed: rows?.length || 0, updated };
+}

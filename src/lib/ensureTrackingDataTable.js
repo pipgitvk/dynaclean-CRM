@@ -1,7 +1,10 @@
 let trackingDataTableReady = false;
+let trackingDataDatesBackfillDone = false;
 
 const ORDER_ID_SQL =
   "VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NULL";
+
+import { backfillTrackingDataDates } from "@/lib/delhiveryTrackingDataMeta";
 
 export async function ensureTrackingDataTable(conn) {
   if (trackingDataTableReady) return;
@@ -57,4 +60,18 @@ export async function ensureTrackingDataTable(conn) {
     }
   }
   trackingDataTableReady = true;
+
+  if (!trackingDataDatesBackfillDone) {
+    trackingDataDatesBackfillDone = true;
+    try {
+      for (let i = 0; i < 15; i += 1) {
+        const { processed } = await backfillTrackingDataDates(conn, {
+          limit: 200,
+        });
+        if (!processed) break;
+      }
+    } catch (err) {
+      console.error("[tracking_data] date backfill failed:", err?.message || err);
+    }
+  }
 }

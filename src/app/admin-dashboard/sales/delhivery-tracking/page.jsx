@@ -17,14 +17,16 @@ import {
   formatDelhiveryDateTime,
   orderStatusHeadline,
   isDelhiveryShipmentDelivered,
+  delhiveryDisplayText,
 } from "@/lib/delhiveryB2bTrackingUi";
 import DelhiveryOrderDetailsPanel from "./DelhiveryOrderDetailsPanel";
 
 function CopyLine({ label, value }) {
-  if (!value) return null;
+  const text = delhiveryDisplayText(value, "");
+  if (!text || text === "—") return null;
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(String(value));
+      await navigator.clipboard.writeText(text);
       toast.success("Copied");
     } catch {
       toast.error("Copy failed");
@@ -37,7 +39,7 @@ function CopyLine({ label, value }) {
       className="group flex w-full items-center gap-2 text-left text-sm text-white/95 hover:text-white"
     >
       <span className="text-white/80">{label}</span>
-      <span className="font-semibold">#{value}</span>
+      <span className="font-semibold">#{text}</span>
       <Copy className="h-3.5 w-3.5 shrink-0 opacity-70 group-hover:opacity-100" />
     </button>
   );
@@ -230,7 +232,11 @@ export default function DelhiveryTrackingPage() {
       });
       const json = await res.json();
       if (!res.ok || !json.success) {
-        throw new Error(json.error || "Tracking failed");
+        const msg = delhiveryDisplayText(
+          json.error,
+          "Tracking failed",
+        );
+        throw new Error(msg === "—" ? "Tracking failed" : msg);
       }
       setActiveId(id);
       setResult(json.data);
@@ -494,7 +500,8 @@ export default function DelhiveryTrackingPage() {
             </h2>
             <p className="text-sm text-gray-500">
               Table <code className="text-xs">tracking_data</code> — synced in
-              small batches (~2s/LR) to avoid Delhivery rate limits.
+              small batches (~2s/LR). Saved rows are kept; failed refresh does
+              not erase last good data.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">

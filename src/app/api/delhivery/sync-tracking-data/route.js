@@ -54,13 +54,13 @@ async function upsertTrackingRow(conn, row, fetchResult) {
        ON DUPLICATE KEY UPDATE
          order_id = VALUES(order_id),
          shipment_type = VALUES(shipment_type),
-         status = VALUES(status),
-         mwbn = VALUES(mwbn),
-         scan_remark = VALUES(scan_remark),
-         location = VALUES(location),
-         pickup_date = VALUES(pickup_date),
-         estimated_delivery_date = VALUES(estimated_delivery_date),
-         delivered_date = VALUES(delivered_date),
+         status = COALESCE(VALUES(status), status),
+         mwbn = COALESCE(VALUES(mwbn), mwbn),
+         scan_remark = COALESCE(VALUES(scan_remark), scan_remark),
+         location = COALESCE(VALUES(location), location),
+         pickup_date = COALESCE(VALUES(pickup_date), pickup_date),
+         estimated_delivery_date = COALESCE(VALUES(estimated_delivery_date), estimated_delivery_date),
+         delivered_date = COALESCE(VALUES(delivered_date), delivered_date),
          payload = VALUES(payload),
          fetch_error = NULL,
          fetched_at = CURRENT_TIMESTAMP`,
@@ -82,6 +82,23 @@ async function upsertTrackingRow(conn, row, fetchResult) {
   }
 
   const errMsg = String(fetchResult.error || "Fetch failed").slice(0, 2000);
+
+  const [existingRows] = await conn.execute(
+    `SELECT status, fetch_error FROM tracking_data WHERE tracking_id = ? LIMIT 1`,
+    [lr],
+  );
+  const existing = existingRows?.[0];
+  const hasGoodSnapshot =
+    existing &&
+    existing.fetch_error == null &&
+    existing.status != null &&
+    String(existing.status).trim() !== "";
+
+  /** Never overwrite a successful snapshot when Delhivery returns a transient/error response. */
+  if (hasGoodSnapshot) {
+    return { lr, ok: false, error: errMsg, preserved: true };
+  }
+
   await conn.execute(
     `INSERT INTO tracking_data
       (tracking_id, order_id, shipment_type, status, mwbn, scan_remark, location, payload, fetch_error)
