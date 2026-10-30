@@ -347,6 +347,145 @@ export default function DelhiveryTrackingPage() {
         </div>
       </form>
 
+      <div className="mb-6 space-y-4">
+        {error ? (
+          <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>{error}</span>
+          </div>
+        ) : null}
+
+        {result ? (
+          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-md">
+            <div className="bg-[#3B966F] px-5 pb-6 pt-5 text-white">
+              <div className="flex items-center gap-2">
+                <h2 className="text-xl font-bold tracking-tight">
+                  {orderStatusHeadline(result.status)}
+                </h2>
+                {isDelhiveryShipmentDelivered(
+                  result.status,
+                  result.delivered_date,
+                ) && (
+                  <CheckCircle2 className="h-6 w-6 shrink-0" strokeWidth={2.5} />
+                )}
+              </div>
+              <div className="mt-4 space-y-2">
+                {awb ? <CopyLine label="AWB" value={awb} /> : null}
+                {lr ? <CopyLine label="LR Number" value={lr} /> : null}
+              </div>
+            </div>
+
+            <div className="px-3 pb-1 pt-3">
+              <div className="flex rounded-full bg-slate-100 p-1">
+                <button
+                  type="button"
+                  onClick={() => setTab("tracking")}
+                  className={`flex-1 rounded-full py-2.5 text-sm font-semibold transition-colors ${
+                    tab === "tracking"
+                      ? "bg-black text-white shadow-sm"
+                      : "text-gray-800 hover:bg-white/60"
+                  }`}
+                >
+                  Tracking
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTab("details")}
+                  className={`flex-1 rounded-full py-2.5 text-sm font-semibold transition-colors ${
+                    tab === "details"
+                      ? "bg-black text-white shadow-sm"
+                      : "text-gray-800 hover:bg-white/60"
+                  }`}
+                >
+                  Order Details
+                </button>
+              </div>
+            </div>
+
+            {tab === "tracking" ? (
+              <div className="px-5 py-6">
+                {timeline.length === 0 ? (
+                  <p className="text-center text-sm text-gray-500">
+                    No tracking milestones available for this shipment.
+                  </p>
+                ) : (
+                  <ul className="list-none">
+                    {timeline.map((step, idx) => {
+                      const isLast = idx === timeline.length - 1;
+                      const highlight = step.highlight || isLast;
+                      const isDelivered =
+                        String(step.label).toLowerCase() === "delivered";
+                      const dotFilled = isDelivered && highlight;
+
+                      return (
+                        <li
+                          key={`${step.key}-${step.at}`}
+                          className="relative pl-9 pb-8 last:pb-0"
+                        >
+                          {!isLast ? (
+                            <span
+                              className="absolute left-[7px] top-[1.125rem] bottom-0 w-0.5 bg-[#3B966F]"
+                              aria-hidden
+                            />
+                          ) : null}
+                          <span
+                            className={`absolute left-0 top-0.5 box-border h-4 w-4 shrink-0 rounded-full border-2 border-[#3B966F] ${
+                              dotFilled ? "bg-[#3B966F]" : "bg-white"
+                            }`}
+                            aria-hidden
+                          />
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[15px] leading-snug">
+                              <span
+                                className={`inline-flex items-center gap-1.5 font-semibold ${
+                                  highlight ? "text-[#3B966F]" : "text-gray-800"
+                                }`}
+                              >
+                                {step.label}
+                                {isDelivered && highlight ? (
+                                  <CheckCircle2
+                                    className="h-4 w-4 text-[#3B966F]"
+                                    strokeWidth={2.5}
+                                  />
+                                ) : null}
+                              </span>
+                              <span className="text-gray-300">|</span>
+                              <span className="text-gray-500 italic">
+                                {formatDelhiveryTimelineDate(step.at)}
+                              </span>
+                            </div>
+                            {step.footnote ? (
+                              <p className="mt-1.5 text-sm text-gray-500">
+                                {step.footnote}
+                              </p>
+                            ) : null}
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
+            ) : (
+              <DelhiveryOrderDetailsPanel result={result} awb={awb} lr={lr} />
+            )}
+          </div>
+        ) : null}
+
+        {!activeId && !loading && !error ? (
+          <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center text-gray-500">
+            <PackageSearch className="mx-auto mb-3 h-10 w-10 text-slate-400" />
+            <p className="font-medium text-gray-700">
+              Search a delivery order LR above
+            </p>
+            <p className="mt-1 text-sm">
+              Pick from recent Delhivery shipments or type order ID / LR, then
+              Track.
+            </p>
+          </div>
+        ) : null}
+      </div>
+
       <div className="mb-8 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -498,140 +637,6 @@ export default function DelhiveryTrackingPage() {
           </table>
         </div>
       </div>
-
-      {!activeId && !loading && !error && (
-        <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 py-16 text-center text-gray-500">
-          <PackageSearch className="mx-auto mb-3 h-10 w-10 text-slate-400" />
-          <p className="font-medium text-gray-700">
-            Search a delivery order LR above
-          </p>
-          <p className="mt-1 text-sm">
-            Pick from recent Delhivery shipments or type order ID / LR, then
-            Track.
-          </p>
-        </div>
-      )}
-
-      {error && (
-        <div className="mb-4 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-          <span>{error}</span>
-        </div>
-      )}
-
-      {result && (
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-md">
-          <div className="bg-[#3B966F] px-5 pb-6 pt-5 text-white">
-            <div className="flex items-center gap-2">
-              <h2 className="text-xl font-bold tracking-tight">
-                {orderStatusHeadline(result.status)}
-              </h2>
-              {isDelhiveryShipmentDelivered(result.status, result.delivered_date) && (
-                <CheckCircle2 className="h-6 w-6 shrink-0" strokeWidth={2.5} />
-              )}
-            </div>
-            <div className="mt-4 space-y-2">
-              {awb ? <CopyLine label="AWB" value={awb} /> : null}
-              {lr ? <CopyLine label="LR Number" value={lr} /> : null}
-            </div>
-          </div>
-
-          <div className="px-3 pb-1 pt-3">
-            <div className="flex rounded-full bg-slate-100 p-1">
-              <button
-                type="button"
-                onClick={() => setTab("tracking")}
-                className={`flex-1 rounded-full py-2.5 text-sm font-semibold transition-colors ${
-                  tab === "tracking"
-                    ? "bg-black text-white shadow-sm"
-                    : "text-gray-800 hover:bg-white/60"
-                }`}
-              >
-                Tracking
-              </button>
-              <button
-                type="button"
-                onClick={() => setTab("details")}
-                className={`flex-1 rounded-full py-2.5 text-sm font-semibold transition-colors ${
-                  tab === "details"
-                    ? "bg-black text-white shadow-sm"
-                    : "text-gray-800 hover:bg-white/60"
-                }`}
-              >
-                Order Details
-              </button>
-            </div>
-          </div>
-
-          {tab === "tracking" ? (
-            <div className="px-5 py-6">
-              {timeline.length === 0 ? (
-                <p className="text-center text-sm text-gray-500">
-                  No tracking milestones available for this shipment.
-                </p>
-              ) : (
-                <ul className="list-none">
-                  {timeline.map((step, idx) => {
-                    const isLast = idx === timeline.length - 1;
-                    const highlight = step.highlight || isLast;
-                    const isDelivered =
-                      String(step.label).toLowerCase() === "delivered";
-                    const dotFilled = isDelivered && highlight;
-
-                    return (
-                      <li
-                        key={`${step.key}-${step.at}`}
-                        className="relative pl-9 pb-8 last:pb-0"
-                      >
-                        {!isLast ? (
-                          <span
-                            className="absolute left-[7px] top-[1.125rem] bottom-0 w-0.5 bg-[#3B966F]"
-                            aria-hidden
-                          />
-                        ) : null}
-                        <span
-                          className={`absolute left-0 top-0.5 box-border h-4 w-4 shrink-0 rounded-full border-2 border-[#3B966F] ${
-                            dotFilled ? "bg-[#3B966F]" : "bg-white"
-                          }`}
-                          aria-hidden
-                        />
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[15px] leading-snug">
-                            <span
-                              className={`inline-flex items-center gap-1.5 font-semibold ${
-                                highlight ? "text-[#3B966F]" : "text-gray-800"
-                              }`}
-                            >
-                              {step.label}
-                              {isDelivered && highlight ? (
-                                <CheckCircle2
-                                  className="h-4 w-4 text-[#3B966F]"
-                                  strokeWidth={2.5}
-                                />
-                              ) : null}
-                            </span>
-                            <span className="text-gray-300">|</span>
-                            <span className="text-gray-500 italic">
-                              {formatDelhiveryTimelineDate(step.at)}
-                            </span>
-                          </div>
-                          {step.footnote ? (
-                            <p className="mt-1.5 text-sm text-gray-500">
-                              {step.footnote}
-                            </p>
-                          ) : null}
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </div>
-          ) : (
-            <DelhiveryOrderDetailsPanel result={result} awb={awb} lr={lr} />
-          )}
-        </div>
-      )}
     </div>
   );
 }
