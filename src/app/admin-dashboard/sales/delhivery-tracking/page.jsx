@@ -8,6 +8,7 @@ import {
   AlertCircle,
   CheckCircle2,
   Copy,
+  RefreshCw,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import {
@@ -52,8 +53,114 @@ export default function DelhiveryTrackingPage() {
   const [lrSuggestions, setLrSuggestions] = useState([]);
   const [lrSuggestLoading, setLrSuggestLoading] = useState(false);
   const [lrDropdownOpen, setLrDropdownOpen] = useState(false);
+  const [syncLoading, setSyncLoading] = useState(false);
+  const [syncSummary, setSyncSummary] = useState(null);
+  const [syncProgress, setSyncProgress] = useState("");
+  const [storedRows, setStoredRows] = useState([]);
+  const [storedLoading, setStoredLoading] = useState(false);
   const searchWrapRef = useRef(null);
   const lrUrlBootstrapped = useRef(false);
+
+  const fetchStoredTracking = useCallback(async () => {
+    setStoredLoading(true);
+    try {
+      const res = await fetch("/api/delhivery/tracking-data?limit=500", {
+        cache: "no-store",
+      });
+      const json = await res.json();
+      if (res.ok && json.success && Array.isArray(json.data)) {
+        setStoredRows(json.data);
+      } else {
+        setStoredRows([]);
+      }
+    } catch {
+      setStoredRows([]);
+    } finally {
+      setStoredLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchStoredTracking();
+  }, [fetchStoredTracking]);
+
+  const runSyncBatches = async ({ retryErrorsOnly = false, force = false } = {}) => {
+    setSyncLoading(true);
+    setSyncSummary(null);
+    setSyncProgress("");
+    let offset = 0;
+    let saved = 0;
+    let failed = 0;
+    let totalEligible = 0;
+    let skippedRecent = 0;
+
+    try {
+      for (;;) {
+        setSyncProgress(
+          retryErrorsOnly
+            ? `Retrying failed LRs… (${offset} processed)`
+            : `Syncing… (${offset} / ${totalEligible || "?"})`,
+        );
+        const res = await fetch("/api/delhivery/sync-tracking-data", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            offset,
+            batchSize: 12,
+            retryErrorsOnly,
+            force,
+            freshHours: 6,
+          }),
+        });
+        const json = await res.json();
+        if (!res.ok || !json.success) {
+          throw new Error(json.error || "Sync failed");
+        }
+        totalEligible = json.totalEligible ?? totalEligible;
+        skippedRecent = json.skippedRecent ?? skippedRecent;
+        saved += Number(json.saved) || 0;
+        failed += Number(json.failed) || 0;
+        offset = json.nextOffset ?? offset;
+
+        if (!json.hasMore) break;
+        await new Promise((r) => setTimeout(r, 800));
+      }
+
+      const summary = {
+        saved,
+        failed,
+        total: totalEligible,
+        skippedRecent,
+        retryErrorsOnly,
+      };
+      setSyncSummary(summary);
+      toast.success(
+        retryErrorsOnly
+          ? `Retry done: ${saved} OK, ${failed} still failed`
+          : `Sync done: ${saved} saved${skippedRecent ? ` · ${skippedRecent} skipped (fresh)` : ""}${failed ? ` · ${failed} failed` : ""}`,
+      );
+      await fetchStoredTracking();
+    } catch (e) {
+      toast.error(e?.message || "Could not sync tracking data");
+    } finally {
+      setSyncLoading(false);
+      setSyncProgress("");
+    }
+  };
+
+  const syncAllTracking = () => runSyncBatches({ retryErrorsOnly: false });
+  const retryFailedTracking = () =>
+    runSyncBatches({ retryErrorsOnly: true, force: true });
+
+  const formatFetchedAt = (value) => {
+    if (!value) return "—";
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return String(value);
+    return d.toLocaleString("en-IN", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    });
+  };
 
   const fetchLrSuggestions = useCallback(async (query) => {
     setLrSuggestLoading(true);
@@ -153,7 +260,7 @@ export default function DelhiveryTrackingPage() {
   const lr = result?.lrnum || activeId;
 
   return (
-    <div className="mx-auto w-full max-w-3xl p-4 md:p-8">
+    <div className="mx-auto w-full max-w-[min(100%,90rem)] p-4 md:p-8">
       <div className="mb-6 flex items-center gap-3">
         <PackageSearch className="h-8 w-8 text-[#3B966F]" />
         <div>
@@ -238,6 +345,128 @@ export default function DelhiveryTrackingPage() {
           </button>
         </div>
       </form>
+
+      <div className="mb-8 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-base font-semibold text-gray-900">
+              Saved tracking data
+            </h2>
+            <p className="text-sm text-gray-500">
+              Table <code className="text-xs">tracking_data</code> — synced in
+              small batches (~2s/LR) to avoid Delhivery rate limits.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={retryFailedTracking}
+              disabled={syncLoading}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-900 hover:bg-amber-100 disabled:opacity-50"
+            >
+              Retry failed only
+            </button>
+            <button
+              type="button"
+              onClick={syncAllTracking}
+              disabled={syncLoading}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#3B966F] bg-[#3B966F]/10 px-4 py-2.5 text-sm font-semibold text-[#2d7358] hover:bg-[#3B966F]/20 disabled:opacity-50"
+            >
+              <RefreshCw
+                className={`h-4 w-4 ${syncLoading ? "animate-spin" : ""}`}
+              />
+              {syncLoading ? "Syncing…" : "Fetch all tracking data"}
+            </button>
+          </div>
+        </div>
+        {syncProgress ? (
+          <p className="mb-2 text-sm font-medium text-[#2d7358]">
+            {syncProgress}
+          </p>
+        ) : null}
+        {syncSummary ? (
+          <p className="mb-3 text-sm text-gray-600">
+            Last run: {syncSummary.saved} saved, {syncSummary.failed} failed
+            {syncSummary.skippedRecent
+              ? ` · ${syncSummary.skippedRecent} skipped (synced in last 6h)`
+              : ""}{" "}
+            (of {syncSummary.total} to update)
+          </p>
+        ) : null}
+        <div className="overflow-x-auto rounded-xl border border-slate-100">
+          <table className="min-w-[72rem] w-full text-left text-sm">
+            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-gray-600">
+              <tr>
+                <th className="px-3 py-2.5 font-semibold">Tracking ID (LR)</th>
+                <th className="px-3 py-2.5 font-semibold">Order</th>
+                <th className="px-3 py-2.5 font-semibold">Type</th>
+                <th className="px-3 py-2.5 font-semibold">Status</th>
+                <th className="px-3 py-2.5 font-semibold">Latest remark</th>
+                <th className="px-3 py-2.5 font-semibold">Location</th>
+                <th className="px-3 py-2.5 font-semibold">Fetched</th>
+                <th className="min-w-[22rem] px-3 py-2.5 font-semibold">Error</th>
+              </tr>
+            </thead>
+            <tbody>
+              {storedLoading ? (
+                <tr>
+                  <td colSpan={8} className="px-3 py-8 text-center text-gray-500">
+                    Loading saved data…
+                  </td>
+                </tr>
+              ) : storedRows.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="px-3 py-8 text-center text-gray-500">
+                    No rows yet. Click &quot;Fetch all tracking data&quot; to pull
+                    Delhivery status for every LR in tracking_id.
+                  </td>
+                </tr>
+              ) : (
+                storedRows.map((row) => (
+                  <tr
+                    key={row.id}
+                    className="border-t border-slate-100 hover:bg-slate-50/80"
+                  >
+                    <td className="px-3 py-2 font-medium text-gray-900">
+                      <button
+                        type="button"
+                        className="text-[#3B966F] hover:underline"
+                        onClick={() => {
+                          setTrackingInput(row.tracking_id);
+                          runTrack(row.tracking_id);
+                        }}
+                      >
+                        {row.tracking_id}
+                      </button>
+                    </td>
+                    <td className="px-3 py-2 text-gray-700">
+                      {row.order_id || "—"}
+                    </td>
+                    <td className="px-3 py-2 capitalize text-gray-600">
+                      {row.shipment_type || "—"}
+                    </td>
+                    <td className="px-3 py-2 text-gray-800">
+                      {row.status || "—"}
+                    </td>
+                    <td className="max-w-[12rem] truncate px-3 py-2 text-gray-600">
+                      {row.scan_remark || "—"}
+                    </td>
+                    <td className="max-w-[10rem] truncate px-3 py-2 text-gray-600">
+                      {row.location || "—"}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2 text-gray-500">
+                      {formatFetchedAt(row.fetched_at)}
+                    </td>
+                    <td className="min-w-[22rem] max-w-[36rem] px-3 py-2 text-sm leading-snug text-red-700 whitespace-normal break-words align-top">
+                      {row.fetch_error || "—"}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
       {!activeId && !loading && !error && (
         <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 py-16 text-center text-gray-500">

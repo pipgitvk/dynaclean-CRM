@@ -10,6 +10,16 @@ import { normalizeRoleKey, isSuperAdminRole } from "@/lib/roleKeyUtils";
 
 const LR_URL_RE = /\/lr\/(\d+)/i;
 
+export const DELHIVERY_PUBLIC_TRACK_LR_BASE =
+  "https://www.delhivery.com/track-v2/lr/";
+
+/** Public Delhivery track page for an LR (digits only). */
+export function buildDelhiveryPublicTrackUrl(lrNumber) {
+  const lr = String(lrNumber ?? "").trim();
+  if (!lr || !/^\d+$/.test(lr)) return null;
+  return `${DELHIVERY_PUBLIC_TRACK_LR_BASE}${lr}`;
+}
+
 export function parseDelhiveryLrFromUrl(url) {
   const raw = String(url || "").trim();
   if (!raw || !/delhivery\.com/i.test(raw)) return null;

@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSessionPayload } from "@/lib/auth";
 
-const DELHIVERY_B2B_TRACK_BASE =
-  "https://btob.api.delhivery.com/v2/track";
+import { fetchDelhiveryB2bTrack } from "@/lib/delhiveryB2bTrackFetch";
 
 export async function GET(req) {
   try {
@@ -24,40 +23,18 @@ export async function GET(req) {
       );
     }
 
-    const url = `${DELHIVERY_B2B_TRACK_BASE}/${encodeURIComponent(trackingId)}?mwbn=true`;
-    const headers = { Accept: "application/json" };
-    const token = process.env.DELHIVERY_B2B_API_TOKEN?.trim();
-    if (token) {
-      headers.Authorization = `Token ${token}`;
-    }
-
-    const upstream = await fetch(url, {
-      headers,
-      cache: "no-store",
-    });
-
-    const raw = await upstream.text();
-    let data = null;
-    try {
-      data = raw ? JSON.parse(raw) : null;
-    } catch {
-      data = { raw };
-    }
-
-    if (!upstream.ok) {
-      const message =
-        (data && (data.message || data.error || data.detail)) ||
-        `Delhivery API error (${upstream.status})`;
+    const fetchResult = await fetchDelhiveryB2bTrack(trackingId);
+    if (!fetchResult.ok) {
       return NextResponse.json(
-        { success: false, error: message, data },
-        { status: upstream.status >= 400 ? upstream.status : 502 },
+        { success: false, error: fetchResult.error, data: fetchResult.data },
+        { status: fetchResult.status >= 400 ? fetchResult.status : 502 },
       );
     }
 
     return NextResponse.json({
       success: true,
       trackingId,
-      data,
+      data: fetchResult.data,
     });
   } catch (err) {
     console.error("[delhivery/b2b-track]", err);
