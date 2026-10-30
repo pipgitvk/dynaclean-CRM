@@ -124,9 +124,7 @@ export default function PaidLeaveLedger() {
     fetchLedger(username);
   };
 
-  const formatDate = (dateString) => {
-    return new formatCrmDateOnly(Date(dateString));
-  };
+  const formatDate = (dateString) => formatCrmDateOnly(dateString);
 
   const downloadLedger = () => {
     if (ledgerData.length === 0 && unpaidLedgerData.length === 0) {

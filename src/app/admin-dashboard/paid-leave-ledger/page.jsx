@@ -124,9 +124,7 @@ export default function PaidLeaveLedger() {
     fetchLedger(username);
   };
 
-  const formatDate = (dateString) => {
-    return new formatCrmDateOnly(Date(dateString));
-  };
+  const formatDate = (dateString) => formatCrmDateOnly(dateString);
 
   const downloadLedger = () => {
     if (ledgerData.length === 0 && unpaidLedgerData.length === 0) {
@@ -444,7 +442,7 @@ export default function PaidLeaveLedger() {
                           </td>
                           <td className="px-6 py-4 text-sm text-gray-600">
                             <div>
-                              <div>{entry.description}</div>
+                              <div>{typeof entry.description === "object" ? "—" : (entry.description || "—")}</div>
                               {entry.created_by && (
                                 <div className="text-xs mt-1 px-2 py-1 bg-indigo-50 border border-indigo-200 rounded text-indigo-700 inline-block">
                                   Added by: <span className="font-medium">{entry.created_by}</span>

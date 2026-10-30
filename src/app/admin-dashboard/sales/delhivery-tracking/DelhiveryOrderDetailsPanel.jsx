@@ -5,12 +5,15 @@ import {
   DELHIVERY_ORDER_DETAIL_SECTIONS,
   delhiveryStatusBadgeClass,
   formatDelhiveryStatusLabel,
+  delhiveryDisplayText,
 } from "@/lib/delhiveryB2bTrackingUi";
 
 function fieldDisplay(data, field) {
   const raw = data?.[field.key];
   if (raw == null || raw === "") return null;
-  return field.format ? field.format(raw) : String(raw);
+  if (field.format) return field.format(raw);
+  const text = delhiveryDisplayText(raw, "");
+  return text === "—" || text === "" ? null : text;
 }
 
 function DetailRow({ label, value, highlight }) {
@@ -32,11 +35,16 @@ function DetailRow({ label, value, highlight }) {
 }
 
 function RouteCard({ data }) {
-  const originCity = data?.origin_city;
-  const originBranch = data?.origin_branch;
-  const destCity = data?.destination_city;
-  const destBranch = data?.destination_branch;
-  if (!originCity && !destCity) return null;
+  const originCity = delhiveryDisplayText(data?.origin_city, "");
+  const originBranch = delhiveryDisplayText(data?.origin_branch, "");
+  const destCity = delhiveryDisplayText(data?.destination_city, "");
+  const destBranch = delhiveryDisplayText(data?.destination_branch, "");
+  const hasOrigin =
+    (originCity && originCity !== "—") ||
+    (originBranch && originBranch !== "—");
+  const hasDest =
+    (destCity && destCity !== "—") || (destBranch && destBranch !== "—");
+  if (!hasOrigin && !hasDest) return null;
 
   return (
     <div className="mb-4 rounded-xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-4">
@@ -46,9 +54,9 @@ function RouteCard({ data }) {
             Origin
           </p>
           <p className="mt-1 text-base font-semibold text-gray-900">
-            {originCity || "—"}
+            {originCity && originCity !== "—" ? originCity : "—"}
           </p>
-          {originBranch ? (
+          {originBranch && originBranch !== "—" ? (
             <p className="mt-0.5 text-sm text-gray-600">{originBranch}</p>
           ) : null}
         </div>
@@ -65,9 +73,9 @@ function RouteCard({ data }) {
             Destination
           </p>
           <p className="mt-1 text-base font-semibold text-gray-900">
-            {destCity || "—"}
+            {destCity && destCity !== "—" ? destCity : "—"}
           </p>
-          {destBranch ? (
+          {destBranch && destBranch !== "—" ? (
             <p className="mt-0.5 text-sm text-gray-600">{destBranch}</p>
           ) : null}
         </div>
@@ -106,13 +114,17 @@ export default function DelhiveryOrderDetailsPanel({ result, awb, lr }) {
           {lr ? (
             <span>
               <span className="text-gray-500">LR </span>
-              <span className="font-semibold text-gray-900">{lr}</span>
+              <span className="font-semibold text-gray-900">
+                {delhiveryDisplayText(lr, "")}
+              </span>
             </span>
           ) : null}
           {awb ? (
             <span>
               <span className="text-gray-500">AWB </span>
-              <span className="font-semibold text-gray-900">{awb}</span>
+              <span className="font-semibold text-gray-900">
+                {delhiveryDisplayText(awb, "")}
+              </span>
             </span>
           ) : null}
         </div>

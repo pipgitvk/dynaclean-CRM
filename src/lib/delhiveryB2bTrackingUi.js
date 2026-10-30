@@ -1,16 +1,42 @@
 import dayjs from "dayjs";
 
+/** Safe string for React text nodes (empty objects are truthy in JS). */
+export function delhiveryDisplayText(value, fallback = "—") {
+  if (value == null || value === "") return fallback;
+  if (typeof value === "object") {
+    if (value instanceof Date) {
+      const d = dayjs(value);
+      return d.isValid() ? d.format("DD MMM YYYY, hh:mm A") : fallback;
+    }
+    if (Array.isArray(value)) {
+      const s = value.map((v) => delhiveryDisplayText(v, "")).filter(Boolean).join(", ");
+      return s || fallback;
+    }
+    const keys = Object.keys(value);
+    if (keys.length === 0) return fallback;
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return fallback;
+    }
+  }
+  const s = String(value).trim();
+  return s === "" ? fallback : s;
+}
+
 export function formatDelhiveryTimelineDate(value) {
   if (value == null || value === "") return "";
+  if (typeof value === "object" && !(value instanceof Date)) return "";
   const d = dayjs(value);
-  if (!d.isValid()) return String(value);
+  if (!d.isValid()) return delhiveryDisplayText(value, "");
   return d.format("ddd, D MMM, h:mm A");
 }
 
 export function formatDelhiveryDateTime(value) {
   if (value == null || value === "") return "—";
+  if (typeof value === "object" && !(value instanceof Date)) return "—";
   const d = dayjs(value);
-  return d.isValid() ? d.format("DD MMM YYYY, hh:mm A") : String(value);
+  return d.isValid() ? d.format("DD MMM YYYY, hh:mm A") : delhiveryDisplayText(value);
 }
 
 export function formatDelhiveryWeight(kg) {
@@ -23,8 +49,7 @@ export function formatDelhiveryWeight(kg) {
 }
 
 export function orderStatusHeadline(status) {
-  const raw = String(status || "")
-    .trim()
+  const raw = delhiveryDisplayText(status, "")
     .replace(/_/g, " ");
   if (!raw) return "Order status";
   const upper = raw.toUpperCase();
@@ -282,7 +307,8 @@ export function delhiveryStatusBadgeClass(status) {
 }
 
 export function formatDelhiveryStatusLabel(status) {
-  const raw = String(status || "").trim().replace(/_/g, " ");
+  const raw = delhiveryDisplayText(status, "")
+    .replace(/_/g, " ");
   if (!raw) return "Unknown";
   return raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
 }

@@ -608,13 +608,13 @@ export default function DelhiveryTrackingPage() {
                       </button>
                     </td>
                     <td className="whitespace-normal break-words px-3 py-2 align-top text-gray-700">
-                      {row.order_id || "—"}
+                      {delhiveryDisplayText(row.order_id)}
                     </td>
                     <td className="whitespace-normal break-words px-3 py-2 align-top capitalize text-gray-600">
-                      {row.shipment_type || "—"}
+                      {delhiveryDisplayText(row.shipment_type)}
                     </td>
                     <td className="whitespace-normal break-words px-3 py-2 align-top text-gray-800">
-                      {row.status || "—"}
+                      {delhiveryDisplayText(row.status)}
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 align-top text-gray-700">
                       {formatDelhiveryDateTime(row.pickup_date)}
@@ -626,16 +626,16 @@ export default function DelhiveryTrackingPage() {
                       {formatDelhiveryDateTime(row.delivered_date)}
                     </td>
                     <td className="whitespace-normal break-words px-3 py-2 align-top text-gray-600">
-                      {row.scan_remark || "—"}
+                      {delhiveryDisplayText(row.scan_remark)}
                     </td>
                     <td className="whitespace-normal break-words px-3 py-2 align-top text-gray-600">
-                      {row.location || "—"}
+                      {delhiveryDisplayText(row.location)}
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 align-top text-gray-500">
                       {formatFetchedAt(row.fetched_at)}
                     </td>
                     <td className="whitespace-normal break-words px-3 py-2 align-top text-sm leading-snug text-red-700">
-                      {row.fetch_error || "—"}
+                      {delhiveryDisplayText(row.fetch_error)}
                     </td>
                   </tr>
                 ))
