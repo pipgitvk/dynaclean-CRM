@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { formatCrmDateOnly } from "@/lib/crmDateFormat";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
+import {
+  firstPaidLeaveCreditDateIso,
+  listPaidLeaveAccrualCreditDates,
+} from "@/lib/paidLeaveAccrualSchedule";
 
 export async function GET(request) {
   try {
@@ -109,35 +113,19 @@ export async function GET(request) {
 
     const [unpaidLeaves] = await conn.execute(unpaidLeavesQuery, [username]);
 
-    // Build ledger with monthly accruals
+    // Build ledger with monthly accruals (1st of month; 15th cutoff rule)
     const ledgerEntries = [];
-
-    // Generate monthly accruals from accrual_start_date to today
-    const startDate = new Date(accrualStartDate);
     const today = new Date();
-    
-    let currentDate = new Date(startDate);
-    const monthlyAccruals = [];
+    const monthlyDays = paidAllowed / 12;
+    const creditDates = listPaidLeaveAccrualCreditDates(accrualStartDate, today);
 
-    while (currentDate <= today) {
-      const accrualMonth = new Date(currentDate);
-      monthlyAccruals.push({
-        date: accrualMonth,
-        days: paidAllowed / 12 // Monthly accrual (divide annual by 12)
-      });
-
-      // Move to next month on the same day
-      currentDate.setMonth(currentDate.getMonth() + 1);
-    }
-
-    // Add all monthly accruals
-    monthlyAccruals.forEach(accrual => {
+    creditDates.forEach((dateIso) => {
       ledgerEntries.push({
         type: "credit",
-        date: accrual.date.toISOString().split('T')[0],
-        days: Math.round(accrual.days * 100) / 100, // Round to 2 decimals
-        description: `Monthly accrual (${formatCrmDateOnly(accrual.date)})`,
-        entryType: "accrual"
+        date: dateIso,
+        days: Math.round(monthlyDays * 100) / 100,
+        description: `Monthly accrual (${formatCrmDateOnly(dateIso)})`,
+        entryType: "accrual",
       });
     });
 
@@ -241,7 +229,8 @@ export async function GET(request) {
       },
       unpaidLedger: sortedUnpaidLedger,
       unpaidSummary,
-      accrualStartDate
+      accrualStartDate,
+      firstPaidLeaveCreditDate: firstPaidLeaveCreditDateIso(accrualStartDate),
     });
   } catch (error) {
     console.error("Error fetching paid leave ledger:", error);

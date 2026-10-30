@@ -28,6 +28,11 @@ import {
   REFERENCE_COLUMN_KEYS,
 } from "@/lib/profileReassignFields";
 import { deriveIsExperiencedForForm } from "@/lib/profileExperiencedUi";
+import { formatCrmDateOnly } from "@/lib/crmDateFormat";
+import {
+  firstPaidLeaveCreditDateIso,
+  PAID_LEAVE_ACCRUAL_CUTOFF_DAY,
+} from "@/lib/paidLeaveAccrualSchedule";
 import { liveProfileToFormInitialData } from "@/lib/buildProfileSubmissionInitialData";
 
 function normalizeSubmissionStatus(status) {
@@ -1065,12 +1070,33 @@ export default function ProfileForm({
                   disabled={reviewMode}
                   className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 ${reviewMode ? 'bg-gray-50 cursor-not-allowed' : ''}`}
                 />
+                {formData.leave_policy?.accrual_start_date ? (
+                  <p className="mt-1.5 text-xs text-gray-600 leading-snug">
+                    First monthly paid leave credit on{" "}
+                    <strong>
+                      {formatCrmDateOnly(
+                        firstPaidLeaveCreditDateIso(
+                          formData.leave_policy.accrual_start_date,
+                        ),
+                      )}
+                    </strong>
+                    . Start on or before the {PAID_LEAVE_ACCRUAL_CUTOFF_DAY}th →
+                    1st of that month; after the {PAID_LEAVE_ACCRUAL_CUTOFF_DAY}
+                    th → 1st of the next month.
+                  </p>
+                ) : null}
               </div>
             </div>
             <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-              <p className="text-xs font-semibold text-blue-700 uppercase mb-2">Auto-Population Rule</p>
+              <p className="text-xs font-semibold text-blue-700 uppercase mb-2">Paid leave accrual</p>
               <p className="text-sm text-blue-900">
-                When employment status changes to <strong>Permanent</strong>, leave benefits are automatically set to: Sick Leave (7 days), Paid Leave (12 days)
+                Credits post on the <strong>1st of each month</strong> (annual paid
+                allowance ÷ 12). Accrual start on/before the 15th counts from the
+                1st of that month; after the 15th, from the 1st of the next month.
+              </p>
+              <p className="text-sm text-blue-900 mt-2">
+                When employment status changes to <strong>Permanent</strong>, defaults
+                are: Sick Leave (7 days), Paid Leave (12 days).
               </p>
             </div>
           </div>

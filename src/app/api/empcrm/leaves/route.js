@@ -21,6 +21,7 @@ import {
   backfillHalfDayLeaveTotals,
   sumLeaveDaysByStatus,
 } from "@/lib/empcrmLeaveDays";
+import { calculateAccruedPaidLeaveDays } from "@/lib/paidLeaveAccrualSchedule";
 
 // GET: Fetch leaves (admin sees all, users see only their own, reporting manager sees reportees only)
 export async function GET(request) {
@@ -325,43 +326,36 @@ export async function POST(request) {
     }
 
     // Calculate accrued leaves based on date of joining or custom accrual start date
-    const calculateAccruedLeaves = (joiningDate, accrualStartDate, maxAllowed, employmentStatus, leaveType) => {
-      // Use custom accrual start date if provided, otherwise use date of joining
-      const effectiveDate = accrualStartDate || joiningDate;
-      
-      if (!effectiveDate) return maxAllowed;
-      
-      const doj = new Date(effectiveDate);
-      const today = new Date();
-      
-      // No accrual during probation
-      if (employmentStatus === 'probation') {
+    const calculateAccruedLeaves = (
+      joiningDate,
+      accrualStartDate,
+      maxAllowed,
+      employmentStatus,
+      leaveType,
+    ) => {
+      if (!maxAllowed) return 0;
+
+      if (employmentStatus === "probation") {
         return 0;
       }
-      
-      // Sick leave shows full amount immediately (no monthly accrual)
-      if (leaveType === 'sick') {
+
+      if (leaveType === "sick") {
         return maxAllowed;
       }
-      
-      // Paid leave accrues monthly based on the day of the accrual start date
-      const accrualDay = doj.getDate();
-      const currentDay = today.getDate();
 
-      // Calculate full months difference
-      const monthsDiff = (today.getFullYear() - doj.getFullYear()) * 12 + (today.getMonth() - doj.getMonth());
-
-      let accrued = monthsDiff;
-
-      // Add 1 if current day is on or after the accrual day (first month counts if day reached)
-      if (currentDay >= accrualDay) {
-        accrued += 1;
+      if (leaveType === "paid") {
+        return calculateAccruedPaidLeaveDays({
+          joiningDate,
+          accrualStartDate,
+          maxAllowed,
+          employmentStatus,
+        });
       }
 
-      // Cap at max allowed
-      accrued = Math.min(accrued, maxAllowed);
+      const effectiveDate = accrualStartDate || joiningDate;
+      if (!effectiveDate) return maxAllowed;
 
-      return Math.max(0, accrued);
+      return maxAllowed;
     };
 
     const holidays = await fetchCompanyHolidays(conn);

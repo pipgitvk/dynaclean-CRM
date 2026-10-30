@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { formatCrmDateOnly } from "@/lib/crmDateFormat";
+import { firstPaidLeaveCreditDateIso } from "@/lib/paidLeaveAccrualSchedule";
 import { useRouter, usePathname } from "next/navigation";
 import {
   Calendar,
@@ -361,9 +362,14 @@ export default function UserLeaveManagement() {
             }`}>
               Employment Status: {stats.employment_status === 'permanent' ? 'Permanent' : 'Probation'}
             </span>
-            {stats.employment_status === 'permanent' && stats.accrual_start_date && (
+            {stats.employment_status === "permanent" &&
+              (stats.first_paid_leave_credit_date || stats.accrual_start_date) && (
               <span className="inline-block px-3 py-1 rounded-full text-sm font-medium bg-purple-100 text-purple-800">
-                Leave Accrual Start Date: {stats.accrual_start_date}
+                Leave paid credit start:{" "}
+                {formatCrmDateOnly(
+                  stats.first_paid_leave_credit_date ||
+                    firstPaidLeaveCreditDateIso(stats.accrual_start_date),
+                )}
               </span>
             )}
           </div>
