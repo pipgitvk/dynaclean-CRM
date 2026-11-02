@@ -177,17 +177,20 @@ export default function MachineAttendancePage() {
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Machine Attendance</h1>
         <p className="text-sm text-gray-500 mt-1">
-          Auto-sync every hour at :00 IST (current month, all employees).
+          Auto-sync every 30 minutes IST (current month, all employees).
         </p>
         <p className="text-sm text-gray-700 mt-2">
           <span className="font-medium text-gray-900">Last sync:</span>{" "}
           {lastSync?.at
             ? `${formatPunchDisplay(lastSync.at)}${
-                lastSync.source === "hourly"
+                lastSync.source === "hourly" ||
+                lastSync.source === "cron-30m"
                   ? " · auto"
                   : lastSync.source === "manual"
                     ? " · manual"
-                    : ""
+                    : lastSync.source
+                      ? ` · ${lastSync.source}`
+                      : ""
               }`
             : "Not synced yet"}
         </p>

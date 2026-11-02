@@ -1,6 +1,6 @@
 /**
  * GET /api/cron/machine-attendance-sync
- * Machine punch sync hourly (eTimeOffice → DB). Vercel cron or ?secret=CRON_SECRET.
+ * Machine punch sync every 30 minutes (eTimeOffice → DB). Vercel cron or ?secret=CRON_SECRET.
  */
 import { NextResponse } from "next/server";
 import { isCronRequestAuthorized } from "@/lib/cronAuth";

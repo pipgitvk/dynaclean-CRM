@@ -11,7 +11,7 @@ const GLOBAL_CRON_JOB_KEY = "__machineAttendanceSyncCronJob__";
 const CATCHUP_DEBOUNCE_KEY = "__machineAttendanceSyncCatchupAt__";
 const SYNC_IN_FLIGHT_KEY = "__machineAttendanceSyncInFlight__";
 
-const CATCHUP_MIN_AGE_MS = 50 * 60 * 1000;
+const CATCHUP_MIN_AGE_MS = 25 * 60 * 1000;
 const CATCHUP_DEBOUNCE_MS = 2 * 60 * 1000;
 
 function parseIstSyncAt(at) {
@@ -42,7 +42,7 @@ async function runMachineAttendanceHourlySyncInner() {
     from,
     to,
     empCode: "ALL",
-    source: "hourly",
+    source: "cron-30m",
     syncedBy: "cron",
   });
   console.log(
@@ -86,7 +86,7 @@ export async function startMachineAttendanceSyncCron() {
   }
 
   const cronJob = cron.schedule(
-    "0 * * * *",
+    "*/30 * * * *",
     () => {
       runMachineAttendanceHourlySync().catch((err) => {
         console.error("❌ Machine attendance sync failed:", err);
@@ -98,7 +98,7 @@ export async function startMachineAttendanceSyncCron() {
   global[GLOBAL_KEY] = true;
   global[GLOBAL_CRON_JOB_KEY] = cronJob;
   console.log(
-    "✅ Machine attendance sync cron scheduled (every hour at :00, Asia/Kolkata)"
+    "✅ Machine attendance sync cron scheduled (every 30 minutes, Asia/Kolkata)"
   );
 
   void maybeRunCatchUpSync();
