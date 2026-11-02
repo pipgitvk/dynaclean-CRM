@@ -5,7 +5,7 @@ import { formatCrmDateOnly } from "@/lib/crmDateFormat";
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import toast from "react-hot-toast";
-import { BadgeCheck } from "lucide-react";
+import { BadgeCheck, X } from "lucide-react";
 import { formatAttendanceTimeForDisplay as formatTime } from "@/lib/istDateTime";
 import { getAttendanceRegularizationAttachmentHref } from "@/lib/attendanceRegularizationAttachmentHref";
 
@@ -30,7 +30,7 @@ function displayOut(req) {
   return req.proposed_checkout_time ?? req.original_checkout_time ?? null;
 }
 
-function statusBadge(status, acknowledgedAt) {
+function statusBadgeClass(status) {
   const s = String(status || "").toLowerCase();
   if (s === "pending") {
     return "bg-amber-100 text-amber-900 border border-amber-200";
@@ -44,8 +44,12 @@ function statusBadge(status, acknowledgedAt) {
   return "bg-gray-100 text-gray-800 border border-gray-200";
 }
 
+function isLikelyImageAttachment(attachmentUrl) {
+  return /\.(jpe?g|png|gif|webp|bmp)$/i.test(String(attachmentUrl || ""));
+}
+
 function StatusBadge({ status, acknowledgedAt }) {
-  const cls = statusBadge(status);
+  const cls = statusBadgeClass(status);
   const display = status || "—";
   const statusEl = (
     <span
@@ -54,13 +58,6 @@ function StatusBadge({ status, acknowledgedAt }) {
       {display}
     </span>
   );
-  // if (!acknowledgedAt) return statusEl;
-  // return (
-  //   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-indigo-100 text-indigo-700 border border-indigo-200">
-  //     <BadgeCheck className="w-3 h-3" />
-  //     Acknowledged
-  //   </span>
-  // );
   return statusEl;
 }
 
@@ -72,6 +69,7 @@ export default function AdminAttendanceRegularizationPage() {
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [acknowledgementRemark, setAcknowledgementRemark] = useState("");
   const [modalAction, setModalAction] = useState(null);
+  const [attachmentPreview, setAttachmentPreview] = useState(null);
 
   // Filter states
   const [statusFilter, setStatusFilter] = useState("all");
@@ -356,17 +354,22 @@ export default function AdminAttendanceRegularizationPage() {
                     </td>
                     <td className="px-3 py-2">
                       {req.attachment_url ? (
-                        <a
-                          href={getAttendanceRegularizationAttachmentHref(
-                            req.attachment_url,
-                            req.id,
-                          )}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setAttachmentPreview({
+                              href: getAttendanceRegularizationAttachmentHref(
+                                req.attachment_url,
+                                req.id,
+                              ),
+                              attachmentUrl: req.attachment_url,
+                              title: `${req.username || "Employee"} — ${formatLogDate(req.log_date)}`,
+                            })
+                          }
                           className="text-teal-700 underline hover:text-teal-900"
                         >
                           View
-                        </a>
+                        </button>
                       ) : (
                         "—"
                       )}
@@ -522,6 +525,71 @@ export default function AdminAttendanceRegularizationPage() {
                  modalAction === "reject" ? "Reject" :
                  modalAction === "approve" ? "Approve" :
                  "Acknowledge"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {attachmentPreview && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="attachment-preview-title"
+          onClick={() => setAttachmentPreview(null)}
+        >
+          <div
+            className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-3 p-4 border-b border-gray-200">
+              <h2
+                id="attachment-preview-title"
+                className="text-lg font-semibold text-gray-800 truncate"
+              >
+                Attachment — {attachmentPreview.title}
+              </h2>
+              <button
+                type="button"
+                onClick={() => setAttachmentPreview(null)}
+                className="p-1 rounded text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+                aria-label="Close preview"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-auto p-4 min-h-[240px] flex items-center justify-center bg-gray-50">
+              {isLikelyImageAttachment(attachmentPreview.attachmentUrl) ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={attachmentPreview.href}
+                  alt="Regularization attachment"
+                  className="max-w-full max-h-[70vh] object-contain rounded border border-gray-200 bg-white"
+                />
+              ) : (
+                <iframe
+                  src={attachmentPreview.href}
+                  title="Regularization attachment"
+                  className="w-full h-[70vh] border border-gray-200 rounded bg-white"
+                />
+              )}
+            </div>
+            <div className="p-3 border-t border-gray-200 flex justify-end gap-4">
+              <a
+                href={attachmentPreview.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-indigo-600 hover:text-indigo-800 underline"
+              >
+                Open in new tab
+              </a>
+              <button
+                type="button"
+                onClick={() => setAttachmentPreview(null)}
+                className="text-sm px-3 py-1.5 rounded border border-gray-300 text-gray-700 hover:bg-gray-50"
+              >
+                Close
               </button>
             </div>
           </div>
