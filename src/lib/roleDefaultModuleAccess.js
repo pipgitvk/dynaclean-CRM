@@ -374,6 +374,8 @@ export const ROLE_DEFAULT_MODULE_KEYS = {
     "my-leads",
     "bulk-reassign",
     "denied-leads",
+    "ads-management",
+    "meta-backfill",
     "task-manager",
     "fast-card",
     "quotations",

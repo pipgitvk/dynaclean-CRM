@@ -59,6 +59,8 @@ function transformMenuItemPaths(item, roleKey) {
       "prospects-add": "/sales-dashboard/prospects/add-manual",
       "prospects-new": "/sales-dashboard/prospects/new",
       "bulk-reassign": "/sales-dashboard/bulk-reassign",
+      "ads-management": "/sales-dashboard/meta-credentials",
+      "meta-backfill": "/sales-dashboard/ads-management",
     };
     if (salesDashboardModulePaths[item.moduleKey]) {
       return { ...item, path: salesDashboardModulePaths[item.moduleKey] };
@@ -365,6 +367,20 @@ const allMenuItems = [
         moduleKey: "bulk-reassign",
         roles: ["ALL"],
         icon: "Upload",
+      },
+      {
+        path: "/admin-dashboard/meta-credentials",
+        name: "Ads Management",
+        moduleKey: "ads-management",
+        roles: ["ALL"],
+        icon: "LayoutGrid",
+      },
+      {
+        path: "/admin-dashboard/ads-management",
+        name: "Meta Backfill",
+        moduleKey: "meta-backfill",
+        roles: ["ALL"],
+        icon: "RefreshCw",
       },
       {
         path: "/user-dashboard/new_upload",

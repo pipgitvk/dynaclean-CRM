@@ -64,6 +64,7 @@ export const MODULE_TREE = [
       { key: "performa-invoices", label: "Performa Invoices" },
       { key: "credit-notes", label: "Credit Notes" },
       { key: "ads-management", label: "Ads Management" },
+      { key: "meta-backfill", label: "Meta Backfill" },
     ],
   },
   {
@@ -81,7 +82,9 @@ export const MODULE_TREE = [
     label: "Leads Management",
     children: [
       { key: "leads-upload", label: "Leads Upload" },
-      { key: "denied-leads", label: "Denied Leads" }
+      { key: "denied-leads", label: "Denied Leads" },
+      { key: "ads-management", label: "Ads Management" },
+      { key: "meta-backfill", label: "Meta Backfill" },
     ],
   },
   {
@@ -263,6 +266,7 @@ export const SUPERADMIN_MODULE_UI_NODES = [
       { kind: "leaf", key: "lead-distribution", label: "Lead Distribution" },
       { kind: "leaf", key: "bulk-reassign", label: "Bulk Reassign Leads" },
       { kind: "leaf", key: "ads-management", label: "Ads Management" },
+      { kind: "leaf", key: "meta-backfill", label: "Meta Backfill" },
     ],
   },
   {
@@ -291,6 +295,8 @@ export const SUPERADMIN_MODULE_UI_NODES = [
       { kind: "leaf", key: "bulk-reassign", label: "Bulk Reassign Leads" },
       { kind: "leaf", key: "leads-upload", label: "Leads Upload" },
       { kind: "leaf", key: "denied-leads", label: "Denied Leads" },
+      { kind: "leaf", key: "ads-management", label: "Ads Management" },
+      { kind: "leaf", key: "meta-backfill", label: "Meta Backfill" },
     ],
   },
   {

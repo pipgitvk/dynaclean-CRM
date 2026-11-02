@@ -148,6 +148,30 @@ export async function middleware(request) {
         }
       }
 
+      // Meta backfill: sales roles use sales-dashboard copy.
+      if (pathname.startsWith("/admin-dashboard/ads-management")) {
+        if (roleNorm.includes("SALES") && role !== "SUPERADMIN") {
+          const dest = new URL(
+            pathname.replace("/admin-dashboard", "/sales-dashboard"),
+            request.url,
+          );
+          dest.search = request.nextUrl.search;
+          return NextResponse.redirect(dest);
+        }
+      }
+
+      // Meta credentials: sales roles use sales-dashboard copy.
+      if (pathname.startsWith("/admin-dashboard/meta-credentials")) {
+        if (roleNorm.includes("SALES") && role !== "SUPERADMIN") {
+          const dest = new URL(
+            pathname.replace("/admin-dashboard", "/sales-dashboard"),
+            request.url,
+          );
+          dest.search = request.nextUrl.search;
+          return NextResponse.redirect(dest);
+        }
+      }
+
       // Prospects: sales roles use sales-dashboard copy; admin/director stay on admin.
       if (pathname.startsWith("/admin-dashboard/prospects")) {
         if (roleNorm.includes("SALES") && role !== "SUPERADMIN") {
@@ -230,6 +254,10 @@ export async function middleware(request) {
         const isDeniedLeadsRoute = pathname.startsWith("/admin-dashboard/denied-leads");
         const isViewCustomerRoute = pathname.startsWith("/admin-dashboard/view-customer");
         const isBulkReassignRoute = pathname.startsWith("/admin-dashboard/bulk-reassign");
+        const isMetaCredentialsRoute =
+          pathname.startsWith("/admin-dashboard/meta-credentials");
+        const isMetaBackfillRoute =
+          pathname.startsWith("/admin-dashboard/ads-management");
         const isAccountingLedgerRoute = pathname.startsWith("/admin-dashboard/accounting/ledger");
         const isInvoicesBuyerRoute = pathname.startsWith("/admin-dashboard/invoices/buyer");
         const isPartiesRoute = pathname.startsWith("/admin-dashboard/parties");
@@ -257,7 +285,12 @@ export async function middleware(request) {
           !(roleNorm === "EA" && isEaAllowed) &&
           !(isTeamLeader && (isDeniedLeadsRoute || isViewCustomerRoute)) &&
           !(isSales && (isDeniedLeadsRoute || isViewCustomerRoute || isBulkReassignRoute)) &&
-          !(isSalesCumBackoffice && (isBulkReassignRoute || isManualPaymentsRoute || isSalesDashboardManualPaymentsRoute)) &&
+          !(isSalesCumBackoffice &&
+            (isBulkReassignRoute ||
+              isMetaCredentialsRoute ||
+              isMetaBackfillRoute ||
+              isManualPaymentsRoute ||
+              isSalesDashboardManualPaymentsRoute)) &&
           !(isServiceHead && isServiceSupportReport) &&
           !(isServiceSupport && isServiceSupportReport) &&
           !(roleNorm === "EA" && isServiceSupportReport) &&

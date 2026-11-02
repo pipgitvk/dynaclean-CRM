@@ -310,17 +310,18 @@ const allMenuItems = [
         icon: "Upload",
       },
       {
-        path: "/admin-dashboard/ads-management",
-        name: "Meta backfill",
+        path: "/admin-dashboard/meta-credentials",
+        name: "Ads Management",
         accessKey: "ads-management",
         roles: ["SUPERADMIN"],
         icon: "LayoutGrid",
       },
       {
-        path: "/admin-dashboard/meta-credentials",
-        name: "Ads management",
+        path: "/admin-dashboard/ads-management",
+        name: "Meta Backfill",
+        accessKey: "meta-backfill",
         roles: ["SUPERADMIN"],
-        icon: "Settings",
+        icon: "LayoutGrid",
       },
       {
         path: "/admin-dashboard/denied-leads",
