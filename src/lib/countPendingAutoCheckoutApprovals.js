@@ -1,27 +1,22 @@
-import { AUTO_CHECKOUT_ATTENDANCE_ADDRESS } from "@/lib/attendanceAutoCheckoutConstants";
-import { ensureAttendanceAutoCheckoutApprovalsTable } from "@/lib/ensureAttendanceAutoCheckoutApprovalsTable";
+import { buildAutoCheckoutApprovalItems } from "@/lib/autoCheckoutApprovalQueue";
 
 /** Automatic check-outs waiting for HR approval (this month by default). */
 export async function countPendingAutoCheckoutApprovals(conn, options = {}) {
   const { monthScope = true } = options;
-  await ensureAttendanceAutoCheckoutApprovalsTable(conn);
-
-  let monthSql = "";
+  let fromDate = null;
+  let toDate = null;
   if (monthScope) {
-    monthSql = `
-      AND YEAR(a.date) = YEAR(CURDATE())
-      AND MONTH(a.date) = MONTH(CURDATE())`;
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, "0");
+    const d = String(now.getDate()).padStart(2, "0");
+    fromDate = `${y}-${m}-01`;
+    toDate = `${y}-${m}-${d}`;
   }
-
-  const [rows] = await conn.execute(
-    `SELECT COUNT(*) AS c
-     FROM attendance_logs a
-     LEFT JOIN attendance_auto_checkout_approvals ap
-       ON ap.username = a.username AND ap.log_date = a.date
-     WHERE TRIM(COALESCE(a.checkout_address, '')) = ?
-       AND (ap.id IS NULL OR ap.status = 'pending')
-     ${monthSql}`,
-    [AUTO_CHECKOUT_ATTENDANCE_ADDRESS]
-  );
-  return Number(rows[0]?.c ?? 0);
+  const items = await buildAutoCheckoutApprovalItems(conn, {
+    fromDate,
+    toDate,
+    statusFilter: "pending",
+  });
+  return items.length;
 }

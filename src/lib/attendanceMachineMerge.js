@@ -7,7 +7,10 @@ import {
   loadRepListCanonicalUsernameMaps,
   resolveCanonicalUsername,
 } from "@/lib/attendanceCanonicalUsername";
+import { lookupAttendanceEmployeeIds } from "@/lib/ensureAttendanceLogsEmployeeColumns";
+import { ensureAttendanceCheckoutGpsTriggersAllowAdmin } from "@/lib/ensureAttendanceCheckoutGpsTriggers";
 import {
+  AUTO_CHECKOUT_ATTENDANCE_ADDRESS,
   AUTO_CHECKOUT_WALL_TIME,
   isAutomaticCheckoutAddress,
 } from "@/lib/attendanceAutoCheckoutConstants";
@@ -257,6 +260,134 @@ export function mergeCrmAndMachineDay(crmRow, machineDay) {
   return merged;
 }
 
+/** SQL fragment: last non-AUTO afternoon punch strictly before 9 PM IST (ignores synthetic auto-9pm rows). */
+export const MACHINE_CHECKOUT_AGG_SQL = `
+  MAX(CASE
+    WHEN TIME(punch_datetime) >= '12:00:00'
+     AND punch_datetime < TIMESTAMP(DATE(punch_datetime), '21:00:00')
+     AND UPPER(COALESCE(m_flag, '')) <> 'AUTO'
+    THEN punch_datetime
+  END)`;
+
+export async function removeAutoNinePmMachinePunch(conn, empCode, dateYmd) {
+  if (!empCode || !dateYmd) return 0;
+  const sourceUid = `auto-9pm-${empCode}-${dateYmd}`;
+  const [result] = await conn.execute(
+    `DELETE FROM machine_attendance_punches WHERE source_uid = ?`,
+    [sourceUid],
+  );
+  return Number(result?.affectedRows ?? 0);
+}
+
+/**
+ * Write biometric check-out (before 9 PM) into attendance_logs; clears Automatic auto-checkout.
+ * Does not overwrite a real CRM app check-out.
+ */
+export async function persistMachineCheckoutBeforeNinePm(
+  conn,
+  {
+    username,
+    dateYmd,
+    machineCheckout,
+    machineCheckin = null,
+    ids = null,
+  },
+) {
+  if (!username || !dateYmd || !machineCheckoutIsBeforeNinePm(machineCheckout, dateYmd)) {
+    return 0;
+  }
+
+  await ensureAttendanceCheckoutGpsTriggersAllowAdmin(conn);
+
+  const employeeIds = ids || (await lookupAttendanceEmployeeIds(conn, username));
+
+  const [result] = await conn.query(
+    `UPDATE attendance_logs
+     SET checkin_time = COALESCE(checkin_time, ?),
+         checkout_time = ?,
+         checkout_latitude = NULL,
+         checkout_longitude = NULL,
+         checkout_address = ?
+     WHERE username = ?
+       AND date = ?
+       AND (
+         checkout_time IS NULL
+         OR TRIM(checkout_time) = ''
+         OR TRIM(COALESCE(checkout_address, '')) = ?
+       )`,
+    [
+      machineCheckin,
+      machineCheckout,
+      MACHINE_ATTENDANCE_ADDRESS,
+      username,
+      dateYmd,
+      AUTO_CHECKOUT_ATTENDANCE_ADDRESS,
+    ],
+  );
+
+  let affected = Number(result?.affectedRows ?? 0);
+
+  if (affected === 0) {
+    const [ins] = await conn.query(
+      `INSERT INTO attendance_logs
+        (username, employee_id, machine_code, date, checkin_time, checkout_time, checkout_address)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+        checkin_time = COALESCE(checkin_time, VALUES(checkin_time)),
+        checkout_time = IF(
+          checkout_time IS NULL OR TRIM(checkout_time) = ''
+            OR TRIM(COALESCE(checkout_address, '')) = ?,
+          VALUES(checkout_time),
+          checkout_time
+        ),
+        checkout_address = IF(
+          checkout_time IS NULL OR TRIM(checkout_time) = ''
+            OR TRIM(COALESCE(checkout_address, '')) = ?,
+          VALUES(checkout_address),
+          checkout_address
+        ),
+        checkout_latitude = IF(
+          checkout_time IS NULL OR TRIM(checkout_time) = ''
+            OR TRIM(COALESCE(checkout_address, '')) = ?,
+          NULL,
+          checkout_latitude
+        ),
+        checkout_longitude = IF(
+          checkout_time IS NULL OR TRIM(checkout_time) = ''
+            OR TRIM(COALESCE(checkout_address, '')) = ?,
+          NULL,
+          checkout_longitude
+        ),
+        employee_id = COALESCE(employee_id, VALUES(employee_id)),
+        machine_code = COALESCE(machine_code, VALUES(machine_code))`,
+      [
+        username,
+        employeeIds.employee_id,
+        employeeIds.machine_code,
+        dateYmd,
+        machineCheckin,
+        machineCheckout,
+        MACHINE_ATTENDANCE_ADDRESS,
+        AUTO_CHECKOUT_ATTENDANCE_ADDRESS,
+        AUTO_CHECKOUT_ATTENDANCE_ADDRESS,
+        AUTO_CHECKOUT_ATTENDANCE_ADDRESS,
+        AUTO_CHECKOUT_ATTENDANCE_ADDRESS,
+      ],
+    );
+    affected = Number(ins?.affectedRows ?? 0) > 0 ? 1 : 0;
+  }
+
+  if (affected > 0) {
+    await conn.query(
+      `DELETE FROM attendance_auto_checkout_approvals
+       WHERE username = ? AND log_date = ?`,
+      [username, dateYmd],
+    );
+  }
+
+  return affected;
+}
+
 export async function loadMachineCodeMaps(conn) {
   await ensureRepListMachineCodeColumn(conn);
   const canonicalMaps = await loadRepListCanonicalUsernameMaps(conn);
@@ -333,7 +464,7 @@ export async function loadMachineDailyByUsername(conn, machineCodeToUsername, op
       emp_code,
       DATE(punch_datetime) AS punch_date,
       MIN(CASE WHEN HOUR(punch_datetime) < 12 THEN punch_datetime END) AS machine_checkin,
-      MAX(CASE WHEN HOUR(punch_datetime) >= 12 THEN punch_datetime END) AS machine_checkout
+      ${MACHINE_CHECKOUT_AGG_SQL.trim()} AS machine_checkout
     FROM machine_attendance_punches`;
   const params = [];
   if (empCodes.length) {

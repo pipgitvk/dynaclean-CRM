@@ -6,6 +6,7 @@ import {
   getLastMachineAttendanceSync,
   syncMachineAttendanceFromEtimeOffice,
 } from "@/lib/syncMachineAttendance";
+import { applyAutomaticCheckouts } from "@/lib/attendanceAutoCheckout";
 import {
   loadRepListInfoByMachineEmpCode,
   repListInfoForEmpCode,
@@ -220,6 +221,8 @@ export async function POST(request) {
       source: "manual",
       syncedBy,
     });
+
+    await applyAutomaticCheckouts();
 
     return NextResponse.json({
       success: true,

@@ -19,6 +19,8 @@ import {
   machineCheckoutIsBeforeNinePm,
   mergeCrmAndMachineDay,
   mergedHasCheckout,
+  persistMachineCheckoutBeforeNinePm,
+  removeAutoNinePmMachinePunch,
 } from "@/lib/attendanceMachineMerge";
 import { lookupAttendanceEmployeeIds } from "@/lib/ensureAttendanceLogsEmployeeColumns";
 
@@ -280,6 +282,36 @@ async function applyAutomaticCheckoutsOnConn(conn, options = {}) {
       const { username, dateYmd, crm, machineDay } = cand;
       const machineOnlyCheckin = isMachineOnlyCheckinAttendanceDay(crm, machineDay);
       const macOut = machineDay?.machine_checkout ?? null;
+      const macIn = machineDay?.machine_checkin ?? null;
+      const empCode = usernameToMachineCode.get(username);
+
+      if (machineCheckoutIsBeforeNinePm(macOut, dateYmd)) {
+        if (
+          crm &&
+          isAutomaticCheckoutAddress(crm.checkout_address)
+        ) {
+          await revertCrmAutomaticCheckoutForMachinePreference(conn, {
+            username,
+            dateYmd,
+            machineDay,
+            machineOnlyCheckin,
+          });
+          crm.checkout_time = null;
+          crm.checkout_address = null;
+        }
+        const persisted = await persistMachineCheckoutBeforeNinePm(conn, {
+          username,
+          dateYmd,
+          machineCheckout: macOut,
+          machineCheckin: machineOnlyCheckin ? macIn : null,
+        });
+        if (persisted > 0) updated += persisted;
+        if (empCode) {
+          const removed = await removeAutoNinePmMachinePunch(conn, empCode, dateYmd);
+          if (removed > 0) updated += removed;
+        }
+        continue;
+      }
 
       const shouldRevertExistingAuto =
         crm &&
@@ -426,10 +458,10 @@ async function applyAutomaticCheckoutsOnConn(conn, options = {}) {
         updated += result.affectedRows;
       }
 
-      const empCode = usernameToMachineCode.get(username);
-      if (empCode) {
+      const empCodeForAuto = usernameToMachineCode.get(username);
+      if (empCodeForAuto) {
         const punched = await insertAutoMachineCheckoutPunch(conn, {
-          empCode,
+          empCode: empCodeForAuto,
           employeeName: displayNameByUser.get(username) || username,
           dateYmd,
           wallTime,

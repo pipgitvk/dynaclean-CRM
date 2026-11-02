@@ -2,18 +2,21 @@
 const ADMIN_ADDR = "Admin";
 /** Must match AUTO_CHECKOUT_ATTENDANCE_ADDRESS in attendanceAutoCheckoutConstants.js */
 const AUTO_ADDR = "Automatic";
+/** Must match MACHINE_ATTENDANCE_ADDRESS in attendanceMachineMerge.js */
+const MACHINE_ADDR = "Machine";
 
-const TRIGGER_VERSION = 2;
+const TRIGGER_VERSION = 4;
 const GLOBAL_VERSION_KEY = "__attendanceCheckoutGpsTriggerVersion__";
 
 function checkoutWithoutGpsAllowedSql(conn) {
   const adminLit = conn.escape(ADMIN_ADDR);
   const autoLit = conn.escape(AUTO_ADDR);
-  return `(TRIM(COALESCE(NEW.checkout_address, '')) <> ${adminLit} AND TRIM(COALESCE(NEW.checkout_address, '')) <> ${autoLit})`;
+  const machineLit = conn.escape(MACHINE_ADDR);
+  return `(TRIM(COALESCE(NEW.checkout_address, '')) <> ${adminLit} AND TRIM(COALESCE(NEW.checkout_address, '')) <> ${autoLit} AND TRIM(COALESCE(NEW.checkout_address, '')) <> ${machineLit})`;
 }
 
 /**
- * Updates DB triggers so checkout without GPS is allowed when checkout_address is Admin (HR edits) or Automatic.
+ * Updates DB triggers so checkout without GPS is allowed when checkout_address is Admin (HR edits), Automatic, or Machine (biometric).
  */
 export async function ensureAttendanceCheckoutGpsTriggersAllowAdmin(conn) {
   if (global[GLOBAL_VERSION_KEY] === TRIGGER_VERSION) return;

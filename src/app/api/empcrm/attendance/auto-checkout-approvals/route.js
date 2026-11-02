@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getDbConnection, withDbConnection } from "@/lib/db";
+import { withDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { getISTDateTimeString } from "@/lib/istDateTime";
 import { AUTO_CHECKOUT_ATTENDANCE_ADDRESS } from "@/lib/attendanceAutoCheckoutConstants";
@@ -10,6 +10,7 @@ import {
   findLeaveForUserOnDate,
   resolveAutoCheckoutForAttendanceDay,
 } from "@/lib/attendanceAutoCheckoutLeave";
+import { buildAutoCheckoutApprovalItems } from "@/lib/autoCheckoutApprovalQueue";
 
 const HR_ATTENDANCE_ROLES = ["SUPERADMIN", "HR HEAD", "HR", "HR Executive"];
 
@@ -67,91 +68,6 @@ async function loadLeaveAndScheduleMaps(conn, fromDate, toDate) {
   return { leaves, scheduleByUser };
 }
 
-function enrichAutoCheckoutRow(row, leaves, scheduleByUser) {
-  const dateYmd = parseYmd(
-    row.date instanceof Date
-      ? row.date.toISOString().slice(0, 10)
-      : String(row.date).slice(0, 10)
-  );
-  const leave = findLeaveForUserOnDate(leaves, row.username, dateYmd);
-  const scheduleRow = scheduleByUser.get(row.username) || null;
-  const resolved = resolveAutoCheckoutForAttendanceDay({
-    leave,
-    dateYmd,
-    scheduleRow,
-    checkinTime: row.checkin_time,
-  });
-  const currentCheckout = checkoutTimeFromDb(row.checkout_time);
-  return {
-    ...row,
-    date: dateYmd,
-    leave_status: leave?.status || null,
-    leave_type: leave?.leave_type || null,
-    suggested_checkout_time: resolved.wallTime,
-    current_checkout_time: currentCheckout,
-    has_active_leave: Boolean(leave),
-    skips_auto_checkout: resolved.skipAuto,
-  };
-}
-
-function filterApprovalQueueItems(items, statusFilter) {
-  if (statusFilter === "pending") {
-    return items.filter((row) => !row.has_active_leave);
-  }
-  return items;
-}
-
-/** Rows still on automatic checkout; approval row optional (implicit pending). */
-async function fetchAutomaticCheckoutRows(conn, { fromDate, toDate, statusFilter }) {
-  const params = [AUTO_CHECKOUT_ATTENDANCE_ADDRESS];
-  let dateSql = "";
-  if (fromDate) {
-    dateSql += " AND a.date >= ?";
-    params.push(fromDate);
-  }
-  if (toDate) {
-    dateSql += " AND a.date <= ?";
-    params.push(toDate);
-  }
-
-  let statusSql = "";
-  if (statusFilter === "pending") {
-    statusSql =
-      " AND (ap.id IS NULL OR ap.status = 'pending')";
-  } else if (statusFilter === "rejected") {
-    statusSql = " AND ap.status = 'rejected'";
-  } else if (statusFilter === "all") {
-    statusSql = " AND (ap.id IS NULL OR ap.status IN ('pending', 'rejected'))";
-  } else {
-    statusSql = " AND (ap.id IS NULL OR ap.status = 'pending')";
-  }
-
-  const [rows] = await conn.query(
-    `SELECT
-      a.username,
-      a.date,
-      a.checkin_time,
-      a.checkout_time,
-      a.checkout_address,
-      a.employee_id,
-      a.machine_code,
-      COALESCE(ap.status, 'pending') AS approval_status,
-      ap.reviewed_by,
-      ap.reviewed_at,
-      ap.note
-    FROM attendance_logs a
-    LEFT JOIN attendance_auto_checkout_approvals ap
-      ON ap.username = a.username AND ap.log_date = a.date
-    WHERE TRIM(COALESCE(a.checkout_address, '')) = ?
-    ${dateSql}
-    ${statusSql}
-    ORDER BY a.date DESC, a.username ASC
-    LIMIT 500`,
-    params
-  );
-  return rows;
-}
-
 export async function GET(request) {
   try {
     const payload = await getSessionPayload();
@@ -168,41 +84,24 @@ export async function GET(request) {
     const status = searchParams.get("status") || "pending";
     const countOnly = searchParams.get("countOnly") === "1";
 
-    const conn = await getDbConnection();
-    await ensureAttendanceAutoCheckoutApprovalsTable(conn);
-
-    const rawItems = await fetchAutomaticCheckoutRows(conn, {
-      fromDate,
-      toDate,
-      statusFilter: status,
-    });
-
-    const { leaves, scheduleByUser } = await loadLeaveAndScheduleMaps(
-      conn,
-      fromDate,
-      toDate
-    );
-    const items = filterApprovalQueueItems(
-      rawItems.map((row) => enrichAutoCheckoutRow(row, leaves, scheduleByUser)),
-      status,
-    );
-
     if (countOnly) {
-      const pendingRaw = await fetchAutomaticCheckoutRows(conn, {
+      const pendingItems = await withDbConnection((conn) =>
+        buildAutoCheckoutApprovalItems(conn, {
+          fromDate,
+          toDate,
+          statusFilter: "pending",
+        }),
+      );
+      return NextResponse.json({ pendingCount: pendingItems.length });
+    }
+
+    const items = await withDbConnection((conn) =>
+      buildAutoCheckoutApprovalItems(conn, {
         fromDate,
         toDate,
-        statusFilter: "pending",
-      });
-      const { leaves: leaveRows, scheduleByUser: schedules } =
-        await loadLeaveAndScheduleMaps(conn, fromDate, toDate);
-      const pendingCount = filterApprovalQueueItems(
-        pendingRaw.map((row) =>
-          enrichAutoCheckoutRow(row, leaveRows, schedules),
-        ),
-        "pending",
-      ).length;
-      return NextResponse.json({ pendingCount });
-    }
+        statusFilter: status,
+      }),
+    );
 
     return NextResponse.json({ items });
   } catch (err) {
