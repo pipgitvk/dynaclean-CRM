@@ -58,6 +58,7 @@ function transformMenuItemPaths(item, roleKey) {
       "prospects-view": "/sales-dashboard/prospects",
       "prospects-add": "/sales-dashboard/prospects/add-manual",
       "prospects-new": "/sales-dashboard/prospects/new",
+      "bulk-reassign": "/sales-dashboard/bulk-reassign",
     };
     if (salesDashboardModulePaths[item.moduleKey]) {
       return { ...item, path: salesDashboardModulePaths[item.moduleKey] };

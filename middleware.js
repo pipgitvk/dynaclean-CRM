@@ -136,6 +136,18 @@ export async function middleware(request) {
         return NextResponse.redirect(dest);
       }
 
+      // Bulk reassign: sales roles use sales-dashboard copy.
+      if (pathname.startsWith("/admin-dashboard/bulk-reassign")) {
+        if (roleNorm.includes("SALES") && role !== "SUPERADMIN") {
+          const dest = new URL(
+            pathname.replace("/admin-dashboard", "/sales-dashboard"),
+            request.url,
+          );
+          dest.search = request.nextUrl.search;
+          return NextResponse.redirect(dest);
+        }
+      }
+
       // Prospects: sales roles use sales-dashboard copy; admin/director stay on admin.
       if (pathname.startsWith("/admin-dashboard/prospects")) {
         if (roleNorm.includes("SALES") && role !== "SUPERADMIN") {
