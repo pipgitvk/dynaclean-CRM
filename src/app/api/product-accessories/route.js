@@ -102,7 +102,15 @@ export async function POST(req) {
 
         const role = tokenPayload.role;
         const roleUpper = String(role).toUpperCase();
-        if (!["ADMIN", "SUPERADMIN", "WAREHOUSE INCHARGE", "DIRECTOR"].includes(roleUpper)) {
+        if (
+            ![
+                "ADMIN",
+                "SUPERADMIN",
+                "WAREHOUSE INCHARGE",
+                "DIRECTOR",
+                "SALES CUM BACKOFFICE",
+            ].includes(roleUpper)
+        ) {
             return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
 
