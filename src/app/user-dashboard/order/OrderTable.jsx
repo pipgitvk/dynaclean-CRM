@@ -48,6 +48,10 @@ import {
 import { isPostAccountPipelineRole } from "@/lib/orderReportVisibility";
 import { isBookingAllowedForOrder } from "@/lib/orderBookingEligibility";
 import {
+  serviceChargeOnlyCompletedStatus,
+  orderIsServiceChargeOnlyOrder,
+} from "@/lib/nonDispatchQuotationLines";
+import {
   canCreateAdditionalBooking,
   canOpenFirstDispatchForOrder,
   canOpenRemainDispatchForOrder,
@@ -252,6 +256,13 @@ export default function OrderTable({ orders, userRole }) {
         icon: <Truck size={14} className="mr-1" />,
       };
     }
+    const serviceCompleted = serviceChargeOnlyCompletedStatus(order);
+    if (serviceCompleted) {
+      return {
+        ...serviceCompleted,
+        icon: <CheckCircle size={14} className="mr-1" />,
+      };
+    }
     if (Number(order.dispatch_status) === 2) {
       return {
         text: "Partial Dispatch",
@@ -444,6 +455,7 @@ export default function OrderTable({ orders, userRole }) {
               <option value="pendinginvoice">Pending Invoice</option>
             )}
             <option value="invoiceuploaded">Invoice Uploaded</option>
+            <option value="completed">Completed</option>
             <option value="bookingdone">Booking Done</option>
             <option value="dispatchdone">Dispatch Done</option>
             <option value="delivered">Delivered</option>
@@ -851,6 +863,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
   const canOpenFirstDispatch = canOpenFirstDispatchForOrder(r);
   const canOpenRemainDispatch = canOpenRemainDispatchForOrder(r);
   const canViewDispatchPanel = canViewDispatchPanelForOrder(r);
+  const serviceOnlyOrder = orderIsServiceChargeOnlyOrder(r);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -932,7 +945,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                     <EditPaymentButton order={r} />
                   </div>
                 )}
-                {hasBooking && dispatchStatus === 1 && (
+                {canViewDispatchPanel && (
                   <Link
                     href={`/user-dashboard/order/dispatch/view/${r.order_id}`}
                     className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700 w-full block"
@@ -943,13 +956,16 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                     <span>View Dispatch</span>
                   </Link>
                 )}
-                <OrderDeliveryMenuLinks
-                  order={r}
-                  userRole={userRole}
-                  DeliveryMenuItem={UpdateDeliveryMenuItem}
-                />
+                {!serviceOnlyOrder && (
+                  <OrderDeliveryMenuLinks
+                    order={r}
+                    userRole={userRole}
+                    DeliveryMenuItem={UpdateDeliveryMenuItem}
+                  />
+                )}
                 {dispatchStatus === 1 &&
-                  !blocksNewReturnInitiate(r.is_returned) && (
+                  !blocksNewReturnInitiate(r.is_returned) &&
+                  !serviceOnlyOrder && (
                     <div
                       className="border-t border-gray-100 mt-1 pt-1"
                       onClick={(e) => e.stopPropagation()}
@@ -983,7 +999,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
               <ClipboardList size={16} />
               <span>View Sales</span>
             </Link>
-            {hasBooking && dispatchStatus === 1 && (
+            {canViewDispatchPanel && (
               <Link
                 href={`/user-dashboard/order/dispatch/view/${r.order_id}`}
                 className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700 w-full block"
@@ -1045,6 +1061,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                     </div>
                   ))}
                 {canManageBookingActions &&
+                  !serviceOnlyOrder &&
                   (!hasBooking || followUpBooking) && (
                     <button
                       type="button"
@@ -1136,13 +1153,16 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                       <span>View Dispatch</span>
                     </Link>
                   )}
-                <OrderDeliveryMenuLinks
-                  order={r}
-                  userRole={userRole}
-                  DeliveryMenuItem={UpdateDeliveryMenuItem}
-                />
+                {!serviceOnlyOrder && (
+                  <OrderDeliveryMenuLinks
+                    order={r}
+                    userRole={userRole}
+                    DeliveryMenuItem={UpdateDeliveryMenuItem}
+                  />
+                )}
                 {canManageReturns &&
                   dispatchStatus === 1 &&
+                  !serviceOnlyOrder &&
                   !blocksNewReturnInitiate(r.is_returned) && (
                   <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>
                     <ReturnInitiateMenuItem
