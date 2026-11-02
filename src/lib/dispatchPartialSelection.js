@@ -11,6 +11,10 @@ import {
   dispatchRowMatchesQuotationLine,
 } from "@/lib/dispatchQuotationMatch";
 import { sqlQuoteTrimEqColumn } from "@/lib/sqlQuoteMatch";
+import {
+  isNonDispatchQuotationLine,
+  ensureNonDispatchLinesCompletedIfInvoiced,
+} from "@/lib/nonDispatchQuotationLines";
 
 /** @param {import("mysql2/promise").PoolConnection} conn */
 
@@ -46,6 +50,8 @@ export async function fetchOrderDispatchLineOptions(conn, orderId) {
   }
   const quoteNumber = orderRows[0].quote_number;
 
+  await ensureNonDispatchLinesCompletedIfInvoiced(conn, orderId);
+
   await ensureDispatchActiveColumn(conn);
 
   // Repair: serial saved / stock already moved ⇒ mark shipped (fixes stuck "Pending")
@@ -78,6 +84,9 @@ export async function fetchOrderDispatchLineOptions(conn, orderId) {
 
   const lines = (qiRows || [])
     .map((row) => {
+      if (isNonDispatchQuotationLine(row.item_name, row.item_code)) {
+        return null;
+      }
       const code = normCode(row.item_code);
       const orderQty = Math.max(1, Number(row.quantity) || 1);
       let dispatchedQty = 0;
@@ -96,6 +105,7 @@ export async function fetchOrderDispatchLineOptions(conn, orderId) {
         pending_qty: pendingQty,
       };
     })
+    .filter(Boolean)
     .filter((l) => l.pending_qty > 0 && (l.item_code || l.item_name));
 
   return { quoteNumber, lines };
@@ -122,6 +132,9 @@ export async function applyDispatchItemSelection(conn, orderId, selectedItems) {
     const code = normCode(item.item_code);
     const qty = Math.max(0, Number(item.quantity) || 0);
     if (!code || qty <= 0) continue;
+    if (isNonDispatchQuotationLine(item.item_name, item.item_code)) {
+      throw new Error(`${code} is not dispatched through warehouse`);
+    }
     selectionMap.set(code, {
       item_code: code,
       item_name: String(item.item_name || "").trim(),

@@ -5,7 +5,11 @@ import { isSpare1110 } from "@/lib/isSpare1110";
 import { isDelhiGodown, pickRowColumn } from "@/lib/godownStock";
 import { computeDispatchCompletionStatus } from "@/lib/dispatchPartialSelection";
 import { canMutateDispatchRole } from "@/lib/roleKeyUtils";
-import { dispatchRowRequiresSerial } from "@/lib/dispatchSerialRules";
+import {
+  dispatchRowRequiresSerial,
+  isNonDispatchQuotationLine,
+} from "@/lib/dispatchSerialRules";
+import { ensureNonDispatchLinesCompletedIfInvoiced } from "@/lib/nonDispatchQuotationLines";
 
 export async function POST(req) {
   try {
@@ -32,6 +36,8 @@ export async function POST(req) {
     }
     const quoteNumber = orderRows[0].quote_number;
 
+    await ensureNonDispatchLinesCompletedIfInvoiced(conn, orderId);
+
     // Block completion until all PRODUCT dispatch rows have serial numbers filled
     // Products are identified by item_code containing at least one alphabet character;
     // spares (purely numeric codes) are allowed to have empty serial numbers.
@@ -43,7 +49,11 @@ export async function POST(req) {
       [quoteNumber],
     );
 
-    if (!activeBatchRows?.length) {
+    const physicalActiveBatch = (activeBatchRows || []).filter(
+      (row) => !isNonDispatchQuotationLine(row.item_name, row.item_code),
+    );
+
+    if (!physicalActiveBatch?.length) {
       return NextResponse.json(
         {
           success: false,
@@ -54,7 +64,7 @@ export async function POST(req) {
       );
     }
 
-    const dispatchRows = (activeBatchRows || []).filter(
+    const dispatchRows = physicalActiveBatch.filter(
       (row) => Number(row.stock_deducted) !== 1,
     );
 
@@ -88,7 +98,19 @@ export async function POST(req) {
        SET stock_deducted = 1, updated_at = NOW()
        WHERE TRIM(quote_number) = TRIM(?)
          AND COALESCE(dispatch_active, 1) = 1
-         AND COALESCE(stock_deducted, 0) = 0`,
+         AND COALESCE(stock_deducted, 0) = 0
+         AND NOT (
+           LOWER(COALESCE(item_name, '')) LIKE '%amc%'
+           OR LOWER(COALESCE(item_name, '')) LIKE '%camc%'
+           OR LOWER(COALESCE(item_name, '')) LIKE '%cmc%'
+           OR LOWER(COALESCE(item_name, '')) LIKE '%service%'
+           OR LOWER(COALESCE(item_name, '')) LIKE '%maintenance%'
+           OR LOWER(COALESCE(item_name, '')) LIKE '%installation%'
+           OR LOWER(COALESCE(item_name, '')) LIKE '%charges%'
+           OR LOWER(COALESCE(item_code, '')) LIKE '%amc%'
+           OR LOWER(COALESCE(item_code, '')) LIKE '%camc%'
+           OR LOWER(COALESCE(item_code, '')) LIKE '%service%'
+         )`,
       [quoteNumber],
     );
 

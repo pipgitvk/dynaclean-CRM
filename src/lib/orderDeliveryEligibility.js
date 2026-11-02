@@ -1,5 +1,6 @@
 import { sqlQuoteTrimEqColumns } from "@/lib/sqlQuoteMatch";
 import { isOrderFullyDelivered } from "@/lib/orderDeliveryStatus";
+import { orderIsServiceChargeOnlyOrder } from "@/lib/nonDispatchQuotationLines";
 
 function orderHasBookingId(order) {
   return (
@@ -98,12 +99,14 @@ export function orderIsFullyDispatched(order) {
 }
 
 export function canViewDispatchPanelForOrder(order) {
+  if (orderIsServiceChargeOnlyOrder(order)) return false;
   if (!orderHasBookingId(order)) return false;
   return orderHasDispatchedStock(order);
 }
 
 /** Pehli booking complete + batch 1 ke products dispatch pending (doosri booking optional). */
 export function canOpenFirstDispatchForOrder(order) {
+  if (orderIsServiceChargeOnlyOrder(order)) return false;
   if (!orderHasBookingId(order)) return false;
   const batch1 = Number(order.batch1_dispatch_pending);
   if (Number.isFinite(batch1) && batch1 > 0) return true;
@@ -117,6 +120,7 @@ export function canOpenFirstDispatchForOrder(order) {
 
 /** Doosri booking (batch 2+) complete + us batch ke products dispatch pending. */
 export function canOpenRemainDispatchForOrder(order) {
+  if (orderIsServiceChargeOnlyOrder(order)) return false;
   if (!orderHasBookingId(order)) return false;
   if (orderIsFullyDispatched(order)) return false;
   if (canCreateRemainProductBooking(order)) return false;
@@ -139,6 +143,7 @@ export function canOpenDispatchForOrder(order) {
 
 /** View / Update Delivery — after at least one unit shipped. */
 export function canShowOrderDeliveryActions(order) {
+  if (orderIsServiceChargeOnlyOrder(order)) return false;
   if (isOrderFullyDelivered(order)) return true;
   // Delivery only after at least one real shipped dispatch row
   return orderHasDispatchedStock(order);

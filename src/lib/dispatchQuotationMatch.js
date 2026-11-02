@@ -1,3 +1,5 @@
+import { isNonDispatchQuotationLine } from "@/lib/dispatchSerialRules";
+
 function norm(value) {
   return String(value ?? "")
     .trim()
@@ -73,6 +75,7 @@ export function computeDispatchPendingFromRows(quotationItems, dispatchRows) {
     for (const row of rows) {
       if (dispatchRowIsShipped(row)) continue;
       if (Number(row.dispatch_active) !== 1) continue;
+      if (isNonDispatchQuotationLine(row.item_name, row.item_code)) continue;
       const matchesOrderLine =
         qiList.length === 0 ||
         qiList.some((qi) => dispatchRowMatchesQuotationLine(row, qi));
@@ -89,6 +92,9 @@ export function computeDispatchPendingFromRows(quotationItems, dispatchRows) {
   }
 
   for (const qi of qiList) {
+    if (isNonDispatchQuotationLine(qi.item_name, qi.item_code)) {
+      continue;
+    }
     const orderQty = Math.max(1, Number(qi.quantity) || 1);
     let allocated = 0;
     let deducted = 0;

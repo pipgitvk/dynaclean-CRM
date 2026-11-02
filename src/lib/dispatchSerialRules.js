@@ -11,15 +11,26 @@ export function isServiceCharge(itemName, itemCode) {
   return (
     name.includes("camc") ||
     name.includes("amc") ||
+    name.includes("cmc") ||
     name.includes("charges") ||
     name.includes("service") ||
     name.includes("labour") ||
+    name.includes("labor") ||
     name.includes("installation") ||
+    name.includes("maintenance") ||
+    name.includes("inst.") ||
     code.includes("camc") ||
     code.includes("amc") ||
+    code.includes("cmc") ||
     code.includes("charges") ||
-    code.includes("service")
+    code.includes("service") ||
+    code.includes("maintenance")
   );
+}
+
+/** AMC/CAMC/installation/service/maintenance lines — never warehouse dispatch. */
+export function isNonDispatchQuotationLine(itemName, itemCode) {
+  return isServiceCharge(itemName, itemCode);
 }
 
 /** Physical product rows that need a serial before dispatch complete. */

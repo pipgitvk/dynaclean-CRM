@@ -50,6 +50,10 @@ import {
 } from "@/lib/orderDocumentEditRules";
 import { isBookingAllowedForOrder } from "@/lib/orderBookingEligibility";
 import {
+  serviceChargeOnlyCompletedStatus,
+  orderIsServiceChargeOnlyOrder,
+} from "@/lib/nonDispatchQuotationLines";
+import {
   canCreateAdditionalBooking,
   canOpenFirstDispatchForOrder,
   canOpenRemainDispatchForOrder,
@@ -447,6 +451,7 @@ function isDisplayedDispatchDone(order) {
   if (order.is_cancelled || order.approval_status === "rejected") return false;
   if (order.installation_status) return false;
   if (order.delivery_status) return false;
+  if (serviceChargeOnlyCompletedStatus(order)) return false;
   return Number(order.dispatch_status) === 1;
 }
 
@@ -652,6 +657,13 @@ function getStatusText(order) {
       icon: <Truck size={14} className="mr-1" />,
     };
   }
+  const serviceCompleted = serviceChargeOnlyCompletedStatus(order);
+  if (serviceCompleted) {
+    return {
+      ...serviceCompleted,
+      icon: <CheckCircle size={14} className="mr-1" />,
+    };
+  }
   if (Number(order.dispatch_status) === 2) {
     return {
       text: "Partial Dispatch",
@@ -723,7 +735,7 @@ function orderMatchesListFilters(order, filters, options = {}) {
     if (appliedStatusFilter === "pendingdispatched") {
       if (Number(order.dispatch_status) === 1) return false;
     } else if (appliedStatusFilter === "dispatchdone") {
-      if (Number(order.dispatch_status) !== 1) return false;
+      if (!isDisplayedDispatchDone(order)) return false;
     } else if (orderStatus !== appliedStatusFilter.toLowerCase()) {
       return false;
     }
@@ -2462,6 +2474,7 @@ export default function OrderTable({
             <option value="">All Status</option>
             <option value="pendinginvoice">Pending Invoice</option>
             <option value="invoiceuploaded">Invoice Uploaded</option>
+            <option value="completed">Completed</option>
             <option value="bookingdone">Booking Done</option>
             <option value="dispatchdone">Dispatch Done</option>
             <option value="delivered">Delivered</option>
@@ -3058,6 +3071,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
   const canOpenFirstDispatch = canOpenFirstDispatchForOrder(r);
   const canOpenRemainDispatch = canOpenRemainDispatchForOrder(r);
   const canViewDispatchPanel = canViewDispatchPanelForOrder(r);
+  const serviceOnlyOrder = orderIsServiceChargeOnlyOrder(r);
   // const canViewDispatchPhotos = [
   //   "warehouse incharge",
   //   "superadmin",
@@ -3174,7 +3188,8 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                   DeliveryMenuItem={UpdateDeliveryMenuItem}
                 />
                 {dispatchStatus === 1 &&
-                  !blocksNewReturnInitiate(r.is_returned) && (
+                  !blocksNewReturnInitiate(r.is_returned) &&
+                  !serviceOnlyOrder && (
                     <div
                       className="border-t border-gray-100 mt-1 pt-1"
                       onClick={(e) => e.stopPropagation()}
@@ -3264,6 +3279,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                 </>
               ))}
             {canManageBookingActions &&
+              !serviceOnlyOrder &&
               (!hasBooking || canCreateAdditionalBooking(r)) && (
                 <button
                   type="button"
@@ -3373,6 +3389,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
             />
             {canManageReturns &&
               dispatchStatus === 1 &&
+              !serviceOnlyOrder &&
               ![1, 2, 3].includes(Number(r.is_returned || 0)) && (
               <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>
                 <ReturnInitiateMenuItem order={r} />

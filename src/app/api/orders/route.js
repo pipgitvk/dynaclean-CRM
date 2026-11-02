@@ -1,5 +1,6 @@
-import { getDbConnection } from "@/lib/db";
+import { isNonDispatchQuotationLine } from "@/lib/nonDispatchQuotationLines";
 import { NextResponse } from "next/server";
+import { getDbConnection } from "@/lib/db";
 import { jwtVerify } from "jose";
 import { canViewAllOrders } from "@/lib/dataScope";
 import {
@@ -494,6 +495,9 @@ export async function POST(req) {
       // 4) Insert dispatch rows for each item based on quantity
       for (const item of quotationItems) {
         const { item_name, item_code, quantity } = item;
+        if (isNonDispatchQuotationLine(item_name, item_code)) {
+          continue;
+        }
         const qty = Number(quantity) || 0;
 
         if (qty > 0) {

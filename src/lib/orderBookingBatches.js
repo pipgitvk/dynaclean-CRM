@@ -10,6 +10,7 @@ import {
   sqlQuoteTrimEqColumns,
   sqlQuoteTrimIn,
 } from "@/lib/sqlQuoteMatch";
+import { isNonDispatchQuotationLine } from "@/lib/nonDispatchQuotationLines";
 
 /** @param {import("mysql2/promise").PoolConnection} conn */
 
@@ -732,6 +733,9 @@ export async function fetchOrderBookingLineOptions(conn, orderId) {
 
   const lines = (qiRows || [])
     .map((row) => {
+      if (isNonDispatchQuotationLine(row.item_name, row.item_code)) {
+        return null;
+      }
       const code = normBookingItemCode(row.item_code);
       const orderQty = Math.max(1, Number(row.quantity) || 1);
       const bookedQty = bookedByCode.get(code) || 0;
@@ -744,6 +748,7 @@ export async function fetchOrderBookingLineOptions(conn, orderId) {
         pending_qty: pendingQty,
       };
     })
+    .filter(Boolean)
     .filter((l) => l.pending_qty > 0 && (l.item_code || l.item_name));
 
   return { quoteNumber, lines };
@@ -770,6 +775,9 @@ export async function applyBookingItemSelection(conn, orderId, selectedItems) {
     const code = normBookingItemCode(item.item_code);
     const qty = Math.max(0, Number(item.quantity) || 0);
     if (!code || qty <= 0) continue;
+    if (isNonDispatchQuotationLine(item.item_name, item.item_code)) {
+      throw new Error(`${code} is not booked for warehouse dispatch`);
+    }
     selectionMap.set(code, {
       item_code: code,
       item_name: String(item.item_name || "").trim(),

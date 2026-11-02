@@ -4,6 +4,8 @@ import { getSessionPayload } from "@/lib/auth";
 import { ensureAddedAccessoryDispatchRows } from "@/lib/seedAddedAccessoryDispatch";
 import { isSalesRole } from "@/lib/isSalesRole";
 import { ensureDispatchActiveColumn } from "@/lib/dispatchPartialSelection";
+import { isNonDispatchQuotationLine } from "@/lib/dispatchSerialRules";
+import { ensureNonDispatchLinesCompletedIfInvoiced } from "@/lib/nonDispatchQuotationLines";
 
 const DISPATCH_VIEW_ROLES = [
   "WAREHOUSE INCHARGE",
@@ -61,6 +63,7 @@ export async function GET(req) {
     if (orderId) {
       try {
         await ensureDispatchActiveColumn(conn);
+        await ensureNonDispatchLinesCompletedIfInvoiced(conn, orderId);
         if (scope === "active") {
           const [activeCodes] = await conn.execute(
             `SELECT DISTINCT TRIM(item_code) AS item_code
@@ -108,7 +111,14 @@ export async function GET(req) {
       [quoteNumber]
     );
 
-    return NextResponse.json({ success: true, data: dispatchRows });
+    let rowsOut = dispatchRows || [];
+    if (scope === "active" || scope === "dispatched") {
+      rowsOut = rowsOut.filter(
+        (r) => !isNonDispatchQuotationLine(r.item_name, r.item_code),
+      );
+    }
+
+    return NextResponse.json({ success: true, data: rowsOut });
   } catch (e) {
     console.error("Dispatch GET error:", e);
     return NextResponse.json({ success: false, error: e.message }, { status: 500 });

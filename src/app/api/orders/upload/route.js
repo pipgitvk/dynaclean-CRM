@@ -16,6 +16,7 @@ import {
 } from "@/lib/orderPaymentHistory";
 import { syncInvoiceAndOrderPaymentLink } from "@/lib/syncInvoiceOrderPaymentLink";
 import { findPartyPaymentPromptForOrder } from "@/lib/partyPaymentOrderLink";
+import { syncNonDispatchLinesAfterAccountUpload } from "@/lib/nonDispatchQuotationLines";
 
 const MAX_FILES_PER_FIELD = 5;
 
@@ -272,6 +273,12 @@ export async function POST(req) {
         orderId,
       ]
     );
+
+    try {
+      await syncNonDispatchLinesAfterAccountUpload(conn, orderId);
+    } catch (nonDispatchErr) {
+      console.error("Non-dispatch line sync after account upload:", nonDispatchErr);
+    }
 
     try {
       await syncInvoiceAndOrderPaymentLink(conn, {
