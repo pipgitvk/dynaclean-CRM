@@ -399,7 +399,6 @@ export async function GET(req) {
     const role = String(payload.role || payload.userRole || "");
     const roleNorm = role.toUpperCase().trim();
 
-    // Only SUPERADMIN, DIRECTOR, SERVICE HEAD can view this report
     const allowed = [
       "SUPERADMIN",
       "ADMIN",
@@ -407,6 +406,7 @@ export async function GET(req) {
       "SERVICE HEAD",
       "SERVICE SUPPORT",
       "EA",
+      "SALES CUM BACKOFFICE",
     ];
     if (!allowed.includes(roleNorm)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });

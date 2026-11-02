@@ -48,7 +48,8 @@ export function canViewAllServiceSupportReport(role) {
     k === "ADMIN" ||
     k === "DIRECTOR" ||
     k === "SERVICE HEAD" ||
-    k === "EA"
+    k === "EA" ||
+    k === "SALES CUM BACKOFFICE"
   );
 }
 
