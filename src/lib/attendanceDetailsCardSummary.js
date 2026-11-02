@@ -137,10 +137,14 @@ export function computeAttendanceDetailsCardSummaryForMonth(p) {
       const treatAsHalfDay = hasRealPunch || leaveIsHalfDay;
       if (treatAsHalfDay) {
         summary.leaves += 0.5;
-        summary.present += 0.5;
         leave_dates.push(dateString);
-        if (hasRealPunch && isLateDaySummary(existingLog, rules)) {
-          summary.lateDays++;
+        if (hasRealPunch) {
+          summary.present += 0.5;
+          if (isLateDaySummary(existingLog, rules)) {
+            summary.lateDays++;
+          }
+        } else {
+          summary.absents += 0.5;
         }
       } else {
         summary.leaves += 1;

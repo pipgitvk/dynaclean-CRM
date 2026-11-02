@@ -566,6 +566,7 @@ const AttendancePage = () => {
           is_half_day: treatAsHalfDay ? 1 : 0,
           half_day_type: treatAsHalfDay ? finalHalfType : null,
           has_punch_on_leave: 0,
+          missing_work_half_unpaid: treatAsHalfDay ? 1 : 0,
           isSunday: isWeekend,
           approvedHalfDay: halfDayMeta,
         });
@@ -629,11 +630,16 @@ const AttendancePage = () => {
       if (log.type === "absent") acc.absents++;
       if (log.type === "leave" || log.type === "paidleave") {
         if (log.is_half_day == 1) {
-          acc.halfDays++;
-          // Only leave-type half-days that are PAID count toward "Paid Half-Days" card.
-          // Attendance-based (late punch etc.) half-days are NOT paid — they stay only in Half-Days.
           if (log.type === "paidleave" || log.leaveType === "Paid" || log.leave_type === "paid") {
+            acc.leaves += 0.5;
+            if (log.has_punch_on_leave == 1) {
+              acc.present += 0.5;
+            } else {
+              acc.absents += 0.5;
+            }
             acc.paidHalfDays++;
+          } else {
+            acc.halfDays++;
           }
         } else {
           acc.leaves++;

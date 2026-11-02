@@ -299,8 +299,9 @@ export function computeSalaryPayDaysForUser(p) {
       }
       if (treatAsHalfDay) {
         half_day++;
-        half_day_paid++;  // Paid leave half-day — full slot credit (no LOP on unpaid half)
-        weekdayPayCredits += 1;
+        half_day_paid++;
+        // With punch: 0.5 present + 0.5 paid leave = 1 slot. Without punch: 0.5 paid leave only (work half = LOP via deduction).
+        weekdayPayCredits += hasRealPunch ? 1 : 0.5;
       } else {
         paid_leave++;
         weekdayPayCredits += 1;

@@ -212,6 +212,11 @@ function LeaveDayStatusBlock({ log, className = "" }) {
           {log.leaveType} Leave
         </p>
       )}
+      {log.missing_work_half_unpaid == 1 && (
+        <p className="text-sm text-red-600 mt-1 font-medium">
+          Work half: Unpaid (Absent)
+        </p>
+      )}
       {log.isSunday && (
         <span className="inline-flex items-center gap-1 mt-2 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-purple-100 text-purple-800 border border-purple-200">
           Sunday
@@ -703,6 +708,8 @@ const AttendancePage = () => {
               is_half_day: treatAsHalfDay ? 1 : 0,
               half_day_type: treatAsHalfDay ? finalHalfType : null,
               has_punch_on_leave: hasRealPunch ? 1 : 0,
+              missing_work_half_unpaid:
+                treatAsHalfDay && !hasRealPunch ? 1 : 0,
             },
             dateString,
             isWeekend,
@@ -834,12 +841,16 @@ const AttendancePage = () => {
         if (log.is_half_day == 1) {
           if (isPaidLeaveRow(log)) {
             acc.leaves += 0.5;
-            acc.present += 0.5;
-            if (
-              logShowsAttendancePunchDetails(log) &&
-              isLateDaySummary(log, rulesFor(log.username))
-            ) {
-              acc.lateDays++;
+            if (log.has_punch_on_leave == 1) {
+              acc.present += 0.5;
+              if (
+                logShowsAttendancePunchDetails(log) &&
+                isLateDaySummary(log, rulesFor(log.username))
+              ) {
+                acc.lateDays++;
+              }
+            } else {
+              acc.absents += 0.5;
             }
           } else {
             acc.halfDays++;

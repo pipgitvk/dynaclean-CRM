@@ -212,13 +212,23 @@ const GenerateSalaryPage = () => {
                     const sunWork = Number(empAtt.pay_sunday_work_credits) || 0;
                     const holWork = Number(empAtt.pay_holiday_work_credits) || 0;
                     const paidLeaveDays = Number(empAtt.paid_leave_days) || 0;
+                    const cardLeaves =
+                        cards != null ? Number(cards.leaves) || 0 : 0;
+                    const halfDayPaid = Number(empAtt.half_day_paid_count) || 0;
+                    const creditedFromPay =
+                        empAtt.pay_credited_days != null && empAtt.pay_credited_days !== ""
+                            ? Number(empAtt.pay_credited_days)
+                            : null;
                     if (
                         (presentFromCards != null
                             ? presentFromCards === 0
                             : presentFromApi === 0) &&
                         sunWork <= 0 &&
                         holWork <= 0 &&
-                        paidLeaveDays <= 0
+                        paidLeaveDays <= 0 &&
+                        cardLeaves <= 0 &&
+                        halfDayPaid <= 0 &&
+                        (creditedFromPay == null || creditedFromPay <= 0)
                     ) {
                         payDaysFromAttendance = 0;
                     }
