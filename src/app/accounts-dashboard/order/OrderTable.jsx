@@ -49,6 +49,10 @@ import {
 } from "@/lib/orderDeliveryEligibility";
 import { isBookingAllowedForOrder } from "@/lib/orderBookingEligibility";
 import {
+  serviceChargeOnlyCompletedStatus,
+  orderIsServiceChargeOnlyOrder,
+} from "@/lib/nonDispatchQuotationLines";
+import {
   isOrderFullyDelivered,
   isOrderPartialDelivery,
   orderHasDeliveryRecord,
@@ -475,7 +479,22 @@ export default function OrderTable({ userRole }) {
         icon: <Truck size={14} className="mr-1" />,
       };
     }
-    if (order.dispatch_status) {
+    const serviceCompleted = serviceChargeOnlyCompletedStatus(order);
+    if (serviceCompleted) {
+      return {
+        ...serviceCompleted,
+        icon: <CheckCircle size={14} className="mr-1" />,
+      };
+    }
+    if (Number(order.dispatch_status) === 2) {
+      return {
+        text: "Partial Dispatch",
+        bg: "bg-amber-100",
+        textCol: "text-amber-900",
+        icon: <Truck size={14} className="mr-1" />,
+      };
+    }
+    if (Number(order.dispatch_status) === 1) {
       return {
         text: "Dispatch Done",
         bg: "bg-violet-100",
@@ -700,6 +719,7 @@ export default function OrderTable({ userRole }) {
             <option value="">All Status</option>
             <option value="pendinginvoice">Pending Invoice</option>
             <option value="invoiceuploaded">Invoice Uploaded</option>
+            <option value="completed">Completed</option>
             <option value="bookingdone">Booking Done</option>
             <option value="dispatchdone">Dispatch Done</option>
             <option value="delivered">Delivered</option>
@@ -1088,6 +1108,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
   const canOpenFirstDispatch = canOpenFirstDispatchForOrder(r);
   const canOpenRemainDispatch = canOpenRemainDispatchForOrder(r);
   const canViewDispatchPanel = canViewDispatchPanelForOrder(r);
+  const serviceOnlyOrder = orderIsServiceChargeOnlyOrder(r);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -1179,13 +1200,16 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                     <span>View Dispatch</span>
                   </Link>
                 )}
-                <OrderDeliveryMenuLinks
-                  order={r}
-                  userRole={userRole}
-                  DeliveryMenuItem={UpdateDeliveryMenuItem}
-                />
+                {!serviceOnlyOrder && (
+                  <OrderDeliveryMenuLinks
+                    order={r}
+                    userRole={userRole}
+                    DeliveryMenuItem={UpdateDeliveryMenuItem}
+                  />
+                )}
                 {dispatchStatus === 1 &&
-                  !blocksNewReturnInitiate(r.is_returned) && (
+                  !blocksNewReturnInitiate(r.is_returned) &&
+                  !serviceOnlyOrder && (
                     <div
                       className="border-t border-gray-100 mt-1 pt-1"
                       onClick={(e) => e.stopPropagation()}
@@ -1269,6 +1293,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                 </div>
               ))}
             {canManageBookingActions &&
+              !serviceOnlyOrder &&
               (!hasBooking || followUpBooking) && (
                 <button
                   type="button"
@@ -1349,13 +1374,16 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                 <span>View Dispatch</span>
               </Link>
             )}
-            <OrderDeliveryMenuLinks
-              order={r}
-              userRole={userRole}
-              DeliveryMenuItem={UpdateDeliveryMenuItem}
-            />
+            {!serviceOnlyOrder && (
+              <OrderDeliveryMenuLinks
+                order={r}
+                userRole={userRole}
+                DeliveryMenuItem={UpdateDeliveryMenuItem}
+              />
+            )}
             {canManageReturns &&
               dispatchStatus === 1 &&
+              !serviceOnlyOrder &&
               !blocksNewReturnInitiate(r.is_returned) && (
               <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>
                 <ReturnInitiateMenuItem
