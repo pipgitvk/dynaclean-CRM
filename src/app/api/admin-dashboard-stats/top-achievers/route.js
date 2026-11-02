@@ -33,7 +33,8 @@ export async function GET(request) {
         ON CAST(qr.emp_name AS CHAR) = CAST(t.username AS CHAR) COLLATE utf8mb4_unicode_ci
       LEFT JOIN neworder no 
         ON no.quote_number = qr.quote_number
-        AND no.approval_status = 'approved'
+        AND (no.is_cancelled = 0 OR no.is_cancelled IS NULL)
+        AND LOWER(TRIM(COALESCE(no.approval_status, ''))) = 'approved'
         AND DATE(no.created_at) >= ?
         AND DATE(no.created_at) <= ?
       LEFT JOIN quotation_items qi 

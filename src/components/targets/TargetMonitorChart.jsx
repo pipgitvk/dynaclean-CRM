@@ -122,7 +122,7 @@ const TargetMonitorChart = ({ rows, periodLabel, filterMonth, filterYear }) => {
       </h2>
       <p className="mb-4 text-center text-xs text-gray-500">
         {periodLabel
-          ? `${periodLabel}: assignments active this month; achieved = orders in this month (within assignment dates). Search applies.`
+          ? `${periodLabel}: assignments active this month; achieved = approved, non-cancelled orders in this month (within assignment dates). Search applies.`
           : "Per assignment period; respects the current search filter."}
       </p>
 

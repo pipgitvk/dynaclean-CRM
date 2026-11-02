@@ -2,6 +2,11 @@
 import { useState, useMemo } from "react";
 import { useUser } from "@/context/UserContext";
 
+function quotationItemImageSrc(imgUrl) {
+  const src = String(imgUrl ?? "").trim();
+  return src || null;
+}
+
 export default function OrderForm({ quotation, reset }) {
   const { user } = useUser();
   const isGemRole = user?.userRole === "GEM";
@@ -316,13 +321,20 @@ export default function OrderForm({ quotation, reset }) {
               </tr>
             </thead>
             <tbody>
-              {quotation.items.map((i, idx) => (
+              {quotation.items.map((i, idx) => {
+                const itemImg = quotationItemImageSrc(i.img_url);
+                return (
                 <tr key={idx} className="divide-x text-center border-t">
                   <td className="p-2">
-                    <img
-                      src={i.img_url}
-                      className="h-12 mx-auto object-contain"
-                    />
+                    {itemImg ? (
+                      <img
+                        src={itemImg}
+                        alt=""
+                        className="h-12 mx-auto object-contain"
+                      />
+                    ) : (
+                      <span className="text-xs text-gray-400">—</span>
+                    )}
                   </td>
                   <td>{i.item_name}</td>
                   <td>{i.item_code}</td>
@@ -334,21 +346,30 @@ export default function OrderForm({ quotation, reset }) {
                   <td>₹{Number(i.gst).toFixed(2)}</td>
                   <td>₹{Number(i.total_price).toFixed(2)}</td>
                 </tr>
-              ))}
+              );
+              })}
             </tbody>
           </table>
         </div>
 
         {/* Mobile Cards */}
         <div className="md:hidden space-y-4">
-          {quotation.items.map((i, idx) => (
+          {quotation.items.map((i, idx) => {
+            const itemImg = quotationItemImageSrc(i.img_url);
+            return (
             <div
               key={idx}
               className="border rounded p-3 shadow-sm bg-white text-sm"
             >
               <div className="flex justify-between items-center mb-2">
                 <span className="font-medium">{i.item_name}</span>
-                <img src={i.img_url} className="h-10 w-10 object-contain" />
+                {itemImg ? (
+                  <img
+                    src={itemImg}
+                    alt=""
+                    className="h-10 w-10 object-contain"
+                  />
+                ) : null}
               </div>
               <div className="grid grid-cols-2 gap-2 text-gray-700">
                 <div>
@@ -378,7 +399,8 @@ export default function OrderForm({ quotation, reset }) {
                 </div>
               </div>
             </div>
-          ))}
+          );
+          })}
         </div>
       </section>
 

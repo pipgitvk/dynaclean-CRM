@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSessionPayload } from "@/lib/auth";
 import { getDbConnection } from "@/lib/db";
+import { NEWORDER_ACTIVE_FOR_TARGET_SQL } from "@/lib/salesTargetAchievement";
 
 export async function GET(request) {
   let db;
@@ -55,7 +56,7 @@ export async function GET(request) {
          JOIN quotation_items qi
            ON qr.quote_number = qi.quote_number
         WHERE qr.emp_name = ?
-          AND no.approval_status = 'approved'
+          ${NEWORDER_ACTIVE_FOR_TARGET_SQL}
           AND MONTH(no.created_at) = ?
           AND YEAR(no.created_at) = ?`,
       [username, month, year]
