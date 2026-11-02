@@ -7,6 +7,7 @@ import { isSalesRole } from "@/lib/isSalesRole";
 import { DASHBOARD_MAP } from "@/components/Dashboards";
 import GemCrmDashboardWrapper from "@/components/GemCrmDashboardWrapper";
 import { getReportingManagerForEmployee } from "@/lib/reportingManager";
+import { countWarehouseDispatchPending } from "@/lib/warehouseDispatchPendingCount";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret";
 
@@ -56,14 +57,8 @@ export default async function UserDashboardPage() {
     // Fetch reporting manager for the user
     const reportingManager = await getReportingManagerForEmployee(username);
 
-    // Dispatch Pendings
-    const [dispatchPendings] = await connection.execute(
-      `
-      SELECT COUNT(*) as dispatchPendings FROM dispatch WHERE serial_no IS NULL and stock_deducted = 0
-      `
-    );
-
-    const dispatchPendingsCount = dispatchPendings[0].dispatchPendings;
+    // Dispatch Pendings (physical products only — excludes AMC/CAMC/service lines)
+    const dispatchPendingsCount = await countWarehouseDispatchPending(connection);
 
     // warehouse in pendings spare
     const [Warehouseinspare] = await connection.execute(
