@@ -33,13 +33,13 @@ async function fetchLatestLinkedOrder(conn, invoice) {
      LEFT JOIN quotations_records qr
        ON qr.quote_number = no.quote_number
      WHERE (
-       (? <> '' AND TRIM(no.invoice_number) = ?)
+       (CHAR_LENGTH(?) > 0 AND TRIM(no.invoice_number) COLLATE utf8mb4_unicode_ci = ?)
        OR (
-         ? <> ''
-         AND TRIM(CAST(no.order_id AS CHAR)) = ?
+         CHAR_LENGTH(?) > 0
+         AND TRIM(CAST(no.order_id AS CHAR)) COLLATE utf8mb4_unicode_ci = ?
        )
-       OR (? <> '' AND TRIM(no.quote_number) = ?)
-       OR (? <> '' AND CAST(qr.\`S.No.\` AS CHAR) = ?)
+       OR (CHAR_LENGTH(?) > 0 AND TRIM(no.quote_number) COLLATE utf8mb4_unicode_ci = ?)
+       OR (CHAR_LENGTH(?) > 0 AND CAST(qr.\`S.No.\` AS CHAR) COLLATE utf8mb4_unicode_ci = ?)
      )
      ORDER BY COALESCE(no.invoice_date, DATE(no.created_at)) DESC,
               no.created_at DESC,

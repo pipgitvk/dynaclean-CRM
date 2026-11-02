@@ -277,7 +277,7 @@ export async function POST(request) {
             status = ?, updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
       `, [
-        working_days, present_days, overtime_hours,
+        workingDays, presentDays, overtimeHours,
         basicSalary, hra, transportAllowance, medicalAllowance,
         specialAllowance, bonus, overtimeAmount, totalEarnings,
         pfStored,
@@ -301,7 +301,7 @@ export async function POST(request) {
          gross_salary, net_salary, status, created_by)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [
-        username, salary_month, working_days, present_days, overtime_hours,
+        username, salary_month, workingDays, presentDays, overtimeHours,
         basicSalary, hra, transportAllowance, medicalAllowance, specialAllowance,
         bonus, overtimeAmount, totalEarnings,
         pfStored,
