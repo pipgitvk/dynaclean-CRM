@@ -2,6 +2,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { Download } from "lucide-react";
+import ExcelJS from "exceljs";
 import { formatCrmDateOnly } from "@/lib/crmDateFormat";
 import { Modal } from "./Modal";
 import ViewModal from "./modals/ViewModal";
@@ -29,6 +31,7 @@ export default function AssetsTable() {
   const [selectedAssetIds, setSelectedAssetIds] = useState(new Set());
   const [showBulkLinkModal, setShowBulkLinkModal] = useState(false);
   const [zoomedImage, setZoomedImage] = useState(null);
+  const [exportingExcel, setExportingExcel] = useState(false);
 
   const handleSort = (key) => {
     setSortConfig((prev) => {
@@ -171,6 +174,73 @@ export default function AssetsTable() {
     setSelectedAssetIds(new Set());
   };
 
+  const exportAssetsToExcel = async (rows) => {
+    if (exportingExcel || !rows.length) return;
+    setExportingExcel(true);
+    try {
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet("Assets");
+
+      worksheet.columns = [
+        { header: "Asset ID", key: "asset_id", width: 12 },
+        { header: "Category", key: "category", width: 18 },
+        { header: "Asset Name", key: "asset_name", width: 28 },
+        { header: "SIM Number", key: "sim_no_1", width: 16 },
+        { header: "Serial Number", key: "serial_number", width: 22 },
+        { header: "Brand", key: "brand_name", width: 16 },
+        { header: "Purchase Price", key: "purchase_price", width: 14 },
+        { header: "Purchase Date", key: "purchase_date", width: 14 },
+        { header: "Status", key: "status", width: 14 },
+        { header: "Assigned To", key: "assigned_to", width: 20 },
+        { header: "Assigned Date", key: "assigned_date", width: 14 },
+        { header: "Linked Trans ID", key: "linked_trans_id", width: 22 },
+        { header: "Receipt", key: "receipt", width: 14 },
+      ];
+
+      worksheet.getRow(1).font = { bold: true };
+
+      rows.forEach((asset) => {
+        const assignedToDisplay =
+          asset.current_status === "Assigned"
+            ? asset.Assigned_to || "Assigned"
+            : "Available";
+        worksheet.addRow({
+          asset_id: asset.asset_id ?? "",
+          category: asset.asset_category || asset.type || "",
+          asset_name: asset.asset_name ?? "",
+          sim_no_1: asset.sim_no_1 ?? "",
+          serial_number: asset.serial_number ?? "",
+          brand_name: asset.brand_name ?? "",
+          purchase_price: asset.purchase_price ?? "",
+          purchase_date: formatCrmDateOnly(asset.purchase_date) || "",
+          status: asset.current_status ?? "",
+          assigned_to: assignedToDisplay,
+          assigned_date: asset.Assigned_Date
+            ? formatCrmDateOnly(asset.Assigned_Date)
+            : "",
+          linked_trans_id: asset.linked_trans_id ?? "",
+          receipt: asset.receipt_path ? "Yes" : "",
+        });
+      });
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const url = window.URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `assets_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      anchor.click();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Failed to export assets:", err);
+      alert("Failed to download Excel. Please try again.");
+    } finally {
+      setExportingExcel(false);
+    }
+  };
+
   if (loading)
     return <div className="text-center py-10">Loading assets...</div>;
   if (error)
@@ -286,6 +356,15 @@ export default function AssetsTable() {
               Clear filters
             </button>
           )}
+          <button
+            type="button"
+            onClick={() => exportAssetsToExcel(sortedAssets)}
+            disabled={exportingExcel || sortedAssets.length === 0}
+            className="ml-auto inline-flex items-center gap-2 px-3 py-1.5 text-sm rounded-md bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Download className="w-4 h-4" />
+            {exportingExcel ? "Exporting…" : "Download Excel"}
+          </button>
         </div>
         <p className="mt-2 text-xs text-gray-500">
           Showing {sortedAssets.length} of {assets.length} assets

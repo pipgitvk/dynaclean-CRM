@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState, useMemo, useRef } from "react";
-import { Eye, Search, Pencil, ArrowRightLeft, History, X } from "lucide-react";
+import { Eye, Search, Pencil, ArrowRightLeft, History, X, Download } from "lucide-react";
 import Link from "next/link";
+import ExcelJS from "exceljs";
 import { pickProductImageUrl } from "@/lib/productImageUrl";
 
 
@@ -1510,7 +1511,7 @@ export default function ProductStockForm() {
   const [transactionsStatusFilter, setTransactionsStatusFilter] = useState(null);
   const [summaryStatusFilter, setSummaryStatusFilter] = useState(null);
   const [previewImage, setPreviewImage] = useState(null);
-  const [showExportOptions, setShowExportOptions] = useState({ available: false, transactions: false, summary: false });
+  const [exportingAvailableExcel, setExportingAvailableExcel] = useState(false);
 
   // Accordion state - only one section open at a time
   const [openSection, setOpenSection] = useState("list");
@@ -1949,6 +1950,63 @@ export default function ProductStockForm() {
     return filtered;
   }, [stockSummaryData, summarySearch, summaryStatusFilter]);
 
+  const exportAvailableStockToExcel = async () => {
+    if (exportingAvailableExcel) return;
+    setExportingAvailableExcel(true);
+    try {
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet("Available Stock");
+
+      worksheet.columns = [
+        { header: "Product Code", key: "product_code", width: 18 },
+        { header: "Item Name", key: "item_name", width: 28 },
+        { header: "HSN Code", key: "hsn_sac", width: 14 },
+        { header: "Total Qty", key: "total", width: 12 },
+        { header: "Pre-booked", key: "pre_booked", width: 12 },
+        { header: "Net Qty", key: "net_qty", width: 12 },
+        { header: "Delhi Godown", key: "delhi", width: 14 },
+        { header: "South Godown", key: "south", width: 14 },
+        { header: "Storage Location", key: "location", width: 22 },
+        { header: "Updated At", key: "updated_at", width: 22 },
+      ];
+
+      worksheet.getRow(1).font = { bold: true };
+
+      filteredAvailableStock.forEach((row) => {
+        worksheet.addRow({
+          product_code: row.product_code ?? "",
+          item_name: row.item_name ?? "",
+          hsn_sac: row.hsn_sac ?? "",
+          total: row.total ?? 0,
+          pre_booked: row.pre_booked ?? 0,
+          net_qty: row.net_qty ?? 0,
+          delhi: row.delhi ?? 0,
+          south: row.south ?? 0,
+          location: row.location ?? "",
+          updated_at: row.updated_at
+            ? new Date(row.updated_at).toLocaleString()
+            : "",
+        });
+      });
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const url = window.URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `available_stock_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      anchor.click();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Failed to export available stock:", err);
+      alert("Failed to download Excel. Please try again.");
+    } finally {
+      setExportingAvailableExcel(false);
+    }
+  };
+
   return (
     <div className="w-full py-2 sm:py-4">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
@@ -2024,7 +2082,7 @@ export default function ProductStockForm() {
         </div>
         {openSection === "available" && (
           <div className="pb-2 sm:pb-4 pt-0">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 px-4 sm:px-6">
               <div className="relative w-full sm:max-w-xs">
                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-500" />
                 <input
@@ -2035,6 +2093,18 @@ export default function ProductStockForm() {
                   className="pl-8 pr-3 py-1.5 border rounded-md text-xs sm:text-sm w-full"
                 />
               </div>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  exportAvailableStockToExcel();
+                }}
+                disabled={exportingAvailableExcel || filteredAvailableStock.length === 0}
+                className="inline-flex items-center justify-center gap-2 px-3 py-1.5 text-xs sm:text-sm rounded-md bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Download className="w-4 h-4" />
+                {exportingAvailableExcel ? "Exporting…" : "Download Excel"}
+              </button>
             </div>
 
             {/* Mobile View – Available Stock */}
