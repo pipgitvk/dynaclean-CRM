@@ -129,7 +129,7 @@ export async function PATCH(req, context) {
 
     const body = await req.json();
 
-    const {
+    // Letterhead-only PATCH: update company block and return (no line items).
     if (body.letterhead_only === true) {
       if (!canEditDocumentLetterhead(payload)) {
         return NextResponse.json(
@@ -176,6 +176,7 @@ export async function PATCH(req, context) {
       }
     }
 
+    const {
       quotation_id = null,
       invoice_number,
       invoice_date,

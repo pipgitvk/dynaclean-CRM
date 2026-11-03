@@ -187,7 +187,7 @@ async function attachMachineSuppression(conn, items) {
  */
 export async function buildAutoCheckoutApprovalItems(
   conn,
-  { fromDate, toDate, statusFilter = "pending", runAutoCheckoutSync = true },
+  { fromDate, toDate, statusFilter = "pending", runAutoCheckoutSync = false },
 ) {
   await ensureAttendanceAutoCheckoutApprovalsTable(conn);
   if (runAutoCheckoutSync) {

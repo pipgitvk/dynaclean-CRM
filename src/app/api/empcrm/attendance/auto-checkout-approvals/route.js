@@ -90,6 +90,7 @@ export async function GET(request) {
           fromDate,
           toDate,
           statusFilter: "pending",
+          runAutoCheckoutSync: true,
         }),
       );
       return NextResponse.json({ pendingCount: pendingItems.length });
@@ -100,6 +101,7 @@ export async function GET(request) {
         fromDate,
         toDate,
         statusFilter: status,
+        runAutoCheckoutSync: true,
       }),
     );
 

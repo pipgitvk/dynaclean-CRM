@@ -246,13 +246,11 @@ export default async function UserDashboardPage() {
     );
     const user = rows[0];
 
-    const [pendingOrders] = await connection.execute(
-      `
-      SELECT * FROM neworder WHERE approval_status = 'pending'
-      `,
+    const [pendingOrderCountRows] = await connection.execute(
+      `SELECT COUNT(*) AS c FROM neworder WHERE approval_status = 'pending'`,
     );
 
-    const pendingOrdersCount = pendingOrders.length;
+    const pendingOrdersCount = Number(pendingOrderCountRows[0]?.c ?? 0);
 
     const [pendingSpecialRows] = await connection.execute(
       `
