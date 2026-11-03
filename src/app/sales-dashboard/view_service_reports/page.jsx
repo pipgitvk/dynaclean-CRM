@@ -4,12 +4,24 @@ import { getDbConnection } from "@/lib/db";
 import { formatCrmDateOnly } from "@/lib/crmDateFormat";
 import ServiceTable from "@/components/services/ServiceTable";
 import { getSessionPayload } from "@/lib/auth";
+import { normalizeRoleKey } from "@/lib/roleKeyUtils";
 
 // ✅ Disable caching to always fetch fresh data from database
 export const revalidate = 0;
 export const dynamic = "force-dynamic";
 
-const PRIVILEGED_ROLES = ["ADMIN", "SUPERADMIN", "SERVICE HEAD", "TEAM LEADER"];
+const PRIVILEGED_ROLES = [
+  "ADMIN",
+  "SUPERADMIN",
+  "SERVICE HEAD",
+  "TEAM LEADER",
+  "SALES CUM BACKOFFICE",
+];
+
+function canViewAllServiceRecords(role) {
+  const k = normalizeRoleKey(role || "");
+  return PRIVILEGED_ROLES.some((r) => normalizeRoleKey(r) === k);
+}
 
 export default async function ViewServiceReportsPage() {
   let serviceRecords = [];
@@ -21,7 +33,7 @@ export default async function ViewServiceReportsPage() {
 
   const role = payload.role;
   const username = payload.username;
-  const isPrivileged = PRIVILEGED_ROLES.includes(role);
+  const isPrivileged = canViewAllServiceRecords(role);
 
   try {
     const conn = await getDbConnection();
