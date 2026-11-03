@@ -2,12 +2,10 @@
 
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { formatCrmDateOnly } from "@/lib/crmDateFormat";
-import { Suspense, useEffect, useState, useCallback } from "react";
-import ManualFilterSearchButton, {
-  MANUAL_FILTER_HINT,
-} from "@/components/ui/ManualFilterSearchButton";
+import { Suspense, useEffect, useState, useCallback, useRef } from "react";
+import ManualFilterSearchButton from "@/components/ui/ManualFilterSearchButton";
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams, useRouter } from "next/navigation";
 import Modal from "./Modal";
 import ServiceAttachmentLink from "./ServiceAttachmentLink";
 import ServiceReportPrintButton from "./ServiceReportPrintButton";
@@ -26,8 +24,7 @@ import ServiceRecordFollowupActions from "@/components/services/ServiceRecordFol
 import {
   isServiceRecordNotCompleted,
   isServiceRecordPendingOver48Hours,
-  parseServiceNotCompletedFromSearchParam,
-  parseServicePendingOver48hFromSearchParam,
+  getServiceTableFiltersFromSearchParams,
 } from "@/lib/serviceRecordsPendingOver48h";
 
 const actionIconClass =
@@ -41,6 +38,15 @@ function dedupeServiceRecords(rows) {
 }
 
 function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const urlFilterSeedRef = useRef(null);
+  if (urlFilterSeedRef.current === null) {
+    urlFilterSeedRef.current = getServiceTableFiltersFromSearchParams(searchParams);
+  }
+  const urlSeed = urlFilterSeedRef.current;
+
   const [records, setRecords] = useState(() => dedupeServiceRecords(serviceRecords));
   const [searchTerm, setSearchTerm] = useState("");
   const [appliedSearchTerm, setAppliedSearchTerm] = useState("");
@@ -52,18 +58,24 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
   const [appliedComplaintDateTo, setAppliedComplaintDateTo] = useState("");
   const [serviceTypeFilter, setServiceTypeFilter] = useState("");
   const [appliedServiceTypeFilter, setAppliedServiceTypeFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState("PENDING");
-  const [appliedStatusFilter, setAppliedStatusFilter] = useState("PENDING");
+  const [statusFilter, setStatusFilter] = useState(urlSeed.statusFilter);
+  const [appliedStatusFilter, setAppliedStatusFilter] = useState(
+    urlSeed.appliedStatusFilter,
+  );
   const [assignedFilter, setAssignedFilter] = useState("");
   const [appliedAssignedFilter, setAppliedAssignedFilter] = useState("");
   const [assignedToFilter, setAssignedToFilter] = useState("");
   const [appliedAssignedToFilter, setAppliedAssignedToFilter] = useState("");
-  const [pendingOver48hOnly, setPendingOver48hOnly] = useState(false);
-  const [appliedPendingOver48hOnly, setAppliedPendingOver48hOnly] =
-    useState(false);
-  const [notCompletedOnly, setNotCompletedOnly] = useState(false);
-  const [appliedNotCompletedOnly, setAppliedNotCompletedOnly] =
-    useState(false);
+  const [pendingOver48hOnly, setPendingOver48hOnly] = useState(
+    urlSeed.pendingOver48hOnly,
+  );
+  const [appliedPendingOver48hOnly, setAppliedPendingOver48hOnly] = useState(
+    urlSeed.appliedPendingOver48hOnly,
+  );
+  const [notCompletedOnly, setNotCompletedOnly] = useState(urlSeed.notCompletedOnly);
+  const [appliedNotCompletedOnly, setAppliedNotCompletedOnly] = useState(
+    urlSeed.appliedNotCompletedOnly,
+  );
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedService, setSelectedService] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -102,34 +114,16 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
   }, [serviceRecords]);
 
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
 
   useEffect(() => {
-    const statusParam = searchParams.get("status");
-    const over48 = parseServicePendingOver48hFromSearchParam(
-      searchParams.get("pending_over_48h"),
-    );
-    const notCompleted = parseServiceNotCompletedFromSearchParam(
-      searchParams.get("not_completed"),
-    );
-    if (notCompleted) {
-      setStatusFilter("");
-      setAppliedStatusFilter("");
-      setNotCompletedOnly(true);
-      setAppliedNotCompletedOnly(true);
-    } else if (statusParam != null && String(statusParam).trim() !== "") {
-      const s = String(statusParam).trim();
-      setStatusFilter(s);
-      setAppliedStatusFilter(s);
-    } else if (over48) {
-      setStatusFilter("PENDING");
-      setAppliedStatusFilter("PENDING");
-    }
-    if (over48) {
-      setPendingOver48hOnly(true);
-      setAppliedPendingOver48hOnly(true);
-    }
+    const next = getServiceTableFiltersFromSearchParams(searchParams);
+    setStatusFilter(next.statusFilter);
+    setAppliedStatusFilter(next.appliedStatusFilter);
+    setNotCompletedOnly(next.notCompletedOnly);
+    setAppliedNotCompletedOnly(next.appliedNotCompletedOnly);
+    setPendingOver48hOnly(next.pendingOver48hOnly);
+    setAppliedPendingOver48hOnly(next.appliedPendingOver48hOnly);
+    setCurrentPage(1);
   }, [searchParams]);
 
   const handleApplySearch = useCallback(() => {
@@ -579,8 +573,8 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
     setAppliedComplaintDateTo("");
     setServiceTypeFilter("");
     setAppliedServiceTypeFilter("");
-    setStatusFilter("");
-    setAppliedStatusFilter("");
+    setStatusFilter("PENDING");
+    setAppliedStatusFilter("PENDING");
     setAssignedFilter("");
     setAppliedAssignedFilter("");
     setAssignedToFilter("");
@@ -590,6 +584,9 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
     setNotCompletedOnly(false);
     setAppliedNotCompletedOnly(false);
     setCurrentPage(1);
+    if (pathname) {
+      router.replace(pathname);
+    }
   };
 
   // Get unique values for filters
@@ -1084,7 +1081,10 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
             </button>
           </div>
         </div>
-        <p className="text-xs text-gray-500">{MANUAL_FILTER_HINT}</p>
+        <p className="text-xs text-gray-500">
+          Text search uses the Search button; date, status, and other filters apply
+          as you change them.
+        </p>
 
         {/* Filters — grid avoids flex-1 squeeze / overlap on mid-width screens */}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 items-end">
@@ -1097,6 +1097,7 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
                 value={complaintDateFrom}
                 onChange={(v) => {
                   setComplaintDateFrom(v);
+                  setAppliedComplaintDateFrom(v);
                   setCurrentPage(1);
                 }}
                 className="p-2 w-full min-w-0 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
@@ -1106,6 +1107,7 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
                 value={complaintDateTo}
                 onChange={(v) => {
                   setComplaintDateTo(v);
+                  setAppliedComplaintDateTo(v);
                   setCurrentPage(1);
                 }}
                 className="p-2 w-full min-w-0 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
@@ -1120,7 +1122,9 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
               className="p-2 w-full min-w-0 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
               value={serviceTypeFilter}
               onChange={(e) => {
-                setServiceTypeFilter(e.target.value);
+                const v = e.target.value;
+                setServiceTypeFilter(v);
+                setAppliedServiceTypeFilter(v);
                 setCurrentPage(1);
               }}
             >
@@ -1140,7 +1144,13 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
               className="p-2 w-full min-w-0 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
               value={statusFilter}
               onChange={(e) => {
-                setStatusFilter(e.target.value);
+                const v = e.target.value;
+                setStatusFilter(v);
+                setAppliedStatusFilter(v);
+                if (v) {
+                  setNotCompletedOnly(false);
+                  setAppliedNotCompletedOnly(false);
+                }
                 setCurrentPage(1);
               }}
             >
@@ -1160,7 +1170,9 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
               className="p-2 w-full min-w-0 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
               value={assignedFilter}
               onChange={(e) => {
-                setAssignedFilter(e.target.value);
+                const v = e.target.value;
+                setAssignedFilter(v);
+                setAppliedAssignedFilter(v);
                 setCurrentPage(1);
               }}
             >
@@ -1177,7 +1189,9 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
               className="p-2 w-full min-w-0 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
               value={assignedToFilter}
               onChange={(e) => {
-                setAssignedToFilter(e.target.value);
+                const v = e.target.value;
+                setAssignedToFilter(v);
+                setAppliedAssignedToFilter(v);
                 setCurrentPage(1);
               }}
             >
@@ -1190,13 +1204,38 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
             </select>
           </div>
           <label
+            className="flex min-h-[42px] cursor-pointer items-center gap-2 rounded-lg border border-amber-200 bg-amber-50/50 px-3 py-2.5 text-sm text-amber-950 min-w-0 xl:col-span-1"
+          >
+            <input
+              type="checkbox"
+              checked={notCompletedOnly}
+              onChange={(e) => {
+                const checked = e.target.checked;
+                setNotCompletedOnly(checked);
+                setAppliedNotCompletedOnly(checked);
+                if (checked) {
+                  setStatusFilter("");
+                  setAppliedStatusFilter("");
+                } else if (!statusFilter) {
+                  setStatusFilter("PENDING");
+                  setAppliedStatusFilter("PENDING");
+                }
+                setCurrentPage(1);
+              }}
+              className="h-4 w-4 shrink-0 rounded border-amber-300 text-amber-600 focus:ring-amber-500"
+            />
+            <span className="leading-tight">Not completed</span>
+          </label>
+          <label
             className="flex min-h-[42px] cursor-pointer items-center gap-2 rounded-lg border border-red-200 bg-red-50/50 px-3 py-2.5 text-sm text-red-900 min-w-0 xl:col-span-1"
           >
             <input
               type="checkbox"
               checked={pendingOver48hOnly}
               onChange={(e) => {
-                setPendingOver48hOnly(e.target.checked);
+                const checked = e.target.checked;
+                setPendingOver48hOnly(checked);
+                setAppliedPendingOver48hOnly(checked);
                 setCurrentPage(1);
               }}
               className="h-4 w-4 shrink-0 rounded border-red-300 text-red-600 focus:ring-red-500"

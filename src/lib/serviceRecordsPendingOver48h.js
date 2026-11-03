@@ -59,3 +59,44 @@ export function parseServicePendingOver48hFromSearchParam(value) {
   const v = String(value ?? "").trim().toLowerCase();
   return v === "1" || v === "true";
 }
+
+/** Initial / URL-synced ServiceTable filter state from query string. */
+export function getServiceTableFiltersFromSearchParams(searchParams) {
+  const get = (key) =>
+    searchParams?.get?.(key) ??
+    (typeof searchParams?.[key] === "string" ? searchParams[key] : null);
+
+  const notCompleted = parseServiceNotCompletedFromSearchParam(get("not_completed"));
+  const over48 = parseServicePendingOver48hFromSearchParam(get("pending_over_48h"));
+  const statusParam = get("status");
+  const trimmedStatus = statusParam != null ? String(statusParam).trim() : "";
+
+  let statusFilter = "PENDING";
+  let appliedStatusFilter = "PENDING";
+  let notCompletedOnly = false;
+  let appliedNotCompletedOnly = false;
+  const pendingOver48hOnly = over48;
+  const appliedPendingOver48hOnly = over48;
+
+  if (notCompleted) {
+    statusFilter = "";
+    appliedStatusFilter = "";
+    notCompletedOnly = true;
+    appliedNotCompletedOnly = true;
+  } else if (trimmedStatus !== "") {
+    statusFilter = trimmedStatus;
+    appliedStatusFilter = trimmedStatus;
+  } else if (over48) {
+    statusFilter = "PENDING";
+    appliedStatusFilter = "PENDING";
+  }
+
+  return {
+    statusFilter,
+    appliedStatusFilter,
+    notCompletedOnly,
+    appliedNotCompletedOnly,
+    pendingOver48hOnly,
+    appliedPendingOver48hOnly,
+  };
+}
