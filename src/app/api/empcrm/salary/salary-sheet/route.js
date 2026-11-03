@@ -7,10 +7,7 @@ import {
   rowToAttendanceRulesShape,
   mergeGlobalRulesWithEmployeeSchedule,
 } from "@/lib/attendanceRulesDb";
-import {
-  computeSalaryPayDaysForUser,
-  dateToYmdKey,
-} from "@/lib/salaryPayDaysFromAttendance";
+import { computeSalaryPayDaysForUser } from "@/lib/salaryPayDaysFromAttendance";
 import { computeAttendanceDetailsCardSummaryForMonth } from "@/lib/attendanceDetailsCardSummary";
 import { getPayrollAttendanceLogDateRange } from "@/lib/payrollLogDateRange";
 import {
@@ -183,7 +180,7 @@ export async function GET(request) {
         globalRules,
         scheduleByUser.get(uk) || null
       );
-      const logs = collectPayrollLogsForUsers(logsByUser, related, dateToYmdKey);
+      const logs = collectPayrollLogsForUsers(logsByUser, related);
       const leavesForPayroll = normalizeLeavesForRelatedAccounts(
         leaves,
         related,

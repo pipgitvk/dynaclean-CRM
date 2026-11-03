@@ -299,7 +299,8 @@ export function computeSalaryPayDaysForUser(p) {
         leaveWorkedDates.push(dateString);
       }
       if (treatAsHalfDay) {
-        half_day++;
+        // Paid half-day leave stays on the Leaves card (0.5), same as attendance.
+        // It is not a Half-Days card day.
         half_day_paid++;
         // With punch: 0.5 present + 0.5 paid leave = 1 slot. Without punch: 0.5 paid leave only (work half = LOP via deduction).
         weekdayPayCredits += hasRealPunch ? 1 : 0.5;
