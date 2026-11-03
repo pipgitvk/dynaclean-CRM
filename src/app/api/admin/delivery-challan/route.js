@@ -38,6 +38,14 @@ export async function POST(request) {
       remarks,
     } = body;
 
+    if (remarks == null || String(remarks).trim() === "") {
+      return NextResponse.json(
+        { error: "Remarks is required." },
+        { status: 400 }
+      );
+    }
+    const trimmedRemarks = String(remarks).trim();
+
     const conn = await getDbConnection();
 
     // Create tables if they don't exist
@@ -139,7 +147,7 @@ export async function POST(request) {
         challan_no,
         challan_date,
         eway_bill,
-        remarks,
+        trimmedRemarks,
       ]
     );
 
