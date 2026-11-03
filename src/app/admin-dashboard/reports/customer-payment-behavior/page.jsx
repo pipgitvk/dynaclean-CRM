@@ -9,6 +9,7 @@ import ManualFilterSearchButton, {
   MANUAL_FILTER_HINT,
 } from "@/components/ui/ManualFilterSearchButton";
 import dayjs from "dayjs";
+import Link from "next/link";
 import { Download, Search, Calendar, DollarSign, AlertTriangle, ChevronLeft, ChevronRight, ArrowUp, ArrowDown } from "lucide-react";
 
 export default function CustomerPaymentBehaviorReport() {
@@ -155,7 +156,12 @@ export default function CustomerPaymentBehaviorReport() {
         <div className="bg-white border border-gray-200 rounded-lg p-4 mb-3 shadow-sm hover:shadow-md transition-shadow">
             <div className="flex justify-between items-start mb-3">
                 <div>
-                    <p className="font-bold text-gray-800 text-lg">{order.order_id}</p>
+                    <Link
+                        href={`/admin-dashboard/order/${order.order_id}`}
+                        className="font-bold text-blue-600 text-lg hover:text-blue-800 hover:underline"
+                    >
+                        {order.order_id}
+                    </Link>
                     <p className="text-sm text-gray-600">{order.client_name}</p>
                     <p className="text-xs text-gray-500">{order.company_name}</p>
                 </div>
@@ -453,7 +459,14 @@ export default function CustomerPaymentBehaviorReport() {
                             ) : paginatedOrders.length > 0 ? (
                                 paginatedOrders.map((order, index) => (
                                     <tr key={index} className="hover:bg-gray-50 transition-colors">
-                                        <td className="px-4 py-3 font-medium text-gray-800">{order.order_id}</td>
+                                        <td className="px-4 py-3 font-medium">
+                                            <Link
+                                                href={`/admin-dashboard/order/${order.order_id}`}
+                                                className="text-blue-600 hover:text-blue-800 hover:underline"
+                                            >
+                                                {order.order_id}
+                                            </Link>
+                                        </td>
                                         <td className="px-4 py-3">
                                             <div className="text-xs">
                                                 <div className="font-semibold text-gray-800">{order.client_name}</div>
