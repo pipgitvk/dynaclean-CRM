@@ -36,7 +36,8 @@ export default function BomListPage() {
       const okQ = !qt ? true : (
         String(r.product_name||'').toLowerCase().includes(qt) ||
         String(r.product_code||'').toLowerCase().includes(qt) ||
-        String(r.specification||'').toLowerCase().includes(qt)
+        String(r.specification||'').toLowerCase().includes(qt) ||
+        String(r.bom_id ?? r.id ?? '').includes(qt)
       );
       return okStatus && okQ;
     });
@@ -77,6 +78,7 @@ export default function BomListPage() {
         <table className="min-w-full text-sm">
           <thead>
             <tr className="bg-gray-100 text-left">
+              <th className="p-2">ID</th>
               <th className="p-2">Image</th>
               <th className="p-2">Product Code</th>
               <th className="p-2">Product Name</th>
@@ -90,11 +92,12 @@ export default function BomListPage() {
           <tbody>
             {viewRows.length === 0 && (
               <tr>
-                <td className="p-2 text-gray-500" colSpan={7}>No data</td>
+                <td className="p-2 text-gray-500" colSpan={9}>No data</td>
               </tr>
             )}
             {viewRows.map((r) => (
               <tr key={`${r.product_code}-${r.bom_id || r.id}`} className="border-t">
+                <td className="p-2 tabular-nums text-gray-700">{r.bom_id ?? r.id ?? "—"}</td>
                 <td className="p-2">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   {r.product_image ? <img src={r.product_image} alt={r.product_name} className="w-12 h-12 object-cover rounded"/> : <div className="w-12 h-12 bg-gray-100 rounded"/>}
@@ -132,6 +135,7 @@ export default function BomListPage() {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             {r.product_image ? <img src={r.product_image} alt={r.product_name} className="w-14 h-14 object-cover rounded"/> : <div className="w-14 h-14 bg-gray-100 rounded"/>}
             <div className="flex-1 min-w-0">
+              <div className="text-xs text-gray-500 tabular-nums">ID: {r.bom_id ?? r.id ?? "—"}</div>
               <div className="font-medium truncate">{r.product_name}</div>
               <div className="text-xs text-gray-500">{r.product_code}</div>
               {r.specification && <div className="text-xs text-gray-500 truncate">{r.specification}</div>}
