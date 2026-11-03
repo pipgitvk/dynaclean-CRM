@@ -467,10 +467,22 @@ export async function loadMachineDailyByUsername(conn, machineCodeToUsername, op
       ${MACHINE_CHECKOUT_AGG_SQL.trim()} AS machine_checkout
     FROM machine_attendance_punches`;
   const params = [];
+  const where = [];
   if (empCodes.length) {
-    sql += ` WHERE emp_code IN (${empCodes.map(() => "?").join(", ")})`;
+    where.push(`emp_code IN (${empCodes.map(() => "?").join(", ")})`);
     params.push(...empCodes);
   }
+  const fromDate = String(options.fromDate || "").trim();
+  const toDate = String(options.toDate || "").trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(fromDate)) {
+    where.push(`punch_datetime >= ?`);
+    params.push(`${fromDate} 00:00:00`);
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(toDate)) {
+    where.push(`punch_datetime < DATE_ADD(?, INTERVAL 1 DAY)`);
+    params.push(toDate);
+  }
+  if (where.length) sql += ` WHERE ${where.join(" AND ")}`;
   sql += ` GROUP BY emp_code, DATE(punch_datetime)`;
   const [rows] = await conn.query(sql, params);
   const byUserDate = new Map();

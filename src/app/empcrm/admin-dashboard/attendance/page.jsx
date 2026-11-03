@@ -3,7 +3,7 @@
 
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { formatCrmDateOnly } from "@/lib/crmDateFormat";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import dayjs from "dayjs";
 import toast from "react-hot-toast";
 import { Loader2, Search, Info, Pencil, Sun, History, AlertTriangle } from "lucide-react";
@@ -228,16 +228,18 @@ function LeaveDayStatusBlock({ log, className = "" }) {
 
 const AttendancePage = () => {
   const [logs, setLogs] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [metaLoading, setMetaLoading] = useState(true);
   const initialRange = currentMonthRange();
   const [fromDate, setFromDate] = useState(initialRange.from);
   const [toDate, setToDate] = useState(initialRange.to);
   const [filterStatus, setFilterStatus] = useState("all");
-  const [selectedUser, setSelectedUser] = useState("all");
+  const [selectedUser, setSelectedUser] = useState("");
   /** Set only after clicking Search; drives summary + table */
   const [appliedUserSelection, setAppliedUserSelection] = useState(null);
   const [searchLoading, setSearchLoading] = useState(false);
   const [uniqueUsers, setUniqueUsers] = useState([]);
+  const reloadDebounceRef = useRef(null);
+  const skipDateReloadRef = useRef(0);
   const [holidays, setHolidays] = useState([]);
   const [leaves, setLeaves] = useState([]);
   const [isHolidayModalOpen, setHolidayModalOpen] = useState(false);
@@ -307,7 +309,10 @@ const AttendancePage = () => {
       setEditHistoryRefresh((n) => n + 1);
       setEditModalOpen(false);
       setEditModalLog(null);
-      fetchAttendance();
+      fetchAttendance(
+        { from: fromDate, to: toDate, username: selectedUser },
+        { machine: true },
+      );
     } catch (error) {
       toast.error(error.message || "Failed to update attendance log");
     }
@@ -327,7 +332,10 @@ const AttendancePage = () => {
       toast.success("Attendance log deleted successfully!");
       setDeleteDialogOpen(false);
       setDeleteModalLog(null);
-      fetchAttendance();
+      fetchAttendance(
+        { from: fromDate, to: toDate, username: selectedUser },
+        { machine: true },
+      );
     } catch (error) {
       toast.error(error.message || "Failed to delete attendance log");
     }
@@ -340,42 +348,142 @@ const AttendancePage = () => {
     setRegModalOpen(true);
   };
 
-  const fetchAttendance = async () => {
-    setLoading(true);
+  const fetchAttendance = async (
+    { from, to, username },
+    { machine = true } = {},
+  ) => {
+    const fromYmd = from || fromDate;
+    const toYmdVal = to || toDate;
     try {
-      const response = await fetch("/api/empcrm/attendance/fetch-all");
+      const qs = new URLSearchParams();
+      if (fromYmd) qs.set("from", fromYmd);
+      if (toYmdVal) qs.set("to", toYmdVal);
+      if (username) qs.set("username", username);
+      if (!machine) qs.set("machine", "0");
+      const response = await fetch(
+        `/api/empcrm/attendance/fetch-all?${qs.toString()}`,
+        { cache: "no-store" },
+      );
 
       if (!response.ok) {
         const errorData = await response
           .json()
           .catch(() => ({ message: "Unknown error" }));
         throw new Error(
-          errorData.message || "Failed to fetch attendance logs."
+          errorData.message || "Failed to fetch attendance logs.",
         );
       }
 
       const data = await response.json();
-      setLogs(data.attendance);
+      setLogs(data.attendance || []);
       setHolidays(data.holidays || []);
       setLeaves(data.leaves || []);
       setRulesByUsername(data.rulesByUsername || {});
-
-      const users = [
-        ...new Set(data.attendance.map((log) => log.username)),
-      ].sort();
-      setUniqueUsers(["all", ...users]);
     } catch (err) {
       toast.error(err.message);
       setLogs([]);
       setHolidays([]);
       setLeaves([]);
-    } finally {
-      setLoading(false);
+      throw err;
     }
   };
 
+  const fetchEmployeeMeta = async () => {
+    setMetaLoading(true);
+    try {
+      const response = await fetch(
+        "/api/empcrm/attendance/fetch-all?meta=1",
+        { cache: "no-store" },
+      );
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || "Failed to load employees.");
+      }
+      const data = await response.json();
+      const users =
+        Array.isArray(data.employees) && data.employees.length
+          ? data.employees
+          : [];
+      setUniqueUsers(users);
+    } catch (err) {
+      toast.error(err.message);
+      setUniqueUsers([]);
+    } finally {
+      setMetaLoading(false);
+    }
+  };
+
+  const loadAttendance = useCallback(
+    async (username, from, to) => {
+      const user = String(username || "").trim();
+      if (!user) return;
+      setSearchLoading(true);
+      setAppliedUserSelection(null);
+      try {
+        await fetchAttendance(
+          { from, to, username: user },
+          { machine: true },
+        );
+        setAppliedUserSelection(user);
+      } catch {
+        /* toast from fetchAttendance */
+      } finally {
+        setSearchLoading(false);
+      }
+    },
+    [fromDate, toDate],
+  );
+
+  const handleEmployeeChange = (e) => {
+    const user = e.target.value;
+    setSelectedUser(user);
+    if (!user) {
+      setAppliedUserSelection(null);
+      setLogs([]);
+      setHolidays([]);
+      setLeaves([]);
+      return;
+    }
+    const range = currentMonthRange();
+    skipDateReloadRef.current = 2;
+    setFromDate(range.from);
+    setToDate(range.to);
+    void loadAttendance(user, range.from, range.to);
+  };
+
+  const scheduleReloadForDates = (from, to) => {
+    const user = String(selectedUser || "").trim();
+    if (!user || searchLoading || appliedUserSelection == null) return;
+    clearTimeout(reloadDebounceRef.current);
+    reloadDebounceRef.current = setTimeout(() => {
+      void loadAttendance(user, from, to);
+    }, 400);
+  };
+
+  const handleFromDateChange = (v) => {
+    setFromDate(v);
+    if (skipDateReloadRef.current > 0) {
+      skipDateReloadRef.current -= 1;
+      return;
+    }
+    scheduleReloadForDates(v, toDate);
+  };
+
+  const handleToDateChange = (v) => {
+    setToDate(v);
+    if (skipDateReloadRef.current > 0) {
+      skipDateReloadRef.current -= 1;
+      return;
+    }
+    scheduleReloadForDates(fromDate, v);
+  };
+
   useEffect(() => {
-    fetchAttendance();
+    return () => clearTimeout(reloadDebounceRef.current);
+  }, []);
+
+  useEffect(() => {
+    fetchEmployeeMeta();
   }, []);
 
   useEffect(() => {
@@ -453,13 +561,13 @@ const AttendancePage = () => {
     setToDate(to);
   };
 
-  const handleSearch = () => {
-    setSearchLoading(true);
-    setAppliedUserSelection(null);
-    setTimeout(() => {
-      setAppliedUserSelection(selectedUser);
-      setSearchLoading(false);
-    }, 120);
+  const handleSearch = async () => {
+    const user = String(selectedUser || "").trim();
+    if (!user) {
+      toast.error("Please select an employee first.");
+      return;
+    }
+    await loadAttendance(user, fromDate, toDate);
   };
 
   const openAttendanceHistoryModal = (log) => {
@@ -561,7 +669,10 @@ const AttendancePage = () => {
       }
       toast.success("Attendance times updated.");
       setEditHistoryRefresh((n) => n + 1);
-      await fetchAttendance();
+      await fetchAttendance(
+        { from: fromDate, to: toDate, username: selectedUser },
+        { machine: true },
+      );
       closeBreakEditModal();
     } catch (e) {
       toast.error(e.message);
@@ -788,16 +899,6 @@ const AttendancePage = () => {
   let fullTimeline = [];
   if (appliedUserSelection == null) {
     fullTimeline = [];
-  } else if (appliedUserSelection === "all") {
-    const allUsersAttendance = uniqueUsers
-      .filter((user) => user !== "all")
-      .flatMap((user) => {
-        const userLogs = logs.filter((log) => log.username === user);
-        return generateAttendanceTimeline(userLogs, user);
-      });
-    fullTimeline = allUsersAttendance.sort(
-      (a, b) => new Date(b.date) - new Date(a.date)
-    );
   } else {
     const userLogs = logs.filter((log) => log.username === appliedUserSelection);
     fullTimeline = generateAttendanceTimeline(userLogs, appliedUserSelection).reverse();
@@ -986,14 +1087,6 @@ const AttendancePage = () => {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-screen">
-        <p className="text-gray-600 text-lg">Loading attendance data...</p>
-      </div>
-    );
-  }
-
   return (
     <>
       <div className="w-full py-2 sm:py-4">
@@ -1007,20 +1100,28 @@ const AttendancePage = () => {
               Employee
               <select
                 value={selectedUser}
-                onChange={(e) => setSelectedUser(e.target.value)}
-                className="rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                onChange={handleEmployeeChange}
+                disabled={metaLoading || searchLoading}
+                className="rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
               >
-                {uniqueUsers.map((user) => (
-                  <option key={user} value={user}>
-                    {user === "all" ? "All Users" : user}
-                  </option>
-                ))}
+                {metaLoading ? (
+                  <option value="">Loading employees…</option>
+                ) : (
+                  <>
+                    <option value="">— Select employee —</option>
+                    {uniqueUsers.map((user) => (
+                      <option key={user} value={user}>
+                        {user}
+                      </option>
+                    ))}
+                  </>
+                )}
               </select>
             </label>
             <button
               type="button"
               onClick={handleSearch}
-              disabled={searchLoading}
+              disabled={searchLoading || metaLoading}
               className="inline-flex items-center justify-center gap-2 rounded-md bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-70"
             >
               {searchLoading ? (
@@ -1037,7 +1138,14 @@ const AttendancePage = () => {
             >
               Holiday List
             </button>
-            <AttendanceBulkImportPanel onComplete={fetchAttendance} />
+            <AttendanceBulkImportPanel
+              onComplete={() => {
+                const user = String(selectedUser || "").trim();
+                if (user) {
+                  void loadAttendance(user, fromDate, toDate);
+                }
+              }}
+            />
           </div>
 
           {searchLoading ? (
@@ -1048,8 +1156,9 @@ const AttendancePage = () => {
             </div>
           ) : appliedUserSelection === null ? (
             <p className="rounded-xl border border-dashed border-slate-300 bg-slate-50 py-12 text-center text-sm text-slate-600">
-              Default is <span className="font-medium">All Users</span>. Pick an employee if needed, then click{" "}
-              <span className="font-medium">Search</span> to load the summary and table.
+              Select an employee — current month loads automatically. Change{" "}
+              <span className="font-medium">From / To</span> dates to load that range
+              (one employee at a time).
             </p>
           ) : (
             <>
@@ -1148,14 +1257,14 @@ const AttendancePage = () => {
               <div className="flex flex-row items-center gap-2 shrink-0">
               <TypeableDateFilterInput
                 value={fromDate}
-                onChange={setFromDate}
+                onChange={handleFromDateChange}
                 placeholder="From Date"
                 wrapperClassName="relative flex w-[10.5rem] sm:w-36 shrink-0 items-stretch"
                 className="px-3 py-2 w-full border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <TypeableDateFilterInput
                 value={toDate}
-                onChange={setToDate}
+                onChange={handleToDateChange}
                 placeholder="To Date"
                 wrapperClassName="relative flex w-[10.5rem] sm:w-36 shrink-0 items-stretch"
                 className="px-3 py-2 w-full border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -2066,7 +2175,10 @@ const AttendancePage = () => {
           setRegForUsername("");
         }}
         onSubmitted={() => {
-          fetchAttendance();
+          fetchAttendance(
+        { from: fromDate, to: toDate, username: selectedUser },
+        { machine: true },
+      );
         }}
       />
       {isHolidayModalOpen && (

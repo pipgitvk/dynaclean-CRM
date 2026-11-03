@@ -7,27 +7,42 @@ import {
   rowToAttendanceRulesShape,
   mergeGlobalRulesWithEmployeeSchedule,
 } from "@/lib/attendanceRulesDb";
-import { ensureAttendanceEditHistoryTable } from "@/lib/ensureAttendanceEditHistoryTable";
 import {
   loadMachineCodeMaps,
   loadMachineDailyByUsername,
   mergeAttendanceListWithMachine,
   mergeCrmAndMachineDay,
 } from "@/lib/attendanceMachineMerge";
-import { ensureAttendanceLogsEmployeeColumns } from "@/lib/ensureAttendanceLogsEmployeeColumns";
-import { applyAutomaticCheckouts } from "@/lib/attendanceAutoCheckout";
 import {
   applyCanonicalUsernameToRow,
   normalizeUsernameKey,
 } from "@/lib/attendanceCanonicalUsername";
 import { attendanceDateKey } from "@/lib/leaveDateRange";
-export const dynamic = 'force-dynamic';
+
+export const dynamic = "force-dynamic";
 
 function normalizeUserKey(value) {
   return normalizeUsernameKey(value);
 }
 
-/** Same employee + date can appear twice before canonical usernames align — merge once. */
+function shiftYmd(ymd, days) {
+  const [y, m, d] = ymd.split("-").map(Number);
+  const dt = new Date(y, m - 1, d);
+  dt.setDate(dt.getDate() + days);
+  const yy = dt.getFullYear();
+  const mm = String(dt.getMonth() + 1).padStart(2, "0");
+  const dd = String(dt.getDate()).padStart(2, "0");
+  return `${yy}-${mm}-${dd}`;
+}
+
+function defaultMonthRange() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  return { from: `${y}-${m}-01`, to: `${y}-${m}-${d}` };
+}
+
 function pickCrmRowForMerge(a, b) {
   if (a._syntheticMachineOnly && !b._syntheticMachineOnly) return b;
   if (b._syntheticMachineOnly && !a._syntheticMachineOnly) return a;
@@ -72,65 +87,151 @@ function dedupeMergedAttendanceRows(mergedRows) {
   return [...byKey.values()];
 }
 
+function buildRulesForUsers(globalRules, scheduleByUser, usernames) {
+  const rulesByUsername = {};
+  for (const u of usernames) {
+    const schedule = scheduleByUser.get(normalizeUserKey(u)) || null;
+    rulesByUsername[u] = mergeGlobalRulesWithEmployeeSchedule(
+      globalRules,
+      schedule,
+    );
+  }
+  return rulesByUsername;
+}
+
 export async function GET(request) {
   try {
-    await applyAutomaticCheckouts();
+    const { searchParams } = new URL(request.url);
+
+    if (searchParams.get("meta") === "1") {
+      const db = await getDbConnection();
+      const [activeEmployees] = await db.query(
+        `SELECT username FROM rep_list WHERE status = 1 ORDER BY username ASC`,
+      );
+      const employeeNames = (activeEmployees || [])
+        .map((r) => String(r.username || "").trim())
+        .filter(Boolean);
+      return NextResponse.json({
+        employees: employeeNames,
+        attendance: [],
+        holidays: [],
+        leaves: [],
+        rulesByUsername: {},
+      });
+    }
+
+    let fromParam = String(searchParams.get("from") || "").trim();
+    let toParam = String(searchParams.get("to") || "").trim();
+    const ymdOk = /^\d{4}-\d{2}-\d{2}$/;
+    if (!ymdOk.test(fromParam) || !ymdOk.test(toParam)) {
+      const def = defaultMonthRange();
+      fromParam = def.from;
+      toParam = def.to;
+    }
+    const queryFrom = shiftYmd(fromParam, -7);
+    const queryTo = toParam;
+    const skipMachine = searchParams.get("machine") === "0";
+    const usernameParam = String(searchParams.get("username") || "").trim();
 
     const db = await getDbConnection();
-    await ensureAttendanceEditHistoryTable(db);
-    await ensureAttendanceLogsEmployeeColumns(db);
 
-    // Query to fetch all attendance logs
-    const [rows] = await db.query(
-      `SELECT
-      a.date,
-      a.username,
-      COALESCE(a.employee_id, r.empId) AS employee_id,
-      COALESCE(NULLIF(TRIM(a.machine_code), ''), NULLIF(TRIM(r.machine_code), '')) AS machine_code,
-      a.admin_time_edit_remark,
-      a.checkin_time,
-      a.checkout_time,
-      a.break_morning_start,
-      a.break_morning_end,
-      a.break_lunch_start,
-      a.break_lunch_end,
-      a.break_evening_start,
-      a.break_evening_end,
-      a.checkin_address,
-      a.checkin_latitude,
-      a.checkin_longitude,
-      a.checkout_address,
-      a.checkout_latitude,
-      a.checkout_longitude,
-      (CASE
-         WHEN a.checkin_photo IS NOT NULL AND TRIM(a.checkin_photo) <> ''
-         THEN 1 ELSE 0
-       END) AS has_checkin_photo
-   FROM attendance_logs a
-   INNER JOIN rep_list r
-      ON a.username COLLATE utf8mb4_unicode_ci = r.username COLLATE utf8mb4_unicode_ci
-   WHERE r.status = 1
-   ORDER BY a.date DESC`
-    );
+    let usernameAliases = [];
+    if (usernameParam) {
+      const [aliasRows] = await db.query(
+        `SELECT r2.username
+         FROM rep_list r1
+         INNER JOIN rep_list r2
+           ON r1.empId = r2.empId AND r2.status = 1
+         WHERE r1.status = 1
+           AND r1.empId IS NOT NULL
+           AND LOWER(TRIM(r1.username)) = LOWER(TRIM(?))`,
+        [usernameParam],
+      );
+      usernameAliases = [
+        ...new Set(
+          [usernameParam, ...(aliasRows || []).map((r) => r.username)]
+            .map((u) => String(u || "").trim())
+            .filter(Boolean),
+        ),
+      ];
+    }
 
+    const userLogSql = usernameAliases.length
+      ? ` AND a.username IN (${usernameAliases.map(() => "?").join(", ")})`
+      : "";
+    const logParams = [queryFrom, queryTo, ...usernameAliases];
 
-    // Fetch holidays
-    const [holidays] = await db.query(
-      `SELECT holiday_date, title, description
-       FROM holidays
-       ORDER BY holiday_date DESC`
-    );
+    const logSql = `
+      SELECT
+        a.date,
+        a.username,
+        COALESCE(a.employee_id, r.empId) AS employee_id,
+        COALESCE(NULLIF(TRIM(a.machine_code), ''), NULLIF(TRIM(r.machine_code), '')) AS machine_code,
+        a.admin_time_edit_remark,
+        a.checkin_time,
+        a.checkout_time,
+        a.break_morning_start,
+        a.break_morning_end,
+        a.break_lunch_start,
+        a.break_lunch_end,
+        a.break_evening_start,
+        a.break_evening_end,
+        a.checkin_address,
+        a.checkin_latitude,
+        a.checkin_longitude,
+        a.checkout_address,
+        a.checkout_latitude,
+        a.checkout_longitude,
+        (CASE
+           WHEN a.checkin_photo IS NOT NULL AND TRIM(a.checkin_photo) <> ''
+           THEN 1 ELSE 0
+         END) AS has_checkin_photo
+      FROM attendance_logs a
+      INNER JOIN rep_list r
+        ON a.username COLLATE utf8mb4_unicode_ci = r.username COLLATE utf8mb4_unicode_ci
+      WHERE r.status = 1
+        AND a.date >= ?
+        AND a.date < DATE_ADD(?, INTERVAL 1 DAY)
+        ${userLogSql}
+      ORDER BY a.date DESC`;
 
-    // Fetch all approved leaves
-    const [leaves] = await db.query(
-      `SELECT username, from_date, to_date, leave_type, reason, is_half_day, half_day_type, start_time, end_time
-       FROM employee_leaves
-       WHERE status = 'approved'
-       ORDER BY from_date DESC`
-    );
+    const leaveParams = [queryTo, queryFrom];
+    let leaveUserSql = "";
+    if (usernameAliases.length) {
+      leaveUserSql = ` AND username IN (${usernameAliases.map(() => "?").join(", ")})`;
+      leaveParams.push(...usernameAliases);
+    }
 
-    const globalRow = await loadGlobalAttendanceRulesRow(db);
-    const globalRules = rowToAttendanceRulesShape(globalRow);
+    const [
+      [rows],
+      [holidays],
+      [leaves],
+      [schedules],
+      [activeEmployees],
+      globalRow,
+    ] = await Promise.all([
+      db.query(logSql, logParams),
+      db.query(
+        `SELECT holiday_date, title, description FROM holidays ORDER BY holiday_date DESC`,
+      ),
+      db.query(
+        `SELECT username, from_date, to_date, leave_type, reason, is_half_day, half_day_type, start_time, end_time
+         FROM employee_leaves
+         WHERE status = 'approved'
+           AND from_date <= ?
+           AND to_date >= ?
+           ${leaveUserSql}
+         ORDER BY from_date DESC`,
+        leaveParams,
+      ),
+      db.query(`SELECT * FROM employee_attendance_schedule`),
+      db.query(
+        `SELECT username, empId, TRIM(machine_code) AS machine_code
+         FROM rep_list WHERE status = 1`,
+      ),
+      loadGlobalAttendanceRulesRow(db),
+    ]);
+
     await ensureEmployeeAttendanceScheduleTable();
 
     const { machineCodeToUsername, canonicalMaps, resolveCanonicalUsername: resolveCanon } =
@@ -140,18 +241,57 @@ export async function GET(request) {
       applyCanonicalUsernameToRow(row, canonicalMaps);
     }
 
-    const [schedules] = await db.query(`SELECT * FROM employee_attendance_schedule`);
     const scheduleByUser = new Map(
-      (schedules || []).map((s) => [normalizeUserKey(s.username), s])
+      (schedules || []).map((s) => [normalizeUserKey(s.username), s]),
     );
-    const rulesByUsername = {};
-    for (const u of [...new Set(rows.map((r) => r.username))]) {
-      const schedule =
-        scheduleByUser.get(normalizeUserKey(u)) || null;
-      rulesByUsername[u] = mergeGlobalRulesWithEmployeeSchedule(
-        globalRules,
-        schedule
+    const globalRules = rowToAttendanceRulesShape(globalRow);
+
+    const employeeNames = [
+      ...new Set(
+        (activeEmployees || []).map((r) =>
+          resolveCanon(r.username, canonicalMaps, {
+            employee_id: r.empId,
+            machine_code: r.machine_code,
+          }),
+        ),
+      ),
+    ].sort((a, b) => String(a).localeCompare(String(b)));
+
+    const idsByUser = new Map();
+    for (const r of activeEmployees || []) {
+      const canon = resolveCanon(r.username, canonicalMaps, {
+        employee_id: r.empId,
+        machine_code: r.machine_code,
+      });
+      idsByUser.set(canon, {
+        employee_id: r.empId ?? null,
+        machine_code: String(r.machine_code || "").trim() || null,
+      });
+    }
+
+    let mergedRows = rows;
+    if (!skipMachine) {
+      const empCodesFromRows = [
+        ...new Set(
+          rows
+            .map((r) => String(r.machine_code || "").trim())
+            .filter(Boolean),
+        ),
+      ];
+      const machineByUserDate = await loadMachineDailyByUsername(
+        db,
+        machineCodeToUsername,
+        {
+          fromDate: queryFrom,
+          toDate: queryTo,
+          empCodes: empCodesFromRows,
+        },
       );
+      mergedRows = dedupeMergedAttendanceRows(
+        mergeAttendanceListWithMachine(rows, machineByUserDate),
+      );
+    } else {
+      mergedRows = dedupeMergedAttendanceRows(mergedRows);
     }
 
     const regMap = new Map();
@@ -163,18 +303,20 @@ export async function GET(request) {
            SELECT username, log_date, MAX(id) AS mid
            FROM attendance_regularization_requests
            WHERE status = 'approved'
+             AND log_date >= ?
+             AND log_date <= ?
            GROUP BY username, log_date
          ) t
            ON ar.username COLLATE utf8mb4_unicode_ci = t.username COLLATE utf8mb4_unicode_ci
            AND ar.log_date = t.log_date
            AND ar.id = t.mid
-         WHERE ar.status = 'approved'`
+         WHERE ar.status = 'approved'`,
+        [queryFrom, queryTo],
       );
       for (const r of regRows || []) {
         const dk = attendanceDateKey(r.log_date);
         const canonUser = resolveCanon(r.username, canonicalMaps);
-        const key = `${canonUser}|${dk}`;
-        regMap.set(key, {
+        regMap.set(`${canonUser}|${dk}`, {
           createdBy: r.username,
           approvedBy: r.reviewed_by || "—",
           reason: r.reason && String(r.reason).trim() ? r.reason : "—",
@@ -184,33 +326,9 @@ export async function GET(request) {
       console.warn("attendance regularization metadata skipped:", e.message);
     }
 
-    const machineByUserDate = await loadMachineDailyByUsername(
-      db,
-      machineCodeToUsername,
-    );
-    let mergedRows = mergeAttendanceListWithMachine(rows, machineByUserDate);
-    mergedRows = dedupeMergedAttendanceRows(mergedRows);
-
-    const [idRows] = await db.query(
-      `SELECT username, empId, TRIM(machine_code) AS machine_code
-       FROM rep_list WHERE status = 1`
-    );
-    const idsByUser = new Map();
-    for (const r of idRows || []) {
-      const canon = resolveCanon(r.username, canonicalMaps, {
-        employee_id: r.empId,
-        machine_code: r.machine_code,
-      });
-      idsByUser.set(canon, {
-        employee_id: r.empId ?? null,
-        machine_code: String(r.machine_code || "").trim() || null,
-      });
-    }
-
     for (const row of mergedRows) {
       const dk = attendanceDateKey(row.date);
-      const meta = regMap.get(`${row.username}|${dk}`);
-      row.regularization = meta || null;
+      row.regularization = regMap.get(`${row.username}|${dk}`) || null;
       const ids = idsByUser.get(row.username);
       if (ids) {
         if (row.employee_id == null) row.employee_id = ids.employee_id;
@@ -218,17 +336,11 @@ export async function GET(request) {
       }
     }
 
-    const uniqueUsernames = [
-      ...new Set(mergedRows.map((r) => r.username)),
-    ];
-    for (const u of uniqueUsernames) {
-      if (rulesByUsername[u]) continue;
-      const schedule = scheduleByUser.get(normalizeUserKey(u)) || null;
-      rulesByUsername[u] = mergeGlobalRulesWithEmployeeSchedule(
-        globalRules,
-        schedule
-      );
-    }
+    const rulesByUsername = buildRulesForUsers(
+      globalRules,
+      scheduleByUser,
+      [...new Set(mergedRows.map((r) => r.username))],
+    );
 
     const normalizedLeaves = (leaves || []).map((leave) => ({
       ...leave,
@@ -246,12 +358,14 @@ export async function GET(request) {
       holidays: normalizedHolidays,
       leaves: normalizedLeaves,
       rulesByUsername,
+      employees: employeeNames,
+      range: { from: fromParam, to: toParam, queryFrom, queryTo },
     });
   } catch (error) {
     console.error("Error fetching attendance logs:", error);
     return NextResponse.json(
       { message: "Internal server error." },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
