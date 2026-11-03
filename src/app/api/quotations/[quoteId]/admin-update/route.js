@@ -192,7 +192,6 @@ export async function PATCH(req, { params }) {
       try {
         await conn.execute(
           `INSERT INTO quotations_records
-           (quote_number, quote_date, customer_id, company_name, company_address, state, gstin, ship_to, qty, gst, cgst_rate, sgst_rate, igst_rate, emp_name, subtotal, round_off, grand_total, term_con, payment_term_days, created_at)
            (quote_number, quote_date, customer_id, company_name, company_address, state, gstin, ship_to, qty, gst, cgst_rate, sgst_rate, igst_rate, emp_name, subtotal, round_off, grand_total, term_con, payment_term_days, ${docCols}, created_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${docPh}, NOW())`,
           [
@@ -218,6 +217,7 @@ export async function PATCH(req, { params }) {
             terms !== undefined ? String(terms ?? "") : quote.term_con,
             payment_term_days ?? quote.payment_term_days,
             ...docVals,
+          ],
         );
         break;
       } catch (err) {
