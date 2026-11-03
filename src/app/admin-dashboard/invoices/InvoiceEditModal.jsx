@@ -9,7 +9,7 @@ import TaxAndSummary from "./new/Tax-invoice";
 import PaymentLinkModal from "@/app/user-dashboard/invoices/new/PaymentLinkModal";
 import DocumentLetterheadHeader from "@/components/invoice/DocumentLetterheadHeader";
 import { useUser } from "@/context/UserContext";
-import { canEditInvoiceHsn } from "@/lib/performaInvoiceAccess";
+import { canEditInvoiceHsn, canRemoveInvoiceLineItems } from "@/lib/performaInvoiceAccess";
 import {
   documentFromCompanyForSubmit,
   mergeDocumentFromCompany,
@@ -125,6 +125,7 @@ export default function InvoiceEditModal({
 }) {
   const { user } = useUser();
   const canEditHsn = canEditInvoiceHsn(user?.role ?? user?.userRole);
+  const canRemoveItems = canRemoveInvoiceLineItems(user?.role ?? user?.userRole);
   const [documentFromCompany, setDocumentFromCompany] = useState(() =>
     mergeDocumentFromCompany({}),
   );
@@ -907,6 +908,7 @@ export default function InvoiceEditModal({
                 setItems={setItems}
                 isEditMode={true}
                 canEditHsn={canEditHsn}
+                canRemoveItems={canRemoveItems}
               />
 
               <TaxAndSummary

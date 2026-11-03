@@ -23,6 +23,15 @@ export function canEditInvoiceHsn(roleOrPayload) {
   return r === "SUPERADMIN" || isAccountantRole(r);
 }
 
+/** Remove line items when editing an existing invoice — SUPERADMIN only. */
+export function canRemoveInvoiceLineItems(roleOrPayload) {
+  const role =
+    roleOrPayload != null && typeof roleOrPayload === "object"
+      ? roleOrPayload.role || roleOrPayload.userRole
+      : roleOrPayload;
+  return String(role || "").toUpperCase().trim() === "SUPERADMIN";
+}
+
 /**
  * SUPERADMIN and ACCOUNTANT roles can see every performa invoice.
  * Other roles only see performa invoices they created.

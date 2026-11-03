@@ -1,7 +1,7 @@
 import { getDbConnection } from "@/lib/db";
 import { NextResponse } from "next/server";
 import { getSessionPayload } from "@/lib/auth";
-import { canAccessPerformaInvoice } from "@/lib/performaInvoiceAccess";
+import { canAccessPerformaInvoice, canRemoveInvoiceLineItems } from "@/lib/performaInvoiceAccess";
 import { ensureInvoiceItemsInsertReady } from "@/lib/ensureInvoiceItemsAutoIncrement";
 import { refreshOrdersAfterInvoiceRemoved } from "@/lib/orderInvoicePaymentClear";
 import { syncInvoiceAndOrderPaymentLink } from "@/lib/syncInvoiceOrderPaymentLink";
@@ -308,7 +308,6 @@ export async function PATCH(req, context) {
     }
 
     const [[existing]] = await conn.execute(
-      `SELECT id, type, created_by, employee_name FROM invoices WHERE id = ? LIMIT 1`,
       `SELECT * FROM invoices WHERE id = ? LIMIT 1`,
       [invoiceId],
     );
@@ -355,6 +354,24 @@ export async function PATCH(req, context) {
 
     await conn.beginTransaction();
 
+    const canRemoveLines = canRemoveInvoiceLineItems(payload);
+    const [existingItemRows] = await conn.execute(
+      `SELECT id FROM invoice_items WHERE invoice_id = ?`,
+      [invoiceId],
+    );
+    const existingItemCount = existingItemRows?.length ?? 0;
+    const incomingItemCount = Array.isArray(items) ? items.length : 0;
+    if (
+      !canRemoveLines &&
+      incomingItemCount < existingItemCount
+    ) {
+      await conn.rollback();
+      return NextResponse.json(
+        { error: "Only SUPERADMIN can remove invoice line items" },
+        { status: 403 },
+      );
+    }
+
     const toMysqlDatetime = (v) => {
       const d = new Date(v);
       if (Number.isNaN(d.getTime())) return null;
@@ -379,7 +396,6 @@ export async function PATCH(req, context) {
           customer_id = ?, linked_trans_ids = ?,
           cgst_rate = COALESCE(?, cgst_rate), sgst_rate = COALESCE(?, sgst_rate), igst_rate = COALESCE(?, igst_rate),
           status = ?,
-          created_at = ?
           created_at = ?,
           ${docSet}
         WHERE id = ?`,
@@ -423,6 +439,7 @@ export async function PATCH(req, context) {
           bodyStatus,
           createdAtSql,
           ...docVals,
+          invoiceId,
         ],
       );
     } else {
@@ -437,7 +454,6 @@ export async function PATCH(req, context) {
           buyers_order_no = ?, eway_bill_no = ?, delivery_challan_no = ?,
           customer_id = ?, linked_trans_ids = ?,
           cgst_rate = COALESCE(?, cgst_rate), sgst_rate = COALESCE(?, sgst_rate), igst_rate = COALESCE(?, igst_rate),
-          status = ?
           status = ?,
           ${docSet}
         WHERE id = ?`,
@@ -480,6 +496,7 @@ export async function PATCH(req, context) {
           bodyIgstRate,
           bodyStatus,
           ...docVals,
+          invoiceId,
         ],
       );
     }

@@ -12,6 +12,7 @@ export default function InvoiceItemsTable({
   setItems,
   isEditMode = false,
   canEditHsn = false,
+  canRemoveItems = false,
   interstate = false,
 }) {
   const [productSuggestions, setProductSuggestions] = useState([]);
@@ -162,9 +163,23 @@ export default function InvoiceItemsTable({
     ]);
   };
 
+  const showRemoveRow = !isEditMode || canRemoveItems;
+
   const removeRow = (index) => {
     if (items.length === 1) {
       alert("At least one item is required");
+      return;
+    }
+    const label =
+      items[index]?.item_name ||
+      items[index]?.item_code ||
+      `line ${index + 1}`;
+    if (
+      isEditMode &&
+      !window.confirm(
+        `Remove "${label}" from this invoice? Save changes to delete it from the database.`,
+      )
+    ) {
       return;
     }
     const updated = items.filter((_, i) => i !== index);
@@ -359,14 +374,24 @@ export default function InvoiceItemsTable({
                   ₹ {(item.taxable_value || 0).toFixed(2)}
                 </td>
                 <td className="border px-2 py-2 text-center">
-                  {!isEditMode && (
+                  {showRemoveRow ? (
                     <button
                       type="button"
                       onClick={() => removeRow(idx)}
                       className="text-red-500 hover:text-red-700"
+                      title={
+                        isEditMode
+                          ? "Remove product (SUPERADMIN — saved on Save changes)"
+                          : "Remove row"
+                      }
+                      aria-label="Remove product"
                     >
                       🗑
                     </button>
+                  ) : (
+                    <span className="text-gray-300" title="Only SUPERADMIN can remove lines">
+                      —
+                    </span>
                   )}
                 </td>
               </tr>
