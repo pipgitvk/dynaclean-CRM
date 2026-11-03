@@ -948,6 +948,7 @@ export default function SpareStockPage() {
   const [previewImage, setPreviewImage] = useState(null);
 
   const [openSection, setOpenSection] = useState("list");
+  const [exportingAvailableExcel, setExportingAvailableExcel] = useState(false);
   const [editingLocation, setEditingLocation] = useState({ key: null, value: "" });
   const [savingLocation, setSavingLocation] = useState(false);
 
