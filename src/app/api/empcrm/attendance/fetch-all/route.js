@@ -12,12 +12,18 @@ import {
   loadMachineDailyByUsername,
   mergeAttendanceListWithMachine,
   mergeCrmAndMachineDay,
+  buildCrmBaseRowForRematch,
+  extractCrmPunchesFromAttendanceLogRow,
+  pickEarlierCheckin,
+  pickLaterCheckout,
 } from "@/lib/attendanceMachineMerge";
 import {
   applyCanonicalUsernameToRow,
   normalizeUsernameKey,
 } from "@/lib/attendanceCanonicalUsername";
 import { attendanceDateKey } from "@/lib/leaveDateRange";
+import { parseAttendanceDateTime } from "@/lib/istDateTime";
+import { isMeaningfulAttendancePunch } from "@/lib/attendanceMeaningfulPunch";
 
 export const dynamic = "force-dynamic";
 
@@ -43,24 +49,47 @@ function defaultMonthRange() {
   return { from: `${y}-${m}-01`, to: `${y}-${m}-${d}` };
 }
 
-function pickCrmRowForMerge(a, b) {
+function pickCrmShellForMerge(a, b) {
   if (a._syntheticMachineOnly && !b._syntheticMachineOnly) return b;
   if (b._syntheticMachineOnly && !a._syntheticMachineOnly) return a;
-  return a;
+  const score = (row) => {
+    if (!row || row._syntheticMachineOnly) return 0;
+    const crm = extractCrmPunchesFromAttendanceLogRow(row);
+    let s = 0;
+    if (isMeaningfulAttendancePunch(crm.checkin)) s += 2;
+    if (isMeaningfulAttendancePunch(crm.checkout)) s += 2;
+    if (
+      row.checkin_address &&
+      !String(row.checkin_address).toLowerCase().includes("machine")
+    ) {
+      s += 1;
+    }
+    if (row.has_checkin_photo) s += 1;
+    return s;
+  };
+  return score(a) >= score(b) ? a : b;
 }
 
 function combineMachineDays(a, b) {
   if (!a) return b || null;
   if (!b) return a;
   const pickEarlier = (x, y) => {
-    if (!x) return y;
-    if (!y) return x;
-    return String(x) <= String(y) ? x : y;
+    if (!isMeaningfulAttendancePunch(x)) return y || null;
+    if (!isMeaningfulAttendancePunch(y)) return x;
+    const dx = parseAttendanceDateTime(x);
+    const dy = parseAttendanceDateTime(y);
+    if (!dx) return y;
+    if (!dy) return x;
+    return dx.getTime() <= dy.getTime() ? x : y;
   };
   const pickLater = (x, y) => {
-    if (!x) return y;
-    if (!y) return x;
-    return String(x) >= String(y) ? x : y;
+    if (!isMeaningfulAttendancePunch(x)) return y || null;
+    if (!isMeaningfulAttendancePunch(y)) return x;
+    const dx = parseAttendanceDateTime(x);
+    const dy = parseAttendanceDateTime(y);
+    if (!dx) return y;
+    if (!dy) return x;
+    return dx.getTime() >= dy.getTime() ? x : y;
   };
   return {
     emp_code: a.emp_code || b.emp_code,
@@ -80,9 +109,24 @@ function dedupeMergedAttendanceRows(mergedRows) {
       byKey.set(key, row);
       continue;
     }
+
     const machineDay = combineMachineDays(prev.machine_day, row.machine_day);
-    const crmRow = pickCrmRowForMerge(prev, row);
-    byKey.set(key, mergeCrmAndMachineDay(crmRow, machineDay));
+    const aCrm = extractCrmPunchesFromAttendanceLogRow(prev);
+    const bCrm = extractCrmPunchesFromAttendanceLogRow(row);
+    const crmIn = pickEarlierCheckin(aCrm.checkin, bCrm.checkin).value;
+    const crmOut = pickLaterCheckout(aCrm.checkout, bCrm.checkout).value;
+    const shell = pickCrmShellForMerge(prev, row);
+    const hasCrmShell = Boolean(shell && !shell._syntheticMachineOnly);
+    const cleanCrm = {
+      ...buildCrmBaseRowForRematch(shell),
+      checkin_time: crmIn,
+      checkout_time: crmOut,
+      crm_checkin_time: crmIn,
+      crm_checkout_time: crmOut,
+      _syntheticMachineOnly: !hasCrmShell,
+    };
+
+    byKey.set(key, mergeCrmAndMachineDay(cleanCrm, machineDay));
   }
   return [...byKey.values()];
 }
@@ -97,6 +141,54 @@ function buildRulesForUsers(globalRules, scheduleByUser, usernames) {
     );
   }
   return rulesByUsername;
+}
+
+/** Machine punches for selected user(s), not only codes seen on CRM rows in range. */
+function buildMachineEmpCodes({
+  rows,
+  usernameToMachineCode,
+  usernameAliases,
+  usernameParam,
+  activeEmployees,
+  idsByUser,
+  resolveCanon,
+  canonicalMaps,
+}) {
+  const codes = new Set();
+  for (const r of rows || []) {
+    const c = String(r.machine_code || "").trim();
+    if (c) codes.add(c);
+  }
+
+  const addCodeForCanonUser = (canon) => {
+    if (!canon) return;
+    const fromMap = usernameToMachineCode.get(canon);
+    if (fromMap) codes.add(fromMap);
+    const fromIds = idsByUser.get(canon)?.machine_code;
+    if (fromIds) codes.add(String(fromIds).trim());
+  };
+
+  if (usernameParam && usernameAliases.length) {
+    for (const alias of usernameAliases) {
+      const preCanon = resolveCanon(alias, canonicalMaps);
+      const ids = idsByUser.get(preCanon);
+      const canon = resolveCanon(alias, canonicalMaps, {
+        employee_id: ids?.employee_id,
+        machine_code: ids?.machine_code,
+      });
+      addCodeForCanonUser(canon);
+    }
+    return [...codes];
+  }
+
+  for (const r of activeEmployees || []) {
+    const c = String(r.machine_code || "").trim();
+    if (c) codes.add(c);
+  }
+  for (const code of usernameToMachineCode.values()) {
+    if (code) codes.add(String(code).trim());
+  }
+  return [...codes];
 }
 
 export async function GET(request) {
@@ -156,44 +248,86 @@ export async function GET(request) {
       ];
     }
 
+    // Collapse massive duplicate rows (same user+date repeated hundreds of times).
+    // Earliest check-in + latest check-out across duplicates; sample row for address/breaks.
     const userLogSql = usernameAliases.length
-      ? ` AND a.username IN (${usernameAliases.map(() => "?").join(", ")})`
+      ? ` AND username IN (${usernameAliases.map(() => "?").join(", ")})`
       : "";
     const logParams = [queryFrom, queryTo, ...usernameAliases];
 
     const logSql = `
       SELECT
-        a.date,
-        a.username,
-        COALESCE(a.employee_id, r.empId) AS employee_id,
-        COALESCE(NULLIF(TRIM(a.machine_code), ''), NULLIF(TRIM(r.machine_code), '')) AS machine_code,
-        a.admin_time_edit_remark,
-        a.checkin_time,
-        a.checkout_time,
-        a.break_morning_start,
-        a.break_morning_end,
-        a.break_lunch_start,
-        a.break_lunch_end,
-        a.break_evening_start,
-        a.break_evening_end,
-        a.checkin_address,
-        a.checkin_latitude,
-        a.checkin_longitude,
-        a.checkout_address,
-        a.checkout_latitude,
-        a.checkout_longitude,
-        (CASE
-           WHEN a.checkin_photo IS NOT NULL AND TRIM(a.checkin_photo) <> ''
-           THEN 1 ELSE 0
-         END) AS has_checkin_photo
-      FROM attendance_logs a
-      INNER JOIN rep_list r
-        ON a.username COLLATE utf8mb4_unicode_ci = r.username COLLATE utf8mb4_unicode_ci
-      WHERE r.status = 1
-        AND a.date >= ?
-        AND a.date < DATE_ADD(?, INTERVAL 1 DAY)
-        ${userLogSql}
-      ORDER BY a.date DESC`;
+        agg.day_date AS date,
+        agg.username,
+        COALESCE(sample.employee_id, r.empId) AS employee_id,
+        COALESCE(
+          NULLIF(TRIM(sample.machine_code), ''),
+          NULLIF(TRIM(r.machine_code), '')
+        ) AS machine_code,
+        sample.admin_time_edit_remark,
+        agg.checkin_time,
+        agg.checkout_time,
+        sample.break_morning_start,
+        sample.break_morning_end,
+        sample.break_lunch_start,
+        sample.break_lunch_end,
+        sample.break_evening_start,
+        sample.break_evening_end,
+        sample.checkin_address,
+        sample.checkin_latitude,
+        sample.checkin_longitude,
+        sample.checkout_address,
+        sample.checkout_latitude,
+        sample.checkout_longitude,
+        agg.has_checkin_photo
+      FROM (
+        SELECT
+          username,
+          DATE(date) AS day_date,
+          MIN(
+            CASE
+              WHEN checkin_time IS NOT NULL
+               AND TRIM(CAST(checkin_time AS CHAR)) <> ''
+               AND CAST(checkin_time AS CHAR) NOT LIKE '0000-00-00%'
+              THEN checkin_time
+            END
+          ) AS checkin_time,
+          MAX(
+            CASE
+              WHEN checkout_time IS NOT NULL
+               AND TRIM(CAST(checkout_time AS CHAR)) <> ''
+               AND CAST(checkout_time AS CHAR) NOT LIKE '0000-00-00%'
+              THEN checkout_time
+            END
+          ) AS checkout_time,
+          COALESCE(
+            MIN(
+              CASE
+                WHEN checkin_address IS NOT NULL
+                 AND TRIM(checkin_address) <> ''
+                 AND LOWER(TRIM(checkin_address)) <> 'machine'
+                THEN id
+              END
+            ),
+            MIN(id)
+          ) AS sample_id,
+          MAX(
+            CASE
+              WHEN checkin_photo IS NOT NULL AND TRIM(checkin_photo) <> ''
+              THEN 1 ELSE 0
+            END
+          ) AS has_checkin_photo
+        FROM attendance_logs
+        WHERE date >= ?
+          AND date < DATE_ADD(?, INTERVAL 1 DAY)
+          ${userLogSql}
+        GROUP BY username, DATE(date)
+      ) agg
+      INNER JOIN attendance_logs sample ON sample.id = agg.sample_id
+      LEFT JOIN rep_list r
+        ON agg.username COLLATE utf8mb4_unicode_ci = r.username COLLATE utf8mb4_unicode_ci
+       AND r.status = 1
+      ORDER BY agg.day_date DESC`;
 
     const leaveParams = [queryTo, queryFrom];
     let leaveUserSql = "";
@@ -234,8 +368,12 @@ export async function GET(request) {
 
     await ensureEmployeeAttendanceScheduleTable();
 
-    const { machineCodeToUsername, canonicalMaps, resolveCanonicalUsername: resolveCanon } =
-      await loadMachineCodeMaps(db);
+    const {
+      usernameToMachineCode,
+      machineCodeToUsername,
+      canonicalMaps,
+      resolveCanonicalUsername: resolveCanon,
+    } = await loadMachineCodeMaps(db);
 
     for (const row of rows) {
       applyCanonicalUsernameToRow(row, canonicalMaps);
@@ -271,21 +409,25 @@ export async function GET(request) {
 
     let mergedRows = rows;
     if (!skipMachine) {
-      const empCodesFromRows = [
-        ...new Set(
-          rows
-            .map((r) => String(r.machine_code || "").trim())
-            .filter(Boolean),
-        ),
-      ];
+      const empCodes = buildMachineEmpCodes({
+        rows,
+        usernameToMachineCode,
+        usernameAliases,
+        usernameParam,
+        activeEmployees,
+        idsByUser,
+        resolveCanon,
+        canonicalMaps,
+      });
+      const machineOpts = {
+        fromDate: queryFrom,
+        toDate: queryTo,
+      };
+      if (empCodes.length) machineOpts.empCodes = empCodes;
       const machineByUserDate = await loadMachineDailyByUsername(
         db,
         machineCodeToUsername,
-        {
-          fromDate: queryFrom,
-          toDate: queryTo,
-          empCodes: empCodesFromRows,
-        },
+        machineOpts,
       );
       mergedRows = dedupeMergedAttendanceRows(
         mergeAttendanceListWithMachine(rows, machineByUserDate),

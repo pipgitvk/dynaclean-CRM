@@ -16,13 +16,44 @@ import {
 } from "@/lib/attendanceAutoCheckoutConstants";
 export const MACHINE_ATTENDANCE_ADDRESS = "Machine";
 
-/** Raw check-in/out stored on attendance_logs (not merged display times). */
+function isMachineAttendanceAddressValue(address) {
+  return (
+    String(address || "").trim().toLowerCase() ===
+    MACHINE_ATTENDANCE_ADDRESS.toLowerCase()
+  );
+}
+
+/**
+ * Raw CRM app punches only (not merged display times).
+ * Prefers crm_* fields after a prior merge pass; ignores Machine-address punches
+ * that were written into attendance_logs from biometric sync.
+ */
 export function extractCrmPunchesFromAttendanceLogRow(crmRow) {
   if (!crmRow || crmRow._syntheticMachineOnly) {
     return { checkin: null, checkout: null };
   }
-  const checkin = crmRow.checkin_time ?? null;
-  const checkout = crmRow.checkout_time ?? null;
+
+  let checkin = crmRow.crm_checkin_time ?? null;
+  let checkout = crmRow.crm_checkout_time ?? null;
+
+  if (!isMeaningfulAttendancePunch(checkin)) {
+    const fromMachine =
+      isMachineAttendanceAddressValue(crmRow.checkin_address) ||
+      crmRow.merge_sources?.checkin === "machine";
+    if (!fromMachine) {
+      checkin = crmRow.checkin_time ?? null;
+    }
+  }
+
+  if (!isMeaningfulAttendancePunch(checkout)) {
+    const fromMachine =
+      isMachineAttendanceAddressValue(crmRow.checkout_address) ||
+      crmRow.merge_sources?.checkout === "machine";
+    if (!fromMachine) {
+      checkout = crmRow.checkout_time ?? null;
+    }
+  }
+
   return {
     checkin: isMeaningfulAttendancePunch(checkin) ? checkin : null,
     checkout: isMeaningfulAttendancePunch(checkout) ? checkout : null,
@@ -137,7 +168,8 @@ function compareInstants(a, b) {
   return da.getTime() - db.getTime();
 }
 
-function pickEarlierCheckin(crmVal, machineVal) {
+/** Display rule: earliest check-in wins (CRM vs machine). */
+export function pickEarlierCheckin(crmVal, machineVal) {
   const hasCrm = isMeaningfulAttendancePunch(crmVal);
   const hasMac = isMeaningfulAttendancePunch(machineVal);
   if (hasCrm && hasMac) {
@@ -151,7 +183,8 @@ function pickEarlierCheckin(crmVal, machineVal) {
   return { value: null, source: null };
 }
 
-function pickLaterCheckout(crmVal, machineVal) {
+/** Display rule: latest check-out wins (CRM vs machine). */
+export function pickLaterCheckout(crmVal, machineVal) {
   const hasCrm = isMeaningfulAttendancePunch(crmVal);
   const hasMac = isMeaningfulAttendancePunch(machineVal);
   if (hasCrm && hasMac) {
@@ -163,6 +196,34 @@ function pickLaterCheckout(crmVal, machineVal) {
   if (hasCrm) return { value: crmVal, source: "crm" };
   if (hasMac) return { value: machineVal, source: "machine" };
   return { value: null, source: null };
+}
+
+/** Rebuild a clean CRM base row before re-merging with machine (dedupe rematch). */
+export function buildCrmBaseRowForRematch(crmRow) {
+  if (!crmRow || crmRow._syntheticMachineOnly) {
+    return {
+      username: crmRow?.username,
+      date: crmRow?.date,
+      checkin_time: null,
+      checkout_time: null,
+      checkin_address: null,
+      checkout_address: null,
+      admin_time_edit_remark: null,
+      _syntheticMachineOnly: true,
+    };
+  }
+  const { checkin, checkout } = extractCrmPunchesFromAttendanceLogRow(crmRow);
+  return {
+    ...crmRow,
+    checkin_time: checkin,
+    checkout_time: checkout,
+    crm_checkin_time: checkin,
+    crm_checkout_time: checkout,
+    merge_sources: undefined,
+    attendance_sources_detail: undefined,
+    machine_day: undefined,
+    _syntheticMachineOnly: false,
+  };
 }
 
 /** Any real checkout on CRM or machine (including Automatic on CRM). */
@@ -260,11 +321,13 @@ export function mergeCrmAndMachineDay(crmRow, machineDay) {
   return merged;
 }
 
-/** SQL fragment: last non-AUTO afternoon punch strictly before 9 PM IST (ignores synthetic auto-9pm rows). */
+/**
+ * Last non-AUTO afternoon/evening punch of the day (ignores synthetic AUTO rows).
+ * Used for CRM↔machine merge: later checkout wins vs CRM.
+ */
 export const MACHINE_CHECKOUT_AGG_SQL = `
   MAX(CASE
     WHEN TIME(punch_datetime) >= '12:00:00'
-     AND punch_datetime < TIMESTAMP(DATE(punch_datetime), '21:00:00')
      AND UPPER(COALESCE(m_flag, '')) <> 'AUTO'
     THEN punch_datetime
   END)`;
@@ -509,18 +572,22 @@ export async function loadMachineDailyByUsername(conn, machineCodeToUsername, op
 export function mergeAttendanceListWithMachine(crmRows, machineByUserDate) {
   const seen = new Set();
   const merged = [];
+  const machineLookup = machineByUserDate || new Map();
 
   for (const row of crmRows || []) {
     const dateYmd = attendanceDateKey(row.date);
     const key = `${row.username}|${dateYmd}`;
     seen.add(key);
-    const machineDay = machineByUserDate.get(key) || null;
-    merged.push(mergeCrmAndMachineDay(row, machineDay));
+    const machineDay = machineLookup.get(key) || null;
+    // Always merge through the picker so earliest in / latest out is applied.
+    merged.push(mergeCrmAndMachineDay(buildCrmBaseRowForRematch(row), machineDay));
   }
 
-  for (const [key, machineDay] of machineByUserDate.entries()) {
+  for (const [key, machineDay] of machineLookup.entries()) {
     if (seen.has(key)) continue;
-    const [username, dateYmd] = key.split("|");
+    const pipe = key.indexOf("|");
+    const username = pipe >= 0 ? key.slice(0, pipe) : key;
+    const dateYmd = pipe >= 0 ? key.slice(pipe + 1) : "";
     const hasMachinePunch =
       isMeaningfulAttendancePunch(machineDay.machine_checkin) ||
       isMeaningfulAttendancePunch(machineDay.machine_checkout);

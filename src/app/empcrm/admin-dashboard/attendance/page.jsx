@@ -40,6 +40,7 @@ import {
   attendanceDateKey as attendanceDateYmd,
   leaveDateRangeKeys,
 } from "@/lib/leaveDateRange";
+import { normalizeUsernameKey } from "@/lib/attendanceCanonicalUsername";
 
 /** HH:mm for <input type="time"> from a DB datetime string. */
 function timeInputFromDbValue(value) {
@@ -233,8 +234,8 @@ const AttendancePage = () => {
   const [fromDate, setFromDate] = useState(initialRange.from);
   const [toDate, setToDate] = useState(initialRange.to);
   const [filterStatus, setFilterStatus] = useState("all");
-  const [selectedUser, setSelectedUser] = useState("");
-  /** Set only after clicking Search; drives summary + table */
+  const [selectedUser, setSelectedUser] = useState("all");
+  /** Drives summary + table: "all" or one username after a successful load */
   const [appliedUserSelection, setAppliedUserSelection] = useState(null);
   const [searchLoading, setSearchLoading] = useState(false);
   const [uniqueUsers, setUniqueUsers] = useState([]);
@@ -354,11 +355,12 @@ const AttendancePage = () => {
   ) => {
     const fromYmd = from || fromDate;
     const toYmdVal = to || toDate;
+    const userFilter = String(username || "").trim();
     try {
       const qs = new URLSearchParams();
       if (fromYmd) qs.set("from", fromYmd);
       if (toYmdVal) qs.set("to", toYmdVal);
-      if (username) qs.set("username", username);
+      if (userFilter && userFilter !== "all") qs.set("username", userFilter);
       if (!machine) qs.set("machine", "0");
       const response = await fetch(
         `/api/empcrm/attendance/fetch-all?${qs.toString()}`,
@@ -379,6 +381,9 @@ const AttendancePage = () => {
       setHolidays(data.holidays || []);
       setLeaves(data.leaves || []);
       setRulesByUsername(data.rulesByUsername || {});
+      if (Array.isArray(data.employees) && data.employees.length) {
+        setUniqueUsers(data.employees);
+      }
     } catch (err) {
       toast.error(err.message);
       setLogs([]);
@@ -388,40 +393,17 @@ const AttendancePage = () => {
     }
   };
 
-  const fetchEmployeeMeta = async () => {
-    setMetaLoading(true);
-    try {
-      const response = await fetch(
-        "/api/empcrm/attendance/fetch-all?meta=1",
-        { cache: "no-store" },
-      );
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || "Failed to load employees.");
-      }
-      const data = await response.json();
-      const users =
-        Array.isArray(data.employees) && data.employees.length
-          ? data.employees
-          : [];
-      setUniqueUsers(users);
-    } catch (err) {
-      toast.error(err.message);
-      setUniqueUsers([]);
-    } finally {
-      setMetaLoading(false);
-    }
-  };
-
   const loadAttendance = useCallback(
     async (username, from, to) => {
-      const user = String(username || "").trim();
-      if (!user) return;
+      const user = String(username || "all").trim() || "all";
       setSearchLoading(true);
-      setAppliedUserSelection(null);
       try {
         await fetchAttendance(
-          { from, to, username: user },
+          {
+            from,
+            to,
+            username: user === "all" ? "" : user,
+          },
           { machine: true },
         );
         setAppliedUserSelection(user);
@@ -429,31 +411,22 @@ const AttendancePage = () => {
         /* toast from fetchAttendance */
       } finally {
         setSearchLoading(false);
+        setMetaLoading(false);
       }
     },
     [fromDate, toDate],
   );
 
   const handleEmployeeChange = (e) => {
-    const user = e.target.value;
+    const user = e.target.value || "all";
     setSelectedUser(user);
-    if (!user) {
-      setAppliedUserSelection(null);
-      setLogs([]);
-      setHolidays([]);
-      setLeaves([]);
-      return;
-    }
-    const range = currentMonthRange();
-    skipDateReloadRef.current = 2;
-    setFromDate(range.from);
-    setToDate(range.to);
-    void loadAttendance(user, range.from, range.to);
+    // Keep current date range; reload full or single-user data immediately.
+    void loadAttendance(user, fromDate, toDate);
   };
 
   const scheduleReloadForDates = (from, to) => {
-    const user = String(selectedUser || "").trim();
-    if (!user || searchLoading || appliedUserSelection == null) return;
+    if (searchLoading || appliedUserSelection == null) return;
+    const user = String(selectedUser || "all").trim() || "all";
     clearTimeout(reloadDebounceRef.current);
     reloadDebounceRef.current = setTimeout(() => {
       void loadAttendance(user, from, to);
@@ -483,7 +456,10 @@ const AttendancePage = () => {
   }, []);
 
   useEffect(() => {
-    fetchEmployeeMeta();
+    const range = currentMonthRange();
+    void loadAttendance("all", range.from, range.to);
+    // Initial full-month load for all employees
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -562,11 +538,7 @@ const AttendancePage = () => {
   };
 
   const handleSearch = async () => {
-    const user = String(selectedUser || "").trim();
-    if (!user) {
-      toast.error("Please select an employee first.");
-      return;
-    }
+    const user = String(selectedUser || "all").trim() || "all";
     await loadAttendance(user, fromDate, toDate);
   };
 
@@ -895,20 +867,54 @@ const AttendancePage = () => {
     return allDates;
   };
 
-  // Generate the full attendance timeline based on the last Search (applied selection)
+  // Generate the full attendance timeline based on the last load (applied selection)
   let fullTimeline = [];
   if (appliedUserSelection == null) {
     fullTimeline = [];
+  } else if (appliedUserSelection === "all") {
+    const usersForTimeline =
+      uniqueUsers.length > 0
+        ? uniqueUsers
+        : [
+            ...new Set(
+              logs
+                .map((l) => String(l.username || "").trim())
+                .filter(Boolean),
+            ),
+          ];
+    fullTimeline = usersForTimeline
+      .flatMap((user) => {
+        const userLogs = logs.filter(
+          (log) =>
+            normalizeUsernameKey(log.username) === normalizeUsernameKey(user),
+        );
+        return generateAttendanceTimeline(userLogs, user);
+      })
+      .sort((a, b) => {
+        const dc = attendanceDateYmd(b.date).localeCompare(
+          attendanceDateYmd(a.date),
+        );
+        if (dc !== 0) return dc;
+        return String(a.username).localeCompare(String(b.username));
+      });
   } else {
-    const userLogs = logs.filter((log) => log.username === appliedUserSelection);
-    fullTimeline = generateAttendanceTimeline(userLogs, appliedUserSelection).reverse();
+    const userLogs = logs.filter(
+      (log) =>
+        normalizeUsernameKey(log.username) ===
+        normalizeUsernameKey(appliedUserSelection),
+    );
+    fullTimeline = generateAttendanceTimeline(
+      userLogs,
+      appliedUserSelection,
+    ).reverse();
   }
 
   const timelineLogKey = (log) =>
-    `${log.username}|${toYmd(new Date(log.date))}`;
+    `${log.username}|${attendanceDateYmd(log.date)}`;
 
   const inSelectedDateRange = (log) => {
-    const logYmd = toYmd(new Date(log.date));
+    const logYmd = attendanceDateYmd(log.date);
+    if (!logYmd) return false;
     if (fromDate && logYmd < fromDate) return false;
     if (toDate && logYmd > toDate) return false;
     return true;
@@ -1104,11 +1110,11 @@ const AttendancePage = () => {
                 disabled={metaLoading || searchLoading}
                 className="rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
               >
-                {metaLoading ? (
-                  <option value="">Loading employees…</option>
+                {metaLoading && uniqueUsers.length === 0 ? (
+                  <option value="all">Loading employees…</option>
                 ) : (
                   <>
-                    <option value="">— Select employee —</option>
+                    <option value="all">All Employees</option>
                     {uniqueUsers.map((user) => (
                       <option key={user} value={user}>
                         {user}
@@ -1140,10 +1146,8 @@ const AttendancePage = () => {
             </button>
             <AttendanceBulkImportPanel
               onComplete={() => {
-                const user = String(selectedUser || "").trim();
-                if (user) {
-                  void loadAttendance(user, fromDate, toDate);
-                }
+                const user = String(selectedUser || "all").trim() || "all";
+                void loadAttendance(user, fromDate, toDate);
               }}
             />
           </div>
@@ -1152,13 +1156,14 @@ const AttendancePage = () => {
             <div className="flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-slate-50/80 py-16 text-slate-600">
               <Loader2 className="h-12 w-12 animate-spin text-indigo-600" />
               <p className="mt-4 text-sm font-medium">Loading attendance…</p>
-              <p className="mt-1 text-xs text-slate-500">Preparing summary and records</p>
+              <p className="mt-1 text-xs text-slate-500">
+                CRM logs + machine punches for the selected range
+              </p>
             </div>
           ) : appliedUserSelection === null ? (
             <p className="rounded-xl border border-dashed border-slate-300 bg-slate-50 py-12 text-center text-sm text-slate-600">
-              Select an employee — current month loads automatically. Change{" "}
-              <span className="font-medium">From / To</span> dates to load that range
-              (one employee at a time).
+              Loading failed — click <span className="font-medium">Search</span> to
+              reload all employees for the selected dates.
             </p>
           ) : (
             <>
@@ -1398,7 +1403,7 @@ const AttendancePage = () => {
                         >
                           <span className="inline-flex items-center gap-0.5">
                             {formatTime(log.checkin_time)}
-                            <AttendanceSourceInfo log={log} />
+                            <AttendanceSourceInfo log={log} showOnlyIfMachine={false} />
                           </span>
                         </span>
                       </div>
@@ -1747,7 +1752,7 @@ const AttendancePage = () => {
                           >
                             <span className="inline-flex items-center gap-0.5">
                               {formatTime(log.checkin_time)}
-                              <AttendanceSourceInfo log={log} />
+                              <AttendanceSourceInfo log={log} showOnlyIfMachine={false} />
                             </span>
                           </td>
                           <td className="px-6 py-4 text-sm text-gray-500">

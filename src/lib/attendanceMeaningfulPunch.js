@@ -26,8 +26,21 @@ export function isMeaningfulAttendancePunch(value) {
 
 export function rowHasMeaningfulCheckinOrCheckout(row) {
   if (!row) return false;
-  return (
+  if (
     isMeaningfulAttendancePunch(row.checkin_time) ||
     isMeaningfulAttendancePunch(row.checkout_time)
+  ) {
+    return true;
+  }
+  if (
+    isMeaningfulAttendancePunch(row.crm_checkin_time) ||
+    isMeaningfulAttendancePunch(row.crm_checkout_time)
+  ) {
+    return true;
+  }
+  const md = row.machine_day;
+  return (
+    isMeaningfulAttendancePunch(md?.machine_checkin) ||
+    isMeaningfulAttendancePunch(md?.machine_checkout)
   );
 }
