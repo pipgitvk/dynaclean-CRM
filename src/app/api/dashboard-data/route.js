@@ -104,6 +104,8 @@ export async function GET(req) {
       FROM neworder
       WHERE created_at >= ?
         AND created_at <= ?
+        AND COALESCE(is_cancelled, 0) = 0
+        AND (approval_status IS NULL OR approval_status <> 'rejected')
     `.trim();
     const newOrdersParams = [startDate, endDate];
     if (selectedEmployee !== "all") {
