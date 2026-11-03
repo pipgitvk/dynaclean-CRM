@@ -3,8 +3,37 @@ import { getDbConnection } from "@/lib/db";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 import { sendTemplatedEmail } from "@/lib/template-utils";
-import { syncInstallationOrderStatusFromServiceReports } from "@/lib/syncInstalledOrdersFromServiceReports";
+import { syncInstallationOrderStatusForSerial } from "@/lib/syncInstalledOrdersFromServiceReports";
 import { v4 as uuidv4 } from "uuid";
+
+export const maxDuration = 120;
+
+async function sendCompletionEmailInBackground({
+  serviceId,
+  completionRemark,
+  completedDate,
+  customerData,
+}) {
+  if (!customerData?.email && !customerData?.site_email) return;
+
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+  const feedbackLink = `${baseUrl}/feedback/${serviceId}`;
+  const templateData = {
+    service_id: serviceId,
+    serial_number: customerData.serial_number,
+    location: customerData.installed_address,
+    installed_address: customerData.installed_address,
+    completion_remark: completionRemark,
+    completed_date: completedDate,
+    feedback_link: feedbackLink,
+    current_year: new Date().getFullYear(),
+  };
+
+  await sendTemplatedEmail("SERVICE_COMPLETION", templateData, {
+    to: [customerData.email, customerData.site_email].filter(Boolean).join(","),
+    cc: "service@dynacleanindustries.com",
+  });
+}
 
 // Helper to save base64 signature
 const saveSignature = async (dataUrl, serviceId, type) => {
@@ -33,13 +62,6 @@ const saveSignature = async (dataUrl, serviceId, type) => {
 export async function POST(request, context) {
   const { params } = await context;
   const serviceId = (await params).service_id;
-  console.log(`📥 [POST] Start | Service ID: ${serviceId}`);
-
-  console.log("----------------------------------------------------------------------------------------------------------------------------------------------");
-  console.log("----------------------------------------------------------------------------------------------------------------------------------------------");
-  console.log("----------------------------------------------------------------------------------------------------------------------------------------------");
-
-
   if (!serviceId) {
     console.error("❌ [POST] Missing service ID");
     return NextResponse.json(
@@ -127,8 +149,6 @@ export async function POST(request, context) {
       engineer_remarks: formData.get("engineer_remarks"),
       trainees: formData.get("trainees"),
     };
-    console.log("🧾 Report Fields:", reportFields);
-
     // === Save files
     const uploadDir = path.join(process.cwd(), "public", "completion_files");
     await mkdir(uploadDir, { recursive: true });
@@ -348,56 +368,6 @@ export async function POST(request, context) {
       console.log("✅ service_records (status/images) updated | Affected Rows:", recordUpdate.affectedRows);
     }
 
-    // === UPDATE neworder.installation_status if all serials installed
-    try {
-      // 1. Fetch all completed installation service_records
-      const [completedServices] = await conn.execute(`
-    SELECT serial_number
-    FROM service_records
-    WHERE service_type = 'INSTALLATION' AND status = 'COMPLETED'
-  `);
-      const completedSerialsSet = new Set(completedServices.map(s => s.serial_number));
-
-      if (completedSerialsSet.size === 0) {
-        console.log("⚠️ No completed installation service records found");
-      } else {
-        // 2. Fetch all dispatch rows with quote_number and serial_no
-        const [dispatchRows] = await conn.execute(`
-      SELECT serial_no, quote_number
-      FROM dispatch
-    `);
-
-        // 3. Group dispatch rows by quote_number
-        const quoteToSerials = {};
-        dispatchRows.forEach(row => {
-          if (!quoteToSerials[row.quote_number]) quoteToSerials[row.quote_number] = [];
-          quoteToSerials[row.quote_number].push(row.serial_no);
-        });
-
-        // 4. Check which quote_numbers have all serial_no completed
-        const quotesToUpdate = [];
-        for (const [quote, serials] of Object.entries(quoteToSerials)) {
-          const allCompleted = serials.every(s => completedSerialsSet.has(s));
-          if (allCompleted) quotesToUpdate.push(quote);
-        }
-
-        console.log("✅ Quotes eligible for installation_status update:", quotesToUpdate);
-
-        // 5. Bulk update neworder.installation_status = 1
-        if (quotesToUpdate.length > 0) {
-          await conn.execute(
-            `UPDATE neworder SET installation_status = 1 WHERE quote_number IN (${quotesToUpdate.map(() => "?").join(",")})`,
-            quotesToUpdate
-          );
-          console.log("✅ Installation status updated for eligible quotes");
-        } else {
-          console.log("ℹ️ No quote_numbers met criteria for update");
-        }
-      }
-    } catch (err) {
-      console.error("❌ Error updating neworder installation_status:", err);
-    }
-
     // === Update warranty_products with location data (if provided)
     if (latitude && longitude) {
       console.log("📍 Updating warranty_products with location data...");
@@ -510,69 +480,49 @@ export async function POST(request, context) {
       }
     }
 
-    // === Email on completion
+    let completionEmailPayload = null;
+    let serialForInstallSync = null;
+
     if (status === "COMPLETED") {
-      try {
-        console.log("📧 Preparing completion email...");
-
-        const [[customerData]] = await conn.execute(
-          `SELECT T1.serial_number, T2.email, T2.installed_address,T2.site_email,T2.site_contact,T2.site_person
-           FROM service_records T1
-           LEFT JOIN warranty_products T2 
-             ON T1.serial_number COLLATE utf8mb4_unicode_ci = T2.serial_number COLLATE utf8mb4_unicode_ci
-           WHERE T1.service_id = ?`,
-          [serviceId]
-        );
-
-        console.log("📨 Customer data for email:", customerData);
-
-        if (customerData?.email || customerData?.site_email) {
-          const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-          const feedbackLink = `${baseUrl}/feedback/${serviceId}`;
-
-          const templateData = {
-            service_id: serviceId,
-            serial_number: customerData.serial_number,
-            location: customerData.installed_address,
-            installed_address: customerData.installed_address,
-            completion_remark: completionRemark,
-            completed_date: completedDate,
-            feedback_link: feedbackLink,
-            current_year: new Date().getFullYear(),
-          };
-
-          await sendTemplatedEmail(
-            "SERVICE_COMPLETION",
-            templateData,
-            {
-              to: [customerData.email, customerData.site_email]
-                .filter(Boolean)
-                .join(","),
-              cc: "service@dynacleanindustries.com",
-            }
-          );
-
-          console.log("✅ Completion email sent");
-        } else {
-          console.log("⚠️ No customer email found, skipping email");
-        }
-      } catch (emailErr) {
-        console.error("⚠️ Completion email failed (non-fatal):", emailErr);
+      const [[completedRow]] = await conn.execute(
+        `SELECT T1.serial_number, T2.email, T2.installed_address, T2.site_email
+         FROM service_records T1
+         LEFT JOIN warranty_products T2
+           ON T1.serial_number COLLATE utf8mb4_unicode_ci = T2.serial_number COLLATE utf8mb4_unicode_ci
+         WHERE T1.service_id = ?`,
+        [serviceId]
+      );
+      serialForInstallSync = completedRow?.serial_number;
+      if (completedRow?.email || completedRow?.site_email) {
+        completionEmailPayload = {
+          serviceId,
+          completionRemark,
+          completedDate,
+          customerData: completedRow,
+        };
       }
     }
 
-    if (status === "COMPLETED" && conn) {
+    if (status === "COMPLETED" && serialForInstallSync) {
       try {
-        await syncInstallationOrderStatusFromServiceReports(conn);
+        await syncInstallationOrderStatusForSerial(conn, serialForInstallSync);
       } catch (syncErr) {
         console.error("installation order sync skipped:", syncErr?.message || syncErr);
       }
     }
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       status: "success",
       message: "Service data saved successfully",
     });
+
+    if (completionEmailPayload) {
+      void sendCompletionEmailInBackground(completionEmailPayload).catch((emailErr) =>
+        console.error("Completion email failed (background):", emailErr?.message || emailErr)
+      );
+    }
+
+    return response;
   } catch (error) {
     console.error("❌ Caught Error:", error);
     return NextResponse.json(

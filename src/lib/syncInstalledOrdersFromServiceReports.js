@@ -1,4 +1,7 @@
-import { sqlTrimUtf8EqColumns } from "@/lib/sqlUtf8Compare";
+import {
+  sqlTrimUtf8Eq,
+  sqlTrimUtf8EqColumns,
+} from "@/lib/sqlUtf8Compare";
 
 const INSTALLATION_COMPLETED_WITH_REPORT_SQL = `
   SELECT DISTINCT d.quote_number AS quote_number
@@ -66,4 +69,65 @@ export async function syncInstallationOrderStatusFromServiceReports(db) {
 /** Fast path for list page: mark newly completed only (skip expensive reopen). */
 export async function syncInstallationOrderStatusMarkOnly(db) {
   return syncInstalledOrdersFromCompletedInstallationReports(db);
+}
+
+/**
+ * After one installation completes, update only quotes that include this serial
+ * (avoids loading all dispatch + all completed installations on every save).
+ */
+export async function syncInstallationOrderStatusForSerial(db, serialNumber) {
+  const sn = serialNumber != null ? String(serialNumber).trim() : "";
+  if (!sn) return { marked: 0 };
+
+  const serialOnDispatch = sqlTrimUtf8Eq("d.serial_no", "?");
+  const [quoteRows] = await db.execute(
+    `SELECT DISTINCT TRIM(CONVERT(d.quote_number USING utf8mb4)) AS quote_number
+     FROM dispatch d
+     WHERE d.serial_no IS NOT NULL
+       AND TRIM(d.serial_no) <> ''
+       AND ${serialOnDispatch}`,
+    [sn]
+  );
+
+  let marked = 0;
+  const quoteEq = sqlTrimUtf8EqColumns("d.quote_number", "?");
+  const serialEq = sqlTrimUtf8EqColumns("sr.serial_number", "d.serial_no");
+
+  for (const row of quoteRows) {
+    const q = row.quote_number;
+    if (!q) continue;
+
+    const [pending] = await db.execute(
+      `SELECT 1
+       FROM dispatch d
+       WHERE ${quoteEq}
+         AND d.serial_no IS NOT NULL
+         AND TRIM(d.serial_no) <> ''
+         AND NOT EXISTS (
+           SELECT 1
+           FROM service_records sr
+           INNER JOIN service_reports srep ON srep.service_id = sr.service_id
+           WHERE ${serialEq}
+             AND UPPER(TRIM(sr.service_type)) = 'INSTALLATION'
+             AND UPPER(TRIM(sr.status)) = 'COMPLETED'
+           LIMIT 1
+         )
+       LIMIT 1`,
+      [q]
+    );
+
+    if (pending.length > 0) continue;
+
+    const orderQuoteEq = sqlTrimUtf8Eq("no.quote_number", "?");
+    const [result] = await db.execute(
+      `UPDATE neworder no
+       SET no.installation_status = 1
+       WHERE ${orderQuoteEq}
+         AND no.installation_status = 0`,
+      [q]
+    );
+    marked += result?.affectedRows ?? 0;
+  }
+
+  return { marked };
 }
