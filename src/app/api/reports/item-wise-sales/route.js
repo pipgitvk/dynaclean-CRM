@@ -14,10 +14,10 @@ export async function POST(req) {
         const params = [];
 
         if (from && to) {
-            dateFilter = "AND n.invoice_date BETWEEN ? AND ?";
+            dateFilter = "AND DATE(n.created_at) BETWEEN ? AND ?";
             params.push(from, to);
         } else if (from) {
-            dateFilter = "AND n.invoice_date >= ?";
+            dateFilter = "AND DATE(n.created_at) >= ?";
             params.push(from);
         }
 
@@ -32,7 +32,7 @@ export async function POST(req) {
       SELECT
         c.customer_id AS customer_id,
         c.lead_source AS lead_source,
-        n.invoice_date AS order_date,
+        n.created_at AS order_date,
         c.first_name AS customer_name,
         c.company AS company_name,
         n.created_by AS employee_name,
@@ -73,7 +73,7 @@ export async function POST(req) {
       WHERE n.invoice_number IS NOT NULL AND n.invoice_number != ''
       ${dateFilter}
       ${employeeFilter}
-      ORDER BY n.invoice_date DESC
+      ORDER BY n.created_at DESC
     `;
 
         const conn = await getDbConnection();

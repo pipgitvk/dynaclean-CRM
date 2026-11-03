@@ -12,10 +12,10 @@ export async function GET(req) {
     const params = [];
 
     if (from && to) {
-      dateFilter = "AND n.invoice_date BETWEEN ? AND ?";
+      dateFilter = "AND DATE(n.created_at) BETWEEN ? AND ?";
       params.push(from, to);
     } else if (from) {
-      dateFilter = "AND n.invoice_date >= ?";
+      dateFilter = "AND DATE(n.created_at) >= ?";
       params.push(from);
     }
 
