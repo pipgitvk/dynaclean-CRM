@@ -37,6 +37,20 @@ import {
 } from "chart.js";
 import toast from "react-hot-toast";
 import TopAchieversCard from "@/components/stats/TopAchieversCard";
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
+
+const formatLocalDate = (date) => {
+    const pad = (value) => String(value).padStart(2, "0");
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+};
+
+const currentMonthRange = () => {
+    const today = new Date();
+    return {
+        dateFrom: formatLocalDate(new Date(today.getFullYear(), today.getMonth(), 1)),
+        dateTo: formatLocalDate(today),
+    };
+};
 
 // Register ChartJS components
 ChartJS.register(
@@ -57,6 +71,10 @@ export default function AdminStatsDashboard() {
     const [stats, setStats] = useState(null);
     const [loading, setLoading] = useState(true);
     const [timeRange, setTimeRange] = useState("thisMonth");
+    const initialDateRange = currentMonthRange();
+    const [dateFrom, setDateFrom] = useState(initialDateRange.dateFrom);
+    const [dateTo, setDateTo] = useState(initialDateRange.dateTo);
+    const [appliedDateRange, setAppliedDateRange] = useState(initialDateRange);
     const [topOrdersModalOpen, setTopOrdersModalOpen] = useState(false);
     const [topOrders, setTopOrders] = useState([]);
     const [topOrdersLoading, setTopOrdersLoading] = useState(false);
@@ -82,12 +100,35 @@ export default function AdminStatsDashboard() {
         fetchDashboardStats();
         fetchTotalAchievedAmount();
         fetchOrdersTotalAmount();
-    }, [timeRange]);
+    }, [timeRange, appliedDateRange]);
+
+    const dashboardQuery = () => {
+        const params = new URLSearchParams({ timeRange });
+        if (timeRange === "custom") {
+            params.set("dateFrom", appliedDateRange.dateFrom);
+            params.set("dateTo", appliedDateRange.dateTo);
+        }
+        return params.toString();
+    };
+
+    const applyCustomDateRange = () => {
+        if (!dateFrom || !dateTo) {
+            toast.error("Please select both From and To dates");
+            return;
+        }
+        const normalized = dateFrom <= dateTo
+            ? { dateFrom, dateTo }
+            : { dateFrom: dateTo, dateTo: dateFrom };
+        setDateFrom(normalized.dateFrom);
+        setDateTo(normalized.dateTo);
+        setAppliedDateRange(normalized);
+        setTimeRange("custom");
+    };
 
     const fetchDashboardStats = async () => {
         setLoading(true);
         try {
-            const response = await fetch(`/api/admin-dashboard-stats?timeRange=${timeRange}`);
+            const response = await fetch(`/api/admin-dashboard-stats?${dashboardQuery()}`);
             const data = await response.json();
 
             if (data.success) {
@@ -124,6 +165,19 @@ export default function AdminStatsDashboard() {
 
     const fetchOrdersTotalAmount = async () => {
         try {
+            if (timeRange === "custom") {
+                const response = await fetch(
+                    `/api/admin-dashboard-stats/orders-total?dateFrom=${appliedDateRange.dateFrom}&dateTo=${appliedDateRange.dateTo}`
+                );
+                const data = await response.json();
+                if (data.success && data.data) {
+                    setOrdersTotalAmount(data.data.total_amount);
+                    setOrdersTaxableAmount(data.data.taxable_amount || 0);
+                    setOrdersTotalCount(data.data.total_orders || 0);
+                }
+                return;
+            }
+
             // Calculate date range based on timeRange (same as OrderTable default)
             const now = new Date();
             let dateFrom, dateTo;
@@ -170,7 +224,7 @@ export default function AdminStatsDashboard() {
         setSelectedSalespersonTotal(0);
         try {
             const res = await fetch(
-                `/api/admin-dashboard-stats/salesperson-quotations?salesperson=${encodeURIComponent(salesperson)}&timeRange=${timeRange}`
+                `/api/admin-dashboard-stats/salesperson-quotations?salesperson=${encodeURIComponent(salesperson)}&${dashboardQuery()}`
             );
             const data = await res.json();
             if (data.success) {
@@ -194,7 +248,7 @@ export default function AdminStatsDashboard() {
     const fetchTopOrders = async () => {
         setTopOrdersLoading(true);
         try {
-            const res = await fetch(`/api/admin-dashboard-stats/top-orders?timeRange=${timeRange}`);
+            const res = await fetch(`/api/admin-dashboard-stats/top-orders?${dashboardQuery()}`);
             const data = await res.json();
             if (data.success) setTopOrders(data.data || []);
             else toast.error(data.error || "Failed to load top orders");
@@ -223,6 +277,15 @@ export default function AdminStatsDashboard() {
     };
 
     const getOrderPageUrl = (status) => {
+        if (timeRange === "custom") {
+            const params = new URLSearchParams({
+                status,
+                dateFrom: appliedDateRange.dateFrom,
+                dateTo: appliedDateRange.dateTo,
+            });
+            return `/admin-dashboard/order?${params.toString()}`;
+        }
+
         const now = new Date();
         let dateFrom;
         let dateTo;
@@ -432,7 +495,7 @@ export default function AdminStatsDashboard() {
                     </div>
 
                     {/* Time Range Selector */}
-                    <div className="flex items-center gap-2 bg-white rounded-lg shadow-md p-1">
+                    <div className="flex flex-wrap items-center gap-2 bg-white rounded-lg shadow-md p-2">
                         {[
                             { label: "Today", value: "today" },
                             { label: "This Week", value: "thisWeek" },
@@ -450,6 +513,31 @@ export default function AdminStatsDashboard() {
                                 {option.label}
                             </button>
                         ))}
+                        <div className="hidden xl:block h-8 w-px bg-gray-200" />
+                        <div className="flex items-center gap-2">
+                            <TypeableDateFilterInput
+                                value={dateFrom}
+                                onChange={setDateFrom}
+                                className="w-36 rounded-md border border-gray-300 px-2 py-2 text-sm"
+                            />
+                            <span className="text-sm text-gray-500">to</span>
+                            <TypeableDateFilterInput
+                                value={dateTo}
+                                onChange={setDateTo}
+                                className="w-36 rounded-md border border-gray-300 px-2 py-2 text-sm"
+                            />
+                            <button
+                                type="button"
+                                onClick={applyCustomDateRange}
+                                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                                    timeRange === "custom"
+                                        ? "bg-blue-600 text-white shadow-md"
+                                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                                }`}
+                            >
+                                Apply
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>

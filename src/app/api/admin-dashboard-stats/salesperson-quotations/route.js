@@ -8,6 +8,8 @@ export async function GET(request) {
   try {
     const salesperson = searchParams.get("salesperson");
     const timeRange = searchParams.get("timeRange") || "thisMonth";
+    const customDateFrom = searchParams.get("dateFrom");
+    const customDateTo = searchParams.get("dateTo");
 
     if (!salesperson) {
       return NextResponse.json({ success: false, error: "Salesperson required" }, { status: 400 });
@@ -17,7 +19,14 @@ export async function GET(request) {
     const today = new Date();
     let startDate, endDate;
 
-    switch (timeRange) {
+    if (
+      timeRange === "custom" &&
+      /^\d{4}-\d{2}-\d{2}$/.test(customDateFrom || "") &&
+      /^\d{4}-\d{2}-\d{2}$/.test(customDateTo || "")
+    ) {
+      startDate = customDateFrom;
+      endDate = customDateTo;
+    } else switch (timeRange) {
       case "today":
         startDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
         endDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
@@ -39,8 +48,8 @@ export async function GET(request) {
 
     const pad = (n) => String(n).padStart(2, "0");
     const fmt = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-    const dateFrom = fmt(startDate);
-    const dateTo = fmt(endDate);
+    const dateFrom = typeof startDate === "string" ? startDate : fmt(startDate);
+    const dateTo = typeof endDate === "string" ? endDate : fmt(endDate);
 
     // EXACT same JOIN structure as TopAchievers API
     // quotations_records → neworder → quotation_items

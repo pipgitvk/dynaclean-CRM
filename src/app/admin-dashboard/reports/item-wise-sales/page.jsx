@@ -1,7 +1,7 @@
 "use client";
 
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import dayjs from "dayjs";
 import {
   getOrderTableDefaultDateFrom,
@@ -19,6 +19,7 @@ export default function ItemWiseSalesPage() {
   const [employee, setEmployee] = useState("");
   const [employeeOptions, setEmployeeOptions] = useState([]);
   const [data, setData] = useState([]);
+  const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -75,13 +76,28 @@ export default function ItemWiseSalesPage() {
     fetchData();
   };
 
-  const totalWithoutGst = data.reduce(
+  const filteredData = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return data;
+
+    return data.filter((row) => {
+      const searchableValues = [
+        ...Object.values(row),
+        row.order_date ? dayjs(row.order_date).format("DD-MM-YYYY") : "",
+      ];
+      return searchableValues.some((value) =>
+        String(value ?? "").toLowerCase().includes(query),
+      );
+    });
+  }, [data, searchQuery]);
+
+  const totalWithoutGst = filteredData.reduce(
     (acc, curr) => acc + (parseFloat(curr.amount_without_gst) || 0),
     0,
   );
-  const totalSale = data.reduce((acc, curr) => acc + (parseFloat(curr.total_sale_amount) || 0), 0);
-  const totalProfit = data.reduce((acc, curr) => acc + (parseFloat(curr.profit_loss) || 0), 0);
-  const totalQty = data.reduce((acc, curr) => acc + (parseInt(curr.qty, 10) || 0), 0);
+  const totalSale = filteredData.reduce((acc, curr) => acc + (parseFloat(curr.total_sale_amount) || 0), 0);
+  const totalProfit = filteredData.reduce((acc, curr) => acc + (parseFloat(curr.profit_loss) || 0), 0);
+  const totalQty = filteredData.reduce((acc, curr) => acc + (parseInt(curr.qty, 10) || 0), 0);
   const profitMargin = totalSale > 0 ? (totalProfit / totalSale) * 100 : 0;
 
   return (
@@ -149,6 +165,16 @@ export default function ItemWiseSalesPage() {
             ))}
           </select>
         </div>
+        <div className="flex-1 min-w-[220px]">
+          <label className="text-sm font-medium block mb-2 text-gray-700">Search</label>
+          <input
+            type="search"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search any field..."
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
+          />
+        </div>
         <button
           type="submit"
           className="bg-blue-600 text-white px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm"
@@ -201,8 +227,8 @@ export default function ItemWiseSalesPage() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {data.length > 0 ? (
-                    data.map((row, index) => (
+                  {filteredData.length > 0 ? (
+                    filteredData.map((row, index) => (
                       <tr key={index} className="hover:bg-gray-50 transition-colors">
                         <td className="px-3 py-3 whitespace-nowrap text-gray-900">
                           {row.customer_id != null ? row.customer_id : "—"}
@@ -272,8 +298,8 @@ export default function ItemWiseSalesPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {data.length > 0 ? (
-                    data.map((row, index) => (
+                  {filteredData.length > 0 ? (
+                    filteredData.map((row, index) => (
                       <tr key={index}>
                         <td className="px-2 py-2 align-top whitespace-nowrap">
                           {row.order_date ? dayjs(row.order_date).format("DD-MM-YYYY") : "—"}
@@ -309,8 +335,8 @@ export default function ItemWiseSalesPage() {
           </div>
 
           <div className="sm:hidden space-y-4">
-            {data.length > 0 ? (
-              data.map((row, index) => (
+            {filteredData.length > 0 ? (
+              filteredData.map((row, index) => (
                 <div key={index} className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 space-y-3">
                   <div className="flex justify-between gap-2">
                     <span className="text-xs text-gray-500">

@@ -17,10 +17,19 @@ export async function GET(req) {
     }
 
     const timeRange = searchParams.get("timeRange") || "thisMonth";
+    const customDateFrom = searchParams.get("dateFrom");
+    const customDateTo = searchParams.get("dateTo");
     let startDate, endDate;
     const today = new Date();
 
-    switch (timeRange) {
+    if (
+      timeRange === "custom" &&
+      /^\d{4}-\d{2}-\d{2}$/.test(customDateFrom || "") &&
+      /^\d{4}-\d{2}-\d{2}$/.test(customDateTo || "")
+    ) {
+      startDate = customDateFrom;
+      endDate = customDateTo;
+    } else switch (timeRange) {
       case "today": {
         startDate = new Date(today);
         startDate.setHours(0, 0, 0, 0);
@@ -48,8 +57,12 @@ export async function GET(req) {
         break;
     }
 
-    const startDateStr = startDate.toISOString().slice(0, 10);
-    const endDateStr = endDate.toISOString().slice(0, 10);
+    const startDateStr = typeof startDate === "string"
+      ? startDate
+      : startDate.toISOString().slice(0, 10);
+    const endDateStr = typeof endDate === "string"
+      ? endDate
+      : endDate.toISOString().slice(0, 10);
 
     const [rows] = await conn.execute(
       `SELECT 

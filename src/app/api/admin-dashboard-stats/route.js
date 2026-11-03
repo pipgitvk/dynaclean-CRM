@@ -25,10 +25,19 @@ export async function GET(req) {
 
     // Get date range from query params or default to current month
     const timeRange = searchParams.get("timeRange") || "thisMonth";
+    const customDateFrom = searchParams.get("dateFrom");
+    const customDateTo = searchParams.get("dateTo");
     let startDate, endDate;
     const today = new Date();
 
-    switch (timeRange) {
+    if (
+      timeRange === "custom" &&
+      /^\d{4}-\d{2}-\d{2}$/.test(customDateFrom || "") &&
+      /^\d{4}-\d{2}-\d{2}$/.test(customDateTo || "")
+    ) {
+      startDate = customDateFrom;
+      endDate = customDateTo;
+    } else switch (timeRange) {
       case "today":
         startDate = new Date(today.setHours(0, 0, 0, 0));
         endDate = new Date(today.setHours(23, 59, 59, 999));
@@ -49,8 +58,12 @@ export async function GET(req) {
         break;
     }
 
-    const startDateStr = startDate.toISOString().slice(0, 10);
-    const endDateStr = endDate.toISOString().slice(0, 10);
+    const startDateStr = typeof startDate === "string"
+      ? startDate
+      : startDate.toISOString().slice(0, 10);
+    const endDateStr = typeof endDate === "string"
+      ? endDate
+      : endDate.toISOString().slice(0, 10);
 
     // ===== 1. SALES STATISTICS =====
     const [salesStats] = await conn.execute(`
