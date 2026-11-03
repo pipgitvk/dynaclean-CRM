@@ -8,14 +8,16 @@ import dayjs from "dayjs";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminTLFollowupPage({ params }) {
+export default async function AdminTLFollowupPage({ params, searchParams }) {
   const payload = await getSessionPayload();
   if (!payload) {
     redirect("/login");
   }
 
   const paramsResolved = await params;
+  const searchParamsResolved = await searchParams;
   const { customerId } = paramsResolved;
+  const editId = searchParamsResolved?.editId;
   const conn = await getDbConnection();
 
   // Ensure model column exists in TL_followups (auto-migration)
@@ -72,6 +74,20 @@ export default async function AdminTLFollowupPage({ params }) {
   );
 
   const latestTLFollowup = tlFollowups[0] || null;
+  let editFollowup = null;
+
+  if (
+    editId &&
+    String(payload.role || "").trim().toUpperCase() === "SUPERADMIN"
+  ) {
+    const [editRows] = await conn.execute(
+      `SELECT * FROM TL_followups
+       WHERE id = ? AND customer_id = ? AND LOWER(TRIM(followed_by)) = LOWER(TRIM(?))
+       LIMIT 1`,
+      [editId, customerId, payload.username],
+    );
+    editFollowup = editRows[0] || null;
+  }
 
   return (
     <TLFollowupClient 
@@ -79,6 +95,7 @@ export default async function AdminTLFollowupPage({ params }) {
       customer={customer}
       latestEmpFollowupTimeStampStr={latestEmpFollowupTimeStampStr}
       latestTLFollowup={latestTLFollowup}
+      editFollowup={editFollowup}
     />
   );
 }

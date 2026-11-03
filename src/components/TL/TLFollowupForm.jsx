@@ -14,6 +14,7 @@ export default function TLFollowupForm({
   customerId,
   customerData,
   latestfollowup,
+  editFollowup = null,
   isAdmin = false,
   currentStage = "New",
 }) {
@@ -104,11 +105,12 @@ export default function TLFollowupForm({
 
   // add alredy filled data of latest followup
   useEffect(() => {
-    if (!latestfollowup) return;
+    const sourceFollowup = editFollowup || latestfollowup;
+    if (!sourceFollowup) return;
 
     const allowed = new Set(getTlTagOptions());
-    const parsedTags = latestfollowup.multi_tag
-      ? latestfollowup.multi_tag
+    const parsedTags = sourceFollowup.multi_tag
+      ? sourceFollowup.multi_tag
           .split(",")
           .map((t) => t.trim())
           .filter(Boolean)
@@ -119,35 +121,43 @@ export default function TLFollowupForm({
 
     // Parse model field - if it's a comma-separated string, convert to array
     let modelArray = [];
-    if (latestfollowup.model) {
-      if (typeof latestfollowup.model === 'string') {
-        modelArray = latestfollowup.model
+    if (sourceFollowup.model) {
+      if (typeof sourceFollowup.model === 'string') {
+        modelArray = sourceFollowup.model
           .split(",")
           .map((m) => m.trim())
           .filter(Boolean);
-      } else if (Array.isArray(latestfollowup.model)) {
-        modelArray = latestfollowup.model;
+      } else if (Array.isArray(sourceFollowup.model)) {
+        modelArray = sourceFollowup.model;
       }
     }
 
     setFormData((prev) => ({
       ...prev,
-      // estimated_order_date: latestfollowup.estimated_order_date || "",
-      lead_quality_score: latestfollowup.lead_quality_score || "",
+      estimated_order_date:
+        editFollowup && sourceFollowup.estimated_order_date
+          ? formatISTDateTime(new Date(sourceFollowup.estimated_order_date))
+          : prev.estimated_order_date,
+      lead_quality_score: sourceFollowup.lead_quality_score || "",
       model: modelArray,
-      status: latestfollowup.status || "",
-      notes: latestfollowup.notes || "",
-      // next_followup_date is intentionally NOT carried over from previous followup.
-      // It must be explicitly set by the user in each new followup entry.
-      next_followup_date: "",
-      stage: latestfollowup.stage || prev.stage,
+      status: sourceFollowup.status || "",
+      notes: sourceFollowup.notes || "",
+      followed_date:
+        editFollowup && sourceFollowup.followed_date
+          ? formatISTDateTime(new Date(sourceFollowup.followed_date))
+          : prev.followed_date,
+      next_followup_date:
+        editFollowup && sourceFollowup.next_followup_date
+          ? formatISTDateTime(new Date(sourceFollowup.next_followup_date))
+          : "",
+      stage: sourceFollowup.stage || prev.stage,
       multi_tag,
       assigned_employee:
-        latestfollowup.assigned_employee || prev.assigned_employee,
+        sourceFollowup.assigned_employee || prev.assigned_employee,
     }));
     setSelectedModels(modelArray);
     setModelSearchInput("");
-  }, [latestfollowup]);
+  }, [latestfollowup, editFollowup]);
 
   const availableStages = stageOptions;
 
@@ -242,9 +252,10 @@ export default function TLFollowupForm({
 
     try {
       const response = await fetch("/api/tl-followup", {
-        method: "POST",
+        method: editFollowup ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          ...(editFollowup ? { id: editFollowup.id } : {}),
           customer_id: customerId,
           ...formData,
           model: formData.model.join(", "), // Convert model array to comma-separated string
@@ -257,7 +268,7 @@ export default function TLFollowupForm({
       if (data.success) {
         // Navigate based on admin or user context
         const basePath = isAdmin ? "/admin-dashboard" : "/user-dashboard";
-        router.push(`${basePath}/tl-customers/${customerId}`);
+        router.push(`${basePath}/tl-customers/${customerId}${editFollowup ? "?tlOnly=true" : ""}`);
         router.refresh();
       } else {
         setError(data.error || "Failed to add TL follow-up");
@@ -278,7 +289,9 @@ export default function TLFollowupForm({
   return (
     <div className="bg-white rounded-lg p-6 shadow-md">
       <div className="flex justify-between items-center mb-6">
-        <h3 className="text-2xl font-semibold text-gray-800">TL Follow-up</h3>
+        <h3 className="text-2xl font-semibold text-gray-800">
+          {editFollowup ? "Edit TL Follow-up" : "TL Follow-up"}
+        </h3>
         <button
           onClick={handleCancel}
           className="text-gray-500 hover:text-gray-700"
@@ -567,7 +580,7 @@ export default function TLFollowupForm({
             className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:bg-blue-300"
           >
             <Save size={18} />
-            {loading ? "Saving..." : "Save Follow-up"}
+            {loading ? "Saving..." : editFollowup ? "Update Follow-up" : "Save Follow-up"}
           </button>
         </div>
       </form>

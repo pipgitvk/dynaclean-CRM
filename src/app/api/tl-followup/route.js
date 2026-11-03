@@ -216,6 +216,13 @@ export async function PUT(request) {
       return NextResponse.json({ error: "id is required" }, { status: 400 });
     }
 
+    if (String(payload.role || "").trim().toUpperCase() !== "SUPERADMIN") {
+      return NextResponse.json(
+        { error: "Only SUPERADMIN can edit TL follow-ups" },
+        { status: 403 }
+      );
+    }
+
     const pool = await getDbConnection();
     const connection = await pool.getConnection();
 
@@ -225,6 +232,19 @@ export async function PUT(request) {
     const estimatedOrderDateUTC = convertISTtoUTC(estimated_order_date);
 
     try {
+      const [ownedRows] = await connection.execute(
+        `SELECT id FROM TL_followups
+         WHERE id = ? AND LOWER(TRIM(followed_by)) = LOWER(TRIM(?))
+         LIMIT 1`,
+        [id, payload.username]
+      );
+      if (ownedRows.length === 0) {
+        return NextResponse.json(
+          { error: "You can only edit your own TL follow-ups" },
+          { status: 403 }
+        );
+      }
+
       await connection.execute(
         `UPDATE TL_followups
          SET estimated_order_date = ?, lead_quality_score = ?, model = ?, multi_tag = ?, notes = ?, followed_date = ?, next_followup_date = ?, assigned_employee = ?

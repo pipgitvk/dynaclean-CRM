@@ -253,6 +253,11 @@ export default async function AdminTLCustomerDetailPage({
             <div className="space-y-3">
               {timelineRows.map((followup, index) => {
                   const isTLFollowup = followup.followupType === "TL";
+                  const canEditOwnFollowup =
+                    isTLFollowup &&
+                    String(payload.role || "").trim().toUpperCase() === "SUPERADMIN" &&
+                    String(followup.followed_by || "").trim().toLowerCase() ===
+                      String(payload.username || "").trim().toLowerCase();
                   const rowKey = isTLFollowup
                     ? `tl-${followup.id ?? followup.created_at}`
                     : `emp-${String(followup.time_stamp)}`;
@@ -302,6 +307,16 @@ export default async function AdminTLCustomerDetailPage({
                             <span className="text-gray-600">
                               <strong>By:</strong> {followup.followed_by}
                             </span>
+                            {canEditOwnFollowup && (
+                              <Link
+                                href={`/admin-dashboard/tl-customers/${customerId}/followup?editId=${followup.id}${tlOnlyStrict ? "&tlOnly=true" : ""}`}
+                                className="ml-auto inline-flex items-center gap-1 rounded bg-orange-100 px-2 py-1 font-medium text-orange-700 hover:bg-orange-200"
+                                title="Edit your follow-up"
+                              >
+                                <Edit className="h-3 w-3" />
+                                Edit
+                              </Link>
+                            )}
                           </div>
 
                           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2 text-xs">

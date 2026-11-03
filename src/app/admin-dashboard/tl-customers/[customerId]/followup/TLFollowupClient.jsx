@@ -12,13 +12,14 @@ export default function TLFollowupClient({
   customer,
   latestEmpFollowupTimeStampStr,
   latestTLFollowup,
+  editFollowup,
 }) {
   const [preBookingModal, setPreBookingModal] = useState(false);
 
   return (
     <div className="max-w-4xl mx-auto mt-10 px-4">
       <h1 className="text-3xl font-bold mb-6 text-center text-gray-800">
-        TL Follow-up Entry (Admin)
+        {editFollowup ? "Edit Your TL Follow-up" : "TL Follow-up Entry (Admin)"}
       </h1>
 
       {/* Customer Info Card */}
@@ -145,6 +146,7 @@ export default function TLFollowupClient({
         customerData={customer}
         isAdmin={true}
         latestfollowup={latestTLFollowup ? { ...latestTLFollowup, status: customer.status, stage: customer.stage } : { status: customer.status, stage: customer.stage }}
+        editFollowup={editFollowup ? { ...editFollowup, status: customer.status, stage: customer.stage } : null}
         currentStage={customer.stage || "New"}
       />
 
