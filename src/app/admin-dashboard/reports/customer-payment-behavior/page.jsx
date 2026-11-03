@@ -327,8 +327,8 @@ export default function CustomerPaymentBehaviorReport() {
                             className="flex-1 md:flex-none px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                         >
                             <option value="all">All Status</option>
-                            <option value="late">Late Payment</option>
-                            <option value="missing">Missing Payment</option>
+                            <option value="late" hidden>Late Payment</option>
+                            <option value="missing">Overdue</option>
                             <option value="on_time">On Time</option>
                         </select>
 
