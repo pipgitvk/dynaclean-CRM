@@ -6,6 +6,7 @@ import { isHalfDayByRules } from "@/lib/attendanceRulesEngine";
 import { isPayrollHalfDayFromUnapprovedAutoCheckout } from "@/lib/attendanceLogForPayroll";
 import { rowHasMeaningfulCheckinOrCheckout } from "@/lib/attendanceMeaningfulPunch";
 import { dateToYmdKey } from "@/lib/salaryPayDaysFromAttendance";
+import { mergeSameDayAttendanceLogs } from "@/lib/attendanceLogPunchMerge";
 import { eachDayInLeaveRange } from "@/lib/leaveContinuousDays";
 
 const MONTHS = [
@@ -88,7 +89,7 @@ export default function AttendanceSummaryGrid({ logs, holidays, leaves, rules, c
 
   const maps = useMemo(() => {
     const dateMap = new Map();
-    for (const log of logs || []) {
+    for (const log of mergeSameDayAttendanceLogs(logs)) {
       const k = dateToYmdKey(log.date);
       if (k) dateMap.set(k, log);
     }

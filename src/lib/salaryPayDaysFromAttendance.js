@@ -10,6 +10,7 @@ import {
   sanitizeAttendanceLogForPayroll,
   isPayrollHalfDayFromUnapprovedAutoCheckout,
 } from "@/lib/attendanceLogForPayroll";
+import { mergeSameDayAttendanceLogs } from "@/lib/attendanceLogPunchMerge";
 
 function startOfDay(d) {
   const x = new Date(d);
@@ -187,7 +188,7 @@ export function computeSalaryPayDaysForUser(p) {
   }
 
   const dateMap = new Map();
-  for (const log of logs || []) {
+  for (const log of mergeSameDayAttendanceLogs(logs)) {
     const k = dateToYmdKey(log.date);
     if (k) dateMap.set(k, sanitizeAttendanceLogForPayroll(log));
   }

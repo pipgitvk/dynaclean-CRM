@@ -202,15 +202,15 @@ export function dedupeEmployeesForPayrollSheet(employees, profileRows) {
   return { employees: winners, relatedUsernamesByWinner };
 }
 
-/** Merge attendance logs for duplicate logins (one row per day). */
-export function collectPayrollLogsForUsers(logsByUser, relatedUsernames, dateToYmdKeyFn) {
+/**
+ * Attendance rows for duplicate logins of the same employee.
+ * Same-day CRM and machine rows are all kept; pay-day math then takes the
+ * earlier check-in and the later check-out.
+ */
+export function collectPayrollLogsForUsers(logsByUser, relatedUsernames) {
   const logs = [];
-  const logDates = new Set();
   for (const uname of relatedUsernames || []) {
     for (const log of logsByUser[normalizeUserKey(uname)] || []) {
-      const dk = dateToYmdKeyFn(log.date);
-      if (dk && logDates.has(dk)) continue;
-      if (dk) logDates.add(dk);
       logs.push(log);
     }
   }
