@@ -90,6 +90,9 @@ export default function CreateBomPage() {
   const addSpare = (s) => {
     setItems((prev) => {
       if (prev.some((it)=> Number(it.spare_id) === Number(s.id))) return prev;
+      const totalQty = Number(s.total_quantity);
+      const delhiQty = Number(s.delhi_qty);
+      const southQty = Number(s.south_qty);
       return [
         ...prev,
         {
@@ -102,13 +105,13 @@ export default function CreateBomPage() {
           make: s.make || null,
           model: s.model || null,
           spec: s.specification || null,
-          total_available: undefined,
-          delhi_available: undefined,
-          south_available: undefined,
+          total_available: Number.isFinite(totalQty) ? totalQty : undefined,
+          delhi_available: Number.isFinite(delhiQty) ? delhiQty : undefined,
+          south_available: Number.isFinite(southQty) ? southQty : undefined,
         }
       ];
     });
-    // Load availability for the newly added spare
+    // Refresh availability from server (search totals may be stale)
     loadAvailability(s.id);
     setSpareQuery("");
     setSpareResults([]);
@@ -201,9 +204,17 @@ export default function CreateBomPage() {
                 <button key={s.id} className="w-full text-left p-2 hover:bg-gray-50 flex gap-3 items-center" onClick={()=>addSpare(s)}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   {s.image ? <img src={s.image} alt={s.item_name} className="w-10 h-10 object-cover rounded"/> : <div className="w-10 h-10 bg-gray-100 rounded"/>}
-                  <div>
+                  <div className="flex-1 min-w-0">
                     <div className="font-medium text-sm">{s.item_name}</div>
-                    <div className="text-xs text-gray-500">{s.compatible_machine || s.spare_number || ''}</div>
+                    <div className="text-xs text-gray-500">
+                      {[s.compatible_machine, s.spare_number].filter(Boolean).join(" · ") || "—"}
+                    </div>
+                    <div className="text-xs text-emerald-700 font-medium mt-0.5">
+                      Total qty: {Number(s.total_quantity) || 0}
+                      <span className="text-gray-500 font-normal ml-2">
+                        (Delhi {Number(s.delhi_qty) || 0}, South {Number(s.south_qty) || 0})
+                      </span>
+                    </div>
                   </div>
                 </button>
               ))}
@@ -221,7 +232,7 @@ export default function CreateBomPage() {
                   <th className="p-2">Specifications</th>
                   <th className="p-2">Qty</th>
                   <th className="p-2">Weight %</th>
-                  <th className="p-2">Total</th>
+                  <th className="p-2">Total Qty</th>
                   <th className="p-2">Delhi</th>
                   <th className="p-2">South</th>
                   <th className="p-2 text-right">Action</th>
@@ -318,7 +329,7 @@ export default function CreateBomPage() {
                   </div>
                   <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
                     <div className="rounded bg-gray-50 p-2 text-center">
-                      <div className="text-[10px] uppercase text-gray-500">Total</div>
+                      <div className="text-[10px] uppercase text-gray-500">Total Qty</div>
                       <div className="font-medium">{typeof it.total_available === 'number' ? it.total_available : '-'}</div>
                     </div>
                     <div className="rounded bg-gray-50 p-2 text-center">

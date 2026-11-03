@@ -16,12 +16,17 @@ export async function GET(req) {
   try {
     const searchQuery = `%${q}%`;
     const [rows] = await conn.execute(
-      "SELECT id, spare_number, item_name, specification, type, make, model, compatible_machine, tax, purchase_price, sale_price, last_negotiation_price, image FROM `spare_list` WHERE item_name LIKE ? OR spare_number LIKE ? LIMIT 15",
+      `SELECT sl.id, sl.spare_number, sl.item_name, sl.specification, sl.type, sl.make, sl.model,
+              sl.compatible_machine, sl.tax, sl.purchase_price, sl.sale_price, sl.last_negotiation_price, sl.image,
+              COALESCE(ss.total_quantity, 0) AS total_quantity,
+              COALESCE(ss.Delhi, 0) AS delhi_qty,
+              COALESCE(ss.South, 0) AS south_qty
+       FROM spare_list sl
+       LEFT JOIN stock_summary ss ON ss.spare_id = sl.id
+       WHERE sl.item_name LIKE ? OR sl.spare_number LIKE ?
+       LIMIT 15`,
       [searchQuery, searchQuery]
     );
-
-    console.log("Search results:", rows);
-    
 
     return new Response(JSON.stringify(rows), {
       status: 200,
