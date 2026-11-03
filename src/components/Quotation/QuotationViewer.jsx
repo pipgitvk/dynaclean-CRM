@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useMemo, forwardRef, useImperativeHandle } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
