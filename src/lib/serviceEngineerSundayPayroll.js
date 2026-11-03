@@ -1,7 +1,4 @@
-import {
-  isMeaningfulAttendancePunch,
-  rowHasMeaningfulCheckinOrCheckout,
-} from "@/lib/attendanceMeaningfulPunch";
+import { rowHasMeaningfulCheckinOrCheckout } from "@/lib/attendanceMeaningfulPunch";
 
 export function normalizePayrollRole(role) {
   return String(role ?? "").trim().toUpperCase();
@@ -84,17 +81,13 @@ function attendanceLocationFromLog(log) {
 }
 
 /**
- * +1 pay day on Sunday / company holiday only when check-in exists and
- * attendance location matches profile work_location.
+ * +1 (or +0.5 half-day) pay day on Sunday / company holiday when the employee
+ * actually punched that day (check-in or check-out). Location is not required —
+ * field staff often punch away from profile work_location.
  */
-export function qualifiesOffDayExtraPayCredit(log, workLocation) {
+export function qualifiesOffDayExtraPayCredit(log, _workLocation) {
   if (!log) return false;
-  if (!rowHasMeaningfulCheckinOrCheckout(log)) return false;
-  if (!isMeaningfulAttendancePunch(log.checkin_time)) return false;
-  return attendanceLocationMatchesWorkLocation(
-    attendanceLocationFromLog(log),
-    workLocation
-  );
+  return rowHasMeaningfulCheckinOrCheckout(log);
 }
 
 /** @deprecated Use qualifiesOffDayExtraPayCredit — same rule for all roles. */

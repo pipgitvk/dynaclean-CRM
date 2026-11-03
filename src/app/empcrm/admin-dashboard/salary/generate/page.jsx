@@ -995,14 +995,11 @@ const GenerateSalaryPage = () => {
                         </p>
                         {attendanceBreakdown.offDayWorkPolicy && (
                             <p className="mb-3 text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
-                                An extra +1 pay day on a Sunday or company <strong>holiday</strong> is added only
-                                when that day's attendance <strong>location</strong> matches the profile{" "}
-                                <strong>work location</strong> (
-                                {attendanceBreakdown.offDayWorkPolicy.workLocation || "set it on the profile"}
-                                ).
+                                An extra pay day is added for each Sunday or company <strong>holiday</strong>{" "}
+                                the employee actually punched (check-in or check-out). Full day +1, half day +0.5.
                                 {attendanceBreakdown.offDayWorkPolicy.offDayWorkEnabled
-                                    ? " Qualifying Sunday/holiday work pay days have been counted this month."
-                                    : " There is no qualifying Sunday/holiday extra pay day this month."}
+                                    ? " Those Sunday/holiday work days are included in pay days this month."
+                                    : " There is no Sunday/holiday punch this month."}
                             </p>
                         )}
                         {attendanceBreakdown.payCalc && (

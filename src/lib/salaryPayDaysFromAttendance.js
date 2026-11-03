@@ -283,6 +283,16 @@ export function computeSalaryPayDaysForUser(p) {
       half_day_unpaid++;
       if (!isSunday && !isHoliday) {
         weekdayPayCredits += 0.5;
+      } else if (
+        qualifiesOffDayExtraPayCredit(existingLog, workLocation)
+      ) {
+        if (isSunday) {
+          sundayWorkedDates.push(dateString);
+          sundayWorkPayCredits += 0.5;
+        } else if (isHoliday) {
+          holidayWorkedDates.push(dateString);
+          holidayWorkPayCredits += 0.5;
+        }
       }
       continue;
     }
@@ -297,6 +307,8 @@ export function computeSalaryPayDaysForUser(p) {
       const treatAsHalfDay = hasRealPunch || dbHalf;
       if (hasRealPunch) {
         leaveWorkedDates.push(dateString);
+        if (isSunday) sundayWorkedDates.push(dateString);
+        else if (isHoliday) holidayWorkedDates.push(dateString);
       }
       if (treatAsHalfDay) {
         // Paid half-day leave stays on the Leaves card (0.5), same as attendance.
@@ -356,6 +368,8 @@ export function computeSalaryPayDaysForUser(p) {
         const treatAsHalfDay = hasRealPunch || dbHalf;
         if (hasRealPunch) {
           leaveWorkedDates.push(dateString);
+          if (isSunday) sundayWorkedDates.push(dateString);
+          else if (isHoliday) holidayWorkedDates.push(dateString);
         }
         if (treatAsHalfDay) {
           half_day++;
