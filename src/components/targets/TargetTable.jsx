@@ -10,32 +10,34 @@ import EditTargetModal from "./EditTargetModal";
 import AssignTargetModal from "./AssignTargetModal";
 import TargetMonitorChart from "./TargetMonitorChart";
 import { useUser } from "@/context/UserContext";
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 
 const MONTH_NAMES = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
 ];
 
-/** Target assignment overlaps the selected calendar month (inclusive). */
-function targetOverlapsMonth(startStr, endStr, year, month) {
+const monthDateRange = (year, month) => {
+  const pad = (n) => String(n).padStart(2, "0");
+  const format = (date) =>
+    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  return {
+    dateFrom: format(new Date(year, month - 1, 1)),
+    dateTo: format(new Date(year, month, 0)),
+  };
+};
+
+const defaultDateRange = () => {
+  const now = new Date();
+  return monthDateRange(now.getFullYear(), now.getMonth() + 1);
+};
+
+/** Target assignment overlaps the selected date range (inclusive). */
+function targetOverlapsRange(startStr, endStr, dateFrom, dateTo) {
   if (!startStr || !endStr) return false;
   const start = String(startStr).slice(0, 10);
   const end = String(endStr).slice(0, 10);
-  const pad = (n) => String(n).padStart(2, "0");
-  const lastDay = new Date(year, month, 0).getDate();
-  const monthStart = `${year}-${pad(month)}-01`;
-  const monthEnd = `${year}-${pad(month)}-${pad(lastDay)}`;
-  return start <= monthEnd && end >= monthStart;
+  return start <= dateTo && end >= dateFrom;
 }
 
 const TargetTable = () => {
@@ -43,8 +45,12 @@ const TargetTable = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const initialDateRange = defaultDateRange();
   const [filterMonth, setFilterMonth] = useState(() => new Date().getMonth() + 1);
   const [filterYear, setFilterYear] = useState(() => new Date().getFullYear());
+  const [dateFrom, setDateFrom] = useState(initialDateRange.dateFrom);
+  const [dateTo, setDateTo] = useState(initialDateRange.dateTo);
+  const [appliedDateRange, setAppliedDateRange] = useState(initialDateRange);
   const [selectedTarget, setSelectedTarget] = useState(null);
   const [isCompletionModalOpen, setIsCompletionModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -110,29 +116,61 @@ const TargetTable = () => {
     }
   };
 
-  const monthFilteredTargets = useMemo(
+  const dateFilteredTargets = useMemo(
     () =>
       targets.filter((t) =>
-        targetOverlapsMonth(t.target_start_date, t.target_end_date, filterYear, filterMonth)
+        targetOverlapsRange(
+          t.target_start_date,
+          t.target_end_date,
+          appliedDateRange.dateFrom,
+          appliedDateRange.dateTo
+        )
       ),
-    [targets, filterYear, filterMonth]
+    [targets, appliedDateRange]
   );
 
   const filteredTargets = useMemo(
     () =>
-      monthFilteredTargets.filter((target) =>
+      dateFilteredTargets.filter((target) =>
         target.username.toLowerCase().includes(searchTerm.toLowerCase())
       ),
-    [monthFilteredTargets, searchTerm]
+    [dateFilteredTargets, searchTerm]
   );
 
-  const periodLabel = `${MONTH_NAMES[filterMonth - 1]} ${filterYear}`;
+  const periodLabel = `${formatDate(appliedDateRange.dateFrom)} to ${formatDate(appliedDateRange.dateTo)}`;
+
+  const applyMonthRange = (year, month) => {
+    const range = monthDateRange(year, month);
+    setDateFrom(range.dateFrom);
+    setDateTo(range.dateTo);
+    setAppliedDateRange(range);
+  };
+
+  const handleMonthChange = (value) => {
+    const month = Number(value);
+    setFilterMonth(month);
+    applyMonthRange(filterYear, month);
+  };
+
+  const handleYearChange = (value) => {
+    const year = Number(value);
+    setFilterYear(year);
+    applyMonthRange(year, filterMonth);
+  };
+
+  const applyDateRange = () => {
+    if (!dateFrom || !dateTo) return;
+    const normalized = dateFrom <= dateTo
+      ? { dateFrom, dateTo }
+      : { dateFrom: dateTo, dateTo: dateFrom };
+    setDateFrom(normalized.dateFrom);
+    setDateTo(normalized.dateTo);
+    setAppliedDateRange(normalized);
+  };
 
   const yearOptions = useMemo(() => {
-    const y = new Date().getFullYear();
-    const list = [];
-    for (let i = y - 5; i <= y + 2; i++) list.push(i);
-    return list;
+    const currentYear = new Date().getFullYear();
+    return Array.from({ length: 8 }, (_, index) => currentYear - 5 + index);
   }, []);
 
   if (loading) {
@@ -153,13 +191,11 @@ const TargetTable = () => {
           <select
             id="monitor-month"
             value={filterMonth}
-            onChange={(e) => setFilterMonth(Number(e.target.value))}
+            onChange={(e) => handleMonthChange(e.target.value)}
             className="min-w-[140px] rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-600"
           >
-            {MONTH_NAMES.map((name, idx) => (
-              <option key={name} value={idx + 1}>
-                {name}
-              </option>
+            {MONTH_NAMES.map((name, index) => (
+              <option key={name} value={index + 1}>{name}</option>
             ))}
           </select>
         </div>
@@ -170,18 +206,44 @@ const TargetTable = () => {
           <select
             id="monitor-year"
             value={filterYear}
-            onChange={(e) => setFilterYear(Number(e.target.value))}
+            onChange={(e) => handleYearChange(e.target.value)}
             className="min-w-[100px] rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-600"
           >
-            {yearOptions.map((y) => (
-              <option key={y} value={y}>
-                {y}
-              </option>
+            {yearOptions.map((year) => (
+              <option key={year} value={year}>{year}</option>
             ))}
           </select>
         </div>
+        <div className="hidden h-10 w-px bg-gray-200 md:block" />
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-medium text-gray-600">
+            From Date
+          </label>
+          <TypeableDateFilterInput
+            value={dateFrom}
+            onChange={setDateFrom}
+            className="min-w-[150px] rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-600"
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-medium text-gray-600">
+            To Date
+          </label>
+          <TypeableDateFilterInput
+            value={dateTo}
+            onChange={setDateTo}
+            className="min-w-[150px] rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-600"
+          />
+        </div>
+        <button
+          type="button"
+          onClick={applyDateRange}
+          className="rounded-lg bg-gray-700 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800"
+        >
+          Apply
+        </button>
         <p className="ml-auto text-xs text-gray-500 sm:ml-0 sm:pt-5">
-          Showing targets active in {periodLabel}
+          Showing targets active from {periodLabel}
         </p>
       </div>
 
@@ -221,8 +283,8 @@ const TargetTable = () => {
       <TargetMonitorChart
         rows={filteredTargets}
         periodLabel={periodLabel}
-        filterMonth={filterMonth}
-        filterYear={filterYear}
+        dateFrom={appliedDateRange.dateFrom}
+        dateTo={appliedDateRange.dateTo}
       />
 
       {/* Desktop Table View */}

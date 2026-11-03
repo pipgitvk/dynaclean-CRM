@@ -33,7 +33,7 @@ const buildLabel = (row, rows) => {
   return `${row.username} (${formatShortDate(row.target_end_date)})`;
 };
 
-const TargetMonitorChart = ({ rows, periodLabel, filterMonth, filterYear }) => {
+const TargetMonitorChart = ({ rows, periodLabel, dateFrom, dateTo }) => {
   const [chartData, setChartData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -44,7 +44,7 @@ const TargetMonitorChart = ({ rows, periodLabel, filterMonth, filterYear }) => {
         (r) =>
           `${r.id}:${r.target}:${r.target_start_date}:${r.target_end_date}:${r.username}`
       )
-      .join("|") + `|m${filterMonth}|y${filterYear}`;
+      .join("|") + `|from:${dateFrom}|to:${dateTo}`;
 
   useEffect(() => {
     if (!rows.length) {
@@ -62,8 +62,8 @@ const TargetMonitorChart = ({ rows, periodLabel, filterMonth, filterYear }) => {
           rows.map((row) => {
             const params = new URLSearchParams({
               targetId: String(row.id),
-              month: String(filterMonth),
-              year: String(filterYear),
+              startDate: dateFrom,
+              endDate: dateTo,
             });
             return fetch(`/api/target-completion?${params.toString()}`).then((res) => {
               if (!res.ok) throw new Error("Failed to load");
@@ -122,7 +122,7 @@ const TargetMonitorChart = ({ rows, periodLabel, filterMonth, filterYear }) => {
       </h2>
       <p className="mb-4 text-center text-xs text-gray-500">
         {periodLabel
-          ? `${periodLabel}: assignments active this month; achieved = approved, non-cancelled orders in this month (within assignment dates). Search applies.`
+          ? `${periodLabel}: assignments active in this range; achieved = approved, non-cancelled orders in this range (within assignment dates). Search applies.`
           : "Per assignment period; respects the current search filter."}
       </p>
 

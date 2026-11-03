@@ -99,6 +99,15 @@ export async function GET(request) {
     let orderStart = startDate;
     let orderEnd = endDate;
 
+    if (startDateParam && endDateParam) {
+      const requestedStart = toYmd(startDateParam);
+      const requestedEnd = toYmd(endDateParam);
+      if (requestedStart && requestedEnd) {
+        orderStart = orderStart > requestedStart ? orderStart : requestedStart;
+        orderEnd = orderEnd < requestedEnd ? orderEnd : requestedEnd;
+      }
+    }
+
     if (monthParam != null && yearParam != null) {
       const m = parseInt(monthParam, 10);
       const y = parseInt(yearParam, 10);
