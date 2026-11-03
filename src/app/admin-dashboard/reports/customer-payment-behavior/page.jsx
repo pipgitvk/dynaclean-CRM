@@ -22,6 +22,7 @@ export default function CustomerPaymentBehaviorReport() {
     const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
     const [filterStatus, setFilterStatus] = useState('all');
     const [appliedFilterStatus, setAppliedFilterStatus] = useState('all');
+    const [activeSummaryCard, setActiveSummaryCard] = useState('all');
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 20;
 
@@ -53,8 +54,18 @@ export default function CustomerPaymentBehaviorReport() {
     const handleApplySearch = useCallback(() => {
         setAppliedSearchQuery(searchQuery);
         setAppliedFilterStatus(filterStatus);
+        setActiveSummaryCard(filterStatus);
         setCurrentPage(1);
     }, [searchQuery, filterStatus]);
+
+    const handleSummaryCardClick = (status, card = status) => {
+        setSearchQuery("");
+        setAppliedSearchQuery("");
+        setFilterStatus(status);
+        setAppliedFilterStatus(status);
+        setActiveSummaryCard(card);
+        setCurrentPage(1);
+    };
 
     const filteredOrders = useMemo(() => {
         const filtered = filterCustomerPaymentBehaviorOrders(orders, {
@@ -206,7 +217,14 @@ export default function CustomerPaymentBehaviorReport() {
 
             {/* Summary Cards */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-4 md:mb-6">
-                <div className="bg-white rounded-lg shadow p-3 md:p-4 border-l-4 border-blue-500">
+                <button
+                    type="button"
+                    onClick={() => handleSummaryCardClick('all')}
+                    aria-pressed={activeSummaryCard === 'all'}
+                    className={`text-left bg-white rounded-lg shadow p-3 md:p-4 border-l-4 border-blue-500 transition-all hover:shadow-md ${
+                        activeSummaryCard === 'all' ? 'ring-2 ring-blue-500' : ''
+                    }`}
+                >
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-xs md:text-sm text-gray-600">Total Orders</p>
@@ -216,9 +234,16 @@ export default function CustomerPaymentBehaviorReport() {
                             <Calendar className="text-blue-600" size={20} />
                         </div>
                     </div>
-                </div>
+                </button>
 
-                <div className="bg-white rounded-lg shadow p-3 md:p-4 border-l-4 border-red-500">
+                <button
+                    type="button"
+                    onClick={() => handleSummaryCardClick('missing', 'overdue')}
+                    aria-pressed={activeSummaryCard === 'overdue'}
+                    className={`text-left bg-white rounded-lg shadow p-3 md:p-4 border-l-4 border-red-500 transition-all hover:shadow-md ${
+                        activeSummaryCard === 'overdue' ? 'ring-2 ring-red-500' : ''
+                    }`}
+                >
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-xs md:text-sm text-gray-600">Overdue</p>
@@ -228,9 +253,16 @@ export default function CustomerPaymentBehaviorReport() {
                             <DollarSign className="text-red-600" size={20} />
                         </div>
                     </div>
-                </div>
+                </button>
 
-                <div className="bg-white rounded-lg shadow p-3 md:p-4 border-l-4 border-yellow-500">
+                <button
+                    type="button"
+                    onClick={() => handleSummaryCardClick('late')}
+                    aria-pressed={activeSummaryCard === 'late'}
+                    className={`text-left bg-white rounded-lg shadow p-3 md:p-4 border-l-4 border-yellow-500 transition-all hover:shadow-md ${
+                        activeSummaryCard === 'late' ? 'ring-2 ring-yellow-500' : ''
+                    }`}
+                >
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-xs md:text-sm text-gray-600">Late Payments</p>
@@ -240,9 +272,16 @@ export default function CustomerPaymentBehaviorReport() {
                             <AlertTriangle className="text-yellow-600" size={20} />
                         </div>
                     </div>
-                </div>
+                </button>
 
-                <div className="bg-white rounded-lg shadow p-3 md:p-4 border-l-4 border-orange-500">
+                <button
+                    type="button"
+                    onClick={() => handleSummaryCardClick('missing')}
+                    aria-pressed={activeSummaryCard === 'missing'}
+                    className={`text-left bg-white rounded-lg shadow p-3 md:p-4 border-l-4 border-orange-500 transition-all hover:shadow-md ${
+                        activeSummaryCard === 'missing' ? 'ring-2 ring-orange-500' : ''
+                    }`}
+                >
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-xs md:text-sm text-gray-600">Missing Payments</p>
@@ -252,7 +291,7 @@ export default function CustomerPaymentBehaviorReport() {
                             <AlertTriangle className="text-orange-600" size={20} />
                         </div>
                     </div>
-                </div>
+                </button>
             </div>
 
             {/* Filters and Actions */}
