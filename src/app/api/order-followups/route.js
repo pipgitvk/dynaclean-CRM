@@ -49,7 +49,9 @@ export async function GET(req) {
         ON o.quote_number COLLATE utf8mb4_unicode_ci = q.quote_number COLLATE utf8mb4_unicode_ci
     `;
 
-    const whereClause = [];
+    const whereClause = [
+      "(o.is_cancelled = 0 OR o.is_cancelled IS NULL)",
+    ];
     const queryParams = [];
 
     if (isServiceSupport) {
@@ -80,10 +82,12 @@ export async function GET(req) {
     const createdByListSql = isServiceSupport
       ? `SELECT DISTINCT created_by FROM neworder
          WHERE created_by IS NOT NULL AND created_by != ''
+           AND (is_cancelled = 0 OR is_cancelled IS NULL)
            AND ${sqlColumnInActiveServiceSupportUsers("created_by")}
          ORDER BY created_by`
       : `SELECT DISTINCT created_by FROM neworder
          WHERE created_by IS NOT NULL AND created_by != ''
+           AND (is_cancelled = 0 OR is_cancelled IS NULL)
          ORDER BY created_by`;
 
     const [created_byList] = await connection.execute(createdByListSql);
