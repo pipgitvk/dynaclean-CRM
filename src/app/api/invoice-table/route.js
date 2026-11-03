@@ -11,6 +11,8 @@ import { findActiveInvoiceForOrder } from "@/lib/activeInvoiceForOrder";
 import { syncInvoiceAndOrderPaymentLink } from "@/lib/syncInvoiceOrderPaymentLink";
 import { settleStatementsForInvoicePayment } from "@/lib/settleStatementsForInvoicePayment";
 import { linkCreatedInvoiceToNeworder } from "@/lib/linkCreatedInvoiceToNeworder";
+import { ensureDocumentFromCompanyColumns } from "@/lib/ensureDocumentFromCompanyColumns";
+import { letterheadPayloadForRole } from "@/lib/documentFromCompany";
 
 /** Parse linked_trans_ids JSON or plain string → array of strings */
 function parseTransIds(raw) {
@@ -764,6 +766,7 @@ export async function GET(req) {
 
     console.time("[invoice-table] total");
     const conn = await getDbConnection();
+    await ensureDocumentFromCompanyColumns(conn);
 
     let where = "WHERE 1=1";
     const values = [];
@@ -992,6 +995,7 @@ export async function POST(req) {
 
     const pool = await getDbConnection();
     conn = await pool.getConnection();
+    await ensureDocumentFromCompanyColumns(conn);
 
     const isPerformaCreate =
       String(invoice_type || "").trim().toLowerCase() === "performa";
@@ -1018,13 +1022,16 @@ export async function POST(req) {
 
     // Fetch employee name from quotation if quotation_id is provided
     let employeeName = payload?.username || null;
+    let quotationLetterheadRow = null;
     console.log("Initial employeeName from session:", employeeName);
     console.log("quotation_id:", quotation_id);
     if (quotation_id) {
       try {
+        const quoteLetterheadCols =
+          "emp_name, from_company, from_gst, from_address, from_mobile, from_email, from_state, logo_file, `CIN_new`";
         // First try to find by quote_number
         let [quoteResult] = await conn.execute(
-          "SELECT emp_name FROM quotations_records WHERE quote_number = ?",
+          `SELECT ${quoteLetterheadCols} FROM quotations_records WHERE quote_number = ?`,
           [quotation_id]
         );
         console.log("Quotation query result (by quote_number):", quoteResult);
@@ -1032,17 +1039,20 @@ export async function POST(req) {
         // If not found by quote_number, try by primary key S.No.
         if (quoteResult.length === 0) {
           [quoteResult] = await conn.execute(
-            "SELECT emp_name FROM quotations_records WHERE `S.No.` = ?",
+            `SELECT ${quoteLetterheadCols} FROM quotations_records WHERE \`S.No.\` = ?`,
             [quotation_id]
           );
           console.log("Quotation query result (by S.No.):", quoteResult);
         }
 
-        if (quoteResult.length > 0 && quoteResult[0].emp_name) {
-          employeeName = quoteResult[0].emp_name;
-          console.log("Employee name from quotation (emp_name):", employeeName);
-        } else {
-          console.log("Quotation found but no emp_name, using session username:", employeeName);
+        if (quoteResult.length > 0) {
+          quotationLetterheadRow = quoteResult[0];
+          if (quoteResult[0].emp_name) {
+            employeeName = quoteResult[0].emp_name;
+            console.log("Employee name from quotation (emp_name):", employeeName);
+          } else {
+            console.log("Quotation found but no emp_name, using session username:", employeeName);
+          }
         }
       } catch (err) {
         console.error("Failed to fetch employee name from quotation:", err);
@@ -1246,6 +1256,20 @@ export async function POST(req) {
         if (statusColumnExists) {
           pushCol("status", bodyStatus);
         }
+
+        const letterhead = letterheadPayloadForRole(
+          body,
+          payload.role,
+          quotationLetterheadRow,
+        );
+        pushCol("from_company", letterhead.from_company);
+        pushCol("from_gst", letterhead.from_gst);
+        pushCol("from_address", letterhead.from_address);
+        pushCol("from_mobile", letterhead.from_mobile);
+        pushCol("from_email", letterhead.from_email);
+        pushCol("from_state", letterhead.from_state);
+        pushCol("logo_file", letterhead.logo_file);
+        pushCol("CIN_new", letterhead.CIN_new);
 
         columns.push("created_at");
         placeholders.push("NOW()");

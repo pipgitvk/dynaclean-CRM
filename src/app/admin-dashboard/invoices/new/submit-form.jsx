@@ -13,7 +13,12 @@ import toast from "react-hot-toast";
 import { Pencil } from "lucide-react";
 import AddSpecialPriceModal from "@/components/specialPrice/AddSpecialPriceModal";
 import dynacleanLogo from "@/components/logo1.jpg";
-import { LetterheadCompanyInfo, LetterheadBankLine, LetterheadSignatoryLine } from "@/components/invoice/InvoiceLetterheadSection";
+import DocumentLetterheadHeader from "@/components/invoice/DocumentLetterheadHeader";
+import { LetterheadBankLine, LetterheadSignatoryLine } from "@/components/invoice/InvoiceLetterheadSection";
+import {
+  documentFromCompanyForSubmit,
+  getDefaultDocumentFromCompany,
+} from "@/lib/documentFromCompany";
 import { useUser } from "@/context/UserContext";
 import { canEditInvoiceHsn } from "@/lib/performaInvoiceAccess";
 import {
@@ -44,8 +49,12 @@ export default function InvoiceForm({
   const canEditHsn = canEditInvoiceHsn(user?.userRole);
   const autoFilledQuoteRef = useRef(false);
   const termsTextareaRef = useRef(null);
+  const letterheadRef = useRef(null);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [documentFromCompany, setDocumentFromCompany] = useState(
+    getDefaultDocumentFromCompany,
+  );
 
   // Determine the display label based on invoice type
   const invoiceTypeLabel = invoiceType === "performa" ? "Performa Invoice" : "Invoice";
@@ -382,6 +391,7 @@ export default function InvoiceForm({
         sgst_rate: sgstRate,
         igst_rate: igstRate,
         linked_trans_ids: null,
+        ...documentFromCompanyForSubmit(documentFromCompany, letterheadRef),
       };
 
       console.log("Data being sent to API:", dataToSend);
@@ -599,25 +609,12 @@ const fetchQuotationAndFill = async (quoteNoArg) => {
       className="space-y-6 max-w-5xl mx-auto px-4 text-gray-800"
     >
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border p-4 rounded bg-gray-50 gap-4">
-        {formLogoSrc ? (
-          <img
-            src={formLogoSrc}
-            alt="Dynaclean Logo"
-            width={120}
-            height={80}
-            className="object-contain"
-            onError={handleFormLogoError}
-          />
-        ) : (
-          <div className="w-[120px] h-[80px] border border-gray-200 flex items-center justify-center text-xs font-semibold text-red-600">
-            DYNACLEAN
-          </div>
-        )}
-
-        <LetterheadCompanyInfo />
-        
-      </div>
+      <DocumentLetterheadHeader
+        ref={letterheadRef}
+        variant="invoice"
+        values={documentFromCompany}
+        onChange={setDocumentFromCompany}
+      />
 
       {/* Invoice Info */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 bg-gray-50 p-4 rounded">
@@ -1034,7 +1031,7 @@ const fetchQuotationAndFill = async (quoteNoArg) => {
         <div className="lg:col-span-1 space-y-4">
           <div className="border p-4 rounded bg-gray-50 text-sm">
             <h4 className="font-semibold mb-2">Bank Details</h4>
-            <LetterheadBankLine />
+            <LetterheadBankLine values={documentFromCompany} />
             <p>ICICI Bank</p>
             <p>Account: 343405500379</p>
             <p>IFSC: ICIC0003434</p>
@@ -1042,7 +1039,7 @@ const fetchQuotationAndFill = async (quoteNoArg) => {
 
           <div className="border p-4 rounded bg-gray-50 text-sm text-center flex flex-col justify-between">
             <div>
-              <LetterheadSignatoryLine />
+              <LetterheadSignatoryLine values={documentFromCompany} />
               <Image
                 src="/images/sign.png"
                 alt="Sign"

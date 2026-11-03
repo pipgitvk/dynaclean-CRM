@@ -1,4 +1,11 @@
 import { getDbConnection } from "@/lib/db";
+import { ensureDocumentFromCompanyColumns } from "@/lib/ensureDocumentFromCompanyColumns";
+import {
+  documentFromCompanyInsertColumnSql,
+  documentFromCompanyInsertPlaceholders,
+  documentFromCompanyInsertValues,
+  letterheadPayloadForRole,
+} from "@/lib/documentFromCompany";
 import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 
@@ -153,6 +160,11 @@ export async function PATCH(req, { params }) {
     await conn.beginTransaction();
 
     const now = new Date();
+    const letterhead = letterheadPayloadForRole(body, payload.role, quote);
+    const docCols = documentFromCompanyInsertColumnSql();
+    const docPh = documentFromCompanyInsertPlaceholders();
+    const docVals = documentFromCompanyInsertValues(letterhead);
+
     const dateStr = now.toISOString().slice(0, 10).replace(/-/g, "");
     const todayPrefix = `QUOTE${dateStr}`;
 
@@ -181,7 +193,8 @@ export async function PATCH(req, { params }) {
         await conn.execute(
           `INSERT INTO quotations_records
            (quote_number, quote_date, customer_id, company_name, company_address, state, gstin, ship_to, qty, gst, cgst_rate, sgst_rate, igst_rate, emp_name, subtotal, round_off, grand_total, term_con, payment_term_days, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+           (quote_number, quote_date, customer_id, company_name, company_address, state, gstin, ship_to, qty, gst, cgst_rate, sgst_rate, igst_rate, emp_name, subtotal, round_off, grand_total, term_con, payment_term_days, ${docCols}, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${docPh}, NOW())`,
           [
             finalQuoteNumber,
             quote_date ?? quote.quote_date,
@@ -204,7 +217,7 @@ export async function PATCH(req, { params }) {
             grand_total ?? quote.grand_total,
             terms !== undefined ? String(terms ?? "") : quote.term_con,
             payment_term_days ?? quote.payment_term_days,
-          ],
+            ...docVals,
         );
         break;
       } catch (err) {

@@ -17,6 +17,7 @@ import {
 import { attachDeliveryBatchesToOrders } from "@/lib/orderDeliveryBatches";
 import { sqlOrderCreatedByEquals } from "@/lib/sqlCreatedByScope";
 import { normalizeOrderListDateRange } from "@/lib/orderTableDateDefaults";
+import { ensureDocumentFromCompanyColumns } from "@/lib/ensureDocumentFromCompanyColumns";
 
 const PAYMENT_TERM_LABEL_TO_DAYS = {
   Advance: 0,
@@ -31,6 +32,7 @@ let accountsOrderListSchemaReady = false;
 
 export async function ensureAccountsOrderListSchema(conn) {
   if (accountsOrderListSchemaReady) return;
+  await ensureDocumentFromCompanyColumns(conn);
   await ensureOrderLinkedPaymentColumns(conn);
   const safeAlters = [
     "ALTER TABLE neworder ADD COLUMN IF NOT EXISTS warehouse_in_done TINYINT(1) DEFAULT 0",

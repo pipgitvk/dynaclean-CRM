@@ -4,12 +4,14 @@ import NewInvoice from "@/components/invoice/DesignInvoice";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { canAccessPerformaInvoice } from "@/lib/performaInvoiceAccess";
+import { ensureDocumentFromCompanyColumns } from "@/lib/ensureDocumentFromCompanyColumns";
 
 export const dynamic = "force-dynamic";
 
 // Fetch invoice + items
 async function getInvoiceWithItems(invoiceNumber) {
   const conn = await getDbConnection();
+  await ensureDocumentFromCompanyColumns(conn);
 
   // Invoice
   const [[invoice]] = await conn.execute(

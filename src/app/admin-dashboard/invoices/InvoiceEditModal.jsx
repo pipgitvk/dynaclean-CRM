@@ -7,8 +7,13 @@ import { Pencil } from "lucide-react";
 import InvoiceItemsTable from "./new/invoice-table";
 import TaxAndSummary from "./new/Tax-invoice";
 import PaymentLinkModal from "@/app/user-dashboard/invoices/new/PaymentLinkModal";
+import DocumentLetterheadHeader from "@/components/invoice/DocumentLetterheadHeader";
 import { useUser } from "@/context/UserContext";
 import { canEditInvoiceHsn } from "@/lib/performaInvoiceAccess";
+import {
+  documentFromCompanyForSubmit,
+  mergeDocumentFromCompany,
+} from "@/lib/documentFromCompany";
 import {
   isPerformaInvoiceType,
   resolvePerformaInvoiceTerms,
@@ -119,7 +124,11 @@ export default function InvoiceEditModal({
   viewHrefBase = "/admin-dashboard/invoices",
 }) {
   const { user } = useUser();
-  const canEditHsn = canEditInvoiceHsn(user?.userRole);
+  const canEditHsn = canEditInvoiceHsn(user?.role ?? user?.userRole);
+  const [documentFromCompany, setDocumentFromCompany] = useState(() =>
+    mergeDocumentFromCompany({}),
+  );
+  const letterheadRef = useRef(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [invoiceNumber, setInvoiceNumber] = useState("");
@@ -334,6 +343,7 @@ export default function InvoiceEditModal({
           order_date: dateInputValue(inv.order_date) || "",
         };
         setForm(loadedForm);
+        setDocumentFromCompany(mergeDocumentFromCompany(inv));
 
         const loadedItems =
           Array.isArray(data.items) && data.items.length
@@ -484,6 +494,7 @@ export default function InvoiceEditModal({
         cgst_rate: headerRates.cgstRate,
         sgst_rate: headerRates.sgstRate,
         igst_rate: headerRates.igstRate,
+        ...documentFromCompanyForSubmit(documentFromCompany, letterheadRef),
       };
 
       const removedTransIds = originalLinkedTransIdsRef.current.filter(tid => !linkedTransIds.includes(tid));
@@ -587,6 +598,15 @@ export default function InvoiceEditModal({
             <p className="text-center py-12 text-gray-600">Loading…</p>
           ) : (
             <form onSubmit={handleSave} className="space-y-4 text-sm">
+              <DocumentLetterheadHeader
+                ref={letterheadRef}
+                variant="invoice"
+                values={documentFromCompany}
+                onChange={setDocumentFromCompany}
+                persistTargetId={
+                  invoiceId ? { type: "invoice", id: invoiceId } : null
+                }
+              />
 
               {linkedTransIds.length > 0 && (
                 <div className="flex flex-wrap items-center gap-2 bg-blue-50 border border-blue-200 rounded p-3">

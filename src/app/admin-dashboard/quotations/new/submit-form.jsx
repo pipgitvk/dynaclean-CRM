@@ -1,13 +1,19 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import QuotationItemsTable from "./quotation-table";
 import TaxAndSummary from "./TaxAndSummary";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import toast from "react-hot-toast";
 import { set } from "date-fns";
-import { LetterheadCompanyInfo, LetterheadBankLine, LetterheadSignatoryLine } from "@/components/invoice/InvoiceLetterheadSection";
+import DocumentLetterheadHeader from "@/components/invoice/DocumentLetterheadHeader";
+import { LetterheadBankLine, LetterheadSignatoryLine } from "@/components/invoice/InvoiceLetterheadSection";
+import {
+  documentFromCompanyForSubmit,
+  getDefaultDocumentFromCompany,
+  mergeDocumentFromCompany,
+} from "@/lib/documentFromCompany";
 
 
 // Remove local generation - will fetch from API
@@ -20,6 +26,10 @@ export default function QuotationForm() {
   // console.log("customer id from url:", customerIdFromUrl);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [documentFromCompany, setDocumentFromCompany] = useState(
+    getDefaultDocumentFromCompany,
+  );
+  const letterheadRef = useRef(null);
   const [showCustomerModal, setShowCustomerModal] =
     useState(!customerIdFromUrl);
   const [customerIdInput, setCustomerIdInput] = useState("");
@@ -510,6 +520,7 @@ export default function QuotationForm() {
         sgstRate: effectiveSgstRate,
         igstRate: effectiveIgstRate,
         terms: editableTerms,
+        ...documentFromCompanyForSubmit(documentFromCompany, letterheadRef),
       };
 
       // --- Log the data being sent to the API ---
@@ -650,21 +661,11 @@ export default function QuotationForm() {
         className="space-y-6 max-w-5xl mx-auto px-4 text-gray-800"
       >
         {/* Header */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border p-4 rounded bg-gray-50 gap-4">
-          {/* Logo */}
-          <Image
-            src="/images/logo.png"
-            alt="Dynaclean Logo"
-            width={120}
-            height={80}
-            className="object-contain"
-            unoptimized
-          />
-
-          {/* Company Info */}
-          <LetterheadCompanyInfo />
-        
-        </div>
+        <DocumentLetterheadHeader
+          ref={letterheadRef}
+          values={documentFromCompany}
+          onChange={setDocumentFromCompany}
+        />
 
         {/* Quote Info */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-gray-50 p-4 rounded">
@@ -924,7 +925,7 @@ export default function QuotationForm() {
           {/* Bank Details */}
           <div className="lg:col-span-1 border p-4 rounded bg-gray-50 text-sm">
             <h4 className="font-semibold mb-2">Bank Details</h4>
-            <LetterheadBankLine label="A/C Holder Name" />
+            <LetterheadBankLine label="A/C Holder Name" values={documentFromCompany} />
             <p>Bank Name : ICICI Bank</p>
             <p>A/c no. : 343405500379</p>
             <p>Branch & IFS Code: ICIC0003434</p>
@@ -933,7 +934,7 @@ export default function QuotationForm() {
           {/* Signatory */}
           <div className="lg:col-span-1 border p-4 rounded bg-gray-50 text-sm text-center flex flex-col justify-between">
             <div>
-              <LetterheadSignatoryLine />
+              <LetterheadSignatoryLine values={documentFromCompany} />
               <Image
                 src="/images/sign.png"
                 alt="Sign"

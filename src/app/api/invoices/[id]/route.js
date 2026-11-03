@@ -5,6 +5,13 @@ import { canAccessPerformaInvoice } from "@/lib/performaInvoiceAccess";
 import { ensureInvoiceItemsInsertReady } from "@/lib/ensureInvoiceItemsAutoIncrement";
 import { refreshOrdersAfterInvoiceRemoved } from "@/lib/orderInvoicePaymentClear";
 import { syncInvoiceAndOrderPaymentLink } from "@/lib/syncInvoiceOrderPaymentLink";
+import { ensureDocumentFromCompanyColumns } from "@/lib/ensureDocumentFromCompanyColumns";
+import {
+  canEditDocumentLetterhead,
+  documentFromCompanyInsertValues,
+  documentFromCompanyUpdateSetSql,
+  letterheadPayloadForRole,
+} from "@/lib/documentFromCompany";
 
 export async function GET(_req, context) {
   try {
@@ -123,6 +130,52 @@ export async function PATCH(req, context) {
     const body = await req.json();
 
     const {
+    if (body.letterhead_only === true) {
+      if (!canEditDocumentLetterhead(payload)) {
+        return NextResponse.json(
+          { error: "Not allowed to edit letterhead" },
+          { status: 403 },
+        );
+      }
+
+      const pool = await getDbConnection();
+      await ensureDocumentFromCompanyColumns(pool);
+      let letterheadConn;
+      try {
+        letterheadConn = await pool.getConnection();
+
+        const [[existingLh]] = await letterheadConn.execute(
+          `SELECT * FROM invoices WHERE id = ? LIMIT 1`,
+          [invoiceId],
+        );
+        if (!existingLh) {
+          return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+        }
+        if (!canAccessPerformaInvoice(payload, existingLh)) {
+          return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+        }
+
+        const letterhead = letterheadPayloadForRole(body, payload, existingLh);
+        const docSet = documentFromCompanyUpdateSetSql();
+        const docVals = documentFromCompanyInsertValues(letterhead);
+
+        const [updateResult] = await letterheadConn.execute(
+          `UPDATE invoices SET ${docSet} WHERE id = ?`,
+          [...docVals, invoiceId],
+        );
+        if (!updateResult?.affectedRows) {
+          return NextResponse.json(
+            { error: "Invoice letterhead was not updated" },
+            { status: 404 },
+          );
+        }
+
+        return NextResponse.json({ success: true, letterhead });
+      } finally {
+        letterheadConn?.release?.();
+      }
+    }
+
       quotation_id = null,
       invoice_number,
       invoice_date,
@@ -182,6 +235,7 @@ export async function PATCH(req, context) {
 
     const pool = await getDbConnection();
 
+    await ensureDocumentFromCompanyColumns(pool);
     let linkedTransIdsSql;
     if (Array.isArray(bodyLinkedTransIds)) {
       linkedTransIdsSql =
@@ -254,6 +308,7 @@ export async function PATCH(req, context) {
 
     const [[existing]] = await conn.execute(
       `SELECT id, type, created_by, employee_name FROM invoices WHERE id = ? LIMIT 1`,
+      `SELECT * FROM invoices WHERE id = ? LIMIT 1`,
       [invoiceId],
     );
     if (!existing) {
@@ -263,6 +318,9 @@ export async function PATCH(req, context) {
       return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
     }
 
+    const letterhead = letterheadPayloadForRole(body, payload, existing);
+    const docSet = documentFromCompanyUpdateSetSql();
+    const docVals = documentFromCompanyInsertValues(letterhead);
     const [[dup]] = await conn.execute(
       `SELECT id FROM invoices WHERE invoice_number = ? AND id != ? LIMIT 1`,
       [invoice_number, invoiceId],
@@ -321,6 +379,8 @@ export async function PATCH(req, context) {
           cgst_rate = COALESCE(?, cgst_rate), sgst_rate = COALESCE(?, sgst_rate), igst_rate = COALESCE(?, igst_rate),
           status = ?,
           created_at = ?
+          created_at = ?,
+          ${docSet}
         WHERE id = ?`,
         [
           quotation_id,
@@ -361,7 +421,7 @@ export async function PATCH(req, context) {
           bodyIgstRate,
           bodyStatus,
           createdAtSql,
-          invoiceId,
+          ...docVals,
         ],
       );
     } else {
@@ -377,6 +437,8 @@ export async function PATCH(req, context) {
           customer_id = ?, linked_trans_ids = ?,
           cgst_rate = COALESCE(?, cgst_rate), sgst_rate = COALESCE(?, sgst_rate), igst_rate = COALESCE(?, igst_rate),
           status = ?
+          status = ?,
+          ${docSet}
         WHERE id = ?`,
         [
           quotation_id,
@@ -416,7 +478,7 @@ export async function PATCH(req, context) {
           bodySgstRate,
           bodyIgstRate,
           bodyStatus,
-          invoiceId,
+          ...docVals,
         ],
       );
     }

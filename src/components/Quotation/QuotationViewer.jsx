@@ -4,9 +4,8 @@ import { useRef, useState, useMemo, forwardRef, useImperativeHandle } from "reac
 import Link from "next/link";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
-import Image from "next/image";
+import LetterheadDocumentBlock from "@/components/invoice/LetterheadDocumentBlock";
 import {
-  LetterheadViewerInfo,
   LetterheadBankLine,
   LetterheadSignatoryLine,
 } from "@/components/invoice/InvoiceLetterheadSection";
@@ -405,20 +404,8 @@ export default forwardRef(function QuotationViewer({
         className="bg-white p-4 sm:p-6 space-y-6 shadow rounded"
         style={{ color: "#000", backgroundColor: "#fff" }}
       >
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border p-4 rounded bg-gray-50 gap-4">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-            <Image
-              src="/images/logo.png"
-              alt="Logo"
-              width={100}
-              height={60}
-              className="object-contain"
-              unoptimized
-            />
-            <LetterheadViewerInfo />
-          </div>
-        </div>
+        {/* Header — same layout as tax invoice */}
+        <LetterheadDocumentBlock values={header} />
         <div className="text-center">
           <span className="text-gray-800">
             {isInvoice ? "Tax Invoice" : "Quotation / Proforma Invoice"}
@@ -646,7 +633,7 @@ export default forwardRef(function QuotationViewer({
           {/* Bank */}
           <div className="border p-4 rounded bg-gray-50">
             <h4 className="font-semibold mb-1">Bank Details</h4>
-            <LetterheadBankLine label="A/C Holder Name" />
+            <LetterheadBankLine label="A/C Holder Name" values={header} />
             <p>ICICI Bank</p>
             <p>Account: 343405500379</p>
             <p>IFSC: ICIC0003434</p>
@@ -655,7 +642,7 @@ export default forwardRef(function QuotationViewer({
           {/* Signatory */}
           <div className="border p-4 rounded bg-gray-50 text-center flex flex-col justify-between">
             <div>
-              <LetterheadSignatoryLine />
+              <LetterheadSignatoryLine values={header} />
               <Image
                 src="/images/sign.png"
                 alt="Sign"

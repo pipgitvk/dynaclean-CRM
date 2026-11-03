@@ -1,13 +1,19 @@
 "use client";
 
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import toast from "react-hot-toast";
 import QuotationItemsTable from "@/app/admin-dashboard/quotations/new/quotation-table";
 import TaxAndSummary from "@/app/admin-dashboard/quotations/new/TaxAndSummary";
-import { LetterheadCompanyInfo, LetterheadBankLine, LetterheadSignatoryLine } from "@/components/invoice/InvoiceLetterheadSection";
+import DocumentLetterheadHeader from "@/components/invoice/DocumentLetterheadHeader";
+import { LetterheadBankLine, LetterheadSignatoryLine } from "@/components/invoice/InvoiceLetterheadSection";
+import {
+  documentFromCompanyForSubmit,
+  getDefaultDocumentFromCompany,
+  mergeDocumentFromCompany,
+} from "@/lib/documentFromCompany";
 
 
 export default function QuotationEditForm({ quoteId }) {
@@ -34,6 +40,10 @@ export default function QuotationEditForm({ quoteId }) {
   const [roundOff, setRoundOff] = useState(0);
   const [isAutoRoundOff, setIsAutoRoundOff] = useState(true);
   const [editableTerms, setEditableTerms] = useState("");
+  const [documentFromCompany, setDocumentFromCompany] = useState(
+    getDefaultDocumentFromCompany,
+  );
+  const letterheadRef = useRef(null);
   const [originalSnapshot, setOriginalSnapshot] = useState(null);
 
   // State dropdown helpers (same as new form)
@@ -84,9 +94,10 @@ export default function QuotationEditForm({ quoteId }) {
       roundOff,
       isAutoRoundOff,
       editableTerms,
+      documentFromCompany,
     };
     return !deepEqual(originalSnapshot, currentSnapshot);
-  }, [originalSnapshot, form, items, quoteDate, cgstRate, sgstRate, igstRate, roundOff, isAutoRoundOff, editableTerms]);
+  }, [originalSnapshot, form, items, quoteDate, cgstRate, sgstRate, igstRate, roundOff, isAutoRoundOff, editableTerms, documentFromCompany]);
 
   const getStateFromGSTIN = (gstin) => {
     if (!gstin || gstin.length < 2) return null;
@@ -133,6 +144,9 @@ export default function QuotationEditForm({ quoteId }) {
         
         const origTerms = h.term_con || "";
         setEditableTerms(origTerms);
+
+        const origLetterhead = mergeDocumentFromCompany(h);
+        setDocumentFromCompany(origLetterhead);
         
         const origCgst = parseFloat(h.cgst_rate) || 0;
         const origSgst = parseFloat(h.sgst_rate) || 0;
@@ -219,6 +233,7 @@ export default function QuotationEditForm({ quoteId }) {
           roundOff: origRound,
           isAutoRoundOff: true,
           editableTerms: origTerms,
+          documentFromCompany: origLetterhead,
         });
       } catch (err) {
         console.error("Error loading quotation:", err);
@@ -319,6 +334,7 @@ export default function QuotationEditForm({ quoteId }) {
         igstRate: effectiveIgstRate,
         terms: editableTerms,
         has_changes: hasChanges,
+        ...documentFromCompanyForSubmit(documentFromCompany, letterheadRef),
       };
 
       const res = await fetch(`/api/quotations/${encodeURIComponent(quoteId)}/admin-update`, {
@@ -386,19 +402,14 @@ export default function QuotationEditForm({ quoteId }) {
         </button>
       </div>
 
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border p-4 rounded bg-gray-50 gap-4">
-        <Image
-          src="/images/logo.png"
-          alt="Dynaclean Logo"
-          width={120}
-          height={80}
-          className="object-contain"
-          unoptimized
-        />
-        <LetterheadCompanyInfo />
-        
-      </div>
+      <DocumentLetterheadHeader
+        ref={letterheadRef}
+        values={documentFromCompany}
+        onChange={setDocumentFromCompany}
+        persistTargetId={
+          quoteId ? { type: "quotation", id: quoteId } : null
+        }
+      />
 
       {/* Quote Info */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-gray-50 p-4 rounded">

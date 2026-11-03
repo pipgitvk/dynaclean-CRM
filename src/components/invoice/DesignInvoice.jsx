@@ -1725,12 +1725,11 @@ import React from "react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import Image from "next/image";
-import dynacleanLogo from "@/components/logo1.jpg";
 import html2canvas from "html2canvas";
 import DownloadPDFButton from "@/app/admin-dashboard/invoices/DownloadButton";
 import InvoicePDFPreview from "../Preview";
 import { numberToWords } from "@/utils/NumbertoWord";
-import { INVOICE_LETTERHEAD } from "@/lib/invoiceLetterhead";
+import { toInvoiceLetterheadShape, resolveLogoSrc } from "@/lib/documentFromCompany";
 import { filterTermsWhenNotesHasCamc } from "@/lib/performaInvoiceTerms";
 import { isInvoiceCancelledDisplay } from "@/lib/resolveInvoiceCancelledDisplay";
 
@@ -1888,7 +1887,7 @@ const NewInvoice = ({ invoice }) => {
   const itemsArray = createItemsArray();
 
   const data = {
-    company: { ...INVOICE_LETTERHEAD },
+    company: toInvoiceLetterheadShape(invoice),
     buyer: {
       name: invoice.customer_name || "",
       address: invoice.billing_address || "",
@@ -2037,12 +2036,19 @@ const NewInvoice = ({ invoice }) => {
     },
   };
 
-  const [logoSrc, setLogoSrc] = React.useState(dynacleanLogo.src);
+  const [logoSrc, setLogoSrc] = React.useState(() =>
+    resolveLogoSrc(invoice?.logo_file),
+  );
   const [logoErrorStep, setLogoErrorStep] = React.useState(0);
   const [signatureSrc, setSignatureSrc] = React.useState(
     INVOICE_SIGNATURE_CANDIDATES[0],
   );
   const [signatureErrorStep, setSignatureErrorStep] = React.useState(0);
+
+  React.useEffect(() => {
+    setLogoSrc(resolveLogoSrc(invoice?.logo_file));
+    setLogoErrorStep(0);
+  }, [invoice?.logo_file]);
 
   const handleLogoError = () => {
     if (logoErrorStep === 0) {
@@ -2833,7 +2839,7 @@ const NewInvoice = ({ invoice }) => {
                       color: "#000",
                     }}
                   >
-                    {INVOICE_LETTERHEAD.name}
+                    {data.company.name}
                   </div>
                   <div
                     style={{
@@ -2844,7 +2850,7 @@ const NewInvoice = ({ invoice }) => {
                       fontWeight: 400,
                     }}
                   >
-                    {INVOICE_LETTERHEAD.addressLine1}
+                    {data.company.addressLine1}
                   </div>
                   <div
                     style={{
@@ -2855,7 +2861,7 @@ const NewInvoice = ({ invoice }) => {
                       fontWeight: 400,
                     }}
                   >
-                    {INVOICE_LETTERHEAD.addressLine2}
+                    {data.company.addressLine2}
                   </div>
                   <div
                     style={{
@@ -2866,7 +2872,7 @@ const NewInvoice = ({ invoice }) => {
                       fontWeight: 400,
                     }}
                   >
-                    Ph: {INVOICE_LETTERHEAD.phone}
+                    Ph: {data.company.phone}
                   </div>
                   <div
                     style={{
@@ -2877,7 +2883,18 @@ const NewInvoice = ({ invoice }) => {
                       fontWeight: 400,
                     }}
                   >
-                    GST: {INVOICE_LETTERHEAD.gstin}, State: {INVOICE_LETTERHEAD.state}
+                    Email: {data.company.email}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: "10px",
+                      lineHeight: 1.45,
+                      marginBottom: "3px",
+                      color: "#000",
+                      fontWeight: 400,
+                    }}
+                  >
+                    GST: {data.company.gstin}, State: {data.company.state}
                   </div>
                   <div
                     style={{
@@ -2887,7 +2904,7 @@ const NewInvoice = ({ invoice }) => {
                       fontWeight: 400,
                     }}
                   >
-                    CIN: {INVOICE_LETTERHEAD.cin}
+                    CIN: {data.company.cin}
                   </div>
                     </div>
                   </div>

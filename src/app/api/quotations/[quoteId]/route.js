@@ -1,5 +1,11 @@
 // app/api/quotations/[quoteId]/route.js
 import { getDbConnection } from "@/lib/db";
+import { ensureDocumentFromCompanyColumns } from "@/lib/ensureDocumentFromCompanyColumns";
+import {
+  documentFromCompanyUpdateSetSql,
+  documentFromCompanyInsertValues,
+  letterheadPayloadForRole,
+} from "@/lib/documentFromCompany";
 import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 
@@ -18,6 +24,7 @@ export async function GET(req, { params }) {
 
   try {
     conn = await pool.getConnection();
+    await ensureDocumentFromCompanyColumns(conn);
     const [headerRows] = await conn.execute(
       "SELECT * FROM quotations_records WHERE quote_number = ?",
       [quoteNumber],
@@ -119,6 +126,7 @@ export async function PUT(req, { params }) {
 
   try {
     conn = await pool.getConnection();
+    await ensureDocumentFromCompanyColumns(conn);
     const body = await req.json();
     const {
       company,
@@ -144,6 +152,10 @@ export async function PUT(req, { params }) {
 
     await conn.beginTransaction();
 
+    const letterhead = letterheadPayloadForRole(body, payload.role);
+    const docSet = documentFromCompanyUpdateSetSql();
+    const docVals = documentFromCompanyInsertValues(letterhead);
+
     await conn.execute(
       `UPDATE quotations_records SET
         quote_date = ?,
@@ -162,7 +174,8 @@ export async function PUT(req, { params }) {
         round_off = ?,
         grand_total = ?,
         term_con = ?,
-        payment_term_days = ?
+        payment_term_days = ?,
+        ${docSet}
       WHERE quote_number = ?`,
       [
         quote_date,
@@ -182,6 +195,7 @@ export async function PUT(req, { params }) {
         grand_total,
         terms,
         payment_term_days,
+        ...docVals,
         quoteId,
       ],
     );

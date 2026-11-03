@@ -4,6 +4,14 @@
 import { getDbConnection } from "@/lib/db";
 import { NextResponse } from "next/server";
 import { getSessionPayload } from "@/lib/auth";
+import { ensureDocumentFromCompanyColumns } from "@/lib/ensureDocumentFromCompanyColumns";
+import {
+  documentFromCompanyInsertColumnSql,
+  documentFromCompanyInsertPlaceholders,
+  documentFromCompanyInsertValues,
+  documentFromCompanyUpdateSetSql,
+  letterheadPayloadForRole,
+} from "@/lib/documentFromCompany";
 
 /**
  * Extract state code from GSTIN and return state info
@@ -191,8 +199,7 @@ export async function POST(req) {
     const pool = await getDbConnection();
     conn = await pool.getConnection();
 
-    // Auto-fix s_no schema issue (renamed from "S. NO." — may still be PK)
-    await fixSnoSchemaIfNeeded(conn);
+    await ensureDocumentFromCompanyColumns(conn);
 
     await conn.beginTransaction();
 
@@ -201,6 +208,12 @@ export async function POST(req) {
     const dateStr = now.toISOString().slice(0, 10).replace(/-/g, ""); // YYYYMMDD
     const todayPrefix = `QUOTE${dateStr}`;
     const serverQuoteDate = quote_date || now.toISOString().split("T")[0];
+
+    await fixSnoSchemaIfNeeded(conn);
+    const letterhead = letterheadPayloadForRole(body, payload.role);
+    const docCols = documentFromCompanyInsertColumnSql();
+    const docPh = documentFromCompanyInsertPlaceholders();
+    const docVals = documentFromCompanyInsertValues(letterhead);
 
     let attempt = 0;
     let finalQuoteNumber = "";
@@ -264,8 +277,8 @@ export async function POST(req) {
         // Try inserting the header row
         await conn.execute(
           `INSERT INTO quotations_records 
-           (quote_number, quote_date, customer_id, company_name, company_address, state, gstin, ship_to, qty, gst, cgst_rate, sgst_rate, igst_rate, emp_name, subtotal, round_off, grand_total, term_con, payment_term_days, created_at) 
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+           (quote_number, quote_date, customer_id, company_name, company_address, state, gstin, ship_to, qty, gst, cgst_rate, sgst_rate, igst_rate, emp_name, subtotal, round_off, grand_total, term_con, payment_term_days, ${docCols}, created_at) 
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${docPh}, NOW())`,
           [
             finalQuoteNumber,
             serverQuoteDate,
@@ -286,6 +299,7 @@ export async function POST(req) {
             grand_total,
             terms,
             payment_term_days ?? null,
+            ...docVals,
           ]
         );
         // Success, break retry loop

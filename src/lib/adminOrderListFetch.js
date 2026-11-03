@@ -13,6 +13,7 @@ import { attachDeliveryBatchesToOrders } from "@/lib/orderDeliveryBatches";
 import { getAccountsOrderListUserRole } from "@/lib/accountsOrderListFetch";
 import { sqlOrderCreatedByEquals } from "@/lib/sqlCreatedByScope";
 import { normalizeOrderListDateRange } from "@/lib/orderTableDateDefaults";
+import { ensureDocumentFromCompanyColumns } from "@/lib/ensureDocumentFromCompanyColumns";
 
 let orderListSchemaReady = false;
 
@@ -36,6 +37,7 @@ const ORDER_LIST_SCHEMA_ALTERS = [
 
 export async function ensureAdminOrderListSchema(conn) {
   if (orderListSchemaReady) return;
+  await ensureDocumentFromCompanyColumns(conn);
   await ensureOrderLinkedPaymentColumns(conn);
   for (const sql of ORDER_LIST_SCHEMA_ALTERS) {
     try {

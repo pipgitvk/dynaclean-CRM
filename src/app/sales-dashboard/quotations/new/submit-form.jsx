@@ -1,13 +1,18 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import QuotationItemsTable from "./quotation-table";
 import TaxAndSummary from "./TaxAndSummary";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import toast from "react-hot-toast";
 import { Select } from "@headlessui/react";
-import { LetterheadCompanyInfo, LetterheadBankLine, LetterheadSignatoryLine } from "@/components/invoice/InvoiceLetterheadSection";
+import DocumentLetterheadHeader from "@/components/invoice/DocumentLetterheadHeader";
+import { LetterheadBankLine, LetterheadSignatoryLine } from "@/components/invoice/InvoiceLetterheadSection";
+import {
+  documentFromCompanyForSubmit,
+  getDefaultDocumentFromCompany,
+} from "@/lib/documentFromCompany";
 
 // Remove local generation - will fetch from API
 
@@ -17,6 +22,10 @@ export default function QuotationForm() {
   const customerIdFromUrl = searchParams.get("customerId");
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [documentFromCompany, setDocumentFromCompany] = useState(
+    getDefaultDocumentFromCompany,
+  );
+  const letterheadRef = useRef(null);
   const [showCustomerModal, setShowCustomerModal] =
     useState(!customerIdFromUrl);
   const [customerIdInput, setCustomerIdInput] = useState("");
@@ -492,6 +501,7 @@ Thanks for doing business with us!`,
         sgstRate,
         igstRate,
         terms: editableTerms,
+        ...documentFromCompanyForSubmit(documentFromCompany, letterheadRef),
       };
 
       // --- Log the data being sent to the API ---
@@ -587,18 +597,11 @@ Thanks for doing business with us!`,
         onSubmit={handleSubmit}
         className="space-y-6 max-w-5xl mx-auto px-4 text-gray-800"
       >
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border p-4 rounded bg-gray-50 gap-4">
-          <Image
-            src="/images/logo.png"
-            alt="Dynaclean Logo"
-            width={120}
-            height={80}
-            className="object-contain"
-            unoptimized
-          />
-          <LetterheadCompanyInfo />
-        
-        </div>
+        <DocumentLetterheadHeader
+          ref={letterheadRef}
+          values={documentFromCompany}
+          onChange={setDocumentFromCompany}
+        />
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-gray-50 p-4 rounded">
           <div>
             <label className="text-sm text-gray-600">Estimate No.</label>
