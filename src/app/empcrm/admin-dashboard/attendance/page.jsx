@@ -154,6 +154,23 @@ function currentMonthRange() {
   return { from: toYmd(first), to: toYmd(now) };
 }
 
+function monthValueFromDate(date = new Date()) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function rangeForMonthValue(monthValue) {
+  const match = String(monthValue || "").match(/^(\d{4})-(\d{2})$/);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const first = new Date(year, month - 1, 1);
+  const now = new Date();
+  const isCurrentMonth =
+    year === now.getFullYear() && month === now.getMonth() + 1;
+  const last = isCurrentMonth ? now : new Date(year, month, 0);
+  return { from: toYmd(first), to: toYmd(last) };
+}
+
 function formatLeaveSummaryDays(value) {
   const n = Number(value);
   if (!Number.isFinite(n)) return "0";
@@ -238,6 +255,7 @@ const AttendancePage = () => {
   const initialRange = currentMonthRange();
   const [fromDate, setFromDate] = useState(initialRange.from);
   const [toDate, setToDate] = useState(initialRange.to);
+  const [selectedMonth, setSelectedMonth] = useState(() => monthValueFromDate());
   const [filterStatus, setFilterStatus] = useState("all");
   const [selectedUser, setSelectedUser] = useState("all");
   /** Drives summary + table: "all" or one username after a successful load */
@@ -439,6 +457,7 @@ const AttendancePage = () => {
   };
 
   const handleFromDateChange = (v) => {
+    setSelectedMonth("");
     setFromDate(v);
     if (skipDateReloadRef.current > 0) {
       skipDateReloadRef.current -= 1;
@@ -448,6 +467,7 @@ const AttendancePage = () => {
   };
 
   const handleToDateChange = (v) => {
+    setSelectedMonth("");
     setToDate(v);
     if (skipDateReloadRef.current > 0) {
       skipDateReloadRef.current -= 1;
@@ -538,8 +558,19 @@ const AttendancePage = () => {
   const handleShowAll = () => {
     setFilterStatus("all");
     const { from, to } = currentMonthRange();
+    setSelectedMonth(monthValueFromDate());
     setFromDate(from);
     setToDate(to);
+  };
+
+  const handleMonthChange = (event) => {
+    const value = event.target.value;
+    setSelectedMonth(value);
+    const range = rangeForMonthValue(value);
+    if (!range) return;
+    setFromDate(range.from);
+    setToDate(range.to);
+    scheduleReloadForDates(range.from, range.to);
   };
 
   const handleSearch = async () => {
@@ -1271,6 +1302,13 @@ const AttendancePage = () => {
                 Show All
               </button>
               <div className="flex flex-row items-center gap-2 shrink-0">
+              <input
+                type="month"
+                value={selectedMonth}
+                onChange={handleMonthChange}
+                aria-label="Select attendance month"
+                className="w-[9.5rem] rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
               <TypeableDateFilterInput
                 value={fromDate}
                 onChange={handleFromDateChange}
