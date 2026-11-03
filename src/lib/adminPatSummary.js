@@ -128,12 +128,7 @@ async function fetchExpenseCategoryNames(conn) {
 }
 
 /** PAT Expenses (F) children: one row per expense head; sub-heads as nested children with +. */
-export async function fetchPatExpenseHeadLines(
-  conn,
-  dateFrom,
-  dateTo,
-  salaryBenefits = 0,
-) {
+export async function fetchPatExpenseHeadLines(conn, dateFrom, dateTo) {
   const lines = [];
   let expenseLineSeq = 0;
 
@@ -146,28 +141,6 @@ export async function fetchPatExpenseHeadLines(
       toggleKey: `F-${expenseLineSeq}`,
     });
   };
-
-  if (Number(salaryBenefits) > 0) {
-    const salaryKey = `F-${expenseLineSeq + 1}`;
-    pushExpenseLine({
-      label: "Employee Salary & Benefits",
-      amount: Number(salaryBenefits) || 0,
-      children: [
-        {
-          id: "",
-          toggleKey: `${salaryKey}-detail`,
-          label: "Approved / paid salary (period total)",
-          amount: Number(salaryBenefits) || 0,
-          lineDetailRows: [
-            {
-              label: "Source",
-              value: "monthly_salary_records for selected date range",
-            },
-          ],
-        },
-      ],
-    });
-  }
 
   let rows = [];
   try {
@@ -853,24 +826,7 @@ export async function buildAdminPatSummary(
 
   const grossProfit = totalRevenue - purchaseCogs;
 
-  const smFrom = salaryMonthFrom || salaryMonth;
-  const smTo = salaryMonthTo || salaryMonth || smFrom;
-  const salaryBenefits = await safeSum(
-    conn,
-    `SELECT COALESCE(SUM(net_salary), 0) AS total
-     FROM monthly_salary_records
-     WHERE salary_month >= ?
-       AND salary_month <= ?
-       AND LOWER(COALESCE(status, '')) IN ('approved', 'paid')`,
-    [smFrom, smTo],
-  );
-
-  const expenseLines = await fetchPatExpenseHeadLines(
-    conn,
-    dateFrom,
-    dateTo,
-    salaryBenefits,
-  );
+  const expenseLines = await fetchPatExpenseHeadLines(conn, dateFrom, dateTo);
 
   const totalExpenses = expenseLines.reduce(
     (sum, line) => sum + (Number(line.amount) || 0),
@@ -888,7 +844,7 @@ export async function buildAdminPatSummary(
     periodLabel,
     dateFrom,
     dateTo,
-    note: "All amounts ex-GST. Order-based lines (A, B, D) include only orders with invoice/report uploaded; cancelled, rejected, and returned orders are excluded. Line D COGS: latest purchase price first; if no purchase, product stock purchase_price (including 0); else spare purchase_price. Sale price is never used as COGS. Salary from monthly_salary_records; operating expenses from client_expenses (by entry date). Tax & interest are zero until configured.",
+    note: "All amounts ex-GST. Order-based lines (A, B, D) include only orders with invoice/report uploaded; cancelled, rejected, and returned orders are excluded. Line D COGS: latest purchase price first; if no purchase, product stock purchase_price (including 0); else spare purchase_price. Sale price is never used as COGS. Operating expenses from client_expenses (by entry date). Tax & interest are zero until configured.",
     lines: {
       revenueSales: {
         id: "A",
@@ -1229,23 +1185,7 @@ export async function fetchPatDrillRows(conn, section, dateFrom, dateTo) {
 
 /** Client expenses for PAT drill-down, grouped by calendar month (newest month first). */
 export async function fetchPatExpenseDrillByMonth(conn, dateFrom, dateTo) {
-  const smFrom = dayjs(dateFrom).format("YYYY-MM");
-  const smTo = dayjs(dateTo).format("YYYY-MM");
-  const salaryBenefits = await safeSum(
-    conn,
-    `SELECT COALESCE(SUM(net_salary), 0) AS total
-     FROM monthly_salary_records
-     WHERE salary_month >= ?
-       AND salary_month <= ?
-       AND LOWER(COALESCE(status, '')) IN ('approved', 'paid')`,
-    [smFrom, smTo],
-  );
-  const byHead = await fetchPatExpenseHeadLines(
-    conn,
-    dateFrom,
-    dateTo,
-    salaryBenefits,
-  );
+  const byHead = await fetchPatExpenseHeadLines(conn, dateFrom, dateTo);
 
   const [rows] = await conn.execute(
     `
