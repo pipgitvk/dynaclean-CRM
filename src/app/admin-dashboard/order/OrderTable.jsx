@@ -3055,6 +3055,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
   const isWarehouse = role === "warehouse incharge";
   const isDirector = role === "director";
   const isTeamLeader = role === "team leader";
+  const isRejected = isRejectedApprovalOrder(r);
   const canManageBookingActions =
     isSuperAdmin ||
     isAdmin ||
@@ -3105,7 +3106,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
     };
   }, [isOpen, toggleMenu]);
 
-  if (r.is_cancelled) {
+  if (r.is_cancelled && !isRejected) {
     return null;
   }
 
@@ -3146,7 +3147,21 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
           className="absolute right-0 mt-2 w-56 max-w-[calc(100vw-2rem)] origin-top-right rounded-lg bg-white shadow-lg ring-1 ring-black/5 z-20 border"
         >
           <div className="py-1 text-sm">
-            {accountantOnlyMenu ? (
+            {isRejected ? (
+              canViewSales ? (
+                <Link
+                  href={`/admin-dashboard/order/${r.order_id}`}
+                  className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
+                  title="View Sales"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <ClipboardList size={16} />
+                  <span>View Sales</span>
+                </Link>
+              ) : (
+                <span className="block px-3 py-2 text-gray-500">Rejected order</span>
+              )
+            ) : accountantOnlyMenu ? (
               <>
                 <AccountantReportActionLinks
                   order={r}
