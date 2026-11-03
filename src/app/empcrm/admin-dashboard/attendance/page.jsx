@@ -41,6 +41,11 @@ import {
   leaveDateRangeKeys,
 } from "@/lib/leaveDateRange";
 import { normalizeUsernameKey } from "@/lib/attendanceCanonicalUsername";
+import {
+  countsHalfDayInSummaryForPresent,
+  isPayrollHalfDayFromUnapprovedAutoCheckout,
+  presentCreditForPresentRow,
+} from "@/lib/attendanceLogForPayroll";
 
 /** HH:mm for <input type="time"> from a DB datetime string. */
 function timeInputFromDbValue(value) {
@@ -970,18 +975,24 @@ const AttendancePage = () => {
       if (log.type === "holiday") acc.holidays++;
       if (log.type === "sunday" || log.isSunday) acc.sundays++;
       if (log.type === "present") {
-        acc.present++;
+        acc.present += presentCreditForPresentRow(log);
         const username = log.username;
         if (!graceCounters[username]) {
           graceCounters[username] = 0;
         }
-        const { isHalfDay: halfDayFlag, graceUsed } = isHalfDayWithGrace(
-          log,
-          rulesFor(username),
-          graceCounters[username],
-        );
-        graceCounters[username] = graceUsed;
-        if (halfDayFlag) {
+        let halfDayFlag;
+        if (isPayrollHalfDayFromUnapprovedAutoCheckout(log)) {
+          halfDayFlag = true;
+        } else {
+          const result = isHalfDayWithGrace(
+            log,
+            rulesFor(username),
+            graceCounters[username],
+          );
+          halfDayFlag = result.isHalfDay;
+          graceCounters[username] = result.graceUsed;
+        }
+        if (countsHalfDayInSummaryForPresent(log, halfDayFlag ? "halfDay" : "regular")) {
           acc.halfDays++;
           halfDayKeys.add(timelineLogKey(log));
         }
@@ -1174,7 +1185,7 @@ const AttendancePage = () => {
               </p>
               <p className="text-sm text-gray-500">Present</p>
               <p className="text-[11px] text-gray-400 mt-0.5">
-                Full day punch = 1; paid half-day work = 0.5
+                Full day = 1; unapproved auto check-out = 0.5
               </p>
             </div>
             <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
@@ -1364,6 +1375,22 @@ const AttendancePage = () => {
                     log.type === "unpaidleave") && (
                     <div className="rounded-md bg-blue-50/80 px-3 py-2">
                       <LeaveDayStatusBlock log={log} className="text-left" />
+                    </div>
+                  )}
+                  {log.type === "present" && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-semibold text-gray-900">
+                        Status:
+                      </span>
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                          halfDayKeys.has(timelineLogKey(log))
+                            ? "bg-orange-100 text-orange-700"
+                            : "bg-green-100 text-green-700"
+                        }`}
+                      >
+                        {halfDayKeys.has(timelineLogKey(log)) ? "Half Day" : "Present"}
+                      </span>
                     </div>
                   )}
                   <div className="flex items-center justify-between">
@@ -1724,7 +1751,21 @@ const AttendancePage = () => {
                             : ""
                         }`}
                       >
-                        <LeaveDayStatusBlock log={log} className="text-left" />
+                        {log.type === "present" ? (
+                          <span
+                            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
+                              halfDayKeys.has(timelineLogKey(log))
+                                ? "bg-orange-100 text-orange-700"
+                                : "bg-green-100 text-green-700"
+                            }`}
+                          >
+                            {halfDayKeys.has(timelineLogKey(log))
+                              ? "Half Day"
+                              : "Present"}
+                          </span>
+                        ) : (
+                          <LeaveDayStatusBlock log={log} className="text-left" />
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {log.username}
