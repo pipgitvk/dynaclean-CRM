@@ -42,6 +42,7 @@ export async function GET(request) {
         rl.empId,
         ep.bank_name,
         ep.bank_account_number,
+        ep.ifsc_code,
         ep.pf_uan,
         ep.esic_number,
         ep.pan_number,

@@ -580,7 +580,7 @@ const GenerateSalaryPage = () => {
             ...(pf > 0
                 ? [
                       {
-                          deduction_name: 'PF',
+                          deduction_name: 'Provident Fund (PF)',
                           calculatedAmount: pf,
                           _fromStructure: true,
                       },
@@ -659,6 +659,16 @@ const GenerateSalaryPage = () => {
             profile?.bank_account ||
             profile?.bankAccountNumber ||
             "-";
+        const bankIfscFromProfile =
+            profile?.ifsc_code ||
+            profile?.ifsc ||
+            profile?.ifscCode ||
+            "";
+        const pfUanFromProfile =
+            profile?.pf_uan ||
+            profile?.uan ||
+            profile?.pfUan ||
+            "";
         const panFromProfile =
             profile?.pan_number ||
             profile?.pan_no ||
@@ -677,6 +687,8 @@ const GenerateSalaryPage = () => {
             designation: profile?.designation || emp?.userRole || "-",
             bankName: bankNameFromProfile,
             bankAccount: bankAccountFromProfile,
+            bankIfsc: bankIfscFromProfile,
+            pfUan: pfUanFromProfile,
             pan: panFromProfile,
             dateOfJoining,
             workingDays: formData.working_days,
@@ -1531,9 +1543,9 @@ const GenerateSalaryPage = () => {
                                     <div className="space-y-2 text-sm">
                                         <div className="flex justify-between"><span>Basic Salary</span> <span>{formatCurrency(calculation.basicSalary)}</span></div>
                                         <div className="flex justify-between"><span>HRA</span> <span>{formatCurrency(calculation.hra)}</span></div>
-                                        <div className="flex justify-between"><span>Transport Allw.</span> <span>{formatCurrency(calculation.transportAllowance)}</span></div>
-                                        <div className="flex justify-between"><span>Medical Allw.</span> <span>{formatCurrency(calculation.medicalAllowance)}</span></div>
-                                        <div className="flex justify-between"><span>Special Allw.</span> <span>{formatCurrency(calculation.specialAllowance)}</span></div>
+                                        <div className="flex justify-between"><span>Transport Allowance</span> <span>{formatCurrency(calculation.transportAllowance)}</span></div>
+                                        <div className="flex justify-between"><span>Medical Allowance</span> <span>{formatCurrency(calculation.medicalAllowance)}</span></div>
+                                        <div className="flex justify-between"><span>Special Allowance</span> <span>{formatCurrency(calculation.specialAllowance)}</span></div>
                                         <div className="flex justify-between"><span>Bonus</span> <span>{formatCurrency(calculation.bonus)}</span></div>
                                         <div className="border-t border-green-200 mt-2 pt-2 flex justify-between font-bold text-green-900">
                                             <span>Total</span> <span>{formatCurrency(calculation.totalEarnings)}</span>

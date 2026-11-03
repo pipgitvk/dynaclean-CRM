@@ -215,6 +215,8 @@ export function buildPayslipOptsFromMonthlyRecord(record) {
     designation: r.userRole || r.userDepartment || r.department || "-",
     bankName: r.bank_name || "-",
     bankAccount: r.bank_account_number || "-",
+    bankIfsc: r.ifsc_code || r.ifsc || "",
+    pfUan: r.pf_uan || r.uan || "",
     pan: r.pan_number || "-",
     dateOfJoining,
     workingDays:
@@ -319,6 +321,8 @@ export const buildTemplatePayslipHTML = (opts) => {
     designation,
     bankName,
     bankAccount,
+    bankIfsc,
+    pfUan,
     pan,
     dateOfJoining,
     workingDays,
@@ -329,14 +333,16 @@ export const buildTemplatePayslipHTML = (opts) => {
   } = opts;
 
   const c = calculation;
-  const EARN_ROW_COUNT = 7;
+  const bankAcNoDisplay = String(bankAccount ?? "").trim() || "-";
+  const ifscDisplay = String(bankIfsc ?? "").trim() || "-";
+  const uanDisplay = String(pfUan ?? "").trim() || "-";
+  const EARN_ROW_COUNT = 6;
   const earningsLabels = [
     "Basic Salary",
     "HRA",
-    "Transport Allw.",
-    "Medical Allw.",
-    "Special Allw.",
-    "Bonus",
+    "Transport Allowance",
+    "Medical Allowance",
+    "Special Allowance",
     "Overtime",
   ];
   const earningAmounts = [
@@ -345,7 +351,6 @@ export const buildTemplatePayslipHTML = (opts) => {
     c.transportAllowance,
     c.medicalAllowance,
     Number(c.specialAllowance) || 0,
-    Number(c.bonus) || 0,
     Number(c.overtimeAmount) || 0,
   ];
 
@@ -356,7 +361,7 @@ export const buildTemplatePayslipHTML = (opts) => {
   const esiFromStruct = Number(c.esi) || 0;
 
   const structureDeds = [
-    { deduction_name: "PF", calculatedAmount: pfDisplay },
+    { deduction_name: "Provident Fund (PF)", calculatedAmount: pfDisplay },
     { deduction_name: "ESI", calculatedAmount: esiFromStruct },
     {
       deduction_name: "Health Insurance",
@@ -448,9 +453,15 @@ export const buildTemplatePayslipHTML = (opts) => {
     </tr>
     <tr>
       <td style="padding:4px 6px;border:1px solid #333;background:#e8f4fc;font-weight:bold;">Bank A/C No.</td>
-      <td style="padding:4px 6px;border:1px solid #333;">${bankAccount || "-"}</td>
+      <td style="padding:4px 6px;border:1px solid #333;">${bankAcNoDisplay}</td>
+      <td style="padding:4px 6px;border:1px solid #333;background:#e8f4fc;font-weight:bold;">IFSC Code</td>
+      <td style="padding:4px 6px;border:1px solid #333;">${ifscDisplay}</td>
+    </tr>
+    <tr>
       <td style="padding:4px 6px;border:1px solid #333;background:#e8f4fc;font-weight:bold;">Date Of Joining</td>
       <td style="padding:4px 6px;border:1px solid #333;">${dateOfJoining || "-"}</td>
+      <td style="padding:4px 6px;border:1px solid #333;background:#e8f4fc;font-weight:bold;">UAN No.</td>
+      <td style="padding:4px 6px;border:1px solid #333;">${uanDisplay}</td>
     </tr>
     <tr>
       <td style="padding:4px 6px;border:1px solid #333;background:#e8f4fc;font-weight:bold;">PAN No.</td>
