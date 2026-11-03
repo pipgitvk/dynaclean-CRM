@@ -1,12 +1,12 @@
-// app/service-reports/page.js
-
 import { getDbConnection } from "@/lib/db";
 import { formatCrmDateOnly } from "@/lib/crmDateFormat";
 import ServiceTable from "@/components/services/ServiceTable";
 import { getSessionPayload } from "@/lib/auth";
 import { normalizeRoleKey } from "@/lib/roleKeyUtils";
+import { ensureServiceReportStepsTable } from "@/lib/ensureServiceReportStepsTable";
+import { ensureServiceRecordsFollowupColumns } from "@/lib/ensureServiceRecordsFollowupColumns";
+import { ensureServiceRecordsPlannedDateColumn } from "@/lib/ensureServiceRecordsPlannedDateColumn";
 
-// ✅ Disable caching to always fetch fresh data from database
 export const revalidate = 0;
 export const dynamic = "force-dynamic";
 
@@ -16,6 +16,7 @@ const PRIVILEGED_ROLES = [
   "SERVICE HEAD",
   "TEAM LEADER",
   "SALES CUM BACKOFFICE",
+  "SERVICE SUPPORT",
 ];
 
 function canViewAllServiceRecords(role) {
@@ -36,6 +37,9 @@ export default async function ViewServiceReportsPage() {
   const isPrivileged = canViewAllServiceRecords(role);
 
   try {
+    await ensureServiceReportStepsTable();
+    await ensureServiceRecordsFollowupColumns();
+    await ensureServiceRecordsPlannedDateColumn();
     const conn = await getDbConnection();
 
     const whereClause = isPrivileged ? "" : "WHERE sr.assigned_to = ?";
@@ -44,10 +48,15 @@ export default async function ViewServiceReportsPage() {
     const sql = `
       SELECT
         sr.*,
+        srs.video_360,
+        srs.video_problem,
+        srs.video_damaged,
+        srs.video_completion,
         wp.customer_name AS customer_name_from_wp,
         wp.contact_person AS contact_person_from_wp,
         wp.installed_address AS installed_address_from_wp,
         wp.id AS machine_id, wp.email, wp.contact, wp.invoice_date, wp.product_name, wp.specification, wp.model,
+        wp.lat, wp.longt,
         (
           SELECT GROUP_CONCAT(srp.id ORDER BY srp.id SEPARATOR ',')
           FROM service_reports srp
@@ -65,6 +74,7 @@ export default async function ViewServiceReportsPage() {
           ELSE 0
         END AS view_status
       FROM service_records sr
+      LEFT JOIN service_report_steps srs ON srs.service_id = sr.service_id
       LEFT JOIN warranty_products wp ON TRIM(sr.serial_number) COLLATE utf8mb4_unicode_ci = TRIM(wp.serial_number) COLLATE utf8mb4_unicode_ci
       ${whereClause}
       ORDER BY sr.service_id DESC;
@@ -72,30 +82,25 @@ export default async function ViewServiceReportsPage() {
 
     const [rows] = await conn.execute(sql, params);
 
-    // console.log("this is the rows: ", rows);
-
     serviceRecords = rows.map((row) => ({
       ...row,
       customer_name: row.customer_name_from_wp || row.contact_person_from_wp || "N/A",
       installed_address: row.installed_address_from_wp || "N/A",
-      // Ensure the date fields are converted to a readable string format
       completed_date: row.completed_date
         ? formatCrmDateOnly(row.completed_date)
         : "N/A",
     }));
-
-    // conn.end();
   } catch (error) {
     console.error("Error fetching service records:", error);
     serviceRecords = [];
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 p-4 sm:p-8">
-      <div className=" mx-auto">
-        <h2 className="text-3xl  text-gray-800 text-center">Service Reports</h2>
-        <ServiceTable serviceRecords={serviceRecords} role={role} />
-      </div>
+    <div className="p-2 sm:p-4 lg:p-6">
+      <h2 className="text-xl sm:text-2xl lg:text-3xl text-gray-800 mb-4">
+        Service Reports
+      </h2>
+      <ServiceTable serviceRecords={serviceRecords} role={role} />
     </div>
   );
 }

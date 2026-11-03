@@ -264,7 +264,10 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
       <Link
         href={
           String(record.service_type || "").trim().toUpperCase() === "COMPLAINT" &&
-          (dashboardPath === "admin-dashboard" || dashboardPath === "user-dashboard" || dashboardPath === "accounts-dashboard")
+          (dashboardPath === "admin-dashboard" ||
+            dashboardPath === "user-dashboard" ||
+            dashboardPath === "accounts-dashboard" ||
+            dashboardPath === "sales-dashboard")
             ? `/${dashboardPath}/service-report-steps/${record.service_id}`
             : String(record.service_type || "").trim().toUpperCase() === "INSTALLATION"
               ? `/${dashboardPath}/installation-completion-video/${record.service_id}`
@@ -355,7 +358,9 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
   ];
 
   const showStepVideos =
-    dashboardPath === "admin-dashboard" || dashboardPath === "user-dashboard";
+    dashboardPath === "admin-dashboard" ||
+    dashboardPath === "user-dashboard" ||
+    dashboardPath === "sales-dashboard";
 
   const renderStepVideos = (record) => {
     const serviceType = String(record.service_type || "").trim().toUpperCase();
@@ -417,7 +422,8 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
 
   const showServiceFollowupColumn =
     dashboardPath === "admin-dashboard" ||
-    dashboardPath === "user-dashboard";
+    dashboardPath === "user-dashboard" ||
+    dashboardPath === "sales-dashboard";
   const tableColSpan =
     (role === "ADMIN" ? 12 : 11) +
     (showStepVideos ? 1 : 0) +

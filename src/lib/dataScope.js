@@ -53,6 +53,19 @@ export function canViewAllServiceSupportReport(role) {
   );
 }
 
+/** Machine follow-up history by serial (service reports, warranty): no added_by filter. */
+export function canViewAllMachinesFollowupHistory(role) {
+  const k = normalizeRoleKey(role || "");
+  return (
+    isSuperAdminRole(role) ||
+    k === "ADMIN" ||
+    k === "EA" ||
+    k === "SERVICE HEAD" ||
+    k === "TEAM LEADER" ||
+    k === "SALES CUM BACKOFFICE"
+  );
+}
+
 export function getScopedUsername(payload) {
   const u = String(payload?.username ?? "").trim();
   return u || null;

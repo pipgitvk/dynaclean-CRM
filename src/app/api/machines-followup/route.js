@@ -6,6 +6,7 @@ import {
   isServiceSupportRole,
   sqlColumnInActiveServiceSupportUsers,
 } from "@/lib/serviceSupportTeamScope";
+import { canViewAllMachinesFollowupHistory } from "@/lib/dataScope";
 
 function phoneSegmentMatch(col, n) {
   return `RIGHT(REGEXP_REPLACE(TRIM(SUBSTRING_INDEX(SUBSTRING_INDEX(REPLACE(${col}, '/', ','), ',', ${n}), ',', -1)), '[^0-9]', ''), 10) = ?`;
@@ -89,10 +90,12 @@ export async function GET(req) {
     const offset     = (page - 1) * limit;
 
     const username     = payload.username || "unknown";
-    const role         = (payload.role || payload.userRole || "").toUpperCase();
-    const isSuperAdmin = role === "SUPERADMIN";
-    const isEA         = role === "EA"; // Add EA role check
+    const role         = payload.role || payload.userRole || "";
+    const roleUpper    = String(role).toUpperCase();
+    const isSuperAdmin = roleUpper === "SUPERADMIN" || roleUpper === "DIRECTOR";
+    const isEA         = roleUpper === "EA";
     const isServiceSupport = isServiceSupportRole(role);
+    const canViewAllHistory = canViewAllMachinesFollowupHistory(role);
 
     const pool = await getDbConnection();
 
@@ -109,7 +112,7 @@ export async function GET(req) {
           WHERE r.username = machines_followup.added_by
             AND UPPER(TRIM(r.userRole)) = 'SERVICE SUPPORT'
         )`);
-      } else if (!isSuperAdmin && !isEA) {
+      } else if (!canViewAllHistory) {
         if (isServiceSupport) {
           hCond.push(sqlColumnInActiveServiceSupportUsers("added_by"));
         } else {
@@ -152,7 +155,7 @@ export async function GET(req) {
     /* ── build WHERE for both modes (no mf. alias needed inside subquery) ── */
     const cond   = [];
     const params = [];
-    if (!isSuperAdmin && !isEA) {
+    if (!canViewAllHistory) {
       if (isServiceSupport) {
         cond.push(sqlColumnInActiveServiceSupportUsers("added_by"));
       } else {
