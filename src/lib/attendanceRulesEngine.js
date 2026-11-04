@@ -203,9 +203,10 @@ export function isHalfDayByRules(log, rules) {
   const outM = parseAttendanceClockMinutes(log.checkout_time);
   if (outM == null) return true;
   const halfInM = parseTimeToMinutes(r.halfDayCheckin);
-  const halfOutM = parseTimeToMinutes(r.halfDayCheckout);
-  // Early checkout always counts as half-day (even if check-in is late)
-  if (outM < halfOutM) {
+  const standardOutM = parseTimeToMinutes(r.checkout);
+  // Salary/card classification must match getCheckoutStatus:
+  // every checkout before the configured shift checkout is a half-day.
+  if (outM < standardOutM) {
     return true;
   }
   // Late check-in also counts as half-day
@@ -242,11 +243,12 @@ export function isHalfDayWithGrace(log, rules, graceUsed = 0) {
   if (outM == null) return { isHalfDay: true, graceUsed };
 
   const halfInM = parseTimeToMinutes(r.halfDayCheckin);
-  const halfOutM = parseTimeToMinutes(r.halfDayCheckout);
+  const standardOutM = parseTimeToMinutes(r.checkout);
   const inStatus = getCheckinStatus(log.checkin_time, r);
 
-  // Early checkout (before half-day checkout time) → half day (always, regardless of grace period)
-  if (outM < halfOutM) {
+  // Keep salary, attendance cards, and checkout status consistent:
+  // any checkout before shift end is a half-day.
+  if (outM < standardOutM) {
     return { isHalfDay: true, graceUsed };
   }
 
