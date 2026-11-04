@@ -6,6 +6,7 @@ import dayjs from "dayjs";
 import {
   getOrderTableDefaultDateFrom,
   getOrderTableDefaultDateTo,
+  normalizeOrderListDateRange,
 } from "@/lib/orderTableDateDefaults";
 
 function formatInr(n) {
@@ -47,10 +48,15 @@ export default function ItemWiseSalesPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
+      const { dateFrom, dateTo } = normalizeOrderListDateRange(from, to);
       const res = await fetch("/api/reports/item-wise-sales", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ from, to, employee: employee || undefined }),
+        body: JSON.stringify({
+          from: dateFrom,
+          to: dateTo,
+          employee: employee || undefined,
+        }),
       });
       if (res.ok) {
         const result = await res.json();
@@ -106,7 +112,7 @@ export default function ItemWiseSalesPage() {
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Item Wise Sale Report</h1>
           <p className="text-sm text-gray-500 mt-1">
-            Line items with taxable amount, payment status, and profitability
+            Approved order line items only — cancelled, rejected, and returned orders are excluded.
           </p>
         </div>
       </div>

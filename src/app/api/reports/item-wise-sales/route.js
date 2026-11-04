@@ -5,6 +5,11 @@ import {
   batteryAddedAmount,
   isBatteryAccessory,
 } from "@/lib/itemWiseSalesBatteryBuyPrice";
+import {
+  ITEM_WISE_SALES_ORDER_ELIGIBILITY,
+  ITEM_WISE_QUOTATION_ITEMS_JOIN,
+  ITEM_WISE_QUOTATION_RECORDS_JOIN,
+} from "@/lib/itemWiseSalesReportSql";
 
 export async function POST(req) {
     try {
@@ -24,8 +29,8 @@ export async function POST(req) {
         let employeeFilter = "";
         const emp = employee != null ? String(employee).trim() : "";
         if (emp) {
-            employeeFilter = "AND n.created_by = ?";
-            params.push(emp);
+            employeeFilter = "AND (n.created_by = ? OR TRIM(qr.emp_name) = ?)";
+            params.push(emp, emp);
         }
 
         const sql = `
@@ -35,7 +40,7 @@ export async function POST(req) {
         n.created_at AS order_date,
         c.first_name AS customer_name,
         c.company AS company_name,
-        n.created_by AS employee_name,
+        COALESCE(NULLIF(TRIM(qr.emp_name), ''), n.created_by) AS employee_name,
         qi.quote_number AS quote_number,
         qi.item_code AS item_code,
         qi.item_name AS model,
@@ -67,10 +72,11 @@ export async function POST(req) {
           0
         ) AS purchase_price_unit
       FROM neworder n
-      LEFT JOIN quotations_records qr ON n.quote_number COLLATE utf8mb4_unicode_ci = qr.quote_number COLLATE utf8mb4_unicode_ci
+      ${ITEM_WISE_QUOTATION_RECORDS_JOIN}
       LEFT JOIN customers c ON qr.customer_id = c.customer_id
-      LEFT JOIN quotation_items qi ON n.quote_number COLLATE utf8mb4_unicode_ci = qi.quote_number COLLATE utf8mb4_unicode_ci
-      WHERE n.invoice_number IS NOT NULL AND n.invoice_number != ''
+      ${ITEM_WISE_QUOTATION_ITEMS_JOIN}
+      WHERE ${ITEM_WISE_SALES_ORDER_ELIGIBILITY}
+      AND TRIM(COALESCE(NULLIF(TRIM(qr.quote_number), ''), NULLIF(TRIM(n.quote_number), ''))) <> ''
       ${dateFilter}
       ${employeeFilter}
       ORDER BY n.created_at DESC
