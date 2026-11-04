@@ -4,8 +4,8 @@ import { normalizeRoleKey } from "@/lib/roleKeyUtils";
 import { userHasModuleKey } from "@/lib/userModuleAccessServer";
 
 /**
- * Meta Leads Backfill APIs: SUPERADMIN/ADMIN, or users with meta-backfill module
- * (e.g. Sales cum Backoffice on /sales-dashboard/ads-management).
+ * Meta Leads Backfill APIs — same rules for /admin-dashboard/ads-management and
+ * /sales-dashboard/ads-management (shared page + leads-report APIs).
  */
 export async function checkMetaBackfillAccess() {
   const main = await getMainSessionPayload();
@@ -24,17 +24,22 @@ export async function checkMetaBackfillAccess() {
   const roleKey =
     normalizeRoleKey(effectiveRole) || String(effectiveRole || "").trim().toUpperCase();
 
-  if (roleKey === "SUPERADMIN" || roleKey === "ADMIN") {
+  if (roleKey === "SUPERADMIN" || roleKey === "ADMIN" || roleKey === "DIRECTOR") {
     return { allowed: true, payload, forbidden: null };
   }
 
-  const hasModule = await userHasModuleKey(
+  const hasMetaBackfill = await userHasModuleKey(
     payload.username,
     effectiveRole,
     "meta-backfill",
   );
+  const hasAdsManagement = await userHasModuleKey(
+    payload.username,
+    effectiveRole,
+    "ads-management",
+  );
 
-  if (hasModule) {
+  if (hasMetaBackfill || hasAdsManagement) {
     return { allowed: true, payload, forbidden: null };
   }
 
