@@ -37,6 +37,7 @@ export default async function CustomersPage({ searchParams }) {
     stage,
     product,
     lead_campaign,
+    lead_source,
     search,
     date_from,
     date_to,
@@ -190,6 +191,10 @@ export default async function CustomersPage({ searchParams }) {
     customerConditions.push("c.lead_campaign = ?");
     customerParams.push(lead_campaign);
   }
+  if (lead_source && isSalesCumBackoffice) {
+    customerConditions.push("c.lead_source = ?");
+    customerParams.push(lead_source);
+  }
 
   appendCustomerListSearchFilter(customerConditions, customerParams, search);
 
@@ -235,6 +240,7 @@ export default async function CustomersPage({ searchParams }) {
       c.stage,
       c.notes,
       c.date_created,
+      c.lead_source,
       c.lead_campaign,
       c.products_interest,
       COALESCE(c.tags, '') AS tags,
@@ -312,6 +318,17 @@ export default async function CustomersPage({ searchParams }) {
 
     const [rows] = await conn.execute(sql, paginatedParams);
 
+    // Fetch lead sources for Sales cum Backoffice filter
+    let leadSources = [];
+    if (isSalesCumBackoffice) {
+      const [sourceRows] = await conn.execute(
+        `SELECT DISTINCT lead_source FROM customers
+         WHERE lead_source IS NOT NULL AND TRIM(lead_source) != ''
+         ORDER BY lead_source`,
+      );
+      leadSources = sourceRows.map((r) => r.lead_source);
+    }
+
     // Fetch employees for employee filter (only for roles that can see it)
     let employees = [];
     if (userRole === "ADMIN" || userRole === "SUPERADMIN" || userRole === "TEAM LEADER" || userRole === "EA") {
@@ -337,6 +354,7 @@ export default async function CustomersPage({ searchParams }) {
           pageSize={pageSize}
           userRole={userRole}
           employees={employees}
+          leadSources={leadSources}
           isSalesCumBackoffice={isSalesCumBackoffice}
         />
       </div>

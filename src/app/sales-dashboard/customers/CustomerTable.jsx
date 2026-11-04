@@ -7,6 +7,7 @@ import dayjs from "dayjs";
 import { formatCrmDatetimeForISTDisplay } from "@/lib/timezone";
 import { useRouter } from "next/navigation";
 import { Eye, Pencil, ArrowRightCircle, Loader2, Search } from "lucide-react";
+import SearchableSelect from "@/components/ui/SearchableSelect";
 
 /** Old option values sent `verygud` etc.; DB stores "Very Good", "Average", … */
 const LEGACY_STATUS_SLUGS = {
@@ -74,6 +75,7 @@ export default function CustomerTable({
   pageSize = 50,
   userRole,
   employees = [],
+  leadSources = [],
   isSalesCumBackoffice = false,
 }) {
   const router = useRouter();
@@ -89,6 +91,7 @@ export default function CustomerTable({
     status: normalizeStatusFromParams(searchParams.status ?? ""),
     stage: searchParams.stage ?? "",
     lead_campaign: searchParams.lead_campaign ?? "",
+    lead_source: searchParams.lead_source ?? "",
     next_follow_date: searchParams.next_follow_date ?? "",
     followed_date: searchParams.followed_date ?? "",
     employee: searchParams.employee ?? "",
@@ -128,6 +131,7 @@ export default function CustomerTable({
       status: normalizeStatusFromParams(searchParams.status ?? ""),
       stage: searchParams.stage ?? "",
       lead_campaign: searchParams.lead_campaign ?? "",
+      lead_source: searchParams.lead_source ?? "",
       next_follow_date: searchParams.next_follow_date ?? "",
       followed_date: searchParams.followed_date ?? "",
       employee: searchParams.employee ?? "",
@@ -151,6 +155,7 @@ export default function CustomerTable({
       status: "",
       stage: "",
       lead_campaign: "",
+      lead_source: "",
       next_follow_date: "",
       followed_date: "",
       employee: "",
@@ -190,6 +195,14 @@ export default function CustomerTable({
   const filtered = useMemo(() => {
     return rows;
   }, [rows]);
+
+  const leadSourceSelectOptions = useMemo(
+    () => [
+      { value: "", label: "All lead sources" },
+      ...leadSources.map((source) => ({ value: source, label: source })),
+    ],
+    [leadSources],
+  );
 
   const handleNextFollowLabelClick = () => {
     setIsNextFollowInputVisible((prev) => !prev);
@@ -386,6 +399,19 @@ export default function CustomerTable({
             ))}
           </select>
         )}
+
+        {isSalesCumBackoffice && (
+          <div className="w-full min-w-[12rem]">
+            <SearchableSelect
+              options={leadSourceSelectOptions}
+              value={filters.lead_source}
+              onChange={(val) => update("lead_source", val)}
+              placeholder="All lead sources"
+              searchPlaceholder="Search lead source..."
+              className="p-2"
+            />
+          </div>
+        )}
       </div>
       
       {/* Reporting dates + Search / Reset */}
@@ -443,6 +469,7 @@ export default function CustomerTable({
                 {[
                   "ID",
                   "Customer",
+                  ...(isSalesCumBackoffice ? ["Lead source"] : []),
                   "Status",
                   "Tags",
                   "Followed Date",
@@ -470,6 +497,11 @@ export default function CustomerTable({
                     <div className="text-xs text-gray-500">{r.email}</div>
                     <div className="text-xs text-gray-500">{r.phone}</div>
                   </td>
+                  {isSalesCumBackoffice && (
+                    <td className="px-4 py-2 whitespace-nowrap">
+                      {r.lead_source || "—"}
+                    </td>
+                  )}
                   <td className="px-4 py-2">{r.status}</td>
                   <td className="px-4 py-2 align-top">
                     <TagsCell tags={r.tags} multiTag={r.multi_tag} />
@@ -524,7 +556,7 @@ export default function CustomerTable({
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={12} className="text-center p-4">
+                  <td colSpan={isSalesCumBackoffice ? 12 : 11} className="text-center p-4">
                     No customers found.
                   </td>
                 </tr>
@@ -554,6 +586,12 @@ export default function CustomerTable({
               <div>
                 <span className="font-semibold">Phone:</span> {r.phone}
               </div>
+              {isSalesCumBackoffice && (
+                <div>
+                  <span className="font-semibold">Lead source:</span>{" "}
+                  {r.lead_source || "—"}
+                </div>
+              )}
               <div>
                 <span className="font-semibold">Status:</span> {r.status}
               </div>
