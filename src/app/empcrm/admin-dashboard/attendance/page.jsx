@@ -25,7 +25,7 @@ import {
 import { weeklyOffSundayCountsAsPaid } from "@/lib/salaryPayDaysFromAttendance";
 import { formatAttendanceTimeForDisplay as formatTime } from "@/lib/istDateTime";
 import AttendanceRegularizeModal from "@/app/user-dashboard/attendance/AttendanceRegularizeModal";
-import AttendanceSourceInfo from "@/components/AttendanceSourceInfo";
+import AttendanceDualSourceTimeCell from "@/components/AttendanceDualSourceTimeCell";
 import CheckinPhotoCell from "@/components/CheckinPhotoCell";
 import AttendanceBulkImportPanel from "@/components/AttendanceBulkImportPanel";
 import AttendanceAddressMapModal, {
@@ -78,21 +78,23 @@ function isMachineAttendanceAddress(address) {
   );
 }
 
-function CheckoutTimeDisplay({ log }) {
-  const time = formatTime(log.checkout_time);
-  if (!isAutomaticCheckoutAddress(log.checkout_address)) return time;
+function checkoutLogLineExtra(timeStr, log) {
+  if (!isAutomaticCheckoutAddress(log.checkout_address)) return timeStr;
   return (
     <span
       className="inline-flex items-center gap-1"
       title={AUTO_CHECKOUT_WARNING_TITLE}
     >
       <AlertTriangle
-        className="w-4 h-4 shrink-0 text-red-600"
+        className="w-3.5 h-3.5 shrink-0 text-red-600"
         aria-label="Automatic checkout warning"
       />
-      <span>{time}</span>
+      <span>{timeStr}</span>
     </span>
   );
+}
+function CheckoutTimeDisplay({ log }) {
+  return checkoutLogLineExtra(formatTime(log.checkout_time), log);
 }
 
 function CheckoutAddressCell({ log, title, onOpen, className = "" }) {
@@ -1467,8 +1469,7 @@ const AttendancePage = () => {
                             }`}
                         >
                           <span className="inline-flex items-center gap-0.5">
-                            {formatTime(log.checkin_time)}
-                            <AttendanceSourceInfo log={log} showOnlyIfMachine={false} />
+                            <AttendanceDualSourceTimeCell log={log} field="checkin" />
                           </span>
                         </span>
                       </div>
@@ -1551,7 +1552,12 @@ const AttendancePage = () => {
                           })()
                             }`}
                         >
-                          <CheckoutTimeDisplay log={log} />
+                          <AttendanceDualSourceTimeCell
+                            log={log}
+                            field="checkout"
+                            mergedFallback={<CheckoutTimeDisplay log={log} />}
+                            checkoutExtra={checkoutLogLineExtra}
+                          />
                         </span>
                       </div>
                       <div className="flex items-center justify-between gap-2">
@@ -1829,10 +1835,7 @@ const AttendancePage = () => {
                             })()
                               }`}
                           >
-                            <span className="inline-flex items-center gap-0.5">
-                              {formatTime(log.checkin_time)}
-                              <AttendanceSourceInfo log={log} showOnlyIfMachine={false} />
-                            </span>
+                            <AttendanceDualSourceTimeCell log={log} field="checkin" />
                           </td>
                           <td className="px-6 py-4 text-sm text-gray-500">
                             <CheckinPhotoCell
@@ -1903,7 +1906,12 @@ const AttendancePage = () => {
                             })()
                               }`}
                           >
-                            <CheckoutTimeDisplay log={log} />
+                            <AttendanceDualSourceTimeCell
+                            log={log}
+                            field="checkout"
+                            mergedFallback={<CheckoutTimeDisplay log={log} />}
+                            checkoutExtra={checkoutLogLineExtra}
+                          />
                           </td>
                           <td className="px-6 py-4 text-sm text-gray-500">
                             <div className="flex flex-wrap items-center gap-1.5">

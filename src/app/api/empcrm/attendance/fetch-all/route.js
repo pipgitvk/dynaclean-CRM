@@ -11,6 +11,7 @@ import {
   loadMachineCodeMaps,
   loadMachineDailyByUsername,
   mergeAttendanceListWithMachine,
+  combineLogsTableTimes,
   mergeCrmAndMachineDay,
   buildCrmBaseRowForRematch,
   extractCrmPunchesFromAttendanceLogRow,
@@ -111,6 +112,10 @@ function dedupeMergedAttendanceRows(mergedRows) {
     }
 
     const machineDay = combineMachineDays(prev.machine_day, row.machine_day);
+    const logsTableTimes = combineLogsTableTimes(
+      prev.logs_table_times,
+      row.logs_table_times,
+    );
     const aCrm = extractCrmPunchesFromAttendanceLogRow(prev);
     const bCrm = extractCrmPunchesFromAttendanceLogRow(row);
     const crmIn = pickEarlierCheckin(aCrm.checkin, bCrm.checkin).value;
@@ -123,6 +128,7 @@ function dedupeMergedAttendanceRows(mergedRows) {
       checkout_time: crmOut,
       crm_checkin_time: crmIn,
       crm_checkout_time: crmOut,
+      logs_table_times: logsTableTimes,
       _syntheticMachineOnly: !hasCrmShell,
     };
 

@@ -85,6 +85,58 @@ export function machineCheckoutIsBeforeNinePm(
   return mac.getTime() < cutoff.getTime();
 }
 
+/** Raw MIN/MAX times stored in attendance_logs (before CRM vs machine merge). */
+export function snapshotLogsTableTimes(crmRow) {
+  if (!crmRow || crmRow._syntheticMachineOnly) {
+    return { checkin: null, checkout: null };
+  }
+  return {
+    checkin: isMeaningfulAttendancePunch(crmRow.checkin_time)
+      ? crmRow.checkin_time
+      : null,
+    checkout: isMeaningfulAttendancePunch(crmRow.checkout_time)
+      ? crmRow.checkout_time
+      : null,
+  };
+}
+
+export function combineLogsTableTimes(a, b) {
+  return {
+    checkin: pickEarlierCheckin(a?.checkin, b?.checkin).value,
+    checkout: pickLaterCheckout(a?.checkout, b?.checkout).value,
+  };
+}
+
+export function getLogsTableTimes(log) {
+  if (log?.logs_table_times) return log.logs_table_times;
+  return snapshotLogsTableTimes(log);
+}
+
+export function getMachinePunchTimes(log) {
+  if (log?.machine_punch_times) return log.machine_punch_times;
+  const md = log?.machine_day;
+  return {
+    checkin: isMeaningfulAttendancePunch(md?.machine_checkin)
+      ? md.machine_checkin
+      : null,
+    checkout: isMeaningfulAttendancePunch(md?.machine_checkout)
+      ? md.machine_checkout
+      : null,
+  };
+}
+
+/** Show separate Log + Machine lines when biometric data exists for this row. */
+export function shouldShowLogAndMachineSourceLines(log) {
+  const mp = getMachinePunchTimes(log);
+  if (
+    isMeaningfulAttendancePunch(mp.checkin) ||
+    isMeaningfulAttendancePunch(mp.checkout)
+  ) {
+    return true;
+  }
+  return Boolean(String(log?.machine_code || "").trim());
+}
+
 export function getAttendanceSourcesDetailFromLog(log) {
   if (!log) return null;
 
@@ -97,14 +149,11 @@ export function getAttendanceSourcesDetailFromLog(log) {
       : null,
   };
 
-  const md = log.machine_day;
+  const logsTable = getLogsTableTimes(log);
+  const machinePunches = getMachinePunchTimes(log);
   const machine = {
-    checkin: isMeaningfulAttendancePunch(md?.machine_checkin)
-      ? md.machine_checkin
-      : null,
-    checkout: isMeaningfulAttendancePunch(md?.machine_checkout)
-      ? md.machine_checkout
-      : null,
+    checkin: machinePunches.checkin,
+    checkout: machinePunches.checkout,
   };
 
   const embedded = log.attendance_sources_detail;
@@ -154,9 +203,13 @@ export function getAttendanceSourcesDetailFromLog(log) {
   const hasAny =
     isMeaningfulAttendancePunch(crm.checkin) ||
     isMeaningfulAttendancePunch(crm.checkout) ||
+    isMeaningfulAttendancePunch(logsTable.checkin) ||
+    isMeaningfulAttendancePunch(logsTable.checkout) ||
     isMeaningfulAttendancePunch(machine.checkin) ||
     isMeaningfulAttendancePunch(machine.checkout);
-  return hasAny ? { crm, machine } : null;
+  return hasAny
+    ? { crm, machine, logsTable, machinePunches: machine }
+    : null;
 }
 
 function compareInstants(a, b) {
@@ -198,6 +251,24 @@ export function pickLaterCheckout(crmVal, machineVal) {
   return { value: null, source: null };
 }
 
+/**
+ * Latest check-out for rules / merged row: CRM app, machine sync, and
+ * attendance_logs table (Log line in UI) — baad wala time wins.
+ */
+export function pickLatestCheckoutForMerge(crmVal, machineVal, logsTableVal) {
+  const base = pickLaterCheckout(crmVal, machineVal);
+  if (!isMeaningfulAttendancePunch(logsTableVal)) {
+    return base;
+  }
+  if (!isMeaningfulAttendancePunch(base.value)) {
+    return { value: logsTableVal, source: "log" };
+  }
+  if (compareInstants(logsTableVal, base.value) > 0) {
+    return { value: logsTableVal, source: "log" };
+  }
+  return base;
+}
+
 /** Rebuild a clean CRM base row before re-merging with machine (dedupe rematch). */
 export function buildCrmBaseRowForRematch(crmRow) {
   if (!crmRow || crmRow._syntheticMachineOnly) {
@@ -213,8 +284,10 @@ export function buildCrmBaseRowForRematch(crmRow) {
     };
   }
   const { checkin, checkout } = extractCrmPunchesFromAttendanceLogRow(crmRow);
+  const logsTableTimes = snapshotLogsTableTimes(crmRow);
   return {
     ...crmRow,
+    logs_table_times: logsTableTimes,
     checkin_time: checkin,
     checkout_time: checkout,
     crm_checkin_time: checkin,
@@ -250,11 +323,24 @@ export function mergeCrmAndMachineDay(crmRow, machineDay) {
     crmOutForMerge = null;
   }
 
+  const logsTableTimes =
+    crmRow?.logs_table_times ?? snapshotLogsTableTimes(crmRow);
+
   const checkinPick = pickEarlierCheckin(crmIn, macIn);
-  const checkoutPick = pickLaterCheckout(crmOutForMerge, macOut);
+  const checkoutPick = pickLatestCheckoutForMerge(
+    crmOutForMerge,
+    macOut,
+    logsTableTimes.checkout,
+  );
+  const machinePunchTimes = {
+    checkin: isMeaningfulAttendancePunch(macIn) ? macIn : null,
+    checkout: isMeaningfulAttendancePunch(macOut) ? macOut : null,
+  };
 
   const merged = {
     ...(crmRow || {}),
+    logs_table_times: logsTableTimes,
+    machine_punch_times: machinePunchTimes,
     crm_checkin_time: isMeaningfulAttendancePunch(crmIn) ? crmIn : null,
     crm_checkout_time: isMeaningfulAttendancePunch(crmOut) ? crmOut : null,
     checkin_time: checkinPick.value,
@@ -282,7 +368,12 @@ export function mergeCrmAndMachineDay(crmRow, machineDay) {
       : null,
   };
 
-  if (checkoutPick.source === "machine" && !isMeaningfulAttendancePunch(crmOut)) {
+  if (
+    !isMeaningfulAttendancePunch(crmOut) &&
+    (checkoutPick.source === "machine" ||
+      (checkoutPick.source === "log" &&
+        isMachineAttendanceAddressValue(crmRow?.checkout_address)))
+  ) {
     merged.checkout_address = MACHINE_ATTENDANCE_ADDRESS;
     merged.checkout_latitude = null;
     merged.checkout_longitude = null;

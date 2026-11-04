@@ -45,26 +45,26 @@ function formatSourceTime(value) {
 
 function TooltipPanel({ detail, log }) {
   return (
-    <div className="w-56 rounded-md bg-gray-900 px-3 py-2 text-left text-xs text-white shadow-xl ring-1 ring-black/10">
-      <p className="mb-1.5 font-semibold text-gray-200">CRM vs machine</p>
+    <div className="w-64 rounded-md bg-gray-900 px-3 py-2 text-left text-xs text-white shadow-xl ring-1 ring-black/10">
+      <p className="mb-1.5 font-semibold text-gray-200">Attendance sources</p>
       <p>
-        <span className="text-gray-400">CRM check-in:</span>{" "}
-        {formatSourceTime(detail.crm?.checkin)}
+        <span className="text-gray-400">Log table in:</span>{" "}
+        {formatSourceTime(detail.logsTable?.checkin)}
       </p>
       <p>
-        <span className="text-gray-400">CRM check-out:</span>{" "}
-        {formatSourceTime(detail.crm?.checkout)}
+        <span className="text-gray-400">Log table out:</span>{" "}
+        {formatSourceTime(detail.logsTable?.checkout)}
       </p>
       <p className="mt-1.5 border-t border-gray-700 pt-1.5">
-        <span className="text-gray-400">Machine check-in:</span>{" "}
+        <span className="text-gray-400">Machine sync in:</span>{" "}
         {formatSourceTime(detail.machine?.checkin)}
       </p>
       <p>
-        <span className="text-gray-400">Machine check-out:</span>{" "}
+        <span className="text-gray-400">Machine sync out:</span>{" "}
         {formatSourceTime(detail.machine?.checkout)}
       </p>
       <p className="mt-1.5 border-t border-gray-700 pt-1.5 text-[10px] text-gray-400">
-        Shown in table: in {formatTime(log.checkin_time) || "—"} · out{" "}
+        Merged (rules / status): in {formatTime(log.checkin_time) || "—"} · out{" "}
         {formatTime(log.checkout_time) || "—"}
       </p>
     </div>
@@ -72,7 +72,7 @@ function TooltipPanel({ detail, log }) {
 }
 
 /**
- * Info icon — hover shows CRM vs machine check-in and check-out (portal, not clipped by tables).
+ * Info icon — hover shows log table vs machine sync times (portal, not clipped by tables).
  */
 export default function AttendanceSourceInfo({
   log,
@@ -92,7 +92,7 @@ export default function AttendanceSourceInfo({
     if (!el) return;
     const rect = el.getBoundingClientRect();
     const panelW = 224;
-    const panelH = 168;
+    const panelH = 140;
     const gap = 8;
     let top = rect.bottom + gap;
     let left = rect.left + rect.width / 2 - panelW / 2;
@@ -107,8 +107,8 @@ export default function AttendanceSourceInfo({
   if (!visible) return null;
 
   const titleText = [
-    `CRM in: ${formatSourceTime(detail.crm?.checkin)}`,
-    `CRM out: ${formatSourceTime(detail.crm?.checkout)}`,
+    `Log in: ${formatSourceTime(detail.logsTable?.checkin)}`,
+    `Log out: ${formatSourceTime(detail.logsTable?.checkout)}`,
     `Machine in: ${formatSourceTime(detail.machine?.checkin)}`,
     `Machine out: ${formatSourceTime(detail.machine?.checkout)}`,
   ].join(" · ");
@@ -134,7 +134,7 @@ export default function AttendanceSourceInfo({
         type="button"
         className="relative ml-0.5 inline-flex shrink-0 align-middle rounded p-0.5 text-indigo-600 hover:bg-indigo-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
         title={titleText}
-        aria-label="CRM and machine attendance details"
+        aria-label="Log and machine attendance details"
         aria-expanded={open}
         onMouseEnter={showTip}
         onMouseLeave={scheduleHide}

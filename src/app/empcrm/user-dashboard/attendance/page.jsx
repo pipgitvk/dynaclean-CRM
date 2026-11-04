@@ -22,7 +22,7 @@ import {
 import { formatAttendanceTimeForDisplay as formatTime } from "@/lib/istDateTime";
 import { getAttendanceRegularizationAttachmentHref } from "@/lib/attendanceRegularizationAttachmentHref";
 import AttendanceRegularizeModal from "@/app/user-dashboard/attendance/AttendanceRegularizeModal";
-import AttendanceSourceInfo from "@/components/AttendanceSourceInfo";
+import AttendanceDualSourceTimeCell from "@/components/AttendanceDualSourceTimeCell";
 import {
   AUTO_CHECKOUT_ATTENDANCE_ADDRESS,
   isAutomaticCheckoutAddress,
@@ -963,13 +963,7 @@ const AttendancePage = () => {
                         })()
                           }`}
                       >
-                        <span className="inline-flex items-center gap-0.5">
-                          {formatTime(log.checkin_time)}
-                          <AttendanceSourceInfo
-                            log={log}
-                            showOnlyIfMachine={false}
-                          />
-                        </span>
+                        <AttendanceDualSourceTimeCell log={log} field="checkin" />
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
@@ -1019,7 +1013,11 @@ const AttendancePage = () => {
                         })()
                           }`}
                       >
-                        <CheckoutTimeDisplay log={log} />
+                        <AttendanceDualSourceTimeCell
+                          log={log}
+                          field="checkout"
+                          mergedFallback={<CheckoutTimeDisplay log={log} />}
+                        />
                       </span>
                     </div>
                   </>
@@ -1265,13 +1263,7 @@ const AttendancePage = () => {
                           })()
                             }`}
                         >
-                          <span className="inline-flex items-center gap-0.5">
-                            {formatTime(log.checkin_time)}
-                            <AttendanceSourceInfo
-                              log={log}
-                              showOnlyIfMachine={false}
-                            />
-                          </span>
+                          <AttendanceDualSourceTimeCell log={log} field="checkin" />
                         </td>
                         <td
                           className={`px-6 py-4 whitespace-nowrap text-sm text-gray-500 ${(() => {
@@ -1320,7 +1312,11 @@ const AttendancePage = () => {
                           })()
                             }`}
                         >
-                          <CheckoutTimeDisplay log={log} />
+                          <AttendanceDualSourceTimeCell
+                          log={log}
+                          field="checkout"
+                          mergedFallback={<CheckoutTimeDisplay log={log} />}
+                        />
                         </td>
                         {filterStatus === "regularize" && (
                           <td className="px-6 py-4 whitespace-nowrap text-sm">
