@@ -27,3 +27,26 @@ export const ITEM_WISE_QUOTATION_ITEMS_JOIN = `
     COALESCE(NULLIF(TRIM(qr.quote_number), ''), NULLIF(TRIM(n.quote_number), ''))
   )
 `;
+
+/** Shared FROM + WHERE for item-wise sales report rows (orders with line items). */
+export const ITEM_WISE_SALES_REPORT_FROM_WHERE = `
+  FROM neworder n
+  ${ITEM_WISE_QUOTATION_RECORDS_JOIN}
+  LEFT JOIN customers c ON qr.customer_id = c.customer_id
+  ${ITEM_WISE_QUOTATION_ITEMS_JOIN}
+  WHERE ${ITEM_WISE_SALES_ORDER_ELIGIBILITY}
+    AND TRIM(COALESCE(NULLIF(TRIM(qr.quote_number), ''), NULLIF(TRIM(n.quote_number), ''))) <> ''
+`;
+
+/** Build date filter on n.created_at and push bound params (mutates params array). */
+export function appendItemWiseSalesDateFilter(from, to, params) {
+  if (from && to) {
+    params.push(from, to);
+    return "AND DATE(n.created_at) BETWEEN ? AND ?";
+  }
+  if (from) {
+    params.push(from);
+    return "AND DATE(n.created_at) >= ?";
+  }
+  return "";
+}

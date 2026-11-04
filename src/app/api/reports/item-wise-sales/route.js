@@ -9,28 +9,37 @@ import {
   ITEM_WISE_SALES_ORDER_ELIGIBILITY,
   ITEM_WISE_QUOTATION_ITEMS_JOIN,
   ITEM_WISE_QUOTATION_RECORDS_JOIN,
+  appendItemWiseSalesDateFilter,
 } from "@/lib/itemWiseSalesReportSql";
 
 export async function POST(req) {
     try {
-        const { from, to, employee } = await req.json();
+        const { from, to, employee, leadSource, model } = await req.json();
 
         let dateFilter = "";
         const params = [];
-
-        if (from && to) {
-            dateFilter = "AND DATE(n.created_at) BETWEEN ? AND ?";
-            params.push(from, to);
-        } else if (from) {
-            dateFilter = "AND DATE(n.created_at) >= ?";
-            params.push(from);
-        }
+        dateFilter = appendItemWiseSalesDateFilter(from, to, params);
 
         let employeeFilter = "";
         const emp = employee != null ? String(employee).trim() : "";
         if (emp) {
-            employeeFilter = "AND (n.created_by = ? OR TRIM(qr.emp_name) = ?)";
-            params.push(emp, emp);
+            employeeFilter =
+              "AND (TRIM(n.created_by) = ? OR TRIM(qr.emp_name) = ? OR TRIM(c.lead_source) = ?)";
+            params.push(emp, emp, emp);
+        }
+
+        let leadSourceFilter = "";
+        const leadSrc = leadSource != null ? String(leadSource).trim() : "";
+        if (leadSrc) {
+            leadSourceFilter = "AND TRIM(c.lead_source) = ?";
+            params.push(leadSrc);
+        }
+
+        let modelFilter = "";
+        const modelVal = model != null ? String(model).trim() : "";
+        if (modelVal) {
+            modelFilter = "AND TRIM(qi.item_name) = ?";
+            params.push(modelVal);
         }
 
         const sql = `
@@ -79,6 +88,8 @@ export async function POST(req) {
       AND TRIM(COALESCE(NULLIF(TRIM(qr.quote_number), ''), NULLIF(TRIM(n.quote_number), ''))) <> ''
       ${dateFilter}
       ${employeeFilter}
+      ${leadSourceFilter}
+      ${modelFilter}
       ORDER BY n.created_at DESC
     `;
 

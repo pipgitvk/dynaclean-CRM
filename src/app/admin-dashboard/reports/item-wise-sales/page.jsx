@@ -8,6 +8,7 @@ import {
   getOrderTableDefaultDateTo,
   normalizeOrderListDateRange,
 } from "@/lib/orderTableDateDefaults";
+import SearchableSelect from "@/components/ui/SearchableSelect";
 
 function formatInr(n) {
   const v = Number(n) || 0;
@@ -18,32 +19,98 @@ export default function ItemWiseSalesPage() {
   const [from, setFrom] = useState(() => getOrderTableDefaultDateFrom());
   const [to, setTo] = useState(() => getOrderTableDefaultDateTo());
   const [employee, setEmployee] = useState("");
+  const [leadSource, setLeadSource] = useState("");
+  const [model, setModel] = useState("");
   const [employeeOptions, setEmployeeOptions] = useState([]);
+  const [leadSourceOptions, setLeadSourceOptions] = useState([]);
+  const [modelOptions, setModelOptions] = useState([]);
   const [data, setData] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const loadFilterOptions = async (dateFrom, dateTo) => {
+    const q = new URLSearchParams();
+    if (dateFrom) q.set("from", dateFrom);
+    if (dateTo) q.set("to", dateTo);
+    const [empRes, leadRes, modelRes] = await Promise.all([
+      fetch(`/api/reports/item-wise-sales/employees?${q}`),
+      fetch(`/api/reports/item-wise-sales/lead-sources?${q}`),
+      fetch(`/api/reports/item-wise-sales/models?${q}`),
+    ]);
+    let employees = [];
+    let sources = [];
+    if (empRes.ok) {
+      const list = await empRes.json();
+      employees = Array.isArray(list) ? list : [];
+    }
+    if (leadRes.ok) {
+      const list = await leadRes.json();
+      sources = Array.isArray(list) ? list : [];
+    }
+    let models = [];
+    if (modelRes.ok) {
+      const list = await modelRes.json();
+      models = Array.isArray(list) ? list : [];
+    }
+    const merged = [...new Set([...employees, ...sources])].sort((a, b) =>
+      a.localeCompare(b),
+    );
+    setEmployeeOptions(merged);
+    setLeadSourceOptions(sources);
+    setModelOptions(models);
+  };
+
+  const mergeFilterOptionsFromRows = (rows) => {
+    if (!Array.isArray(rows) || !rows.length) return;
+    setEmployeeOptions((prev) => {
+      const set = new Set(prev);
+      rows.forEach((row) => {
+        const rep = String(row.employee_name ?? "").trim();
+        const src = String(row.lead_source ?? "").trim();
+        if (rep) set.add(rep);
+        if (src) set.add(src);
+      });
+      return [...set].sort((a, b) => a.localeCompare(b));
+    });
+    setLeadSourceOptions((prev) => {
+      const set = new Set(prev);
+      rows.forEach((row) => {
+        const src = String(row.lead_source ?? "").trim();
+        if (src) set.add(src);
+      });
+      return [...set].sort((a, b) => a.localeCompare(b));
+    });
+    setModelOptions((prev) => {
+      const set = new Set(prev);
+      rows.forEach((row) => {
+        const m = String(row.model ?? "").trim();
+        if (m) set.add(m);
+      });
+      return [...set].sort((a, b) => a.localeCompare(b));
+    });
+  };
+
   useEffect(() => {
-    (async () => {
-      try {
-        const q = new URLSearchParams({ from, to });
-        const res = await fetch(`/api/reports/item-wise-sales/employees?${q}`);
-        if (!res.ok) {
-          setEmployeeOptions([]);
-          return;
-        }
-        const list = await res.json();
-        setEmployeeOptions(Array.isArray(list) ? list : []);
-      } catch (e) {
-        console.error(e);
-        setEmployeeOptions([]);
-      }
-    })();
+    const { dateFrom, dateTo } = normalizeOrderListDateRange(from, to);
+    loadFilterOptions(dateFrom, dateTo).catch((e) => {
+      console.error(e);
+      setEmployeeOptions([]);
+      setLeadSourceOptions([]);
+      setModelOptions([]);
+    });
   }, [from, to]);
 
   useEffect(() => {
     setEmployee((prev) => (prev && !employeeOptions.includes(prev) ? "" : prev));
   }, [employeeOptions]);
+
+  useEffect(() => {
+    setLeadSource((prev) => (prev && !leadSourceOptions.includes(prev) ? "" : prev));
+  }, [leadSourceOptions]);
+
+  useEffect(() => {
+    setModel((prev) => (prev && !modelOptions.includes(prev) ? "" : prev));
+  }, [modelOptions]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -56,11 +123,17 @@ export default function ItemWiseSalesPage() {
           from: dateFrom,
           to: dateTo,
           employee: employee || undefined,
+          leadSource: leadSource || undefined,
+          model: model || undefined,
         }),
       });
       if (res.ok) {
         const result = await res.json();
-        setData(Array.isArray(result) ? result : []);
+        const rows = Array.isArray(result) ? result : [];
+        setData(rows);
+        mergeFilterOptionsFromRows(rows);
+        const { dateFrom, dateTo } = normalizeOrderListDateRange(from, to);
+        loadFilterOptions(dateFrom, dateTo).catch(console.error);
       } else {
         console.error("Failed to fetch data");
         setData([]);
@@ -105,6 +178,14 @@ export default function ItemWiseSalesPage() {
   const totalProfit = filteredData.reduce((acc, curr) => acc + (parseFloat(curr.profit_loss) || 0), 0);
   const totalQty = filteredData.reduce((acc, curr) => acc + (parseInt(curr.qty, 10) || 0), 0);
   const profitMargin = totalSale > 0 ? (totalProfit / totalSale) * 100 : 0;
+
+  const modelSelectOptions = useMemo(
+    () => [
+      { value: "", label: "All models" },
+      ...modelOptions.map((name) => ({ value: name, label: name })),
+    ],
+    [modelOptions],
+  );
 
   return (
     <div className="max-w-[1600px] mx-auto px-4 sm:px-6 py-8 space-y-8 bg-gray-50 min-h-screen">
@@ -170,6 +251,32 @@ export default function ItemWiseSalesPage() {
               </option>
             ))}
           </select>
+        </div>
+        <div className="flex-1 min-w-[200px]">
+          <label className="text-sm font-medium block mb-2 text-gray-700">Lead source</label>
+          <select
+            value={leadSource}
+            onChange={(e) => setLeadSource(e.target.value)}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors bg-white"
+          >
+            <option value="">All lead sources</option>
+            {leadSourceOptions.map((source) => (
+              <option key={source} value={source}>
+                {source}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="flex-1 min-w-[220px]">
+          <label className="text-sm font-medium block mb-2 text-gray-700">Model</label>
+          <SearchableSelect
+            options={modelSelectOptions}
+            value={model}
+            onChange={setModel}
+            placeholder="All models"
+            searchPlaceholder="Search model..."
+            className="px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          />
         </div>
         <div className="flex-1 min-w-[220px]">
           <label className="text-sm font-medium block mb-2 text-gray-700">Search</label>

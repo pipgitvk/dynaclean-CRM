@@ -1,44 +1,32 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import {
-  ITEM_WISE_SALES_ORDER_ELIGIBILITY,
-  ITEM_WISE_QUOTATION_RECORDS_JOIN,
+  appendItemWiseSalesDateFilter,
+  ITEM_WISE_SALES_REPORT_FROM_WHERE,
 } from "@/lib/itemWiseSalesReportSql";
 
-/** GET: distinct sales usernames for approved orders in range (created_by + quotation emp_name). */
+/** GET: distinct rep names + customer lead_source for report rows in date range. */
 export async function GET(req) {
   try {
     const { searchParams } = new URL(req.url);
     const from = searchParams.get("from");
     const to = searchParams.get("to");
 
-    let dateFilter = "";
     const params = [];
-
-    if (from && to) {
-      dateFilter = "AND DATE(n.created_at) BETWEEN ? AND ?";
-      params.push(from, to);
-    } else if (from) {
-      dateFilter = "AND DATE(n.created_at) >= ?";
-      params.push(from);
-    }
+    const dateFilter = appendItemWiseSalesDateFilter(from, to, params);
 
     const sql = `
       SELECT DISTINCT username FROM (
-        SELECT TRIM(n.created_by) AS username
-        FROM neworder n
-        ${ITEM_WISE_QUOTATION_RECORDS_JOIN}
-        WHERE ${ITEM_WISE_SALES_ORDER_ELIGIBILITY}
-          AND n.created_by IS NOT NULL
-          AND TRIM(n.created_by) != ''
+        SELECT TRIM(COALESCE(NULLIF(TRIM(qr.emp_name), ''), n.created_by)) AS username
+        ${ITEM_WISE_SALES_REPORT_FROM_WHERE}
+          AND COALESCE(NULLIF(TRIM(qr.emp_name), ''), n.created_by) IS NOT NULL
+          AND TRIM(COALESCE(NULLIF(TRIM(qr.emp_name), ''), n.created_by)) != ''
         ${dateFilter}
         UNION
-        SELECT TRIM(qr.emp_name) AS username
-        FROM neworder n
-        ${ITEM_WISE_QUOTATION_RECORDS_JOIN}
-        WHERE ${ITEM_WISE_SALES_ORDER_ELIGIBILITY}
-          AND qr.emp_name IS NOT NULL
-          AND TRIM(qr.emp_name) != ''
+        SELECT TRIM(c.lead_source) AS username
+        ${ITEM_WISE_SALES_REPORT_FROM_WHERE}
+          AND c.lead_source IS NOT NULL
+          AND TRIM(c.lead_source) != ''
         ${dateFilter}
       ) u
       WHERE username IS NOT NULL AND username != ''
