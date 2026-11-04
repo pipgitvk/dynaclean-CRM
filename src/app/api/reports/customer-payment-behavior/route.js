@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
+import {
+  calculateAdjustedOrderTotal,
+  computeOrderPaymentRemaining,
+  roundInr,
+} from "@/lib/paymentOrderStatus";
+import { sumOrderPaymentAmounts } from "@/lib/orderPaymentHistory";
 
 export async function GET(request) {
     try {
@@ -29,19 +35,19 @@ export async function GET(request) {
         const queryParams = [];
 
         const buildBaseWhere = () => {
-            let where = `(is_cancelled = 0 OR is_cancelled IS NULL)`;
+            let where = `(o.is_cancelled = 0 OR o.is_cancelled IS NULL)`;
             if (roleNorm === "SALES") {
-                where += ` AND created_by = ?`;
+                where += ` AND o.created_by = ?`;
                 queryParams.push(username);
             } else if (employeeFilter) {
-                where += ` AND created_by = ?`;
+                where += ` AND o.created_by = ?`;
                 queryParams.push(employeeFilter);
             }
             if (from && to) {
-                where += ` AND DATE(created_at) BETWEEN ? AND ?`;
+                where += ` AND DATE(o.created_at) BETWEEN ? AND ?`;
                 queryParams.push(from, to);
             } else if (from) {
-                where += ` AND DATE(created_at) >= ?`;
+                where += ` AND DATE(o.created_at) >= ?`;
                 queryParams.push(from);
             }
             return where;
@@ -78,78 +84,42 @@ export async function GET(request) {
 
         let sql = `
       SELECT 
-        order_id,
-        quote_number,
-        client_name,
-        company_name,
-        contact,
-        created_by,
-        totalamt,
-        payment_amount,
-        payment_date,
-        payment_status,
-        duedate,
-        created_at,
-        is_returned,
-        invoice_date
-      FROM neworder
+        o.order_id,
+        o.quote_number,
+        o.client_name,
+        o.company_name,
+        o.contact,
+        o.created_by,
+        o.totalamt,
+        o.baseAmount,
+        o.taxamt,
+        o.payment_amount,
+        o.payment_id,
+        o.payment_date,
+        o.transaction_id,
+        o.linked_payments_json,
+        o.payment_status,
+        o.duedate,
+        o.created_at,
+        o.is_returned,
+        o.invoice_date,
+        qr.grand_total AS quotation_grand_total
+      FROM neworder o
+      LEFT JOIN quotations_records qr ON qr.quote_number = o.quote_number
       WHERE ${whereClause}
-      ORDER BY duedate DESC`;
+      ORDER BY o.duedate DESC`;
 
         const [rows] = await pool.query(sql, queryParams);
 
         // Analyze payment behavior for each order
         const orders = await Promise.all(rows.map(async (order) => {
-            let totalAmt = parseFloat(order.totalamt || 0);
-
-            // If partially returned, calculate adjusted total
-            if (order.is_returned === 2 && order.quote_number) {
-                try {
-                    // Get returned items for this order
-                    const [returnedItems] = await pool.query(
-                        `SELECT item_code, quantity_returned FROM order_return_items WHERE order_id = ?`,
-                        [order.order_id]
-                    );
-
-                    if (returnedItems.length > 0) {
-                        // Get prices from quotation_items
-                        const itemCodes = returnedItems.map(item => item.item_code);
-                        const placeholders = itemCodes.map(() => '?').join(',');
-
-                        const [quotationItems] = await pool.query(
-                            `SELECT item_code, total_price, quantity FROM quotation_items 
-                             WHERE quote_number = ? AND item_code IN (${placeholders})`,
-                            [order.quote_number, ...itemCodes]
-                        );
-
-                        // Calculate total value of returned items
-                        let returnedValue = 0;
-                        returnedItems.forEach(returnedItem => {
-                            const quotItem = quotationItems.find(q => q.item_code === returnedItem.item_code);
-                            if (quotItem) {
-                                // Calculate price per unit and multiply by returned quantity
-                                const pricePerUnit = parseFloat(quotItem.total_price) / parseInt(quotItem.quantity);
-                                returnedValue += pricePerUnit * returnedItem.quantity_returned;
-                            }
-                        });
-
-                        // Adjust total amount by subtracting returned items value
-                        totalAmt = totalAmt - returnedValue;
-                    }
-                } catch (err) {
-                    console.error(`Error calculating returned value for order ${order.order_id}:`, err);
-                    // Continue with original total if calculation fails
-                }
-            }
-
-            // Parse payment_amount which might be comma-separated values
-            const paymentAmounts = (order.payment_amount || "")
-                .toString()
-                .split(",")
-                .map(s => parseFloat(s.trim()) || 0);
-
-            const paidAmount = paymentAmounts.reduce((sum, amt) => sum + amt, 0);
-            const remaining = Math.max(0, totalAmt - paidAmount); // Never negative
+            const totalAmt = roundInr(await calculateAdjustedOrderTotal(pool, order));
+            const paidAmount = roundInr(sumOrderPaymentAmounts(order));
+            const { remaining } = computeOrderPaymentRemaining(
+              totalAmt,
+              paidAmount,
+              0,
+            );
 
             // Parse payment_date which might be comma-separated values
             const paymentDates = (order.payment_date || "")
