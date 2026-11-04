@@ -4,7 +4,7 @@
  * POST: { since, until, autoImport: true } — imports only new phones, assigned to KAVYA
  */
 import { NextResponse } from "next/server";
-import { getSessionPayload, getMainSessionPayload } from "@/lib/auth";
+import { checkMetaBackfillAccess } from "@/lib/checkMetaBackfillAccess";
 import { normalizePhone } from "@/lib/phone-check";
 import {
   fetchTamilFormLeadsFromMeta,
@@ -19,21 +19,10 @@ import { getFBCredentials } from "@/lib/fbCredentials";
 
 export const maxDuration = 300;
 
-/** Prefer main JWT when impersonating so SUPERADMIN keeps access to Meta tools */
-async function assertAdminMetaRole() {
-  const main = await getMainSessionPayload();
-  const session = await getSessionPayload();
-  const role = (main?.role ?? session?.role ?? "").toUpperCase() || "";
-  if (!["ADMIN", "SUPERADMIN"].includes(role)) {
-    return NextResponse.json({ error: "Forbidden - Admin access required" }, { status: 403 });
-  }
-  return null;
-}
-
 export async function GET(request) {
   try {
-    const forbidden = await assertAdminMetaRole();
-    if (forbidden) return forbidden;
+    const access = await checkMetaBackfillAccess();
+    if (!access.allowed) return access.forbidden;
 
     const { searchParams } = new URL(request.url);
     const since = searchParams.get("since");
@@ -103,8 +92,8 @@ export async function GET(request) {
 
 export async function POST(request) {
   try {
-    const forbidden = await assertAdminMetaRole();
-    if (forbidden) return forbidden;
+    const access = await checkMetaBackfillAccess();
+    if (!access.allowed) return access.forbidden;
 
     const body = await request.json().catch(() => ({}));
     const since = body.since;

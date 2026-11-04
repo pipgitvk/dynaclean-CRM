@@ -4,7 +4,7 @@
  * When formIds is provided, filters to only show leads from those specific form IDs.
  */
 import { getDbConnection } from "@/lib/db";
-import { getSessionPayload } from "@/lib/auth";
+import { checkMetaBackfillAccess } from "@/lib/checkMetaBackfillAccess";
 import { NextResponse } from "next/server";
 
 const ASSIGNER_CASE = `CASE
@@ -16,14 +16,8 @@ END`;
 
 export async function GET(request) {
   try {
-    const payload = await getSessionPayload();
-    if (!payload) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    const role = payload.role?.toUpperCase() || "";
-    if (!["ADMIN", "SUPERADMIN"].includes(role)) {
-      return NextResponse.json({ error: "Forbidden - Admin access required" }, { status: 403 });
-    }
+    const access = await checkMetaBackfillAccess();
+    if (!access.allowed) return access.forbidden;
 
     const { searchParams } = new URL(request.url);
     const from = searchParams.get("from");
