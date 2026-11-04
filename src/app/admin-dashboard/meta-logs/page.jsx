@@ -6,8 +6,10 @@ import axios from 'axios';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
 import { ArrowLeft, CheckCircle, XCircle, AlertCircle, Clock, Filter } from 'lucide-react';
+import { useMetaCredentialsPaths } from '@/hooks/useMetaCredentialsPaths';
 
 export default function MetaLogsPage() {
+  const paths = useMetaCredentialsPaths();
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filterFormId, setFilterFormId] = useState('');
@@ -106,7 +108,7 @@ export default function MetaLogsPage() {
     <div className="p-6 max-w-7xl mx-auto">
       <div className="mb-6">
         <Link
-          href="/admin-dashboard/meta-credentials"
+          href={paths.list}
           className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 mb-4"
         >
           <ArrowLeft className="w-4 h-4" />

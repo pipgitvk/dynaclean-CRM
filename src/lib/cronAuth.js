@@ -1,4 +1,5 @@
 import { getMainSessionPayload, getSessionPayload } from "@/lib/auth";
+import { checkMetaCredentialsAccess } from "@/lib/checkMetaCredentialsAccess";
 
 /**
  * For /api/cron/* routes called by Vercel/external cron OR admin dashboard "Test".
@@ -23,5 +24,10 @@ export async function isCronRequestAuthorized(request) {
   const main = await getMainSessionPayload();
   const session = await getSessionPayload();
   const role = (main?.role ?? session?.role ?? "").toUpperCase();
-  return ["ADMIN", "SUPERADMIN"].includes(role);
+  if (["ADMIN", "SUPERADMIN", "DIRECTOR"].includes(role)) {
+    return true;
+  }
+
+  const { allowed } = await checkMetaCredentialsAccess();
+  return allowed;
 }

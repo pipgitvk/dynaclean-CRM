@@ -1,9 +1,22 @@
 // app/api/lead-distribution/route.js
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
+import { checkLeadDistributionAccess } from "@/lib/checkLeadDistributionAccess";
+
+function leadDistributionRedirectPath(req) {
+  const referer = req.headers.get("referer") || "";
+  return referer.includes("/sales-dashboard/lead-distribution")
+    ? "/sales-dashboard/lead-distribution"
+    : "/admin-dashboard/lead-distribution";
+}
 
 // GET: return current distribution (duplicate of /config but convenient here)
 export async function GET() {
+  const access = await checkLeadDistributionAccess();
+  if (!access.allowed) {
+    return access.forbidden;
+  }
+
   const conn = await getDbConnection();
   const [rows] = await conn.execute(
     "SELECT username, priority, max_leads FROM lead_distribution ORDER BY priority ASC"
@@ -13,6 +26,11 @@ export async function GET() {
 
 // POST: create a row. Accepts JSON: { username, priority, max_leads }
 export async function POST(req) {
+  const access = await checkLeadDistributionAccess();
+  if (!access.allowed) {
+    return access.forbidden;
+  }
+
   const contentType = req.headers.get("content-type") || "";
   const conn = await getDbConnection();
 
@@ -45,7 +63,7 @@ export async function POST(req) {
     }
 
     return NextResponse.redirect(
-      new URL("/admin-dashboard/lead-distribution", req.url)
+      new URL(leadDistributionRedirectPath(req), req.url)
     );
   }
 
@@ -69,6 +87,11 @@ export async function POST(req) {
 
 // PUT: update a row by username
 export async function PUT(req) {
+  const access = await checkLeadDistributionAccess();
+  if (!access.allowed) {
+    return access.forbidden;
+  }
+
   const conn = await getDbConnection();
   const body = await req.json();
   const { username, priority, max_leads } = body || {};
@@ -89,6 +112,11 @@ export async function PUT(req) {
 
 // DELETE: remove a row by username
 export async function DELETE(req) {
+  const access = await checkLeadDistributionAccess();
+  if (!access.allowed) {
+    return access.forbidden;
+  }
+
   const conn = await getDbConnection();
   const { searchParams } = new URL(req.url);
   const username = searchParams.get("username");

@@ -6,9 +6,11 @@ import toast from 'react-hot-toast';
 import { Plus, Edit2, Trash2, Power, PowerOff, RefreshCw, Clock, CheckCircle, XCircle, AlertCircle, Database, Eye, ArrowRight, Tag, Copy } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useMetaCredentialsPaths } from '@/hooks/useMetaCredentialsPaths';
 
 export default function MetaCredentialsPage() {
   const router = useRouter();
+  const paths = useMetaCredentialsPaths();
   const [credentials, setCredentials] = useState([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
@@ -261,35 +263,35 @@ export default function MetaCredentialsPage() {
       {/* Add Credential Button */}
       <div className="mb-6 flex flex-col sm:flex-row gap-3">
         <Link
-          href="/admin-dashboard/meta-credentials/add"
+          href={paths.add}
           className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700"
         >
           <Plus className="w-4 h-4" />
           Add New Credential
         </Link>
         <Link
-          href="/admin-dashboard/skipped-leads"
+          href={paths.skippedLeads}
           className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg font-medium hover:bg-orange-700"
         >
           <Database className="w-4 h-4" />
           Skipped Leads
         </Link>
         <Link
-          href="/admin-dashboard/meta-credentials/duplicate-leads"
+          href={paths.duplicateLeads}
           className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700"
         >
           <Copy className="w-4 h-4" />
           Duplicate Leads
         </Link>
         <Link
-          href="/admin-dashboard/imported-leads"
+          href={paths.importedLeads}
           className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700"
         >
           <CheckCircle className="w-4 h-4" />
           Imported Leads
         </Link>
         <Link
-          href="/admin-dashboard/meta-logs"
+          href={paths.metaLogs}
           className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700"
         >
           <Clock className="w-4 h-4" />
@@ -309,7 +311,7 @@ export default function MetaCredentialsPage() {
             <h3 className="text-base md:text-lg font-medium text-gray-900 mb-2">No credentials added yet</h3>
             <p className="text-gray-500 mb-4 text-sm md:text-base">Add your first Meta credential to start syncing leads</p>
             <Link
-              href="/admin-dashboard/meta-credentials/add"
+              href={paths.add}
               className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700"
             >
               <Plus className="w-4 h-4" />
@@ -412,7 +414,7 @@ export default function MetaCredentialsPage() {
                     {cred.isActive ? <PowerOff className="w-4 h-4" /> : <Power className="w-4 h-4" />}
                   </button>
                   <Link
-                    href={`/admin-dashboard/meta-credentials/${cred._id}/view`}
+                    href={paths.view(cred._id)}
                     className="p-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200"
                     title="View"
                   >
@@ -426,7 +428,7 @@ export default function MetaCredentialsPage() {
                     <ArrowRight className="w-4 h-4" />
                   </Link>
                   <Link
-                    href={`/admin-dashboard/meta-credentials/${cred._id}/edit`}
+                    href={paths.edit(cred._id)}
                     className="p-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200"
                     title="Edit"
                   >

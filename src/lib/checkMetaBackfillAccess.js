@@ -24,7 +24,12 @@ export async function checkMetaBackfillAccess() {
   const roleKey =
     normalizeRoleKey(effectiveRole) || String(effectiveRole || "").trim().toUpperCase();
 
-  if (roleKey === "SUPERADMIN" || roleKey === "ADMIN" || roleKey === "DIRECTOR") {
+  if (
+    roleKey === "SUPERADMIN" ||
+    roleKey === "ADMIN" ||
+    roleKey === "DIRECTOR" ||
+    roleKey === "SALES CUM BACKOFFICE"
+  ) {
     return { allowed: true, payload, forbidden: null };
   }
 

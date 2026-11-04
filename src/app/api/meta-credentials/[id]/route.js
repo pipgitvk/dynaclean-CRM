@@ -4,10 +4,16 @@ import {
   updateCredential,
   deleteCredential
 } from '@/lib/mysql/metaCredentialModel';
+import { checkMetaCredentialsAccess } from '@/lib/checkMetaCredentialsAccess';
 
 // GET single credential by ID
 export async function GET(request, { params }) {
   try {
+    const access = await checkMetaCredentialsAccess();
+    if (!access.allowed) {
+      return access.forbidden;
+    }
+
     const { id } = await params;
     const credential = await getCredentialById(id);
     
@@ -31,6 +37,11 @@ export async function GET(request, { params }) {
 // PUT update credential
 export async function PUT(request, { params }) {
   try {
+    const access = await checkMetaCredentialsAccess();
+    if (!access.allowed) {
+      return access.forbidden;
+    }
+
     const { id } = await params;
     const body = await request.json();
     const { employeeName, verifyToken, pageId, pageToken, formIds, isActive } = body;
@@ -67,6 +78,11 @@ export async function PUT(request, { params }) {
 // DELETE credential
 export async function DELETE(request, { params }) {
   try {
+    const access = await checkMetaCredentialsAccess();
+    if (!access.allowed) {
+      return access.forbidden;
+    }
+
     const { id } = await params;
     const deleted = await deleteCredential(id);
     

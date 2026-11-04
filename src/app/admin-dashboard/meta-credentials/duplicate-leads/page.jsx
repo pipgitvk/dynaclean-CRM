@@ -6,6 +6,7 @@ import axios from 'axios';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
 import { ArrowLeft, Calendar, Copy, RefreshCw, Search, Users } from 'lucide-react';
+import { useMetaCredentialsPaths } from '@/hooks/useMetaCredentialsPaths';
 
 function formatDateInput(date) {
   const y = date.getFullYear();
@@ -47,6 +48,7 @@ function formatIstDateTime(value) {
 }
 
 export default function DuplicateMetaLeadsPage() {
+  const paths = useMetaCredentialsPaths();
   const defaultRange = getDefaultMonthRange();
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -172,7 +174,7 @@ export default function DuplicateMetaLeadsPage() {
     <div className="p-4 md:p-6 max-w-7xl mx-auto">
       <div className="mb-6">
         <Link
-          href="/admin-dashboard/meta-credentials"
+          href={paths.list}
           className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 mb-4"
         >
           <ArrowLeft className="w-4 h-4" />
@@ -328,7 +330,7 @@ export default function DuplicateMetaLeadsPage() {
                     </td>
                     <td className="px-4 py-3">
                       <Link
-                        href={`/admin-dashboard/view-customer/${lead.crmCustomerId}`}
+                        href={paths.viewCustomer(lead.crmCustomerId)}
                         className="text-blue-600 hover:text-blue-800 font-mono"
                       >
                         {lead.crmCustomerId}

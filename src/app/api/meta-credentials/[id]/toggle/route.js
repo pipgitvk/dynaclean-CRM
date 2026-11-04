@@ -1,9 +1,15 @@
 import { NextResponse } from 'next/server';
 import { toggleCredentialActive } from '@/lib/mysql/metaCredentialModel';
+import { checkMetaCredentialsAccess } from '@/lib/checkMetaCredentialsAccess';
 
 // POST toggle credential active status
 export async function POST(request, { params }) {
   try {
+    const access = await checkMetaCredentialsAccess();
+    if (!access.allowed) {
+      return access.forbidden;
+    }
+
     const { id } = await params;
     const credential = await toggleCredentialActive(id);
     

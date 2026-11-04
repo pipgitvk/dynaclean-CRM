@@ -53,6 +53,10 @@ function transformMenuItemPaths(item, roleKey) {
     return { ...item, path: "/sales-dashboard/backlinks-excel" };
   }
 
+  if (roleUpper === "SALES CUM BACKOFFICE" && item.moduleKey === "lead-distribution") {
+    return { ...item, path: "/sales-dashboard/lead-distribution" };
+  }
+
   if (dashboardPrefix === "/sales-dashboard" && item.moduleKey) {
     const salesDashboardModulePaths = {
       "prospects-view": "/sales-dashboard/prospects",

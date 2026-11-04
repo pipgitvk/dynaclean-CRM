@@ -1,7 +1,13 @@
 import { getDbConnection } from "@/lib/db";
 import { NextResponse } from "next/server";
+import { checkLeadDistributionAccess } from "@/lib/checkLeadDistributionAccess";
 
 export async function GET(req) {
+  const access = await checkLeadDistributionAccess();
+  if (!access.allowed) {
+    return access.forbidden;
+  }
+
   const conn = await getDbConnection();
 
   const { searchParams } = new URL(req.url);

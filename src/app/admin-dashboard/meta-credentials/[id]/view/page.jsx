@@ -8,10 +8,12 @@ import Link from 'next/link';
 import { ArrowLeft, Users, Loader2, Tag } from 'lucide-react';
 import MetaFormAssignments from '@/components/MetaFormAssignments';
 import MetaFormLeadsTable from '@/components/MetaFormLeadsTable';
+import { useMetaCredentialsPaths } from '@/hooks/useMetaCredentialsPaths';
 
 export default function ViewCredentialPage() {
   const router = useRouter();
   const params = useParams();
+  const paths = useMetaCredentialsPaths();
   const [loading, setLoading] = useState(true);
   const [employees, setEmployees] = useState([]);
   const [loadingEmployees, setLoadingEmployees] = useState(true);
@@ -47,7 +49,7 @@ export default function ViewCredentialPage() {
     } catch (error) {
       toast.error('Failed to fetch credential');
       console.error(error);
-      router.push('/admin-dashboard/meta-credentials');
+      router.push(paths.list);
     } finally {
       setLoading(false);
     }
@@ -73,7 +75,7 @@ export default function ViewCredentialPage() {
     <div className="w-full px-2 sm:px-4 py-4 sm:py-6">
       <div className="mb-6">
         <Link
-          href="/admin-dashboard/meta-credentials"
+          href={paths.list}
           className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 mb-4"
         >
           <ArrowLeft className="w-4 h-4" />

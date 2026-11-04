@@ -861,9 +861,21 @@ export function applySuperadminOnlyModuleRestrictions(allowedKeys, role) {
  * Role-specific deny lists (even if module_access contains the key).
  * Global Module Access / Quick Edit selections are the source of truth — no stripping here.
  */
+function stripLeadDistributionForNonScbSales(allowedKeys, role) {
+  if (!Array.isArray(allowedKeys)) return allowedKeys;
+  const roleKey =
+    normalizeRoleKey(role) || String(role || "").trim().toUpperCase();
+  if (roleKey === "SALES CUM BACKOFFICE") return allowedKeys;
+  if (roleKey.includes("SALES")) {
+    return allowedKeys.filter((k) => k !== "lead-distribution");
+  }
+  return allowedKeys;
+}
+
 export function applyRoleDenyModuleRestrictions(allowedKeys, role) {
   if (!allowedKeys) return allowedKeys ?? null;
-  return stripHrOnlyModulesForNonHrRoles(allowedKeys, role);
+  const afterHr = stripHrOnlyModulesForNonHrRoles(allowedKeys, role);
+  return stripLeadDistributionForNonScbSales(afterHr, role);
 }
 
 /**

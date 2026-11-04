@@ -1,6 +1,12 @@
 import { getDbConnection } from "@/lib/db";
+import { checkLeadDistributionAccess } from "@/lib/checkLeadDistributionAccess";
 
 export async function GET() {
+  const access = await checkLeadDistributionAccess();
+  if (!access.allowed) {
+    return access.forbidden;
+  }
+
   const conn = await getDbConnection();
 
   const [rows] = await conn.execute(

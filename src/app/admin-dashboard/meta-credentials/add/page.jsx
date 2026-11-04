@@ -7,9 +7,11 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Plus, X } from 'lucide-react';
 import MetaFormAssignments from '@/components/MetaFormAssignments';
+import { useMetaCredentialsPaths } from '@/hooks/useMetaCredentialsPaths';
 
 export default function AddCredentialPage() {
   const router = useRouter();
+  const paths = useMetaCredentialsPaths();
   const [loading, setLoading] = useState(false);
   const [employees, setEmployees] = useState([]);
   const [loadingEmployees, setLoadingEmployees] = useState(true);
@@ -103,7 +105,7 @@ export default function AddCredentialPage() {
 
       if (response.data.success) {
         toast.success('Credential added successfully');
-        router.push('/admin-dashboard/meta-credentials');
+        router.push(paths.list);
       }
     } catch (error) {
       toast.error(error.response?.data?.error || 'Failed to add credential');
@@ -117,7 +119,7 @@ export default function AddCredentialPage() {
     <div className="p-6 max-w-4xl mx-auto">
       <div className="mb-6">
         <Link
-          href="/admin-dashboard/meta-credentials"
+          href={paths.list}
           className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 mb-4"
         >
           <ArrowLeft className="w-4 h-4" />
@@ -225,7 +227,7 @@ export default function AddCredentialPage() {
               {loading ? 'Adding...' : 'Add Credential'}
             </button>
             <Link
-              href="/admin-dashboard/meta-credentials"
+              href={paths.list}
               className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300"
             >
               Cancel

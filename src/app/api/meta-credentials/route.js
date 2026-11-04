@@ -3,10 +3,16 @@ import {
   createCredential,
   getAllCredentials
 } from '@/lib/mysql/metaCredentialModel';
+import { checkMetaCredentialsAccess } from '@/lib/checkMetaCredentialsAccess';
 
 // GET all credentials
 export async function GET(request) {
   try {
+    const access = await checkMetaCredentialsAccess();
+    if (!access.allowed) {
+      return access.forbidden;
+    }
+
     const { searchParams } = new URL(request.url);
     const activeOnly = searchParams.get('activeOnly') === 'true';
     
@@ -25,6 +31,11 @@ export async function GET(request) {
 // POST create new credential
 export async function POST(request) {
   try {
+    const access = await checkMetaCredentialsAccess();
+    if (!access.allowed) {
+      return access.forbidden;
+    }
+
     const body = await request.json();
     const { employeeName, verifyToken, pageId, pageToken, formIds } = body;
     

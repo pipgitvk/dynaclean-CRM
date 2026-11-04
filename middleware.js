@@ -148,6 +148,34 @@ export async function middleware(request) {
         }
       }
 
+      // Lead distribution: only Sales cum Backoffice uses sales-dashboard copy.
+      if (pathname.startsWith("/admin-dashboard/lead-distribution")) {
+        if (roleNorm === "SALES CUM BACKOFFICE") {
+          const dest = new URL(
+            pathname.replace("/admin-dashboard", "/sales-dashboard"),
+            request.url,
+          );
+          dest.search = request.nextUrl.search;
+          return NextResponse.redirect(dest);
+        }
+      }
+
+      if (pathname.startsWith("/sales-dashboard/lead-distribution")) {
+        const canSalesLeadDistribution =
+          roleNorm === "SALES CUM BACKOFFICE" ||
+          role === "SUPERADMIN" ||
+          role === "ADMIN" ||
+          roleNorm === "DIRECTOR";
+        if (!canSalesLeadDistribution) {
+          const dest = new URL(
+            roleNorm.includes("SALES") ? "/sales-dashboard" : "/user-dashboard",
+            request.url,
+          );
+          dest.search = request.nextUrl.search;
+          return NextResponse.redirect(dest);
+        }
+      }
+
       // Meta backfill: sales roles use sales-dashboard copy.
       if (pathname.startsWith("/admin-dashboard/ads-management")) {
         if (roleNorm.includes("SALES") && role !== "SUPERADMIN") {
@@ -170,6 +198,26 @@ export async function middleware(request) {
           dest.search = request.nextUrl.search;
           return NextResponse.redirect(dest);
         }
+      }
+
+      // Meta lead tools (linked from meta-credentials): sales roles use sales-dashboard copy.
+      const salesMetaToolAdminPrefixes = [
+        "/admin-dashboard/skipped-leads",
+        "/admin-dashboard/imported-leads",
+        "/admin-dashboard/meta-logs",
+        "/admin-dashboard/meta-sync-logs",
+      ];
+      if (
+        salesMetaToolAdminPrefixes.some((p) => pathname.startsWith(p)) &&
+        roleNorm.includes("SALES") &&
+        role !== "SUPERADMIN"
+      ) {
+        const dest = new URL(
+          pathname.replace("/admin-dashboard", "/sales-dashboard"),
+          request.url,
+        );
+        dest.search = request.nextUrl.search;
+        return NextResponse.redirect(dest);
       }
 
       // Prospects: sales roles use sales-dashboard copy; admin/director stay on admin.
@@ -254,10 +302,16 @@ export async function middleware(request) {
         const isDeniedLeadsRoute = pathname.startsWith("/admin-dashboard/denied-leads");
         const isViewCustomerRoute = pathname.startsWith("/admin-dashboard/view-customer");
         const isBulkReassignRoute = pathname.startsWith("/admin-dashboard/bulk-reassign");
+        const isLeadDistributionRoute = pathname.startsWith(
+          "/admin-dashboard/lead-distribution",
+        );
         const isMetaCredentialsRoute =
           pathname.startsWith("/admin-dashboard/meta-credentials");
         const isMetaBackfillRoute =
           pathname.startsWith("/admin-dashboard/ads-management");
+        const isMetaLeadToolsRoute = salesMetaToolAdminPrefixes.some((p) =>
+          pathname.startsWith(p),
+        );
         const isAccountingLedgerRoute = pathname.startsWith("/admin-dashboard/accounting/ledger");
         const isInvoicesBuyerRoute = pathname.startsWith("/admin-dashboard/invoices/buyer");
         const isPartiesRoute = pathname.startsWith("/admin-dashboard/parties");
@@ -287,8 +341,10 @@ export async function middleware(request) {
           !(isSales && (isDeniedLeadsRoute || isViewCustomerRoute || isBulkReassignRoute)) &&
           !(isSalesCumBackoffice &&
             (isBulkReassignRoute ||
+              isLeadDistributionRoute ||
               isMetaCredentialsRoute ||
               isMetaBackfillRoute ||
+              isMetaLeadToolsRoute ||
               isManualPaymentsRoute ||
               isSalesDashboardManualPaymentsRoute)) &&
           !(isServiceHead && isServiceSupportReport) &&

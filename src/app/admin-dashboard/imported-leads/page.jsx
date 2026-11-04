@@ -5,8 +5,10 @@ import axios from 'axios';
 import toast from 'react-hot-toast';
 import { ArrowLeft, CheckCircle } from 'lucide-react';
 import Link from 'next/link';
+import { useMetaCredentialsPaths } from '@/hooks/useMetaCredentialsPaths';
 
 export default function ImportedLeadsPage() {
+  const paths = useMetaCredentialsPaths();
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -53,7 +55,7 @@ export default function ImportedLeadsPage() {
     <div className="p-6 max-w-7xl mx-auto">
       <div className="mb-6">
         <Link
-          href="/admin-dashboard/meta-credentials"
+          href={paths.list}
           className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 mb-4"
         >
           <ArrowLeft className="w-4 h-4" />
