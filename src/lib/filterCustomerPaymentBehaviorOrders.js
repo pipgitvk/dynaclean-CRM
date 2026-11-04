@@ -17,6 +17,8 @@ export function filterCustomerPaymentBehaviorOrders(
       );
     } else if (filterStatus === "on_time") {
       filtered = filtered.filter((o) => o.payment_behavior === "on_time");
+    } else if (filterStatus === "pending") {
+      filtered = filtered.filter((o) => o.payment_behavior === "pending");
     }
   }
 

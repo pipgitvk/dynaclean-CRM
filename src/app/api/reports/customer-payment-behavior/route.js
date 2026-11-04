@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 
-export async function GET() {
+export async function GET(request) {
     try {
         const payload = await getSessionPayload();
         if (!payload) {
@@ -10,16 +10,72 @@ export async function GET() {
         }
 
         const { role, username } = payload;
+        const roleNorm = String(role ?? "").trim().toUpperCase();
 
         // Check if user has access to this report
         const allowedRoles = ["SUPERADMIN", "ADMIN", "ACCOUNTANT", "HR HEAD", "SALES", "SALES CUM BACKOFFICE", "SALES HEAD", "TEAM LEADER", "DIRECTOR"];
-        if (!allowedRoles.includes(String(role).toUpperCase())) {
+        if (!allowedRoles.includes(roleNorm)) {
             return NextResponse.json({ error: "Access denied" }, { status: 403 });
         }
 
-        const pool = await getDbConnection();
+        const { searchParams } = new URL(request.url);
+        const from = searchParams.get("from");
+        const to = searchParams.get("to");
+        const employeeParam = searchParams.get("employee");
+        const employeeFilter =
+            employeeParam != null ? String(employeeParam).trim() : "";
 
-        // Build SQL query based on role
+        const pool = await getDbConnection();
+        const queryParams = [];
+
+        const buildBaseWhere = () => {
+            let where = `(is_cancelled = 0 OR is_cancelled IS NULL)`;
+            if (roleNorm === "SALES") {
+                where += ` AND created_by = ?`;
+                queryParams.push(username);
+            } else if (employeeFilter) {
+                where += ` AND created_by = ?`;
+                queryParams.push(employeeFilter);
+            }
+            if (from && to) {
+                where += ` AND DATE(created_at) BETWEEN ? AND ?`;
+                queryParams.push(from, to);
+            } else if (from) {
+                where += ` AND DATE(created_at) >= ?`;
+                queryParams.push(from);
+            }
+            return where;
+        };
+
+        // Employee dropdown: distinct creators in date range (before employee filter)
+        const employeeListParams = [];
+        let employeeSql = `
+      SELECT DISTINCT TRIM(created_by) AS username
+      FROM neworder
+      WHERE (is_cancelled = 0 OR is_cancelled IS NULL)
+        AND created_by IS NOT NULL
+        AND TRIM(created_by) != ''`;
+        if (roleNorm === "SALES") {
+            employeeSql += ` AND created_by = ?`;
+            employeeListParams.push(username);
+        }
+        if (from && to) {
+            employeeSql += ` AND DATE(created_at) BETWEEN ? AND ?`;
+            employeeListParams.push(from, to);
+        } else if (from) {
+            employeeSql += ` AND DATE(created_at) >= ?`;
+            employeeListParams.push(from);
+        }
+        employeeSql += ` ORDER BY username ASC`;
+
+        const [employeeRows] = await pool.query(employeeSql, employeeListParams);
+        const employees = (employeeRows || [])
+            .map((r) => (r.username != null ? String(r.username).trim() : ""))
+            .filter(Boolean);
+
+        queryParams.length = 0;
+        const whereClause = buildBaseWhere();
+
         let sql = `
       SELECT 
         order_id,
@@ -37,19 +93,10 @@ export async function GET() {
         is_returned,
         invoice_date
       FROM neworder
-      WHERE (is_cancelled = 0 OR is_cancelled IS NULL)
-    `;
+      WHERE ${whereClause}
+      ORDER BY duedate DESC`;
 
-        // Filter for SALES role - only their own orders
-        if (role === "SALES") {
-            sql += ` AND created_by = ?`;
-        }
-
-        sql += ` ORDER BY duedate DESC`;
-
-        const [rows] = role === "SALES"
-            ? await pool.query(sql, [username])
-            : await pool.query(sql);
+        const [rows] = await pool.query(sql, queryParams);
 
         // Analyze payment behavior for each order
         const orders = await Promise.all(rows.map(async (order) => {
@@ -214,6 +261,8 @@ export async function GET() {
         return NextResponse.json({
             success: true,
             orders: orders,
+            employees,
+            filters: { from, to, employee: employeeFilter || null },
             summary: {
                 total_orders: orders.length,
                 late_payments_count: latePayments.length,

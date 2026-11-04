@@ -8,10 +8,22 @@ import {
 import ManualFilterSearchButton, {
   MANUAL_FILTER_HINT,
 } from "@/components/ui/ManualFilterSearchButton";
+import PaymentBehaviorBadge from "@/components/reports/PaymentBehaviorBadge";
+import { getPaymentBehaviorLabel } from "@/lib/customerPaymentBehaviorLabels";
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
+import {
+  buildCustomerPaymentBehaviorReportUrl,
+  getDefaultCustomerPaymentBehaviorDateRange,
+} from "@/lib/customerPaymentBehaviorReportFetch";
 import dayjs from "dayjs";
 import { Download, Search, Calendar, DollarSign, AlertTriangle, ChevronLeft, ChevronRight, ArrowUp, ArrowDown } from "lucide-react";
 
 export default function CustomerPaymentBehaviorReport() {
+    const defaultRange = getDefaultCustomerPaymentBehaviorDateRange();
+    const [from, setFrom] = useState(defaultRange.from);
+    const [to, setTo] = useState(defaultRange.to);
+    const [filterEmployee, setFilterEmployee] = useState("");
+    const [employeeOptions, setEmployeeOptions] = useState([]);
     const [orders, setOrders] = useState([]);
     const [paginatedOrders, setPaginatedOrders] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -25,20 +37,22 @@ export default function CustomerPaymentBehaviorReport() {
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 20;
 
-    useEffect(() => {
-        fetchReport();
-    }, []);
-
-    const fetchReport = async () => {
+    const fetchReport = async (opts = {}) => {
         try {
             setLoading(true);
-            const res = await fetch("/api/reports/customer-payment-behavior");
+            const url = buildCustomerPaymentBehaviorReportUrl({
+                from: opts.from ?? from,
+                to: opts.to ?? to,
+                employee: opts.employee ?? filterEmployee,
+            });
+            const res = await fetch(url);
             const data = await res.json();
 
             if (data.success) {
                 setOrders(data.orders || []);
                 setUserRole(data.userRole || "");
                 setSummary(data.summary || {});
+                setEmployeeOptions(Array.isArray(data.employees) ? data.employees : []);
             } else {
                 alert(data.error || "Failed to fetch report");
             }
@@ -50,11 +64,17 @@ export default function CustomerPaymentBehaviorReport() {
         }
     };
 
+    useEffect(() => {
+        fetchReport();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
     const handleApplySearch = useCallback(() => {
         setAppliedSearchQuery(searchQuery);
         setAppliedFilterStatus(filterStatus);
         setCurrentPage(1);
-    }, [searchQuery, filterStatus]);
+        fetchReport({ from, to, employee: filterEmployee });
+    }, [searchQuery, filterStatus, from, to, filterEmployee]);
 
     const filteredOrders = useMemo(() => {
         const filtered = filterCustomerPaymentBehaviorOrders(orders, {
@@ -86,25 +106,9 @@ export default function CustomerPaymentBehaviorReport() {
             <ArrowDown size={14} className="inline ml-1" />;
     };
 
-    const getPaymentBehaviorBadge = (behavior) => {
-        const badges = {
-            'late_payment': { text: '🟡 Late Payment', color: 'bg-yellow-100 text-yellow-800 border border-yellow-300' },
-            'missing_payment': { text: '🔴 Missing Payment', color: 'bg-red-100 text-red-800 border border-red-300' },
-            'partial_overdue': { text: '🔴 Partial (Overdue)', color: 'bg-red-100 text-red-800 border border-red-300' },
-            'on_time': { text: '🟢 On Time', color: 'bg-green-100 text-green-800 border border-green-300' },
-            'partial_payment': { text: '🔵 Partial Payment', color: 'bg-blue-100 text-blue-800 border border-blue-300' },
-            'pending': { text: '⚪ Pending', color: 'bg-gray-100 text-gray-800 border border-gray-300' },
-            'paid_no_date': { text: 'Paid (No Date)', color: 'bg-gray-100 text-gray-600 border border-gray-300' },
-            'no_due_date': { text: 'No Due Date', color: 'bg-gray-100 text-gray-600 border border-gray-300' },
-            'paid_no_due_date': { text: 'Paid (No Due Date)', color: 'bg-gray-100 text-gray-600 border border-gray-300' },
-        };
-        const badge = badges[behavior] || { text: behavior, color: 'bg-gray-100 text-gray-800' };
-        return (
-            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${badge.color}`}>
-                {badge.text}
-            </span>
-        );
-    };
+    const getPaymentBehaviorBadge = (behavior) => (
+        <PaymentBehaviorBadge behavior={behavior} />
+    );
 
     const exportToCSV = () => {
         const headers = [
@@ -125,7 +129,7 @@ export default function CustomerPaymentBehaviorReport() {
             order.due_date ? dayjs(order.due_date).format("DD-MM-YYYY") : "N/A",
             order.payment_date ? dayjs(order.payment_date).format("DD-MM-YYYY") : "N/A",
             order.days_overdue,
-            order.payment_behavior
+            getPaymentBehaviorLabel(order.payment_behavior)
         ]);
 
         const csvContent = [
@@ -233,7 +237,7 @@ export default function CustomerPaymentBehaviorReport() {
                 <div className="bg-white rounded-lg shadow p-3 md:p-4 border-l-4 border-yellow-500">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-xs md:text-sm text-gray-600">Late Payments</p>
+                            <p className="text-xs md:text-sm text-gray-600">Overdue Cleared</p>
                             <p className="text-xl md:text-2xl font-bold text-yellow-600">{summary.late_payments_count || 0}</p>
                         </div>
                         <div className="bg-yellow-100 p-2 md:p-3 rounded-full">
@@ -245,7 +249,7 @@ export default function CustomerPaymentBehaviorReport() {
                 <div className="bg-white rounded-lg shadow p-3 md:p-4 border-l-4 border-orange-500">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-xs md:text-sm text-gray-600">Missing Payments</p>
+                            <p className="text-xs md:text-sm text-gray-600">Overdue (count)</p>
                             <p className="text-xl md:text-2xl font-bold text-orange-600">{summary.missing_payments_count || 0}</p>
                         </div>
                         <div className="bg-orange-100 p-2 md:p-3 rounded-full">
@@ -256,7 +260,42 @@ export default function CustomerPaymentBehaviorReport() {
             </div>
 
             {/* Filters and Actions */}
-            <div className="bg-white rounded-lg shadow p-3 md:p-4 mb-4">
+            <div className="bg-white rounded-lg shadow p-3 md:p-4 mb-4 space-y-3">
+                <div className="flex flex-col md:flex-row gap-3 md:gap-4 flex-wrap">
+                    <div className="min-w-[140px] flex-1 md:flex-none md:w-40">
+                        <label className="text-xs font-medium text-gray-600 block mb-1">From date</label>
+                        <TypeableDateFilterInput
+                            value={from}
+                            onChange={setFrom}
+                            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                    </div>
+                    <div className="min-w-[140px] flex-1 md:flex-none md:w-40">
+                        <label className="text-xs font-medium text-gray-600 block mb-1">To date</label>
+                        <TypeableDateFilterInput
+                            value={to}
+                            onChange={setTo}
+                            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                    </div>
+                    {String(userRole).toUpperCase() !== "SALES" && (
+                        <div className="min-w-[160px] flex-1 md:flex-none md:w-48">
+                            <label className="text-xs font-medium text-gray-600 block mb-1">Employee</label>
+                            <select
+                                value={filterEmployee}
+                                onChange={(e) => setFilterEmployee(e.target.value)}
+                                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                            >
+                                <option value="">All employees</option>
+                                {employeeOptions.map((name) => (
+                                    <option key={name} value={name}>
+                                        {name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+                </div>
                 <div className="flex flex-col md:flex-row gap-3 md:gap-4">
                     <div className="relative flex-1">
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
@@ -282,9 +321,10 @@ export default function CustomerPaymentBehaviorReport() {
                             className="flex-1 md:flex-none px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                         >
                             <option value="all">All Status</option>
-                            <option value="late">Late Payment</option>
-                            <option value="missing">Missing Payment</option>
-                            <option value="on_time">On Time</option>
+                            <option value="pending">Payment Awaited</option>
+                            <option value="on_time">On Time Paid</option>
+                            <option value="missing">Overdue</option>
+                            <option value="late">Overdue Cleared</option>
                         </select>
 
                         <ManualFilterSearchButton onClick={handleApplySearch} />
