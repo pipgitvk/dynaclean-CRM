@@ -5,13 +5,10 @@
  */
 import { getDbConnection } from "@/lib/db";
 import { checkMetaBackfillAccess } from "@/lib/checkMetaBackfillAccess";
+import { LEADS_REPORT_RECEIVER_SQL } from "@/lib/metaLeadsReportEmployee";
 import { NextResponse } from "next/server";
 
-const EMPLOYEE_CASE = `CASE 
-  WHEN c.assigned_to IS NULL OR c.assigned_to = '' OR c.assigned_to = 'Automatic' 
-  THEN COALESCE(c.lead_source, c.sales_representative, 'Unassigned')
-  ELSE c.assigned_to 
-END`;
+const EMPLOYEE_CASE = LEADS_REPORT_RECEIVER_SQL;
 
 export async function GET(request) {
   try {

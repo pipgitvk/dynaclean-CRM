@@ -5,6 +5,7 @@
  */
 import { getDbConnection } from "@/lib/db";
 import { checkMetaBackfillAccess } from "@/lib/checkMetaBackfillAccess";
+import { LEADS_REPORT_RECEIVER_SQL } from "@/lib/metaLeadsReportEmployee";
 import { NextResponse } from "next/server";
 
 export async function GET(request) {
@@ -37,11 +38,7 @@ export async function GET(request) {
       // Get lead counts per employee for the specific form IDs
       let query = `
         SELECT 
-          CASE 
-            WHEN c.assigned_to IS NULL OR c.assigned_to = '' OR c.assigned_to = 'Automatic' 
-            THEN COALESCE(c.lead_source, c.sales_representative, 'Unassigned')
-            ELSE c.assigned_to 
-          END as employee,
+          ${LEADS_REPORT_RECEIVER_SQL} as employee,
           COUNT(*) as lead_count
         FROM customers c
         INNER JOIN meta_leads ml ON c.customer_id = ml.crm_customer_id

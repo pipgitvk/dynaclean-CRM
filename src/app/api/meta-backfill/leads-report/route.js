@@ -5,6 +5,7 @@
  */
 import { getDbConnection } from "@/lib/db";
 import { checkMetaBackfillAccess } from "@/lib/checkMetaBackfillAccess";
+import { LEADS_REPORT_RECEIVER_SQL } from "@/lib/metaLeadsReportEmployee";
 import { NextResponse } from "next/server";
 
 export async function GET(request) {
@@ -27,20 +28,10 @@ export async function GET(request) {
 
     const conn = await getDbConnection();
 
-    // All reps from lead_distribution (who receive leads)
-    const [allReps] = await conn.execute(
-      `SELECT username FROM lead_distribution WHERE is_active = 1 ORDER BY priority ASC`
-    );
-
-    // Leads count per employee in date range
-    // When assigned_to = 'Automatic', use lead_source/sales_representative (actual rep)
+    // Leads count per employee who received the lead (lead_source / sales_representative)
     let byEmployeeQuery = `
       SELECT 
-        CASE 
-          WHEN c.assigned_to IS NULL OR c.assigned_to = '' OR c.assigned_to = 'Automatic' 
-          THEN COALESCE(c.lead_source, c.sales_representative, 'Unassigned')
-          ELSE c.assigned_to 
-        END as employee,
+        ${LEADS_REPORT_RECEIVER_SQL} as employee,
         COUNT(*) as lead_count
        FROM customers c`;
     
@@ -63,28 +54,13 @@ export async function GET(request) {
 
     const [byEmployee] = await conn.execute(byEmployeeQuery, byEmployeeParams);
 
-    // Build map: employee -> count
-    const countMap = Object.fromEntries(
-      byEmployee.map((r) => [r.employee, Number(r.lead_count)])
-    );
-
-    // When formIds are filtered, only show employees who actually received leads from those forms
-    // Otherwise, show all reps from lead_distribution + any others from customers (e.g. Unassigned)
-    let repSet;
-    if (formIds && formIds.length > 0) {
-      // Only show employees who are in the byEmployee results
-      repSet = new Set(byEmployee.map((r) => r.employee));
-    } else {
-      // Combine: all reps from lead_distribution + any others from customers (e.g. Unassigned)
-      repSet = new Set(allReps.map((r) => r.username));
-      byEmployee.forEach((r) => repSet.add(r.employee));
-    }
-
-    const byEmployeeFull = [...repSet]
-      .map((emp) => ({
-        employee: emp,
-        leadCount: countMap[emp] ?? 0,
+    // Only employees who actually received leads in this range
+    const byEmployeeFull = byEmployee
+      .map((r) => ({
+        employee: r.employee,
+        leadCount: Number(r.lead_count),
       }))
+      .filter((row) => row.leadCount > 0)
       .sort((a, b) => b.leadCount - a.leadCount);
 
     // Total leads in date range
