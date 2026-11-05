@@ -62,14 +62,30 @@ export async function PATCH(request) {
       return NextResponse.json({ success: false, message: "username is required" }, { status: 400 });
     }
 
+    const db = await getDbConnection();
+
+    // Merge with existing policy so extra keys (accrual_start_date, paid_full_year, etc.) are preserved
+    const [existing] = await db.query(
+      "SELECT leave_policy FROM employee_profiles WHERE username = ? LIMIT 1",
+      [username]
+    );
+    let existingPolicy = {};
+    if (existing.length > 0 && existing[0].leave_policy) {
+      try {
+        existingPolicy = JSON.parse(existing[0].leave_policy);
+      } catch {
+        existingPolicy = {};
+      }
+    }
+
     const policy = JSON.stringify({
+      ...existingPolicy,
       sick_enabled: Boolean(sick_enabled),
       paid_enabled: Boolean(paid_enabled),
       sick_allowed: Number(sick_allowed ?? 0),
       paid_allowed: Number(paid_allowed ?? 0),
     });
 
-    const db = await getDbConnection();
     await db.query(
       "UPDATE employee_profiles SET leave_policy = ? WHERE username = ?",
       [policy, username]
