@@ -20,6 +20,7 @@ function ProductInterestBadge({ value, className = '' }) {
 
 export default function MetaFormLeadsTable({ formIds, productInterestByFormId = {} }) {
   const [leadsData, setLeadsData] = useState({});
+  const [leadCounts, setLeadCounts] = useState({});
   const [loading, setLoading] = useState({});
   const [importFilter, setImportFilter] = useState('all');
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
@@ -62,6 +63,10 @@ export default function MetaFormLeadsTable({ formIds, productInterestByFormId = 
         setLeadsData(prev => ({
           ...prev,
           [formId]: response.data.data
+        }));
+        setLeadCounts(prev => ({
+          ...prev,
+          [formId]: response.data.counts || null
         }));
         setPagination(prev => ({
           ...prev,
@@ -217,6 +222,7 @@ export default function MetaFormLeadsTable({ formIds, productInterestByFormId = 
       {formIds.map((formId, index) => {
         const leads = leadsData[formId] || [];
         const isLoading = loading[formId];
+        const counts = leadCounts[formId];
 
         return (
           <div key={formId} className="mb-4 border rounded-lg overflow-hidden">
@@ -226,8 +232,20 @@ export default function MetaFormLeadsTable({ formIds, productInterestByFormId = 
                   <span className="font-medium text-gray-900 text-sm">Form ID</span>
                   <span className="text-xs sm:text-sm text-gray-600 font-mono break-all">{formId}</span>
                   <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full shrink-0">
-                    {leads.length} leads
+                    {pagination[formId]?.total ?? leads.length} leads
                   </span>
+                  {counts && (
+                    <>
+                      <span className="inline-flex items-center gap-1 text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full shrink-0">
+                        <CheckCircle className="w-3 h-3" />
+                        {counts.imported} imported
+                      </span>
+                      <span className="inline-flex items-center gap-1 text-xs bg-red-100 text-red-700 px-2 py-1 rounded-full shrink-0">
+                        <XCircle className="w-3 h-3" />
+                        {counts.notImported} not imported
+                      </span>
+                    </>
+                  )}
                 </div>
                 {productInterestByFormId[formId] && (
                   <ProductInterestBadge value={productInterestByFormId[formId]} className="w-full sm:w-auto" />

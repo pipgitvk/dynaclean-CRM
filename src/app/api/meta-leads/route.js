@@ -37,10 +37,25 @@ export async function GET(request) {
     
     const leads = await getAllLeads(filters);
     const total = await countLeads(filters);
-    
+
+    // Imported / not-imported counts — ignore the isImported filter itself,
+    // but keep formId, date range and uniqueness so badges match the list.
+    const countFilters = { ...filters };
+    delete countFilters.isImported;
+    delete countFilters.limit;
+    delete countFilters.skip;
+    const [importedCount, notImportedCount] = await Promise.all([
+      countLeads({ ...countFilters, isImported: true }),
+      countLeads({ ...countFilters, isImported: false }),
+    ]);
+
     return NextResponse.json({ 
       success: true, 
       data: leads,
+      counts: {
+        imported: importedCount,
+        notImported: notImportedCount,
+      },
       pagination: {
         total,
         limit,
