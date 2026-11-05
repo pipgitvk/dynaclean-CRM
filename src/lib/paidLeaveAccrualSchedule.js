@@ -48,6 +48,11 @@ export function listPaidLeaveAccrualCreditDates(
   return dates;
 }
 
+/** True when policy grants the full paid allowance upfront instead of monthly accrual. */
+export function isPaidLeaveFullYear(leavePolicy) {
+  return leavePolicy?.paid_full_year === true;
+}
+
 /**
  * Paid leave balance accrued so far (days), from monthly credits.
  * Sick/casual use full allowance — call only for paid leave.

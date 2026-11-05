@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { backfillHalfDayLeaveTotals } from "@/lib/empcrmLeaveDays";
-import { calculateAccruedPaidLeaveDays, firstPaidLeaveCreditDateIso } from "@/lib/paidLeaveAccrualSchedule";
+import { calculateAccruedPaidLeaveDays, firstPaidLeaveCreditDateIso, isPaidLeaveFullYear } from "@/lib/paidLeaveAccrualSchedule";
 
 // GET: Fetch leave statistics
 export async function GET(request) {
@@ -71,6 +71,7 @@ export async function GET(request) {
       maxAllowed,
       employmentStatus,
       leaveType,
+      paidFullYear = false,
     ) => {
       if (!maxAllowed) return 0;
 
@@ -83,6 +84,7 @@ export async function GET(request) {
       }
 
       if (leaveType === "paid") {
+        if (paidFullYear) return maxAllowed;
         return calculateAccruedPaidLeaveDays({
           joiningDate,
           accrualStartDate,
@@ -163,7 +165,8 @@ export async function GET(request) {
         leavePolicy.accrual_start_date,
         maxAllowed,
         profile.employment_status,
-        type
+        type,
+        isPaidLeaveFullYear(leavePolicy)
       );
       
       // Count BOTH full-day AND half-day rows for the same leave_type

@@ -4,6 +4,7 @@ import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import {
   firstPaidLeaveCreditDateIso,
+  isPaidLeaveFullYear,
   listPaidLeaveAccrualCreditDates,
 } from "@/lib/paidLeaveAccrualSchedule";
 
@@ -46,6 +47,7 @@ export async function GET(request) {
 
     let accrualStartDate = null;
     let paidAllowed = 0;
+    let paidFullYear = false;
 
     if (profile && profile.length > 0) {
       try {
@@ -54,6 +56,7 @@ export async function GET(request) {
           : profile[0].leave_policy;
         accrualStartDate = leavePolicy?.accrual_start_date;
         paidAllowed = leavePolicy?.paid_allowed || 0;
+        paidFullYear = isPaidLeaveFullYear(leavePolicy);
       } catch (e) {
         console.log("Could not parse leave_policy");
       }
@@ -119,15 +122,25 @@ export async function GET(request) {
     const monthlyDays = paidAllowed / 12;
     const creditDates = listPaidLeaveAccrualCreditDates(accrualStartDate, today);
 
-    creditDates.forEach((dateIso) => {
+    if (paidFullYear) {
       ledgerEntries.push({
         type: "credit",
-        date: dateIso,
-        days: Math.round(monthlyDays * 100) / 100,
-        description: `Monthly accrual (${formatCrmDateOnly(dateIso)})`,
+        date: accrualStartDate,
+        days: paidAllowed,
+        description: `Full year paid leave credit (${paidAllowed} days)`,
         entryType: "accrual",
       });
-    });
+    } else {
+      creditDates.forEach((dateIso) => {
+        ledgerEntries.push({
+          type: "credit",
+          date: dateIso,
+          days: Math.round(monthlyDays * 100) / 100,
+          description: `Monthly accrual (${formatCrmDateOnly(dateIso)})`,
+          entryType: "accrual",
+        });
+      });
+    }
 
     // Add debit (used) entries for paid leaves
     leavesUsed.forEach(leave => {

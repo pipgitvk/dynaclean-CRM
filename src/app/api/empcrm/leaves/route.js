@@ -21,7 +21,7 @@ import {
   backfillHalfDayLeaveTotals,
   sumLeaveDaysByStatus,
 } from "@/lib/empcrmLeaveDays";
-import { calculateAccruedPaidLeaveDays } from "@/lib/paidLeaveAccrualSchedule";
+import { calculateAccruedPaidLeaveDays, isPaidLeaveFullYear } from "@/lib/paidLeaveAccrualSchedule";
 
 // GET: Fetch leaves (admin sees all, users see only their own, reporting manager sees reportees only)
 export async function GET(request) {
@@ -332,6 +332,7 @@ export async function POST(request) {
       maxAllowed,
       employmentStatus,
       leaveType,
+      paidFullYear = false,
     ) => {
       if (!maxAllowed) return 0;
 
@@ -344,6 +345,7 @@ export async function POST(request) {
       }
 
       if (leaveType === "paid") {
+        if (paidFullYear) return maxAllowed;
         return calculateAccruedPaidLeaveDays({
           joiningDate,
           accrualStartDate,
@@ -532,7 +534,8 @@ export async function POST(request) {
         leavePolicy.accrual_start_date,
         maxAllowed,
         profile.employment_status,
-        leave_type
+        leave_type,
+        isPaidLeaveFullYear(leavePolicy)
       ));
 
       let projectedCommitted;
