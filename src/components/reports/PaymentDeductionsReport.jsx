@@ -89,6 +89,13 @@ export default function PaymentDeductionsReport({ paymentPendingPath }) {
     fetchDeductions();
   }, [fetchDeductions]);
 
+  // Auto-open the Add Deduction popup when arriving via ?order_id=...
+  useEffect(() => {
+    if (initialOrderId && canManage) {
+      setAddModalOpen(true);
+    }
+  }, [initialOrderId, canManage]);
+
   const exportToCSV = () => {
     const headers = [
       "Order Number",
@@ -555,7 +562,7 @@ function TypeBadge({ type }) {
   );
 }
 
-function AddDeductionModal({ open, onClose, initialOrderId, onSaved }) {
+export function AddDeductionModal({ open, onClose, initialOrderId, onSaved }) {
   const [orderId, setOrderId] = useState("");
   const [deductionType, setDeductionType] = useState("TDS");
   const [amount, setAmount] = useState("");

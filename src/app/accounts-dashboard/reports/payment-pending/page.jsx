@@ -8,10 +8,10 @@ import {
   sortPaymentPendingOrders,
 } from "@/lib/filterPaymentPendingOrders";
 import PaymentPendingStatsBar from "@/components/reports/PaymentPendingStatsBar";
+import { AddDeductionModal } from "@/components/reports/PaymentDeductionsReport";
 import ManualFilterSearchButton, {
   MANUAL_FILTER_HINT,
 } from "@/components/ui/ManualFilterSearchButton";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import dayjs from "dayjs";
 import {
@@ -21,7 +21,6 @@ import {
 import { Download, Search, Calendar, DollarSign, ArrowUp, ArrowDown, Trash2, X, PhoneCall, History, Loader2, MinusCircle, List } from "lucide-react";
 
 export default function PaymentPendingReport() {
-  const router = useRouter();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -48,6 +47,7 @@ export default function PaymentPendingReport() {
   const [followupModalOpen, setFollowupModalOpen] = useState(false);
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [deductionOrderId, setDeductionOrderId] = useState(null);
   const canAddDeduction = ["ACCOUNTANT", "PRODUCTION ACCOUNTANT", "ADMIN", "SUPERADMIN"].includes(userRole);
 
   const fetchReport = useCallback(async (completion) => {
@@ -505,11 +505,7 @@ export default function PaymentPendingReport() {
                           {canAddDeduction && (
                             <button
                               type="button"
-                              onClick={() => {
-                                router.push(
-                                  `/accounts-dashboard/reports/deductions?order_id=${encodeURIComponent(order.order_id)}`
-                                );
-                              }}
+                              onClick={() => setDeductionOrderId(order.order_id)}
                               className="inline-flex items-center justify-center gap-1 rounded-md bg-orange-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-orange-700"
                               title="Add deduction"
                             >
@@ -553,6 +549,16 @@ export default function PaymentPendingReport() {
           setSelectedOrder(null);
         }}
         order={selectedOrder}
+      />
+
+      <AddDeductionModal
+        open={deductionOrderId != null}
+        initialOrderId={deductionOrderId || ""}
+        onClose={() => setDeductionOrderId(null)}
+        onSaved={() => {
+          setDeductionOrderId(null);
+          fetchReport(appliedCompletionFilter);
+        }}
       />
     </div>
   );
