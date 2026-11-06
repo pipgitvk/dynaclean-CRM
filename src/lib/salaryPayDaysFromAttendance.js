@@ -315,10 +315,16 @@ export function computeSalaryPayDaysForUser(p) {
         // It is not a Half-Days card day.
         half_day_paid++;
         // With punch: 0.5 present + 0.5 paid leave = 1 slot. Without punch: 0.5 paid leave only (work half = LOP via deduction).
-        weekdayPayCredits += hasRealPunch ? 1 : 0.5;
+        // Sunday/holiday leave gets no weekday credit — that day is already paid as weekly-off/holiday.
+        if (!isSunday && !isHoliday) {
+          weekdayPayCredits += hasRealPunch ? 1 : 0.5;
+        }
       } else {
         paid_leave++;
-        weekdayPayCredits += 1;
+        // Sunday/holiday paid leave: already paid via period days — no extra credit.
+        if (!isSunday && !isHoliday) {
+          weekdayPayCredits += 1;
+        }
       }
       continue;
     }
@@ -374,10 +380,14 @@ export function computeSalaryPayDaysForUser(p) {
         if (treatAsHalfDay) {
           half_day++;
           half_day_unpaid++;  // Non-paid leave half-day (sick, casual, etc)
-          weekdayPayCredits += 0.5;
+          if (!isSunday && !isHoliday) {
+            weekdayPayCredits += 0.5;
+          }
         } else {
           paid_leave++;
-          weekdayPayCredits += 1;
+          if (!isSunday && !isHoliday) {
+            weekdayPayCredits += 1;
+          }
         }
       }
       continue;
