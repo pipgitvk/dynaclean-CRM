@@ -16,7 +16,8 @@ export async function PATCH(req, { params }) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const orderId = String(params?.order_id ?? "").trim();
+    const resolvedParams = await params;
+    const orderId = String(resolvedParams?.order_id ?? "").trim();
     if (!orderId) {
       return NextResponse.json({ error: "Order ID is required" }, { status: 400 });
     }

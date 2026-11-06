@@ -29,7 +29,12 @@ export default function OrderPoDateCell({
     }
     setSaving(true);
     try {
-      const res = await fetch(`/api/orders/${order.order_id}/po-date`, {
+      const orderId = String(order?.order_id ?? "").trim();
+      if (!orderId) {
+        alert("Order ID is required");
+        return;
+      }
+      const res = await fetch(`/api/orders/${encodeURIComponent(orderId)}/po-date`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ order_date: value }),

@@ -27,6 +27,18 @@ import {
   getServiceTableFiltersFromSearchParams,
 } from "@/lib/serviceRecordsPendingOver48h";
 
+/** completed_date may be ISO from DB or already shown as DD-MM-YYYY. */
+function completedDateToIso(value) {
+  if (value == null || value === "") return null;
+  const s = String(value).trim();
+  if (!s || s === "N/A" || s === "—") return null;
+  const iso = s.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (iso) return iso[1];
+  const dmy = s.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+  if (!dmy) return null;
+  return `${dmy[3]}-${dmy[2].padStart(2, "0")}-${dmy[1].padStart(2, "0")}`;
+}
+
 const actionIconClass =
   "inline-flex items-center justify-center p-1.5 rounded-md text-white transition-colors";
 
@@ -56,6 +68,10 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
   const [appliedComplaintDateFrom, setAppliedComplaintDateFrom] = useState("");
   const [complaintDateTo, setComplaintDateTo] = useState("");
   const [appliedComplaintDateTo, setAppliedComplaintDateTo] = useState("");
+  const [completeDateFrom, setCompleteDateFrom] = useState("");
+  const [appliedCompleteDateFrom, setAppliedCompleteDateFrom] = useState("");
+  const [completeDateTo, setCompleteDateTo] = useState("");
+  const [appliedCompleteDateTo, setAppliedCompleteDateTo] = useState("");
   const [serviceTypeFilter, setServiceTypeFilter] = useState("");
   const [appliedServiceTypeFilter, setAppliedServiceTypeFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState(urlSeed.statusFilter);
@@ -130,6 +146,8 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
     setAppliedSearchTerm(searchTerm);
     setAppliedComplaintDateFrom(complaintDateFrom);
     setAppliedComplaintDateTo(complaintDateTo);
+    setAppliedCompleteDateFrom(completeDateFrom);
+    setAppliedCompleteDateTo(completeDateTo);
     setAppliedServiceTypeFilter(serviceTypeFilter);
     setAppliedStatusFilter(statusFilter);
     setAppliedAssignedFilter(assignedFilter);
@@ -141,6 +159,8 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
     searchTerm,
     complaintDateFrom,
     complaintDateTo,
+    completeDateFrom,
+    completeDateTo,
     serviceTypeFilter,
     statusFilter,
     assignedFilter,
@@ -484,6 +504,17 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
       }
     }
 
+    if (appliedCompleteDateFrom || appliedCompleteDateTo) {
+      const recordDate = completedDateToIso(record.completed_date);
+      if (!recordDate) return false;
+      if (appliedCompleteDateFrom && recordDate < appliedCompleteDateFrom) {
+        return false;
+      }
+      if (appliedCompleteDateTo && recordDate > appliedCompleteDateTo) {
+        return false;
+      }
+    }
+
     if (
       appliedServiceTypeFilter &&
       record.service_type !== appliedServiceTypeFilter
@@ -571,6 +602,10 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
     setAppliedComplaintDateFrom("");
     setComplaintDateTo("");
     setAppliedComplaintDateTo("");
+    setCompleteDateFrom("");
+    setAppliedCompleteDateFrom("");
+    setCompleteDateTo("");
+    setAppliedCompleteDateTo("");
     setServiceTypeFilter("");
     setAppliedServiceTypeFilter("");
     setStatusFilter("PENDING");
@@ -1108,6 +1143,32 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
                 onChange={(v) => {
                   setComplaintDateTo(v);
                   setAppliedComplaintDateTo(v);
+                  setCurrentPage(1);
+                }}
+                className="p-2 w-full min-w-0 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              />
+            </div>
+          </div>
+          <div className="min-w-0 sm:col-span-2 lg:col-span-3 xl:col-span-2">
+            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+              Complete Date
+            </label>
+            <div className="grid grid-cols-1 gap-2 min-[480px]:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] min-[480px]:items-center">
+              <TypeableDateFilterInput
+                value={completeDateFrom}
+                onChange={(v) => {
+                  setCompleteDateFrom(v);
+                  setAppliedCompleteDateFrom(v);
+                  setCurrentPage(1);
+                }}
+                className="p-2 w-full min-w-0 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              />
+              <span className="text-gray-400 text-xs text-center min-[480px]:px-0 px-1">to</span>
+              <TypeableDateFilterInput
+                value={completeDateTo}
+                onChange={(v) => {
+                  setCompleteDateTo(v);
+                  setAppliedCompleteDateTo(v);
                   setCurrentPage(1);
                 }}
                 className="p-2 w-full min-w-0 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
