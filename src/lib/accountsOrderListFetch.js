@@ -18,6 +18,7 @@ import { attachDeliveryBatchesToOrders } from "@/lib/orderDeliveryBatches";
 import { sqlOrderCreatedByEquals } from "@/lib/sqlCreatedByScope";
 import { normalizeOrderListDateRange } from "@/lib/orderTableDateDefaults";
 import { ensureDocumentFromCompanyColumns } from "@/lib/ensureDocumentFromCompanyColumns";
+import { ensureNeworderPunchDateColumn } from "@/lib/ensureNeworderPunchDateColumn";
 
 const PAYMENT_TERM_LABEL_TO_DAYS = {
   Advance: 0,
@@ -34,6 +35,7 @@ export async function ensureAccountsOrderListSchema(conn) {
   if (accountsOrderListSchemaReady) return;
   await ensureDocumentFromCompanyColumns(conn);
   await ensureOrderLinkedPaymentColumns(conn);
+  await ensureNeworderPunchDateColumn(conn);
   const safeAlters = [
     "ALTER TABLE neworder ADD COLUMN IF NOT EXISTS warehouse_in_done TINYINT(1) DEFAULT 0",
     "ALTER TABLE neworder ADD COLUMN IF NOT EXISTS warehouse_in_date DATE NULL",
@@ -96,7 +98,7 @@ function buildAccountsOrderListBaseSql(
                 no.client_name, no.contact, no.is_cancelled, no.dispatch_status,
                 ${dispatchedSelect},
                 ${pendingSelect},
-                no.created_at, no.created_by , no.einvoice_file, no.booking_id, no.quote_number, no.duedate,
+                no.created_at, no.punch_date, no.created_by , no.einvoice_file, no.booking_id, no.quote_number, no.duedate,
                 no.invoice_date , no.account_by ,no.booking_by , no.dispatch_person,
                 no.payment_id, no.payment_date, no.payment_amount, no.advance_requested, no.payment_status,no.totalamt, no.baseAmount, no.taxamt, no.transaction_id,
                 no.invoice_number, no.amount_received, no.payment_received_date, no.linked_payments_json,

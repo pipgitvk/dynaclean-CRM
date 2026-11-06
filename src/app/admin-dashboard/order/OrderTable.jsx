@@ -80,6 +80,9 @@ import {
   blocksNewReturnInitiate,
   isReturnInitiatedStatus,
 } from "@/lib/orderReturnStatus";
+import OrderPoDateCell, {
+  formatOrderPunchDate,
+} from "@/components/orders/OrderPoDateCell";
 import {
   canManageReturnBookingRole,
   canManageAnyOrderDeliveryRole,
@@ -820,6 +823,15 @@ export default function OrderTable({
   const fetchAbortRef = useRef(null);
   const tableScrollRef = useRef(null);
 
+  const handleOrderPoDateUpdated = useCallback((orderId, isoDate) => {
+    const nextCreated = isoDate ? `${isoDate} 00:00:00` : null;
+    setOrders((prev) =>
+      prev.map((o) =>
+        o.order_id === orderId ? { ...o, created_at: nextCreated } : o,
+      ),
+    );
+  }, []);
+
   const [productCatalog, setProductCatalog] = useState([]);
   const [spareCatalog, setSpareCatalog] = useState([]);
   const searchParams = useSearchParams();
@@ -1253,6 +1265,10 @@ export default function OrderTable({
         return order.created_by?.toString().toLowerCase() || "";
       case "created_at":
         return order.created_at ? new Date(order.created_at).getTime() : 0;
+      case "punch_date":
+        return order.punch_date || order.created_at
+          ? new Date(order.punch_date || order.created_at).getTime()
+          : 0;
       case "client_name":
         return order.client_name?.toString().toLowerCase() || "";
       case "company_name":
@@ -1407,7 +1423,8 @@ export default function OrderTable({
         { header: "Item Code", key: "item_code", width: 20 },
         { header: "Created By", key: "created_by", width: 15 },
         { header: "Lead Campaign", key: "lead_campaign", width: 18 },
-        { header: "Created At", key: "created_at", width: 20 },
+        { header: "Order Date / PO Date", key: "created_at", width: 20 },
+        { header: "Punch Date", key: "punch_date", width: 22 },
         { header: "Due Date", key: "duedate", width: 15 },
         { header: "Payment Status", key: "payment_status", width: 15 },
         { header: "Approval Status", key: "approval_status", width: 15 },
@@ -1448,7 +1465,12 @@ export default function OrderTable({
           item_code: order.item_code || "",
           created_by: order.created_by || "",
           lead_campaign: formatLeadCampaignLabel(order.lead_campaign),
-          created_at: order.created_at ? dayjs(order.created_at).format("DD-MM-YYYY HH:mm:ss") : "",
+          created_at: order.created_at ? dayjs(order.created_at).format("DD-MM-YYYY") : "",
+          punch_date: order.punch_date
+            ? dayjs(order.punch_date).format("DD-MM-YYYY HH:mm:ss")
+            : order.created_at
+              ? dayjs(order.created_at).format("DD-MM-YYYY HH:mm:ss")
+              : "",
           duedate: order.duedate ? dayjs(order.duedate).format("DD-MM-YYYY") : "",
           payment_status: order.payment_status || "",
           approval_status: order.approval_status || "",
@@ -2598,8 +2620,19 @@ export default function OrderTable({
                 onClick={() => handleSort("created_at")}
               >
                 <div className="flex items-center gap-1">
-                  Order Date
+                  Order Date / PO Date
                   {sortColumn === "created_at" && (
+                    sortDirection === "asc" ? <ArrowUp size={14} /> : <ArrowDown size={14} />
+                  )}
+                </div>
+              </th>
+              <th
+                className="px-3 py-3 font-semibold text-left cursor-pointer hover:bg-gray-700 transition-colors"
+                onClick={() => handleSort("punch_date")}
+              >
+                <div className="flex items-center gap-1">
+                  Punch Date
+                  {sortColumn === "punch_date" && (
                     sortDirection === "asc" ? <ArrowUp size={14} /> : <ArrowDown size={14} />
                   )}
                 </div>
@@ -2732,7 +2765,16 @@ export default function OrderTable({
                       {r.created_by}
                     </td>
                     <td className="px-3 py-3 text-left">
-                      {dayjs(r.created_at).format("DD-MM-YYYY")}
+                      <OrderPoDateCell
+                        order={r}
+                        userRole={userRole}
+                        onUpdated={(isoDate) =>
+                          handleOrderPoDateUpdated(r.order_id, isoDate)
+                        }
+                      />
+                    </td>
+                    <td className="px-3 py-3 text-left text-xs text-gray-700">
+                      {formatOrderPunchDate(r)}
                     </td>
                     <td className="px-3 py-3 text-left text-xs font-medium text-indigo-800">
                       {formatLeadCampaignLabel(r.lead_campaign)}
@@ -2895,8 +2937,11 @@ export default function OrderTable({
                 <div className="flex justify-between items-start gap-2 flex-wrap">
                   <span className="text-xs text-gray-500">#{i + 1}</span>
                   <div className="flex items-center gap-2 flex-wrap justify-end min-w-0">
-                    <span className="font-medium text-gray-800 text-xs shrink-0">
-                      {dayjs(r.created_at).format("DD-MM-YYYY")}
+                    <span className="font-medium text-gray-800 text-xs shrink-0 text-right">
+                      <span className="block">PO: {dayjs(r.created_at).format("DD-MM-YYYY")}</span>
+                      <span className="block text-gray-500 font-normal">
+                        Punch: {formatOrderPunchDate(r)}
+                      </span>
                     </span>
                     <span
                       className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium shrink-0 ${status.bg} ${status.textCol}`}

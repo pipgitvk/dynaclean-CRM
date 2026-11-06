@@ -1,6 +1,7 @@
 "use client";
 import { useState, useMemo } from "react";
 import { useUser } from "@/context/UserContext";
+import OrderPoDateField from "@/components/orders/OrderPoDateField";
 
 export default function OrderForm({ quotation, reset }) {
   const { user } = useUser();
@@ -13,6 +14,7 @@ export default function OrderForm({ quotation, reset }) {
     clientDeliveryDate: "",
     poNumber: "",
     paymentDate: "",
+    orderDate: "",
     transactionId: "",
     paymentAmount: "",
   });
@@ -117,6 +119,7 @@ export default function OrderForm({ quotation, reset }) {
     }
     // Include computed duedate
     if (computedDueDateISO) fd.append("duedate", computedDueDateISO);
+    if (formData.orderDate) fd.append("order_date", formData.orderDate);
 
     // Add first product's data from quotation items
     if (quotation.items && quotation.items.length > 0) {
@@ -233,6 +236,10 @@ export default function OrderForm({ quotation, reset }) {
               className="w-full px-3 py-2 border rounded bg-white"
             />
           </div>
+          <OrderPoDateField
+            value={formData.orderDate}
+            onChange={(v) => setFormData((fd) => ({ ...fd, orderDate: v }))}
+          />
           {isGemRole && (
             <div>
               <label className="block font-medium mb-1">PO Number / Gem Order Number *</label>

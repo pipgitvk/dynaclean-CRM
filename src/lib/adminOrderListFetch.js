@@ -14,6 +14,7 @@ import { getAccountsOrderListUserRole } from "@/lib/accountsOrderListFetch";
 import { sqlOrderCreatedByEquals } from "@/lib/sqlCreatedByScope";
 import { normalizeOrderListDateRange } from "@/lib/orderTableDateDefaults";
 import { ensureDocumentFromCompanyColumns } from "@/lib/ensureDocumentFromCompanyColumns";
+import { ensureNeworderPunchDateColumn } from "@/lib/ensureNeworderPunchDateColumn";
 
 let orderListSchemaReady = false;
 
@@ -39,6 +40,7 @@ export async function ensureAdminOrderListSchema(conn) {
   if (orderListSchemaReady) return;
   await ensureDocumentFromCompanyColumns(conn);
   await ensureOrderLinkedPaymentColumns(conn);
+  await ensureNeworderPunchDateColumn(conn);
   for (const sql of ORDER_LIST_SCHEMA_ALTERS) {
     try {
       await conn.execute(sql);
@@ -76,7 +78,7 @@ function buildAdminOrderListSql(userRole, username, serviceSupportOnly) {
                 no.client_name, no.contact, no.is_cancelled, no.dispatch_status,
                 0 AS dispatched_stock_count,
                 0 AS pending_dispatch_units,
-                no.created_at, no.created_by , no.einvoice_file, no.booking_id, no.quote_number, no.duedate,
+                no.created_at, no.punch_date, no.created_by , no.einvoice_file, no.booking_id, no.quote_number, no.duedate,
                 no.invoice_date , no.account_by ,no.booking_by , no.dispatch_person,
                 no.payment_id, no.payment_date, no.payment_amount, no.advance_requested, no.amount_received, no.payment_received_date,
                 no.linked_payments_json,

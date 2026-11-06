@@ -39,6 +39,9 @@ import {
   blocksNewReturnInitiate,
   isReturnInitiatedStatus,
 } from "@/lib/orderReturnStatus";
+import OrderPoDateCell, {
+  formatOrderPunchDate,
+} from "@/components/orders/OrderPoDateCell";
 import {
   canCreateAdditionalBooking,
   canOpenFirstDispatchForOrder,
@@ -136,6 +139,14 @@ function readDateFilterFromStorage(key) {
 export default function OrderTable({ userRole }) {
   const router = useRouter();
   const [orders, setOrders] = useState([]);
+  const handleOrderPoDateUpdated = useCallback((orderId, isoDate) => {
+    const nextCreated = isoDate ? `${isoDate} 00:00:00` : null;
+    setOrders((prev) =>
+      prev.map((o) =>
+        o.order_id === orderId ? { ...o, created_at: nextCreated } : o,
+      ),
+    );
+  }, []);
   const [listLoading, setListLoading] = useState(true);
   const [fetchError, setFetchError] = useState(null);
   const fetchAbortRef = useRef(null);
@@ -639,7 +650,7 @@ export default function OrderTable({ userRole }) {
 
   const exportToCSV = () => {
     const headers = [
-      "Order ID", "Quotation", "Created By", "Order Date", "Client Name", "Company Name",
+      "Order ID", "Quotation", "Created By", "Order Date / PO Date", "Punch Date", "Client Name", "Company Name",
       "Contact", "Location", "Item Name", "Item Code", "Status", "Payment Status",
       "Invoice Number", "Amount Received (Linked)", "Due Date", "Total Amount", "Paid Amount",
     ];
@@ -658,6 +669,7 @@ export default function OrderTable({ userRole }) {
         order.quote_number,
         order.created_by,
         dayjs(order.created_at).format("DD-MM-YYYY"),
+        formatOrderPunchDate(order),
         order.client_name,
         order.company_name,
         order.contact,
@@ -808,7 +820,8 @@ export default function OrderTable({ userRole }) {
               <th className="px-3 py-3 font-semibold text-center">#</th>
               <th className="px-3 py-3 font-semibold text-left">Order ID / Quotation</th>
               <th className="px-3 py-3 font-semibold text-left">Created By</th>
-              <th className="px-3 py-3 font-semibold text-left">Order Date</th>
+              <th className="px-3 py-3 font-semibold text-left">Order Date / PO Date</th>
+              <th className="px-3 py-3 font-semibold text-left">Punch Date</th>
               <th className="px-3 py-3 font-semibold text-left">Company</th>
               <th className="px-3 py-3 font-semibold text-left">Item</th>
               <th className="px-3 py-3 font-semibold text-left">Payment Terms</th>
@@ -854,7 +867,16 @@ export default function OrderTable({ userRole }) {
                       {r.created_by}
                     </td>
                     <td className="px-3 py-3 text-left">
-                      {dayjs(r.created_at).format("DD-MM-YYYY")}
+                      <OrderPoDateCell
+                        order={r}
+                        userRole={userRole}
+                        onUpdated={(isoDate) =>
+                          handleOrderPoDateUpdated(r.order_id, isoDate)
+                        }
+                      />
+                    </td>
+                    <td className="px-3 py-3 text-left text-xs text-gray-700">
+                      {formatOrderPunchDate(r)}
                     </td>
                     <td className="px-3 py-3 text-left">
                       <div className="space-y-1 text-xs">
@@ -982,8 +1004,11 @@ export default function OrderTable({ userRole }) {
                 <div className="flex justify-between items-center text-gray-500">
                   <span className="text-xs">#{i + 1}</span>
                   <div className="flex items-center">
-                    <span className="font-medium text-gray-800 mr-2">
-                      {dayjs(r.created_at).format("DD-MM-YYYY")}
+                    <span className="font-medium text-gray-800 mr-2 text-right text-xs">
+                      <span className="block">PO: {dayjs(r.created_at).format("DD-MM-YYYY")}</span>
+                      <span className="block text-gray-500 font-normal">
+                        Punch: {formatOrderPunchDate(r)}
+                      </span>
                     </span>
                     <span
                       className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${status.bg} ${status.textCol}`}

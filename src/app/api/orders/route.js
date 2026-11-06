@@ -18,7 +18,12 @@ import {
   orderListApprovalWhereSql,
 } from "@/lib/orderApprovalVisibility";
 import { ensureNeworderBookingPaymentColumns } from "@/lib/ensureNeworderBookingPaymentColumns";
+import { ensureNeworderPunchDateColumn } from "@/lib/ensureNeworderPunchDateColumn";
 import { seedOrderBookingPaymentSnapshot } from "@/lib/seedOrderBookingPaymentSnapshot";
+import {
+  orderPoDateToMysqlDateTime,
+  parseOrderPoDateInput,
+} from "@/lib/orderPoDatePermissions";
 
 const UPLOAD_DIR = path.join(process.cwd(), "public", "uploads");
 
@@ -263,6 +268,21 @@ export async function POST(req) {
       );
     }
 
+    const orderPoDateRaw =
+      fields.order_date ??
+      fields.orderDate ??
+      fields.po_date ??
+      fields.poDate ??
+      "";
+    const orderPoDateParsed = parseOrderPoDateInput(orderPoDateRaw);
+    if (!orderPoDateParsed) {
+      return NextResponse.json(
+        { error: "Order Date / PO Date is required" },
+        { status: 400 },
+      );
+    }
+    const orderPoDateMysql = orderPoDateToMysqlDateTime(orderPoDateParsed);
+
     // 3. Save files locally instead of uploading to Cloudinary
     // Handle multiple PO files
     let poFileUrls = [];
@@ -294,14 +314,14 @@ export async function POST(req) {
     // 5. Insert into DB
     const conn = await getDbConnection();
 
-    const [[{ count }]] = await conn.execute(
-      "SELECT COUNT(*) AS count FROM neworder WHERE DATE(created_at) = CURDATE()",
-    );
-    const orderId = generateOrderId(count);
-    // console.log("Generated Order ID:", orderId);
-
     await ensureNeworderQuotationIdColumn(conn);
     await ensureNeworderBookingPaymentColumns(conn);
+    await ensureNeworderPunchDateColumn(conn);
+
+    const [[{ count }]] = await conn.execute(
+      "SELECT COUNT(*) AS count FROM neworder WHERE DATE(COALESCE(punch_date, created_at)) = CURDATE()",
+    );
+    const orderId = generateOrderId(count);
 
     const [quotationRows] = await conn.execute(
       `SELECT customer_id, payment_term_days, grand_total, \`S.No.\` AS quotation_id
@@ -365,8 +385,8 @@ export async function POST(req) {
           contact, email, delivery_location, company_name, company_address,
           state, sales_status, sales_remark, ship_to, created_by, duedate, client_delivery_date, approval_status,
           po_number, payment_date, transaction_id, payment_id, payment_amount, payment_status, advance_requested, item_name, item_code, specification,
-          quantity, unit, price_per_unit, taxable_price, gst, total_price, img_url, customer_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          quantity, unit, price_per_unit, taxable_price, gst, total_price, img_url, customer_id, created_at, punch_date)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
       [
         orderId,
         quote_number,
@@ -405,6 +425,7 @@ export async function POST(req) {
         total_price || null,
         img_url || null,
         customerIdFromQuotation,
+        orderPoDateMysql,
       ],
     );
 
