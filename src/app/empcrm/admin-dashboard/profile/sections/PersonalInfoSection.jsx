@@ -341,7 +341,7 @@ export default function PersonalInfoSection({
               className="w-4 h-4 text-blue-600 rounded border-gray-300"
             />
             <div>
-              <label className="text-sm font-medium text-gray-700">Employment Confirmation Letter *</label>
+              <label className="text-sm font-medium text-gray-700">Employment Confirmation Letter</label>
               {(files.doc_employment_confirmation_letter || formData.fileUrls?.doc_employment_confirmation_letter) && (
                 <p className="text-xs text-green-600">Selected</p>
               )}
@@ -374,6 +374,27 @@ export default function PersonalInfoSection({
               </a>
             )}
           </div>
+        </div>
+        )}
+
+        {isPrivilegedEditor && show("leave_policy_accrual_start_date") && formData.employment_status === "permanent" && (
+        <div>
+          <label className={labelClass}>Leave Accrual Start Date</label>
+          <TypeableDateFilterInput
+            value={formData.leave_policy?.accrual_start_date || ""}
+            onChange={(v) => {
+              if (ro) return;
+              setFormData((prev) => ({
+                ...prev,
+                leave_policy: {
+                  ...(prev.leave_policy || {}),
+                  accrual_start_date: v,
+                },
+              }));
+            }}
+            disabled={ro}
+            className={inactive(inputClass)}
+          />
         </div>
         )}
       </div>

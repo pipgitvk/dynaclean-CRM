@@ -248,10 +248,7 @@ export default function ProfileForm({
       "doc_12th_certificate",
     ];
     
-    // Only require Employment Confirmation Letter for permanent employees (privileged editors only)
-    if (isPrivilegedEditor && formData.employment_status === "permanent") {
-      MANDATORY_KEYS.push("doc_employment_confirmation_letter");
-    }
+    // Employment Confirmation Letter is optional — not in MANDATORY_KEYS.
 
     if (effectiveExperiencedForEmployeeReassignUi(isExperienced, reassignFieldKeys)) {
       MANDATORY_KEYS.push(
