@@ -482,6 +482,19 @@ export async function persistMachineCheckoutBeforeNinePm(
   let affected = Number(result?.affectedRows ?? 0);
 
   if (affected === 0) {
+    // UPDATE can report 0 affectedRows when values are unchanged — only
+    // insert when no row exists for this user+date, otherwise every sync
+    // run duplicates the attendance_logs row.
+    const [existingRows] = await conn.query(
+      `SELECT id FROM attendance_logs WHERE username = ? AND date = ? LIMIT 1`,
+      [username, dateYmd],
+    );
+    if (existingRows.length > 0) {
+      affected = 1;
+    }
+  }
+
+  if (affected === 0) {
     const [ins] = await conn.query(
       `INSERT INTO attendance_logs
         (username, employee_id, machine_code, date, checkin_time, checkout_time, checkout_address)

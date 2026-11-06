@@ -33,7 +33,6 @@ import {
   dedupeEmployeesForPayrollSheet,
   filterEmployeesForPayrollSheet,
   mergeDeductionsForRelated,
-  normalizeLeavesForRelatedAccounts,
   pickFirstByRelatedUsernames,
 } from "@/lib/payrollActiveEmployees";
 
@@ -121,11 +120,24 @@ export async function GET(request) {
       `SELECT holiday_date, title, description FROM holidays ORDER BY holiday_date DESC`
     );
 
+    const [leaveYear, leaveMonth] = month.split("-").map(Number);
+    const lastDayOfMonth = `${month}-${String(new Date(leaveYear, leaveMonth, 0).getDate()).padStart(2, "0")}`;
     const [leaves] = await db.query(
       `SELECT username, from_date, to_date, leave_type, reason, is_half_day, half_day_type, status
        FROM employee_leaves
-       WHERE status = 'approved'`
+       WHERE status = 'approved'
+       AND from_date <= ? AND to_date >= ?`,
+      [lastDayOfMonth, `${month}-01`]
     );
+
+    // Index leaves by normalized username once — avoids scanning the full
+    // leave table for every employee inside the per-row payroll math.
+    const leavesByUserKey = new Map();
+    for (const leave of leaves) {
+      const key = normalizeUserKey(leave.username);
+      if (!leavesByUserKey.has(key)) leavesByUserKey.set(key, []);
+      leavesByUserKey.get(key).push(leave);
+    }
 
     const globalRow = await loadGlobalAttendanceRulesRow(db);
     const globalRules = rowToAttendanceRulesShape(globalRow);
@@ -135,9 +147,11 @@ export async function GET(request) {
       (schedules || []).map((s) => [normalizeUserKey(s.username), s])
     );
 
+    // DISTINCT: machine sync has inserted the same punch rows thousands of
+    // times — only ~124 unique rows exist in a typical month range.
     const [attendance] = await db.query(
       `
-      SELECT ${ATT_SELECT}
+      SELECT DISTINCT ${ATT_SELECT}
       FROM attendance_logs a
       WHERE a.date >= ? AND a.date <= ?
     `,
@@ -181,11 +195,14 @@ export async function GET(request) {
         scheduleByUser.get(uk) || null
       );
       const logs = collectPayrollLogsForUsers(logsByUser, related);
-      const leavesForPayroll = normalizeLeavesForRelatedAccounts(
-        leaves,
-        related,
-        emp.username
-      );
+      // Only this employee's (and alias accounts') leaves for the month —
+      // the payroll math functions scan this list per employee.
+      const leavesForPayroll = [];
+      for (const u of related) {
+        for (const leave of leavesByUserKey.get(normalizeUserKey(u)) || []) {
+          leavesForPayroll.push({ ...leave, username: emp.username });
+        }
+      }
 
       const stats = computeSalaryPayDaysForUser({
         monthStr: month,
@@ -217,19 +234,10 @@ export async function GET(request) {
       const weeklyOff = Number(stats.weekend_off) || 0;
       const holidayCount = Number(stats.holiday) || 0;
 
-      const sickLeave = related.reduce(
-        (sum, u) => sum + countLeaveTypeDaysInMonth(leaves, u, month, "sick"),
-        0
-      );
+      const sickLeave = countLeaveTypeDaysInMonth(leavesForPayroll, emp.username, month, "sick");
       // PL = approved `paid` leave only (not sick/casual — those show under SL / HD on the sheet).
-      const paidLeave = related.reduce(
-        (sum, u) => sum + countLeaveTypeDaysInMonth(leaves, u, month, "paid"),
-        0
-      );
-      const unpaidLeave = related.reduce(
-        (sum, u) => sum + countLeaveTypeDaysInMonth(leaves, u, month, "unpaid"),
-        0
-      );
+      const paidLeave = countLeaveTypeDaysInMonth(leavesForPayroll, emp.username, month, "paid");
+      const unpaidLeave = countLeaveTypeDaysInMonth(leavesForPayroll, emp.username, month, "unpaid");
       const halfDayCount =
         cards?.halfDays != null
           ? Number(cards.halfDays) || 0

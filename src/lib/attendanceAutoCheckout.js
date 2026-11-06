@@ -429,31 +429,39 @@ async function applyAutomaticCheckoutsOnConn(conn, options = {}) {
       );
 
       if (result?.affectedRows === 0) {
-        const ids = await lookupAttendanceEmployeeIds(conn, username);
-        await conn.query(
-          `INSERT INTO attendance_logs
-            (username, employee_id, machine_code, date, checkin_time, checkout_time, checkout_address)
-           VALUES (?, ?, ?, ?, ?, TIMESTAMP(?, ?), ?)
-           ON DUPLICATE KEY UPDATE
-            checkin_time = COALESCE(checkin_time, VALUES(checkin_time)),
-            checkout_time = VALUES(checkout_time),
-            checkout_address = VALUES(checkout_address),
-            checkout_latitude = NULL,
-            checkout_longitude = NULL,
-            employee_id = COALESCE(employee_id, VALUES(employee_id)),
-            machine_code = COALESCE(machine_code, VALUES(machine_code))`,
-          [
-            username,
-            ids.employee_id,
-            ids.machine_code,
-            dateYmd,
-            checkinForRow,
-            dateYmd,
-            wallTime,
-            AUTO_CHECKOUT_ATTENDANCE_ADDRESS,
-          ]
+        // UPDATE reports 0 when values are unchanged — check existence first
+        // so identical rows are not duplicated on every auto-checkout run.
+        const [existingRows] = await conn.query(
+          `SELECT id FROM attendance_logs WHERE username = ? AND date = ? LIMIT 1`,
+          [username, dateYmd],
         );
-        updated += 1;
+        if (existingRows.length === 0) {
+          const ids = await lookupAttendanceEmployeeIds(conn, username);
+          await conn.query(
+            `INSERT INTO attendance_logs
+              (username, employee_id, machine_code, date, checkin_time, checkout_time, checkout_address)
+             VALUES (?, ?, ?, ?, ?, TIMESTAMP(?, ?), ?)
+             ON DUPLICATE KEY UPDATE
+              checkin_time = COALESCE(checkin_time, VALUES(checkin_time)),
+              checkout_time = VALUES(checkout_time),
+              checkout_address = VALUES(checkout_address),
+              checkout_latitude = NULL,
+              checkout_longitude = NULL,
+              employee_id = COALESCE(employee_id, VALUES(employee_id)),
+              machine_code = COALESCE(machine_code, VALUES(machine_code))`,
+            [
+              username,
+              ids.employee_id,
+              ids.machine_code,
+              dateYmd,
+              checkinForRow,
+              dateYmd,
+              wallTime,
+              AUTO_CHECKOUT_ATTENDANCE_ADDRESS,
+            ]
+          );
+          updated += 1;
+        }
       } else {
         updated += result.affectedRows;
       }
