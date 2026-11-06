@@ -646,7 +646,12 @@ const AttendancePage = () => {
         }
       }
       if (log.type === "holiday") acc.holidays++;
-      if (log.type === "sunday" || log.isSunday) acc.sundays++;
+      // Leave rows on Sunday count under Leaves only — not Sundays (same as admin page).
+      const isLeaveRow =
+        log.type === "leave" ||
+        log.type === "paidleave" ||
+        log.type === "unpaidleave";
+      if (!isLeaveRow && (log.type === "sunday" || log.isSunday)) acc.sundays++;
       if (log.type === "present") {
         acc.present += presentCreditForPresentRow(log);
         let cls;
