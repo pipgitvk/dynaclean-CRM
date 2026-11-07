@@ -81,16 +81,21 @@ function enrichAutoCheckoutRow(row, leaves, scheduleByUser) {
   };
 }
 
-/** Drop approval rows when attendance is no longer an unapproved automatic check-out. */
+/** Drop stale non-approved rows, but retain approved records for audit history. */
 export async function pruneStaleAutoCheckoutApprovals(conn) {
   await conn.query(
     `DELETE ap FROM attendance_auto_checkout_approvals ap
      LEFT JOIN attendance_logs a
        ON a.username = ap.username AND a.date = ap.log_date
      WHERE a.username IS NULL
-        OR TRIM(COALESCE(a.checkout_address, '')) <> ?
-        OR a.checkout_time IS NULL
-        OR TRIM(a.checkout_time) = ''`,
+        OR (
+          ap.status <> 'approved'
+          AND (
+            TRIM(COALESCE(a.checkout_address, '')) <> ?
+            OR a.checkout_time IS NULL
+            OR TRIM(a.checkout_time) = ''
+          )
+        )`,
     [AUTO_CHECKOUT_ATTENDANCE_ADDRESS],
   );
 }
