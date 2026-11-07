@@ -22,7 +22,7 @@ export async function ensureAttendanceAutoCheckoutApprovalsTable(conn) {
   if (globalThis[GLOBAL_KEY]) return;
   const db = conn || (await getDbConnection());
   try {
-    await db.execute(CREATE_TABLE);
+    await db.query(CREATE_TABLE);
     globalThis[GLOBAL_KEY] = true;
   } catch (e) {
     console.error("ensureAttendanceAutoCheckoutApprovalsTable:", e?.message);

@@ -23,6 +23,12 @@ export default function AutoCheckoutApprovalsPage() {
   const initialRange = currentMonthRange();
   const [fromDate, setFromDate] = useState(initialRange.from);
   const [toDate, setToDate] = useState(initialRange.to);
+  const [applied, setApplied] = useState(null);
+
+  const runSearch = () => {
+    if (!fromDate || !toDate) return;
+    setApplied({ from: fromDate, to: toDate, n: Date.now() });
+  };
 
   return (
     <div className="w-full py-2 sm:py-4 px-2 sm:px-0">
@@ -73,12 +79,26 @@ export default function AutoCheckoutApprovalsPage() {
               className="min-w-[160px]"
             />
           </label>
+          <button
+            type="button"
+            onClick={runSearch}
+            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+          >
+            Search
+          </button>
         </div>
 
-        <AttendanceAutoCheckoutApprovalsCard
-          fromDate={fromDate}
-          toDate={toDate}
-        />
+        {applied ? (
+          <AttendanceAutoCheckoutApprovalsCard
+            key={applied.n}
+            fromDate={applied.from}
+            toDate={applied.to}
+          />
+        ) : (
+          <p className="rounded-lg border border-dashed border-slate-200 bg-slate-50 py-8 text-center text-sm text-slate-600">
+            Choose a date range and click Search.
+          </p>
+        )}
       </div>
     </div>
   );

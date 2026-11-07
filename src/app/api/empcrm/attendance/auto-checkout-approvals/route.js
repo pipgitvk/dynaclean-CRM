@@ -10,6 +10,7 @@ import {
   findLeaveForUserOnDate,
   resolveAutoCheckoutForAttendanceDay,
 } from "@/lib/attendanceAutoCheckoutLeave";
+import { applyAutomaticCheckouts } from "@/lib/attendanceAutoCheckout";
 import { buildAutoCheckoutApprovalItems } from "@/lib/autoCheckoutApprovalQueue";
 
 const HR_ATTENDANCE_ROLES = ["SUPERADMIN", "HR HEAD", "HR", "HR Executive"];
@@ -84,13 +85,17 @@ export async function GET(request) {
     const status = searchParams.get("status") || "pending";
     const countOnly = searchParams.get("countOnly") === "1";
 
+    // Sync opens its own connection. Do not run it inside withDbConnection —
+    // a second checkout (or a pool rebuild) closes this connection, and the
+    // next query throws "Can't add new command when connection is in closed state".
+    await applyAutomaticCheckouts();
+
     if (countOnly) {
       const pendingItems = await withDbConnection((conn) =>
         buildAutoCheckoutApprovalItems(conn, {
           fromDate,
           toDate,
           statusFilter: "pending",
-          runAutoCheckoutSync: true,
         }),
       );
       return NextResponse.json({ pendingCount: pendingItems.length });
@@ -101,7 +106,6 @@ export async function GET(request) {
         fromDate,
         toDate,
         statusFilter: status,
-        runAutoCheckoutSync: true,
       }),
     );
 

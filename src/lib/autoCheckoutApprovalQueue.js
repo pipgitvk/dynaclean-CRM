@@ -1,4 +1,3 @@
-import { applyAutomaticCheckouts } from "@/lib/attendanceAutoCheckout";
 import {
   AUTO_CHECKOUT_ATTENDANCE_ADDRESS,
   isAutomaticCheckoutAddress,
@@ -192,12 +191,9 @@ async function attachMachineSuppression(conn, items) {
  */
 export async function buildAutoCheckoutApprovalItems(
   conn,
-  { fromDate, toDate, statusFilter = "pending", runAutoCheckoutSync = false },
+  { fromDate, toDate, statusFilter = "pending" },
 ) {
   await ensureAttendanceAutoCheckoutApprovalsTable(conn);
-  if (runAutoCheckoutSync) {
-    await applyAutomaticCheckouts();
-  }
   await pruneStaleAutoCheckoutApprovals(conn);
 
   const rawItems = await fetchAutomaticCheckoutRows(conn, {
