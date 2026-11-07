@@ -10,7 +10,7 @@ import Modal from "./Model";
 import StatementLinkModal from "./StatementLinkModal";
 import MultiStatementLinkModal from "./MultiStatementLinkModal";
 
-export default function ExpenseTable({ rows, role, activeEmployeesList }) {
+export default function ExpenseTable({ rows, role }) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -57,39 +57,31 @@ export default function ExpenseTable({ rows, role, activeEmployeesList }) {
   const [selectedRowForLink, setSelectedRowForLink] = useState(null);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
 
-  // Get unique employees for the filter - filter by active list if provided
-  const employees = Array.from(new Set(rows.map((row) => row.username)))
-    .filter(Boolean)
-    .filter(username => !activeEmployeesList || activeEmployeesList.includes(username))
-    .sort();
-
-  // Filter rows based on the search query, employee, date range, and status
-  const filteredRows = rows.filter((row) => {
-    const totalCost =
-      Number(row.TicketCost || 0) +
-      Number(row.HotelCost || 0) +
-      Number(row.MealsCost || 0) +
-      Number(row.OtherExpenses || 0);
-
+  const rowMatchesTableContext = (row) => {
     const formattedDate = dayjs(row.TravelDate).format("DD-MM-YYYY");
-
-    // Check if any field matches the search query
     const matchesSearch =
       Object.values(row)
         .join(" ")
         .toLowerCase()
         .includes(searchQuery.toLowerCase()) ||
       formattedDate.toLowerCase().includes(searchQuery.toLowerCase());
-
-    const matchesEmployee = !selectedEmployee || row.username === selectedEmployee;
-
     const matchesStatus = !selectedStatus || row.approval_status === selectedStatus;
-
     const matchesDateRange =
       (!fromDate || dayjs(row.TravelDate).isAfter(dayjs(fromDate).subtract(1, "day"))) &&
       (!toDate || dayjs(row.TravelDate).isBefore(dayjs(toDate).add(1, "day")));
+    return matchesSearch && matchesStatus && matchesDateRange;
+  };
 
-    return matchesSearch && matchesEmployee && matchesStatus && matchesDateRange;
+  // Only usernames that appear in the table for the current date, status, and search.
+  const employees = Array.from(
+    new Set(rows.filter(rowMatchesTableContext).map((row) => row.username)),
+  )
+    .filter(Boolean)
+    .sort();
+
+  const filteredRows = rows.filter((row) => {
+    const matchesEmployee = !selectedEmployee || row.username === selectedEmployee;
+    return rowMatchesTableContext(row) && matchesEmployee;
   });
 
   const isDirector = (role || "").toUpperCase() === "DIRECTOR";

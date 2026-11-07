@@ -1,4 +1,5 @@
 {
   "BACKOFFICE": "/user-dashboard",
-  "BDM": "/sales-dashboard"
+  "BDM": "/sales-dashboard",
+  "OFFICE-BOY": "/user-dashboard"
 }

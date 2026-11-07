@@ -343,7 +343,11 @@ export function computeSalaryPayDaysForUser(p) {
         half_day++;
         // Punch-based / rules half-day (no paid leave on this date) = unpaid half-day
         half_day_unpaid++;
-        weekdayPayCredits += 0.5;
+        // Sunday/holiday half-days get their credit only through the off-day rule below —
+        // adding a weekday credit here would cancel the half-day deduction.
+        if (!isSunday && !isHoliday) {
+          weekdayPayCredits += 0.5;
+        }
       } else if (!isSunday && !isHoliday) {
         weekdayPayCredits += 1;
       }
