@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import dayjs from "dayjs";
 import OrderDocumentFileCard from "@/components/orders/OrderDocumentFileCard";
+import OrderPoDateCell from "@/components/orders/OrderPoDateCell";
 import {
   ORDER_PIPELINE_STAGES,
   deriveOrderPipelineProgress,
@@ -32,6 +33,7 @@ export default function OrderDetailsClient({
   orderId,
   gstin,
   quoteCustomerId,
+  userRole,
   delhiveryLr = null,
   returnDelhiveryLr = null,
 }) {
@@ -74,6 +76,11 @@ export default function OrderDetailsClient({
     () => deriveOrderPipelineProgress(orderDetails, statuses),
     [orderDetails, statuses],
   );
+
+  const [poDateOrder, setPoDateOrder] = useState({
+    order_id: orderDetails.order_id,
+    created_at: orderDetails.created_at,
+  });
 
   const [fileValues, setFileValues] = useState(() => {
     const initial = {};
@@ -291,7 +298,25 @@ export default function OrderDetailsClient({
               orderId={orderDetails.order_id}
               order={orderForDocRules}
               onUploaded={handleFilesUploaded}
-            />
+            >
+              {key === "po_file" ? (
+                <div className="mb-3">
+                  <p className="text-xs font-medium text-gray-600 mb-1">
+                    Order Date / PO Date
+                  </p>
+                  <OrderPoDateCell
+                    order={poDateOrder}
+                    userRole={userRole}
+                    onUpdated={(isoDate) =>
+                      setPoDateOrder((prev) => ({
+                        ...prev,
+                        created_at: isoDate ? `${isoDate} 00:00:00` : null,
+                      }))
+                    }
+                  />
+                </div>
+              ) : null}
+            </OrderDocumentFileCard>
           ))}
         </div>
       </div>

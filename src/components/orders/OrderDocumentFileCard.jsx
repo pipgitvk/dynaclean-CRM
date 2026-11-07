@@ -30,6 +30,7 @@ export default function OrderDocumentFileCard({
   orderId,
   order,
   onUploaded,
+  children,
 }) {
   const [uploading, setUploading] = useState(false);
   const canEdit = canEditOrderDocumentField(order, fieldKey, file);
@@ -91,6 +92,7 @@ export default function OrderDocumentFileCard({
   return (
     <div className="p-4 border rounded-lg bg-white">
       <h4 className="text-sm font-semibold mb-2">{label}</h4>
+      {children}
       {fileUrls.length === 0 ? (
         <p className="text-gray-500 text-xs mb-2">Not uploaded</p>
       ) : fileUrls.length === 1 ? (

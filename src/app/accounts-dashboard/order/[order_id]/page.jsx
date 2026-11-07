@@ -121,6 +121,7 @@ export default async function Page({ params }) {
         orderId={orderId}
         gstin={gstin}
         quoteCustomerId={quoteCustomerId}
+        userRole={userRole}
         delhiveryLr={delhiveryLr}
         returnDelhiveryLr={returnDelhiveryLr}
       />

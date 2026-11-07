@@ -39,9 +39,7 @@ import {
   blocksNewReturnInitiate,
   isReturnInitiatedStatus,
 } from "@/lib/orderReturnStatus";
-import OrderPoDateCell, {
-  formatOrderPunchDate,
-} from "@/components/orders/OrderPoDateCell";
+import { formatOrderPunchDate } from "@/components/orders/OrderPoDateCell";
 import {
   canCreateAdditionalBooking,
   canOpenFirstDispatchForOrder,
@@ -139,14 +137,6 @@ function readDateFilterFromStorage(key) {
 export default function OrderTable({ userRole }) {
   const router = useRouter();
   const [orders, setOrders] = useState([]);
-  const handleOrderPoDateUpdated = useCallback((orderId, isoDate) => {
-    const nextCreated = isoDate ? `${isoDate} 00:00:00` : null;
-    setOrders((prev) =>
-      prev.map((o) =>
-        o.order_id === orderId ? { ...o, created_at: nextCreated } : o,
-      ),
-    );
-  }, []);
   const [listLoading, setListLoading] = useState(true);
   const [fetchError, setFetchError] = useState(null);
   const fetchAbortRef = useRef(null);
@@ -867,13 +857,7 @@ export default function OrderTable({ userRole }) {
                       {r.created_by}
                     </td>
                     <td className="px-3 py-3 text-left">
-                      <OrderPoDateCell
-                        order={r}
-                        userRole={userRole}
-                        onUpdated={(isoDate) =>
-                          handleOrderPoDateUpdated(r.order_id, isoDate)
-                        }
-                      />
+                      {r.created_at ? dayjs(r.created_at).format("DD-MM-YYYY") : "—"}
                     </td>
                     <td className="px-3 py-3 text-left text-xs text-gray-700">
                       {formatOrderPunchDate(r)}
