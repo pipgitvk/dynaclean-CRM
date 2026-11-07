@@ -45,12 +45,16 @@ export async function POST(request) {
   };
 
   try {
-    // Get pool and a connection from it
-    pool = await getDbConnection();
-    conn = await pool.getConnection();
-
     const { username, password } = await request.json();
     console.log("🟡 Login request received:", username);
+
+    // Schema check uses the pool. Do it before holding a connection, and only
+    // until the column exists — an ALTER on every login locks emplist and
+    // exhausts the 5-connection pool until the gateway returns 504 HTML.
+    await ensureLoginTimeRestrictionColumn();
+
+    pool = await getDbConnection();
+    conn = await pool.getConnection();
 
     if (!username || !password) {
       return NextResponse.json(
@@ -83,8 +87,6 @@ export async function POST(request) {
       await recordActivity("admin", "SUPERADMIN", "SUCCESS", `Superadmin default login from IP: ${ip}`);
       return res;
     }
-
-    await ensureLoginTimeRestrictionColumn();
 
     // Step 1: Try emplist
     const [empRows] = await conn.execute(
@@ -209,11 +211,6 @@ export async function POST(request) {
       }
     }
     const dbPassword = user.password || "";
-
-    console.log("inputPassword",inputPassword);
-    console.log("dbPassword",dbPassword);
-    
-   
 
     if (dbPassword !== inputPassword) {
       await recordActivity(username, userRole, "FAILED", "Incorrect password");

@@ -2,6 +2,7 @@ import { getDbConnection } from "@/lib/db";
 
 const TABLES = ["rep_list", "emplist"];
 const COLUMN = "login_time_restriction_enabled";
+const READY_KEY = "__loginTimeRestrictionReady__";
 
 export async function columnExists(conn, table, columnName = COLUMN) {
   const [rows] = await conn.query(
@@ -28,7 +29,14 @@ async function restoreSqlMode(conn) {
 }
 
 async function fixEmplistLegacyDefaults(conn) {
-  if (!(await columnExists(conn, "emplist", "email_token_time"))) {
+  const [rows] = await conn.query(
+    `SELECT IS_NULLABLE
+     FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'emplist'
+       AND COLUMN_NAME = 'email_token_time'`
+  );
+  if (!rows.length || String(rows[0].IS_NULLABLE).toUpperCase() === "YES") {
     return;
   }
 
@@ -96,6 +104,8 @@ async function addColumn(conn, table) {
 }
 
 export async function ensureLoginTimeRestrictionColumn() {
+  if (globalThis[READY_KEY]) return { skipped: true };
+
   const conn = await getDbConnection();
   await fixEmplistLegacyDefaults(conn);
 
@@ -103,6 +113,10 @@ export async function ensureLoginTimeRestrictionColumn() {
 
   for (const table of TABLES) {
     results[table] = await addColumn(conn, table);
+  }
+
+  if (TABLES.every((table) => results[table])) {
+    globalThis[READY_KEY] = true;
   }
 
   return results;

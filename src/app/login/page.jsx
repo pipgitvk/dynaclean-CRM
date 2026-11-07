@@ -57,10 +57,21 @@ const LoginPage = () => {
         body: JSON.stringify({ username, password }),
       });
 
-      const data = await res.json();
+      const raw = await res.text();
+      let data = {};
+      try {
+        data = raw ? JSON.parse(raw) : {};
+      } catch {
+        data = {};
+      }
 
       if (!res.ok) {
-        setError(data.error || "Login failed");
+        setError(
+          data.error ||
+            (res.status === 504
+              ? "Login server timed out. Try again."
+              : "Login failed")
+        );
         setIsSubmitting(false);
         return;
       }

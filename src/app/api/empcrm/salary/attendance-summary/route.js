@@ -105,6 +105,13 @@ function mapOneEmployeeSummary(emp, logs, holidays, leaves, globalRules, schedul
       stats.holiday_work_pay_credits != null
         ? Number(stats.holiday_work_pay_credits)
         : null,
+    pay_off_day_half_days:
+      stats.off_day_half_days != null ? Number(stats.off_day_half_days) : 0,
+    pay_off_day_half_day_dates: stats.off_day_half_day_dates || [],
+    pay_off_day_half_day_deduction:
+      stats.off_day_half_day_deduction != null
+        ? Number(stats.off_day_half_day_deduction)
+        : 0,
     attendance_log_days: logs.length,
     dates_worked: logs.map((l) => l.date),
     sunday_worked_dates: stats.sunday_worked_dates,

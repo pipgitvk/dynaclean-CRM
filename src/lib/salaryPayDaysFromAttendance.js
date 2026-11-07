@@ -250,6 +250,15 @@ export function computeSalaryPayDaysForUser(p) {
   let sundayWorkPayCredits = 0;
   /** +1 pay day per punch on a company holiday (Mon–Sat; Sunday+holiday counts once via Sunday). */
   let holidayWorkPayCredits = 0;
+  /**
+   * Half-days that fell on a Sunday or company holiday.
+   * A weekday half-day already loses 0.5 via `weekdayPayCredits`, but an off-day half-day only
+   * lowers the Sunday/holiday work bonus (1 → 0.5) — so its own 0.5 half-day loss is applied
+   * separately, otherwise the half-day would not be deducted.
+   */
+  let offDayHalfDays = 0;
+  /** Dates of the Sunday/holiday half-days above (UI). */
+  const offDayHalfDayDates = [];
 
   for (let day = 1; day <= daysInMonth; day++) {
     const d = new Date(y, monthIndex, day);
@@ -281,6 +290,10 @@ export function computeSalaryPayDaysForUser(p) {
       present++;
       half_day++;
       half_day_unpaid++;
+      if (isSunday || isHoliday) {
+        offDayHalfDays++;
+        offDayHalfDayDates.push(dateString);
+      }
       if (!isSunday && !isHoliday) {
         weekdayPayCredits += 0.5;
       } else if (
@@ -343,6 +356,10 @@ export function computeSalaryPayDaysForUser(p) {
         half_day++;
         // Punch-based / rules half-day (no paid leave on this date) = unpaid half-day
         half_day_unpaid++;
+        if (isSunday || isHoliday) {
+          offDayHalfDays++;
+          offDayHalfDayDates.push(dateString);
+        }
         // Sunday/holiday half-days get their credit only through the off-day rule below —
         // adding a weekday credit here would cancel the half-day deduction.
         if (!isSunday && !isHoliday) {
@@ -384,6 +401,10 @@ export function computeSalaryPayDaysForUser(p) {
         if (treatAsHalfDay) {
           half_day++;
           half_day_unpaid++;  // Non-paid leave half-day (sick, casual, etc)
+          if (isSunday || isHoliday) {
+            offDayHalfDays++;
+            offDayHalfDayDates.push(dateString);
+          }
           if (!isSunday && !isHoliday) {
             weekdayPayCredits += 0.5;
           }
@@ -435,7 +456,8 @@ export function computeSalaryPayDaysForUser(p) {
     deductionDays -
     sundaysUnpaidNoWeekPresence +
     sundayWorkPayCredits +
-    holidayWorkPayCredits;
+    holidayWorkPayCredits -
+    offDayHalfDays * 0.5;
   /** 31-day month and 30 credited → absent 1 → pay days 29. Amount is still ÷ 30. */
   const absentDays = daysInMonth - creditedDays;
   const payDays = payDaysOnThirtyDaySalary(creditedDays, daysInMonth);
@@ -467,6 +489,9 @@ export function computeSalaryPayDaysForUser(p) {
     leave_worked_dates: leaveWorkedDates,
     sunday_work_pay_credits: sundayWorkPayCredits,
     holiday_work_pay_credits: holidayWorkPayCredits,
+    off_day_half_days: offDayHalfDays,
+    off_day_half_day_dates: offDayHalfDayDates,
+    off_day_half_day_deduction: offDayHalfDays * 0.5,
     sundays_in_period_dates: sundaysInPeriodDates,
     period_days: periodDays,
     salary_period_cap: salaryPeriodCap,

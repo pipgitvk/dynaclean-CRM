@@ -356,6 +356,12 @@ const GenerateSalaryPage = () => {
                                           empAtt.pay_holiday_work_credits !== ""
                                               ? Number(empAtt.pay_holiday_work_credits)
                                               : 0,
+                                      offDayHalfDays:
+                                          Number(empAtt.pay_off_day_half_days) || 0,
+                                      offDayHalfDayDates:
+                                          empAtt.pay_off_day_half_day_dates || [],
+                                      offDayHalfDayDeduction:
+                                          Number(empAtt.pay_off_day_half_day_deduction) || 0,
                                       salaryFullDays: presN,
                                       salaryHalfDays: Number(empAtt.half_day_count) || 0,
                                       salaryLateDays: lateN,
@@ -1213,6 +1219,35 @@ const GenerateSalaryPage = () => {
                                                     {" "}
                                                     (
                                                     {holidaysWorked
+                                                        .map((d) => formatDate(d))
+                                                        .join(", ")}
+                                                    )
+                                                </span>
+                                            )}
+                                        </li>
+                                    )}
+                                    {(attendanceDisplayAllZero
+                                        ? 0
+                                        : Number(
+                                              attendanceBreakdown.payCalc
+                                                  .offDayHalfDayDeduction
+                                          ) || 0) > 0 && (
+                                        <li>
+                                            Half-day on Sunday/holiday (−0.5 each) ={" "}
+                                            <span className="font-semibold tabular-nums text-amber-800">
+                                                −{formatPayCalcNumber(
+                                                    attendanceDisplayAllZero
+                                                        ? 0
+                                                        : attendanceBreakdown.payCalc
+                                                              .offDayHalfDayDeduction
+                                                )}
+                                            </span>
+                                            {attendanceBreakdown.payCalc.offDayHalfDayDates
+                                                ?.length > 0 && (
+                                                <span className="text-slate-500">
+                                                    {" "}
+                                                    (
+                                                    {attendanceBreakdown.payCalc.offDayHalfDayDates
                                                         .map((d) => formatDate(d))
                                                         .join(", ")}
                                                     )
