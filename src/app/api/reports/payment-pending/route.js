@@ -14,13 +14,129 @@ import {
     sumOrderPaymentAmounts,
 } from "@/lib/orderPaymentHistory";
 import { ensureOrderDeliveryBatchesTable } from "@/lib/orderDeliveryBatches";
-import { sqlTrimUtf8EqColumns } from "@/lib/sqlUtf8Compare";
 import {
   collectOrderDeliveryDateStrings,
   computeDueDateFromDeliveryAndTerms,
   pickDeliveryAnchorForDueDate,
   uniqueSortedDateStrings,
 } from "@/lib/paymentPendingOrderDates";
+
+function chunkList(items, size) {
+    const chunks = [];
+    for (let i = 0; i < items.length; i += size) chunks.push(items.slice(i, i + size));
+    return chunks;
+}
+
+function completedDateYmd(value) {
+    if (value == null || value === "") return "";
+    if (value instanceof Date && !Number.isNaN(value.getTime())) {
+        const y = value.getFullYear();
+        const m = String(value.getMonth() + 1).padStart(2, "0");
+        const d = String(value.getDate()).padStart(2, "0");
+        return `${y}-${m}-${d}`;
+    }
+    const match = String(value).trim().match(/^(\d{4}-\d{2}-\d{2})/);
+    return match ? match[1] : "";
+}
+
+/** Indexed lookups. A TRIM/CONVERT join across neworder, dispatch, and service_records exceeds max_statement_time. */
+async function loadInstallationByOrder(conn, orders) {
+    const installationDatesByOrder = new Map();
+    const serviceIdsByOrder = new Map();
+    const quoteToOrderIds = new Map();
+    const quoteParams = [];
+    const seenQuotes = new Set();
+
+    for (const order of orders) {
+        const raw = order?.quote_number == null ? "" : String(order.quote_number);
+        const key = raw.trim();
+        if (!key || !order?.order_id) continue;
+        if (!quoteToOrderIds.has(key)) quoteToOrderIds.set(key, []);
+        quoteToOrderIds.get(key).push(order.order_id);
+        for (const candidate of [raw, key]) {
+            if (seenQuotes.has(candidate)) continue;
+            seenQuotes.add(candidate);
+            quoteParams.push(candidate);
+        }
+    }
+    if (!quoteParams.length) return { installationDatesByOrder, serviceIdsByOrder };
+
+    const dispatchRows = [];
+    for (const chunk of chunkList(quoteParams, 80)) {
+        const placeholders = chunk.map(() => "?").join(",");
+        const [part] = await conn.query(
+            `SELECT quote_number, serial_no
+             FROM dispatch
+             WHERE quote_number IN (${placeholders})
+               AND serial_no IS NOT NULL
+               AND TRIM(serial_no) <> ''`,
+            chunk,
+        );
+        dispatchRows.push(...(part || []));
+    }
+
+    const serialToQuotes = new Map();
+    const serialParams = [];
+    const seenSerials = new Set();
+    for (const row of dispatchRows) {
+        const quoteKey = String(row.quote_number ?? "").trim();
+        const rawSerial = row.serial_no == null ? "" : String(row.serial_no);
+        const serialKey = rawSerial.trim();
+        if (!quoteKey || !serialKey || !quoteToOrderIds.has(quoteKey)) continue;
+        if (!serialToQuotes.has(serialKey)) serialToQuotes.set(serialKey, new Set());
+        serialToQuotes.get(serialKey).add(quoteKey);
+        for (const candidate of [rawSerial, serialKey]) {
+            if (seenSerials.has(candidate)) continue;
+            seenSerials.add(candidate);
+            serialParams.push(candidate);
+        }
+    }
+    if (!serialParams.length) return { installationDatesByOrder, serviceIdsByOrder };
+
+    const datesByOrder = new Map();
+    const idsByOrder = new Map();
+    for (const chunk of chunkList(serialParams, 80)) {
+        const placeholders = chunk.map(() => "?").join(",");
+        const [part] = await conn.query(
+            `SELECT serial_number, service_id, completed_date, service_type, status
+             FROM service_records
+             WHERE serial_number IN (${placeholders})
+               AND completed_date IS NOT NULL`,
+            chunk,
+        );
+        for (const row of part || []) {
+            const serviceType = String(row.service_type ?? "").trim().toUpperCase();
+            const status = String(row.status ?? "").trim().toUpperCase();
+            if (serviceType !== "INSTALLATION" || status !== "COMPLETED") continue;
+            const ymd = completedDateYmd(row.completed_date);
+            const serialKey = String(row.serial_number ?? "").trim();
+            if (!ymd || !serialKey) continue;
+            const quotes = serialToQuotes.get(serialKey);
+            if (!quotes) continue;
+            for (const quoteKey of quotes) {
+                for (const orderId of quoteToOrderIds.get(quoteKey) || []) {
+                    if (!datesByOrder.has(orderId)) datesByOrder.set(orderId, new Set());
+                    datesByOrder.get(orderId).add(ymd);
+                    const serviceId = String(row.service_id ?? "").trim();
+                    if (!serviceId) continue;
+                    if (!idsByOrder.has(orderId)) idsByOrder.set(orderId, new Set());
+                    idsByOrder.get(orderId).add(serviceId);
+                }
+            }
+        }
+    }
+
+    for (const [orderId, dates] of datesByOrder) {
+        installationDatesByOrder.set(orderId, [...dates].sort());
+    }
+    for (const [orderId, ids] of idsByOrder) {
+        serviceIdsByOrder.set(
+            orderId,
+            [...ids].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })),
+        );
+    }
+    return { installationDatesByOrder, serviceIdsByOrder };
+}
 
 export async function GET(request) {
     try {
@@ -126,52 +242,13 @@ export async function GET(request) {
                     deliveryBatchDatesByOrder.get(row.order_id).push(row.delivered_on);
                 }
 
-                const serialJoin = sqlTrimUtf8EqColumns(
-                    "sr.serial_number",
-                    "d.serial_no",
-                );
-                const quoteJoin = sqlTrimUtf8EqColumns(
-                    "no.quote_number",
-                    "d.quote_number",
-                );
                 try {
-                    const [installationRows] = await conn.execute(
-                        `SELECT no.order_id,
-                                GROUP_CONCAT(
-                                  DISTINCT DATE_FORMAT(sr.completed_date, '%Y-%m-%d')
-                                  ORDER BY sr.completed_date
-                                  SEPARATOR ','
-                                ) AS installation_dates,
-                                GROUP_CONCAT(
-                                  DISTINCT sr.service_id
-                                  ORDER BY sr.service_id
-                                  SEPARATOR ','
-                                ) AS service_ids
-                         FROM neworder no
-                         INNER JOIN dispatch d ON ${quoteJoin}
-                         INNER JOIN service_records sr
-                           ON ${serialJoin}
-                          AND UPPER(TRIM(sr.service_type)) = 'INSTALLATION'
-                          AND UPPER(TRIM(sr.status)) = 'COMPLETED'
-                          AND sr.completed_date IS NOT NULL
-                         WHERE no.order_id IN (${placeholders})
-                           AND d.serial_no IS NOT NULL
-                           AND TRIM(d.serial_no) <> ''
-                         GROUP BY no.order_id`,
-                        orderIds,
-                    );
-                    for (const row of installationRows || []) {
-                        const dateParts = String(row.installation_dates || "")
-                            .split(",")
-                            .map((s) => s.trim())
-                            .filter(Boolean);
-                        installationDatesByOrder.set(row.order_id, dateParts);
-
-                        const idParts = String(row.service_ids || "")
-                            .split(",")
-                            .map((s) => s.trim())
-                            .filter(Boolean);
-                        serviceIdsByOrder.set(row.order_id, idParts);
+                    const loaded = await loadInstallationByOrder(conn, rows);
+                    for (const [orderId, dates] of loaded.installationDatesByOrder) {
+                        installationDatesByOrder.set(orderId, dates);
+                    }
+                    for (const [orderId, ids] of loaded.serviceIdsByOrder) {
+                        serviceIdsByOrder.set(orderId, ids);
                     }
                 } catch (instErr) {
                     console.error("Error fetching installation dates:", instErr);
