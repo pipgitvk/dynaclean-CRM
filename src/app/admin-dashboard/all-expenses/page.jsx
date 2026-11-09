@@ -62,11 +62,15 @@ export default async function ExpensesPage() {
 
   // ✅ Fetch expenses
   const query = `
-    SELECT ID, TravelDate, FromLocation, Tolocation,
-           TicketCost, HotelCost, MealsCost, OtherExpenses,
-           approved_amount, payment_date, approval_status, username, linked_statement_ids, approved_by
-    FROM expenses
-    ORDER BY TravelDate DESC
+    SELECT e.ID, e.TravelDate, e.FromLocation, e.Tolocation,
+           e.TicketCost, e.HotelCost, e.MealsCost, e.OtherExpenses,
+           e.approved_amount, e.payment_date, e.approval_status, e.username,
+           e.linked_statement_ids, e.approved_by,
+           COALESCE(r.status, 1) AS employee_status
+    FROM expenses e
+    LEFT JOIN rep_list r
+      ON TRIM(r.username) = TRIM(e.username)
+    ORDER BY e.TravelDate DESC
   `;
 
   let rows = [];

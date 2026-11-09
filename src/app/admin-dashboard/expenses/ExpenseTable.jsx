@@ -10,6 +10,21 @@ import Modal from "./Model";
 import StatementLinkModal from "./StatementLinkModal";
 import MultiStatementLinkModal from "./MultiStatementLinkModal";
 
+function isInactiveExpenseEmployee(row) {
+  return Number(row?.employee_status) === 0;
+}
+
+function formatExpenseUsername(row) {
+  const name = row?.username || "";
+  if (!isInactiveExpenseEmployee(row)) return name;
+  return (
+    <>
+      {name}
+      <span className="ml-1 text-xs font-medium text-amber-700">(Inactive)</span>
+    </>
+  );
+}
+
 export default function ExpenseTable({ rows, role }) {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -40,11 +55,11 @@ export default function ExpenseTable({ rows, role }) {
   // Sync with URL search params
   useEffect(() => {
     const userParam = searchParams.get("username");
-    if (userParam !== null) {
+    if (userParam) {
       setSelectedEmployee(userParam);
-      // If we are coming from a link with a username, we might want to see all their expenses
-      // but only if it's the first time or explicitly intended. 
-      // For now, let's keep it simple: just sync the employee.
+      // Inactive / ex-staff: show full expense history, not only the current month.
+      setFromDate("");
+      setToDate("");
     } else {
       setSelectedEmployee("");
     }
@@ -77,10 +92,19 @@ export default function ExpenseTable({ rows, role }) {
     new Set(rows.filter(rowMatchesTableContext).map((row) => row.username)),
   )
     .filter(Boolean)
-    .sort();
+    .sort((a, b) => String(a).trim().localeCompare(String(b).trim()));
+
+  const employeeInactiveByUsername = new Map();
+  for (const row of rows) {
+    const key = String(row.username || "").trim();
+    if (!key) continue;
+    if (isInactiveExpenseEmployee(row)) employeeInactiveByUsername.set(key, true);
+  }
 
   const filteredRows = rows.filter((row) => {
-    const matchesEmployee = !selectedEmployee || row.username === selectedEmployee;
+    const matchesEmployee =
+      !selectedEmployee ||
+      String(row.username || "").trim() === String(selectedEmployee).trim();
     return rowMatchesTableContext(row) && matchesEmployee;
   });
 
@@ -395,6 +419,9 @@ export default function ExpenseTable({ rows, role }) {
           {employees.map((emp) => (
             <option key={emp} value={emp}>
               {emp}
+              {employeeInactiveByUsername.has(String(emp).trim())
+                ? " (Inactive)"
+                : ""}
             </option>
           ))}
         </select>
@@ -482,7 +509,7 @@ export default function ExpenseTable({ rows, role }) {
                         ? dayjs(row.TravelDate).format("DD-MM-YYYY")
                         : "-"}
                     </td>
-                    <td className="p-3">{row.username}</td>
+                    <td className="p-3">{formatExpenseUsername(row)}</td>
                     <td className="p-3">{row.FromLocation}</td>
                     <td className="p-3">{row.Tolocation}</td>
                     <td className="p-3">₹{totalCost.toFixed(2)}</td>
