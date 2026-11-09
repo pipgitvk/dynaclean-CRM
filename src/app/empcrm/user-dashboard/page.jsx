@@ -123,7 +123,8 @@ export default function UserEmpCrmDashboard() {
       description: "Download monthly payslips",
       icon: Receipt,
       color: "bg-pink-500",
-      available: false,
+      href: "/empcrm/user-dashboard/payslips",
+      available: true,
     },
   ];
 
