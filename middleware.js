@@ -72,6 +72,7 @@ export async function middleware(request) {
     pathname.startsWith("/hr-dashboard") ||
     pathname.startsWith("/digital-marketing-dashboard") ||
     pathname.startsWith("/accounts-dashboard") ||
+    pathname.startsWith("/warehouse-incharge") ||
     pathname.startsWith("/accountant-dashboard") ||
     pathname.startsWith("/gem-dashboard") ||
     pathname.startsWith("/third-party-engineer-dashboard")
@@ -446,6 +447,34 @@ export async function middleware(request) {
         return NextResponse.redirect(dest);
       }
 
+      if (pathname.startsWith("/warehouse-incharge-dashboard")) {
+        const dest = new URL(
+          pathname.replace("/warehouse-incharge-dashboard", "/warehouse-incharge"),
+          request.url,
+        );
+        dest.search = request.nextUrl.search;
+        return NextResponse.redirect(dest);
+      }
+
+      if (
+        pathname.startsWith("/warehouse-incharge") &&
+        roleNorm !== "WAREHOUSE INCHARGE"
+      ) {
+        return NextResponse.redirect(new URL("/user-dashboard", request.url));
+      }
+
+      if (
+        roleNorm === "WAREHOUSE INCHARGE" &&
+        pathname.startsWith("/user-dashboard")
+      ) {
+        const dest = new URL(
+          pathname.replace(/^\/user-dashboard/, "/warehouse-incharge"),
+          request.url,
+        );
+        dest.search = request.nextUrl.search;
+        return NextResponse.redirect(dest);
+      }
+
       const thirdPartyServicePrefixes = [
         "/user-dashboard/complete-service",
         "/user-dashboard/update-service",
@@ -512,6 +541,8 @@ export const config = {
     "/hr-dashboard/:path*",
     "/digital-marketing-dashboard/:path*",
     "/accounts-dashboard/:path*",
+    "/warehouse-incharge/:path*",
+    "/warehouse-incharge-dashboard/:path*",
     "/accountant-dashboard/:path*",
     "/api/schedule-visit",
     "/api/schedule-visit/:path*",

@@ -40,6 +40,10 @@ export default async function UserDashboardPage() {
       redirect("/sales-dashboard");
     }
 
+    if (roleKey === "WAREHOUSE INCHARGE") {
+      redirect("/warehouse-incharge");
+    }
+
     const connection = await getDbConnection();
 
     // The SQL query correctly finds the user based on the username from the token

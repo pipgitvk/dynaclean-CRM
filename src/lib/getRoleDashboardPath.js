@@ -28,6 +28,7 @@ export function getRoleDashboardPath(role) {
     return "/digital-marketing-dashboard";
   }
   if (roleNorm.includes("ACCOUNTANT")) return "/accounts-dashboard";
+  if (roleNorm === "WAREHOUSE INCHARGE") return "/warehouse-incharge";
 
   return "/user-dashboard";
 }

@@ -32,6 +32,7 @@ function getDashboardPrefix(roleKey) {
   if (role.includes("HR")) return "/hr-dashboard";
   if (role.includes("DIGITAL") || role.includes("MARKETER")) return "/digital-marketing-dashboard";
   if (role.includes("ACCOUNTANT")) return "/accounts-dashboard";
+  if (role === "WAREHOUSE INCHARGE") return "/warehouse-incharge";
   return "/user-dashboard"; // Default for other roles
 }
 
@@ -176,6 +177,7 @@ function transformMenuItemPaths(item, roleKey) {
   if (
     item.path?.startsWith("/admin-dashboard") ||
     item.path?.startsWith("/accounts-dashboard") ||
+    item.path?.startsWith("/warehouse-incharge") ||
     item.path?.startsWith("/empcrm")
   ) {
     if (item.children?.length) {

@@ -23,6 +23,10 @@ const nextConfig = {
           source: "/director-dashboard/:path+",
           destination: "/user-dashboard/:path+",
         },
+        {
+          source: "/warehouse-incharge/:path+",
+          destination: "/user-dashboard/:path+",
+        },
         // Handle common misspellings/pluralizations for expense attachments
         {
           source: "/expenses_attachments/:path*",
