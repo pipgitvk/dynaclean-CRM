@@ -5,6 +5,7 @@ import toast from "react-hot-toast";
 import { Loader2, Search } from "lucide-react";
 import { DEFAULT_ATTENDANCE_RULES } from "@/lib/attendanceRulesEngine";
 import AttendanceSummaryGrid from "@/components/AttendanceSummaryGrid";
+import { attendanceSummaryIncludeUserForMonth } from "@/lib/attendanceSheetMonth";
 
 const ALL_USERS = "__all__";
 
@@ -14,6 +15,7 @@ export default function AdminAttendanceSummaryPage() {
   const [leaves, setLeaves] = useState([]);
   const [rules, setRules] = useState(DEFAULT_ATTENDANCE_RULES);
   const [rulesByUsername, setRulesByUsername] = useState({});
+  const [dataRange, setDataRange] = useState(null);
   const [loading, setLoading] = useState(true);
   /** Dropdown value (not applied until Search) */
   const [selectedUser, setSelectedUser] = useState("");
@@ -52,6 +54,7 @@ export default function AdminAttendanceSummaryPage() {
         setHolidays(data.holidays || []);
         setLeaves(data.leaves || []);
         setRulesByUsername(data.rulesByUsername || {});
+        setDataRange(data.range || null);
       } catch (err) {
         if (!cancelled) {
           toast.error(err.message);
@@ -59,6 +62,7 @@ export default function AdminAttendanceSummaryPage() {
           setHolidays([]);
           setLeaves([]);
           setRulesByUsername({});
+          setDataRange(null);
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -86,13 +90,28 @@ export default function AdminAttendanceSummaryPage() {
     };
   }, []);
 
+  const registerMonthStr = dataRange?.from
+    ? String(dataRange.from).slice(0, 7)
+    : null;
+
   const usernames = useMemo(() => {
     const s = new Set();
     logs.forEach((l) => l.username && s.add(l.username));
     leaves.forEach((lv) => lv.username && s.add(lv.username));
     Object.keys(rulesByUsername).forEach((u) => s.add(u));
-    return [...s].sort((a, b) => a.localeCompare(b));
-  }, [logs, leaves, rulesByUsername]);
+    const list = [...s].sort((a, b) => a.localeCompare(b));
+    if (!registerMonthStr) return list;
+    return list.filter((u) =>
+      attendanceSummaryIncludeUserForMonth({
+        monthStr: registerMonthStr,
+        username: u,
+        logs,
+        leaves,
+        holidays,
+        rules: rulesFor(u),
+      }),
+    );
+  }, [logs, leaves, holidays, rulesByUsername, rules, registerMonthStr]);
 
   const handleSearch = () => {
     if (!selectedUser) {
@@ -180,6 +199,13 @@ export default function AdminAttendanceSummaryPage() {
             </p>
           ) : appliedSelection === ALL_USERS ? (
             <div className="space-y-10">
+              {usernames.length === 0 ? (
+                <p className="rounded-xl border border-dashed border-slate-300 bg-slate-50/80 py-12 text-center text-sm text-slate-600">
+                  {registerMonthStr
+                    ? `No employees with present, leave, or half-day in ${registerMonthStr}.`
+                    : "No employees match the register filter for this period."}
+                </p>
+              ) : null}
               {usernames.map((u, idx) => (
                 <div key={u}>
                   <h2 className="mb-3 text-lg font-semibold text-slate-800">{u}</h2>

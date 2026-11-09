@@ -11,7 +11,10 @@ import { computeSalaryPayDaysForUser } from "@/lib/salaryPayDaysFromAttendance";
 import { isServiceEngineerRole } from "@/lib/serviceEngineerSundayPayroll";
 import { computeAttendanceDetailsCardSummaryForMonth } from "@/lib/attendanceDetailsCardSummary";
 import { getPayrollAttendanceLogDateRange } from "@/lib/payrollLogDateRange";
-import { calendarMonthMeta } from "@/lib/attendanceSheetMonth";
+import {
+  attendanceSummaryIncludeUserForMonth,
+  calendarMonthMeta,
+} from "@/lib/attendanceSheetMonth";
 import { dateToYmdKey } from "@/lib/salaryPayDaysFromAttendance";
 import {
   normalizeUserKey,
@@ -322,7 +325,25 @@ export async function GET(request) {
       logsByUser[uk].push(row);
     }
 
-    const employeeSummary = payrollEmployees.map((emp) => {
+    const employeeSummary = payrollEmployees
+      .filter((emp) => {
+      const related = relatedUsernamesByWinner.get(emp.username) || [emp.username];
+      const logs = collectPayrollLogsForUsers(logsByUser, related);
+      const rules = mergeGlobalRulesWithEmployeeSchedule(
+        globalRules,
+        scheduleByUser.get(normalizeUserKey(emp.username)) || null,
+      );
+      return attendanceSummaryIncludeUserForMonth({
+        monthStr: month,
+        username: emp.username,
+        relatedUsernames: related,
+        logs,
+        leaves: monthLeaves,
+        holidays,
+        rules,
+      });
+    })
+      .map((emp) => {
       const uk = normalizeUserKey(emp.username);
       const profile = profileByUser.get(uk) || {};
       const related = relatedUsernamesByWinner.get(emp.username) || [emp.username];

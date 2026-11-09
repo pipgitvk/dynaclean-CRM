@@ -144,6 +144,44 @@ export function attendanceSheetIncludeInRegister(row) {
   return Number(row?.total_present) > 0;
 }
 
+/** Same register-day gate as the attendance sheet, for one user in YYYY-MM. */
+export function attendanceSummaryIncludeUserForMonth({
+  monthStr,
+  username,
+  relatedUsernames,
+  logs,
+  leaves,
+  holidays,
+  rules,
+}) {
+  const meta = calendarMonthMeta(monthStr);
+  if (!meta) return false;
+  const related =
+    relatedUsernames?.length > 0 ? relatedUsernames : [username];
+  const relatedKeys = new Set(related.map((u) => normalizeUserKey(u)));
+  const monthLogs = (logs || []).filter((l) => {
+    const dk = dateToYmdKey(l.date);
+    if (!dk || dk < meta.from || dk > meta.to) return false;
+    return relatedKeys.has(normalizeUserKey(l.username));
+  });
+  const userLeaves = (leaves || []).filter((lv) =>
+    relatedKeys.has(normalizeUserKey(lv.username)),
+  );
+  const row = buildEmployeeAttendanceSheetRow({
+    meta,
+    username,
+    relatedUsernames: related,
+    displayName: username,
+    profile: {},
+    emp: {},
+    logs: monthLogs,
+    holidays: holidays || [],
+    leaves: userLeaves,
+    rules: rules || {},
+  });
+  return attendanceSheetIncludeInRegister(row);
+}
+
 /** Count of HD cells on the attendance register (calendar month, same rules as the grid). */
 export function countAttendanceSheetHalfDaysInMonth({
   monthStr,
