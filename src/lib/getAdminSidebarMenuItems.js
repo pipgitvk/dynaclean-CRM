@@ -589,12 +589,19 @@ const allMenuItems = [
         roles: ["ALL"],
         icon: "Users",
       },
-          {
-            path: "/admin-dashboard/purchase/purchases",
-            name: "Purchases",
-            roles: ["SUPERADMIN"],
-            icon: "ShoppingBag",
-          },
+      {
+        path: "/admin-dashboard/purchase-products",
+        name: "Purchase Billings",
+        accessKey: "purchase-products",
+        roles: ["ALL"],
+        icon: "ShoppingBag",
+      },
+      {
+        path: "/admin-dashboard/purchase/purchases",
+        name: "Purchases",
+        roles: ["SUPERADMIN"],
+        icon: "ShoppingBag",
+      },
      
        {
             path: "/admin-dashboard/purchase/direct-in",
