@@ -1,5 +1,7 @@
 "use client";
 
+import { useRef, useEffect, useState } from "react";
+import { Camera, ImagePlus } from "lucide-react";
 import { CategoryBadge, itemLineKey } from "@/components/forms/warehouseInUi";
 import { warehouseInQtyFields } from "@/lib/warehouseInQuantities";
 
@@ -30,24 +32,94 @@ function ReceivedQtyCell({ item, line, set, inputClass, showHint }) {
   );
 }
 
-function ImageCell({ line, set, prefix, inputClass, showHint }) {
+function ImageCell({ line, set, prefix, showHint }) {
+  const cameraInputRef = useRef(null);
+  const galleryInputRef = useRef(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
+
+  useEffect(() => {
+    if (!line.receivedImage) {
+      setPreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(line.receivedImage);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [line.receivedImage]);
+
+  const onPick = (e) => {
+    const file = e.target.files?.[0] ?? null;
+    set({ receivedImage: file });
+    e.target.value = "";
+  };
+
+  const btnClass = showHint
+    ? "inline-flex items-center justify-center gap-2 flex-1 min-h-[44px] px-3 py-2.5 rounded-lg border text-sm font-medium"
+    : "inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded border text-xs font-medium";
+
   return (
-    <div>
+    <div className="space-y-2">
       <input
-        id={`${prefix}-image`}
+        ref={cameraInputRef}
+        id={`${prefix}-image-camera`}
         type="file"
-        accept=".pdf,image/*"
-        className={`${inputClass} file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-gray-100`}
-        onChange={(e) => {
-          const file = e.target.files?.[0] ?? null;
-          set({ receivedImage: file });
-        }}
-        required={!line.receivedImage}
+        accept="image/*"
+        capture="environment"
+        className="sr-only"
+        tabIndex={-1}
+        aria-hidden
+        onChange={onPick}
       />
-      {showHint ? (
-        <p className="text-xs text-gray-500 mt-1">Photo proof of received stock</p>
+      <input
+        ref={galleryInputRef}
+        id={`${prefix}-image-gallery`}
+        type="file"
+        accept="image/*"
+        className="sr-only"
+        tabIndex={-1}
+        aria-hidden
+        onChange={onPick}
+      />
+      <div className={`flex gap-2 ${showHint ? "flex-col sm:flex-row" : "flex-wrap"}`}>
+        <button
+          type="button"
+          onClick={() => cameraInputRef.current?.click()}
+          className={`${btnClass} bg-green-600 text-white border-green-700 hover:bg-green-700`}
+        >
+          <Camera className="w-4 h-4 shrink-0" aria-hidden />
+          Open camera
+        </button>
+        <button
+          type="button"
+          onClick={() => galleryInputRef.current?.click()}
+          className={`${btnClass} bg-white text-gray-800 border-gray-300 hover:bg-gray-50`}
+        >
+          <ImagePlus className="w-4 h-4 shrink-0" aria-hidden />
+          Choose image
+        </button>
+      </div>
+      {line.receivedImage ? (
+        <div className={`flex items-center gap-2 ${showHint ? "" : "mt-1"}`}>
+          {previewUrl ? (
+            <img
+              src={previewUrl}
+              alt=""
+              className="w-12 h-12 object-cover rounded border border-gray-200"
+            />
+          ) : null}
+          <p
+            className={`text-gray-700 truncate ${showHint ? "text-sm" : "text-xs"} ${inputClass ? "" : ""}`}
+            title={line.receivedImage.name}
+          >
+            {line.receivedImage.name}
+          </p>
+        </div>
       ) : (
-        <p className="text-xs text-gray-500 mt-0.5">Photo proof</p>
+        <p className={`text-gray-500 ${showHint ? "text-xs" : "text-[11px]"}`}>
+          {showHint
+            ? "Tap Open camera to take a photo, or Choose image from gallery"
+            : "Camera or gallery"}
+        </p>
       )}
     </div>
   );
