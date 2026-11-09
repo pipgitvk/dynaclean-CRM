@@ -251,16 +251,17 @@ export default function AttendanceStatusTracker({ username }) {
         ? breakRemainingSec
         : Math.max(1, Math.abs(breakRemainingSec));
 
-  const getBreakIconColor = (state) => {
-    switch (state) {
-      case "pending":
-        return "text-red-500";
-      case "ready":
-        return "text-white";
-      case "in_progress":
-        return "text-green-500";
+  const renderBreakTypeIcon = (breakType, { compact = false } = {}) => {
+    const size = compact ? 14 : 20;
+    const className = "text-white shrink-0";
+    switch (breakType) {
+      case "break_morning":
+      case "break_evening":
+        return <SiGitea size={size} className={className} aria-hidden />;
+      case "break_lunch":
+        return <MdFastfood size={size} className={className} aria-hidden />;
       default:
-        return "text-gray-400";
+        return null;
     }
   };
 
@@ -277,18 +278,31 @@ export default function AttendanceStatusTracker({ username }) {
         );
       case "break_morning":
       case "break_evening":
-        return (
-          <SiGitea size={20} className={getBreakIconColor(primaryInfo.status)} />
-        );
       case "break_lunch":
-        return (
-          <MdFastfood size={20} className={getBreakIconColor(primaryInfo.status)} />
-        );
+        return renderBreakTypeIcon(primaryInfo.type);
       case "working":
         return <FaBuildingCircleCheck size={20} className="text-white" />;
       default:
         return null;
     }
+  };
+
+  const renderPrimaryBreakContent = () => {
+    if (
+      isBreakInProgress &&
+      displayedBreakSec != null &&
+      primaryInfo?.type.startsWith("break_")
+    ) {
+      return (
+        <span className="flex flex-col items-center justify-center gap-px leading-none">
+          {renderBreakTypeIcon(primaryInfo.type, { compact: true })}
+          <span className="text-[9px] font-bold tabular-nums text-white">
+            {formatCountdown(displayedBreakSec)}
+          </span>
+        </span>
+      );
+    }
+    return renderPrimaryIcon();
   };
 
   const getLocation = () =>
@@ -415,8 +429,8 @@ export default function AttendanceStatusTracker({ username }) {
 
     return [
       isCheckoutButton
-        ? "flex min-h-10 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold sm:text-sm whitespace-nowrap transition-colors shadow-sm"
-        : "flex min-h-10 min-w-10 items-center justify-center rounded-lg p-2 transition-colors",
+        ? "flex h-10 w-10 min-h-10 min-w-10 shrink-0 items-center justify-center gap-1.5 rounded-xl p-2 text-xs font-semibold whitespace-nowrap transition-colors shadow-sm min-[1100px]:h-auto min-[1100px]:w-auto min-[1100px]:px-3 min-[1100px]:py-2 sm:text-sm"
+        : "flex h-10 w-10 min-h-10 min-w-10 shrink-0 items-center justify-center rounded-xl p-2 transition-colors shadow-sm",
       isPassiveWorking || isWaitingCheckin || isBreakPending
         ? "cursor-default"
         : "disabled:cursor-not-allowed disabled:opacity-50",
@@ -487,12 +501,8 @@ export default function AttendanceStatusTracker({ username }) {
         >
           {actionLoading ? (
             <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
-          ) : isBreakInProgress && displayedBreakSec != null ? (
-            <span className="text-[11px] font-bold tabular-nums leading-none text-white">
-              {formatCountdown(displayedBreakSec)}
-            </span>
           ) : (
-            renderPrimaryIcon()
+            renderPrimaryBreakContent()
           )}
         </button>
       ) : null}
@@ -510,15 +520,25 @@ export default function AttendanceStatusTracker({ username }) {
           {actionLoading && !primaryInfo ? (
             <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
           ) : checkoutInfo.status === "completed" ? (
-            <span className="inline-flex items-center gap-1.5">
-              <CircleCheck size={17} strokeWidth={2.25} aria-hidden />
-              Checked out
-            </span>
+            <>
+              <span className="inline-flex min-[1100px]:hidden" title="Checked out">
+                <CircleCheck size={17} strokeWidth={2.25} aria-hidden />
+              </span>
+              <span className="hidden min-[1100px]:inline-flex items-center gap-1.5">
+                <CircleCheck size={17} strokeWidth={2.25} aria-hidden />
+                Checked out
+              </span>
+            </>
           ) : (
-            <span className="inline-flex items-center gap-1.5">
-              <LogOut size={17} strokeWidth={2.25} aria-hidden />
-              Checkout
-            </span>
+            <>
+              <span className="inline-flex min-[1100px]:hidden" title="Checkout">
+                <LogOut size={17} strokeWidth={2.25} aria-hidden />
+              </span>
+              <span className="hidden min-[1100px]:inline-flex items-center gap-1.5">
+                <LogOut size={17} strokeWidth={2.25} aria-hidden />
+                Checkout
+              </span>
+            </>
           )}
         </button>
       ) : null}

@@ -382,95 +382,51 @@ export default function Navbar({ onToggleSidebar, showSalesMeta = false }) {
       document.body
     );
 
-  return (
-    <nav
-      data-dashboard-navbar
-      className={
-        showSalesMeta
-          ? "print:hidden w-full min-h-16 h-auto border-b border-slate-200 bg-white py-2 shadow-[0_1px_3px_rgba(0,0,0,0.06)] flex flex-col gap-2 min-[1100px]:min-h-16 min-[1100px]:flex-row min-[1100px]:items-center min-[1100px]:justify-between px-3 min-[1100px]:px-5 md:px-6 lg:px-8 flex-shrink-0"
-          : `print:hidden w-full min-h-16 h-auto py-2 min-[1100px]:py-0 min-[1100px]:h-16 bg-gradient-to-r ${
-              theme.navbar?.gradient || theme.sidebar.gradient
-            } ${theme.navbar?.textureClass || ""} shadow-lg flex flex-col gap-2 min-[1100px]:flex-row min-[1100px]:items-center min-[1100px]:justify-between px-3 min-[1100px]:px-4 md:px-6 lg:px-8 border-b ${
-              theme.sidebar.border
-            } transition-colors duration-300 flex-shrink-0`
-      }
+  const quickHeaderTools = (
+    <>
+      {!isThirdPartyEngineerPortal && (
+        <ProspectHeaderButton userRole={userRole} username={username} />
+      )}
+      {shouldShowAttendanceTracker && !isThirdPartyEngineerPortal && (
+        <AttendanceStatusTracker username={username} />
+      )}
+    </>
+  );
+
+  const customerSearchField = shouldShowSearch() ? (
+    <div
+      ref={searchRef}
+      className="relative w-full min-w-0 min-[1100px]:w-72 min-[1100px]:shrink-0"
     >
-      <div className="flex items-center gap-4 min-w-0 flex-shrink-0">
-        <button
-          onClick={onToggleSidebar}
-          className={
+      <div
+        className={`flex min-h-[44px] w-full items-center gap-2 rounded-xl border px-3 py-2 min-[1100px]:min-h-0 min-[1100px]:h-10 ${
+          showSalesMeta
+            ? "border-slate-200 bg-slate-50"
+            : "border-gray-200 bg-white"
+        }`}
+      >
+        <input
+          type="text"
+          placeholder={
             showSalesMeta
-              ? "rounded-lg border border-slate-200 bg-white p-2 text-slate-600 transition hover:bg-slate-50 flex-shrink-0"
-              : `${theme.sidebar.text} ${theme.sidebar.hover} p-2 rounded-lg transition-all flex-shrink-0`
+              ? "Search customers by name, phone, etc..."
+              : "Search customers by name, phone, company, or ID..."
           }
-          aria-label="Toggle Sidebar"
-        >
-          <Menu size={24} />
-        </button>
-
-        {showSalesMeta ? (
-          <div className="hidden min-w-0 items-center gap-2.5 min-[1100px]:flex">
-            <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-500">
-              <User size={16} />
-            </div>
-            <div className="min-w-0 leading-tight">
-              <p className="truncate text-sm font-semibold text-slate-800">
-                {username ? `Welcome, ${username} 👋` : "Welcome 👋"}
-              </p>
-              <p className="truncate text-xs text-slate-500">
-                {userRole || "—"}
-                {reportingManager ? ` | Reporting Manager: ${reportingManager}` : ""}
-              </p>
-            </div>
-          </div>
-        ) : (
-          <div className="hidden min-[1100px]:flex items-center gap-2 min-w-0">
-            <User size={20} className={`${theme.sidebar.text} flex-shrink-0`} />
-            <span className={`font-medium ${theme.sidebar.text} truncate`}>
-              {username ? `Welcome, ${username}` : "Welcome"} - {userRole}
-            </span>
-          </div>
-        )}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onFocus={() => {
+            if (showDropdown) updateDropdownPosition();
+          }}
+          className="flex-1 min-w-0 outline-none text-sm"
+        />
+        <Search size={18} className="text-gray-600 shrink-0" aria-hidden />
       </div>
+      {searchDropdown}
+    </div>
+  ) : null;
 
-      <div className="flex flex-1 min-w-0 flex-col gap-2 min-[1100px]:flex-row min-[1100px]:items-center min-[1100px]:justify-end min-[1100px]:gap-4 min-[1100px]:overflow-visible overflow-x-auto">
-        {!isThirdPartyEngineerPortal && (
-          <ProspectHeaderButton userRole={userRole} username={username} />
-        )}
-        {shouldShowAttendanceTracker && !isThirdPartyEngineerPortal && (
-          <AttendanceStatusTracker username={username} />
-        )}
-        {shouldShowSearch() && (
-          <div
-            ref={searchRef}
-            className="relative flex-1 min-w-0 w-full min-[1100px]:w-72 min-[1100px]:flex-none min-[1100px]:flex-shrink-0"
-          >
-            <div className={`flex min-h-[44px] w-full items-center gap-2 rounded-xl border px-3 py-2 min-[1100px]:min-h-0 min-[1100px]:h-10 ${
-              showSalesMeta
-                ? "border-slate-200 bg-slate-50"
-                : "border-gray-200 bg-white"
-            }`}>
-              <input
-                type="text"
-                placeholder={
-                  showSalesMeta
-                    ? "Search customers by name, phone, etc..."
-                    : "Search customers by name, phone, company, or ID..."
-                }
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onFocus={() => {
-                  if (showDropdown) updateDropdownPosition();
-                }}
-                className="flex-1 min-w-0 outline-none text-sm"
-              />
-              <Search size={18} className="text-gray-600 flex-shrink-0" aria-hidden />
-            </div>
-            {searchDropdown}
-          </div>
-        )}
-
-        <div className="flex shrink-0 items-center justify-end gap-2 md:gap-3">
+  const headerIconActions = (
+    <>
           {shouldShowAddCustomer && (
           <Link
             href={
@@ -640,10 +596,78 @@ export default function Navbar({ onToggleSidebar, showSalesMeta = false }) {
           </div>
           )}
 
-          <HeaderLogoutButton
-            onClick={handleLogout}
-            variant={showSalesMeta ? "sales" : "gradient"}
-          />
+      <HeaderLogoutButton
+        onClick={handleLogout}
+        variant={showSalesMeta ? "sales" : "gradient"}
+      />
+    </>
+  );
+
+  return (
+    <nav
+      data-dashboard-navbar
+      className={
+        showSalesMeta
+          ? "print:hidden w-full min-h-16 h-auto border-b border-slate-200 bg-white py-2 shadow-[0_1px_3px_rgba(0,0,0,0.06)] flex flex-col gap-2 min-[1100px]:min-h-16 min-[1100px]:flex-row min-[1100px]:items-center min-[1100px]:justify-between px-3 min-[1100px]:px-5 md:px-6 lg:px-8 shrink-0"
+          : `print:hidden w-full min-h-16 h-auto py-2 min-[1100px]:py-0 min-[1100px]:h-16 bg-gradient-to-r ${
+              theme.navbar?.gradient || theme.sidebar.gradient
+            } ${theme.navbar?.textureClass || ""} shadow-lg flex flex-col gap-2 min-[1100px]:flex-row min-[1100px]:items-center min-[1100px]:justify-between px-3 min-[1100px]:px-4 md:px-6 lg:px-8 border-b ${
+              theme.sidebar.border
+            } transition-colors duration-300 shrink-0`
+      }
+    >
+      <div className="flex w-full min-w-0 items-center gap-2 min-[1100px]:gap-4 min-[1100px]:shrink-0">
+        <button
+          onClick={onToggleSidebar}
+          className={
+            showSalesMeta
+              ? "rounded-lg border border-slate-200 bg-white p-2 text-slate-600 transition hover:bg-slate-50 shrink-0"
+              : `${theme.sidebar.text} ${theme.sidebar.hover} p-2 rounded-lg transition-all shrink-0`
+          }
+          aria-label="Toggle Sidebar"
+        >
+          <Menu size={24} />
+        </button>
+
+        {showSalesMeta ? (
+          <div className="hidden min-w-0 items-center gap-2.5 min-[1100px]:flex">
+            <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-500">
+              <User size={16} />
+            </div>
+            <div className="min-w-0 leading-tight">
+              <p className="truncate text-sm font-semibold text-slate-800">
+                {username ? `Welcome, ${username} 👋` : "Welcome 👋"}
+              </p>
+              <p className="truncate text-xs text-slate-500">
+                {userRole || "—"}
+                {reportingManager ? ` | Reporting Manager: ${reportingManager}` : ""}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="hidden min-[1100px]:flex items-center gap-2 min-w-0">
+            <User size={20} className={`${theme.sidebar.text} shrink-0`} />
+            <span className={`font-medium ${theme.sidebar.text} truncate`}>
+              {username ? `Welcome, ${username}` : "Welcome"} - {userRole}
+            </span>
+          </div>
+        )}
+
+        <div className="min-w-0 flex-1 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden min-[1100px]:hidden">
+          <div className="flex w-max max-w-full flex-nowrap items-center gap-1.5 pl-0.5 [&_a]:shrink-0 [&_button]:shrink-0 [&>div]:shrink-0">
+            {quickHeaderTools}
+            {headerIconActions}
+          </div>
+        </div>
+      </div>
+
+      <div className="flex w-full min-w-0 flex-col gap-2 min-[1100px]:min-w-0 min-[1100px]:flex-1 min-[1100px]:flex-row min-[1100px]:items-center min-[1100px]:justify-end min-[1100px]:gap-4">
+        <div className="hidden min-[1100px]:flex shrink-0 items-center gap-4">
+          {quickHeaderTools}
+        </div>
+        {customerSearchField}
+        <div className="hidden min-[1100px]:flex shrink-0 items-center justify-end gap-3">
+          {headerIconActions}
         </div>
       </div>
     </nav>

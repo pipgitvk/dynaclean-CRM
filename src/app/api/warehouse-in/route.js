@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import fs from "fs/promises";
 import path from "path";
 import { getSessionPayload } from "@/lib/auth";
+import { usesWarehouseInInchargeFlow } from "@/lib/warehouseInAccess.server";
 
 const UPLOAD_DIR = path.join(process.cwd(), "public", "ADMIN", "STOCK_REQUESTS");
 
@@ -19,6 +20,21 @@ async function ensureUploadDir() {
 }
 
 // Save uploaded file
+async function saveSupportingDocs(formData) {
+  const paths = [];
+  const multi = formData.getAll("supporting_docs");
+  const legacy = formData.get("supporting_doc");
+  const files = multi.length > 0 ? multi : legacy ? [legacy] : [];
+  for (const file of files) {
+    if (!file || typeof file === "string") continue;
+    const p = await saveFile(file);
+    if (p) paths.push(p);
+  }
+  if (paths.length === 0) return null;
+  if (paths.length === 1) return paths[0];
+  return JSON.stringify(paths);
+}
+
 async function saveFile(file) {
   console.log("saveFile() called with:", file ? file.name : null);
 
@@ -53,6 +69,8 @@ export async function GET(req) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const inchargeFlow = await usesWarehouseInInchargeFlow(payload);
+
     const pool = await getDbConnection();
     conn = await pool.getConnection();
     console.log("DB connection established");
@@ -64,6 +82,7 @@ export async function GET(req) {
         psr.product_image,
         psr.product_name,
         psr.quantity,
+        ${inchargeFlow ? "COALESCE(psr.received_quantity, 0) AS received_quantity," : ""}
         psr.from_company,
         psr.contact,
         psr.mode_of_transport,
@@ -71,6 +90,8 @@ export async function GET(req) {
         psr.created_at,
         psr.created_by,
         psr.status,
+        psr.invoice_number,
+        psr.invoice_date,
         CASE 
           WHEN TRIM(COALESCE(psr.product_code, '')) = '' THEN NULL
           WHEN EXISTS (
@@ -86,6 +107,11 @@ export async function GET(req) {
         END AS item_category
       FROM product_stock_request psr
       WHERE psr.status = 'requested'
+        ${
+          inchargeFlow
+            ? "AND psr.quantity > COALESCE(psr.received_quantity, 0)"
+            : "AND COALESCE(psr.received_quantity, 0) = 0"
+        }
       ORDER BY psr.created_at DESC
     `;
 
@@ -135,70 +161,126 @@ export async function POST(req) {
     }
 
     const username = payload.username;
+    const inchargeFlow = await usesWarehouseInInchargeFlow(payload);
 
     console.log("Reading formData...");
     const formData = await req.formData();
     const db = await getDbConnection();
     const conn = await db.getConnection();
 
-    // Extract form fields
-    const request_id = formData.get("request_id");
     const received_date = formData.get("received_date");
-    const received_quantity = formData.get("received_quantity");
     const warehouse_name = formData.get("warehouse_name");
     const location = formData.get("location");
     const remarks = formData.get("remarks");
 
-    console.log("Form Data:", {
-      request_id,
-      received_date,
-      received_quantity,
-      warehouse_name,
-      location,
-      remarks
-    });
+    let lineItems = [];
+    const bulkRaw = formData.get("bulk_items");
+    if (bulkRaw) {
+      try {
+        const parsed = JSON.parse(String(bulkRaw));
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          lineItems = parsed.map((row) => ({
+            request_id: Number(row.request_id),
+            received_quantity: Number(row.received_quantity),
+          }));
+        }
+      } catch {
+        return NextResponse.json(
+          { error: "Invalid bulk_items payload" },
+          { status: 400 },
+        );
+      }
+    }
+    if (lineItems.length === 0) {
+      const request_id = formData.get("request_id");
+      lineItems = [
+        {
+          request_id: Number(request_id),
+          received_quantity: Number(formData.get("received_quantity")),
+        },
+      ];
+    }
 
-    // Handle file uploads
-    console.log("Uploading received_image...");
-    const received_image = await saveFile(formData.get("received_image"));
-
-    console.log("Uploading supporting_doc...");
-    const supporting_doc = await saveFile(formData.get("supporting_doc"));
-
-    if (!received_image) {
-      console.log("Error: Received image missing");
+    if (lineItems.some((i) => !i.request_id || !i.received_quantity)) {
       return NextResponse.json(
-        { error: "Received image is mandatory" },
-        { status: 400 }
+        { error: "Each line needs request_id and received_quantity" },
+        { status: 400 },
       );
     }
 
-    // Start transaction
-    console.log("Starting DB transaction...");
+    const received_image = await saveFile(formData.get("received_image"));
+    const supporting_doc = await saveSupportingDocs(formData);
+
+    if (!received_image) {
+      return NextResponse.json(
+        { error: "Received image is mandatory" },
+        { status: 400 },
+      );
+    }
+
     await conn.beginTransaction();
 
     try {
-      console.log("Fetching request by ID:", request_id);
+      for (const line of lineItems) {
+        const request_id = line.request_id;
+        const received_quantity = line.received_quantity;
 
       const [requests] = await conn.execute(
         "SELECT * FROM product_stock_request WHERE id = ?",
         [request_id]
       );
 
-      console.log("Request found:", requests.length);
-
       if (requests.length === 0) {
-        throw new Error("Request not found");
+        throw new Error(`Request not found: ${request_id}`);
       }
 
       const request = requests[0];
 
-      if (request.status !== 'requested') {
-        console.log("Request already processed. Status:", request.status);
-        return NextResponse.json({ error: "This request has already been processed." }, { status: 409 });
+      if (request.status !== "requested") {
+        const err = new Error(`Request #${request_id} was already processed.`);
+        err.statusCode = 409;
+        throw err;
       }
 
-      console.log("Updating product_stock_request with receipt details...");
+      const requestedQty = Number(request.quantity) || 0;
+      const prevReceived = Number(request.received_quantity) || 0;
+      const qtyNum = Number(received_quantity) || 0;
+
+      if (qtyNum < 1) {
+        const err = new Error(`Invalid received quantity for request #${request_id}`);
+        err.statusCode = 400;
+        throw err;
+      }
+
+      let newReceivedTotal = qtyNum;
+      let isComplete = true;
+      const unitPrice = Number(request.amount_per_unit) || 0;
+      let lineNetAmount = unitPrice * qtyNum;
+
+      if (inchargeFlow) {
+        const remainingBefore = requestedQty - prevReceived;
+        if (qtyNum > remainingBefore) {
+          const err = new Error(
+            `Request #${request_id}: cannot receive ${qtyNum}; only ${remainingBefore} remaining.`,
+          );
+          err.statusCode = 400;
+          throw err;
+        }
+        newReceivedTotal = prevReceived + qtyNum;
+        isComplete = newReceivedTotal >= requestedQty;
+        lineNetAmount = unitPrice * qtyNum;
+      } else {
+        if (prevReceived > 0) {
+          const err = new Error(
+            `Request #${request_id} is partially received. Warehouse Incharge must complete it.`,
+          );
+          err.statusCode = 409;
+          throw err;
+        }
+        newReceivedTotal = qtyNum;
+        isComplete = true;
+        lineNetAmount = Number(request.net_amount) || unitPrice * qtyNum;
+      }
 
       const updateRequestQuery = `
         UPDATE product_stock_request
@@ -211,23 +293,22 @@ export async function POST(req) {
           remarks = ?,
           warehouse_name = ?,
           location = ?,
-          status = 'fulfilled'
+          status = ?
         WHERE id = ?
       `;
 
       await conn.execute(updateRequestQuery, [
         username,
         received_date,
-        received_quantity,
+        newReceivedTotal,
         received_image,
         supporting_doc,
         remarks,
         warehouse_name,
         location,
-        request_id
+        isComplete ? "fulfilled" : "requested",
+        request_id,
       ]);
-
-      const qtyNum = Number(received_quantity) || 0;
       const isDelhi = /delhi/i.test(String(warehouse_name || ""));
 
       // Determine if this product_code belongs to a spare or a product
@@ -277,9 +358,10 @@ export async function POST(req) {
           [
             spare_id,
             qtyNum,
-            request.amount_per_unit,
-            request.net_amount,
-            remarks || `Stock request #${request_id} fulfilled`,
+            unitPrice,
+            lineNetAmount,
+            remarks ||
+              `Stock request #${request_id} — spare +${qtyNum}${isComplete ? "" : " (partial)"}`,
             location || request.delivery_location,
             received_date ? new Date(received_date) : new Date(),
             request.from_company,
@@ -411,18 +493,27 @@ export async function POST(req) {
 
         console.log("Product stock updated in product_stock / product_stock_summary");
       }
+      }
 
-      console.log("Committing transaction...");
       await conn.commit();
 
-      console.log("POST processing completed successfully");
       return NextResponse.json({
         success: true,
-        message: "Warehouse receipt processed successfully"
+        message:
+          lineItems.length > 1
+            ? `Warehouse receipt processed for ${lineItems.length} items`
+            : "Warehouse receipt processed successfully",
+        processed_count: lineItems.length,
       });
     } catch (error) {
       console.error("Inner transaction error:", error);
       await conn.rollback();
+      if (error.statusCode === 409 || error.statusCode === 400) {
+        return NextResponse.json(
+          { error: error.message },
+          { status: error.statusCode },
+        );
+      }
       throw error;
     } finally {
       console.log("Releasing DB connection...");

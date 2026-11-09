@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import fs from "fs/promises";
 import path from "path";
 import { getSessionPayload } from "@/lib/auth";
+import { usesWarehouseInInchargeFlow } from "@/lib/warehouseInAccess.server";
 
 const UPLOAD_DIR = path.join(process.cwd(), "public", "ADMIN", "STOCK_REQUESTS");
 
@@ -33,6 +34,21 @@ async function saveFile(file) {
   return `/ADMIN/STOCK_REQUESTS/${filename}`;
 }
 
+async function saveSupportingDocs(formData) {
+  const paths = [];
+  const multi = formData.getAll("supporting_docs");
+  const legacy = formData.get("supporting_doc");
+  const files = multi.length > 0 ? multi : legacy ? [legacy] : [];
+  for (const file of files) {
+    if (!file || typeof file === "string") continue;
+    const p = await saveFile(file);
+    if (p) paths.push(p);
+  }
+  if (paths.length === 0) return null;
+  if (paths.length === 1) return paths[0];
+  return JSON.stringify(paths);
+}
+
 // ---------------- GET — Pending Spare Stock Requests ----------------
 export async function GET() {
   console.log("[GET] Fetching pending spare stock requests…");
@@ -46,12 +62,21 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const inchargeFlow = await usesWarehouseInInchargeFlow(payload);
+
     const pool = await getDbConnection();
     const [requests] = await pool.execute(`
-      SELECT id, spare_id, spare_name, spare_image ,quantity, from_company, contact,
+      SELECT id, spare_id, spare_name, spare_image, quantity,
+             ${inchargeFlow ? "COALESCE(received_quantity, 0) AS received_quantity," : ""}
+             from_company, contact,
              mode_of_transport, porter_contact, created_at, created_by, status
       FROM spare_stock_request
       WHERE status = 'requested'
+        ${
+          inchargeFlow
+            ? "AND quantity > COALESCE(received_quantity, 0)"
+            : "AND COALESCE(received_quantity, 0) = 0"
+        }
       ORDER BY created_at DESC
     `);
 
@@ -78,6 +103,7 @@ export async function POST(req) {
     }
 
     const username = payload.username;
+    const inchargeFlow = await usesWarehouseInInchargeFlow(payload);
 
     console.log("[POST] Reading form data...");
     const formData = await req.formData();
@@ -89,21 +115,21 @@ export async function POST(req) {
     // Extract fields
     const request_id = formData.get("request_id");
     const received_date = formData.get("received_date");
-    const received_quantity = Number(formData.get("received_quantity") || 0);
+    const qtyThisReceipt = Number(formData.get("received_quantity") || 0);
     const warehouse_name = formData.get("warehouse_name");
     const location = formData.get("location");
     const remarks = formData.get("remarks");
 
     console.log("[POST] Form data:", {
-      request_id, received_date, received_quantity, warehouse_name, location, remarks
+      request_id, received_date, received_quantity: qtyThisReceipt, warehouse_name, location, remarks
     });
 
     // Upload files
     console.log("[POST] Uploading received_image...");
     const received_image = await saveFile(formData.get("received_image"));
 
-    console.log("[POST] Uploading supporting_doc...");
-    const supporting_doc = await saveFile(formData.get("supporting_doc"));
+    console.log("[POST] Uploading supporting document(s)...");
+    const supporting_doc = await saveSupportingDocs(formData);
 
     if (!received_image) {
       console.log("[POST] ERROR: Received image is missing");
@@ -132,25 +158,67 @@ export async function POST(req) {
         return NextResponse.json({ error: "This request has already been processed." }, { status: 409 });
       }
 
-      // Update request status
-      console.log("[POST] Updating spare_stock_request to fulfilled…");
+      const requestedQty = Number(reqRow.quantity) || 0;
+      const prevReceived = Number(reqRow.received_quantity) || 0;
+
+      if (qtyThisReceipt < 1) {
+        await conn.rollback();
+        return NextResponse.json({ error: "Invalid received quantity" }, { status: 400 });
+      }
+
+      let newReceivedTotal = qtyThisReceipt;
+      let isComplete = true;
+
+      if (inchargeFlow) {
+        const remainingBefore = requestedQty - prevReceived;
+        if (qtyThisReceipt > remainingBefore) {
+          await conn.rollback();
+          return NextResponse.json(
+            {
+              error: `Cannot receive ${qtyThisReceipt}; only ${remainingBefore} remaining on this request.`,
+            },
+            { status: 400 },
+          );
+        }
+        newReceivedTotal = prevReceived + qtyThisReceipt;
+        isComplete = newReceivedTotal >= requestedQty;
+      } else {
+        if (prevReceived > 0) {
+          await conn.rollback();
+          return NextResponse.json(
+            {
+              error:
+                "This request is partially received. Warehouse Incharge must complete it.",
+            },
+            { status: 409 },
+          );
+        }
+        newReceivedTotal = qtyThisReceipt;
+        isComplete = true;
+      }
+
+      console.log("[POST] Updating spare_stock_request…", {
+        newReceivedTotal,
+        isComplete,
+      });
 
       await conn.execute(
         `UPDATE spare_stock_request SET 
           received_by = ?, received_date = ?, received_quantity = ?, received_image = ?, supporting_doc = ?, 
-          remarks = ?, warehouse_name = ?, location = ?, status = 'fulfilled'
+          remarks = ?, warehouse_name = ?, location = ?, status = ?
          WHERE id = ?`,
         [
           username,
           received_date,
-          received_quantity,
+          newReceivedTotal,
           received_image,
           supporting_doc,
           remarks,
           warehouse_name,
           location,
-          request_id
-        ]
+          isComplete ? "fulfilled" : "requested",
+          request_id,
+        ],
       );
 
       // Fetch last stock totals
@@ -173,9 +241,13 @@ export async function POST(req) {
       const isDelhi = /delhi/i.test(String(warehouse_name || ""));
       console.log("[POST] Warehouse location parsed:", { isDelhi });
 
-      const delhiD = isDelhi ? delhiDB + received_quantity : delhiDB;
-      const southD = isDelhi ? southDB : southDB + received_quantity;
-      const totalD = totalDB + received_quantity;
+      const delhiD = isDelhi ? delhiDB + qtyThisReceipt : delhiDB;
+      const southD = isDelhi ? southDB : southDB + qtyThisReceipt;
+      const totalD = totalDB + qtyThisReceipt;
+      const unitPrice = Number(reqRow.amount_per_unit) || 0;
+      const lineNetAmount = inchargeFlow
+        ? unitPrice * qtyThisReceipt
+        : Number(reqRow.net_amount) || unitPrice * qtyThisReceipt;
 
       console.log("[POST] New computed totals:", { delhiD, southD, totalD });
 
@@ -189,10 +261,11 @@ export async function POST(req) {
         ) VALUES (?, ?, ?, ?, ?, ?, 'IN', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           reqRow.spare_id,
-          received_quantity,
-          reqRow.amount_per_unit,
-          reqRow.net_amount,
-          remarks || `Spare request #${request_id} fulfilled`,
+          qtyThisReceipt,
+          unitPrice,
+          lineNetAmount,
+          remarks ||
+            `Spare request #${request_id} — received ${qtyThisReceipt}${isComplete ? "" : " (partial)"}`,
           location,
           received_date ? new Date(received_date) : new Date(),
           reqRow.from_company,
@@ -219,30 +292,30 @@ export async function POST(req) {
 
       if (summaryRows.length > 0) {
         const existing = summaryRows[0];
-        const newTotal = (Number(existing.total_quantity) || 0) + received_quantity;
+        const newTotal = (Number(existing.total_quantity) || 0) + qtyThisReceipt;
         let newDelhi = Number(existing.Delhi) || 0;
         let newSouth = Number(existing.South) || 0;
 
-        if (isDelhi) newDelhi += received_quantity;
-        else newSouth += received_quantity;
+        if (isDelhi) newDelhi += qtyThisReceipt;
+        else newSouth += qtyThisReceipt;
 
         await conn.execute(
           `UPDATE stock_summary SET 
             last_updated_quantity = ?, total_quantity = ?, Delhi = ?, South = ?, 
             last_status = 'IN', updated_at = NOW() 
            WHERE spare_id = ?`,
-          [received_quantity, newTotal, newDelhi, newSouth, reqRow.spare_id]
+          [qtyThisReceipt, newTotal, newDelhi, newSouth, reqRow.spare_id]
         );
         console.log("[POST] Updated existing summary");
       } else {
-        const initialDelhi = isDelhi ? received_quantity : 0;
-        const initialSouth = isDelhi ? 0 : received_quantity;
+        const initialDelhi = isDelhi ? qtyThisReceipt : 0;
+        const initialSouth = isDelhi ? 0 : qtyThisReceipt;
 
         await conn.execute(
           `INSERT INTO stock_summary 
             (spare_id, last_updated_quantity, total_quantity, Delhi, South, last_status)
            VALUES (?, ?, ?, ?, ?, 'IN')`,
-          [reqRow.spare_id, received_quantity, received_quantity, initialDelhi, initialSouth]
+          [reqRow.spare_id, qtyThisReceipt, qtyThisReceipt, initialDelhi, initialSouth]
         );
 
         console.log("[POST] Created new summary row");
@@ -253,7 +326,13 @@ export async function POST(req) {
 
       return NextResponse.json({
         success: true,
-        message: "Spare warehouse receipt processed successfully"
+        message: isComplete
+          ? "Spare stock updated — request fully received"
+          : `Spare stock +${qtyThisReceipt} (partial — ${newReceivedTotal}/${requestedQty} received)`,
+        stock_added: qtyThisReceipt,
+        received_total: newReceivedTotal,
+        requested_quantity: requestedQty,
+        is_complete: isComplete,
       });
     } catch (e) {
       console.error("[POST] Error in transaction:", e);
