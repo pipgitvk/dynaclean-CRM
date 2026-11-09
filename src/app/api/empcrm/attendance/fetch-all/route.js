@@ -25,6 +25,11 @@ import {
 import { attendanceDateKey } from "@/lib/leaveDateRange";
 import { parseAttendanceDateTime } from "@/lib/istDateTime";
 import { isMeaningfulAttendancePunch } from "@/lib/attendanceMeaningfulPunch";
+import {
+  collectUsernamesWithAttendanceSheetActivity,
+  PAYROLL_SHEET_EMPLOYEE_SQL,
+  isInactiveRepForAttendanceRegister,
+} from "@/lib/payrollActiveEmployees";
 
 export const dynamic = "force-dynamic";
 
@@ -239,9 +244,8 @@ export async function GET(request) {
         `SELECT r2.username
          FROM rep_list r1
          INNER JOIN rep_list r2
-           ON r1.empId = r2.empId AND r2.status = 1
-         WHERE r1.status = 1
-           AND r1.empId IS NOT NULL
+           ON r1.empId = r2.empId
+         WHERE r1.empId IS NOT NULL
            AND LOWER(TRIM(r1.username)) = LOWER(TRIM(?))`,
         [usernameParam],
       );
@@ -332,7 +336,6 @@ export async function GET(request) {
       INNER JOIN attendance_logs sample ON sample.id = agg.sample_id
       LEFT JOIN rep_list r
         ON agg.username COLLATE utf8mb4_unicode_ci = r.username COLLATE utf8mb4_unicode_ci
-       AND r.status = 1
       ORDER BY agg.day_date DESC`;
 
     const leaveParams = [queryTo, queryFrom];
@@ -390,28 +393,73 @@ export async function GET(request) {
     );
     const globalRules = rowToAttendanceRulesShape(globalRow);
 
-    const employeeNames = [
-      ...new Set(
-        (activeEmployees || []).map((r) =>
-          resolveCanon(r.username, canonicalMaps, {
-            employee_id: r.empId,
-            machine_code: r.machine_code,
-          }),
-        ),
-      ),
-    ].sort((a, b) => String(a).localeCompare(String(b)));
+    const rowsInRange = (rows || []).filter((row) => {
+      const dk = attendanceDateKey(row.date);
+      return dk && dk >= fromParam && dk <= toParam;
+    });
+    const activityKeys = collectUsernamesWithAttendanceSheetActivity(
+      rowsInRange,
+      leaves,
+      fromParam,
+      toParam,
+    );
 
+    const employeeNameSet = new Set();
+    const inactiveEmployees = new Set();
+    const activeCanonKeys = new Set();
     const idsByUser = new Map();
+
     for (const r of activeEmployees || []) {
       const canon = resolveCanon(r.username, canonicalMaps, {
         employee_id: r.empId,
         machine_code: r.machine_code,
       });
+      if (!canon) continue;
+      employeeNameSet.add(canon);
+      activeCanonKeys.add(normalizeUserKey(canon));
       idsByUser.set(canon, {
         employee_id: r.empId ?? null,
         machine_code: String(r.machine_code || "").trim() || null,
       });
     }
+
+    const needsInactive = [...activityKeys].some(
+      (uk) => !activeCanonKeys.has(uk),
+    );
+    if (needsInactive) {
+      const [allRepRows] = await db.query(PAYROLL_SHEET_EMPLOYEE_SQL);
+      for (const r of allRepRows || []) {
+        if (!isInactiveRepForAttendanceRegister(r)) continue;
+        const canon = resolveCanon(r.username, canonicalMaps, {
+          employee_id: r.empId,
+          machine_code: r.machine_code,
+        });
+        if (!canon) continue;
+        const uk = normalizeUserKey(canon);
+        if (!activityKeys.has(uk)) continue;
+        if (activeCanonKeys.has(uk)) continue;
+        employeeNameSet.add(canon);
+        inactiveEmployees.add(canon);
+        if (!idsByUser.has(canon)) {
+          idsByUser.set(canon, {
+            employee_id: r.empId ?? null,
+            machine_code: String(r.machine_code || "").trim() || null,
+          });
+        }
+      }
+      for (const uk of activityKeys) {
+        if ([...employeeNameSet].some((n) => normalizeUserKey(n) === uk)) continue;
+        const raw =
+          rowsInRange.find((row) => normalizeUserKey(row.username) === uk)
+            ?.username || uk;
+        employeeNameSet.add(raw);
+        inactiveEmployees.add(raw);
+      }
+    }
+
+    const employeeNames = [...employeeNameSet].sort((a, b) =>
+      String(a).localeCompare(String(b)),
+    );
 
     let mergedRows = rows;
     if (!skipMachine) {
@@ -507,6 +555,7 @@ export async function GET(request) {
       leaves: normalizedLeaves,
       rulesByUsername,
       employees: employeeNames,
+      inactiveEmployees: [...inactiveEmployees],
       range: { from: fromParam, to: toParam, queryFrom, queryTo },
     });
   } catch (error) {

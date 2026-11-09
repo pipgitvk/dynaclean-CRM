@@ -264,6 +264,7 @@ const AttendancePage = () => {
   const [appliedUserSelection, setAppliedUserSelection] = useState(null);
   const [searchLoading, setSearchLoading] = useState(false);
   const [uniqueUsers, setUniqueUsers] = useState([]);
+  const [inactiveUsers, setInactiveUsers] = useState([]);
   const reloadDebounceRef = useRef(null);
   const skipDateReloadRef = useRef(0);
   const [holidays, setHolidays] = useState([]);
@@ -409,6 +410,9 @@ const AttendancePage = () => {
       if (Array.isArray(data.employees) && data.employees.length) {
         setUniqueUsers(data.employees);
       }
+      setInactiveUsers(
+        Array.isArray(data.inactiveEmployees) ? data.inactiveEmployees : [],
+      );
     } catch (err) {
       toast.error(err.message);
       setLogs([]);
@@ -525,6 +529,17 @@ const AttendancePage = () => {
     String(value ?? "")
       .trim()
       .toLowerCase();
+
+  const isInactiveAttendanceUser = (username) =>
+  (inactiveUsers || []).some(
+    (u) => normalizeUsernameKey(u) === normalizeUsernameKey(username),
+  );
+
+  const formatAttendanceUserLabel = (username) => {
+    const name = String(username || "").trim();
+    if (!name) return "";
+    return isInactiveAttendanceUser(name) ? `${name} (Inactive)` : name;
+  };
 
   const rulesFor = (username) => {
     if (!username) return rules;
@@ -1166,7 +1181,7 @@ const AttendancePage = () => {
                     <option value="all">All Employees</option>
                     {uniqueUsers.map((user) => (
                       <option key={user} value={user}>
-                        {user}
+                        {formatAttendanceUserLabel(user)}
                       </option>
                     ))}
                   </>
@@ -1443,7 +1458,7 @@ const AttendancePage = () => {
                       User:
                     </span>
                     <span className="text-sm text-gray-700 text-right">
-                      {log.username}
+                      {formatAttendanceUserLabel(log.username)}
                       {log.employee_id != null ? (
                         <span className="block text-xs text-gray-500">
                           Emp ID: {log.employee_id}
@@ -1817,7 +1832,7 @@ const AttendancePage = () => {
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {log.username}
+                        {formatAttendanceUserLabel(log.username)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {log.employee_id != null && log.employee_id !== ""

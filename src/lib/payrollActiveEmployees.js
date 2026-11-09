@@ -193,6 +193,15 @@ export function filterEmployeesForAttendanceSheet(employees, profileRows, monthE
   return filterEmployeesForPayrollSheet(employees, profileRows, monthEndYmd);
 }
 
+/** Inactive rep_list row allowed on attendance registers when they have month activity. */
+export function isInactiveRepForAttendanceRegister(emp) {
+  if (!emp || Number(emp.status) === 1 || String(emp.status) === "1") return false;
+  if (isPayrollSheetExcluded(emp)) return false;
+  if (normalizeRepListRole(emp) === "SUPERADMIN") return false;
+  if (normalizeUserKey(emp.username) === "admin") return false;
+  return true;
+}
+
 function normalizePersonName(value) {
   const s = String(value ?? "").trim().replace(/\s+/g, " ");
   return normalizeUserKey(s);
