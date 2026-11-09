@@ -11,6 +11,7 @@ import {
 import { Search } from "lucide-react";
 import Link from "next/link";
 import InventoryPriceEditMenu from "@/components/inventory/InventoryPriceEditMenu";
+import InventorySaleCustomerCells from "@/components/inventory/InventorySaleCustomerCells";
 
 async function fetchJson(url, { timeoutMs = 120_000 } = {}) {
   const controller = new AbortController();
@@ -525,6 +526,9 @@ export default function SparesNewContent() {
                         Quantity
                       </th>
                       <th className="p-3 border-b text-left font-semibold">Date</th>
+                      <th className="p-3 border-b text-left font-semibold min-w-[12rem]">
+                        Customer / Order
+                      </th>
                       <th className="p-3 border-b text-left font-semibold">
                         Action
                       </th>
@@ -533,13 +537,13 @@ export default function SparesNewContent() {
                   <tbody>
                     {historyLoading ? (
                       <tr>
-                        <td colSpan={7} className="p-4 text-center text-gray-500">
+                        <td colSpan={8} className="p-4 text-center text-gray-500">
                           Loading records…
                         </td>
                       </tr>
                     ) : filteredCombined.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="p-4 text-center text-gray-500">
+                        <td colSpan={8} className="p-4 text-center text-gray-500">
                           No records found for this spare
                         </td>
                       </tr>
@@ -566,6 +570,10 @@ export default function SparesNewContent() {
                               ? formatCrmDateOnly(item.date)
                               : "—"}
                           </td>
+                          <InventorySaleCustomerCells
+                            type={item.type}
+                            sale={item.sale}
+                          />
                           <td className="p-3">
                             {item.link ? (
                               <button

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
+import { buildInventorySaleCustomerInfo } from "@/lib/inventorySaleCustomerInfo";
 
 function pushRow(rows, row) {
   rows.push(row);
@@ -161,8 +162,9 @@ export async function GET(request) {
     }
 
     const [orderRows] = await conn.execute(
-      `SELECT no.order_id, no.quote_number, no.client_name, no.created_at, no.totalamt,
-              no.approval_status, qi.quantity, qi.price_per_unit, qi.item_name
+      `SELECT no.order_id, no.quote_number, no.client_name, no.company_name,
+              no.customer_id, no.created_at, no.totalamt, no.approval_status,
+              qi.quantity, qi.price_per_unit, qi.item_name
        FROM neworder no
        INNER JOIN quotation_items qi ON qi.quote_number = no.quote_number
        WHERE ${itemMatchSql}
@@ -177,6 +179,7 @@ export async function GET(request) {
       seenOrders.add(key);
       const isApproved =
         String(o.approval_status || "").toLowerCase() === "approved";
+      const sale = isApproved ? buildInventorySaleCustomerInfo(o) : null;
       pushRow(rows, {
         type: isApproved ? "Sale" : "Order",
         ref: o.order_id,
@@ -184,13 +187,16 @@ export async function GET(request) {
         amount: Number(o.totalamt) || Number(o.price_per_unit) || 0,
         quantity: Number(o.quantity) || 0,
         date: rowDate(o.created_at),
-        link: `/admin-dashboard/order?search=${encodeURIComponent(o.order_id)}`,
+        link: o.order_id
+          ? `/admin-dashboard/order/${encodeURIComponent(o.order_id)}`
+          : null,
+        sale,
       });
     }
 
     const [orderDirect] = await conn.execute(
-      `SELECT order_id, quote_number, client_name, created_at, totalamt, approval_status,
-              quantity, item_name, item_code
+      `SELECT order_id, quote_number, client_name, company_name, customer_id,
+              created_at, totalamt, approval_status, quantity, item_name, item_code
        FROM neworder
        WHERE TRIM(CAST(item_code AS CHAR)) = TRIM(CAST(? AS CHAR))
           OR TRIM(CAST(item_code AS CHAR)) = TRIM(CAST(? AS CHAR))
@@ -205,6 +211,7 @@ export async function GET(request) {
       seenOrders.add(key);
       const isApproved =
         String(o.approval_status || "").toLowerCase() === "approved";
+      const sale = isApproved ? buildInventorySaleCustomerInfo(o) : null;
       pushRow(rows, {
         type: isApproved ? "Sale" : "Order",
         ref: o.order_id,
@@ -212,7 +219,10 @@ export async function GET(request) {
         amount: Number(o.totalamt) || 0,
         quantity: Number(o.quantity) || 0,
         date: rowDate(o.created_at),
-        link: `/admin-dashboard/order?search=${encodeURIComponent(o.order_id)}`,
+        link: o.order_id
+          ? `/admin-dashboard/order/${encodeURIComponent(o.order_id)}`
+          : null,
+        sale,
       });
     }
 

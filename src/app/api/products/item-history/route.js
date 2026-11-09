@@ -6,9 +6,10 @@ import {
   sqlTrimUtf8EqColumns,
   sqlUtf8TrimExpr,
 } from "@/lib/sqlUtf8Compare";
+import { buildInventorySaleCustomerInfo } from "@/lib/inventorySaleCustomerInfo";
 
-function combinedRow(type, typeColor, data, display) {
-  return { type, typeColor, data, display };
+function combinedRow(type, typeColor, data, display, sale = null) {
+  return { type, typeColor, data, display, sale };
 }
 
 function rowDate(value) {
@@ -170,6 +171,85 @@ export async function GET(request) {
           date: rowDate(q.quote_date),
           id: q.quote_number,
         }),
+      );
+    }
+
+    const itemMatchSql = `(
+      ${sqlTrimUtf8Eq("qi.item_code")}
+      OR LOWER(${sqlUtf8TrimExpr("qi.item_name")}) = LOWER(TRIM(?))
+    )`;
+    const seenOrders = new Set();
+
+    const [orderRows] = await conn.execute(
+      `SELECT no.order_id, no.quote_number, no.client_name, no.company_name,
+              no.customer_id, no.created_at, no.totalamt, no.approval_status,
+              qi.quantity, qi.price_per_unit, qi.item_name
+       FROM neworder no
+       INNER JOIN quotation_items qi ON ${sqlTrimUtf8EqColumns("qi.quote_number", "no.quote_number")}
+       WHERE ${itemMatchSql}
+       ORDER BY no.created_at DESC
+       LIMIT 200`,
+      [productCode, itemName],
+    );
+
+    for (const o of orderRows || []) {
+      const key = `${o.order_id}|${o.quote_number}`;
+      if (seenOrders.has(key)) continue;
+      seenOrders.add(key);
+      if (String(o.approval_status || "").toLowerCase() !== "approved") continue;
+      const sale = buildInventorySaleCustomerInfo(o);
+      combined.push(
+        combinedRow(
+          "Sale",
+          "bg-red-100 text-red-800",
+          o,
+          {
+            main: o.order_id,
+            sub1: o.client_name || o.item_name || "",
+            sub2: `₹${(Number(o.totalamt) || Number(o.price_per_unit) || 0).toLocaleString()}`,
+            quantity: Number(o.quantity) || 0,
+            date: rowDate(o.created_at),
+            id: o.order_id,
+          },
+          sale,
+        ),
+      );
+    }
+
+    const [orderDirect] = await conn.execute(
+      `SELECT order_id, quote_number, client_name, company_name, customer_id,
+              created_at, totalamt, approval_status, quantity, item_name, item_code
+       FROM neworder
+       WHERE (
+         ${sqlTrimUtf8Eq("item_code")}
+         OR LOWER(${sqlUtf8TrimExpr("item_name")}) = LOWER(TRIM(?))
+       )
+       ORDER BY created_at DESC
+       LIMIT 100`,
+      [productCode, itemName],
+    );
+
+    for (const o of orderDirect || []) {
+      const key = `direct-${o.order_id}`;
+      if (seenOrders.has(key)) continue;
+      seenOrders.add(key);
+      if (String(o.approval_status || "").toLowerCase() !== "approved") continue;
+      const sale = buildInventorySaleCustomerInfo(o);
+      combined.push(
+        combinedRow(
+          "Sale",
+          "bg-red-100 text-red-800",
+          o,
+          {
+            main: o.order_id,
+            sub1: o.client_name || o.item_name || "",
+            sub2: `₹${(Number(o.totalamt) || 0).toLocaleString()}`,
+            quantity: Number(o.quantity) || 0,
+            date: rowDate(o.created_at),
+            id: o.order_id,
+          },
+          sale,
+        ),
       );
     }
 
