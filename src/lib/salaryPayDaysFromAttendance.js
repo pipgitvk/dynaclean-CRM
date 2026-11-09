@@ -287,7 +287,7 @@ export function computeSalaryPayDaysForUser(p) {
     const hasRealPunch = rowHasMeaningfulCheckinOrCheckout(existingLog);
 
     if (existingLog && isPayrollHalfDayFromUnapprovedAutoCheckout(existingLog)) {
-      present++;
+      present += 0.5;
       half_day++;
       half_day_unpaid++;
       if (isSunday || isHoliday) {

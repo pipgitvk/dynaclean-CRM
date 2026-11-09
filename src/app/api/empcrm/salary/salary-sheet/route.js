@@ -32,13 +32,18 @@ import {
   buildEmployeeProfileByUsername,
   buildAttendanceSheetEmployeeList,
   collectUsernamesWithAttendanceSheetActivity,
-  collectPayrollLogsForUsers,
   dedupeEmployeesForPayrollSheet,
   filterEmployeesForPayrollSheet,
   mergeDeductionsForRelated,
   pickFirstByRelatedUsernames,
 } from "@/lib/payrollActiveEmployees";
 import { dateToYmdKey } from "@/lib/salaryPayDaysFromAttendance";
+import {
+  PAYROLL_ATTENDANCE_LOG_FROM,
+  PAYROLL_ATTENDANCE_LOG_SELECT,
+  buildMergedPayrollLogsForEmployee,
+  loadPayrollMachineByUserDate,
+} from "@/lib/payrollMergedAttendanceLogs";
 
 const HR_SALARY_ROLES = [
   "SUPERADMIN",
@@ -50,15 +55,6 @@ const HR_SALARY_ROLES = [
   "ACCOUNTANT",
   "PRODUCTION ACCOUNTANT",
 ];
-
-const ATT_SELECT = `
-      a.username, a.date, a.checkin_time, a.checkout_time,
-      a.checkin_latitude, a.checkin_longitude, a.checkin_address,
-      a.checkout_latitude, a.checkout_longitude, a.checkout_address,
-      a.break_morning_start, a.break_morning_end,
-      a.break_lunch_start, a.break_lunch_end,
-      a.break_evening_start, a.break_evening_end
-`;
 
 function pickLatestStructure(rows) {
   const byUser = new Map();
@@ -150,11 +146,17 @@ export async function GET(request) {
     // times — only ~124 unique rows exist in a typical month range.
     const [attendance] = await db.query(
       `
-      SELECT DISTINCT ${ATT_SELECT}
-      FROM attendance_logs a
+      SELECT DISTINCT ${PAYROLL_ATTENDANCE_LOG_SELECT}
+      ${PAYROLL_ATTENDANCE_LOG_FROM}
       WHERE a.date >= ? AND a.date <= ?
     `,
       [logRange.from, logRange.to]
+    );
+
+    const machineByUserDate = await loadPayrollMachineByUserDate(
+      db,
+      meta.from,
+      meta.to,
     );
 
     const attendanceInMonth = (attendance || []).filter((row) => {
@@ -242,7 +244,13 @@ export async function GET(request) {
         globalRules,
         scheduleByUser.get(uk) || null
       );
-      const logs = collectPayrollLogsForUsers(logsByUser, related);
+      const logs = buildMergedPayrollLogsForEmployee({
+        logsByUser,
+        machineByUserDate,
+        relatedUsernames: related,
+        from: meta.from,
+        to: meta.to,
+      });
       // Only this employee's (and alias accounts') leaves for the month —
       // the payroll math functions scan this list per employee.
       const leavesForPayroll = [];
@@ -378,6 +386,8 @@ export async function GET(request) {
           holiday_work_days: holidayWorkDays,
           holiday_work_pay: holidayWorkPay,
           paid_days: payDays,
+          credited_days:
+            stats.credited_days != null ? Number(stats.credited_days) : null,
         },
         earned: breakdown
           ? {

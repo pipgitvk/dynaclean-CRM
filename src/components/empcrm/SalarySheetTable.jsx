@@ -170,7 +170,12 @@ export default function SalarySheetTable({
               <th className={thBase} title="Holiday work bonus days and pay (salary ÷ 30 × days)">
                 Hol+
               </th>
-              <th className={thBase}>Paid Days</th>
+              <th
+                className={thBase}
+                title="Pay days for salary (÷30-day month). In 31-day months this can be 0.5 less than P+PL+WO credits; earnings use this column."
+              >
+                Paid Days
+              </th>
               <th className={thGreen}>Basic</th>
               <th className={thGreen}>HRA</th>
               <th className={thGreen}>Other Allow</th>
