@@ -27,7 +27,7 @@ export async function POST(request) {
 
     // Verify employee exists
     const [empData] = await db.query(
-      "SELECT username FROM rep_list WHERE username = ? and status = 1",
+      "SELECT username FROM rep_list WHERE LOWER(TRIM(username)) = LOWER(TRIM(?))",
       [username]
     );
 

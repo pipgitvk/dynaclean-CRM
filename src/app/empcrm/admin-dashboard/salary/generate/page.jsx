@@ -122,8 +122,11 @@ const GenerateSalaryPage = () => {
             }
         };
         fetchUserRole();
-        fetchEmployees();
     }, []);
+
+    useEffect(() => {
+        if (selectedMonth) fetchEmployees(selectedMonth);
+    }, [selectedMonth]);
 
     // Fetch Employee Details when selection changes
     useEffect(() => {
@@ -148,13 +151,43 @@ const GenerateSalaryPage = () => {
         }
     }, [formData, salaryStructure, deductions]);
 
-    const fetchEmployees = async () => {
+    const normEmpKey = (u) =>
+        String(u ?? "")
+            .trim()
+            .toLowerCase();
+
+    const fetchEmployees = async (month) => {
+        if (!month) return;
         try {
-            const response = await fetch("/api/empcrm/employees");
-            const data = await response.json();
-            if (data.success) {
-                setEmployees(data.employees || []);
+            const [empRes, summaryRes] = await Promise.all([
+                fetch("/api/empcrm/employees"),
+                fetch(
+                    `/api/empcrm/salary/attendance-summary?month=${encodeURIComponent(month)}`,
+                ),
+            ]);
+            const data = await empRes.json().catch(() => ({}));
+            const summaryData = await summaryRes.json().catch(() => ({}));
+            const base = data.success ? data.employees || [] : [];
+            const merged = [...base];
+            const seen = new Set(base.map((e) => normEmpKey(e.username)));
+
+            for (const row of summaryData.employees || []) {
+                if (!row?.employee_inactive) continue;
+                const key = normEmpKey(row.username);
+                if (!key || seen.has(key)) continue;
+                seen.add(key);
+                merged.push({
+                    username: row.username,
+                    full_name: row.full_name || row.username,
+                    status: 0,
+                    employee_inactive: true,
+                });
             }
+
+            merged.sort((a, b) =>
+                String(a.username || "").localeCompare(String(b.username || "")),
+            );
+            setEmployees(merged);
         } catch (error) {
             console.error("Error fetching employees:", error);
             toast.error("Failed to fetch employee list");
@@ -867,11 +900,19 @@ const GenerateSalaryPage = () => {
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:outline-none"
                         >
                             <option value="">Select Employee...</option>
-                            {employees.map(emp => (
-                                <option key={emp.empId || emp.username} value={emp.username}>
-                                    {emp.username} {emp.full_name ? `- ${emp.full_name}` : ""}
-                                </option>
-                            ))}
+                            {employees.map(emp => {
+                                const inactive =
+                                    emp.employee_inactive ||
+                                    Number(emp.status) === 0;
+                                const label = inactive
+                                    ? `${emp.username}${emp.full_name && emp.full_name !== emp.username ? ` - ${emp.full_name}` : ""} (Inactive)`
+                                    : `${emp.username}${emp.full_name ? ` - ${emp.full_name}` : ""}`;
+                                return (
+                                    <option key={emp.empId || emp.username} value={emp.username}>
+                                        {label}
+                                    </option>
+                                );
+                            })}
                         </select>
                     </div>
 

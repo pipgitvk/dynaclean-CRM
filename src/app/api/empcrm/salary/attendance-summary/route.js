@@ -11,12 +11,22 @@ import { computeSalaryPayDaysForUser } from "@/lib/salaryPayDaysFromAttendance";
 import { isServiceEngineerRole } from "@/lib/serviceEngineerSundayPayroll";
 import { computeAttendanceDetailsCardSummaryForMonth } from "@/lib/attendanceDetailsCardSummary";
 import { getPayrollAttendanceLogDateRange } from "@/lib/payrollLogDateRange";
-
-function normalizeUserKey(value) {
-  return String(value ?? "")
-    .trim()
-    .toLowerCase();
-}
+import { calendarMonthMeta } from "@/lib/attendanceSheetMonth";
+import { dateToYmdKey } from "@/lib/salaryPayDaysFromAttendance";
+import {
+  normalizeUserKey,
+  loadEmployeeProfilesRows,
+} from "@/lib/employeeProfileLookup";
+import {
+  PAYROLL_ACTIVE_EMPLOYEE_SQL,
+  PAYROLL_SHEET_EMPLOYEE_SQL,
+  buildEmployeeProfileByUsername,
+  buildAttendanceSheetEmployeeList,
+  collectUsernamesWithAttendanceSheetActivity,
+  collectPayrollLogsForUsers,
+  dedupeEmployeesForPayrollSheet,
+  filterEmployeesForPayrollSheet,
+} from "@/lib/payrollActiveEmployees";
 
 const ATT_SELECT = `
       a.username, a.date, a.checkin_time, a.checkout_time,
@@ -54,9 +64,16 @@ function mapOneEmployeeSummary(emp, logs, holidays, leaves, globalRules, schedul
     dateOfJoining: emp.date_of_joining ?? null,
   });
 
+  const inactive = Number(emp.status) === 0 || Boolean(emp.employee_inactive);
+  let fullName = emp.full_name || emp.username;
+  if (inactive && !fullName.includes("(Inactive)")) {
+    fullName = `${fullName} (Inactive)`;
+  }
+
   return {
     username: emp.username,
-    full_name: emp.full_name,
+    full_name: fullName,
+    employee_inactive: inactive,
     attendance_cards,
     present_days: stats.present,
     total_punched_days:
@@ -177,82 +194,13 @@ export async function GET(request) {
     );
 
     /** Single-employee path: join logs to rep_list so usernames always match Attendance screens. */
-    if (usernameFilter != null && String(usernameFilter).trim() !== "") {
-      const [empRows] = await db.query(
-        `
-        SELECT username, username AS full_name, userRole, userDepartment
-        FROM rep_list
-        WHERE status = 1 AND LOWER(TRIM(username)) = LOWER(TRIM(?))
-        LIMIT 1
-      `,
-        [usernameFilter]
-      );
-
-      if (!empRows.length) {
-        return NextResponse.json({ success: false, message: "Employee not found." }, { status: 404 });
-      }
-
-      let dateOfJoining = null;
-      let workLocation = null;
-      try {
-        const [profileRows] = await db.query(
-          `SELECT date_of_joining, work_location FROM employee_profiles WHERE username = ? LIMIT 1`,
-          [empRows[0].username]
-        );
-        dateOfJoining = profileRows[0]?.date_of_joining ?? null;
-        workLocation = profileRows[0]?.work_location ?? null;
-      } catch {
-        /* table/column missing in some DBs */
-      }
-
-      const emp = {
-        ...empRows[0],
-        _monthStr: month,
-        date_of_joining: dateOfJoining,
-        work_location: workLocation,
-      };
-
-      const [attendance] = await db.query(
-        `
-        SELECT ${ATT_SELECT}
-        FROM attendance_logs a
-        INNER JOIN rep_list r
-          ON a.username COLLATE utf8mb4_unicode_ci = r.username COLLATE utf8mb4_unicode_ci
-        WHERE r.status = 1 AND r.username = ?
-          AND a.date >= ? AND a.date <= ?
-      `,
-        [emp.username, logRange.from, logRange.to]
-      );
-
-      const summary = mapOneEmployeeSummary(emp, attendance, holidays, leaves, globalRules, scheduleByUser);
-
-      return NextResponse.json({
-        success: true,
-        employees: [summary],
-      });
+    const meta = calendarMonthMeta(month);
+    if (!meta) {
+      return NextResponse.json({ message: "Invalid month format." }, { status: 400 });
     }
 
-    const [employees] = await db.query(`
-      SELECT username, username as full_name, userRole, userDepartment 
-      FROM rep_list 
-      WHERE status = 1
-    `);
-
-    let dojByUser = new Map();
-    let workLocationByUser = new Map();
-    try {
-      const [profileRows] = await db.query(
-        `SELECT username, date_of_joining, work_location FROM employee_profiles`
-      );
-      dojByUser = new Map(
-        (profileRows || []).map((p) => [normalizeUserKey(p.username), p.date_of_joining])
-      );
-      workLocationByUser = new Map(
-        (profileRows || []).map((p) => [normalizeUserKey(p.username), p.work_location])
-      );
-    } catch {
-      /* employee_profiles missing */
-    }
+    const profileRows = await loadEmployeeProfilesRows(db);
+    const profileByUser = buildEmployeeProfileByUsername(profileRows);
 
     const [attendance] = await db.query(
       `
@@ -263,6 +211,110 @@ export async function GET(request) {
       [logRange.from, logRange.to]
     );
 
+    const attendanceInMonth = (attendance || []).filter((row) => {
+      const dk = dateToYmdKey(row.date);
+      return dk && dk >= meta.from && dk <= meta.to;
+    });
+
+  const monthLeaves = (leaves || []).filter(
+    (leave) =>
+      dateToYmdKey(leave.from_date) <= meta.to &&
+      dateToYmdKey(leave.to_date) >= meta.from,
+  );
+
+    if (usernameFilter != null && String(usernameFilter).trim() !== "") {
+      const [empRows] = await db.query(
+        `
+        SELECT username, username AS full_name, userRole, userDepartment, status
+        FROM rep_list
+        WHERE LOWER(TRIM(username)) = LOWER(TRIM(?))
+        LIMIT 1
+      `,
+        [usernameFilter]
+      );
+
+      if (!empRows.length) {
+        return NextResponse.json({ success: false, message: "Employee not found." }, { status: 404 });
+      }
+
+      const rep = empRows[0];
+      const profile = profileByUser.get(normalizeUserKey(rep.username)) || {};
+      const emp = {
+        ...rep,
+        full_name: profile.full_name || rep.full_name || rep.username,
+        _monthStr: month,
+        date_of_joining: profile.date_of_joining ?? null,
+        work_location: profile.work_location ?? null,
+      };
+
+      const [userAttendance] = await db.query(
+        `
+        SELECT ${ATT_SELECT}
+        FROM attendance_logs a
+        WHERE LOWER(TRIM(a.username)) = LOWER(TRIM(?))
+          AND a.date >= ? AND a.date <= ?
+      `,
+        [emp.username, logRange.from, logRange.to]
+      );
+
+      const summary = mapOneEmployeeSummary(
+        emp,
+        userAttendance,
+        holidays,
+        leaves,
+        globalRules,
+        scheduleByUser,
+      );
+
+      return NextResponse.json({
+        success: true,
+        employees: [summary],
+      });
+    }
+
+    const activityKeys = collectUsernamesWithAttendanceSheetActivity(
+      attendanceInMonth,
+      monthLeaves,
+      meta.from,
+      meta.to,
+    );
+    const usernameByNormalizedKey = new Map();
+    for (const row of attendanceInMonth) {
+      const uk = normalizeUserKey(row.username);
+      if (uk && !usernameByNormalizedKey.has(uk)) {
+        usernameByNormalizedKey.set(uk, row.username);
+      }
+    }
+
+    const [employeeRows] = await db.query(PAYROLL_ACTIVE_EMPLOYEE_SQL);
+    const activeFiltered = filterEmployeesForPayrollSheet(
+      employeeRows,
+      profileRows,
+      logRange.to,
+    );
+    const activeKeySet = new Set(
+      activeFiltered.map((e) => normalizeUserKey(e.username)),
+    );
+    const needsInactive =
+      [...activityKeys].some((k) => !activeKeySet.has(k)) &&
+      activityKeys.size > 0;
+
+    let roster = activeFiltered;
+    if (needsInactive) {
+      const [allRepRows] = await db.query(PAYROLL_SHEET_EMPLOYEE_SQL);
+      roster = buildAttendanceSheetEmployeeList(
+        activeFiltered,
+        allRepRows,
+        activityKeys,
+        profileRows,
+        logRange.to,
+        usernameByNormalizedKey,
+      );
+    }
+
+    const { employees: payrollEmployees, relatedUsernamesByWinner } =
+      dedupeEmployeesForPayrollSheet(roster, profileRows);
+
     const logsByUser = {};
     for (const row of attendance) {
       const uk = normalizeUserKey(row.username);
@@ -270,18 +322,24 @@ export async function GET(request) {
       logsByUser[uk].push(row);
     }
 
-    const employeeSummary = employees.map((emp) => {
-      const logs = logsByUser[normalizeUserKey(emp.username)] || [];
+    const employeeSummary = payrollEmployees.map((emp) => {
       const uk = normalizeUserKey(emp.username);
-      const dateOfJoining = dojByUser.get(uk) ?? null;
-      const workLocation = workLocationByUser.get(uk) ?? null;
+      const profile = profileByUser.get(uk) || {};
+      const related = relatedUsernamesByWinner.get(emp.username) || [emp.username];
+      const logs = collectPayrollLogsForUsers(logsByUser, related);
       return mapOneEmployeeSummary(
-        { ...emp, _monthStr: month, date_of_joining: dateOfJoining, work_location: workLocation },
+        {
+          ...emp,
+          full_name: profile.full_name || emp.username,
+          _monthStr: month,
+          date_of_joining: profile.date_of_joining ?? null,
+          work_location: profile.work_location ?? null,
+        },
         logs,
         holidays,
         leaves,
         globalRules,
-        scheduleByUser
+        scheduleByUser,
       );
     });
 
