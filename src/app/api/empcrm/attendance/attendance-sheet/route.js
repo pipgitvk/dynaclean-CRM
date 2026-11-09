@@ -19,7 +19,10 @@ import {
 } from "@/lib/attendanceSheetMonth";
 import {
   PAYROLL_ACTIVE_EMPLOYEE_SQL,
+  PAYROLL_SHEET_EMPLOYEE_SQL,
   buildEmployeeProfileByUsername,
+  buildAttendanceSheetEmployeeList,
+  collectUsernamesWithAttendanceSheetActivity,
   dedupeEmployeesForPayrollSheet,
   filterEmployeesForAttendanceSheet,
 } from "@/lib/payrollActiveEmployees";
@@ -114,19 +117,8 @@ export async function GET(request) {
 
     const db = await getDbConnection();
 
-    const [employeeRows] = await db.query(PAYROLL_ACTIVE_EMPLOYEE_SQL);
     const profileRows = await loadEmployeeProfilesRows(db);
     const profileByUser = buildEmployeeProfileByUsername(profileRows);
-    const filtered = filterEmployeesForAttendanceSheet(
-      employeeRows,
-      profileRows,
-      meta.to
-    );
-    const { employees, relatedUsernamesByWinner } = dedupeEmployeesForPayrollSheet(
-      filtered,
-      profileRows
-    );
-    const profileIndex = buildEmployeeProfileIndex(profileRows);
 
     const [holidays] = await db.query(
       `SELECT holiday_date, title, description FROM holidays ORDER BY holiday_date DESC`
@@ -138,25 +130,67 @@ export async function GET(request) {
        WHERE status = 'approved'`
     );
 
+    const [attendance] = await db.query(
+      `
+      SELECT ${ATT_SELECT}
+      FROM attendance_logs a
+      WHERE a.date >= ? AND a.date <= ?
+    `,
+      [meta.from, meta.to]
+    );
+
+    const activityKeys = collectUsernamesWithAttendanceSheetActivity(
+      attendance,
+      leaves,
+      meta.from,
+      meta.to,
+    );
+    const usernameByNormalizedKey = new Map();
+    for (const row of attendance || []) {
+      const uk = normalizeUserKey(row.username);
+      if (uk && !usernameByNormalizedKey.has(uk)) {
+        usernameByNormalizedKey.set(uk, row.username);
+      }
+    }
+
+    const [employeeRows] = await db.query(PAYROLL_ACTIVE_EMPLOYEE_SQL);
+    const activeFiltered = filterEmployeesForAttendanceSheet(
+      employeeRows,
+      profileRows,
+      meta.to,
+    );
+    const activeKeySet = new Set(
+      activeFiltered.map((e) => normalizeUserKey(e.username)),
+    );
+    const needsInactive =
+      [...activityKeys].some((k) => !activeKeySet.has(k)) &&
+      activityKeys.size > 0;
+
+    let roster = activeFiltered;
+    if (needsInactive) {
+      const [allRepRows] = await db.query(PAYROLL_SHEET_EMPLOYEE_SQL);
+      roster = buildAttendanceSheetEmployeeList(
+        activeFiltered,
+        allRepRows,
+        activityKeys,
+        profileRows,
+        meta.to,
+        usernameByNormalizedKey,
+      );
+    }
+
+    const { employees, relatedUsernamesByWinner } = dedupeEmployeesForPayrollSheet(
+      roster,
+      profileRows,
+    );
+    const profileIndex = buildEmployeeProfileIndex(profileRows);
+
     const globalRow = await loadGlobalAttendanceRulesRow(db);
     const globalRules = rowToAttendanceRulesShape(globalRow);
     await ensureEmployeeAttendanceScheduleTable();
     const [schedules] = await db.query(`SELECT * FROM employee_attendance_schedule`);
     const scheduleByUser = new Map(
       (schedules || []).map((s) => [normalizeUserKey(s.username), s])
-    );
-
-    const [attendance] = await db.query(
-      `
-      SELECT ${ATT_SELECT}
-      FROM attendance_logs a
-      INNER JOIN rep_list r
-        ON a.username COLLATE utf8mb4_unicode_ci = r.username COLLATE utf8mb4_unicode_ci
-      WHERE r.status = 1
-        AND UPPER(TRIM(COALESCE(r.userRole, ''))) <> 'SUPERADMIN'
-        AND a.date >= ? AND a.date <= ?
-    `,
-      [meta.from, meta.to]
     );
 
     const logsByUser = {};
@@ -197,11 +231,15 @@ export async function GET(request) {
       const logs = collapseMergedAttendanceByDate(
         mergeAttendanceListWithMachine(crmLogs, machineSlice)
       );
+      let displayName = profile.full_name || emp.username;
+      if (Number(emp.status) === 0) {
+        displayName = `${displayName} (Inactive)`;
+      }
       const row = buildEmployeeAttendanceSheetRow({
         meta,
         username: emp.username,
         relatedUsernames: related,
-        displayName: profile.full_name || emp.username,
+        displayName,
         profile,
         emp,
         logs,

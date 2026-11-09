@@ -5,6 +5,7 @@ import {
   resolveEmployeeProfile,
 } from "@/lib/employeeProfileLookup";
 import { dateToYmdKey } from "@/lib/salaryPayDaysFromAttendance";
+import { rowHasMeaningfulCheckinOrCheckout } from "@/lib/attendanceMeaningfulPunch";
 
 /** Not shown on attendance / salary registers (roles). */
 export const PAYROLL_SHEET_EXCLUDED_ROLES = [];
@@ -31,6 +32,16 @@ export const PAYROLL_ACTIVE_EMPLOYEE_SQL = `
   FROM rep_list r
   WHERE r.status = 1
     AND UPPER(TRIM(COALESCE(r.userRole, ''))) <> 'SUPERADMIN'
+    AND LOWER(TRIM(r.username)) <> 'admin'
+    AND LOWER(TRIM(r.username)) <> 'neha'
+  ORDER BY r.username ASC
+`;
+
+/** All rep_list rows for sheet lookups (includes inactive). */
+export const PAYROLL_SHEET_EMPLOYEE_SQL = `
+  SELECT r.username, r.empId, r.userRole, r.userDepartment, r.status
+  FROM rep_list r
+  WHERE UPPER(TRIM(COALESCE(r.userRole, ''))) <> 'SUPERADMIN'
     AND LOWER(TRIM(r.username)) <> 'admin'
     AND LOWER(TRIM(r.username)) <> 'neha'
   ORDER BY r.username ASC
@@ -85,8 +96,102 @@ export function filterEmployeesForPayrollSheet(employees, profileRows, monthEndY
   });
 }
 
-/** @deprecated use filterEmployeesForPayrollSheet */
-export const filterEmployeesForAttendanceSheet = filterEmployeesForPayrollSheet;
+export function approvedLeaveOverlapsMonth(leave, monthFrom, monthTo) {
+  const from = dateToYmdKey(leave?.from_date);
+  const to = dateToYmdKey(leave?.to_date);
+  if (!from || !to || !monthFrom || !monthTo) return false;
+  return from <= monthTo && to >= monthFrom;
+}
+
+/** Usernames with punch or approved leave in the sheet month (incl. inactive staff). */
+export function collectUsernamesWithAttendanceSheetActivity(
+  attendanceRows,
+  leaves,
+  monthFrom,
+  monthTo,
+) {
+  const keys = new Set();
+  for (const row of attendanceRows || []) {
+    if (rowHasMeaningfulCheckinOrCheckout(row)) {
+      const uk = normalizeUserKey(row.username);
+      if (uk) keys.add(uk);
+    }
+  }
+  for (const leave of leaves || []) {
+    if (String(leave?.status ?? "").toLowerCase() !== "approved") continue;
+    if (!approvedLeaveOverlapsMonth(leave, monthFrom, monthTo)) continue;
+    const uk = normalizeUserKey(leave.username);
+    if (uk) keys.add(uk);
+  }
+  return keys;
+}
+
+function attendanceSheetExtraEligible(emp, monthEndYmd, profileIndex) {
+  if (isPayrollSheetExcluded(emp)) return false;
+  if (normalizeRepListRole(emp) === "SUPERADMIN") return false;
+  if (normalizeUserKey(emp.username) === "admin") return false;
+  const profile = resolveEmployeeProfile(emp, profileIndex);
+  const doj = pickDateOfJoining(profile);
+  if (doj && monthEndYmd) {
+    const dojKey = dateToYmdKey(doj);
+    if (dojKey && dojKey > monthEndYmd) return false;
+  }
+  return true;
+}
+
+/**
+ * Active sheet roster + inactive employees who had attendance or approved leave that month.
+ */
+export function buildAttendanceSheetEmployeeList(
+  activeFiltered,
+  allRepRows,
+  activityKeys,
+  profileRows,
+  monthEndYmd,
+  usernameByNormalizedKey = new Map(),
+) {
+  const profileIndex = buildEmployeeProfileIndex(profileRows);
+  const activeKeys = new Set(
+    (activeFiltered || []).map((e) => normalizeUserKey(e.username)),
+  );
+  const repByUser = new Map();
+  for (const row of allRepRows || []) {
+    const uk = normalizeUserKey(row.username);
+    if (uk) repByUser.set(uk, row);
+  }
+
+  const extras = [];
+  for (const uk of activityKeys || []) {
+    if (activeKeys.has(uk)) continue;
+    const fromRep = repByUser.get(uk);
+    if (fromRep) {
+      if (!attendanceSheetExtraEligible(fromRep, monthEndYmd, profileIndex)) continue;
+      extras.push(fromRep);
+      continue;
+    }
+    const rawName = usernameByNormalizedKey.get(uk) || uk;
+    extras.push({
+      username: rawName,
+      empId: null,
+      userRole: "",
+      userDepartment: "",
+      status: 0,
+    });
+  }
+
+  extras.sort((a, b) =>
+    String(a.username ?? "").localeCompare(String(b.username ?? ""), undefined, {
+      sensitivity: "base",
+    }),
+  );
+
+  return [...(activeFiltered || []), ...extras];
+}
+
+/** Active employees for the sheet month (same rules as payroll register). */
+export function filterEmployeesForAttendanceSheet(employees, profileRows, monthEndYmd) {
+  return filterEmployeesForPayrollSheet(employees, profileRows, monthEndYmd);
+}
 
 function normalizePersonName(value) {
   const s = String(value ?? "").trim().replace(/\s+/g, " ");
