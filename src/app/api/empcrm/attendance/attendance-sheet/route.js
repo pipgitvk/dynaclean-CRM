@@ -15,6 +15,7 @@ import {
 } from "@/lib/employeeProfileLookup";
 import {
   calendarMonthMeta,
+  attendanceSheetIncludeInRegister,
   buildEmployeeAttendanceSheetRow,
 } from "@/lib/attendanceSheetMonth";
 import {
@@ -25,6 +26,7 @@ import {
   collectUsernamesWithAttendanceSheetActivity,
   dedupeEmployeesForPayrollSheet,
   filterEmployeesForAttendanceSheet,
+  filterEmployeesWithAttendanceSheetMonthActivity,
 } from "@/lib/payrollActiveEmployees";
 import { dateToYmdKey } from "@/lib/salaryPayDaysFromAttendance";
 import {
@@ -179,9 +181,12 @@ export async function GET(request) {
       );
     }
 
-    const { employees, relatedUsernamesByWinner } = dedupeEmployeesForPayrollSheet(
-      roster,
-      profileRows,
+    const { employees: rosterDeduped, relatedUsernamesByWinner } =
+      dedupeEmployeesForPayrollSheet(roster, profileRows);
+    const employees = filterEmployeesWithAttendanceSheetMonthActivity(
+      rosterDeduped,
+      relatedUsernamesByWinner,
+      activityKeys,
     );
     const profileIndex = buildEmployeeProfileIndex(profileRows);
 
@@ -248,7 +253,9 @@ export async function GET(request) {
         rules,
       });
       return { sno: index + 1, ...row };
-    });
+    })
+      .filter(attendanceSheetIncludeInRegister)
+      .map((row, index) => ({ ...row, sno: index + 1 }));
 
     return NextResponse.json({
       success: true,

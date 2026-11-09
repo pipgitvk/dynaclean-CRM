@@ -126,6 +126,20 @@ export function collectUsernamesWithAttendanceSheetActivity(
   return keys;
 }
 
+/** Keep register rows only for staff with punch or approved leave in the sheet month. */
+export function filterEmployeesWithAttendanceSheetMonthActivity(
+  employees,
+  relatedUsernamesByWinner,
+  activityKeys,
+) {
+  const keys = activityKeys || new Set();
+  return (employees || []).filter((emp) => {
+    const related =
+      relatedUsernamesByWinner?.get(emp.username) || [emp.username];
+    return related.some((u) => keys.has(normalizeUserKey(u)));
+  });
+}
+
 function attendanceSheetExtraEligible(emp, monthEndYmd, profileIndex) {
   if (isPayrollSheetExcluded(emp)) return false;
   if (normalizeRepListRole(emp) === "SUPERADMIN") return false;

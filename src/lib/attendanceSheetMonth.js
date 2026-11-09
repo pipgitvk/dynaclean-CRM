@@ -139,6 +139,11 @@ function countTowardTotalPresent(code) {
   return 0;
 }
 
+/** Hide rows with no payable days (P / L / HD) — Sundays-only or all-A months. */
+export function attendanceSheetIncludeInRegister(row) {
+  return Number(row?.total_present) > 0;
+}
+
 /** Count of HD cells on the attendance register (calendar month, same rules as the grid). */
 export function countAttendanceSheetHalfDaysInMonth({
   monthStr,
