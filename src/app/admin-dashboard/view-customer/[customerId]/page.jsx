@@ -5,6 +5,7 @@ import { ensureCustomersFollowupNotesText } from "@/lib/ensureCustomersFollowupN
 import dayjs from "dayjs";
 import FollowUpHistory from "@/components/Leads/FollowUpHistory";
 import CustomerContactsModal from "@/components/Customers/CustomerContactsModal";
+import ContactHierarchyContactActions from "@/components/Customers/ContactHierarchyContactActions";
 import ViewCustomerQuotationsLink from "@/components/Customers/ViewCustomerQuotationsLink";
 import CustomerPerformaInvoiceButton from "@/components/invoice/CustomerPerformaInvoiceButton";
 import ScheduleVisitModal from "@/components/scheduleVisit/ScheduleVisitModal";
@@ -360,19 +361,19 @@ export default async function CustomerPage({ params }) {
         {parentContact && (
           <div className="p-3 bg-blue-50 rounded border border-blue-200">
             <p className="text-xs text-blue-600 font-medium mb-2">Parent:</p>
-            <div className="flex items-center justify-between">
-              <div>
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium text-gray-800">
                   {[parentContact.first_name, parentContact.last_name].filter(Boolean).join(" ") || "—"}
                 </p>
                 <p className="text-sm text-gray-600">{parentContact.phone || "—"}</p>
               </div>
-              <Link
-                href={`/admin-dashboard/view-customer/${parentContact.customer_id}/follow-up`}
-                className="ml-2 px-3 py-1 text-xs whitespace-nowrap bg-green-600 text-white rounded hover:bg-green-700 transition"
-              >
-                Follow
-              </Link>
+              <ContactHierarchyContactActions
+                customerId={parentContact.customer_id}
+                displayName={[parentContact.first_name, parentContact.last_name].filter(Boolean).join(" ")}
+                followHref={`/admin-dashboard/view-customer/${parentContact.customer_id}/follow-up`}
+                userRole={userRole}
+              />
             </div>
           </div>
         )}
@@ -389,12 +390,12 @@ export default async function CustomerPage({ params }) {
                   </p>
                   <p className="text-sm text-gray-600">{contact.phone || "—"}</p>
                 </div>
-                <Link
-                  href={`/admin-dashboard/view-customer/${contact.customer_id}/follow-up`}
-                  className="ml-2 px-3 py-1 text-xs whitespace-nowrap bg-green-600 text-white rounded hover:bg-green-700 transition"
-                >
-                  Follow
-                </Link>
+                <ContactHierarchyContactActions
+                  customerId={contact.customer_id}
+                  displayName={[contact.first_name, contact.last_name].filter(Boolean).join(" ")}
+                  followHref={`/admin-dashboard/view-customer/${contact.customer_id}/follow-up`}
+                  userRole={userRole}
+                />
               </div>
             ))}
           </>
@@ -412,12 +413,12 @@ export default async function CustomerPage({ params }) {
                   </p>
                   <p className="text-sm text-gray-600">{contact.phone || "—"}</p>
                 </div>
-                <Link
-                  href={`/admin-dashboard/view-customer/${contact.customer_id}/follow-up`}
-                  className="ml-2 px-3 py-1 text-xs whitespace-nowrap bg-green-600 text-white rounded hover:bg-green-700 transition"
-                >
-                  Follow
-                </Link>
+                <ContactHierarchyContactActions
+                  customerId={contact.customer_id}
+                  displayName={[contact.first_name, contact.last_name].filter(Boolean).join(" ")}
+                  followHref={`/admin-dashboard/view-customer/${contact.customer_id}/follow-up`}
+                  userRole={userRole}
+                />
               </div>
             ))}
           </>
