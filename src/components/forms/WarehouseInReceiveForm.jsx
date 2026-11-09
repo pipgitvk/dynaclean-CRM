@@ -120,8 +120,8 @@ function WarehouseInReceiveContent() {
     return (
       <div className="space-y-3">
         <p className="text-sm text-gray-700">
-          Pehle list se item select karein — invoice popup se &quot;Receive
-          stock&quot; use karein.
+          Select an item from the list first — use &quot;Receive stock&quot; from
+          the invoice popup on the main list.
         </p>
         <Link
           href={listPath}

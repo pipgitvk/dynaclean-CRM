@@ -273,11 +273,11 @@ export default function WarehouseInReceiveModal({
 
   const handleReceiveStock = async () => {
     if (!selectedItem) {
-      toast.error("Pehle item select karein");
+      toast.error("Please select an item first");
       return;
     }
     if (!formData.warehouse_name) {
-      toast.error("Warehouse select karein");
+      toast.error("Please select a warehouse");
       return;
     }
 
@@ -295,12 +295,12 @@ export default function WarehouseInReceiveModal({
 
     const qty = Number(line.receivedQty);
     if (!Number.isFinite(qty) || qty < 1) {
-      toast.error("Valid received qty enter karein");
+      toast.error("Please enter a valid received quantity");
       return;
     }
     const { remaining } = warehouseInQtyFields(selectedItem);
     if (qty > remaining) {
-      toast.error(`Sirf ${remaining} remaining qty receive ho sakti hai`);
+      toast.error(`You can receive at most ${remaining} (remaining quantity)`);
       return;
     }
 
@@ -343,7 +343,7 @@ export default function WarehouseInReceiveModal({
       toast.success(
         json.message ||
           (json.stock_added
-            ? `${json.stock_added} qty spare/stock me add ho gayi`
+            ? `${json.stock_added} qty added to spare/stock`
             : "Stock received!"),
       );
       setSelectedItemKey("");
@@ -457,7 +457,7 @@ export default function WarehouseInReceiveModal({
                 value={selectedItemKey}
                 onChange={(e) => setSelectedItemKey(e.target.value)}
               >
-                <option value="">— Item choose karein —</option>
+                <option value="">— Select item —</option>
                 {group.items.map((item) => (
                   <option key={itemLineKey(item)} value={itemLineKey(item)}>
                     #{item.id} · {item.product_name} (Qty {item.quantity})

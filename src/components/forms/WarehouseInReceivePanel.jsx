@@ -170,7 +170,7 @@ export default function WarehouseInReceivePanel({
     }
     const { remaining } = warehouseInQtyFields(item);
     if (qty > remaining) {
-      toast.error(`Sirf ${remaining} remaining qty receive ho sakti hai`);
+      toast.error(`You can receive at most ${remaining} (remaining quantity)`);
       return;
     }
 
@@ -211,7 +211,7 @@ export default function WarehouseInReceivePanel({
       toast.success(
         json.message ||
           (json.stock_added
-            ? `${json.stock_added} qty spare/stock me add ho gayi`
+            ? `${json.stock_added} qty added to spare/stock`
             : "Stock received successfully!"),
       );
       onSuccess?.();

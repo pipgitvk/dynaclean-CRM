@@ -87,8 +87,8 @@ export default function WarehouseInInchargeForm() {
           Warehouse In - Receive Stock
         </h3>
         <p className="text-sm text-gray-600 mb-4">
-          Invoice-wise list. Receive par popup — item select karke fields expand,
-          yahin Receive stock. Full form page optional link se.
+          Invoice-wise list. Receive opens a popup — select an item to expand
+          fields and receive stock here. Optional link to the full form page.
         </p>
 
         <div className="space-y-4">
