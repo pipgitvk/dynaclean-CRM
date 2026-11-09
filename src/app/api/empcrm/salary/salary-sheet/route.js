@@ -16,7 +16,7 @@ import {
   getSalaryRateFromStructure,
   countLeaveTypeDaysInMonth,
 } from "@/lib/salaryPayrollBreakdown";
-import { countAttendanceSheetHalfDaysInMonth } from "@/lib/attendanceSheetMonth";
+import { calendarMonthMeta, countAttendanceSheetHalfDaysInMonth } from "@/lib/attendanceSheetMonth";
 import {
   normalizeUserKey,
   buildEmployeeProfileIndex,
@@ -28,13 +28,17 @@ import {
 } from "@/lib/employeeProfileLookup";
 import {
   PAYROLL_ACTIVE_EMPLOYEE_SQL,
+  PAYROLL_SHEET_EMPLOYEE_SQL,
   buildEmployeeProfileByUsername,
+  buildAttendanceSheetEmployeeList,
+  collectUsernamesWithAttendanceSheetActivity,
   collectPayrollLogsForUsers,
   dedupeEmployeesForPayrollSheet,
   filterEmployeesForPayrollSheet,
   mergeDeductionsForRelated,
   pickFirstByRelatedUsernames,
 } from "@/lib/payrollActiveEmployees";
+import { dateToYmdKey } from "@/lib/salaryPayDaysFromAttendance";
 
 const HR_SALARY_ROLES = [
   "SUPERADMIN",
@@ -102,18 +106,13 @@ export async function GET(request) {
 
     const db = await getDbConnection();
 
-    const [employeeRows] = await db.query(PAYROLL_ACTIVE_EMPLOYEE_SQL);
+    const meta = calendarMonthMeta(month);
+    if (!meta) {
+      return NextResponse.json({ message: "Invalid month format." }, { status: 400 });
+    }
+
     const profileRows = await loadEmployeeProfilesRows(db);
     const profileByUser = buildEmployeeProfileByUsername(profileRows);
-    const filtered = filterEmployeesForPayrollSheet(
-      employeeRows,
-      profileRows,
-      logRange.to
-    );
-    const { employees, relatedUsernamesByWinner } = dedupeEmployeesForPayrollSheet(
-      filtered,
-      profileRows
-    );
     const profileIndex = buildEmployeeProfileIndex(profileRows);
 
     const [holidays] = await db.query(
@@ -156,6 +155,55 @@ export async function GET(request) {
       WHERE a.date >= ? AND a.date <= ?
     `,
       [logRange.from, logRange.to]
+    );
+
+    const attendanceInMonth = (attendance || []).filter((row) => {
+      const dk = dateToYmdKey(row.date);
+      return dk && dk >= meta.from && dk <= meta.to;
+    });
+    const activityKeys = collectUsernamesWithAttendanceSheetActivity(
+      attendanceInMonth,
+      leaves,
+      meta.from,
+      meta.to,
+    );
+    const usernameByNormalizedKey = new Map();
+    for (const row of attendanceInMonth) {
+      const uk = normalizeUserKey(row.username);
+      if (uk && !usernameByNormalizedKey.has(uk)) {
+        usernameByNormalizedKey.set(uk, row.username);
+      }
+    }
+
+    const [employeeRows] = await db.query(PAYROLL_ACTIVE_EMPLOYEE_SQL);
+    const activeFiltered = filterEmployeesForPayrollSheet(
+      employeeRows,
+      profileRows,
+      logRange.to,
+    );
+    const activeKeySet = new Set(
+      activeFiltered.map((e) => normalizeUserKey(e.username)),
+    );
+    const needsInactive =
+      [...activityKeys].some((k) => !activeKeySet.has(k)) &&
+      activityKeys.size > 0;
+
+    let roster = activeFiltered;
+    if (needsInactive) {
+      const [allRepRows] = await db.query(PAYROLL_SHEET_EMPLOYEE_SQL);
+      roster = buildAttendanceSheetEmployeeList(
+        activeFiltered,
+        allRepRows,
+        activityKeys,
+        profileRows,
+        logRange.to,
+        usernameByNormalizedKey,
+      );
+    }
+
+    const { employees, relatedUsernamesByWinner } = dedupeEmployeesForPayrollSheet(
+      roster,
+      profileRows,
     );
 
     const logsByUser = {};
@@ -297,10 +345,16 @@ export async function GET(request) {
 
       const fatherOrSpouse = pickFatherOrSpouseName(profile);
 
+      let employeeName = profile.full_name || emp.username;
+      if (Number(emp.status) === 0) {
+        employeeName = `${employeeName} (Inactive)`;
+      }
+
       return {
         username: emp.username,
         employee_code: profile.employee_code || emp.empId || profile.empId || "",
-        employee_name: profile.full_name || emp.username,
+        employee_name: employeeName,
+        employee_inactive: Number(emp.status) === 0,
         employee_role: emp.userRole || profile.designation || profile.userRole || "",
         date_of_joining: dateOfJoining,
         date_of_joining_display: formatDojDisplay(dateOfJoining),
