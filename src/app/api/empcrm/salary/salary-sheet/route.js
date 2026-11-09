@@ -358,7 +358,7 @@ export async function GET(request) {
         employeeName = `${employeeName} (Inactive)`;
       }
 
-      return {
+      const row = {
         username: emp.username,
         employee_code: profile.employee_code || emp.empId || profile.empId || "",
         employee_name: employeeName,
@@ -423,7 +423,13 @@ export async function GET(request) {
           : null,
         net_salary: netSalary,
       };
-    });
+      return row;
+    })
+      .filter((row) => {
+        if (!row.employee_inactive) return true;
+        const p = Number(row.attendance?.present) || 0;
+        return p > 0;
+      });
 
     const [y, m] = month.split("-").map(Number);
     const monthLabel = new Date(y, m - 1, 1).toLocaleString("en-IN", {
