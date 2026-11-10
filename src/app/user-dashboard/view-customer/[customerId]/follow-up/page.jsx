@@ -2,6 +2,7 @@ import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { ensureCustomersFollowupNotesText } from "@/lib/ensureCustomersFollowupNotesText";
 import FollowupForm from "./FollowupForm";
+import ViewCustomerSubpageBack from "@/components/Customers/ViewCustomerSubpageBack";
 import dayjs from "dayjs";
 export const dynamic = "force-dynamic";
 
@@ -61,6 +62,10 @@ export default async function FollowUpPage({ params }) {
 
   return (
     <div className="max-w-2xl mx-auto mt-10 bg-white shadow-lg rounded-xl p-6">
+      <ViewCustomerSubpageBack
+        customerId={customerId}
+        dashboardBase="user-dashboard"
+      />
       <h1 className="text-2xl font-bold mb-6 text-center text-gray-700">
         Follow-up Entry
       </h1>

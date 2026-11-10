@@ -1,7 +1,10 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { FileText } from "lucide-react";
+import { withEmbedQuery } from "@/lib/dashboardEmbed";
 
 /**
  * Links to the dedicated customer quotations page.
@@ -14,7 +17,19 @@ export default function ViewCustomerQuotationsLink({
   className = "",
   variant = "admin", // kept for backwards compat but no longer changes the URL
 }) {
-  const href = `/${dashboardBase}/view-customer/${encodeURIComponent(String(customerId))}/quotations`;
+  const searchParams = useSearchParams();
+  const [inIframe, setInIframe] = useState(false);
+
+  useEffect(() => {
+    setInIframe(window.self !== window.top);
+  }, []);
+
+  const href = useMemo(() => {
+    const path = `/${dashboardBase}/view-customer/${encodeURIComponent(String(customerId))}/quotations`;
+    const embed =
+      searchParams.get("embed") === "1" || inIframe;
+    return embed ? withEmbedQuery(path) : path;
+  }, [customerId, dashboardBase, inIframe, searchParams]);
 
   const base =
     variant === "user"

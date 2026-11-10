@@ -1,5 +1,6 @@
 import { getDbConnection } from "@/lib/db";
 import EditCustomerForm from "@/components/customer/EditCustomerForm";
+import ViewCustomerSubpageBack from "@/components/Customers/ViewCustomerSubpageBack";
 import UpdateLeadSourceForm from "@/components/customer/UpdateLeadSourceForm";
 import { getSessionPayload } from "@/lib/auth";
 import { latestFollowupNotesLanguageSelectSql } from "@/lib/customerFollowupNotesLanguage";
@@ -82,6 +83,10 @@ export default async function EditCustomerPage({ params }) {
 
   return (
     <div className="max-w-xl mx-auto mt-10 p-6 bg-white shadow-lg rounded-lg text-gray-700">
+      <ViewCustomerSubpageBack
+        customerId={customerId}
+        dashboardBase="user-dashboard"
+      />
       <h1 className="text-2xl font-bold mb-6 text-center text-blue-700">
         Edit Customer #{customerId}
       </h1>

@@ -4,6 +4,7 @@ import { isUnknownApprovalNoteColumnError } from "@/lib/specialPriceApprovalNote
 import { redirect } from "next/navigation";
 import { deleteSpecialPrice, updateSpecialPrice } from "../../_actions";
 import SpecialPriceApproveRejectButtons from "@/components/specialPrice/SpecialPriceApproveRejectButtons";
+import ViewCustomerSubpageBack from "@/components/Customers/ViewCustomerSubpageBack";
 import {
   dealerApprovalNoteForTerm,
   isDealerPricePending,
@@ -84,6 +85,10 @@ export default async function ProductSpecialPrice({ params }) {
 
   return (
     <div className="p-6 max-w-2xl">
+      <ViewCustomerSubpageBack
+        customerId={customerId}
+        dashboardBase="admin-dashboard"
+      />
       <h1 className="text-2xl font-bold mb-6">
         Admin – Special Price
       </h1>

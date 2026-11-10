@@ -4,7 +4,7 @@ import AddSpecialPriceModal from "@/components/specialPrice/AddSpecialPriceModal
 import RequestDealerPriceModal from "@/components/specialPrice/RequestDealerPriceModal";
 import DeleteButton from "@/components/specialPrice/DeleteButton";
 import CustomerSpecialPriceTable from "@/components/specialPrice/CustomerSpecialPriceTable";
-import Link from "next/link";
+import ViewCustomerSubpageBack from "@/components/Customers/ViewCustomerSubpageBack";
 
 export const dynamic = "force-dynamic";
 
@@ -89,12 +89,11 @@ export default async function CustomerSpecialPrice({ params, searchParams }) {
         <pre className="text-xs bg-gray-100 p-3 rounded overflow-auto max-h-40">
           {err?.message || String(err)}
         </pre>
-        <Link
-          href={`/admin-dashboard/view-customer/${customerId}`}
-          className="inline-block mt-4 text-blue-600 hover:underline"
-        >
-          ← Back to customer
-        </Link>
+        <ViewCustomerSubpageBack
+          customerId={customerId}
+          dashboardBase="admin-dashboard"
+          className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-800"
+        />
       </div>
     );
   }
@@ -111,13 +110,13 @@ export default async function CustomerSpecialPrice({ params, searchParams }) {
 
   return (
     <div className="p-6">
+      <ViewCustomerSubpageBack
+        customerId={customerId}
+        dashboardBase="admin-dashboard"
+      />
 
       <div className="flex justify-between items-center mb-6">
-        
         <div className="flex gap-3 items-center">
-           <Link
-    href={`/admin-dashboard/view-customer/${customerId}`}
-    className="bg-yellow-600 text-white px-4 py-2 rounded">Back</Link>   
           <h1 className="text-2xl font-bold">
           Customer Special Prices
         </h1>

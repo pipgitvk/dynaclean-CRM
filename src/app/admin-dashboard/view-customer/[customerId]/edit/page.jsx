@@ -6,6 +6,7 @@ import { latestFollowupNotesLanguageSelectSql } from "@/lib/customerFollowupNote
 import { ensureCustomerNotesLanguageColumn } from "@/lib/ensureCustomerNotesLanguageColumn";
 import { headers } from "next/headers";
 import { isDashboardEmbedPage } from "@/lib/dashboardEmbed";
+import ViewCustomerSubpageBack from "@/components/Customers/ViewCustomerSubpageBack";
 
 export const dynamic = "force-dynamic";
 
@@ -92,6 +93,10 @@ export default async function EditCustomerPage({ params, searchParams }) {
           : "max-w-xl mx-auto mt-10 p-6 bg-white shadow-lg rounded-lg text-gray-700"
       }
     >
+      <ViewCustomerSubpageBack
+        customerId={customerId}
+        dashboardBase="admin-dashboard"
+      />
       {!isEmbed ? (
         <h1 className="text-2xl font-bold mb-6 text-center text-blue-700">
           Edit Customere #{customerId}

@@ -2,6 +2,7 @@ import { getDbConnection } from "@/lib/db";
 import OrderTable from "@/app/admin-dashboard/order/OrderTable";
 import { getSessionPayload } from "@/lib/auth";
 import Link from "next/link";
+import ViewCustomerSubpageBack from "@/components/Customers/ViewCustomerSubpageBack";
 import { sqlApprovedOrdersOnlyClause } from "@/lib/orderApprovalVisibility";
 import {
   customerOrderMatchParams,
@@ -105,12 +106,12 @@ export default async function CustomerOrdersPage({ params }) {
     <div className="mx-auto p-6">
       <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-6">
         <div>
-          <Link
-            href={`/admin-dashboard/view-customer/${customerId}`}
-            className="text-blue-600 hover:text-blue-800 text-sm font-medium mb-2 inline-block"
-          >
-            ← Back to Customer Details
-          </Link>
+          <ViewCustomerSubpageBack
+            customerId={customerId}
+            dashboardBase="admin-dashboard"
+            label="Back to customer details"
+            className="mb-2 inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-800"
+          />
           <h3 className="text-xl font-bold text-gray-800">
             Orders for {customerName}
             {customer.company && (

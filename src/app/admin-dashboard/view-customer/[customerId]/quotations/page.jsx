@@ -1,13 +1,15 @@
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import CustomerQuotationsTable from "@/components/Quotation/CustomerQuotationsTable";
+import { headers } from "next/headers";
+import { isDashboardEmbedPage } from "@/lib/dashboardEmbed";
 
 export const dynamic = "force-dynamic";
 
-export default async function CustomerQuotationsPage({ params }) {
+export default async function CustomerQuotationsPage({ params, searchParams }) {
   const { customerId } = await params;
+  const isEmbed = isDashboardEmbedPage(await searchParams, await headers());
 
   const payload = await getSessionPayload();
   const username = payload?.username || "";
@@ -26,15 +28,13 @@ export default async function CustomerQuotationsPage({ params }) {
     || `Customer #${customerId}`;
 
   return (
-    <div className="mx-auto px-4 py-8 text-gray-700">
-      {/* Back link */}
-      <Link
-        href={`/admin-dashboard/view-customer/${customerId}`}
-        className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 mb-4"
-      >
-        ← Back to {displayName}
-      </Link>
-
+    <div
+      className={
+        isEmbed
+          ? "mx-auto px-0 py-2 text-gray-700"
+          : "mx-auto px-4 py-8 text-gray-700"
+      }
+    >
       <h1 className="text-2xl font-semibold mb-1">
         All Quotations
       </h1>
@@ -47,6 +47,7 @@ export default async function CustomerQuotationsPage({ params }) {
         customerName={displayName}
         username={username}
         role={role}
+        dashboardBase="admin-dashboard"
       />
     </div>
   );

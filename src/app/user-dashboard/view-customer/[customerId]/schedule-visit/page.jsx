@@ -1,6 +1,7 @@
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import ScheduleVisitForm from "./ScheduleVisitForm";
+import ViewCustomerSubpageBack from "@/components/Customers/ViewCustomerSubpageBack";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,10 @@ export default async function ScheduleVisitPage({ params }) {
 
   return (
     <div className="max-w-3xl mx-auto mt-4 p-6 bg-white shadow-lg rounded-xl">
+      <ViewCustomerSubpageBack
+        customerId={customerId}
+        dashboardBase="user-dashboard"
+      />
       <h1 className="text-2xl font-bold text-center mb-6 text-gray-700">Schedule Visit</h1>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6 text-gray-700">

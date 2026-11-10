@@ -2,6 +2,7 @@ import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
+import ViewCustomerSubpageBack from "@/components/Customers/ViewCustomerSubpageBack";
 import dayjs from "dayjs";
 import timezone from "dayjs/plugin/timezone";
 import utc from "dayjs/plugin/utc";
@@ -93,15 +94,11 @@ export default async function MachineFollowupPage({ params }) {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
-      {/* Back button */}
-      <div className="mb-6">
-        <Link
-          href={`/admin-dashboard/view-customer/${customerId}`}
-          className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 transition-colors"
-        >
-          ← Back to Customer
-        </Link>
-      </div>
+      <ViewCustomerSubpageBack
+        customerId={customerId}
+        dashboardBase="admin-dashboard"
+        className="mb-6 inline-flex items-center gap-1.5 text-sm font-medium text-gray-600 hover:text-gray-900"
+      />
 
       <h1 className="text-2xl font-bold text-gray-800 mb-1">Machine Follow-up History</h1>
       <p className="text-sm text-gray-500 mb-6">

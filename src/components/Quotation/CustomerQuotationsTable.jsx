@@ -2,8 +2,15 @@
 
 import { useEffect, useState } from "react";
 import QuotationViewModal from "@/components/Quotation/QuotationViewModal";
+import ViewCustomerSubpageBack from "@/components/Customers/ViewCustomerSubpageBack";
 
-export default function CustomerQuotationsTable({ customerId, customerName, username, role }) {
+export default function CustomerQuotationsTable({
+  customerId,
+  customerName,
+  username,
+  role,
+  dashboardBase = "admin-dashboard",
+}) {
   const isSuperAdmin = role === "SUPERADMIN";
 
   const [quotations, setQuotations] = useState([]);
@@ -104,6 +111,16 @@ export default function CustomerQuotationsTable({ customerId, customerName, user
 
   return (
     <div className="bg-white rounded shadow p-4">
+      <ViewCustomerSubpageBack
+        customerId={customerId}
+        dashboardBase={dashboardBase}
+        label={
+          customerName
+            ? `Back to ${customerName}`
+            : "Back to customer"
+        }
+        className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-800"
+      />
       <QuotationViewModal
         quoteNumber={modalQuote}
         onClose={() => setModalQuote(null)}

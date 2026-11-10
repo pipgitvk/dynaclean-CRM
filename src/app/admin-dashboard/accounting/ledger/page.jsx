@@ -1,8 +1,7 @@
 import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
 import LedgerTable from "./LedgerTable";
+import ViewCustomerSubpageBack from "@/components/Customers/ViewCustomerSubpageBack";
 import LedgerTableClient from "@/app/admin-dashboard/ledger/[companyName]/LedgerTableClient";
 import { getDbConnection } from "@/lib/db";
 import { buildLedgerForParty } from "@/lib/partyLedger";
@@ -65,13 +64,11 @@ export default async function LedgerPage({ searchParams }) {
 
     return (
       <div className="max-w-[1600px] mx-auto p-4 md:p-6 w-full space-y-4">
-        <Link
-          href={`/admin-dashboard/view-customer/${encodeURIComponent(customerIdParam)}`}
-          className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-blue-600 transition-colors"
-        >
-          <ArrowLeft size={15} />
-          Back to customer
-        </Link>
+        <ViewCustomerSubpageBack
+          customerId={customerIdParam}
+          dashboardBase="admin-dashboard"
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-600 hover:text-blue-600"
+        />
 
         <div>
           <h1 className="text-2xl font-bold text-gray-800">{partyName}</h1>

@@ -2,6 +2,7 @@ import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import ViewCustomerSubpageBack from "@/components/Customers/ViewCustomerSubpageBack";
 import { deleteSpecialPrice, updateSpecialPrice } from "../../_actions";
 import {
   resolveSpecialPriceTerm,
@@ -109,6 +110,10 @@ export default async function ProductSpecialPrice({ params }) {
 
   return (
     <div className="p-6 max-w-2xl">
+      <ViewCustomerSubpageBack
+        customerId={customerId}
+        dashboardBase="user-dashboard"
+      />
 
        <div className="flex items-center justify-between mb-6 w-full">
         <h1 className="text-2xl font-bold mb-6">

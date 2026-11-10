@@ -2,6 +2,7 @@ import { getDbConnection } from "@/lib/db";
 import DemoForm from "./DemoForm";
 import { cookies } from "next/headers";
 import jwt from "jsonwebtoken";
+import ViewCustomerSubpageBack from "@/components/Customers/ViewCustomerSubpageBack";
 
 export const dynamic = "force-dynamic";
 
@@ -44,6 +45,10 @@ export default async function DemoRegistrationPage({ params }) {
   // ✅ Render
   return (
     <div className="max-w-6xl mx-auto mt-1 p-6 bg-white shadow-lg rounded-xl">
+      <ViewCustomerSubpageBack
+        customerId={customerId}
+        dashboardBase="admin-dashboard"
+      />
       <h1 className="text-2xl font-bold text-center mb-8 text-gray-700">
         Demo Registration
       </h1>
