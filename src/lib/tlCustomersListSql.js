@@ -15,7 +15,9 @@ export function shouldHideDeniedInvalidLeads({
   showTLOnly,
   isSuperAdmin,
   statusFilter,
+  search,
 }) {
+  if (search) return false;
   if (statusFilter) return false;
   if (!showTLOnly && isSuperAdmin) return false;
   return true;
@@ -23,10 +25,15 @@ export function shouldHideDeniedInvalidLeads({
 
 export function appendStatusVisibilityFilter(
   query,
-  { showTLOnly, isSuperAdmin, statusFilter },
+  { showTLOnly, isSuperAdmin, statusFilter, search },
 ) {
   if (
-    !shouldHideDeniedInvalidLeads({ showTLOnly, isSuperAdmin, statusFilter })
+    !shouldHideDeniedInvalidLeads({
+      showTLOnly,
+      isSuperAdmin,
+      statusFilter,
+      search,
+    })
   ) {
     return query;
   }

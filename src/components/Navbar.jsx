@@ -2,13 +2,26 @@
 
 import { useRouter, usePathname } from "next/navigation";
 import { createPortal } from "react-dom";
-import { Menu, User, Plus, UserPlus, Search, Bell, X, DollarSign, ExternalLink } from "lucide-react";
+import {
+  Menu,
+  User,
+  Plus,
+  UserPlus,
+  Search,
+  Bell,
+  X,
+  DollarSign,
+  ExternalLink,
+  NotebookPen,
+} from "lucide-react";
 import HeaderLogoutButton from "@/components/HeaderLogoutButton";
 import { useTheme } from "@/context/ThemeContext";
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import AttendanceStatusTracker from "@/components/AttendanceStatusTracker";
 import ProspectHeaderButton from "@/components/prospects/ProspectHeaderButton";
+import { formatCrmDatetimeForISTDisplay } from "@/lib/timezone";
+import { HEADER_TL_FOLLOWUP_SAVED_MESSAGE } from "@/lib/headerTlFollowupModal";
 
 export default function Navbar({ onToggleSidebar, showSalesMeta = false }) {
   const router = useRouter();
@@ -22,6 +35,7 @@ export default function Navbar({ onToggleSidebar, showSalesMeta = false }) {
   const [results, setResults] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
+  const [headerCustomerModal, setHeaderCustomerModal] = useState(null);
   const searchRef = useRef(null);
   
   // Notifications state
@@ -122,7 +136,17 @@ export default function Navbar({ onToggleSidebar, showSalesMeta = false }) {
     document.addEventListener("click", handleClickOutside);
     return () => document.removeEventListener("click", handleClickOutside);
   }, [showDropdown]);
-  
+
+  useEffect(() => {
+    const onMessage = (event) => {
+      if (event.origin !== window.location.origin) return;
+      if (event.data?.type !== HEADER_TL_FOLLOWUP_SAVED_MESSAGE) return;
+      setHeaderCustomerModal(null);
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, []);
+
   // Close notification dropdown on click outside
   useEffect(() => {
     if (!showNotificationDropdown) return;
@@ -209,11 +233,15 @@ export default function Navbar({ onToggleSidebar, showSalesMeta = false }) {
       return;
     }
 
+    const isSuperAdmin = normalizeRoleKey(userRole) === "SUPERADMIN";
+
     try {
       setLoading(true);
       const res = await fetch(
-        `/api/customers-data?search=${encodeURIComponent(q)}&pageSize=5&global=1`,
-        { credentials: "include" }
+        isSuperAdmin
+          ? `/api/tl-customers/search-suggestions?q=${encodeURIComponent(q)}`
+          : `/api/customers-data?search=${encodeURIComponent(q)}&pageSize=5&global=1`,
+        { credentials: "include" },
       );
       const data = await res.json();
       if (!res.ok) {
@@ -221,7 +249,11 @@ export default function Navbar({ onToggleSidebar, showSalesMeta = false }) {
         setShowDropdown(true);
         return;
       }
-      setResults(data.customers || []);
+      setResults(
+        isSuperAdmin
+          ? data.suggestions || []
+          : data.customers || [],
+      );
       setShowDropdown(true);
     } finally {
       setLoading(false);
@@ -284,12 +316,77 @@ export default function Navbar({ onToggleSidebar, showSalesMeta = false }) {
     !isThirdPartyEngineerPortal &&
     normalizeRoleKey(userRole) !== "DESIGN ENGINEER";
 
-  const customerViewHref = (customerId) => {
-    const base = pathname?.startsWith("/admin-dashboard")
-      ? "admin-dashboard"
-      : "user-dashboard";
-    return `/${base}/view-customer/${customerId}`;
+  const dashboardBase = pathname?.startsWith("/admin-dashboard")
+    ? "admin-dashboard"
+    : "user-dashboard";
+
+  const customerViewHref = (customerId) =>
+    `/${dashboardBase}/view-customer/${customerId}`;
+
+  const customerViewEmbedPath = (customerId) =>
+    `/${dashboardBase}/view-customer/${customerId}?embed=1`;
+
+  const isSuperAdminSearch = normalizeRoleKey(userRole) === "SUPERADMIN";
+
+  const tlFollowupPagePath = (customerId) =>
+    `/${dashboardBase}/tl-customers/${customerId}/followup?tlOnly=true&embed=1`;
+
+  const openHeaderCustomerModal = (kind, customerId) => {
+    setShowDropdown(false);
+    setHeaderCustomerModal({ kind, customerId });
   };
+
+  const headerCustomerModalPortal =
+    typeof window !== "undefined" &&
+    headerCustomerModal != null &&
+    createPortal(
+      <div
+        className="fixed inset-0 z-[10050] flex items-center justify-center bg-black/50 p-3 sm:p-6"
+        role="dialog"
+        aria-modal="true"
+        aria-label={
+          headerCustomerModal.kind === "tl"
+            ? "TL follow-up"
+            : "View customer"
+        }
+        onClick={() => setHeaderCustomerModal(null)}
+      >
+        <div
+          className="bg-white rounded-lg shadow-2xl w-full max-w-6xl h-[min(92vh,900px)] flex flex-col overflow-hidden"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-gray-200 shrink-0">
+            <h2 className="text-sm font-semibold text-gray-800">
+              {headerCustomerModal.kind === "tl"
+                ? `TL Follow-up — Customer #${headerCustomerModal.customerId}`
+                : `View Customer — #${headerCustomerModal.customerId}`}
+            </h2>
+            <button
+              type="button"
+              onClick={() => setHeaderCustomerModal(null)}
+              className="p-1.5 rounded-md text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+              aria-label="Close"
+            >
+              <X size={20} />
+            </button>
+          </div>
+          <iframe
+            title={
+              headerCustomerModal.kind === "tl"
+                ? `TL follow-up ${headerCustomerModal.customerId}`
+                : `View customer ${headerCustomerModal.customerId}`
+            }
+            src={
+              headerCustomerModal.kind === "tl"
+                ? tlFollowupPagePath(headerCustomerModal.customerId)
+                : customerViewEmbedPath(headerCustomerModal.customerId)
+            }
+            className="flex-1 w-full min-h-0 border-0 bg-white"
+          />
+        </div>
+      </div>,
+      document.body,
+    );
 
   const searchDropdown =
     typeof window !== "undefined" &&
@@ -308,39 +405,95 @@ export default function Navbar({ onToggleSidebar, showSalesMeta = false }) {
           {results.map((c) => (
             <div
               key={c.customer_id}
-              className="flex justify-between items-center gap-2 px-3 py-2 hover:bg-gray-100 border-b last:border-b-0 cursor-pointer"
+              className="flex justify-between items-start gap-2 px-3 py-2 hover:bg-gray-100 border-b last:border-b-0 cursor-pointer"
             >
-              <div className="text-sm min-w-0">
+              <div className="text-sm min-w-0 flex-1">
                 <div className="font-medium truncate">
-                  {c.company?.trim() ||
-                    [c.first_name, c.last_name].filter(Boolean).join(" ").trim() ||
-                    "Unnamed"}
+                  {isSuperAdminSearch
+                    ? c.name ||
+                      c.company?.trim() ||
+                      [c.first_name, c.last_name].filter(Boolean).join(" ").trim() ||
+                      "Unnamed"
+                    : c.company?.trim() ||
+                      [c.first_name, c.last_name].filter(Boolean).join(" ").trim() ||
+                      "Unnamed"}
                 </div>
                 <div className="text-xs text-gray-500 truncate">
                   ID: {c.customer_id}
                   {c.phone ? ` • ${c.phone}` : ""}
+                  {isSuperAdminSearch && c.company ? ` • ${c.company}` : ""}
                 </div>
-                {c.lead_source ? (
+                {isSuperAdminSearch ? (
+                  c.tl_followed_date ? (
+                    <div className="text-xs text-indigo-800 mt-1 leading-snug">
+                      <span className="font-medium">Last TL:</span>{" "}
+                      {formatCrmDatetimeForISTDisplay(
+                        c.tl_followed_date,
+                        "DD-MM-YYYY HH:mm",
+                      ) || "—"}
+                      {c.tl_followed_by ? ` · ${c.tl_followed_by}` : ""}
+                      {c.tl_next_followup ? (
+                        <>
+                          {" "}
+                          · Next:{" "}
+                          {formatCrmDatetimeForISTDisplay(
+                            c.tl_next_followup,
+                            "DD-MM-YYYY HH:mm",
+                          )}
+                        </>
+                      ) : null}
+                      {c.tl_notes ? (
+                        <span className="block text-gray-600 mt-0.5 line-clamp-2">
+                          {String(c.tl_notes).trim()}
+                        </span>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <div className="text-xs text-gray-400 mt-1">
+                      No TL follow-up yet
+                    </div>
+                  )
+                ) : c.lead_source ? (
                   <div className="text-xs text-gray-400 truncate">
                     Lead source: {c.lead_source}
                   </div>
                 ) : null}
               </div>
               <div className="flex items-center gap-1 flex-shrink-0">
-                <a
-                  href={customerViewHref(c.customer_id)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={(e) => e.stopPropagation()}
-                  className="p-1.5 text-gray-600 hover:text-blue-700 hover:bg-blue-50 rounded border border-transparent hover:border-blue-200"
-                  title="Open in new tab"
-                  aria-label="Open customer in new tab"
-                >
-                  <ExternalLink size={16} />
-                </a>
+                {isSuperAdminSearch ? (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openHeaderCustomerModal("tl", c.customer_id);
+                    }}
+                    className="p-1.5 text-indigo-700 hover:bg-indigo-50 rounded border border-transparent hover:border-indigo-200"
+                    title="TL follow-up (popup)"
+                    aria-label="Open TL follow-up in popup"
+                  >
+                    <NotebookPen size={16} />
+                  </button>
+                ) : (
+                  <a
+                    href={customerViewHref(c.customer_id)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="p-1.5 text-gray-600 hover:text-blue-700 hover:bg-blue-50 rounded border border-transparent hover:border-blue-200"
+                    title="Open in new tab"
+                    aria-label="Open customer in new tab"
+                  >
+                    <ExternalLink size={16} />
+                  </a>
+                )}
                 <button
                   type="button"
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (isSuperAdminSearch) {
+                      openHeaderCustomerModal("view", c.customer_id);
+                      return;
+                    }
                     setShowDropdown(false);
                     setResults([]);
                     setQuery("");
@@ -604,6 +757,7 @@ export default function Navbar({ onToggleSidebar, showSalesMeta = false }) {
   );
 
   return (
+    <>
     <nav
       data-dashboard-navbar
       className={
@@ -671,5 +825,7 @@ export default function Navbar({ onToggleSidebar, showSalesMeta = false }) {
         </div>
       </div>
     </nav>
+    {headerCustomerModalPortal}
+    </>
   );
 }

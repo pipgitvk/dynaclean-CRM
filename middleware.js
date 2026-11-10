@@ -3,6 +3,7 @@ import { jwtVerify } from "jose";
 import { normalizeRoleKey, isJwtAccountingRole } from "@/lib/roleKeyUtils";
 import { getRoleDashboardPath } from "@/lib/getRoleDashboardPath";
 import { resolveOrderBasePathFromPathname } from "@/lib/orderRouteBasePath";
+import { nextWithDashboardEmbed } from "@/lib/dashboardEmbedMiddleware";
 
 /** Attendance rules: SUPERADMIN + ADMIN + HR roles. */
 const ATTENDANCE_RULES_MIDDLEWARE_ROLES = [
@@ -520,20 +521,20 @@ export async function middleware(request) {
         return NextResponse.redirect(new URL("/admin-dashboard", request.url));
       }
 
-      const requestHeaders = new Headers(request.headers);
-      if (/\/order(\/|$)/.test(pathname)) {
-        requestHeaders.set(
-          "x-order-base-path",
-          resolveOrderBasePathFromPathname(pathname),
-        );
-      }
-      return NextResponse.next({ request: { headers: requestHeaders } });
+      return nextWithDashboardEmbed(request, (requestHeaders) => {
+        if (/\/order(\/|$)/.test(pathname)) {
+          requestHeaders.set(
+            "x-order-base-path",
+            resolveOrderBasePathFromPathname(pathname),
+          );
+        }
+      });
     } catch {
       return NextResponse.redirect(new URL("/login", request.url));
     }
   }
 
-  return NextResponse.next();
+  return nextWithDashboardEmbed(request);
 }
 
 export const config = {

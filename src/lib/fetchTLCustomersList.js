@@ -9,6 +9,7 @@ import {
   appendExactMultiTagFilter,
   appendStatusVisibilityFilter,
   normalizeSearchParam,
+  shouldHideDeniedInvalidLeads,
 } from "@/lib/tlCustomersListSql";
 import { ensureTLFollowupsModelColumn } from "@/lib/ensureTLFollowupsModelColumn";
 
@@ -193,7 +194,7 @@ function appendTLCustomersFilters(
 
   query = appendExactMultiTagFilter(query, params, tag, sqlMultiTag);
 
-  if (showTLOnly) {
+  if (showTLOnly && !search) {
     query += ` AND tlf.customer_id IS NOT NULL`;
   }
 
@@ -252,6 +253,297 @@ function appendTLCustomersFilters(
   return query;
 }
 
+const KPI_EXCLUDED_STAGES_SQL = `('Won (Order Received)', 'Lost', 'Disqualified / Invalid Lead')`;
+
+/** COUNT / KPI can use `customers` only when join-heavy filters are off. */
+export function canUseCustomerOnlyCount(filters, showTLOnly) {
+  if (showTLOnly && !filters.search) return false;
+  return !(
+    filters.tag ||
+    filters.model ||
+    filters.nextFromDate ||
+    filters.nextToDate ||
+    filters.notes_language ||
+    filters.showPreBookingOnly
+  );
+}
+
+function appendCustomerOnlyFilters(
+  query,
+  params,
+  filters,
+  payload,
+  statusVisibility,
+  showTLOnly,
+) {
+  const { search, employee, status, stage, lead_campaign } = filters;
+
+  if (search) {
+    query += ` AND (c.customer_id = ? OR c.phone LIKE ? OR c.first_name LIKE ? OR c.last_name LIKE ? OR c.company LIKE ?)`;
+    const searchTerm = `%${search}%`;
+    params.push(search, searchTerm, searchTerm, searchTerm, searchTerm);
+  }
+
+  const isEA = String(payload?.role || "").toUpperCase() === "EA";
+  if (isEA && showTLOnly) {
+    query += ` AND (c.assigned_to = ? OR c.lead_source = ?)`;
+    params.push(payload?.username || "", payload?.username || "");
+  }
+
+  if (employee) {
+    query += ` AND (c.lead_source = ? OR c.assigned_to = ?)`;
+    params.push(employee, employee);
+  }
+
+  if (status) {
+    query += ` AND c.status = ?`;
+    params.push(status);
+  } else {
+    query = appendStatusVisibilityFilter(query, statusVisibility);
+  }
+
+  if (stage) {
+    query += ` AND c.stage = ?`;
+    params.push(stage);
+  }
+
+  if (lead_campaign) {
+    query += ` AND c.lead_campaign = ?`;
+    params.push(lead_campaign);
+  }
+
+  return query;
+}
+
+function buildKpiEligibleSql(statusVisibility) {
+  return shouldHideDeniedInvalidLeads(statusVisibility)
+    ? `(c.status NOT IN ('Denied', 'Invalid'))`
+    : "1=1";
+}
+
+/**
+ * SQL aggregates for KPI chips + status/stage counts (TL toggle OFF — avoids loading all rows).
+ */
+export async function fetchTLCustomersKpiStats(
+  conn,
+  payload,
+  searchParamsResolved,
+) {
+  const filters = parseTLCustomersListParams(searchParamsResolved);
+  const { showTLOnly, showPreBookingOnly } = filters;
+
+  const isSuperAdmin =
+    String(payload.role ?? payload.userRole ?? "").trim().toUpperCase() ===
+    "SUPERADMIN";
+  const statusVisibility = {
+    showTLOnly,
+    isSuperAdmin,
+    statusFilter: filters.status,
+    search: filters.search,
+  };
+
+  await ensureTLFollowupsModelColumn(conn);
+  const sqlMultiTag = showTLOnly ? "tlf.multi_tag" : "cf.multi_tag";
+  const sqlNextForDateFilter = SQL_EFFECTIVE_NEXT_FOLLOWUP;
+  const eligible = buildKpiEligibleSql(statusVisibility);
+  const tagExpr = `LOWER(COALESCE(${sqlMultiTag}, ''))`;
+
+  const fromClause = buildFromClause({
+    mode: "kpi",
+    showTLOnly,
+    tlModelSubqueryCol: "",
+    tlModelKpiSubqueryCol: "",
+  });
+
+  let chipQuery = `
+    SELECT
+      SUM(CASE WHEN ${eligible} THEN 1 ELSE 0 END) AS total,
+      SUM(CASE WHEN ${eligible} AND ${tagExpr} LIKE '%strong followup%' THEN 1 ELSE 0 END) AS upcoming,
+      SUM(CASE WHEN ${eligible} AND c.stage NOT IN ${KPI_EXCLUDED_STAGES_SQL}
+        AND ${sqlNextForDateFilter} IS NOT NULL AND ${sqlNextForDateFilter} < NOW() THEN 1 ELSE 0 END) AS due,
+      SUM(CASE WHEN ${eligible} AND ${tagExpr} LIKE '%prime%' THEN 1 ELSE 0 END) AS prime
+    ${fromClause}
+  `;
+
+  const chipParams = [];
+  chipQuery = appendTLCustomersFilters(chipQuery, chipParams, filters, payload, {
+    showTLOnly,
+    sqlMultiTag,
+    sqlNextForDateFilter,
+    statusVisibility,
+    hasModelColumn: false,
+  });
+
+  const lightKpi = canUseCustomerOnlyCount(filters, showTLOnly);
+
+  let statusQuery = lightKpi
+    ? `SELECT c.status, COUNT(*) AS cnt FROM customers c WHERE 1=1`
+    : `SELECT c.status, COUNT(*) AS cnt ${fromClause}`;
+  const statusParams = [];
+  if (lightKpi) {
+    statusQuery = appendCustomerOnlyFilters(
+      statusQuery,
+      statusParams,
+      filters,
+      payload,
+      statusVisibility,
+      showTLOnly,
+    );
+  } else {
+    statusQuery = appendTLCustomersFilters(
+      statusQuery,
+      statusParams,
+      filters,
+      payload,
+      {
+        showTLOnly,
+        sqlMultiTag,
+        sqlNextForDateFilter,
+        statusVisibility,
+        hasModelColumn: false,
+      },
+    );
+  }
+  statusQuery += ` GROUP BY c.status`;
+
+  let stageQuery = lightKpi
+    ? `SELECT c.stage, COUNT(*) AS cnt FROM customers c WHERE 1=1`
+    : `SELECT c.stage, COUNT(*) AS cnt ${fromClause}`;
+  const stageParams = [];
+  if (lightKpi) {
+    stageQuery = appendCustomerOnlyFilters(
+      stageQuery,
+      stageParams,
+      filters,
+      payload,
+      statusVisibility,
+      showTLOnly,
+    );
+  } else {
+    stageQuery = appendTLCustomersFilters(
+      stageQuery,
+      stageParams,
+      filters,
+      payload,
+      {
+        showTLOnly,
+        sqlMultiTag,
+        sqlNextForDateFilter,
+        statusVisibility,
+        hasModelColumn: false,
+      },
+    );
+  }
+  stageQuery += ` GROUP BY c.stage`;
+
+  const [[chipRow], [statusRows], [stageRows]] = await Promise.all([
+    conn.execute(chipQuery, chipParams),
+    conn.execute(statusQuery, statusParams),
+    conn.execute(stageQuery, stageParams),
+  ]);
+
+  const statusCounts = {};
+  for (const row of statusRows) {
+    if (row.status != null) {
+      statusCounts[row.status] = Number(row.cnt) || 0;
+    }
+  }
+
+  const stageCounts = {};
+  for (const row of stageRows) {
+    if (row.stage != null) {
+      stageCounts[row.stage] = Number(row.cnt) || 0;
+    }
+  }
+
+  return {
+    filterCounts: {
+      total: Number(chipRow?.total) || 0,
+      upcoming: Number(chipRow?.upcoming) || 0,
+      due: Number(chipRow?.due) || 0,
+      prime: Number(chipRow?.prime) || 0,
+    },
+    statusCounts,
+    stageCounts,
+  };
+}
+
+async function attachLatestFollowups(
+  conn,
+  customers,
+  hasModelColumn,
+  showTLOnly,
+) {
+  if (!customers.length) return customers;
+  const ids = customers.map((c) => c.customer_id);
+  const ph = ids.map(() => "?").join(",");
+
+  const [cfRows] = await conn.execute(
+    `SELECT f.customer_id, f.next_followup_date, f.followed_date, f.notes, f.followed_by, f.multi_tag
+     FROM customers_followup f
+     INNER JOIN (
+       SELECT customer_id, MAX(time_stamp) AS max_ts
+       FROM customers_followup
+       WHERE customer_id IN (${ph})
+       GROUP BY customer_id
+     ) m ON f.customer_id = m.customer_id AND f.time_stamp = m.max_ts
+     WHERE f.customer_id IN (${ph})`,
+    [...ids, ...ids],
+  );
+
+  const modelSel = hasModelColumn ? "f.model AS tl_model," : "NULL AS tl_model,";
+  const [tlfRows] = await conn.execute(
+    `SELECT f.customer_id, f.id AS tl_followup_id, f.estimated_order_date, f.lead_quality_score,
+      ${modelSel} f.multi_tag, f.notes AS tl_notes, f.next_followup_date AS tl_next_followup,
+      f.followed_date AS tl_followed_date, f.followed_by AS tl_followed_by
+     FROM TL_followups f
+     INNER JOIN (
+       SELECT customer_id, MAX(created_at) AS max_ca
+       FROM TL_followups
+       WHERE customer_id IN (${ph})
+       GROUP BY customer_id
+     ) m ON f.customer_id = m.customer_id AND f.created_at = m.max_ca
+     WHERE f.customer_id IN (${ph})`,
+    [...ids, ...ids],
+  );
+
+  const [pbRows] = await conn.execute(
+    `SELECT DISTINCT customer_id FROM pre_booking WHERE customer_id IN (${ph})`,
+    ids,
+  );
+
+  const cfBy = new Map(cfRows.map((r) => [r.customer_id, r]));
+  const tlfBy = new Map(tlfRows.map((r) => [r.customer_id, r]));
+  const pbSet = new Set(pbRows.map((r) => r.customer_id));
+
+  return customers.map((c) => {
+    const cf = cfBy.get(c.customer_id);
+    const tlf = tlfBy.get(c.customer_id);
+    const multiTag = showTLOnly
+      ? tlf?.multi_tag ?? null
+      : cf?.multi_tag ?? tlf?.multi_tag ?? null;
+    return {
+      ...c,
+      latest_next_followup: cf?.next_followup_date ?? null,
+      latest_followed_date: cf?.followed_date ?? null,
+      latest_notes: cf?.notes ?? null,
+      latest_followed_by: cf?.followed_by ?? null,
+      cf_multi_tag: cf?.multi_tag ?? null,
+      multi_tag: multiTag,
+      followup_start_at: null,
+      tl_followup_id: tlf?.tl_followup_id ?? null,
+      estimated_order_date: tlf?.estimated_order_date ?? null,
+      lead_quality_score: tlf?.lead_quality_score ?? null,
+      tl_model: tlf?.tl_model ?? null,
+      tl_notes: tlf?.tl_notes ?? null,
+      tl_next_followup: tlf?.tl_next_followup ?? null,
+      tl_followed_date: tlf?.tl_followed_date ?? null,
+      tl_followed_by: tlf?.tl_followed_by ?? null,
+      has_pre_booking: pbSet.has(c.customer_id) ? c.customer_id : null,
+    };
+  });
+}
+
 /**
  * @param {import("mysql2/promise").PoolConnection} conn
  * @param {object} payload session
@@ -279,6 +571,62 @@ export async function fetchTLCustomersList(
 
   const hasModelColumn = await ensureTLFollowupsModelColumn(conn);
   const tlModelSelect = hasModelColumn ? "tlf.model as tl_model" : "NULL AS tl_model";
+
+  const useFastListPath =
+    mode === "full" &&
+    paginate &&
+    canUseCustomerOnlyCount(filters, showTLOnly);
+
+  if (useFastListPath) {
+    const countParams = [];
+    let countQuery = `SELECT COUNT(*) as total FROM customers c WHERE 1=1`;
+    countQuery = appendCustomerOnlyFilters(
+      countQuery,
+      countParams,
+      filters,
+      payload,
+      statusVisibility,
+      showTLOnly,
+    );
+    const [[countRow]] = await conn.execute(countQuery, countParams);
+    const totalRecords = countRow?.total ?? 0;
+    const totalPages = Math.ceil(totalRecords / pageSize);
+
+    const listParams = [];
+    const offset = (page - 1) * pageSize;
+    let listQuery = `SELECT c.* FROM customers c WHERE 1=1`;
+    listQuery = appendCustomerOnlyFilters(
+      listQuery,
+      listParams,
+      filters,
+      payload,
+      statusVisibility,
+      showTLOnly,
+    );
+    listQuery += ` ORDER BY c.date_created DESC LIMIT ? OFFSET ?`;
+    listParams.push(Number(pageSize), Number(offset));
+
+    const [customerRows] = await conn.execute(listQuery, listParams);
+    const rows = await attachLatestFollowups(
+      conn,
+      customerRows,
+      hasModelColumn,
+      showTLOnly,
+    );
+
+    return {
+      rows,
+      totalRecords,
+      totalPages,
+      page,
+      pageSize,
+      filters,
+      showTLOnly,
+      showPreBookingOnly,
+      isSuperAdmin,
+    };
+  }
+
   const tlModelSubqueryCol = hasModelColumn ? "model, " : "";
   const tlModelKpiSubqueryCol = hasModelColumn ? "model, " : "";
   const sqlNextForDateFilter = SQL_EFFECTIVE_NEXT_FOLLOWUP;
@@ -312,12 +660,27 @@ export async function fetchTLCustomersList(
   let totalPages = null;
 
   if (paginate && mode === "full") {
-    const countQuery = query.replace(
-      /SELECT[\s\S]*?FROM customers c/,
-      "SELECT COUNT(*) as total FROM customers c",
-    );
-    const [[countRow]] = await conn.execute(countQuery, params);
-    totalRecords = countRow?.total ?? 0;
+    if (canUseCustomerOnlyCount(filters, showTLOnly)) {
+      const countParams = [];
+      let countQuery = `SELECT COUNT(*) as total FROM customers c WHERE 1=1`;
+      countQuery = appendCustomerOnlyFilters(
+        countQuery,
+        countParams,
+        filters,
+        payload,
+        statusVisibility,
+        showTLOnly,
+      );
+      const [[countRow]] = await conn.execute(countQuery, countParams);
+      totalRecords = countRow?.total ?? 0;
+    } else {
+      const countQuery = query.replace(
+        /SELECT[\s\S]*?FROM customers c/,
+        "SELECT COUNT(*) as total FROM customers c",
+      );
+      const [[countRow]] = await conn.execute(countQuery, params);
+      totalRecords = countRow?.total ?? 0;
+    }
     totalPages = Math.ceil(totalRecords / pageSize);
   }
 

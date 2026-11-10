@@ -2,7 +2,10 @@ import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import TLCustomersTable from "@/app/user-dashboard/tl-customers/TLCustomersTable";
 import Link from "next/link";
-import { fetchTLCustomersList } from "@/lib/fetchTLCustomersList";
+import {
+  fetchTLCustomersKpiStats,
+  fetchTLCustomersList,
+} from "@/lib/fetchTLCustomersList";
 
 export const dynamic = "force-dynamic";
 

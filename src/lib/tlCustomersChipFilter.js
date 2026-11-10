@@ -1,7 +1,16 @@
 import dayjs from "dayjs";
 import { pickEffectiveNextFollowup } from "@/utils/tlNextFollowupResolve";
 
-export function allowTLCustomerByStatus(customer, { tlOnly, isSuperAdmin, statusFilter }) {
+export function allowTLCustomerByStatus(
+  customer,
+  { tlOnly, isSuperAdmin, statusFilter, search },
+) {
+  if (search) {
+    if (!statusFilter) return true;
+    if (statusFilter === "Denied") return customer.status === "Denied";
+    if (statusFilter === "Invalid") return customer.status === "Invalid";
+    return customer.status === statusFilter;
+  }
   if (!tlOnly && isSuperAdmin) {
     if (!statusFilter) return true;
     if (statusFilter === "Denied") return customer.status === "Denied";
@@ -22,7 +31,7 @@ const EXCLUDED_STAGES_FOR_DUE = [
 export function applyTLCustomersChipFilter(
   customers,
   activeFilter,
-  { tlOnly, isSuperAdmin, statusFilter, preBookingOnly },
+  { tlOnly, isSuperAdmin, statusFilter, preBookingOnly, search },
 ) {
   const now = dayjs();
   let base = customers;
@@ -30,7 +39,7 @@ export function applyTLCustomersChipFilter(
     base = base.filter((c) => c.has_pre_booking);
   }
 
-  const ctx = { tlOnly, isSuperAdmin, statusFilter };
+  const ctx = { tlOnly, isSuperAdmin, statusFilter, search };
 
   switch (activeFilter) {
     case "upcoming":

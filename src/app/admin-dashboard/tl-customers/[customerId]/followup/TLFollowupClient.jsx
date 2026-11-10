@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import TLFollowupForm from "@/components/TL/TLFollowupForm";
 import FollowupNotesWithDelete from "@/components/TL/FollowupNotesWithDelete";
 import PreBookingModal from "@/components/PreBookingModal";
@@ -15,12 +16,22 @@ export default function TLFollowupClient({
   editFollowup,
 }) {
   const [preBookingModal, setPreBookingModal] = useState(false);
+  const searchParams = useSearchParams();
+  const isEmbed = searchParams.get("embed") === "1";
 
   return (
-    <div className="max-w-4xl mx-auto mt-10 px-4">
-      <h1 className="text-3xl font-bold mb-6 text-center text-gray-800">
-        {editFollowup ? "Edit Your TL Follow-up" : "TL Follow-up Entry (Admin)"}
-      </h1>
+    <div
+      className={
+        isEmbed
+          ? "max-w-full mx-auto px-0"
+          : "max-w-4xl mx-auto mt-10 px-4"
+      }
+    >
+      {!isEmbed ? (
+        <h1 className="text-3xl font-bold mb-6 text-center text-gray-800">
+          {editFollowup ? "Edit Your TL Follow-up" : "TL Follow-up Entry (Admin)"}
+        </h1>
+      ) : null}
 
       {/* Customer Info Card */}
       <div className="bg-white shadow-lg rounded-xl p-6 mb-6">

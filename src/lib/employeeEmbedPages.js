@@ -32,10 +32,7 @@ export function buildEmployeeSubPagePath(dashboardPrefix, pageKey, username) {
   return `/${prefix}/${pageKey}/${user}`;
 }
 
-export function withEmbedQuery(path) {
-  if (!path) return path;
-  return path.includes("?") ? `${path}&embed=1` : `${path}?embed=1`;
-}
+export { withEmbedQuery } from "@/lib/dashboardEmbed";
 
 /** Fixed iframe height (px) — avoids huge empty area inside the modal. */
 export function iframeHeightForPage(pageKey) {

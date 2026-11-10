@@ -4,11 +4,14 @@ import UpdateLeadSourceForm from "@/components/customer/UpdateLeadSourceForm";
 import { getSessionPayload } from "@/lib/auth";
 import { latestFollowupNotesLanguageSelectSql } from "@/lib/customerFollowupNotesLanguage";
 import { ensureCustomerNotesLanguageColumn } from "@/lib/ensureCustomerNotesLanguageColumn";
+import { headers } from "next/headers";
+import { isDashboardEmbedPage } from "@/lib/dashboardEmbed";
 
 export const dynamic = "force-dynamic";
 
-export default async function EditCustomerPage({ params }) {
+export default async function EditCustomerPage({ params, searchParams }) {
   const { customerId } = await params;
+  const isEmbed = isDashboardEmbedPage(await searchParams, await headers());
   
   const payload = await getSessionPayload();
   const userRole = payload?.role;
@@ -82,10 +85,18 @@ export default async function EditCustomerPage({ params }) {
   const leadSources = leadSourceRows.map((row) => row.lead_source);
 
   return (
-    <div className="max-w-xl mx-auto mt-10 p-6 bg-white shadow-lg rounded-lg text-gray-700">
-      <h1 className="text-2xl font-bold mb-6 text-center text-blue-700">
-        Edit Customere #{customerId}
-      </h1>
+    <div
+      className={
+        isEmbed
+          ? "max-w-xl mx-auto mt-0 p-4 bg-white shadow-md rounded-lg text-gray-700"
+          : "max-w-xl mx-auto mt-10 p-6 bg-white shadow-lg rounded-lg text-gray-700"
+      }
+    >
+      {!isEmbed ? (
+        <h1 className="text-2xl font-bold mb-6 text-center text-blue-700">
+          Edit Customere #{customerId}
+        </h1>
+      ) : null}
       <UpdateLeadSourceForm initialData={customerData} leadSources={leadSources} serviceEmployees={serviceEmployees} gemEmployees={gemEmployees} userRole={userRole} />
       <EditCustomerForm initialData={customerData} userRole={userRole} dashboardBase="admin-dashboard" />
     </div>

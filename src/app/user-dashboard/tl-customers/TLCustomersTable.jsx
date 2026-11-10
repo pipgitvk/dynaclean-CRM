@@ -1,7 +1,14 @@
 "use client";
 
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
-import { useState, useTransition, useMemo, useEffect } from "react";
+import {
+  useState,
+  useTransition,
+  useMemo,
+  useEffect,
+  useRef,
+  useCallback,
+} from "react";
 import { useRouter } from "next/navigation";
 import {
   Search,
@@ -34,6 +41,7 @@ import PreBookingColumn from "@/components/PreBookingColumn";
 export default function TLCustomersTable({
   customers,
   allCustomersForKPI = [],
+  kpiStats = null,
   employees,
   productsList = [],
   searchParams,
@@ -48,6 +56,63 @@ export default function TLCustomersTable({
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+
+  const persistedCustomers = useRef(customers);
+  const persistedKpiStats = useRef(kpiStats);
+  const persistedKpiRows = useRef(allCustomersForKPI);
+  const persistedMeta = useRef({
+    currentPage,
+    totalPages,
+    totalRecords,
+    tlOnly,
+    preBookingOnly,
+  });
+
+  useEffect(() => {
+    if (!isPending) {
+      persistedCustomers.current = customers;
+      persistedKpiStats.current = kpiStats;
+      persistedKpiRows.current = allCustomersForKPI;
+      persistedMeta.current = {
+        currentPage,
+        totalPages,
+        totalRecords,
+        tlOnly,
+        preBookingOnly,
+      };
+    }
+  }, [
+    isPending,
+    customers,
+    kpiStats,
+    allCustomersForKPI,
+    currentPage,
+    totalPages,
+    totalRecords,
+    tlOnly,
+    preBookingOnly,
+  ]);
+
+  const displayCustomers = isPending
+    ? persistedCustomers.current
+    : customers;
+  const displayKpiStats = isPending ? persistedKpiStats.current : kpiStats;
+  const displayKpiRows = isPending
+    ? persistedKpiRows.current
+    : allCustomersForKPI;
+  const displayMeta = isPending
+    ? persistedMeta.current
+    : {
+        currentPage,
+        totalPages,
+        totalRecords,
+        tlOnly,
+        preBookingOnly,
+      };
+  const viewTlOnly = displayMeta.tlOnly;
+  const viewCurrentPage = displayMeta.currentPage;
+  const viewTotalPages = displayMeta.totalPages;
+  const viewTotalRecords = displayMeta.totalRecords;
   const [searchTerm, setSearchTerm] = useState(searchParams?.search || "");
   const [selectedEmployee, setSelectedEmployee] = useState(
     searchParams?.employee || "",
@@ -82,6 +147,67 @@ export default function TLCustomersTable({
     customerId: null,
     customerName: null,
   });
+  const [searchSuggestions, setSearchSuggestions] = useState([]);
+  const [searchSuggestOpen, setSearchSuggestOpen] = useState(false);
+  const [searchSuggestLoading, setSearchSuggestLoading] = useState(false);
+  const [searchSuggestHighlight, setSearchSuggestHighlight] = useState(-1);
+  const searchSuggestRef = useRef(null);
+  const searchSuggestDebounceRef = useRef(null);
+
+  const fetchSearchSuggestions = useCallback((q) => {
+    if (searchSuggestDebounceRef.current) {
+      clearTimeout(searchSuggestDebounceRef.current);
+    }
+    const trimmed = String(q ?? "").trim();
+    if (trimmed.length < 1) {
+      setSearchSuggestions([]);
+      setSearchSuggestOpen(false);
+      setSearchSuggestLoading(false);
+      return;
+    }
+
+    searchSuggestDebounceRef.current = setTimeout(async () => {
+      setSearchSuggestLoading(true);
+      try {
+        const res = await fetch(
+          `/api/tl-customers/search-suggestions?q=${encodeURIComponent(trimmed)}`,
+        );
+        const data = await res.json();
+        if (data.success && Array.isArray(data.suggestions)) {
+          setSearchSuggestions(data.suggestions);
+          setSearchSuggestOpen(data.suggestions.length > 0);
+          setSearchSuggestHighlight(-1);
+        } else {
+          setSearchSuggestions([]);
+          setSearchSuggestOpen(false);
+        }
+      } catch {
+        setSearchSuggestions([]);
+        setSearchSuggestOpen(false);
+      } finally {
+        setSearchSuggestLoading(false);
+      }
+    }, 220);
+  }, []);
+
+  useEffect(() => {
+    fetchSearchSuggestions(searchTerm);
+    return () => {
+      if (searchSuggestDebounceRef.current) {
+        clearTimeout(searchSuggestDebounceRef.current);
+      }
+    };
+  }, [searchTerm, fetchSearchSuggestions]);
+
+  useEffect(() => {
+    function handlePointerDown(e) {
+      if (!searchSuggestRef.current?.contains(e.target)) {
+        setSearchSuggestOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, []);
 
   // Fetch products if not provided via props
   useEffect(() => {
@@ -135,25 +261,85 @@ export default function TLCustomersTable({
     return params;
   };
 
+  const applySearchValue = (value) => {
+    const v = String(value ?? "").trim();
+    setSearchTerm(v);
+    setSearchSuggestOpen(false);
+    startTransition(() => {
+      const params = buildFilterParams({ search: v });
+      if (!v) params.delete("search");
+      params.delete("page");
+      router.push(`${basePath}?${params.toString()}`);
+    });
+  };
+
+  const pickSearchSuggestion = (s) => {
+    applySearchValue(String(s.customer_id));
+  };
+
+  const onSearchInputKeyDown = (e) => {
+    if (
+      e.key === "Enter" &&
+      searchSuggestOpen &&
+      searchSuggestHighlight >= 0 &&
+      searchSuggestions[searchSuggestHighlight]
+    ) {
+      e.preventDefault();
+      pickSearchSuggestion(searchSuggestions[searchSuggestHighlight]);
+      return;
+    }
+    if (!searchSuggestOpen || searchSuggestions.length === 0) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setSearchSuggestHighlight(
+        (h) => (h + 1) % searchSuggestions.length,
+      );
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setSearchSuggestHighlight((h) =>
+        h <= 0 ? searchSuggestions.length - 1 : h - 1,
+      );
+    } else if (e.key === "Escape") {
+      setSearchSuggestOpen(false);
+    }
+  };
+
   // Use allCustomersForKPI for counts, or fallback to customers if not provided
   const customersForKPI =
-    allCustomersForKPI.length > 0 ? allCustomersForKPI : customers;
+    displayKpiRows.length > 0 ? displayKpiRows : displayCustomers;
+
+  const activeSearch = useMemo(
+    () => String(searchParams?.search ?? "").trim(),
+    [searchParams?.search],
+  );
 
   const chipFilterContext = useMemo(
     () => ({
-      tlOnly,
+      tlOnly: viewTlOnly,
       isSuperAdmin,
       statusFilter: selectedStatus,
-      preBookingOnly,
+      preBookingOnly: displayMeta.preBookingOnly,
+      search: activeSearch,
     }),
-    [tlOnly, isSuperAdmin, selectedStatus, preBookingOnly],
+    [
+      viewTlOnly,
+      isSuperAdmin,
+      selectedStatus,
+      displayMeta.preBookingOnly,
+      activeSearch,
+    ],
   );
 
   const getFilteredCustomers = () =>
-    applyTLCustomersChipFilter(customers, activeFilter, chipFilterContext);
+    applyTLCustomersChipFilter(
+      displayCustomers,
+      activeFilter,
+      chipFilterContext,
+    );
 
   // Get counts for each filter using KPI data (all customers)
   const getFilterCounts = () => {
+    if (displayKpiStats?.filterCounts) return displayKpiStats.filterCounts;
     const now = dayjs();
     const total = customersForKPI.filter((customer) => allowCustomerByStatus(customer)).length;
     // const upcoming = customersForKPI.filter((customer) => {
@@ -222,6 +408,13 @@ export default function TLCustomersTable({
 
   // Get counts for tags
   const getTagCounts = () => {
+    if (displayKpiStats && displayKpiRows.length === 0) {
+      const empty = {};
+      filterTagOptions.forEach((tag) => {
+        empty[tag] = 0;
+      });
+      return empty;
+    }
     const tagCounts = {};
     filterTagOptions.forEach((tag) => {
       tagCounts[tag] = customersForKPI.filter((customer) => {
@@ -238,6 +431,10 @@ export default function TLCustomersTable({
 
   // denied customer not show
   const allowCustomerByStatus = (customer) => {
+    if (activeSearch) {
+      if (!selectedStatus) return true;
+      return customer.status === selectedStatus;
+    }
     // When tlOnly is OFF, superadmin can see Denied/Invalid leads
     if (!tlOnly && isSuperAdmin) {
       // If no status filter selected (All Statuses), show everything
@@ -259,6 +456,7 @@ export default function TLCustomersTable({
 
   // Get counts for statuses
   const getStatusCounts = () => {
+    if (displayKpiStats?.statusCounts) return displayKpiStats.statusCounts;
     const statuses = [
       "New",
       "Good",
@@ -283,6 +481,7 @@ export default function TLCustomersTable({
 
   // Get counts for stages
   const getStageCounts = () => {
+    if (displayKpiStats?.stageCounts) return displayKpiStats.stageCounts;
     const stages = [
       "New",
       "Contacted",
@@ -532,18 +731,110 @@ export default function TLCustomersTable({
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Search (ID, Phone, Name, Company)
                   </label>
-                  <div className="relative">
+                  <div className="relative z-30" ref={searchSuggestRef}>
                     <input
-                      type="text"
+                      type="search"
                       value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      placeholder="Search customers..."
-                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      onChange={(e) => {
+                        setSearchTerm(e.target.value);
+                        setSearchSuggestOpen(true);
+                      }}
+                      onFocus={() => {
+                        if (searchSuggestions.length > 0) {
+                          setSearchSuggestOpen(true);
+                        }
+                      }}
+                      onKeyDown={onSearchInputKeyDown}
+                      placeholder="Type ID, phone, name or company…"
+                      autoComplete="off"
+                      aria-autocomplete="list"
+                      aria-expanded={searchSuggestOpen}
+                      className="w-full pl-10 pr-9 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                     <Search
-                      className="absolute left-3 top-2.5 text-gray-400"
+                      className="absolute left-3 top-2.5 text-gray-400 pointer-events-none"
                       size={20}
                     />
+                    {searchSuggestLoading ? (
+                      <Loader2
+                        className="absolute right-3 top-2.5 text-blue-500 animate-spin"
+                        size={18}
+                      />
+                    ) : null}
+                    {searchSuggestOpen && searchSuggestions.length > 0 ? (
+                      <ul
+                        className="absolute left-0 right-0 mt-1 max-h-64 overflow-y-auto bg-white border border-gray-200 rounded-md shadow-lg"
+                        role="listbox"
+                      >
+                        {searchSuggestions.map((s, index) => (
+                          <li key={s.customer_id} role="option">
+                            <button
+                              type="button"
+                              className={`w-full text-left px-3 py-2 border-b border-gray-100 last:border-b-0 text-sm ${
+                                index === searchSuggestHighlight
+                                  ? "bg-blue-50 text-blue-900"
+                                  : "hover:bg-gray-50 text-gray-800"
+                              }`}
+                              onMouseEnter={() =>
+                                setSearchSuggestHighlight(index)
+                              }
+                              onClick={() => pickSearchSuggestion(s)}
+                            >
+                              <div className="font-medium">
+                                {s.name || s.company || "Customer"}{" "}
+                                <span className="text-gray-500 font-normal">
+                                  #{s.customer_id}
+                                </span>
+                              </div>
+                              <div className="text-xs text-gray-500 mt-0.5">
+                                {s.phone ? `${s.phone}` : ""}
+                                {s.phone && s.company ? " · " : ""}
+                                {s.company || ""}
+                              </div>
+                              {s.tl_followed_date ? (
+                                <div className="text-xs text-indigo-800 mt-1 leading-snug">
+                                  <span className="font-medium">Last TL:</span>{" "}
+                                  {formatCrmDatetimeForISTDisplay(
+                                    s.tl_followed_date,
+                                    "DD-MM-YYYY HH:mm",
+                                  ) || "—"}
+                                  {s.tl_followed_by
+                                    ? ` · ${s.tl_followed_by}`
+                                    : ""}
+                                  {s.tl_next_followup ? (
+                                    <>
+                                      {" "}
+                                      · Next:{" "}
+                                      {formatCrmDatetimeForISTDisplay(
+                                        s.tl_next_followup,
+                                        "DD-MM-YYYY HH:mm",
+                                      )}
+                                    </>
+                                  ) : null}
+                                  {s.tl_notes ? (
+                                    <span className="block text-gray-600 mt-0.5 line-clamp-2">
+                                      {String(s.tl_notes).trim()}
+                                    </span>
+                                  ) : null}
+                                </div>
+                              ) : (
+                                <div className="text-xs text-gray-400 mt-1">
+                                  No TL follow-up yet
+                                </div>
+                              )}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                    {searchSuggestOpen &&
+                    searchTerm.trim() &&
+                    !searchSuggestLoading &&
+                    searchSuggestions.length === 0 ? (
+                      <div className="absolute left-0 right-0 mt-1 px-3 py-2 text-xs text-gray-500 bg-white border border-gray-200 rounded-md shadow">
+                        No matching customers
+                      </div>
+                    ) : null}
                   </div>
                 </div>
 
@@ -1134,7 +1425,7 @@ export default function TLCustomersTable({
 
       {/* Table - shows all customers, or only pre-booking customers when toggle is ON */}
       <>
-        {isAdmin && tlOnly && isSuperAdmin ? (
+        {isAdmin && viewTlOnly && isSuperAdmin ? (
           <TLCustomerFollowUpCards
             customers={getFilteredCustomers()}
             basePath={basePath}
@@ -1144,12 +1435,16 @@ export default function TLCustomersTable({
         ) : null}
 
         {/* Table */}
-        <div className="overflow-x-auto relative">
+        <div
+          className={`overflow-x-auto relative transition-opacity duration-200 ${
+            isPending ? "opacity-90" : "opacity-100"
+          }`}
+        >
         {isPending && (
-          <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10">
-            <div className="flex flex-col items-center gap-2">
-              <Loader2 size={40} className="animate-spin text-blue-600" />
-              <p className="text-sm text-gray-600 font-medium">Loading...</p>
+          <div className="sticky top-0 z-10 flex justify-end pointer-events-none mb-1">
+            <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 text-blue-800 text-xs font-medium px-3 py-1.5 rounded-full shadow-sm">
+              <Loader2 size={14} className="animate-spin shrink-0" />
+              Updating list…
             </div>
           </div>
         )}
@@ -1165,7 +1460,7 @@ export default function TLCustomersTable({
               <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
                 Assigned To
               </th>
-              {tlOnly ? (
+              {viewTlOnly ? (
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
                   Follow-up start date
                 </th>
@@ -1209,7 +1504,7 @@ export default function TLCustomersTable({
             {getFilteredCustomers().length === 0 ? (
               <tr>
                 <td
-                  colSpan={tlOnly ? 11 : 12}
+                  colSpan={viewTlOnly ? 11 : 12}
                   className="px-4 py-4 text-center text-gray-500"
                 >
                   {activeFilter === "all"
@@ -1237,7 +1532,7 @@ export default function TLCustomersTable({
                   <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
                     {customer.lead_source || "Unassigned"}
                   </td>
-                  {tlOnly ? (
+                  {viewTlOnly ? (
                     <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
                       {customer.followup_start_at
                         ? formatCrmDatetimeForISTDisplay(
@@ -1298,7 +1593,7 @@ export default function TLCustomersTable({
                   </td>
 
                   <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
-                    {tlOnly
+                    {viewTlOnly
                       ? formatCrmDatetimeForISTDisplay(
                           customer.tl_next_followup,
                           "DD-MM-YYYY HH:mm",
@@ -1523,9 +1818,12 @@ export default function TLCustomersTable({
         <div className="flex items-center justify-between">
           <div className="text-sm text-gray-600">
             <p>
-              Showing {(currentPage - 1) * pageSize + 1} to{" "}
-              {Math.min(currentPage * pageSize, totalRecords)} of {totalRecords}{" "}
-              customers
+              Showing {(viewCurrentPage - 1) * pageSize + 1} to{" "}
+              {Math.min(viewCurrentPage * pageSize, viewTotalRecords)} of{" "}
+              {viewTotalRecords} customers
+              {isPending ? (
+                <span className="ml-2 text-blue-600">(updating…)</span>
+              ) : null}
             </p>
             {activeFilter !== "all" && (
               <p className="text-xs text-gray-500 mt-1">
@@ -1537,8 +1835,8 @@ export default function TLCustomersTable({
           {/* Pagination Controls */}
           <div className="flex items-center gap-2">
             <button
-              onClick={() => handlePageChange(currentPage - 1)}
-              disabled={currentPage === 1 || isPending}
+              onClick={() => handlePageChange(viewCurrentPage - 1)}
+              disabled={viewCurrentPage === 1 || isPending}
               className="px-3 py-1 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Previous
@@ -1546,7 +1844,7 @@ export default function TLCustomersTable({
 
             <div className="flex items-center gap-1">
               {/* First page */}
-              {currentPage > 3 && (
+              {viewCurrentPage > 3 && (
                 <>
                   <button
                     onClick={() => handlePageChange(1)}
@@ -1555,21 +1853,21 @@ export default function TLCustomersTable({
                   >
                     1
                   </button>
-                  {currentPage > 4 && (
+                  {viewCurrentPage > 4 && (
                     <span className="px-2 text-gray-500">...</span>
                   )}
                 </>
               )}
 
               {/* Page numbers around current page */}
-              {Array.from({ length: totalPages }, (_, i) => i + 1)
+              {Array.from({ length: viewTotalPages }, (_, i) => i + 1)
                 .filter((page) => {
                   return (
-                    page === currentPage ||
-                    page === currentPage - 1 ||
-                    page === currentPage + 1 ||
-                    page === currentPage - 2 ||
-                    page === currentPage + 2
+                    page === viewCurrentPage ||
+                    page === viewCurrentPage - 1 ||
+                    page === viewCurrentPage + 1 ||
+                    page === viewCurrentPage - 2 ||
+                    page === viewCurrentPage + 2
                   );
                 })
                 .map((page) => (
@@ -1578,7 +1876,7 @@ export default function TLCustomersTable({
                     onClick={() => handlePageChange(page)}
                     disabled={isPending}
                     className={`px-3 py-1 border rounded-md text-sm font-medium ${
-                      page === currentPage
+                      page === viewCurrentPage
                         ? "bg-blue-600 text-white border-blue-600"
                         : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
                     }`}
@@ -1588,25 +1886,25 @@ export default function TLCustomersTable({
                 ))}
 
               {/* Last page */}
-              {currentPage < totalPages - 2 && (
+              {viewCurrentPage < viewTotalPages - 2 && (
                 <>
-                  {currentPage < totalPages - 3 && (
+                  {viewCurrentPage < viewTotalPages - 3 && (
                     <span className="px-2 text-gray-500">...</span>
                   )}
                   <button
-                    onClick={() => handlePageChange(totalPages)}
+                    onClick={() => handlePageChange(viewTotalPages)}
                     disabled={isPending}
                     className="px-3 py-1 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
                   >
-                    {totalPages}
+                    {viewTotalPages}
                   </button>
                 </>
               )}
             </div>
 
             <button
-              onClick={() => handlePageChange(currentPage + 1)}
-              disabled={currentPage === totalPages || isPending}
+              onClick={() => handlePageChange(viewCurrentPage + 1)}
+              disabled={viewCurrentPage === viewTotalPages || isPending}
               className="px-3 py-1 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Next

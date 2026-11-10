@@ -9,6 +9,7 @@ import {
   getTlMultiTagChipClass,
   normalizeLegacyPostponingTagLabel,
 } from "@/utils/tlFollowupTagOptions";
+import { notifyHeaderTlFollowupSaved } from "@/lib/headerTlFollowupModal";
 
 export default function TLFollowupForm({
   customerId,
@@ -266,7 +267,9 @@ export default function TLFollowupForm({
       const data = await response.json();
 
       if (data.success) {
-        // Navigate based on admin or user context
+        if (notifyHeaderTlFollowupSaved(customerId)) {
+          return;
+        }
         const basePath = isAdmin ? "/admin-dashboard" : "/user-dashboard";
         router.push(`${basePath}/tl-customers/${customerId}${editFollowup ? "?tlOnly=true" : ""}`);
         router.refresh();

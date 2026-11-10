@@ -2,12 +2,14 @@
 
 import { useState, useEffect } from "react";
 import { Pencil } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { withEmbedQuery } from "@/lib/dashboardEmbed";
 import toast from "react-hot-toast";
 import { NOTES_LANGUAGE_OPTIONS } from "@/constants/notesLanguageOptions";
 
 export default function EditCustomerForm({ initialData, userRole, dashboardBase = "user-dashboard" }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [data, setData] = useState({
     ...initialData,
     notes_language: initialData?.notes_language || "",
@@ -99,7 +101,11 @@ export default function EditCustomerForm({ initialData, userRole, dashboardBase 
     setSaving(false);
     if (res.ok) {
       toast.success("Customer updated successfully!");
-      router.push(`/${dashboardBase}/view-customer/${data.customer_id}`);
+      const viewPath = `/${dashboardBase}/view-customer/${data.customer_id}`;
+      const inEmbed =
+        searchParams.get("embed") === "1" ||
+        (typeof window !== "undefined" && window.self !== window.top);
+      router.push(inEmbed ? withEmbedQuery(viewPath) : viewPath);
     } else {
       toast.error("Failed to update customer.");
     }

@@ -14,6 +14,8 @@ import { userHasModuleKey } from "@/lib/userModuleAccessServer";
 import Link from "next/link";
 import axios from "axios";
 import { notFound } from "next/navigation";
+import { headers } from "next/headers";
+import { isDashboardEmbedPage, withEmbedQuery } from "@/lib/dashboardEmbed";
 import {
   collectHierarchyCustomerIds,
   fetchCustomerFollowupHistory,
@@ -23,8 +25,13 @@ import {
   sqlCustomerOrderBelongsToCustomer,
 } from "@/lib/customerOrderScope";
 
-export default async function CustomerPage({ params }) {
+export default async function CustomerPage({ params, searchParams }) {
   const { customerId } = await params;
+  const isEmbed = isDashboardEmbedPage(
+    await searchParams,
+    await headers(),
+  );
+  const dashHref = (path) => (isEmbed ? withEmbedQuery(path) : path);
   const conn = await getDbConnection();
   await ensureCustomersFollowupNotesText(conn);
 
@@ -187,10 +194,18 @@ export default async function CustomerPage({ params }) {
   // await conn.end();
 
   return (
-    <div className="mx-auto text-gray-700 px-4 py-8">
-      <h1 className="text-2xl font-semibold mb-6">
-        {customer.first_name || "Unnamed"} (ID: {customer.customer_id})
-      </h1>
+    <div
+      className={
+        isEmbed
+          ? "mx-auto text-gray-700 px-0 py-1"
+          : "mx-auto text-gray-700 px-4 py-8"
+      }
+    >
+      {!isEmbed ? (
+        <h1 className="text-2xl font-semibold mb-6">
+          {customer.first_name || "Unnamed"} (ID: {customer.customer_id})
+        </h1>
+      ) : null}
 
       <div className="grid grid-cols-1 gap-8 mb-8">
         {/* Customer Details Block */}
@@ -282,7 +297,9 @@ export default async function CustomerPage({ params }) {
             <dt className="text-sm font-medium text-gray-500">Parent Customer</dt>
             <dd className="mt-1 text-gray-800">
               <Link
-                href={`/admin-dashboard/view-customer/${customer.parent_id}`}
+                href={dashHref(
+                  `/admin-dashboard/view-customer/${customer.parent_id}`,
+                )}
                 className="text-blue-600 hover:text-blue-800 font-medium underline"
               >
                 {customer.parent_name?.trim() || "—"} (ID: {customer.parent_id})
@@ -444,19 +461,25 @@ export default async function CustomerPage({ params }) {
           <div className="w-full mb-10">
             <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-center">
               <a
-                href={`/admin-dashboard/view-customer/${customerId}/follow-up`}
+                href={dashHref(
+                  `/admin-dashboard/view-customer/${customerId}/follow-up`,
+                )}
                 className="btn w-full md:w-auto md:flex-shrink-0 whitespace-nowrap text-white bg-green-600 hover:bg-green-700 py-2 px-4 rounded-md text-center transition duration-300"
               >
                 Follow-up
               </a>
               <a
-                href={`/admin-dashboard/view-customer/${customerId}/edit`}
+                href={dashHref(
+                  `/admin-dashboard/view-customer/${customerId}/edit`,
+                )}
                 className="btn w-full md:w-auto md:flex-shrink-0 whitespace-nowrap text-white bg-yellow-600 hover:bg-yellow-700 py-2 px-4 rounded-md text-center transition duration-300"
               >
                 Edit
               </a>
               <a
-                href={`/admin-dashboard/view-customer/${customerId}/demo`}
+                href={dashHref(
+                  `/admin-dashboard/view-customer/${customerId}/demo`,
+                )}
                 className="btn w-full md:w-auto md:flex-shrink-0 whitespace-nowrap text-white bg-blue-600 hover:bg-blue-700 py-2 px-4 rounded-md text-center transition duration-300"
               >
                 Demo Registration
@@ -470,7 +493,9 @@ export default async function CustomerPage({ params }) {
                 variant="admin"
               />
               <Link
-                href={`/admin-dashboard/quotations/new?customerId=${customerId}`}
+                href={dashHref(
+                  `/admin-dashboard/quotations/new?customerId=${customerId}`,
+                )}
                 className="btn w-full md:w-auto md:flex-shrink-0 whitespace-nowrap text-white bg-amber-900 hover:bg-amber-950 py-2 px-4 rounded-md text-center transition duration-300"
               >
                 add Quotation
@@ -478,18 +503,24 @@ export default async function CustomerPage({ params }) {
               {canCreatePerformaInvoice && (
                 <CustomerPerformaInvoiceButton
                   quotationNumber={latestQuoteNumber}
-                  href={`/admin-dashboard/invoices/performa?quotation_number=${encodeURIComponent(latestQuoteNumber)}`}
+                  href={dashHref(
+                    `/admin-dashboard/invoices/performa?quotation_number=${encodeURIComponent(latestQuoteNumber)}`,
+                  )}
                   className="btn w-full md:w-auto md:flex-shrink-0 whitespace-nowrap text-white bg-violet-700 hover:bg-violet-800 py-2 px-4 rounded-md text-center transition duration-300"
                 />
               )}
               <Link
-                href={`/admin-dashboard/special-pricing/${customerId}`}
+                href={dashHref(
+                  `/admin-dashboard/special-pricing/${customerId}`,
+                )}
                 className="btn w-full md:w-auto md:flex-shrink-0 whitespace-nowrap text-white bg-pink-600 hover:bg-pink-700 py-2 px-4 rounded-md text-center transition duration-300"
               >
                 Special Price
               </Link>
               <Link
-                href={`/admin-dashboard/accounting/ledger?customerId=${encodeURIComponent(customerId)}`}
+                href={dashHref(
+                  `/admin-dashboard/accounting/ledger?customerId=${encodeURIComponent(customerId)}`,
+                )}
                 className="btn w-full md:w-auto md:flex-shrink-0 whitespace-nowrap text-white bg-indigo-600 hover:bg-indigo-700 py-2 px-4 rounded-md text-center transition duration-300"
               >
                 View Ledger
@@ -506,7 +537,9 @@ export default async function CustomerPage({ params }) {
               )}
               {orderCount > 0 && (
                 <Link
-                  href={`/admin-dashboard/view-customer/${customerId}/orders`}
+                  href={dashHref(
+                    `/admin-dashboard/view-customer/${customerId}/orders`,
+                  )}
                   className="btn w-full md:w-auto md:flex-shrink-0 whitespace-nowrap text-white bg-teal-600 hover:bg-teal-700 py-2 px-4 rounded-md text-center transition duration-300"
                 >
                   Orders ({orderCount})
@@ -514,7 +547,9 @@ export default async function CustomerPage({ params }) {
               )}
               {canSeeMachineFollowup && (
                 <Link
-                  href={`/admin-dashboard/view-customer/${customerId}/machine-followup`}
+                  href={dashHref(
+                    `/admin-dashboard/view-customer/${customerId}/machine-followup`,
+                  )}
                   className="btn w-full md:w-auto md:flex-shrink-0 whitespace-nowrap text-white bg-purple-600 hover:bg-purple-700 py-2 px-4 rounded-md text-center transition duration-300"
                 >
                   Machine Follow-up

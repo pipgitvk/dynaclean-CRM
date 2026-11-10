@@ -6,7 +6,10 @@ import { useEffect } from "react";
 export default function EmbedLightBackground() {
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (new URLSearchParams(window.location.search).get("embed") !== "1") return;
+    const embedQuery =
+      new URLSearchParams(window.location.search).get("embed") === "1";
+    const inIframe = window.self !== window.top;
+    if (!embedQuery && !inIframe) return;
 
     const html = document.documentElement;
     const body = document.body;
