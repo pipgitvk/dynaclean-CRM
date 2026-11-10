@@ -33,9 +33,14 @@ export default function CustomerQuickViewModal({
   const tlFollowupPagePath = (customerId) =>
     `/${dashboardBase}/tl-customers/${customerId}/followup?tlOnly=true&embed=1`;
 
+  const fullPageHref =
+    modal.kind === "tl"
+      ? `/${dashboardBase}/tl-customers/${modal.customerId}/followup?tlOnly=true`
+      : `/${dashboardBase}/view-customer/${modal.customerId}`;
+
   return createPortal(
     <div
-      className="fixed inset-0 z-[10050] flex items-center justify-center bg-black/50 p-3 sm:p-6"
+      className="fixed inset-0 z-[10050] flex items-center justify-center bg-black/50 p-2 sm:p-4"
       role="dialog"
       aria-modal="true"
       aria-label={
@@ -44,23 +49,33 @@ export default function CustomerQuickViewModal({
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-lg shadow-2xl w-full max-w-6xl h-[min(92vh,900px)] flex flex-col overflow-hidden"
+        className="bg-white rounded-lg shadow-2xl w-full max-w-[min(98vw,1320px)] h-[min(96vh,940px)] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-gray-200 shrink-0">
-          <h2 className="text-sm font-semibold text-gray-800">
+          <h2 className="text-sm font-semibold text-gray-800 truncate">
             {modal.kind === "tl"
               ? `TL Follow-up — Customer #${modal.customerId}`
               : `View Customer — #${modal.customerId}`}
           </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-1.5 rounded-md text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-            aria-label="Close"
-          >
-            <X size={20} />
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <a
+              href={fullPageHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs font-medium text-blue-700 hover:text-blue-900 hover:underline whitespace-nowrap"
+            >
+              Open full page
+            </a>
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1.5 rounded-md text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+              aria-label="Close"
+            >
+              <X size={20} />
+            </button>
+          </div>
         </div>
         <iframe
           title={

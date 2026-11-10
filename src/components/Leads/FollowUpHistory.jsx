@@ -435,30 +435,19 @@ export default function FollowUpHistory({
     return uploadsByDate[dateKey] || [];
   };
 
+  const tableMinWidth = hasUploads
+    ? showNameColumn
+      ? "min-w-[1180px]"
+      : "min-w-[1040px]"
+    : showNameColumn
+      ? "min-w-[880px]"
+      : "min-w-[720px]";
+
   return (
-    <div className="overflow-x-auto bg-white shadow rounded w-full">
+    <div className="overflow-x-auto bg-white shadow rounded w-full max-w-full">
       <table
-        className={`w-full divide-y divide-gray-200 text-sm ${
-          showNameColumn ? "table-auto" : "table-fixed"
-        }`}
+        className={`w-full divide-y divide-gray-200 text-sm table-auto ${tableMinWidth}`}
       >
-        <colgroup>
-          {showNameColumn && <col className={hasUploads ? "w-[12%]" : "w-[14%]"} />}
-          <col className={hasUploads ? "w-[10%]" : "w-[12%]"} />
-          <col className={hasUploads ? "w-[8%]" : "w-[10%]"} />
-          <col className={hasUploads ? "w-[10%]" : "w-[12%]"} />
-          <col className={hasUploads ? "w-[6%]" : "w-[8%]"} />
-          <col className={hasUploads ? "w-[12%]" : "w-[14%]"} />
-          <col className={hasUploads ? "w-[24%]" : "w-[34%]"} />
-          {hasUploads && (
-            <>
-              <col className="w-[8%]" />
-              <col className="w-[6%]" />
-              <col className="w-[5%]" />
-              <col className="w-[5%]" />
-            </>
-          )}
-        </colgroup>
         <thead className="bg-gray-100 text-gray-700 uppercase text-xs tracking-wide">
           <tr>
             {showNameColumn && (
@@ -478,18 +467,34 @@ export default function FollowUpHistory({
                 </select>
               </th>
             )}
-            <th className="px-3 py-2 text-left">{nextFollowupLabel}</th>
-            <th className="px-3 py-2 text-left">Followed By</th>
-            <th className="px-3 py-2 text-left">Followed Date</th>
-            <th className="px-3 py-2 text-left">Mode</th>
-            <th className="px-3 py-2 text-left">Tags</th>
-            <th className="px-3 py-2 text-left">Remarks</th>
+            <th className="px-3 py-2 text-left whitespace-nowrap min-w-[7.5rem]">
+              {nextFollowupLabel}
+            </th>
+            <th className="px-3 py-2 text-left whitespace-nowrap min-w-[6rem]">
+              Followed By
+            </th>
+            <th className="px-3 py-2 text-left whitespace-nowrap min-w-[7.5rem]">
+              Followed Date
+            </th>
+            <th className="px-3 py-2 text-left whitespace-nowrap min-w-[4.5rem]">
+              Mode
+            </th>
+            <th className="px-3 py-2 text-left min-w-[5.5rem]">Tags</th>
+            <th className="px-3 py-2 text-left min-w-[12rem] max-w-[22rem]">
+              Remarks
+            </th>
             {hasUploads && (
               <>
-                <th className="px-3 py-2 text-left">Date & Time</th>
-                <th className="px-3 py-2 text-left">User</th>
-                <th className="px-3 py-2 text-left">Summary</th>
-                <th className="px-3 py-2 text-left">Key Points</th>
+                <th className="px-3 py-2 text-left whitespace-nowrap min-w-[7rem]">
+                  Date & Time
+                </th>
+                <th className="px-3 py-2 text-left min-w-[5rem]">User</th>
+                <th className="px-3 py-2 text-left min-w-[10rem] max-w-[18rem]">
+                  Summary
+                </th>
+                <th className="px-3 py-2 text-left min-w-[8rem] max-w-[14rem]">
+                  Key Points
+                </th>
               </>
             )}
           </tr>

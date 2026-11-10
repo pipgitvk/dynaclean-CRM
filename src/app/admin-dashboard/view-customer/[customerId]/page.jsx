@@ -198,7 +198,7 @@ export default async function CustomerPage({ params, searchParams }) {
     <div
       className={
         isEmbed
-          ? "mx-auto text-gray-700 px-0 py-1"
+          ? "mx-auto w-full min-w-0 max-w-full text-gray-700 px-1 py-1"
           : "mx-auto text-gray-700 px-4 py-8"
       }
     >
@@ -214,10 +214,14 @@ export default async function CustomerPage({ params, searchParams }) {
           <h2 className="text-xl font-semibold mb-6 text-gray-800 border-b pb-3">
             Customer Details
           </h2>
-    <div className="w-full flex flex-col lg:flex-row gap-10">
+    <div
+      className={`w-full min-w-0 flex flex-col gap-6 ${
+        isEmbed ? "" : "lg:flex-row lg:gap-10"
+      }`}
+    >
 
   {/* LEFT SIDE – Customer Details */}
-  <div className="w-full lg:w-[60%]">
+  <div className={`w-full min-w-0 ${isEmbed ? "" : "lg:w-[60%]"}`}>
     <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-6">
 
       {/* Row 1 */}
@@ -344,7 +348,7 @@ export default async function CustomerPage({ params, searchParams }) {
   </div>
 
   {/* RIGHT SIDE – Suggestion Summary */}
-  <div className="w-full lg:w-[40%]">
+  <div className={`w-full min-w-0 ${isEmbed ? "" : "lg:w-[40%]"}`}>
     <div className=" p-2 rounded-xl  h-fit">
       
       <h3 className="text-lg font-semibold text-gray-800 mb-3">
@@ -457,8 +461,18 @@ export default async function CustomerPage({ params, searchParams }) {
         </div>
 
         {/* Actions and Follow-up History Block */}
-        <div className="bg-white shadow-lg rounded-lg p-6 flex flex-col">
-          <h2 className="text-2xl font-bold text-gray-800 mb-5">Actions</h2>
+        <div
+          className={`bg-white shadow-lg rounded-lg flex flex-col min-w-0 ${
+            isEmbed ? "p-4" : "p-6"
+          }`}
+        >
+          <h2
+            className={`font-bold text-gray-800 mb-4 ${
+              isEmbed ? "text-lg" : "text-2xl mb-5"
+            }`}
+          >
+            Actions
+          </h2>
           <div className="w-full mb-10">
             <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-center">
               <a
@@ -557,8 +571,14 @@ export default async function CustomerPage({ params, searchParams }) {
             </div>
           </div>
 
-          <section>
-            <h2 className="text-2xl font-bold mb-4">Follow-up History</h2>
+          <section className="min-w-0 w-full">
+            <h2
+              className={`font-bold mb-4 ${
+                isEmbed ? "text-lg" : "text-2xl"
+              }`}
+            >
+              Follow-up History
+            </h2>
             <FollowUpHistory
               entries={fups}
               cust_analysis_external={cust_analysis_external}

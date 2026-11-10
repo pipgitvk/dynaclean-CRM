@@ -8,8 +8,10 @@ export default function DashboardEmbedShell({ children }) {
   return (
     <UserProvider>
       <EmbedLightBackground />
-      <div className="min-h-0 w-full bg-gray-50 text-gray-900">
-        <main className="w-full min-h-0 overflow-auto p-2 sm:p-3">{children}</main>
+      <div className="min-h-0 min-w-0 w-full max-w-full bg-gray-50 text-gray-900">
+        <main className="w-full min-w-0 max-w-full min-h-0 overflow-x-hidden overflow-y-auto p-2 sm:p-3">
+          {children}
+        </main>
       </div>
     </UserProvider>
   );
