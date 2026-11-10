@@ -16,6 +16,7 @@ import axios from "axios";
 import { notFound } from "next/navigation";
 import { headers } from "next/headers";
 import { isDashboardEmbedPage, withEmbedQuery } from "@/lib/dashboardEmbed";
+import { customerPartyLedgerHref } from "@/lib/customerPartyLedger";
 import {
   collectHierarchyCustomerIds,
   fetchCustomerFollowupHistory,
@@ -518,9 +519,7 @@ export default async function CustomerPage({ params, searchParams }) {
                 Special Price
               </Link>
               <Link
-                href={dashHref(
-                  `/admin-dashboard/accounting/ledger?customerId=${encodeURIComponent(customerId)}`,
-                )}
+                href={dashHref(customerPartyLedgerHref(customerId, userRole))}
                 className="btn w-full md:w-auto md:flex-shrink-0 whitespace-nowrap text-white bg-indigo-600 hover:bg-indigo-700 py-2 px-4 rounded-md text-center transition duration-300"
               >
                 View Ledger

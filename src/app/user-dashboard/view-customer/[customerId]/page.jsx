@@ -11,6 +11,7 @@ import CustomerPerformaInvoiceButton from "@/components/invoice/CustomerPerforma
 import ScheduleVisitModal from "@/components/scheduleVisit/ScheduleVisitModal";
 import { canShowScheduleVisitOnCustomerProfile } from "@/lib/scheduleVisitScope";
 import { isSalesRole } from "@/lib/isSalesRole";
+import { customerPartyLedgerHref } from "@/lib/customerPartyLedger";
 import {
   collectHierarchyCustomerIds,
   fetchCustomerFollowupHistory,
@@ -556,7 +557,7 @@ export default async function CustomerPage({ params }) {
             {/* View Ledger - hidden for SERVICE SUPPORT */}
             {userRole !== "SERVICE SUPPORT" && (
               <Link
-                href={`/admin-dashboard/accounting/ledger?customerId=${customerId}`}
+                href={customerPartyLedgerHref(customerId, userRole)}
                 className="btn text-white bg-indigo-600 hover:bg-indigo-700 py-2 px-4 rounded-md w-full md:w-auto text-center transition duration-300"
               >
                 View Ledger

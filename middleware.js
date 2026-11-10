@@ -273,6 +273,22 @@ export async function middleware(request) {
         }
       }
 
+      // Customer party ledger (`?customerId=`): sales roles use sales-dashboard copy.
+      if (pathname.startsWith("/admin-dashboard/accounting/ledger")) {
+        if (
+          roleNorm.includes("SALES") &&
+          role !== "SUPERADMIN" &&
+          roleNorm !== "DIRECTOR"
+        ) {
+          const dest = new URL(
+            pathname.replace("/admin-dashboard", "/sales-dashboard"),
+            request.url,
+          );
+          dest.search = request.nextUrl.search;
+          return NextResponse.redirect(dest);
+        }
+      }
+
       if (roleNorm === "SALES CUM BACKOFFICE") {
         if (pathname.startsWith("/admin-dashboard/reports/payment-pending")) {
           const dest = new URL(
