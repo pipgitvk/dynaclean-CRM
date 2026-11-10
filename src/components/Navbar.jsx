@@ -11,6 +11,7 @@ import {
   Bell,
   X,
   DollarSign,
+  ExternalLink,
 } from "lucide-react";
 import HeaderLogoutButton from "@/components/HeaderLogoutButton";
 import { useTheme } from "@/context/ThemeContext";
@@ -353,7 +354,7 @@ export default function Navbar({ onToggleSidebar, showSalesMeta = false }) {
                   {c.phone ? ` • ${c.phone}` : ""}
                   {isSuperAdminSearch && c.company ? ` • ${c.company}` : ""}
                 </div>
-                {!isSuperAdminSearch && c.lead_source ? (
+                {c.lead_source ? (
                   <div className="text-xs text-gray-400 truncate">
                     Lead source: {c.lead_source}
                   </div>
@@ -361,17 +362,30 @@ export default function Navbar({ onToggleSidebar, showSalesMeta = false }) {
               </div>
               <div className="flex items-center gap-1 flex-shrink-0">
                 {isSuperAdminSearch ? (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openHeaderCustomerModal("view", c.customer_id);
-                    }}
-                    className="text-xs px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
-                    title="View customer (popup)"
-                  >
-                    View
-                  </button>
+                  <>
+                    <a
+                      href={customerViewHref(c.customer_id)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="p-1.5 text-gray-600 hover:text-blue-700 hover:bg-blue-50 rounded border border-transparent hover:border-blue-200"
+                      title="Open in new tab"
+                      aria-label="Open customer in new tab"
+                    >
+                      <ExternalLink size={16} />
+                    </a>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openHeaderCustomerModal("view", c.customer_id);
+                      }}
+                      className="text-xs px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+                      title="View customer (popup)"
+                    >
+                      View
+                    </button>
+                  </>
                 ) : (
                   <CustomerSearchResultActions
                     viewHref={customerViewHref(c.customer_id)}
