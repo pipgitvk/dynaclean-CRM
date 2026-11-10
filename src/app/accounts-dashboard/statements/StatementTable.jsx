@@ -137,6 +137,11 @@ export default function StatementTable({ rows }) {
         if (Number.isFinite(id) && id > 0) out.push({ prefix: "IP", id });
         continue;
       }
+      if (/^PTY\d+$/.test(s)) {
+        const id = Number(s.slice(3));
+        if (Number.isFinite(id) && id > 0) out.push({ prefix: "PTY", id });
+        continue;
+      }
       if (/^(PP|PS|SP)\d+$/.test(s)) {
         const prefix = s.startsWith("SP") ? "PS" : s.slice(0, 2);
         const id = Number(s.slice(2));
@@ -151,6 +156,19 @@ export default function StatementTable({ rows }) {
     }
     return out;
   };
+
+  const getVisiblePurchaseRefs = (row) => {
+    const refs = getLinkedPurchaseRefs(row);
+    const hasInvoice = !!String(row.invoice_number || "").trim();
+    return refs.filter((x) => {
+      if (x.prefix === "PTY") return false;
+      if (hasInvoice && x.prefix === "IP") return false;
+      return true;
+    });
+  };
+
+  const getPartyPaymentRefs = (row) =>
+    getLinkedPurchaseRefs(row).filter((x) => x.prefix === "PTY");
 
   const isSettledRow = (row) => {
     const linked = getLinkedPurchaseRefs(row);
@@ -992,9 +1010,9 @@ export default function StatementTable({ rows }) {
               <th className="p-3">Bank</th>
               <th
                 className="p-2 w-[1%] max-w-[5.5rem] text-[11px] leading-snug whitespace-normal"
-                title="Invoice, Purchases, DD, Expense"
+                title="Invoice, Purchases, DD, Expense, Party"
               >
-                Inv / Pur / DD / Exp
+                Inv / Pur / DD / Exp / Pty
               </th>
               <th
                 onClick={() => handleSort("balance")}
@@ -1102,24 +1120,43 @@ export default function StatementTable({ rows }) {
                           </div>
                         );
                       })()}
+                      {getPartyPaymentRefs(row).map((x) => (
+                        <Link
+                          key={`pty-${x.id}`}
+                          href={`/accounts-dashboard/party-payments?search=${encodeURIComponent(
+                            String(x.id),
+                          )}`}
+                          className="px-1.5 py-0.5 bg-teal-100 text-teal-800 text-xs font-mono font-bold rounded whitespace-nowrap underline"
+                          title="Party payment entry"
+                        >
+                          PTY{x.id}
+                        </Link>
+                      ))}
+                      {String(row.party_payment_customer_ids || "").trim()
+                        ? String(row.party_payment_customer_ids)
+                            .split(/[,;\s]+/)
+                            .filter(Boolean)
+                            .map((cid) => (
+                              <Link
+                                key={`cid-${cid}`}
+                                href={`/user-dashboard/view-customer/${encodeURIComponent(cid)}`}
+                                className="px-1.5 py-0.5 bg-cyan-50 text-cyan-900 text-xs font-medium rounded whitespace-nowrap underline"
+                                title="Customer from party payment"
+                              >
+                                {cid}
+                              </Link>
+                            ))
+                        : null}
                       {(() => {
-                        const refs = getLinkedPurchaseRefs(row);
-                        if (refs.length > 0) {
-                          // Hide IP-prefixed refs when an invoice_number already covers them (P299 is redundant when INV299 shown)
-                          const hasInvoice = !!String(row.invoice_number || "").trim();
-                          const visibleRefs = hasInvoice
-                            ? refs.filter(x => x.prefix !== "IP")
-                            : refs;
-                          if (visibleRefs.length === 0) return null;
-                          return (
-                            <div>
-                              <span className="text-xs font-mono text-slate-700">
-                                {visibleRefs.map((x) => `P${x.id}`).join(", ")}
-                              </span>
-                            </div>
-                          );
-                        }
-                        return null;
+                        const visibleRefs = getVisiblePurchaseRefs(row);
+                        if (visibleRefs.length === 0) return null;
+                        return (
+                          <div>
+                            <span className="text-xs font-mono text-slate-700">
+                              {visibleRefs.map((x) => `${x.prefix}${x.id}`).join(", ")}
+                            </span>
+                          </div>
+                        );
                       })()}
                       {row.dd_id && (
                         <div>
@@ -1135,7 +1172,12 @@ export default function StatementTable({ rows }) {
                           </span>
                         </div>
                       )}
-                      {!row.invoice_number && !getLinkedPurchaseRefs(row).length && !row.dd_id && !row.client_expense_id && !row.linked_module_id && (
+                      {!row.invoice_number &&
+                        !getLinkedPurchaseRefs(row).length &&
+                        !String(row.party_payment_customer_ids || "").trim() &&
+                        !row.dd_id &&
+                        !row.client_expense_id &&
+                        !row.linked_module_id && (
                         <span className="text-gray-300 text-xs">—</span>
                       )}
                       {row.linked_module_id && row.linked_module_type && (
@@ -1268,21 +1310,39 @@ export default function StatementTable({ rows }) {
                     </span>
                   ));
                 })()}
+                {getPartyPaymentRefs(row).map((x) => (
+                  <Link
+                    key={`pty-m-${x.id}`}
+                    href={`/accounts-dashboard/party-payments?search=${encodeURIComponent(
+                      String(x.id),
+                    )}`}
+                    className="block px-2 py-0.5 bg-teal-100 text-teal-800 text-xs font-mono font-bold rounded w-fit underline"
+                  >
+                    PTY{x.id}
+                  </Link>
+                ))}
+                {String(row.party_payment_customer_ids || "").trim()
+                  ? String(row.party_payment_customer_ids)
+                      .split(/[,;\s]+/)
+                      .filter(Boolean)
+                      .map((cid) => (
+                        <Link
+                          key={`cid-m-${cid}`}
+                          href={`/user-dashboard/view-customer/${encodeURIComponent(cid)}`}
+                          className="block px-2 py-0.5 bg-cyan-50 text-cyan-900 text-xs font-medium rounded w-fit underline"
+                        >
+                          {cid}
+                        </Link>
+                      ))
+                  : null}
                 {(() => {
-                  const refs = getLinkedPurchaseRefs(row);
-                  if (refs.length > 0) {
-                    const hasInvoice = !!String(row.invoice_number || "").trim();
-                    const visibleRefs = hasInvoice
-                      ? refs.filter(x => x.prefix !== "IP")
-                      : refs;
-                    if (visibleRefs.length === 0) return null;
-                    return (
-                      <span className="block text-xs font-mono text-slate-700">
-                        {visibleRefs.map((x) => `P${x.id}`).join(", ")}
-                      </span>
-                    );
-                  }
-                  return null;
+                  const visibleRefs = getVisiblePurchaseRefs(row);
+                  if (visibleRefs.length === 0) return null;
+                  return (
+                    <span className="block text-xs font-mono text-slate-700">
+                      {visibleRefs.map((x) => `${x.prefix}${x.id}`).join(", ")}
+                    </span>
+                  );
                 })()}
                 {row.dd_id && (
                   <span className="block px-2 py-0.5 bg-purple-100 text-purple-700 text-xs font-bold rounded w-fit">
@@ -1309,7 +1369,12 @@ export default function StatementTable({ rows }) {
                      row.linked_module_type === 'Expense' ? `EXP${row.linked_module_id}` : `${row.linked_module_type}${row.linked_module_id}`}
                   </span>
                 )}
-                {!row.invoice_number && !getLinkedPurchaseRefs(row).length && !row.dd_id && !row.client_expense_id && !row.linked_module_id && (
+                {!row.invoice_number &&
+                  !getLinkedPurchaseRefs(row).length &&
+                  !String(row.party_payment_customer_ids || "").trim() &&
+                  !row.dd_id &&
+                  !row.client_expense_id &&
+                  !row.linked_module_id && (
                   <span className="text-gray-400">—</span>
                 )}
               </div>

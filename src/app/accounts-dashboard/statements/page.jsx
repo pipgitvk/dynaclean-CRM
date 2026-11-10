@@ -2,6 +2,8 @@ import { getDbConnection } from "@/lib/db";
 import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 import StatementTable from "./StatementTable";
+import { parseLinkedStatementIds } from "@/lib/statementLinkedPurchases";
+import { ensurePartyPaymentsTable } from "@/lib/ensurePartyPaymentsTable";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
@@ -139,7 +141,40 @@ export default async function StatementsPage() {
        LEFT JOIN bank_masters bm ON bm.id = s.bank_id
        ORDER BY s.date DESC, s.id DESC`
     );
-    rows = result;
+
+    const statementCustomerMap = new Map();
+    try {
+      await ensurePartyPaymentsTable(conn);
+      const [partyRows] = await conn.execute(
+        `SELECT id, customer_id, linked_statement_ids FROM party_payments`,
+      );
+      for (const pp of partyRows || []) {
+        const cid =
+          pp.customer_id != null && String(pp.customer_id).trim() !== ""
+            ? String(pp.customer_id).trim()
+            : "";
+        if (!cid) continue;
+        const stmtIds = parseLinkedStatementIds(pp.linked_statement_ids);
+        for (const sid of stmtIds) {
+          const n = Number(sid);
+          if (!Number.isFinite(n) || n <= 0) continue;
+          if (!statementCustomerMap.has(n)) {
+            statementCustomerMap.set(n, new Set());
+          }
+          statementCustomerMap.get(n).add(cid);
+        }
+      }
+    } catch (partyErr) {
+      console.error("[statements] party_payments join:", partyErr?.message);
+    }
+
+    rows = (result || []).map((row) => {
+      const ids = statementCustomerMap.get(Number(row.id));
+      return {
+        ...row,
+        party_payment_customer_ids: ids ? [...ids].join(", ") : "",
+      };
+    });
   } catch (err) {
     console.error("[statements] DB error:", err?.message);
   }
