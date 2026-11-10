@@ -1,7 +1,8 @@
 "use client";
 
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import PartyPaymentEntryModal from "@/components/party-payments/PartyPaymentEntryModal";
 import { useParams, useRouter } from "next/navigation";
 import dayjs from "dayjs";
 import toast from "react-hot-toast";
@@ -88,6 +89,19 @@ export default function EditStatementForm({
   const [selectedCredit, setSelectedCredit] = useState(null);
   const [selectedDebit, setSelectedDebit] = useState(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [showPartyPaymentModal, setShowPartyPaymentModal] = useState(false);
+
+  const partyPaymentInitialForm = useMemo(() => {
+    const stmtId = Number(id);
+    const amt = Math.abs(Number(form.amount) || 0);
+    const isCredit = String(form.type || "").trim() === "Credit";
+    return {
+      linked_statement_ids: stmtId > 0 ? [stmtId] : [],
+      amount_in: isCredit && amt > 0 ? String(amt) : "",
+      amount_out: !isCredit && amt > 0 ? String(amt) : "",
+      payment_date: form.date || "",
+    };
+  }, [id, form.amount, form.type, form.date]);
 
   useEffect(() => {
     // Fetch current user role
@@ -391,6 +405,10 @@ export default function EditStatementForm({
           value={statementType}
           onChange={(e) => {
             const value = e.target.value;
+            if (value === "party_payments") {
+              setShowPartyPaymentModal(true);
+              return;
+            }
             if (embedded) {
               setStatementType(value);
               return;
@@ -416,7 +434,9 @@ export default function EditStatementForm({
             }
           }}
           disabled={isTypeLocked}
-          className="w-full sm:w-1/2 border p-2 rounded disabled:bg-gray-200 disabled:cursor-not-allowed"
+          className={`w-full border p-2 rounded disabled:bg-gray-200 disabled:cursor-not-allowed ${
+            embedded ? "max-w-md" : "sm:max-w-md"
+          }`}
           required
         >
           <option value="">-- Select --</option>
@@ -427,6 +447,7 @@ export default function EditStatementForm({
           <option value="purchase_billings">Purchase Billings</option>
           <option value="dd_management">DD Management</option>
           <option value="employee_expenses">Employee Expenses</option>
+          <option value="party_payments">Add Party Payments</option>
         </select>
         {isTypeLocked && (
           <p className="text-xs text-red-600 mt-2">
@@ -631,6 +652,16 @@ export default function EditStatementForm({
           </button>
         </div>
       </form>
+
+      <PartyPaymentEntryModal
+        open={showPartyPaymentModal}
+        onClose={() => setShowPartyPaymentModal(false)}
+        initialForm={partyPaymentInitialForm}
+        onSuccess={() => {
+          setShowPartyPaymentModal(false);
+          onSuccess?.();
+        }}
+      />
     </div>
   );
 }

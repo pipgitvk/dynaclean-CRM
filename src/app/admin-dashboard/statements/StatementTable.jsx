@@ -30,13 +30,19 @@ function StatementLinkedModulesCell({
 }) {
   const hasInvoice = !!String(row.invoice_number || "").trim();
   const refs = getLinkedPurchaseRefs(row);
-  const visibleRefs = hasInvoice ? refs.filter((x) => x.prefix !== "IP") : refs;
+  const ptyRefs = refs.filter((x) => x.prefix === "PTY");
+  const visibleRefs = hasInvoice
+    ? refs.filter((x) => x.prefix !== "IP" && x.prefix !== "PTY")
+    : refs.filter((x) => x.prefix !== "PTY");
   const ipRefs = refs.filter((x) => x.prefix === "IP");
+  const partyCustomerIds = String(row.party_payment_customer_ids || "").trim();
 
   const hasAnyLink =
     hasInvoice ||
     ipRefs.length > 0 ||
+    ptyRefs.length > 0 ||
     visibleRefs.length > 0 ||
+    partyCustomerIds ||
     row.dd_id ||
     row.client_expense_id ||
     (row.linked_module_id && row.linked_module_type);
@@ -81,6 +87,36 @@ function StatementLinkedModulesCell({
           ))}
         </div>
       )}
+      {ptyRefs.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {ptyRefs.map((x) => (
+            <Link
+              key={`pty-${x.id}`}
+              href={`/admin-dashboard/party-payments?search=${encodeURIComponent(
+                String(x.id),
+              )}`}
+              className={`${viewLink} bg-teal-100 text-teal-800 font-bold`}
+              title="Party payment entry"
+            >
+              PTY{x.id}
+            </Link>
+          ))}
+        </div>
+      )}
+      {partyCustomerIds ? (
+        <div className="flex flex-wrap gap-1">
+          {partyCustomerIds.split(/[,;\s]+/).filter(Boolean).map((cid) => (
+            <Link
+              key={`cid-${cid}`}
+              href={`/admin-dashboard/view-customer/${encodeURIComponent(cid)}`}
+              className="inline-block px-1.5 py-0.5 text-xs font-medium rounded bg-cyan-50 text-cyan-900 underline decoration-cyan-400/60 hover:decoration-cyan-700"
+              title="Customer from party payment"
+            >
+              {cid}
+            </Link>
+          ))}
+        </div>
+      ) : null}
       {visibleRefs.length > 0 && (
         <div className="flex flex-wrap gap-1">
           {visibleRefs.map((x) => (
@@ -323,6 +359,11 @@ export default function StatementTable({ rows }) {
         // Invoice-linked token — treat as settled
         const id = Number(s.slice(2));
         if (Number.isFinite(id) && id > 0) out.push({ prefix: "IP", id });
+        continue;
+      }
+      if (/^PTY\d+$/.test(s)) {
+        const id = Number(s.slice(3));
+        if (Number.isFinite(id) && id > 0) out.push({ prefix: "PTY", id });
         continue;
       }
       if (/^(PP|PS|SP)\d+$/.test(s)) {
@@ -1310,7 +1351,7 @@ export default function StatementTable({ rows }) {
               <th onClick={() => handleSort("credit")} className="p-3 cursor-pointer select-none">Credit<SortIcon column="credit" /></th>
               <th onClick={() => handleSort("status")} className="p-3 cursor-pointer select-none">Status<SortIcon column="status" /></th>
               <th className="p-3">Bank</th>
-              <th className="p-3">Invoice, Purchases, DD, Expense</th>
+              <th className="p-3">Invoice, Purchases, DD, Expense, Party</th>
               <th
                 onClick={() => handleSort("balance")}
                 className="p-3 cursor-pointer select-none"
