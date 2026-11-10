@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo, useRef } from "react";
 import InvoiceItemsTable from "./invoice-table";
 import TaxAndSummary from "./Tax-invoice";
+import PaymentLinkModal from "@/app/user-dashboard/invoices/new/PaymentLinkModal";
 import { usePathname, useRouter } from "next/navigation";
 import {
   navigateAfterInvoiceCreate,
@@ -62,7 +63,8 @@ export default function InvoiceForm({
   const [quotationNumber, setQuotationNumber] = useState(String(initialQuotationNumber || "").trim());
   const [orderId, setOrderId] = useState(String(initialOrderId || "").trim());
   const [isFromQuotation, setIsFromQuotation] = useState(false);
-
+  const [showPaymentLinkModal, setShowPaymentLinkModal] = useState(false);
+  const [linkedTransIds, setLinkedTransIds] = useState([]);
 
   const [items, setItems] = useState([
     {
@@ -402,7 +404,7 @@ export default function InvoiceForm({
         cgst_rate: cgstRate,
         sgst_rate: sgstRate,
         igst_rate: igstRate,
-        linked_trans_ids: null,
+        linked_trans_ids: linkedTransIds.length > 0 ? linkedTransIds : null,
         ...documentFromCompanyForSubmit(documentFromCompany, letterheadRef),
       };
 
@@ -903,7 +905,16 @@ const fetchQuotationAndFill = async (quoteNoArg) => {
 
 
 <div>
-  <label className="text-sm text-gray-600">Amount Paid</label>
+  <div className="flex items-center justify-between gap-2 mb-1">
+    <label className="text-sm text-gray-600">Amount Paid</label>
+    <button
+      type="button"
+      className="text-xs font-medium px-2 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 whitespace-nowrap"
+      onClick={() => setShowPaymentLinkModal(true)}
+    >
+      Payment Link
+    </button>
+  </div>
   <input
     type="number"
     min="0"
@@ -911,8 +922,35 @@ const fetchQuotationAndFill = async (quoteNoArg) => {
     value={form.amount_paid}
     readOnly
     tabIndex={-1}
-    title="From quotation when applicable"
+    title="Set via Payment Link"
   />
+  {linkedTransIds.length > 0 && (
+    <div className="flex flex-wrap items-center gap-1.5 mt-2">
+      <span className="text-xs text-gray-500">Linked:</span>
+      {linkedTransIds.map((tid) => (
+        <span
+          key={tid}
+          className="text-xs font-mono bg-blue-50 text-blue-800 border border-blue-200 px-1.5 py-0.5 rounded"
+        >
+          {tid}
+        </span>
+      ))}
+      <button
+        type="button"
+        className="text-xs text-red-500 hover:underline"
+        onClick={() => {
+          setLinkedTransIds([]);
+          setForm((prev) => ({
+            ...prev,
+            amount_paid: 0,
+            payment_status: "UNPAID",
+          }));
+        }}
+      >
+        Clear
+      </button>
+    </div>
+  )}
 </div>
 
         <div>
@@ -1110,6 +1148,36 @@ const fetchQuotationAndFill = async (quoteNoArg) => {
     </div>
   </div>
 )}
+
+    <PaymentLinkModal
+      open={showPaymentLinkModal}
+      onClose={() => setShowPaymentLinkModal(false)}
+      defaultCustomerId={form.customer_id}
+      defaultAmount={taxSummary.grandTotal}
+      lockedTransIds={linkedTransIds}
+      currentInvoiceNumber={invoiceNumber}
+      onApply={(transIds, paymentStatus, amountPaid) => {
+        setLinkedTransIds(transIds);
+        if (amountPaid > 0) {
+          setForm((prev) => ({
+            ...prev,
+            amount_paid: amountPaid,
+            payment_status:
+              paymentStatus === "Settled"
+                ? "PAID"
+                : paymentStatus === "Partial Paid"
+                  ? "PARTIAL"
+                  : prev.payment_status,
+          }));
+        } else {
+          setForm((prev) => ({
+            ...prev,
+            amount_paid: 0,
+            payment_status: "UNPAID",
+          }));
+        }
+      }}
+    />
 
     </>
   );
