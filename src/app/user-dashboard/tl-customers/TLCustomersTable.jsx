@@ -22,6 +22,7 @@ import {
   FileText,
 } from "lucide-react";
 import CustomerQuickViewModal from "@/components/Customers/CustomerQuickViewModal";
+import CustomerSearchPopupActions from "@/components/Customers/CustomerSearchPopupActions";
 import { applyTLCustomersChipFilter } from "@/lib/tlCustomersChipFilter";
 import Link from "next/link";
 import { NOTES_LANGUAGE_OPTIONS } from "@/constants/notesLanguageOptions";
@@ -831,36 +832,20 @@ export default function TLCustomersTable({
                                 )}
                               </button>
                               {isSuperAdmin && isAdmin ? (
-                                <div className="flex items-center gap-1 flex-shrink-0">
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      openCustomerQuickViewModal(
-                                        "tl",
-                                        s.customer_id,
-                                      );
-                                    }}
-                                    className="text-xs px-2.5 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700"
-                                    title="TL follow-up (popup)"
-                                  >
-                                    TL
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      openCustomerQuickViewModal(
-                                        "view",
-                                        s.customer_id,
-                                      );
-                                    }}
-                                    className="text-xs px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
-                                    title="View customer (popup)"
-                                  >
-                                    View
-                                  </button>
-                                </div>
+                                <CustomerSearchPopupActions
+                                  onTl={() =>
+                                    openCustomerQuickViewModal(
+                                      "tl",
+                                      s.customer_id,
+                                    )
+                                  }
+                                  onView={() =>
+                                    openCustomerQuickViewModal(
+                                      "view",
+                                      s.customer_id,
+                                    )
+                                  }
+                                />
                               ) : null}
                             </div>
                           </li>

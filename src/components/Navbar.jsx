@@ -11,7 +11,6 @@ import {
   Bell,
   X,
   DollarSign,
-  ExternalLink,
 } from "lucide-react";
 import HeaderLogoutButton from "@/components/HeaderLogoutButton";
 import { useTheme } from "@/context/ThemeContext";
@@ -20,6 +19,10 @@ import Link from "next/link";
 import AttendanceStatusTracker from "@/components/AttendanceStatusTracker";
 import ProspectHeaderButton from "@/components/prospects/ProspectHeaderButton";
 import { formatCrmDatetimeForISTDisplay } from "@/lib/timezone";
+import CustomerQuickViewModal from "@/components/Customers/CustomerQuickViewModal";
+import CustomerSearchPopupActions from "@/components/Customers/CustomerSearchPopupActions";
+import CustomerSearchResultActions from "@/components/Customers/CustomerSearchResultActions";
+
 export default function Navbar({ onToggleSidebar, showSalesMeta = false }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -33,7 +36,8 @@ export default function Navbar({ onToggleSidebar, showSalesMeta = false }) {
   const [showDropdown, setShowDropdown] = useState(false);
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
   const searchRef = useRef(null);
-  
+  const [headerCustomerModal, setHeaderCustomerModal] = useState(null);
+
   // Notifications state
   const [notifications, setNotifications] = useState([]);
   const [showNotificationDropdown, setShowNotificationDropdown] = useState(false);
@@ -311,6 +315,11 @@ export default function Navbar({ onToggleSidebar, showSalesMeta = false }) {
 
   const isSuperAdminSearch = normalizeRoleKey(userRole) === "SUPERADMIN";
 
+  const openHeaderCustomerModal = (kind, customerId) => {
+    setShowDropdown(false);
+    setHeaderCustomerModal({ kind, customerId });
+  };
+
   const searchDropdown =
     typeof window !== "undefined" &&
     showDropdown &&
@@ -383,30 +392,26 @@ export default function Navbar({ onToggleSidebar, showSalesMeta = false }) {
                 ) : null}
               </div>
               <div className="flex items-center gap-1 flex-shrink-0">
-                <a
-                  href={customerViewHref(c.customer_id)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={(e) => e.stopPropagation()}
-                  className="p-1.5 text-gray-600 hover:text-blue-700 hover:bg-blue-50 rounded border border-transparent hover:border-blue-200"
-                  title="Open in new tab"
-                  aria-label="Open customer in new tab"
-                >
-                  <ExternalLink size={16} />
-                </a>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowDropdown(false);
-                    setResults([]);
-                    setQuery("");
-                    router.push(customerViewHref(c.customer_id));
-                  }}
-                  className="text-xs px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
-                >
-                  View
-                </button>
+                {isSuperAdminSearch ? (
+                  <CustomerSearchPopupActions
+                    onTl={() =>
+                      openHeaderCustomerModal("tl", c.customer_id)
+                    }
+                    onView={() =>
+                      openHeaderCustomerModal("view", c.customer_id)
+                    }
+                  />
+                ) : (
+                  <CustomerSearchResultActions
+                    viewHref={customerViewHref(c.customer_id)}
+                    onView={() => {
+                      setShowDropdown(false);
+                      setResults([]);
+                      setQuery("");
+                      router.push(customerViewHref(c.customer_id));
+                    }}
+                  />
+                )}
               </div>
             </div>
           ))}
@@ -729,6 +734,11 @@ export default function Navbar({ onToggleSidebar, showSalesMeta = false }) {
         </div>
       </div>
     </nav>
+    <CustomerQuickViewModal
+      modal={headerCustomerModal}
+      onClose={() => setHeaderCustomerModal(null)}
+      dashboardBase={dashboardBase}
+    />
     </>
   );
 }
