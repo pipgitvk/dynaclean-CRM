@@ -313,6 +313,41 @@ export default function TLCustomersTable({
     [searchParams?.search],
   );
 
+  const applyListSearchDebounceRef = useRef(null);
+
+  // Apply search to the list (URL) so TL-only view still shows matches with no TL row yet.
+  useEffect(() => {
+    const trimmed = searchTerm.trim();
+    if (trimmed === activeSearch) return;
+
+    if (applyListSearchDebounceRef.current) {
+      clearTimeout(applyListSearchDebounceRef.current);
+    }
+
+    if (!trimmed) {
+      if (activeSearch) {
+        applyListSearchDebounceRef.current = setTimeout(() => {
+          applySearchValue("");
+        }, 200);
+      }
+      return () => {
+        if (applyListSearchDebounceRef.current) {
+          clearTimeout(applyListSearchDebounceRef.current);
+        }
+      };
+    }
+
+    applyListSearchDebounceRef.current = setTimeout(() => {
+      applySearchValue(trimmed);
+    }, 450);
+
+    return () => {
+      if (applyListSearchDebounceRef.current) {
+        clearTimeout(applyListSearchDebounceRef.current);
+      }
+    };
+  }, [searchTerm, activeSearch]);
+
   const chipFilterContext = useMemo(
     () => ({
       tlOnly: viewTlOnly,

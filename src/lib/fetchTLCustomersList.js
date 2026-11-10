@@ -164,7 +164,7 @@ function appendTLCustomersFilters(
   } = filters;
 
   if (search) {
-    query += ` AND (c.customer_id = ? OR c.phone LIKE ? OR c.first_name LIKE ? OR c.last_name LIKE ? OR c.company LIKE ?)`;
+    query += ` AND (CAST(c.customer_id AS CHAR) = ? OR c.phone LIKE ? OR c.first_name LIKE ? OR c.last_name LIKE ? OR c.company LIKE ?)`;
     const searchTerm = `%${search}%`;
     params.push(search, searchTerm, searchTerm, searchTerm, searchTerm);
   }
@@ -279,7 +279,7 @@ function appendCustomerOnlyFilters(
   const { search, employee, status, stage, lead_campaign } = filters;
 
   if (search) {
-    query += ` AND (c.customer_id = ? OR c.phone LIKE ? OR c.first_name LIKE ? OR c.last_name LIKE ? OR c.company LIKE ?)`;
+    query += ` AND (CAST(c.customer_id AS CHAR) = ? OR c.phone LIKE ? OR c.first_name LIKE ? OR c.last_name LIKE ? OR c.company LIKE ?)`;
     const searchTerm = `%${search}%`;
     params.push(search, searchTerm, searchTerm, searchTerm, searchTerm);
   }
@@ -567,6 +567,7 @@ export async function fetchTLCustomersList(
     showTLOnly,
     isSuperAdmin,
     statusFilter: filters.status,
+    search: filters.search,
   };
 
   const hasModelColumn = await ensureTLFollowupsModelColumn(conn);

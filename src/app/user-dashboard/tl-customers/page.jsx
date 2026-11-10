@@ -137,8 +137,9 @@ export default async function TLCustomersPage({ searchParams }) {
     }
   }
 
-  // TL toggle on: only customers who have at least one TL_followups row (TL ne follow-up dala ho)
-  if (showTLOnly) {
+  // TL toggle on: require TL row unless user is searching (show matches without TL follow-up).
+  const hasSearch = search != null && String(search).trim() !== "";
+  if (showTLOnly && !hasSearch) {
     query += ` AND tlf.customer_id IS NOT NULL`;
   }
 
@@ -263,7 +264,7 @@ export default async function TLCustomersPage({ searchParams }) {
     }
   }
 
-  if (showTLOnly) {
+  if (showTLOnly && !hasSearch) {
     kpiQuery += ` AND tlf.customer_id IS NOT NULL`;
   }
 
