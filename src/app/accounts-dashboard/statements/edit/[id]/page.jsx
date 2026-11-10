@@ -1,7 +1,8 @@
 "use client";
 
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import PartyPaymentEntryModal from "@/components/party-payments/PartyPaymentEntryModal";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import dayjs from "dayjs";
@@ -34,6 +35,19 @@ export default function EditStatementPage() {
   const [selectedCredit, setSelectedCredit] = useState(null);
   const [selectedDebit, setSelectedDebit] = useState(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [showPartyPaymentModal, setShowPartyPaymentModal] = useState(false);
+
+  const partyPaymentInitialForm = useMemo(() => {
+    const stmtId = Number(id);
+    const amt = Math.abs(Number(form.amount) || 0);
+    const isCredit = String(form.type || "").trim() === "Credit";
+    return {
+      linked_statement_ids: stmtId > 0 ? [stmtId] : [],
+      amount_in: isCredit && amt > 0 ? String(amt) : "",
+      amount_out: !isCredit && amt > 0 ? String(amt) : "",
+      payment_date: form.date || "",
+    };
+  }, [id, form.amount, form.type, form.date]);
 
   useEffect(() => {
     // Fetch current user role
@@ -317,6 +331,10 @@ export default function EditStatementPage() {
           value={statementType}
           onChange={(e) => {
             const value = e.target.value;
+            if (value === "party_payments") {
+              setShowPartyPaymentModal(true);
+              return;
+            }
             if (value === "invoices") {
               if (userRole.includes("ACCOUNTANT") || userRole === "USER") {
                 router.push("/user-dashboard/invoices");
@@ -349,6 +367,7 @@ export default function EditStatementPage() {
           <option value="purchase_billings">Purchase Billings</option>
           <option value="dd_management">DD Management</option>
           <option value="employee_expenses">Employee Expenses</option>
+          <option value="party_payments">Add Party Payments</option>
         </select>
         {isTypeLocked && (
           <p className="text-xs text-red-600 mt-2">
@@ -549,6 +568,16 @@ export default function EditStatementPage() {
           </button>
         </div>
       </form>
+
+      <PartyPaymentEntryModal
+        open={showPartyPaymentModal}
+        onClose={() => setShowPartyPaymentModal(false)}
+        initialForm={partyPaymentInitialForm}
+        onSuccess={() => {
+          setShowPartyPaymentModal(false);
+          router.refresh();
+        }}
+      />
     </div>
   );
 }
