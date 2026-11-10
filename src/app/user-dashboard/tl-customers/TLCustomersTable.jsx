@@ -20,8 +20,8 @@ import {
   Shield,
   FileSpreadsheet,
   FileText,
-  ExternalLink,
 } from "lucide-react";
+import CustomerQuickViewModal from "@/components/Customers/CustomerQuickViewModal";
 import { applyTLCustomersChipFilter } from "@/lib/tlCustomersChipFilter";
 import Link from "next/link";
 import { NOTES_LANGUAGE_OPTIONS } from "@/constants/notesLanguageOptions";
@@ -154,6 +154,7 @@ export default function TLCustomersTable({
   const [searchSuggestHighlight, setSearchSuggestHighlight] = useState(-1);
   const searchSuggestRef = useRef(null);
   const searchSuggestDebounceRef = useRef(null);
+  const [customerQuickViewModal, setCustomerQuickViewModal] = useState(null);
 
   const fetchSearchSuggestions = useCallback((q) => {
     if (searchSuggestDebounceRef.current) {
@@ -272,8 +273,10 @@ export default function TLCustomersTable({
     ? "admin-dashboard"
     : "user-dashboard";
 
-  const customerViewHref = (customerId) =>
-    `/${quickViewDashboardBase}/view-customer/${customerId}`;
+  const openCustomerQuickViewModal = (kind, customerId) => {
+    setSearchSuggestOpen(false);
+    setCustomerQuickViewModal({ kind, customerId });
+  };
 
   const onSearchInputKeyDown = (e) => {
     if (
@@ -829,27 +832,31 @@ export default function TLCustomersTable({
                               </button>
                               {isSuperAdmin && isAdmin ? (
                                 <div className="flex items-center gap-1 flex-shrink-0">
-                                  <a
-                                    href={customerViewHref(s.customer_id)}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    onClick={(e) => e.stopPropagation()}
-                                    className="p-1.5 text-gray-600 hover:text-blue-700 hover:bg-blue-50 rounded border border-transparent hover:border-blue-200"
-                                    title="Open in new tab"
-                                    aria-label="Open customer in new tab"
-                                  >
-                                    <ExternalLink size={16} />
-                                  </a>
                                   <button
                                     type="button"
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      setSearchSuggestOpen(false);
-                                      router.push(
-                                        customerViewHref(s.customer_id),
+                                      openCustomerQuickViewModal(
+                                        "tl",
+                                        s.customer_id,
+                                      );
+                                    }}
+                                    className="text-xs px-2.5 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700"
+                                    title="TL follow-up (popup)"
+                                  >
+                                    TL
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      openCustomerQuickViewModal(
+                                        "view",
+                                        s.customer_id,
                                       );
                                     }}
                                     className="text-xs px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+                                    title="View customer (popup)"
                                   >
                                     View
                                   </button>
@@ -1956,6 +1963,11 @@ export default function TLCustomersTable({
         onSuccess={() => {}}
       />
 
+      <CustomerQuickViewModal
+        modal={customerQuickViewModal}
+        onClose={() => setCustomerQuickViewModal(null)}
+        dashboardBase={quickViewDashboardBase}
+      />
     </div>
   );
 }
