@@ -18,9 +18,7 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import AttendanceStatusTracker from "@/components/AttendanceStatusTracker";
 import ProspectHeaderButton from "@/components/prospects/ProspectHeaderButton";
-import { formatCrmDatetimeForISTDisplay } from "@/lib/timezone";
 import CustomerQuickViewModal from "@/components/Customers/CustomerQuickViewModal";
-import CustomerSearchPopupActions from "@/components/Customers/CustomerSearchPopupActions";
 import CustomerSearchResultActions from "@/components/Customers/CustomerSearchResultActions";
 
 export default function Navbar({ onToggleSidebar, showSalesMeta = false }) {
@@ -355,37 +353,7 @@ export default function Navbar({ onToggleSidebar, showSalesMeta = false }) {
                   {c.phone ? ` • ${c.phone}` : ""}
                   {isSuperAdminSearch && c.company ? ` • ${c.company}` : ""}
                 </div>
-                {isSuperAdminSearch ? (
-                  c.tl_followed_date ? (
-                    <div className="text-xs text-indigo-800 mt-1 leading-snug">
-                      <span className="font-medium">Last TL:</span>{" "}
-                      {formatCrmDatetimeForISTDisplay(
-                        c.tl_followed_date,
-                        "DD-MM-YYYY HH:mm",
-                      ) || "—"}
-                      {c.tl_followed_by ? ` · ${c.tl_followed_by}` : ""}
-                      {c.tl_next_followup ? (
-                        <>
-                          {" "}
-                          · Next:{" "}
-                          {formatCrmDatetimeForISTDisplay(
-                            c.tl_next_followup,
-                            "DD-MM-YYYY HH:mm",
-                          )}
-                        </>
-                      ) : null}
-                      {c.tl_notes ? (
-                        <span className="block text-gray-600 mt-0.5 line-clamp-2">
-                          {String(c.tl_notes).trim()}
-                        </span>
-                      ) : null}
-                    </div>
-                  ) : (
-                    <div className="text-xs text-gray-400 mt-1">
-                      No TL follow-up yet
-                    </div>
-                  )
-                ) : c.lead_source ? (
+                {!isSuperAdminSearch && c.lead_source ? (
                   <div className="text-xs text-gray-400 truncate">
                     Lead source: {c.lead_source}
                   </div>
@@ -393,14 +361,17 @@ export default function Navbar({ onToggleSidebar, showSalesMeta = false }) {
               </div>
               <div className="flex items-center gap-1 flex-shrink-0">
                 {isSuperAdminSearch ? (
-                  <CustomerSearchPopupActions
-                    onTl={() =>
-                      openHeaderCustomerModal("tl", c.customer_id)
-                    }
-                    onView={() =>
-                      openHeaderCustomerModal("view", c.customer_id)
-                    }
-                  />
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openHeaderCustomerModal("view", c.customer_id);
+                    }}
+                    className="text-xs px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+                    title="View customer (popup)"
+                  >
+                    View
+                  </button>
                 ) : (
                   <CustomerSearchResultActions
                     viewHref={customerViewHref(c.customer_id)}
