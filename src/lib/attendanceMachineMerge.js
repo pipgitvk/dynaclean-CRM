@@ -107,9 +107,43 @@ export function combineLogsTableTimes(a, b) {
   };
 }
 
+/** Log / merged checkout shown only when it is after check-in and not a lone machine punch duplicate. */
+export function isInvalidDisplayCheckout(checkout, checkinRef, machineDay) {
+  if (!isMeaningfulAttendancePunch(checkout)) return false;
+
+  const macIn = machineDay?.machine_checkin ?? null;
+  const macOut = machineDay?.machine_checkout ?? null;
+  const humanPunches = Number(machineDay?.human_punch_count ?? 0);
+  const inn = checkinRef;
+
+  if (
+    !isMeaningfulAttendancePunch(macOut) &&
+    humanPunches <= 1 &&
+    ((isMeaningfulAttendancePunch(inn) &&
+      machinePunchesSameInstant(checkout, inn)) ||
+      (isMeaningfulAttendancePunch(macIn) &&
+        machinePunchesSameInstant(checkout, macIn)))
+  ) {
+    return true;
+  }
+
+  if (!isMeaningfulAttendancePunch(inn)) return false;
+
+  if (machinePunchesSameInstant(inn, checkout)) return true;
+  return compareInstants(checkout, inn) <= 0;
+}
+
 export function getLogsTableTimes(log) {
-  if (log?.logs_table_times) return log.logs_table_times;
-  return snapshotLogsTableTimes(log);
+  const raw = log?.logs_table_times
+    ? { ...log.logs_table_times }
+    : snapshotLogsTableTimes(log);
+  const machineDay = log?.machine_day ?? null;
+  const checkinRef =
+    raw.checkin ?? log?.checkin_time ?? machineDay?.machine_checkin ?? null;
+  if (isInvalidDisplayCheckout(raw.checkout, checkinRef, machineDay)) {
+    return { ...raw, checkout: null };
+  }
+  return raw;
 }
 
 export function getMachinePunchTimes(log) {
@@ -409,12 +443,39 @@ export function mergeCrmAndMachineDay(crmRow, machineDay) {
     }
   }
 
+  applyMergedCheckoutGuards(merged, machineDay);
+
   return merged;
 }
 
+/** Drop log/CRM checkout when it duplicates a single machine punch or is not after check-in. */
+function applyMergedCheckoutGuards(merged, machineDay) {
+  const inn = merged.checkin_time;
+  const out = merged.checkout_time;
+
+  if (
+    isMeaningfulAttendancePunch(out) &&
+    isInvalidDisplayCheckout(out, inn, machineDay)
+  ) {
+    merged.checkout_time = null;
+    if (merged.merge_sources) merged.merge_sources.checkout = null;
+  }
+
+  if (merged.logs_table_times) {
+    const logIn =
+      merged.logs_table_times.checkin ?? inn ?? machineDay?.machine_checkin;
+    const logOut = merged.logs_table_times.checkout;
+    if (isInvalidDisplayCheckout(logOut, logIn, machineDay)) {
+      merged.logs_table_times = {
+        ...merged.logs_table_times,
+        checkout: null,
+      };
+    }
+  }
+}
+
 /**
- * Last non-AUTO afternoon/evening punch of the day (ignores synthetic AUTO rows).
- * Used for CRM↔machine merge: later checkout wins vs CRM.
+ * @deprecated Legacy AM/PM split — use MIN first punch + conditional MAX checkout in loadMachineDailyByUsername.
  */
 export const MACHINE_CHECKOUT_AGG_SQL = `
   MAX(CASE
@@ -422,6 +483,23 @@ export const MACHINE_CHECKOUT_AGG_SQL = `
      AND UPPER(COALESCE(m_flag, '')) <> 'AUTO'
     THEN punch_datetime
   END)`;
+
+function machinePunchesSameInstant(a, b) {
+  const d1 = parseAttendanceDateTime(a);
+  const d2 = parseAttendanceDateTime(b);
+  if (!d1 || !d2) return false;
+  return d1.getTime() === d2.getTime();
+}
+
+/** Checkout from machine punches only when 2+ real (non-AUTO) punches that day. */
+export function machineCheckoutFromDailyAggregates(row) {
+  const humanCount = Number(row?.human_punch_count ?? 0);
+  const out = row?.machine_checkout ?? null;
+  if (humanCount <= 1 || !isMeaningfulAttendancePunch(out)) return null;
+  const inn = row?.machine_checkin ?? null;
+  if (machinePunchesSameInstant(inn, out)) return null;
+  return out;
+}
 
 export async function removeAutoNinePmMachinePunch(conn, empCode, dateYmd) {
   if (!empCode || !dateYmd) return 0;
@@ -630,8 +708,20 @@ export async function loadMachineDailyByUsername(conn, machineCodeToUsername, op
     SELECT
       emp_code,
       DATE(punch_datetime) AS punch_date,
-      MIN(CASE WHEN HOUR(punch_datetime) < 12 THEN punch_datetime END) AS machine_checkin,
-      ${MACHINE_CHECKOUT_AGG_SQL.trim()} AS machine_checkout
+      MIN(punch_datetime) AS machine_checkin,
+      MAX(
+        CASE
+          WHEN UPPER(COALESCE(m_flag, '')) <> 'AUTO'
+          THEN punch_datetime
+        END
+      ) AS machine_checkout,
+      COUNT(*) AS punch_count,
+      SUM(
+        CASE
+          WHEN UPPER(COALESCE(m_flag, '')) <> 'AUTO' THEN 1
+          ELSE 0
+        END
+      ) AS human_punch_count
     FROM machine_attendance_punches`;
   const params = [];
   const where = [];
@@ -659,11 +749,14 @@ export async function loadMachineDailyByUsername(conn, machineCodeToUsername, op
     if (!username) continue;
     const dateYmd = attendanceDateKey(row.punch_date);
     if (!dateYmd) continue;
+    const machine_checkout = machineCheckoutFromDailyAggregates(row);
     byUserDate.set(`${username}|${dateYmd}`, {
       emp_code: empCode,
       punch_date: dateYmd,
       machine_checkin: row.machine_checkin,
-      machine_checkout: row.machine_checkout,
+      machine_checkout,
+      punch_count: Number(row.punch_count ?? 0),
+      human_punch_count: Number(row.human_punch_count ?? 0),
     });
   }
   return byUserDate;
