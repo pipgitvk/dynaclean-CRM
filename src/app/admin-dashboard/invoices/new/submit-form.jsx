@@ -177,6 +177,19 @@ export default function InvoiceForm({
     return match ? match[1] : null;
   };
 
+  const consigneeFromQuotationCustomer = (quotation) => {
+    const first = String(
+      quotation.first_name || quotation.customer_name || "",
+    ).trim();
+    const phone = String(quotation.customer_contact || "").trim();
+    const contactLine =
+      first && phone ? `${first}-${phone}` : phone || first;
+    return {
+      Consignee: first,
+      Consignee_Contact: contactLine,
+    };
+  };
+
   const [stateSearch, setStateSearch] = useState("");
   const [stateSuggestions, setStateSuggestions] = useState([]);
   const [showStateSuggestions, setShowStateSuggestions] = useState(false);
@@ -361,14 +374,13 @@ export default function InvoiceForm({
         finalPaymentStatus = "UNPAID";
       }
 
-      const buyersOrderNo = String(
-        form.buyers_order_no || orderId || initialOrderId || "",
-      ).trim();
+      const contextOrderId = String(orderId || initialOrderId || "").trim();
+      const buyersOrderNo = String(form.buyers_order_no || "").trim();
 
       const dataToSend = {
         ...form,
-        buyers_order_no: buyersOrderNo,
-        order_id: buyersOrderNo || undefined,
+        buyers_order_no: buyersOrderNo || null,
+        order_id: contextOrderId || undefined,
         quotation_id: form.quotation_id || quotationNumber || undefined,
         invoice_number: invoiceNumber,
         invoice_date: invoiceDate,
@@ -471,15 +483,14 @@ const fetchQuotationAndFill = async (quoteNoArg) => {
     setIsFromQuotation(true);
 
     // Fill only available quotation fields
+    const consigneeFields = consigneeFromQuotationCustomer(quotation);
+
     setForm((prev) => ({
       ...prev,
-      buyers_order_no:
-        prev.buyers_order_no ||
-        String(orderId || initialOrderId || "").trim() ||
-        prev.buyers_order_no,
       customer_name: quotation.customer_name,
       customer_email: quotation.customer_email,
       customer_phone: quotation.customer_contact,
+      ...consigneeFields,
       billing_address: quotation.billing_address,
       shipping_address: quotation.shipping_address,
       gst_number: quotation.gst_number,
@@ -572,10 +583,6 @@ const fetchQuotationAndFill = async (quoteNoArg) => {
     const oid = String(initialOrderId || "").trim();
     if (!oid) return;
     setOrderId(oid);
-    setForm((prev) => ({
-      ...prev,
-      buyers_order_no: prev.buyers_order_no || oid,
-    }));
   }, [initialOrderId]);
 
   return (
@@ -821,7 +828,7 @@ const fetchQuotationAndFill = async (quoteNoArg) => {
         />
         <input
           type="text"
-          placeholder="Consignee Contact"
+          placeholder="Consignee Contact (Name-Phone)"
           className="input w-full"
           value={form.Consignee_Contact}
           onChange={(e) =>

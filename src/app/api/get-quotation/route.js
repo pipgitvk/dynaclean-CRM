@@ -135,6 +135,7 @@ export async function GET(req) {
         quotation_date: quotation.quote_date,
 
         customer_id: quotation.customer_id || "",
+        first_name: String(quotation.first_name || "").trim(),
         customer_name: quotation.first_name || quotation.company_name || "",
         customer_email: quotation.email || "",
         customer_contact: quotation.phone || "",

@@ -214,14 +214,25 @@ export function buildInvoicePdfDocumentData(invoice) {
       phone: invo.customer_phone || "",
       email: invo.customer_email || "",
     },
-    consignee: {
-      name: invo.Consignee || invo.customer_name || "",
-      address: invo.shipping_address || invo.billing_address || "",
-      gstin: invo.gst_number || "",
-      state: invo.state || "",
-      contactPerson: invo.customer_name || "",
-      phone: invo.Consignee_Contact || "",
-    },
+    consignee: (() => {
+      const nameRaw = String(invo.Consignee || invo.customer_name || "").trim();
+      const contactRaw = String(invo.Consignee_Contact || "").trim();
+      const phoneOnly = String(invo.customer_phone || "").trim();
+      const contactDisplay =
+        contactRaw ||
+        (nameRaw && phoneOnly
+          ? `${nameRaw}-${phoneOnly}`
+          : phoneOnly || nameRaw);
+      return {
+        name: nameRaw,
+        address: invo.shipping_address || invo.billing_address || "",
+        gstin: invo.gst_consignee || invo.gst_number || "",
+        state: invo.state || "",
+        contactDisplay,
+        contactPerson: nameRaw || invo.customer_name || "",
+        phone: phoneOnly,
+      };
+    })(),
     invoice: {
       number: invo.invoice_number || "",
       buyersOrderNo: invo.buyers_order_no || "",

@@ -120,6 +120,19 @@ export default function InvoiceForm({
     return match ? match[1] : null;
   };
 
+  const consigneeFromQuotationCustomer = (quotation) => {
+    const first = String(
+      quotation.first_name || quotation.customer_name || "",
+    ).trim();
+    const phone = String(quotation.customer_contact || "").trim();
+    const contactLine =
+      first && phone ? `${first}-${phone}` : phone || first;
+    return {
+      Consignee: first,
+      Consignee_Contact: contactLine,
+    };
+  };
+
   const [stateSearch, setStateSearch] = useState("");
   const [stateSuggestions, setStateSuggestions] = useState([]);
   const [showStateSuggestions, setShowStateSuggestions] = useState(false);
@@ -273,14 +286,13 @@ Thanks for doing business with us!`,
       else if (balanceAmount > 0 && balanceAmount < taxSummary.grandTotal) finalPaymentStatus = "PARTIAL";
       else if (balanceAmount >= taxSummary.grandTotal) finalPaymentStatus = "UNPAID";
 
-      const buyersOrderNo = String(
-        form.buyers_order_no || orderId || initialOrderId || "",
-      ).trim();
+      const contextOrderId = String(orderId || initialOrderId || "").trim();
+      const buyersOrderNo = String(form.buyers_order_no || "").trim();
 
       const dataToSend = {
         ...form,
-        buyers_order_no: buyersOrderNo,
-        order_id: buyersOrderNo || undefined,
+        buyers_order_no: buyersOrderNo || null,
+        order_id: contextOrderId || undefined,
         quotation_id: form.quotation_id || quotationNumber || undefined,
         invoice_number: invoiceNumber,
         invoice_date: invoiceDate,
@@ -364,10 +376,13 @@ Thanks for doing business with us!`,
 
       setIsFromQuotation(true);
 
+      const consigneeFields = consigneeFromQuotationCustomer(quotation);
+
       const nextForm = {
         customer_name: quotation.customer_name,
         customer_email: quotation.customer_email,
         customer_phone: quotation.customer_contact,
+        ...consigneeFields,
         billing_address: quotation.billing_address,
         shipping_address: quotation.shipping_address,
         gst_number: quotation.gst_number,
@@ -384,10 +399,6 @@ Thanks for doing business with us!`,
       setForm((prev) => ({
         ...prev,
         ...nextForm,
-        buyers_order_no:
-          prev.buyers_order_no ||
-          String(orderId || initialOrderId || "").trim() ||
-          prev.buyers_order_no,
       }));
 
       const interstate = isInterstateInvoiceSupply({
@@ -462,10 +473,6 @@ Thanks for doing business with us!`,
     const oid = String(initialOrderId || "").trim();
     if (!oid) return;
     setOrderId(oid);
-    setForm((prev) => ({
-      ...prev,
-      buyers_order_no: prev.buyers_order_no || oid,
-    }));
   }, [initialOrderId]);
 
   return (
@@ -578,7 +585,7 @@ Thanks for doing business with us!`,
           <input type="text" placeholder="Billing Address *" className="input w-full" value={form.billing_address} onChange={(e) => setForm({ ...form, billing_address: e.target.value })} required />
           <input type="text" placeholder="Shipping Address" className="input w-full" value={form.shipping_address} onChange={(e) => setForm({ ...form, shipping_address: e.target.value })} />
           <input type="text" placeholder="Consignee Name" className="input w-full" value={form.Consignee} onChange={(e) => setForm({ ...form, Consignee: e.target.value })} />
-          <input type="text" placeholder="Consignee Contact" className="input w-full" value={form.Consignee_Contact} onChange={(e) => setForm({ ...form, Consignee_Contact: e.target.value })} />
+          <input type="text" placeholder="Consignee Contact (Name-Phone)" className="input w-full" value={form.Consignee_Contact} onChange={(e) => setForm({ ...form, Consignee_Contact: e.target.value })} />
           <input type="text" placeholder="GSTIN" className="input w-full" value={form.gst_number} onChange={(e) => setForm({ ...form, gst_number: e.target.value })} />
 
           {getStateFromGSTIN(form.gst_number?.trim()) ? (

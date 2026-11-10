@@ -1898,14 +1898,27 @@ const NewInvoice = ({ invoice }) => {
       phone: invoice.customer_phone || "",
       email: invoice.customer_email || "",
     },
-    consignee: {
-      name: invoice.Consignee || invoice.customer_name || "",
-      address: invoice.shipping_address || invoice.billing_address || "",
-      gstin: invoice.gst_consignee || invoice.gst_number || "",
-      state: invoice.state || "",
-      contactPerson: invoice.customer_name || "",
-      phone: invoice.Consignee_Contact || "",
-    },
+    consignee: (() => {
+      const nameRaw = String(
+        invoice.Consignee || invoice.customer_name || "",
+      ).trim();
+      const contactRaw = String(invoice.Consignee_Contact || "").trim();
+      const phoneOnly = String(invoice.customer_phone || "").trim();
+      const contactDisplay =
+        contactRaw ||
+        (nameRaw && phoneOnly
+          ? `${nameRaw}-${phoneOnly}`
+          : phoneOnly || nameRaw);
+      return {
+        name: nameRaw,
+        address: invoice.shipping_address || invoice.billing_address || "",
+        gstin: invoice.gst_consignee || invoice.gst_number || "",
+        state: invoice.state || "",
+        contactDisplay,
+        contactPerson: nameRaw || invoice.customer_name || "",
+        phone: phoneOnly,
+      };
+    })(),
     invoice: {
       number: invoice.invoice_number || "",
       buyersOrderNo: invoice.buyers_order_no || "",
@@ -3177,7 +3190,7 @@ const NewInvoice = ({ invoice }) => {
 
   <div style={{ marginBottom: "3px" }}><b>State: </b>{data.consignee.state}</div>
 
-  <div style={{ marginBottom: "3px" }}><b>Contact: </b>{data.consignee.contactPerson} ({data.consignee.phone})</div>
+  <div style={{ marginBottom: "3px" }}><b>Contact: </b>{data.consignee.contactDisplay || `${data.consignee.contactPerson || "-"} (${data.consignee.phone || "-"})`}</div>
               </td>
             </tr>
             <tr>

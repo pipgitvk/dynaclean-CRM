@@ -574,8 +574,10 @@ const InvoicePDFDocument = ({ data, logoSrc, signatureSrc }) => {
                   </Text>
                   <Text style={{ fontSize: 8.5, lineHeight: 1.25 }}>
                     <Text style={styles.bold}>Contact: </Text>
-                    <Text>{data.consignee.contactPerson || "-"}</Text>
-                    <Text> ({data.consignee.phone || "-"})</Text>
+                    <Text>
+                      {data.consignee.contactDisplay ||
+                        `${data.consignee.contactPerson || "-"} (${data.consignee.phone || "-"})`}
+                    </Text>
                   </Text>
                 </View>
               </View>
