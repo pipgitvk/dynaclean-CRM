@@ -261,20 +261,10 @@ export default function TLCustomersTable({
     return params;
   };
 
-  const applySearchValue = (value) => {
-    const v = String(value ?? "").trim();
-    setSearchTerm(v);
-    setSearchSuggestOpen(false);
-    startTransition(() => {
-      const params = buildFilterParams({ search: v });
-      if (!v) params.delete("search");
-      params.delete("page");
-      router.push(`${basePath}?${params.toString()}`);
-    });
-  };
-
   const pickSearchSuggestion = (s) => {
-    applySearchValue(String(s.customer_id));
+    setSearchTerm(String(s.customer_id));
+    setSearchSuggestOpen(false);
+    setSearchSuggestHighlight(-1);
   };
 
   const onSearchInputKeyDown = (e) => {
@@ -312,41 +302,6 @@ export default function TLCustomersTable({
     () => String(searchParams?.search ?? "").trim(),
     [searchParams?.search],
   );
-
-  const applyListSearchDebounceRef = useRef(null);
-
-  // Apply search to the list (URL) so TL-only view still shows matches with no TL row yet.
-  useEffect(() => {
-    const trimmed = searchTerm.trim();
-    if (trimmed === activeSearch) return;
-
-    if (applyListSearchDebounceRef.current) {
-      clearTimeout(applyListSearchDebounceRef.current);
-    }
-
-    if (!trimmed) {
-      if (activeSearch) {
-        applyListSearchDebounceRef.current = setTimeout(() => {
-          applySearchValue("");
-        }, 200);
-      }
-      return () => {
-        if (applyListSearchDebounceRef.current) {
-          clearTimeout(applyListSearchDebounceRef.current);
-        }
-      };
-    }
-
-    applyListSearchDebounceRef.current = setTimeout(() => {
-      applySearchValue(trimmed);
-    }, 450);
-
-    return () => {
-      if (applyListSearchDebounceRef.current) {
-        clearTimeout(applyListSearchDebounceRef.current);
-      }
-    };
-  }, [searchTerm, activeSearch]);
 
   const chipFilterContext = useMemo(
     () => ({
