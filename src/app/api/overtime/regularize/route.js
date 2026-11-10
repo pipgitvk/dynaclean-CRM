@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { getReportees } from "@/lib/reportingManager";
+import { ensureAttendanceRegularizationCreatedByColumn } from "@/lib/ensureAttendanceRegularizationCreatedBy";
 import fs from "fs/promises";
 import path from "path";
 
@@ -81,6 +82,7 @@ export async function POST(req) {
     }
 
     const conn = await getDbConnection();
+    await ensureAttendanceRegularizationCreatedByColumn(conn);
     console.log("Database connection established");
 
     // Try different column names for attendance logs
@@ -149,13 +151,16 @@ export async function POST(req) {
     }
 
     console.log("Inserting regularization request...");
+    const createdBy = String(session.username || "").trim();
+
     const [result] = await conn.execute(
       `INSERT INTO attendance_regularization_requests 
-       (username, log_date, original_checkin_time, original_checkout_time,
+       (username, created_by, log_date, original_checkin_time, original_checkout_time,
         proposed_checkin_time, proposed_checkout_time, reason, attachment_url, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
       [
         employee,
+        createdBy || employee,
         date,
         currentAttendance.checkin_time,
         currentAttendance.checkout_time,

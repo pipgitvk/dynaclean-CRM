@@ -6,6 +6,7 @@ import {
   canManageAttendanceRules,
   resolveRoleForAttendanceAdmin,
 } from "@/lib/adminAttendanceRulesAuth";
+import { ensureAttendanceRegularizationCreatedByColumn } from "@/lib/ensureAttendanceRegularizationCreatedBy";
 
 /**
  * List all attendance regularization requests (admin / HR).
@@ -32,6 +33,7 @@ export async function GET() {
     } catch (e) {
       if (!String(e.message).includes("Duplicate column name")) throw e;
     }
+    await ensureAttendanceRegularizationCreatedByColumn(conn);
 
     const [rows] = await conn.execute(
       `SELECT *

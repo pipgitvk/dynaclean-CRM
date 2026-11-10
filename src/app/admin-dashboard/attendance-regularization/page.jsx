@@ -8,6 +8,7 @@ import toast from "react-hot-toast";
 import { BadgeCheck, X } from "lucide-react";
 import { formatAttendanceTimeForDisplay as formatTime } from "@/lib/istDateTime";
 import { getAttendanceRegularizationAttachmentHref } from "@/lib/attendanceRegularizationAttachmentHref";
+import { getAttendanceRegularizationCreatedBy } from "@/lib/ensureAttendanceRegularizationCreatedBy";
 
 function formatLogDate(v) {
   if (v == null) return "—";
@@ -268,6 +269,9 @@ export default function AdminAttendanceRegularizationPage() {
                     Employee
                   </th>
                   <th className="px-3 py-2 font-medium whitespace-nowrap">
+                    Created by
+                  </th>
+                  <th className="px-3 py-2 font-medium whitespace-nowrap">
                     Date
                   </th>
                   <th className="px-3 py-2 font-medium whitespace-nowrap">
@@ -291,6 +295,9 @@ export default function AdminAttendanceRegularizationPage() {
                     <td className="px-3 py-2 text-gray-800">{req.id}</td>
                     <td className="px-3 py-2 font-medium text-gray-900">
                       {req.username}
+                    </td>
+                    <td className="px-3 py-2 text-gray-800 whitespace-nowrap">
+                      {getAttendanceRegularizationCreatedBy(req)}
                     </td>
                     <td className="px-3 py-2 whitespace-nowrap">
                       {formatLogDate(req.log_date)}

@@ -23,6 +23,7 @@ import {
   normalizeUsernameKey,
 } from "@/lib/attendanceCanonicalUsername";
 import { attendanceDateKey } from "@/lib/leaveDateRange";
+import { getAttendanceRegularizationCreatedBy } from "@/lib/ensureAttendanceRegularizationCreatedBy";
 import { parseAttendanceDateTime } from "@/lib/istDateTime";
 import { isMeaningfulAttendancePunch } from "@/lib/attendanceMeaningfulPunch";
 import {
@@ -493,7 +494,8 @@ export async function GET(request) {
     const regMap = new Map();
     try {
       const [regRows] = await db.query(
-        `SELECT ar.username, ar.log_date, ar.reason, ar.reviewed_by
+        `SELECT ar.username, ar.log_date, ar.reason, ar.reviewed_by,
+                ar.created_by, ar.proxy_submitter_username
          FROM attendance_regularization_requests ar
          INNER JOIN (
            SELECT username, log_date, MAX(id) AS mid
@@ -513,7 +515,7 @@ export async function GET(request) {
         const dk = attendanceDateKey(r.log_date);
         const canonUser = resolveCanon(r.username, canonicalMaps);
         regMap.set(`${canonUser}|${dk}`, {
-          createdBy: r.username,
+          createdBy: getAttendanceRegularizationCreatedBy(r),
           approvedBy: r.reviewed_by || "—",
           reason: r.reason && String(r.reason).trim() ? r.reason : "—",
         });

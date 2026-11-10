@@ -13,6 +13,7 @@ import {
   canProxyAttendanceRegularization,
   resolveRoleForAttendanceAdmin,
 } from "@/lib/adminAttendanceRulesAuth";
+import { ensureAttendanceRegularizationCreatedByColumn } from "@/lib/ensureAttendanceRegularizationCreatedBy";
 
 const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
 const ALLOWED_ATTACHMENT_MIME = new Set([
@@ -255,6 +256,7 @@ export async function POST(request) {
     }
 
     const conn = await getDbConnection();
+    await ensureAttendanceRegularizationCreatedByColumn(conn);
 
     const [pendingDup] = await conn.execute(
       `SELECT id FROM attendance_regularization_requests
@@ -305,9 +307,11 @@ export async function POST(request) {
       );
     }
 
+    const createdBy = String(session.username || "").trim() || subjectUsername;
+
     await conn.execute(
       `INSERT INTO attendance_regularization_requests (
-        username, log_date, status, reason,
+        username, created_by, log_date, status, reason,
         original_checkin_time, original_checkout_time,
         original_break_morning_start, original_break_morning_end,
         original_break_lunch_start, original_break_lunch_end,
@@ -317,12 +321,13 @@ export async function POST(request) {
         proposed_break_lunch_start, proposed_break_lunch_end,
         proposed_break_evening_start, proposed_break_evening_end,
         attachment_url
-      ) VALUES (?, ?, 'pending', ?,
+      ) VALUES (?, ?, ?, 'pending', ?,
         ?, ?, ?, ?, ?, ?, ?, ?,
         ?, ?, ?, ?, ?, ?, ?, ?,
         ?)`,
       [
         subjectUsername,
+        createdBy,
         log_date,
         reason,
         orig.checkin_time,
