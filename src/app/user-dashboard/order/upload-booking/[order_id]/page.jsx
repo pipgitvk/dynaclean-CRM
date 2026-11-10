@@ -5,10 +5,10 @@ import {
 } from "@/lib/getOrderForBookingUpload";
 import { getSessionPayload } from "@/lib/auth";
 import { redirect } from "next/navigation";
-
-const ORDER_BASE = "/user-dashboard/order";
+import { getServerOrderBasePath } from "@/lib/orderRouteBasePath";
 
 export default async function UploadBookingPage({ params }) {
+  const ORDER_BASE = await getServerOrderBasePath();
   const { order_id: orderId } = await params;
   const payload = await getSessionPayload();
   const viewerRole = payload?.role ?? payload?.userRole ?? "";

@@ -41,6 +41,19 @@ export function allowNeworderPaymentAmountWithoutInvoiceLink(order) {
   return ymd < LEGACY_NEWORDER_PAYMENT_AMOUNT_BEFORE_YMD;
 }
 
+/** Accountant-recorded `payment_amount` on neworder (excludes booking advance only). */
+export function neworderRecordedPaymentAmountIsEmpty(order) {
+  const raw = order?.payment_amount;
+  if (raw == null || String(raw).trim() === "") return true;
+  return sumOrderPaymentAmounts(order) <= 0;
+}
+
+function advanceRequestedForOrderListPaid(order) {
+  const adv = Number(order?.advance_requested);
+  if (!Number.isFinite(adv) || adv <= 0) return 0;
+  return adv;
+}
+
 function orderTotalForPaidCap(order) {
   const invGrand = Number(order?.invoice_grand_total);
   if (Number.isFinite(invGrand) && invGrand > 0) return invGrand;
@@ -396,8 +409,9 @@ export function sumAdvanceRequestedForDisplay(order) {
 
 /**
  * Order list Paid / Balance (admin / accounts / superadmin).
- * Invoice Link Payment → invoice-linked amounts; otherwise neworder.payment_amount
- * only for orders dated before LEGACY_NEWORDER_PAYMENT_AMOUNT_BEFORE_YMD.
+ * Invoice Link Payment → invoice-linked amounts; otherwise neworder payment fields:
+ * — before LEGACY_NEWORDER_PAYMENT_AMOUNT_BEFORE_YMD: advance_requested or payment_amount;
+ * — after that date: advance_requested only until accountant sets payment_amount.
  */
 export function getOrderPaidAmountForDisplay(order) {
   const orderTotal = orderTotalForPaidCap(order);
@@ -412,6 +426,8 @@ export function getOrderPaidAmountForDisplay(order) {
     }
   } else if (allowNeworderPaymentAmountWithoutInvoiceLink(order)) {
     paid = sumAdvanceRequestedForDisplay(order);
+  } else if (neworderRecordedPaymentAmountIsEmpty(order)) {
+    paid = advanceRequestedForOrderListPaid(order);
   }
 
   if (orderTotal > 0) {
@@ -420,12 +436,23 @@ export function getOrderPaidAmountForDisplay(order) {
   return paid;
 }
 
+/** Order list UI: paid figure is booking advance only (no invoice link, no payment_amount). */
+export function orderListPaidAmountIsRequestedOnly(order) {
+  if (getOrderPaidAmountForDisplay(order) <= 0) return false;
+  if (orderInvoiceHasPaymentLink(order)) return false;
+  if (!neworderRecordedPaymentAmountIsEmpty(order)) return false;
+  return advanceRequestedForOrderListPaid(order) > 0;
+}
+
 /** Payment lines for list / View Payment when no invoice link (date cutoff applies). */
 export function buildOrderOnlyPaymentLinesForDisplay(order) {
   if (orderInvoiceHasPaymentLink(order)) {
     return [];
   }
-  if (!allowNeworderPaymentAmountWithoutInvoiceLink(order)) {
+  const legacyNeworderPayments = allowNeworderPaymentAmountWithoutInvoiceLink(
+    order,
+  );
+  if (!legacyNeworderPayments && !neworderRecordedPaymentAmountIsEmpty(order)) {
     return [];
   }
   const adv = Number(order?.advance_requested);

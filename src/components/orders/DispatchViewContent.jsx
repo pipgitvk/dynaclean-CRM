@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import Link from "next/link";
+import { useParams, usePathname } from "next/navigation";
+import { resolveOrderBasePathFromPathname } from "@/lib/orderRouteBasePath";
 
 const PHOTO_LABELS = ["Front", "Back", "Right", "Left"];
 
@@ -25,6 +27,8 @@ function parseAccessories(value) {
 
 export default function DispatchViewContent() {
   const { order_id } = useParams();
+  const pathname = usePathname();
+  const orderListPath = resolveOrderBasePathFromPathname(pathname);
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -47,10 +51,16 @@ export default function DispatchViewContent() {
 
   return (
     <div className="p-4 space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-lg font-semibold">
           Dispatch Details for Order #{order_id}
         </h2>
+        <Link
+          href={orderListPath}
+          className="text-sm font-medium text-blue-600 hover:underline"
+        >
+          Back to orders
+        </Link>
       </div>
 
       {rows.length === 0 ? (

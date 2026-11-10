@@ -2,7 +2,8 @@
 
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { resolveOrderBasePathFromPathname } from "@/lib/orderRouteBasePath";
 
 export default function UploadBookingForm({
   order,
@@ -11,6 +12,8 @@ export default function UploadBookingForm({
   initialBooking = null,
 }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const orderListPath = resolveOrderBasePathFromPathname(pathname) || redirectPath;
   const [formData, setFormData] = useState(
     initialBooking || {
       booking_id: "",
@@ -64,7 +67,7 @@ export default function UploadBookingForm({
           : "Booking uploaded successfully. Email sent to customer.",
       );
       setTimeout(() => {
-        router.push(redirectPath);
+        router.push(orderListPath);
       }, 1500);
     } catch {
       setError("Failed to save booking.");

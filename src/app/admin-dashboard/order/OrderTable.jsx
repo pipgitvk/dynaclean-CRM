@@ -27,6 +27,7 @@ import dayjs from "dayjs";
 import {
   buildOrderPaymentRows,
   getOrderPaidAmountForDisplay,
+  orderListPaidAmountIsRequestedOnly,
   sumOrderPaymentAmounts,
 } from "@/lib/orderPaymentHistory";
 import { EMPTY_ORDER_STATS } from "@/lib/adminOrderListStatCards";
@@ -477,18 +478,31 @@ function getAccountantReportPaidAmount(order) {
   return getOrderPaidAmountForDisplay(order);
 }
 
-/** Green when any paid amount shows (invoice link or neworder payment_amount). */
+/** Green for recorded payment; grey for booking advance (`advance_requested` only). */
 function getOrderPaidAmountUiClasses(order) {
   const paid = getOrderPaidAmountForDisplay(order);
+  const requestedOnly = orderListPaidAmountIsRequestedOnly(order);
+  const greyMuted =
+    "font-bold text-gray-500 underline decoration-gray-400 underline-offset-2 hover:text-gray-700";
+  const greyRequested =
+    "font-bold text-gray-600 underline decoration-gray-400 underline-offset-2 hover:text-gray-800";
   if (paid <= 0) {
     return {
       label: "font-semibold text-gray-500",
-      value:
-        "font-bold text-gray-500 underline decoration-gray-400 underline-offset-2 hover:text-gray-700",
+      amountLabel: "Paid:",
+      value: greyMuted,
+    };
+  }
+  if (requestedOnly) {
+    return {
+      label: "font-semibold text-gray-500",
+      amountLabel: "Requested:",
+      value: greyRequested,
     };
   }
   return {
     label: "font-semibold text-green-700",
+    amountLabel: "Paid:",
     value:
       "font-bold text-green-600 underline decoration-green-400 underline-offset-2 hover:text-green-800",
   };
@@ -2831,7 +2845,7 @@ export default function OrderTable({
                           </span>
                         </div>
                         <div className="flex justify-between gap-4">
-                          <span className={paidUi.label}>Paid:</span>
+                          <span className={paidUi.label}>{paidUi.amountLabel}</span>
                           <OrderPaymentHistoryTrigger
                             order={r}
                             paymentStatusRaw={deriveOrderListPaymentStatus(r)}
@@ -3013,7 +3027,11 @@ export default function OrderTable({
                   })}
                 </div>
                 <div>
-                  <strong>Paid Amount:</strong>{" "}
+                  <strong>
+                    {orderListPaidAmountIsRequestedOnly(r)
+                      ? "Requested Amount:"
+                      : "Paid Amount:"}
+                  </strong>{" "}
                   <OrderPaymentHistoryTrigger
                     order={r}
                     paymentStatusRaw={deriveOrderListPaymentStatus(r)}

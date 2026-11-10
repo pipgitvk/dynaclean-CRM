@@ -1,6 +1,7 @@
 import ViewOrderDetails from "./ViewOrderDetails";
 import { notFound } from "next/navigation";
 import { getViewBookingPageData } from "@/lib/getViewBookingPageData";
+import { getServerOrderBasePath } from "@/lib/orderRouteBasePath";
 
 export const dynamic = "force-dynamic";
 
@@ -10,10 +11,11 @@ export default async function Page({ params, searchParams }) {
   const seq = sp?.seq ? String(sp.seq) : undefined;
   const data = await getViewBookingPageData(order_id, seq);
   if (!data) return notFound();
+  const orderBasePath = await getServerOrderBasePath();
   return (
     <ViewOrderDetails
       data={data}
-      orderBasePath="/user-dashboard/order"
+      orderBasePath={orderBasePath}
     />
   );
 }

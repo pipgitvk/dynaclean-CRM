@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { resolveOrderBasePathFromPathname } from "@/lib/orderRouteBasePath";
 import { useInvoiceLinkedPaymentAutofill } from "@/hooks/useInvoiceLinkedPaymentAutofill";
 import { useOrderUploadInvoicePrefill } from "@/hooks/useOrderUploadInvoicePrefill";
 import InvoiceNumberSearchField from "@/components/orders/InvoiceNumberSearchField";
@@ -105,6 +106,8 @@ export default function UploadForm({
     }),
   );
   const router = useRouter();
+  const pathname = usePathname();
+  const orderListPath = resolveOrderBasePathFromPathname(pathname) || redirectPath;
 
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
@@ -359,7 +362,7 @@ export default function UploadForm({
           setPartyPaymentPromptAfterUpload(true);
           setPartyPaymentModalOpen(true);
         } else {
-          router.push(redirectPath);
+          router.push(orderListPath);
         }
       } else {
         setMessage("❌ " + result.error);
@@ -375,7 +378,7 @@ export default function UploadForm({
     setPartyPaymentModalOpen(false);
     setPartyPaymentPrompt(null);
     if (partyPaymentPromptAfterUpload) {
-      router.push(redirectPath);
+      router.push(orderListPath);
     }
     setPartyPaymentPromptAfterUpload(false);
   };
@@ -555,7 +558,7 @@ export default function UploadForm({
               : "Upload Files"}
         </button>
         <a
-          href={redirectPath}
+          href={orderListPath}
           className="text-sm text-gray-600 hover:text-gray-800 underline"
         >
           ← Back to Order List

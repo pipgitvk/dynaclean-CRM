@@ -118,10 +118,12 @@ export default function ViewPaymentButton({ order, className }) {
                       : "Order payments"}
                 </div>
                 {!invoiceLinked &&
-                !allowNeworderPaymentAmountWithoutInvoiceLink(order) ? (
+                !allowNeworderPaymentAmountWithoutInvoiceLink(order) &&
+                !displayLines.length ? (
                   <p className="text-gray-500 py-2">
-                    Without invoice link, booking payment on neworder is shown
-                    only for orders before 08-Apr-2026.
+                    Without invoice link, recorded payment on neworder is shown
+                    only for orders before 08-Apr-2026, or when a booking advance
+                    was requested at order punch.
                   </p>
                 ) : null}
                 {displayLines.length ? (
@@ -190,10 +192,10 @@ export function orderHasViewablePayment(order) {
   if (!order) return false;
   if (getOrderPaidAmountForDisplay(order) > 0) return true;
   if (orderInvoiceHasPaymentLink(order)) return true;
+  if (Number(order.advance_requested) > 0) return true;
   if (
     allowNeworderPaymentAmountWithoutInvoiceLink(order) &&
-    (Number(order.advance_requested) > 0 ||
-      String(order.payment_amount || "").trim())
+    String(order.payment_amount || "").trim()
   ) {
     return true;
   }

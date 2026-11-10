@@ -2,7 +2,8 @@
 import { useEffect, useState, useRef } from "react";
 import { useAsyncClick } from "@/lib/useAsyncClick";
 import { buildChecklistAccessoriesUrl } from "@/lib/dispatchChecklistAccessories";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation";
+import { resolveOrderBasePathFromPathname } from "@/lib/orderRouteBasePath";
 import { loadDispatchFormRows } from "@/lib/loadDispatchFormRows";
 import { isSpare1110 } from "@/lib/isSpare1110";
 import {
@@ -19,6 +20,8 @@ import {
 
 export default function DispatchFormPage({ params }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const orderBasePath = resolveOrderBasePathFromPathname(pathname);
   const searchParams = useSearchParams();
   const { order_id } = useParams();
   const dispatchRound =
@@ -420,7 +423,11 @@ export default function DispatchFormPage({ params }) {
       if (!doneRes.ok || !doneJson.success)
         throw new Error(doneJson.error || "Failed to mark dispatch complete");
       alert("Dispatch updated and marked complete");
-      router.push(`/user-dashboard/order/dispatch/view/${order_id}`);
+      if (orderBasePath === "/warehouse-incharge/order") {
+        router.push(orderBasePath);
+      } else {
+        router.push(`${orderBasePath}/dispatch/view/${order_id}`);
+      }
     } catch (e) {
       alert(e.message || "Failed to save");
     } finally {

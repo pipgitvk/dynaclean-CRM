@@ -234,7 +234,7 @@ export default function ViewOrderDetails({ data, orderBasePath }) {
 
       <div className="mt-8 text-center">
         <a
-          href="/user-dashboard/order"
+          href={orderBasePath || "/user-dashboard/order"}
           className="inline-block text-sm px-4 py-2 border rounded hover:bg-gray-100"
         >
           ← Back to Order List

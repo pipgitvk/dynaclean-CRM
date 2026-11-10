@@ -14,8 +14,10 @@ import {
   Truck,
   ArrowUp,
   Pencil,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
-import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback, Fragment } from "react";
 import dayjs from "dayjs";
 import {
   buildOrderPaymentRows,
@@ -30,6 +32,7 @@ import {
   getOrderTableDefaultDateFrom,
   getOrderTableDefaultDateTo,
 } from "@/lib/orderTableDateDefaults";
+import { formatMobileMaskedLast4 } from "@/lib/formatMobileLast4";
 
 import DeleteButton from "@/components/accounts/DeleteButton";
 import toast from "react-hot-toast";
@@ -110,7 +113,24 @@ const SkeletonLoader = () => (
   </div>
 );
 
-export default function OrderTable({ orders, userRole }) {
+const ORDER_TABLE_COL_COUNT = 11;
+
+const WAREHOUSE_INCHARGE_STATUS_KEYS = new Set([
+  "bookingdone",
+  "dispatchdone",
+]);
+
+export default function OrderTable({
+  orders,
+  userRole,
+  orderBasePath = "/user-dashboard/order",
+  warehouseInchargeItemExpand = false,
+  onWarehouseDispatchItem,
+}) {
+  const showPaymentTerms = !warehouseInchargeItemExpand;
+  const tableColCount = showPaymentTerms
+    ? ORDER_TABLE_COL_COUNT
+    : ORDER_TABLE_COL_COUNT - 1;
   const hidePendingInvoiceFilter = isPostAccountPipelineRole(userRole);
   const [searchQuery, setSearchQuery] = useState("");
   const [appliedSearchQuery, setAppliedSearchQuery] = useState("");
@@ -118,9 +138,13 @@ export default function OrderTable({ orders, userRole }) {
   const [appliedStatusFilter, setAppliedStatusFilter] = useState("");
   const [paymentTermsFilter, setPaymentTermsFilter] = useState("");
   const [appliedPaymentTermsFilter, setAppliedPaymentTermsFilter] = useState("");
-  const [dateFrom, setDateFrom] = useState(() => getOrderTableDefaultDateFrom());
+  const [dateFrom, setDateFrom] = useState(() =>
+    warehouseInchargeItemExpand ? "" : getOrderTableDefaultDateFrom(),
+  );
   const [appliedDateFrom, setAppliedDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState(() => getOrderTableDefaultDateTo());
+  const [dateTo, setDateTo] = useState(() =>
+    warehouseInchargeItemExpand ? "" : getOrderTableDefaultDateTo(),
+  );
   const [appliedDateTo, setAppliedDateTo] = useState("");
   const [createdByFilter, setCreatedByFilter] = useState("");
   const [appliedCreatedByFilter, setAppliedCreatedByFilter] = useState("");
@@ -141,10 +165,41 @@ export default function OrderTable({ orders, userRole }) {
     createdByFilter,
   ]);
   const [openMenuId, setOpenMenuId] = useState(null); // State to track which menu is open
+  const [whExpandedId, setWhExpandedId] = useState(null);
+  const [whLinesByOrder, setWhLinesByOrder] = useState({});
+  const [whLinesLoading, setWhLinesLoading] = useState({});
   // const canShowInstall = ["ADMIN", "SALES", "SERVICE"].includes(userRole);
 
   const toggleMenu = (id) => {
     setOpenMenuId(openMenuId === id ? null : id);
+  };
+
+  const toggleWarehouseOrderExpand = async (orderId) => {
+    if (!warehouseInchargeItemExpand) return;
+    if (whExpandedId === orderId) {
+      setWhExpandedId(null);
+      return;
+    }
+    setWhExpandedId(orderId);
+    if (whLinesByOrder[orderId]) return;
+    setWhLinesLoading((prev) => ({ ...prev, [orderId]: true }));
+    try {
+      const res = await fetch(
+        `/api/warehouse-incharge/orders?order_id=${encodeURIComponent(orderId)}`,
+      );
+      const data = await res.json();
+      if (data.success) {
+        setWhLinesByOrder((prev) => ({ ...prev, [orderId]: data.lines || [] }));
+      } else {
+        toast.error(data.error || "Could not load items");
+        setWhExpandedId(null);
+      }
+    } catch {
+      toast.error("Could not load items");
+      setWhExpandedId(null);
+    } finally {
+      setWhLinesLoading((prev) => ({ ...prev, [orderId]: false }));
+    }
   };
 
   const getStatusText = (order) => {
@@ -338,6 +393,16 @@ export default function OrderTable({ orders, userRole }) {
   //   return done ? { text: "Installed", cls: "text-green-700" } : { text: "Pending", cls: "text-gray-600" };
   // };
 
+  const formatListContact = (contact) =>
+    showPaymentTerms ? contact : formatMobileMaskedLast4(contact);
+
+  const formatWarehouseShipToAddress = (order) => {
+    const addr = String(
+      order?.ship_to || order?.delivery_location || order?.state || "",
+    ).trim();
+    return addr || "—";
+  };
+
   const formatCompanyName = (name) => {
     const text = String(name || "").trim();
     if (!text) return "";
@@ -356,11 +421,19 @@ export default function OrderTable({ orders, userRole }) {
 
   const matchesListFilters = useCallback(
     (order, { omitCreatedBy = false } = {}) => {
+      const orderStatusKey = getStatusText(order)
+        .text.toLowerCase()
+        .replace(/\s+/g, "");
+
+      if (
+        warehouseInchargeItemExpand &&
+        !WAREHOUSE_INCHARGE_STATUS_KEYS.has(orderStatusKey)
+      ) {
+        return false;
+      }
+
       if (statusFilter) {
-        const orderStatus = getStatusText(order)
-          .text.toLowerCase()
-          .replace(/\s+/g, "");
-        if (orderStatus !== statusFilter.toLowerCase()) return false;
+        if (orderStatusKey !== statusFilter.toLowerCase()) return false;
       }
 
       if (dateFrom || dateTo) {
@@ -385,7 +458,11 @@ export default function OrderTable({ orders, userRole }) {
         return false;
       }
 
-      if (paymentTermsFilter && order.payment_terms !== paymentTermsFilter) {
+      if (
+        showPaymentTerms &&
+        paymentTermsFilter &&
+        order.payment_terms !== paymentTermsFilter
+      ) {
         return false;
       }
 
@@ -407,6 +484,8 @@ export default function OrderTable({ orders, userRole }) {
       dateFrom,
       dateTo,
       createdByFilter,
+      showPaymentTerms,
+      warehouseInchargeItemExpand,
     ],
   );
 
@@ -450,23 +529,34 @@ export default function OrderTable({ orders, userRole }) {
             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
           >
             <option value="">All Status</option>
-            <option value="orderinitialized">Order Initiated</option>
-            {!hidePendingInvoiceFilter && (
-              <option value="pendinginvoice">Pending Invoice</option>
+            {warehouseInchargeItemExpand ? (
+              <>
+                <option value="bookingdone">Booking Done</option>
+                <option value="dispatchdone">Dispatch Done</option>
+              </>
+            ) : (
+              <>
+                <option value="orderinitialized">Order Initiated</option>
+                {!hidePendingInvoiceFilter && (
+                  <option value="pendinginvoice">Pending Invoice</option>
+                )}
+                <option value="invoiceuploaded">Invoice Uploaded</option>
+                <option value="completed">Completed</option>
+                <option value="bookingdone">Booking Done</option>
+                <option value="dispatchdone">Dispatch Done</option>
+                <option value="delivered">Delivered</option>
+                <option value="installed">Installed</option>
+                <option value="canceled">Canceled</option>
+                <option value="returninitiated">Return Initiated</option>
+                <option value="partialreturninitiated">
+                  Partial Return Initiated
+                </option>
+                <option value="returnbookingdone">Return Booking Done</option>
+                <option value="partiallyreturned">Partially Returned</option>
+                <option value="fullyreturned">Fully Returned</option>
+                <option value="returncompleted">Return Completed</option>
+              </>
             )}
-            <option value="invoiceuploaded">Invoice Uploaded</option>
-            <option value="completed">Completed</option>
-            <option value="bookingdone">Booking Done</option>
-            <option value="dispatchdone">Dispatch Done</option>
-            <option value="delivered">Delivered</option>
-            <option value="installed">Installed</option>
-            <option value="canceled">Canceled</option>
-            <option value="returninitiated">Return Initiated</option>
-            <option value="partialreturninitiated">Partial Return Initiated</option>
-            <option value="returnbookingdone">Return Booking Done</option>
-            <option value="partiallyreturned">Partially Returned</option>
-            <option value="fullyreturned">Fully Returned</option>
-            <option value="returncompleted">Return Completed</option>
           </select>
         </div>
         <div className="min-w-[140px] flex-1 sm:max-w-[200px]">
@@ -492,26 +582,35 @@ export default function OrderTable({ orders, userRole }) {
             ))}
           </select>
         </div>
-        <div className="min-w-[140px] flex-1 sm:max-w-[200px]">
-          <label className="block text-xs text-gray-600 mb-1">Payment Terms</label>
-          <select
-            value={paymentTermsFilter}
-            onChange={(e) => setPaymentTermsFilter(e.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-          >
-            <option value="">All Terms</option>
-            {[...new Set(orders?.map((o) => o.payment_terms).filter(Boolean))]
-              .sort()
-              .map((term) => (
-                <option key={term} value={term}>
-                  {term}
-                </option>
-              ))}
-          </select>
-        </div>
+        {showPaymentTerms && (
+          <div className="min-w-[140px] flex-1 sm:max-w-[200px]">
+            <label className="block text-xs text-gray-600 mb-1">Payment Terms</label>
+            <select
+              value={paymentTermsFilter}
+              onChange={(e) => setPaymentTermsFilter(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            >
+              <option value="">All Terms</option>
+              {[...new Set(orders?.map((o) => o.payment_terms).filter(Boolean))]
+                .sort()
+                .map((term) => (
+                  <option key={term} value={term}>
+                    {term}
+                  </option>
+                ))}
+            </select>
+          </div>
+        )}
         <OrderListSearchApplyButton onApply={handleApplySearch} />
       </div>
       <p className="text-xs text-gray-500">Set filters, then click Search to update the list.</p>
+      {warehouseInchargeItemExpand && (
+        <p className="text-xs text-gray-600">
+          Click a row or use the{" "}
+          <ChevronDown className="inline w-3.5 h-3.5 align-text-bottom" aria-hidden />{" "}
+          icon to expand product lines.
+        </p>
+      )}
 
       {/* 👨‍💼 TABLE VIEW for large screens */}
       <div className="hidden lg:block overflow-x-auto overflow-y-auto max-h-[calc(100vh-160px)] min-h-[calc(100vh-240px)] bg-white rounded-xl shadow-lg">
@@ -524,7 +623,9 @@ export default function OrderTable({ orders, userRole }) {
               <th className="px-3 py-3 font-semibold text-left">Order Date</th>
               <th className="px-3 py-3 font-semibold text-left">Company</th>
               <th className="px-3 py-3 font-semibold text-left">Item</th>
-              <th className="px-3 py-3 font-semibold text-left">Payment Terms</th>
+              {showPaymentTerms && (
+                <th className="px-3 py-3 font-semibold text-left">Payment Terms</th>
+              )}
               <th className="px-3 py-3 font-semibold text-center">Status</th>
               <th className="px-3 py-3 font-semibold text-center">Payment</th>
               <th className="px-3 py-3 font-semibold text-center">Due Date</th>
@@ -540,14 +641,39 @@ export default function OrderTable({ orders, userRole }) {
                 const status = getStatusText(r);
                 const pay = getPaymentBadge(deriveOrderListPaymentStatus(r));
                 // const inst = getInstallationLabel(r.installation_status);
+                const whExpanded = warehouseInchargeItemExpand && whExpandedId === r.order_id;
+                const whLines = whLinesByOrder[r.order_id];
+                const whItemsLoading = whLinesLoading[r.order_id];
                 return (
+                  <Fragment key={r.order_id}>
                   <tr
-                    key={r.order_id}
-                    className="hover:bg-gray-50 text-center transition-colors duration-150"
+                    className={`hover:bg-gray-50 text-center transition-colors duration-150 ${
+                      warehouseInchargeItemExpand ? "cursor-pointer" : ""
+                    } ${whExpanded ? "bg-blue-50/50" : ""}`}
+                    onClick={
+                      warehouseInchargeItemExpand
+                        ? () => toggleWarehouseOrderExpand(r.order_id)
+                        : undefined
+                    }
                   >
                     <td className="px-3 py-3">{i + 1}</td>
-                    <td className="px-3 py-3 font-medium text-gray-800">
-                      {r.order_id}
+                    <td className="px-3 py-3 font-medium text-gray-800 text-left">
+                      <span className="inline-flex items-center gap-2">
+                        {warehouseInchargeItemExpand && (
+                          <span
+                            className="shrink-0 rounded-md border border-gray-300 bg-white p-0.5 text-gray-600"
+                            title={whExpanded ? "Collapse products" : "Expand products"}
+                            aria-hidden
+                          >
+                            {whExpanded ? (
+                              <ChevronUp className="w-4 h-4" />
+                            ) : (
+                              <ChevronDown className="w-4 h-4" />
+                            )}
+                          </span>
+                        )}
+                        {r.order_id}
+                      </span>
                     </td>
                     <td className="px-3 py-3 font-medium text-gray-800">
                       {r.created_by}
@@ -557,43 +683,58 @@ export default function OrderTable({ orders, userRole }) {
                     </td>
                     <td className="px-3 py-3 text-left">
                       <div className="space-y-1 text-xs">
-                        <div>
-                          <span className="font-semibold">Client:</span>{" "}
-                          {r.client_name}
-                        </div>
+                        {!warehouseInchargeItemExpand && (
+                          <div>
+                            <span className="font-semibold">Client:</span>{" "}
+                            {r.client_name}
+                          </div>
+                        )}
                         <div>
                           <span className="font-semibold">Company:</span>{" "}
                           {formatCompanyName(r.company_name)}
                         </div>
                         <div>
                           <span className="font-semibold">Contact:</span>{" "}
-                          {r.contact}
+                          {formatListContact(r.contact)}
                         </div>
-                        <div>
-                          <span className="font-semibold">Location:</span>{" "}
-                          {r.state}
-                        </div>
+                        {warehouseInchargeItemExpand ? (
+                          <div className="whitespace-normal break-words max-w-[280px]">
+                            <span className="font-semibold">Ship To Address:</span>{" "}
+                            {formatWarehouseShipToAddress(r)}
+                          </div>
+                        ) : (
+                          <div>
+                            <span className="font-semibold">Location:</span>{" "}
+                            {r.state}
+                          </div>
+                        )}
                       </div>
                     </td>
                     <td className="px-3 py-3 text-left">
                       <div className="space-y-1 text-xs">
                         <div>
-                          <span className="font-semibold">Item:</span> {r.item_name}
+                          <span className="font-semibold">
+                            {warehouseInchargeItemExpand ? "Product name:" : "Item:"}
+                          </span>{" "}
+                          {r.item_name || "—"}
                         </div>
                         <div>
-                          <span className="font-semibold">Modal:</span> {r.item_code}
+                          <span className="font-semibold">Model:</span>{" "}
+                          {r.item_code || "—"}
                         </div>
                       </div>
                     </td>
-                    <td className="px-3 py-3 text-left text-sm">
-                      {r.payment_terms ? (
-                        <span className="inline-block px-2.5 py-1 bg-blue-100 text-blue-800 rounded font-medium">
-                          {r.payment_terms}
-                        </span>
-                      ) : (
-                        <span className="text-gray-400">-</span>
-                      )}
-                    </td>
+                    {showPaymentTerms && (
+                      <td className="px-3 py-3 text-left text-sm">
+                        {r.payment_terms ? (
+                          <span className="inline-block px-2.5 py-1 bg-blue-100 text-blue-800 rounded font-medium">
+                            {r.payment_terms}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
+                    )}
                     <td className="px-3 py-3">
                       <div className="flex flex-col items-center gap-1">
                         <span
@@ -628,15 +769,84 @@ export default function OrderTable({ orders, userRole }) {
                         </span>
                       </td>
                     )} */}
-                    <td className="px-3 py-3 space-x-2 flex items-center justify-center relative">
+                    <td
+                      className="px-3 py-3 space-x-2 flex items-center justify-center relative"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <ActionButtons
                         r={r}
                         userRole={userRole}
                         isOpen={openMenuId === r.order_id}
                         toggleMenu={() => toggleMenu(r.order_id)}
+                        orderBasePath={orderBasePath}
                       />
                     </td>
                   </tr>
+                  {whExpanded && (
+                    <tr className="bg-gray-50">
+                      <td
+                        colSpan={tableColCount}
+                        className="px-4 py-3 text-left border-t border-gray-200"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {whItemsLoading ? (
+                          <p className="text-sm text-gray-500">Loading items…</p>
+                        ) : !whLines?.length ? (
+                          <p className="text-sm text-gray-500">No dispatchable items.</p>
+                        ) : (
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-sm border border-gray-200 rounded-lg overflow-hidden">
+                              <thead className="bg-gray-100 text-gray-700">
+                                <tr>
+                                  <th className="px-3 py-2 text-left font-medium">
+                                    Product name
+                                  </th>
+                                  <th className="px-3 py-2 text-left font-medium">Model</th>
+                                  <th className="px-3 py-2 text-right font-medium">Qty</th>
+                                  <th className="px-3 py-2 text-right font-medium">Action</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-200 bg-white">
+                                {whLines.map((line) => (
+                                  <tr key={line.item_code} className="hover:bg-gray-50">
+                                    <td className="px-3 py-2 font-medium text-gray-900">
+                                      {line.item_name || "—"}
+                                    </td>
+                                    <td className="px-3 py-2 font-mono text-xs text-gray-700">
+                                      {line.item_code || "—"}
+                                    </td>
+                                    <td className="px-3 py-2 text-right tabular-nums">
+                                      {line.pending_qty}
+                                      <span className="text-gray-400 text-xs">
+                                        {" "}
+                                        / {line.order_qty}
+                                      </span>
+                                    </td>
+                                    <td className="px-3 py-2 text-right">
+                                      <button
+                                        type="button"
+                                        className="text-blue-600 hover:underline text-sm font-medium"
+                                        onClick={() =>
+                                          onWarehouseDispatchItem?.({
+                                            orderId: r.order_id,
+                                            itemCode: line.item_code,
+                                            itemName: line.item_name,
+                                          })
+                                        }
+                                      >
+                                        Fill data / image
+                                      </button>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  )}
+                  </Fragment>
                 );
               })
             ) : (
@@ -655,13 +865,32 @@ export default function OrderTable({ orders, userRole }) {
         {filteredOrders.length > 0 ? (
           filteredOrders.map((r, i) => {
             const status = getStatusText(r);
+            const whExpanded =
+              warehouseInchargeItemExpand && whExpandedId === r.order_id;
+            const whLines = whLinesByOrder[r.order_id];
+            const whItemsLoading = whLinesLoading[r.order_id];
             return (
               <div
                 key={r.order_id}
-                className="bg-white border border-gray-200 rounded-xl shadow-md p-4 space-y-2 text-sm"
+                className={`bg-white border border-gray-200 rounded-xl shadow-md p-4 space-y-2 text-sm ${
+                  warehouseInchargeItemExpand ? "cursor-pointer" : ""
+                } ${whExpanded ? "ring-1 ring-blue-200" : ""}`}
+                onClick={
+                  warehouseInchargeItemExpand
+                    ? () => toggleWarehouseOrderExpand(r.order_id)
+                    : undefined
+                }
               >
                 <div className="flex justify-between items-center text-gray-500">
-                  <span className="text-xs">#{i + 1}</span>
+                  <span className="text-xs inline-flex items-center gap-1">
+                    #{i + 1}
+                    {warehouseInchargeItemExpand &&
+                      (whExpanded ? (
+                        <ChevronUp className="w-4 h-4" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4" />
+                      ))}
+                  </span>
                   <div className="flex items-center">
                     <span className="font-medium text-gray-800 mr-2">
                       {dayjs(r.created_at).format("DD-MM-YYYY")}
@@ -671,12 +900,13 @@ export default function OrderTable({ orders, userRole }) {
                     >
                       {status.text}
                     </span>
-                    <span>
+                    <span onClick={(e) => e.stopPropagation()}>
                       <ActionButtons
                         r={r}
                         userRole={userRole}
                         isOpen={openMenuId === r.order_id}
                         toggleMenu={() => toggleMenu(r.order_id)}
+                        orderBasePath={orderBasePath}
                       />
                     </span>
                   </div>
@@ -684,22 +914,83 @@ export default function OrderTable({ orders, userRole }) {
                 <div>
                   <strong>Order Id:</strong> {r.order_id}
                 </div>
+                {warehouseInchargeItemExpand && (
+                  <>
+                    <div>
+                      <strong>Product name:</strong> {r.item_name || "—"}
+                    </div>
+                    <div>
+                      <strong>Model:</strong> {r.item_code || "—"}
+                    </div>
+                  </>
+                )}
 
-                <div>
-                  <strong>Client:</strong> {r.client_name}
-                </div>
+                {!warehouseInchargeItemExpand && (
+                  <div>
+                    <strong>Client:</strong> {r.client_name}
+                  </div>
+                )}
                 <div className="whitespace-normal break-words max-w-full">
                   <strong>Company:</strong> {formatCompanyName(r.company_name)}
                 </div>
                 <div>
-                  <strong>Contact:</strong> {r.contact}
+                  <strong>Contact:</strong> {formatListContact(r.contact)}
                 </div>
-                <div>
-                  <strong>Location:</strong> {r.state}
-                </div>
+                {warehouseInchargeItemExpand ? (
+                  <div className="whitespace-normal break-words">
+                    <strong>Ship To Address:</strong>{" "}
+                    {formatWarehouseShipToAddress(r)}
+                  </div>
+                ) : (
+                  <div>
+                    <strong>Location:</strong> {r.state}
+                  </div>
+                )}
                 {r.approval_remark && (
                   <div>
                     <strong>Remark:</strong> {r.approval_remark}
+                  </div>
+                )}
+                {whExpanded && (
+                  <div
+                    className="mt-3 border-t pt-3 space-y-2"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {whItemsLoading ? (
+                      <p className="text-gray-500 text-xs">Loading products…</p>
+                    ) : !whLines?.length ? (
+                      <p className="text-gray-500 text-xs">No dispatchable items.</p>
+                    ) : (
+                      whLines.map((line) => (
+                        <div
+                          key={line.item_code}
+                          className="rounded-lg border bg-gray-50 p-2 text-xs space-y-1"
+                        >
+                          <div>
+                            <strong>Product name:</strong> {line.item_name || "—"}
+                          </div>
+                          <div>
+                            <strong>Model:</strong> {line.item_code}
+                          </div>
+                          <div>
+                            <strong>Qty:</strong> {line.pending_qty} / {line.order_qty}
+                          </div>
+                          <button
+                            type="button"
+                            className="text-blue-600 font-medium"
+                            onClick={() =>
+                              onWarehouseDispatchItem?.({
+                                orderId: r.order_id,
+                                itemCode: line.item_code,
+                                itemName: line.item_name,
+                              })
+                            }
+                          >
+                            Fill data / image
+                          </button>
+                        </div>
+                      ))
+                    )}
                   </div>
                 )}
               </div>
@@ -811,7 +1102,13 @@ function ViewReturnBookingMenuItem({ order }) {
 }
 
 // 🔘 Modular Action Buttons (used in both views)
-function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
+function ActionButtons({
+  r,
+  userRole,
+  isOpen,
+  toggleMenu,
+  orderBasePath = "/user-dashboard/order",
+}) {
   if (r.is_cancelled) {
     return null;
   }
@@ -904,7 +1201,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
       <DispatchProductSelectModal
         open={bookingProductSelectOpen}
         orderId={r.order_id}
-        nextHref={`/user-dashboard/order/upload-booking/${r.order_id}`}
+        nextHref={`${orderBasePath}/upload-booking/${r.order_id}`}
         onClose={() => setBookingProductSelectOpen(false)}
         purpose="booking"
         title={
@@ -925,14 +1222,14 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
               <>
                 <AccountantReportActionLinks
                   order={r}
-                  viewSalesHref={`/user-dashboard/order/${r.order_id}`}
-                  uploadHref={`/user-dashboard/order/upload/${r.order_id}`}
-                  viewHref={`/user-dashboard/order/view/${r.order_id}`}
+                  viewSalesHref={`${orderBasePath}/${r.order_id}`}
+                  uploadHref={`${orderBasePath}/upload/${r.order_id}`}
+                  viewHref={`${orderBasePath}/view/${r.order_id}`}
                   onClick={(e) => e.stopPropagation()}
                 />
                 <OrderBookingViewMenuLinks
                   order={r}
-                  basePath="/user-dashboard/order"
+                  basePath={orderBasePath}
                   canSee={hasBooking}
                   linkClassName="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700 w-full block"
                   onClick={(e) => e.stopPropagation()}
@@ -947,7 +1244,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                 )}
                 {canViewDispatchPanel && (
                   <Link
-                    href={`/user-dashboard/order/dispatch/view/${r.order_id}`}
+                    href={`${orderBasePath}/dispatch/view/${r.order_id}`}
                     className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700 w-full block"
                     title="View Dispatch"
                     onClick={(e) => e.stopPropagation()}
@@ -972,7 +1269,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                     >
                       <ReturnInitiateMenuItem
                         order={r}
-                        orderListPath="/user-dashboard/order"
+                        orderListPath={orderBasePath}
                       />
                     </div>
                   )}
@@ -991,7 +1288,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
             ) : (
               <>
             <Link
-              href={`/user-dashboard/order/${r.order_id}`}
+              href={`${orderBasePath}/${r.order_id}`}
               className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700 w-full block"
               title="View Sales"
               onClick={(e) => e.stopPropagation()}
@@ -1001,7 +1298,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
             </Link>
             {canViewDispatchPanel && (
               <Link
-                href={`/user-dashboard/order/dispatch/view/${r.order_id}`}
+                href={`${orderBasePath}/dispatch/view/${r.order_id}`}
                 className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700 w-full block"
                 title="View Dispatch"
                 onClick={(e) => e.stopPropagation()}
@@ -1016,7 +1313,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                   (r.report_file ? (
                     <>
                       <Link
-                        href={`/user-dashboard/order/view/${r.order_id}`}
+                        href={`${orderBasePath}/view/${r.order_id}`}
                         className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700 w-full block"
                         title="View Report"
                         onClick={(e) => e.stopPropagation()}
@@ -1026,7 +1323,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                       </Link>
                       {isSuperAdmin && dispatchStatus === 0 && (
                         <Link
-                          href={`/user-dashboard/order/upload/${r.order_id}`}
+                          href={`${orderBasePath}/upload/${r.order_id}`}
                           className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-blue-700 w-full block"
                           title="Edit Report"
                           onClick={(e) => e.stopPropagation()}
@@ -1047,7 +1344,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                   ) : (
                     <div className="flex items-center">
                       <Link
-                        href={`/user-dashboard/order/upload/${r.order_id}`}
+                        href={`${orderBasePath}/upload/${r.order_id}`}
                         className="flex-1 flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-yellow-700"
                         title="Upload Report"
                         onClick={(e) => e.stopPropagation()}
@@ -1091,7 +1388,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                   !orderHasDispatchedStock(r) &&
                   dispatchStatus !== 1 && (
                     <Link
-                      href={`/user-dashboard/order/upload-booking/${r.order_id}`}
+                      href={`${orderBasePath}/upload-booking/${r.order_id}`}
                       className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-blue-700 w-full block"
                       title="Edit Booking"
                       onClick={(e) => e.stopPropagation()}
@@ -1102,7 +1399,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                   )}
                 <OrderBookingViewMenuLinks
                   order={r}
-                  basePath="/user-dashboard/order"
+                  basePath={orderBasePath}
                   canSee={hasBooking && (canManageReturns || canEditBooking)}
                   linkClassName="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700 w-full block"
                   onClick={(e) => e.stopPropagation()}
@@ -1113,7 +1410,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                   canAdminAfterReport) &&
                   canOpenFirstDispatch && (
                     <Link
-                      href={`/user-dashboard/order/dispatch/${r.order_id}`}
+                      href={`${orderBasePath}/dispatch/${r.order_id}`}
                       className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700 w-full block"
                       title="Dispatch — pehli booking ke products"
                       onClick={(e) => e.stopPropagation()}
@@ -1128,7 +1425,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                   canAdminAfterReport) &&
                   canOpenRemainDispatch && (
                     <Link
-                      href={`/user-dashboard/order/dispatch/${r.order_id}?round=remain`}
+                      href={`${orderBasePath}/dispatch/${r.order_id}?round=remain`}
                       className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700 w-full block"
                       title="Dispatch (Remain) — doosri booking ke products"
                       onClick={(e) => e.stopPropagation()}
@@ -1144,7 +1441,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                   canViewSales) &&
                   canViewDispatchPanel && (
                     <Link
-                      href={`/user-dashboard/order/dispatch/view/${r.order_id}`}
+                      href={`${orderBasePath}/dispatch/view/${r.order_id}`}
                       className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700 w-full block"
                       title="View Dispatch"
                       onClick={(e) => e.stopPropagation()}
@@ -1167,7 +1464,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                   <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>
                     <ReturnInitiateMenuItem
                       order={r}
-                      orderListPath="/user-dashboard/order"
+                      orderListPath={orderBasePath}
                     />
                   </div>
                 )}

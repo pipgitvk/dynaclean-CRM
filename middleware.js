@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 import { normalizeRoleKey, isJwtAccountingRole } from "@/lib/roleKeyUtils";
 import { getRoleDashboardPath } from "@/lib/getRoleDashboardPath";
+import { resolveOrderBasePathFromPathname } from "@/lib/orderRouteBasePath";
 
 /** Attendance rules: SUPERADMIN + ADMIN + HR roles. */
 const ATTENDANCE_RULES_MIDDLEWARE_ROLES = [
@@ -519,7 +520,14 @@ export async function middleware(request) {
         return NextResponse.redirect(new URL("/admin-dashboard", request.url));
       }
 
-      return NextResponse.next();
+      const requestHeaders = new Headers(request.headers);
+      if (/\/order(\/|$)/.test(pathname)) {
+        requestHeaders.set(
+          "x-order-base-path",
+          resolveOrderBasePathFromPathname(pathname),
+        );
+      }
+      return NextResponse.next({ request: { headers: requestHeaders } });
     } catch {
       return NextResponse.redirect(new URL("/login", request.url));
     }
