@@ -2157,10 +2157,25 @@ const NewInvoice = ({ invoice }) => {
 
       // Apply color overrides — avoid painting every cell white (can clip text in html2canvas).
       clonedEl.querySelectorAll("*").forEach((elem) => {
+        const tag = elem.tagName?.toLowerCase();
+        const inCancelledWatermark = Boolean(
+          elem.closest?.('[data-invoice-cancelled-watermark="true"]'),
+        );
+        if (elem.getAttribute?.("data-invoice-cancelled-watermark") === "true") {
+          elem.style.backgroundColor = "transparent";
+          elem.style.pointerEvents = "none";
+          return;
+        }
+        if (inCancelledWatermark) {
+          if (tag !== "img") {
+            elem.style.overflow = "visible";
+            elem.style.overflowY = "visible";
+          }
+          return;
+        }
         elem.style.color = "rgb(0, 0, 0)";
         elem.style.webkitTextFillColor = "rgb(0, 0, 0)";
         elem.style.borderColor = "rgb(0, 0, 0)";
-        const tag = elem.tagName?.toLowerCase();
         if (tag !== "img" && tag !== "td" && tag !== "th" && tag !== "tr" && tag !== "table") {
           elem.style.backgroundColor = "rgb(255, 255, 255)";
         }
