@@ -27,6 +27,18 @@ function parseYmd(s) {
   return /^\d{4}-\d{2}-\d{2}$/.test(t) ? t : null;
 }
 
+/** eTimeOffice daily row: earliest punch = in, latest = out (not AM/PM split). */
+function formatPunchTime12h(dt) {
+  if (dt == null) return "";
+  const d = dt instanceof Date ? dt : new Date(dt);
+  if (Number.isNaN(d.getTime())) return "";
+  const h = d.getHours();
+  const m = d.getMinutes();
+  const hour12 = h % 12 || 12;
+  const ampm = h < 12 ? "am" : "pm";
+  return `${hour12}:${String(m).padStart(2, "0")} ${ampm}`;
+}
+
 function buildMachinePunchFilters(from, to, employeeSearch) {
   const where = [];
   const params = [];
@@ -125,23 +137,14 @@ export async function GET(request) {
          emp_code,
          MAX(employee_name) AS employee_name,
          DATE(punch_datetime) AS punch_date,
+         MIN(punch_datetime) AS first_punch,
+         MAX(punch_datetime) AS last_punch,
+         COUNT(*) AS punch_count,
          GROUP_CONCAT(
-           CASE
-             WHEN HOUR(punch_datetime) < 12
-             THEN LOWER(TIME_FORMAT(punch_datetime, '%h:%i %p'))
-           END
-           ORDER BY punch_datetime
-           SEPARATOR ', '
-         ) AS check_in_times,
-         GROUP_CONCAT(
-           CASE
-             WHEN HOUR(punch_datetime) >= 12
-             THEN LOWER(TIME_FORMAT(punch_datetime, '%h:%i %p'))
-           END
-           ORDER BY punch_datetime
-           SEPARATOR ', '
-         ) AS check_out_times,
-         COUNT(*) AS punch_count
+           punch_datetime
+           ORDER BY punch_datetime ASC
+           SEPARATOR '||'
+         ) AS all_punch_datetimes
        FROM machine_attendance_punches
        ${whereSql}
        GROUP BY emp_code, DATE(punch_datetime)
@@ -150,16 +153,28 @@ export async function GET(request) {
       params
     );
 
-    const normalized = (rows || []).map((row) =>
-      attachRepListFields({
+    const normalized = (rows || []).map((row) => {
+      const punchCount = Number(row.punch_count ?? 0);
+      const allRaw = String(row.all_punch_datetimes || "")
+        .split("||")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const allPunches = allRaw
+        .map((dt) => formatPunchTime12h(dt))
+        .filter((t) => t);
+      const checkIn = allPunches[0] || "";
+      const checkOut =
+        punchCount > 1 ? allPunches[allPunches.length - 1] || "" : "";
+      return attachRepListFields({
         emp_code: row.emp_code,
         employee_name: row.employee_name,
         punch_date: row.punch_date,
-        check_in: row.check_in_times ? String(row.check_in_times).trim() : "",
-        check_out: row.check_out_times ? String(row.check_out_times).trim() : "",
-        punch_count: Number(row.punch_count ?? 0),
-      })
-    );
+        check_in: checkIn,
+        check_out: checkOut,
+        all_punches: allPunches,
+        punch_count: punchCount,
+      });
+    });
 
     return NextResponse.json({
       view: "daily",

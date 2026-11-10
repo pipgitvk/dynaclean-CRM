@@ -4,16 +4,33 @@ import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import toast from "react-hot-toast";
-import { formatAttendanceTimeForDisplay as formatTime } from "@/lib/istDateTime";
+import {
+  formatAttendanceTimeForDisplay as formatTime,
+  getISTDateString,
+  getISTMonthEndYmd,
+  getISTMonthStartYmd,
+} from "@/lib/istDateTime";
 
 // Helper function to check if attendance is complete
+function attendanceCheckInOutSameTime(attendance) {
+  if (!attendance?.checkin_time || !attendance?.checkout_time) return false;
+  return (
+    formatTime(attendance.checkin_time) ===
+    formatTime(attendance.checkout_time)
+  );
+}
+
 function isAttendanceComplete(attendance) {
   if (!attendance) return false;
-  
-  const hasCheckIn = attendance.checkin_time && attendance.checkin_time.trim() !== "";
-  const hasCheckOut = attendance.checkout_time && attendance.checkout_time.trim() !== "";
-  
-  return hasCheckIn && hasCheckOut;
+
+  const hasCheckIn =
+    attendance.checkin_time && attendance.checkin_time.trim() !== "";
+  const hasCheckOut =
+    attendance.checkout_time && attendance.checkout_time.trim() !== "";
+
+  if (!hasCheckIn || !hasCheckOut) return false;
+  if (attendanceCheckInOutSameTime(attendance)) return false;
+  return true;
 }
 
 // Helper function to check if attendance has issues
@@ -53,12 +70,8 @@ export default function OvertimeManagementPage() {
   const [selectedEmployee, setSelectedEmployee] = useState("");
   const [selectedDate, setSelectedDate] = useState("");
   const [employeeFilter, setEmployeeFilter] = useState("");
-  const [fromDate, setFromDate] = useState(() => {
-    const date = new Date();
-    date.setDate(date.getDate() - 30);
-    return date.toISOString().split('T')[0];
-  });
-  const [toDate, setToDate] = useState(new Date().toISOString().split('T')[0]);
+  const [fromDate, setFromDate] = useState(() => getISTMonthStartYmd());
+  const [toDate, setToDate] = useState(() => getISTMonthEndYmd());
   const [regularizationForm, setRegularizationForm] = useState({
     checkin_time: "",
     checkout_time: "",
@@ -85,11 +98,11 @@ export default function OvertimeManagementPage() {
     setLoading(true);
     try {
       // Calculate days between from and to date
-      const from = new Date(fromDate);
-      const to = new Date(toDate);
-      const daysBack = Math.ceil((to - from) / (1000 * 60 * 60 * 24)) + 1;
-      
-      const res = await fetch(`/api/overtime/team-attendance?daysBack=${daysBack}`);
+      const q = new URLSearchParams();
+      if (fromDate) q.set("from", fromDate);
+      if (toDate) q.set("to", toDate);
+
+      const res = await fetch(`/api/overtime/team-attendance?${q.toString()}`);
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.error || "Failed to fetch attendance");
@@ -212,8 +225,15 @@ export default function OvertimeManagementPage() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 To Date
               </label>
-              <TypeableDateFilterInput value={toDate} onChange={setToDate} min={fromDate}
-                max={new Date().toISOString().split('T')[0]}
+              <TypeableDateFilterInput
+                value={toDate}
+                onChange={setToDate}
+                min={fromDate}
+                max={
+                  fromDate
+                    ? getISTMonthEndYmd(new Date(`${fromDate}T12:00:00`))
+                    : getISTMonthEndYmd()
+                }
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"/>
             </div>
             
@@ -278,12 +298,25 @@ export default function OvertimeManagementPage() {
 
               if (filteredEmployees.length === 0) return null;
 
+              const isToday = date === getISTDateString();
+
               return (
                 <div key={date} className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
                   {/* Date Header */}
-                  <div className="px-6 py-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200">
+                  <div
+                    className={`px-6 py-4 border-b border-gray-200 ${
+                      isToday
+                        ? "bg-gradient-to-r from-amber-50 to-orange-50"
+                        : "bg-gradient-to-r from-blue-50 to-indigo-50"
+                    }`}
+                  >
                     <h2 className="text-lg font-semibold text-gray-900">
                       📅 {formatDateHeader(date)}
+                      {isToday ? (
+                        <span className="ml-2 text-sm font-semibold text-orange-700">
+                          (Today)
+                        </span>
+                      ) : null}
                     </h2>
                     <p className="text-sm text-gray-600 mt-1">
                       {filteredEmployees.length} assigned employee(s)

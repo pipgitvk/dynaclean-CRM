@@ -184,3 +184,18 @@ export function formatAttendanceTimeForDisplay(value) {
     hour12: true,
   });
 }
+
+/** First calendar day of the IST month containing `ref` (YYYY-MM-DD). */
+export function getISTMonthStartYmd(ref = new Date()) {
+  const ymd = getISTDateString(ref);
+  const [y, m] = ymd.split("-");
+  return `${y}-${m}-01`;
+}
+
+/** Last calendar day of the IST month containing `ref` (YYYY-MM-DD). */
+export function getISTMonthEndYmd(ref = new Date()) {
+  const ymd = getISTDateString(ref);
+  const [y, m] = ymd.split("-").map(Number);
+  const lastDay = new Date(y, m, 0).getDate();
+  return `${y}-${String(m).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+}

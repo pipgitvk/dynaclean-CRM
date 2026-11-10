@@ -312,9 +312,10 @@ export default function MachineAttendancePage() {
                 {viewMode === "daily" ? (
                   <>
                     <th className="px-4 py-3 text-left">Date</th>
-                    <th className="px-4 py-3 text-left">Check-in (AM)</th>
-                    <th className="px-4 py-3 text-left">Check-out (PM)</th>
-                    <th className="px-4 py-3 text-left">Punches</th>
+                    <th className="px-4 py-3 text-left">Check-in</th>
+                    <th className="px-4 py-3 text-left">Check-out</th>
+                    <th className="px-4 py-3 text-left">All punches</th>
+                    <th className="px-4 py-3 text-left">Count</th>
                   </>
                 ) : (
                   <>
@@ -329,7 +330,7 @@ export default function MachineAttendancePage() {
               {!loading && rows.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={viewMode === "daily" ? 8 : 7}
+                    colSpan={viewMode === "daily" ? 9 : 7}
                     className="px-4 py-8 text-center text-gray-500"
                   >
                     No punches found. Sync from machine or clear filters (Show
@@ -367,6 +368,48 @@ export default function MachineAttendancePage() {
                     </td>
                     <td className="px-4 py-2 text-indigo-800 font-medium">
                       {formatTimesCell(row.check_out)}
+                    </td>
+                    <td className="px-4 py-2 text-gray-800">
+                      {Array.isArray(row.all_punches) &&
+                      row.all_punches.length > 0 ? (
+                        <span className="font-mono text-sm">
+                          {row.all_punches.map((t, i) => {
+                            const isFirst = i === 0;
+                            const isLast =
+                              i === row.all_punches.length - 1 &&
+                              row.all_punches.length > 1;
+                            return (
+                              <span
+                                key={`${row.emp_code}-${row.punch_date}-${i}`}
+                              >
+                                {i > 0 ? (
+                                  <span className="text-gray-400"> · </span>
+                                ) : null}
+                                <span
+                                  className={
+                                    isFirst
+                                      ? "text-green-800 font-medium"
+                                      : isLast
+                                        ? "text-indigo-800 font-medium"
+                                        : "text-gray-700"
+                                  }
+                                  title={
+                                    isFirst
+                                      ? "Check-in"
+                                      : isLast
+                                        ? "Check-out"
+                                        : "Punch"
+                                  }
+                                >
+                                  {t}
+                                </span>
+                              </span>
+                            );
+                          })}
+                        </span>
+                      ) : (
+                        "—"
+                      )}
                     </td>
                     <td className="px-4 py-2 text-gray-600 tabular-nums">
                       {row.punch_count ?? "—"}
