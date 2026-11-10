@@ -12,7 +12,6 @@ import {
   X,
   DollarSign,
   ExternalLink,
-  NotebookPen,
 } from "lucide-react";
 import HeaderLogoutButton from "@/components/HeaderLogoutButton";
 import { useTheme } from "@/context/ThemeContext";
@@ -21,8 +20,6 @@ import Link from "next/link";
 import AttendanceStatusTracker from "@/components/AttendanceStatusTracker";
 import ProspectHeaderButton from "@/components/prospects/ProspectHeaderButton";
 import { formatCrmDatetimeForISTDisplay } from "@/lib/timezone";
-import CustomerQuickViewModal from "@/components/Customers/CustomerQuickViewModal";
-
 export default function Navbar({ onToggleSidebar, showSalesMeta = false }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -35,7 +32,6 @@ export default function Navbar({ onToggleSidebar, showSalesMeta = false }) {
   const [results, setResults] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
-  const [headerCustomerModal, setHeaderCustomerModal] = useState(null);
   const searchRef = useRef(null);
   
   // Notifications state
@@ -315,11 +311,6 @@ export default function Navbar({ onToggleSidebar, showSalesMeta = false }) {
 
   const isSuperAdminSearch = normalizeRoleKey(userRole) === "SUPERADMIN";
 
-  const openHeaderCustomerModal = (kind, customerId) => {
-    setShowDropdown(false);
-    setHeaderCustomerModal({ kind, customerId });
-  };
-
   const searchDropdown =
     typeof window !== "undefined" &&
     showDropdown &&
@@ -392,40 +383,21 @@ export default function Navbar({ onToggleSidebar, showSalesMeta = false }) {
                 ) : null}
               </div>
               <div className="flex items-center gap-1 flex-shrink-0">
-                {isSuperAdminSearch ? (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openHeaderCustomerModal("tl", c.customer_id);
-                    }}
-                    className="p-1.5 text-indigo-700 hover:bg-indigo-50 rounded border border-transparent hover:border-indigo-200"
-                    title="TL follow-up (popup)"
-                    aria-label="Open TL follow-up in popup"
-                  >
-                    <NotebookPen size={16} />
-                  </button>
-                ) : (
-                  <a
-                    href={customerViewHref(c.customer_id)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                    className="p-1.5 text-gray-600 hover:text-blue-700 hover:bg-blue-50 rounded border border-transparent hover:border-blue-200"
-                    title="Open in new tab"
-                    aria-label="Open customer in new tab"
-                  >
-                    <ExternalLink size={16} />
-                  </a>
-                )}
+                <a
+                  href={customerViewHref(c.customer_id)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="p-1.5 text-gray-600 hover:text-blue-700 hover:bg-blue-50 rounded border border-transparent hover:border-blue-200"
+                  title="Open in new tab"
+                  aria-label="Open customer in new tab"
+                >
+                  <ExternalLink size={16} />
+                </a>
                 <button
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (isSuperAdminSearch) {
-                      openHeaderCustomerModal("view", c.customer_id);
-                      return;
-                    }
                     setShowDropdown(false);
                     setResults([]);
                     setQuery("");
@@ -757,11 +729,6 @@ export default function Navbar({ onToggleSidebar, showSalesMeta = false }) {
         </div>
       </div>
     </nav>
-    <CustomerQuickViewModal
-      modal={headerCustomerModal}
-      onClose={() => setHeaderCustomerModal(null)}
-      dashboardBase={dashboardBase}
-    />
     </>
   );
 }
