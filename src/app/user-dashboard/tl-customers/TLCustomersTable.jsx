@@ -20,7 +20,9 @@ import {
   Shield,
   FileSpreadsheet,
   FileText,
+  NotebookPen,
 } from "lucide-react";
+import CustomerQuickViewModal from "@/components/Customers/CustomerQuickViewModal";
 import { applyTLCustomersChipFilter } from "@/lib/tlCustomersChipFilter";
 import Link from "next/link";
 import { NOTES_LANGUAGE_OPTIONS } from "@/constants/notesLanguageOptions";
@@ -151,6 +153,7 @@ export default function TLCustomersTable({
   const [searchSuggestOpen, setSearchSuggestOpen] = useState(false);
   const [searchSuggestLoading, setSearchSuggestLoading] = useState(false);
   const [searchSuggestHighlight, setSearchSuggestHighlight] = useState(-1);
+  const [customerQuickViewModal, setCustomerQuickViewModal] = useState(null);
   const searchSuggestRef = useRef(null);
   const searchSuggestDebounceRef = useRef(null);
 
@@ -266,6 +269,15 @@ export default function TLCustomersTable({
     setSearchSuggestOpen(false);
     setSearchSuggestHighlight(-1);
   };
+
+  const openCustomerQuickViewModal = (kind, customerId) => {
+    setSearchSuggestOpen(false);
+    setCustomerQuickViewModal({ kind, customerId });
+  };
+
+  const quickViewDashboardBase = isAdmin
+    ? "admin-dashboard"
+    : "user-dashboard";
 
   const onSearchInputKeyDown = (e) => {
     if (
@@ -757,62 +769,101 @@ export default function TLCustomersTable({
                         role="listbox"
                       >
                         {searchSuggestions.map((s, index) => (
-                          <li key={s.customer_id} role="option">
-                            <button
-                              type="button"
-                              className={`w-full text-left px-3 py-2 border-b border-gray-100 last:border-b-0 text-sm ${
-                                index === searchSuggestHighlight
-                                  ? "bg-blue-50 text-blue-900"
-                                  : "hover:bg-gray-50 text-gray-800"
-                              }`}
-                              onMouseEnter={() =>
-                                setSearchSuggestHighlight(index)
-                              }
-                              onClick={() => pickSearchSuggestion(s)}
-                            >
-                              <div className="font-medium">
-                                {s.name || s.company || "Customer"}{" "}
-                                <span className="text-gray-500 font-normal">
-                                  #{s.customer_id}
-                                </span>
-                              </div>
-                              <div className="text-xs text-gray-500 mt-0.5">
-                                {s.phone ? `${s.phone}` : ""}
-                                {s.phone && s.company ? " · " : ""}
-                                {s.company || ""}
-                              </div>
-                              {s.tl_followed_date ? (
-                                <div className="text-xs text-indigo-800 mt-1 leading-snug">
-                                  <span className="font-medium">Last TL:</span>{" "}
-                                  {formatCrmDatetimeForISTDisplay(
-                                    s.tl_followed_date,
-                                    "DD-MM-YYYY HH:mm",
-                                  ) || "—"}
-                                  {s.tl_followed_by
-                                    ? ` · ${s.tl_followed_by}`
-                                    : ""}
-                                  {s.tl_next_followup ? (
-                                    <>
-                                      {" "}
-                                      · Next:{" "}
-                                      {formatCrmDatetimeForISTDisplay(
-                                        s.tl_next_followup,
-                                        "DD-MM-YYYY HH:mm",
-                                      )}
-                                    </>
-                                  ) : null}
-                                  {s.tl_notes ? (
-                                    <span className="block text-gray-600 mt-0.5 line-clamp-2">
-                                      {String(s.tl_notes).trim()}
-                                    </span>
-                                  ) : null}
+                          <li
+                            key={s.customer_id}
+                            role="option"
+                            aria-selected={index === searchSuggestHighlight}
+                            className={`border-b border-gray-100 last:border-b-0 text-sm ${
+                              index === searchSuggestHighlight
+                                ? "bg-blue-50"
+                                : "bg-white"
+                            }`}
+                            onMouseEnter={() =>
+                              setSearchSuggestHighlight(index)
+                            }
+                          >
+                            <div className="flex justify-between items-start gap-2 px-3 py-2">
+                              <button
+                                type="button"
+                                className="min-w-0 flex-1 text-left text-gray-800 hover:text-blue-900"
+                                onClick={() => pickSearchSuggestion(s)}
+                              >
+                                <div className="font-medium">
+                                  {s.name || s.company || "Customer"}{" "}
+                                  <span className="text-gray-500 font-normal">
+                                    #{s.customer_id}
+                                  </span>
                                 </div>
-                              ) : (
-                                <div className="text-xs text-gray-400 mt-1">
-                                  No TL follow-up yet
+                                <div className="text-xs text-gray-500 mt-0.5">
+                                  {s.phone ? `${s.phone}` : ""}
+                                  {s.phone && s.company ? " · " : ""}
+                                  {s.company || ""}
                                 </div>
-                              )}
-                            </button>
+                                {s.tl_followed_date ? (
+                                  <div className="text-xs text-indigo-800 mt-1 leading-snug">
+                                    <span className="font-medium">Last TL:</span>{" "}
+                                    {formatCrmDatetimeForISTDisplay(
+                                      s.tl_followed_date,
+                                      "DD-MM-YYYY HH:mm",
+                                    ) || "—"}
+                                    {s.tl_followed_by
+                                      ? ` · ${s.tl_followed_by}`
+                                      : ""}
+                                    {s.tl_next_followup ? (
+                                      <>
+                                        {" "}
+                                        · Next:{" "}
+                                        {formatCrmDatetimeForISTDisplay(
+                                          s.tl_next_followup,
+                                          "DD-MM-YYYY HH:mm",
+                                        )}
+                                      </>
+                                    ) : null}
+                                    {s.tl_notes ? (
+                                      <span className="block text-gray-600 mt-0.5 line-clamp-2">
+                                        {String(s.tl_notes).trim()}
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                ) : (
+                                  <div className="text-xs text-gray-400 mt-1">
+                                    No TL follow-up yet
+                                  </div>
+                                )}
+                              </button>
+                              {isSuperAdmin && isAdmin ? (
+                                <div className="flex items-center gap-1 flex-shrink-0">
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      openCustomerQuickViewModal(
+                                        "tl",
+                                        s.customer_id,
+                                      );
+                                    }}
+                                    className="p-1.5 text-indigo-700 hover:bg-indigo-50 rounded border border-transparent hover:border-indigo-200"
+                                    title="TL follow-up (popup)"
+                                    aria-label="Open TL follow-up in popup"
+                                  >
+                                    <NotebookPen size={16} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      openCustomerQuickViewModal(
+                                        "view",
+                                        s.customer_id,
+                                      );
+                                    }}
+                                    className="text-xs px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+                                  >
+                                    View
+                                  </button>
+                                </div>
+                              ) : null}
+                            </div>
                           </li>
                         ))}
                       </ul>
@@ -1911,6 +1962,12 @@ export default function TLCustomersTable({
         customerId={preBookingModal.customerId}
         customerName={preBookingModal.customerName}
         onSuccess={() => {}}
+      />
+
+      <CustomerQuickViewModal
+        modal={customerQuickViewModal}
+        onClose={() => setCustomerQuickViewModal(null)}
+        dashboardBase={quickViewDashboardBase}
       />
     </div>
   );

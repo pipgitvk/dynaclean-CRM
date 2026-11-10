@@ -21,7 +21,7 @@ import Link from "next/link";
 import AttendanceStatusTracker from "@/components/AttendanceStatusTracker";
 import ProspectHeaderButton from "@/components/prospects/ProspectHeaderButton";
 import { formatCrmDatetimeForISTDisplay } from "@/lib/timezone";
-import { HEADER_TL_FOLLOWUP_SAVED_MESSAGE } from "@/lib/headerTlFollowupModal";
+import CustomerQuickViewModal from "@/components/Customers/CustomerQuickViewModal";
 
 export default function Navbar({ onToggleSidebar, showSalesMeta = false }) {
   const router = useRouter();
@@ -136,16 +136,6 @@ export default function Navbar({ onToggleSidebar, showSalesMeta = false }) {
     document.addEventListener("click", handleClickOutside);
     return () => document.removeEventListener("click", handleClickOutside);
   }, [showDropdown]);
-
-  useEffect(() => {
-    const onMessage = (event) => {
-      if (event.origin !== window.location.origin) return;
-      if (event.data?.type !== HEADER_TL_FOLLOWUP_SAVED_MESSAGE) return;
-      setHeaderCustomerModal(null);
-    };
-    window.addEventListener("message", onMessage);
-    return () => window.removeEventListener("message", onMessage);
-  }, []);
 
   // Close notification dropdown on click outside
   useEffect(() => {
@@ -323,70 +313,12 @@ export default function Navbar({ onToggleSidebar, showSalesMeta = false }) {
   const customerViewHref = (customerId) =>
     `/${dashboardBase}/view-customer/${customerId}`;
 
-  const customerViewEmbedPath = (customerId) =>
-    `/${dashboardBase}/view-customer/${customerId}?embed=1`;
-
   const isSuperAdminSearch = normalizeRoleKey(userRole) === "SUPERADMIN";
-
-  const tlFollowupPagePath = (customerId) =>
-    `/${dashboardBase}/tl-customers/${customerId}/followup?tlOnly=true&embed=1`;
 
   const openHeaderCustomerModal = (kind, customerId) => {
     setShowDropdown(false);
     setHeaderCustomerModal({ kind, customerId });
   };
-
-  const headerCustomerModalPortal =
-    typeof window !== "undefined" &&
-    headerCustomerModal != null &&
-    createPortal(
-      <div
-        className="fixed inset-0 z-[10050] flex items-center justify-center bg-black/50 p-3 sm:p-6"
-        role="dialog"
-        aria-modal="true"
-        aria-label={
-          headerCustomerModal.kind === "tl"
-            ? "TL follow-up"
-            : "View customer"
-        }
-        onClick={() => setHeaderCustomerModal(null)}
-      >
-        <div
-          className="bg-white rounded-lg shadow-2xl w-full max-w-6xl h-[min(92vh,900px)] flex flex-col overflow-hidden"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-gray-200 shrink-0">
-            <h2 className="text-sm font-semibold text-gray-800">
-              {headerCustomerModal.kind === "tl"
-                ? `TL Follow-up — Customer #${headerCustomerModal.customerId}`
-                : `View Customer — #${headerCustomerModal.customerId}`}
-            </h2>
-            <button
-              type="button"
-              onClick={() => setHeaderCustomerModal(null)}
-              className="p-1.5 rounded-md text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-              aria-label="Close"
-            >
-              <X size={20} />
-            </button>
-          </div>
-          <iframe
-            title={
-              headerCustomerModal.kind === "tl"
-                ? `TL follow-up ${headerCustomerModal.customerId}`
-                : `View customer ${headerCustomerModal.customerId}`
-            }
-            src={
-              headerCustomerModal.kind === "tl"
-                ? tlFollowupPagePath(headerCustomerModal.customerId)
-                : customerViewEmbedPath(headerCustomerModal.customerId)
-            }
-            className="flex-1 w-full min-h-0 border-0 bg-white"
-          />
-        </div>
-      </div>,
-      document.body,
-    );
 
   const searchDropdown =
     typeof window !== "undefined" &&
@@ -825,7 +757,11 @@ export default function Navbar({ onToggleSidebar, showSalesMeta = false }) {
         </div>
       </div>
     </nav>
-    {headerCustomerModalPortal}
+    <CustomerQuickViewModal
+      modal={headerCustomerModal}
+      onClose={() => setHeaderCustomerModal(null)}
+      dashboardBase={dashboardBase}
+    />
     </>
   );
 }
