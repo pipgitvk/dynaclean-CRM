@@ -359,6 +359,12 @@ export default function Navbar({ onToggleSidebar, showSalesMeta = false }) {
                     Lead source: {c.lead_source}
                   </div>
                 ) : null}
+                {isSuperAdminSearch &&
+                String(c.tl_notes || "").trim() ? (
+                  <div className="text-xs text-gray-700 mt-0.5 line-clamp-2 leading-snug">
+                    {String(c.tl_notes).trim()}
+                  </div>
+                ) : null}
               </div>
               <div className="flex items-center gap-1 flex-shrink-0">
                 {isSuperAdminSearch ? (

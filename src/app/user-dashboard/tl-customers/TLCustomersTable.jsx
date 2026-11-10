@@ -799,37 +799,16 @@ export default function TLCustomersTable({
                                   {s.phone && s.company ? " · " : ""}
                                   {s.company || ""}
                                 </div>
-                                {s.tl_followed_date ? (
-                                  <div className="text-xs text-indigo-800 mt-1 leading-snug">
-                                    <span className="font-medium">Last TL:</span>{" "}
-                                    {formatCrmDatetimeForISTDisplay(
-                                      s.tl_followed_date,
-                                      "DD-MM-YYYY HH:mm",
-                                    ) || "—"}
-                                    {s.tl_followed_by
-                                      ? ` · ${s.tl_followed_by}`
-                                      : ""}
-                                    {s.tl_next_followup ? (
-                                      <>
-                                        {" "}
-                                        · Next:{" "}
-                                        {formatCrmDatetimeForISTDisplay(
-                                          s.tl_next_followup,
-                                          "DD-MM-YYYY HH:mm",
-                                        )}
-                                      </>
-                                    ) : null}
-                                    {s.tl_notes ? (
-                                      <span className="block text-gray-600 mt-0.5 line-clamp-2">
-                                        {String(s.tl_notes).trim()}
-                                      </span>
-                                    ) : null}
+                                {s.lead_source ? (
+                                  <div className="text-xs text-gray-400 mt-1 truncate">
+                                    Lead source: {s.lead_source}
                                   </div>
-                                ) : (
-                                  <div className="text-xs text-gray-400 mt-1">
-                                    No TL follow-up yet
+                                ) : null}
+                                {String(s.tl_notes || "").trim() ? (
+                                  <div className="text-xs text-gray-700 mt-1 line-clamp-2 leading-snug">
+                                    {String(s.tl_notes).trim()}
                                   </div>
-                                )}
+                                ) : null}
                               </button>
                               {isSuperAdmin && isAdmin ? (
                                 <CustomerSearchPopupActions
