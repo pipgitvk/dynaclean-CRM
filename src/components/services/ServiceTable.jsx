@@ -27,6 +27,7 @@ import {
   getServiceTableFiltersFromSearchParams,
 } from "@/lib/serviceRecordsPendingOver48h";
 import { isServiceRecordAssigned } from "@/lib/serviceRecordAssignment";
+import MachineRegistrationModal from "@/components/warranty/MachineRegistrationModal";
 
 function ServiceRecordCompanyCell({ record }) {
   const company = String(record.customer_name || "").trim() || "N/A";
@@ -149,8 +150,18 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
   const [thirdPartyEngineers, setThirdPartyEngineers] = useState([]);
   const [isAssignSubmitting, setIsAssignSubmitting] = useState(false);
   const [assignError, setAssignError] = useState("");
+  const [machineRegModal, setMachineRegModal] = useState({
+    open: false,
+    serial: "",
+  });
 
   const { ProductFollowupIcons, followupModals } = useWarrantyProductFollowup();
+
+  const openMachineRegistration = (serial) => {
+    const s = String(serial || "").trim();
+    if (!s) return;
+    setMachineRegModal({ open: true, serial: s });
+  };
 
   useEffect(() => {
     setRecords(dedupeServiceRecords(serviceRecords));
@@ -1462,9 +1473,18 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
                           className="mb-1"
                         />
                         <div>{record.service_id}</div>
-                        {record.serial_number && (
-                          <div className="text-xs text-green-600 font-medium mt-0.5">{record.serial_number}</div>
-                        )}
+                        {record.serial_number ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              openMachineRegistration(record.serial_number)
+                            }
+                            className="text-xs text-green-700 font-medium mt-0.5 underline decoration-dotted hover:text-green-900 hover:decoration-solid text-left max-w-full break-all"
+                            title="View machine registration"
+                          >
+                            {record.serial_number}
+                          </button>
+                        ) : null}
                       </td>
                       {showServiceFollowupColumn && (
                         <td className="px-3 py-3 align-top">
@@ -1642,6 +1662,18 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
                       <span className="font-bold text-lg text-blue-600">
                         Service ID: {record.service_id}
                       </span>
+                      {record.serial_number ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            openMachineRegistration(record.serial_number)
+                          }
+                          className="block text-xs text-green-700 font-medium mt-1 underline decoration-dotted hover:text-green-900 text-left break-all"
+                          title="View machine registration"
+                        >
+                          Serial: {record.serial_number}
+                        </button>
+                      ) : null}
                       {showServiceFollowupColumn && (
                         <div className="mt-2">
                           <ServiceRecordFollowupActions
@@ -2067,6 +2099,12 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
           </div>
         </div>
       )}
+      <MachineRegistrationModal
+        isOpen={machineRegModal.open}
+        serialNumber={machineRegModal.serial}
+        onClose={() => setMachineRegModal({ open: false, serial: "" })}
+        dashboardPath={dashboardPath}
+      />
       {followupModals}
     </div>
   );

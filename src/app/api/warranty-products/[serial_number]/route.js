@@ -23,7 +23,7 @@ export async function GET(req, { params }) {
   try {
     conn = await getDbConnection();
     const [rows] = await conn.execute(
-      `SELECT * FROM warranty_products WHERE serial_number = ?`,
+      `SELECT * FROM warranty_products WHERE TRIM(serial_number) = TRIM(?) LIMIT 1`,
       [serialNumber],
     );
 
