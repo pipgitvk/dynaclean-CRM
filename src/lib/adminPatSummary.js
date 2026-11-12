@@ -504,11 +504,19 @@ const PAT_SOLD_LINES_BY_INVENTORY_SQL = `
   SELECT
     inventory_key,
     MIN(item_code_display) AS item_code_display,
+    MIN(item_name_display) AS item_name_display,
     SUM(line_qty) AS qty_sold
   FROM (
     SELECT
       ${PAT_INVENTORY_KEY_FROM_QI_SQL} AS inventory_key,
       TRIM(qi.item_code) AS item_code_display,
+      CASE
+        WHEN TRIM(COALESCE(qi.item_name, '')) <> ''
+          AND TRIM(qi.item_name) <> TRIM(qi.item_code)
+          AND TRIM(qi.item_name) NOT REGEXP '^[0-9]+$'
+        THEN TRIM(qi.item_name)
+        ELSE NULL
+      END AS item_name_display,
       COALESCE(qi.quantity, 1) AS line_qty
     FROM neworder no
     ${ORDER_QUOTATION_HEADER_JOIN}
@@ -516,6 +524,44 @@ const PAT_SOLD_LINES_BY_INVENTORY_SQL = `
       AND TRIM(COALESCE(qi.item_code, '')) <> ''
   ) sale_lines
   GROUP BY inventory_key
+`;
+
+/** Resolve product/spare master name (inventory_key + sold code fallbacks). */
+const PAT_INVENTORY_MASTER_NAME_SQL = `
+  COALESCE(
+    (
+      SELECT TRIM(sl.item_name)
+      FROM spare_list sl
+      WHERE sold.inventory_key = CONCAT('spare:', sl.id)
+        AND TRIM(COALESCE(sl.item_name, '')) <> ''
+      LIMIT 1
+    ),
+    (
+      SELECT TRIM(sl.item_name)
+      FROM spare_list sl
+      WHERE (
+          CAST(sl.id AS CHAR) = TRIM(sold.item_code_display)
+          OR CAST(sl.spare_number AS CHAR) = TRIM(sold.item_code_display)
+        )
+        AND TRIM(COALESCE(sl.item_name, '')) <> ''
+      LIMIT 1
+    ),
+    (
+      SELECT TRIM(pl.item_name)
+      FROM products_list pl
+      WHERE (
+          sold.inventory_key = CONCAT('product:', LOWER(TRIM(pl.item_code)))
+          OR sold.inventory_key = CONCAT('product:', LOWER(TRIM(CAST(pl.product_number AS CHAR))))
+          OR TRIM(pl.item_code) = TRIM(sold.item_code_display)
+          OR CAST(pl.product_number AS CHAR) = TRIM(sold.item_code_display)
+          OR LOWER(TRIM(pl.item_code)) = LOWER(TRIM(sold.item_code_display))
+        )
+        AND TRIM(COALESCE(pl.item_name, '')) <> ''
+      LIMIT 1
+    ),
+    NULLIF(TRIM(sold.item_name_display), ''),
+    '—'
+  )
 `;
 
 /**
@@ -777,6 +823,7 @@ export async function fetchPatDrillRows(conn, section, dateFrom, dateTo) {
         `
           SELECT
             sold.item_code_display,
+            ${PAT_INVENTORY_MASTER_NAME_SQL} AS item_display_name,
             sold.qty_sold,
             latest.purchase_id,
             latest.purchase_date,
@@ -829,6 +876,7 @@ export async function fetchPatDrillRows(conn, section, dateFrom, dateTo) {
         return {
           id: r.item_code_display,
           col1: r.item_code_display,
+          itemName: String(r.item_display_name || "").trim() || "—",
           col2: String(qty),
           col3: costSourceRef,
           productPurchasePrice,

@@ -483,6 +483,7 @@ function PatRow({
                       ) : row.drillSection === "purchase_cogs" ? (
                         <>
                           <th className="px-2 py-1.5">Product code</th>
+                          <th className="px-2 py-1.5">Product / spare name</th>
                           <th className="px-2 py-1.5 text-right">Qty sold</th>
                           <th className="px-2 py-1.5 text-right">
                             Product purchase price
@@ -524,6 +525,11 @@ function PatRow({
                               d.col1
                             )}
                           </td>
+                          {row.drillSection === "purchase_cogs" ? (
+                            <td className="px-2 py-1.5 text-slate-800">
+                              {d.itemName ?? "—"}
+                            </td>
+                          ) : null}
                           <td
                             className={`px-2 py-1.5 ${row.drillSection === "purchase_cogs" ? "text-right tabular-nums" : ""}`}
                           >
@@ -545,7 +551,7 @@ function PatRow({
                     ) : (
                       <tr className="border-t border-slate-100">
                         <td
-                          colSpan={row.drillSection === "purchase_cogs" ? 5 : 4}
+                          colSpan={row.drillSection === "purchase_cogs" ? 6 : 4}
                           className="px-2 py-3 text-center text-slate-500"
                         >
                           {row.drillSection === "purchase_cogs"
@@ -558,7 +564,7 @@ function PatRow({
                   {row.drillSection === "purchase_cogs" && drillRows.length > 0 ? (
                     <tfoot className="border-t-2 border-slate-200 bg-slate-50 font-semibold text-slate-800">
                       <tr>
-                        <td colSpan={4} className="px-2 py-2 text-right text-xs uppercase tracking-wide">
+                        <td colSpan={5} className="px-2 py-2 text-right text-xs uppercase tracking-wide">
                           Total (D)
                         </td>
                         <td className="px-2 py-2 text-right tabular-nums">
