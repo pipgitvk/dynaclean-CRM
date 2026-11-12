@@ -8,6 +8,10 @@ import {
   MACHINE_REPAIR_SPARE_MATCH_SQL,
   SPARE_PARTS_SALES_MATCH_SQL,
 } from "@/lib/patQuotationItemFilters";
+import {
+  buildPatBatteryCogsContext,
+  patBatteryUnitAddOn,
+} from "@/lib/patProductBatteryCogs";
 
 const ORDER_APPROVED_SQL = `
   (
@@ -564,8 +568,55 @@ const PAT_INVENTORY_MASTER_NAME_SQL = `
   )
 `;
 
+const PAT_COGS_SOLD_LINES_SQL = `
+  SELECT
+    sold.inventory_key,
+    sold.item_code_display,
+    ${PAT_INVENTORY_MASTER_NAME_SQL} AS item_display_name,
+    sold.qty_sold,
+    latest.purchase_id,
+    latest.purchase_date,
+    latest.purchase_kind,
+    ${PAT_COGS_UNIT_PRICE_EXPR} AS base_cogs_unit,
+    latest.latest_price AS latest_purchase_unit_price,
+    spare_master.unit_price AS spare_master_unit_price,
+    product_master.product_purchase_price,
+    product_master.purchase_price_is_set
+  FROM (${PAT_SOLD_LINES_BY_INVENTORY_SQL}) sold
+  LEFT JOIN (${PAT_LATEST_PURCHASE_BY_INVENTORY_SQL}) latest
+    ON latest.inventory_key = sold.inventory_key
+  LEFT JOIN (${PAT_SPARE_MASTER_UNIT_PRICE_SQL}) spare_master
+    ON spare_master.inventory_key = sold.inventory_key
+  LEFT JOIN (${PAT_PRODUCT_MASTER_UNIT_PRICE_SQL}) product_master
+    ON product_master.inventory_key = sold.inventory_key
+  ORDER BY sold.item_code_display ASC
+`;
+
+async function fetchPatCogsSoldLinesWithBattery(conn, dateFrom, dateTo) {
+  await ensureProductListPurchasePriceColumn(conn);
+  const [rows] = await conn.execute(PAT_COGS_SOLD_LINES_SQL, [dateFrom, dateTo]);
+  const batteryCtx = await buildPatBatteryCogsContext(conn, rows);
+  return (rows || []).map((r) => {
+    const baseUnit = Number(r.base_cogs_unit) || 0;
+    const batteryUnit = patBatteryUnitAddOn(
+      r.item_code_display,
+      r.item_display_name,
+      batteryCtx,
+    );
+    const unit = baseUnit + batteryUnit;
+    const qty = Number(r.qty_sold) || 0;
+    return {
+      ...r,
+      battery_unit_addon: batteryUnit,
+      unit_price: unit,
+      line_total: qty * unit,
+    };
+  });
+}
+
 /**
  * PAT line D: sold qty × latest purchase price_per_unit (product_stock_request + spare_stock_request).
+ * Machines with battery accessory (package_status added) include battery spare purchase in unit COGS.
  */
 export async function fetchPurchaseCogsFromSalesLatestPurchasePrice(
   conn,
@@ -573,21 +624,8 @@ export async function fetchPurchaseCogsFromSalesLatestPurchasePrice(
   dateTo,
 ) {
   try {
-    await ensureProductListPurchasePriceColumn(conn);
-    const [rows] = await conn.execute(
-      `
-        SELECT COALESCE(SUM(sold.qty_sold * ${PAT_COGS_UNIT_PRICE_EXPR}), 0) AS total
-        FROM (${PAT_SOLD_LINES_BY_INVENTORY_SQL}) sold
-        LEFT JOIN (${PAT_LATEST_PURCHASE_BY_INVENTORY_SQL}) latest
-          ON latest.inventory_key = sold.inventory_key
-        LEFT JOIN (${PAT_SPARE_MASTER_UNIT_PRICE_SQL}) spare_master
-          ON spare_master.inventory_key = sold.inventory_key
-        LEFT JOIN (${PAT_PRODUCT_MASTER_UNIT_PRICE_SQL}) product_master
-          ON product_master.inventory_key = sold.inventory_key
-      `,
-      [dateFrom, dateTo],
-    );
-    return Number(rows[0]?.total) || 0;
+    const lines = await fetchPatCogsSoldLinesWithBattery(conn, dateFrom, dateTo);
+    return lines.reduce((sum, r) => sum + (Number(r.line_total) || 0), 0);
   } catch (e) {
     console.error("fetchPurchaseCogsFromSalesLatestPurchasePrice:", e);
     return 0;
@@ -767,7 +805,7 @@ export async function buildAdminPatSummary(
     periodLabel,
     dateFrom,
     dateTo,
-    note: "All amounts ex-GST. Order-based lines (A, B, D) include only orders with invoice/report uploaded; cancelled, rejected, and returned orders are excluded. Line D COGS: latest purchase price first; if no purchase, product stock purchase_price (including 0); else spare purchase_price. Sale price is never used as COGS. Operating expenses from client_expenses (by entry date). Tax & interest are zero until configured.",
+    note: "All amounts ex-GST. Order-based lines (A, B, D) include only orders with invoice/report uploaded; cancelled, rejected, and returned orders are excluded. Line D COGS: latest purchase price first; if no purchase, product stock purchase_price (including 0); else spare purchase_price. Machines with battery accessory (package status added) also include latest battery spare purchase per unit. Sale price is never used as COGS. Operating expenses from client_expenses (by entry date). Tax & interest are zero until configured.",
     lines: {
       revenueSales: {
         id: "A",
@@ -818,36 +856,12 @@ export async function buildAdminPatSummary(
 export async function fetchPatDrillRows(conn, section, dateFrom, dateTo) {
   if (section === "purchase_cogs") {
     try {
-      await ensureProductListPurchasePriceColumn(conn);
-      const [rows] = await conn.execute(
-        `
-          SELECT
-            sold.item_code_display,
-            ${PAT_INVENTORY_MASTER_NAME_SQL} AS item_display_name,
-            sold.qty_sold,
-            latest.purchase_id,
-            latest.purchase_date,
-            latest.purchase_kind,
-            ${PAT_COGS_UNIT_PRICE_EXPR} AS unit_price,
-            latest.latest_price AS latest_purchase_unit_price,
-            spare_master.unit_price AS spare_master_unit_price,
-            product_master.product_purchase_price,
-            product_master.purchase_price_is_set,
-            sold.qty_sold * ${PAT_COGS_UNIT_PRICE_EXPR} AS line_total
-          FROM (${PAT_SOLD_LINES_BY_INVENTORY_SQL}) sold
-          LEFT JOIN (${PAT_LATEST_PURCHASE_BY_INVENTORY_SQL}) latest
-            ON latest.inventory_key = sold.inventory_key
-          LEFT JOIN (${PAT_SPARE_MASTER_UNIT_PRICE_SQL}) spare_master
-            ON spare_master.inventory_key = sold.inventory_key
-          LEFT JOIN (${PAT_PRODUCT_MASTER_UNIT_PRICE_SQL}) product_master
-            ON product_master.inventory_key = sold.inventory_key
-          ORDER BY sold.item_code_display ASC
-        `,
-        [dateFrom, dateTo],
-      );
+      const rows = await fetchPatCogsSoldLinesWithBattery(conn, dateFrom, dateTo);
       return rows.map((r) => {
         const qty = Number(r.qty_sold) || 0;
         const unit = Number(r.unit_price) || 0;
+        const batteryUnit = Number(r.battery_unit_addon) || 0;
+        const baseUnit = Number(r.base_cogs_unit) || 0;
         // Match product-stock UI: NULL purchase_price displays as 0
         const productPurchasePrice =
           r.product_purchase_price != null
@@ -872,6 +886,13 @@ export async function fetchPatDrillRows(conn, section, dateFrom, dateTo) {
         } else {
           costSourceRef =
             "No purchase found & no product purchase price (COGS ₹0 — sale price not used)";
+        }
+        if (batteryUnit > 0) {
+          costSourceRef += ` · + Battery purchase ₹${batteryUnit.toLocaleString("en-IN")}/unit`;
+          if (baseUnit > 0) {
+            costSourceRef += ` (machine ₹${baseUnit.toLocaleString("en-IN")} + battery)`;
+          }
+          costSourceRef += ` → COGS ₹${unit.toLocaleString("en-IN")}/unit`;
         }
         return {
           id: r.item_code_display,
