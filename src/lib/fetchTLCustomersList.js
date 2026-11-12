@@ -1,4 +1,7 @@
-import { SQL_EFFECTIVE_NEXT_FOLLOWUP } from "@/lib/tlEffectiveNextFollowupSql";
+import {
+  SQL_EFFECTIVE_FOLLOWED_DATE,
+  SQL_EFFECTIVE_NEXT_FOLLOWUP,
+} from "@/lib/tlEffectiveNextFollowupSql";
 import {
   mysqlBoundsForIstDateRange,
   mysqlLowerBoundIstDayStart,
@@ -21,6 +24,8 @@ export function parseTLCustomersListParams(searchParamsResolved) {
     stage,
     nextFromDate,
     nextToDate,
+    followedFromDate,
+    followedToDate,
     lead_campaign,
     notes_language,
     page = "1",
@@ -39,6 +44,8 @@ export function parseTLCustomersListParams(searchParamsResolved) {
     stage: normalizeSearchParam(stage),
     nextFromDate: normalizeSearchParam(nextFromDate),
     nextToDate: normalizeSearchParam(nextToDate),
+    followedFromDate: normalizeSearchParam(followedFromDate),
+    followedToDate: normalizeSearchParam(followedToDate),
     lead_campaign: normalizeSearchParam(lead_campaign),
     notes_language: normalizeSearchParam(notes_language),
     tag: normalizeSearchParam(searchParamsResolved?.tag),
@@ -157,6 +164,8 @@ function appendTLCustomersFilters(
     tag,
     nextFromDate,
     nextToDate,
+    followedFromDate,
+    followedToDate,
     lead_campaign,
     model,
     notes_language,
@@ -235,6 +244,28 @@ function appendTLCustomersFilters(
     }
   }
 
+  const followedDateExpr = showTLOnly
+    ? "tlf.followed_date"
+    : SQL_EFFECTIVE_FOLLOWED_DATE;
+
+  if (followedFromDate && followedToDate) {
+    const ist = mysqlBoundsForIstDateRange(followedFromDate, followedToDate);
+    query += ` AND ${followedDateExpr} IS NOT NULL AND ${followedDateExpr} BETWEEN ? AND ?`;
+    if (ist) {
+      params.push(ist.start, ist.end);
+    } else {
+      params.push(`${followedFromDate} 00:00:00`, `${followedToDate} 23:59:59`);
+    }
+  } else if (followedFromDate) {
+    const lo = mysqlLowerBoundIstDayStart(followedFromDate);
+    query += ` AND ${followedDateExpr} IS NOT NULL AND ${followedDateExpr} >= ?`;
+    params.push(lo ?? `${followedFromDate} 00:00:00`);
+  } else if (followedToDate) {
+    const hi = mysqlUpperBoundIstDayEnd(followedToDate);
+    query += ` AND ${followedDateExpr} IS NOT NULL AND ${followedDateExpr} <= ?`;
+    params.push(hi ?? `${followedToDate} 23:59:59`);
+  }
+
   if (lead_campaign) {
     query += ` AND c.lead_campaign = ?`;
     params.push(lead_campaign);
@@ -263,6 +294,8 @@ export function canUseCustomerOnlyCount(filters, showTLOnly) {
     filters.model ||
     filters.nextFromDate ||
     filters.nextToDate ||
+    filters.followedFromDate ||
+    filters.followedToDate ||
     filters.notes_language ||
     filters.showPreBookingOnly
   );

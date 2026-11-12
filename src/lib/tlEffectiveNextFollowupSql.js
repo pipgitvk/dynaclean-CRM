@@ -15,3 +15,13 @@ export const SQL_EFFECTIVE_NEXT_FOLLOWUP = `(
     ELSE GREATEST(tlf.next_followup_date, cf.next_followup_date)
   END
 )`;
+
+/** Latest activity date from TL_followups vs customers_followup (requires `tlf`, `cf` joins). */
+export const SQL_EFFECTIVE_FOLLOWED_DATE = `(
+  CASE
+    WHEN tlf.followed_date IS NULL AND cf.followed_date IS NULL THEN NULL
+    WHEN tlf.followed_date IS NULL THEN cf.followed_date
+    WHEN cf.followed_date IS NULL THEN tlf.followed_date
+    ELSE GREATEST(tlf.followed_date, cf.followed_date)
+  END
+)`;

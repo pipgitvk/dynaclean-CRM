@@ -131,6 +131,12 @@ export default function TLCustomersTable({
     searchParams?.nextFromDate || "",
   );
   const [nextToDate, setNextToDate] = useState(searchParams?.nextToDate || "");
+  const [followedFromDate, setFollowedFromDate] = useState(
+    searchParams?.followedFromDate || "",
+  );
+  const [followedToDate, setFollowedToDate] = useState(
+    searchParams?.followedToDate || "",
+  );
   const [selectedNotesLanguage, setSelectedNotesLanguage] = useState(
     searchParams?.notes_language || "",
   );
@@ -252,6 +258,8 @@ export default function TLCustomersTable({
       model: selectedModel,
       nextFromDate,
       nextToDate,
+      followedFromDate,
+      followedToDate,
       notes_language: selectedNotesLanguage,
       ...overrides,
     };
@@ -588,6 +596,8 @@ export default function TLCustomersTable({
       setSelectedModel("");
       setNextFromDate("");
       setNextToDate("");
+      setFollowedFromDate("");
+      setFollowedToDate("");
       setSelectedNotesLanguage("");
       router.push(basePath);
     });
@@ -1016,6 +1026,30 @@ export default function TLCustomersTable({
                   <TypeableDateFilterInput value={nextToDate} onChange={setNextToDate} placeholder="dd/mm/yyyy" className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"/>
                 </div>
 
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Followed date from
+                  </label>
+                  <TypeableDateFilterInput
+                    value={followedFromDate}
+                    onChange={setFollowedFromDate}
+                    placeholder="dd/mm/yyyy"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Followed date to
+                  </label>
+                  <TypeableDateFilterInput
+                    value={followedToDate}
+                    onChange={setFollowedToDate}
+                    placeholder="dd/mm/yyyy"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
                 {/* Products / Models filter - Dropdown */}
                 <div className="relative">
                   <label className="block text-xs md:text-sm font-medium text-gray-700 mb-1">
@@ -1083,6 +1117,10 @@ export default function TLCustomersTable({
                               params.set("nextFromDate", nextFromDate);
                             if (nextToDate)
                               params.set("nextToDate", nextToDate);
+                            if (followedFromDate)
+                              params.set("followedFromDate", followedFromDate);
+                            if (followedToDate)
+                              params.set("followedToDate", followedToDate);
                             router.push(`${basePath}?${params.toString()}`);
                           });
                         }}
@@ -1122,6 +1160,13 @@ export default function TLCustomersTable({
                                   params.set("nextFromDate", nextFromDate);
                                 if (nextToDate)
                                   params.set("nextToDate", nextToDate);
+                                if (followedFromDate)
+                                  params.set(
+                                    "followedFromDate",
+                                    followedFromDate,
+                                  );
+                                if (followedToDate)
+                                  params.set("followedToDate", followedToDate);
                                 router.push(`${basePath}?${params.toString()}`);
                               });
                             }}
@@ -1222,6 +1267,10 @@ export default function TLCustomersTable({
                           if (nextFromDate)
                             params.set("nextFromDate", nextFromDate);
                           if (nextToDate) params.set("nextToDate", nextToDate);
+                          if (followedFromDate)
+                            params.set("followedFromDate", followedFromDate);
+                          if (followedToDate)
+                            params.set("followedToDate", followedToDate);
                           params.set("tlOnly", tlOnly ? "false" : "true");
                           router.push(`${basePath}?${params.toString()}`);
                         });
@@ -1267,6 +1316,10 @@ export default function TLCustomersTable({
                             if (nextFromDate)
                               params.set("nextFromDate", nextFromDate);
                             if (nextToDate) params.set("nextToDate", nextToDate);
+                            if (followedFromDate)
+                              params.set("followedFromDate", followedFromDate);
+                            if (followedToDate)
+                              params.set("followedToDate", followedToDate);
                             params.set("tlOnly", tlOnly ? "true" : "false");
                             params.set(
                               "preBookingOnly",
