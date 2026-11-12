@@ -17,10 +17,14 @@ function LabelValue({ label, children }) {
 }
 
 /** Single column: customer + client + company + order (Sale rows with order link only). */
-export default function InventorySaleCustomerCells({ type, sale }) {
+export default function InventorySaleCustomerCells({
+  type,
+  sale,
+  cellClassName = "p-3",
+}) {
   if (type !== "Sale" || !sale) {
     return (
-      <td className="p-3 text-gray-400 align-top">
+      <td className={`${cellClassName} text-gray-400 align-top`}>
         <CellDash />
       </td>
     );
@@ -34,14 +38,14 @@ export default function InventorySaleCustomerCells({ type, sale }) {
 
   if (!hasAny) {
     return (
-      <td className="p-3 text-gray-400 align-top">
+      <td className={`${cellClassName} text-gray-400 align-top`}>
         <CellDash />
       </td>
     );
   }
 
   return (
-    <td className="p-3 align-top min-w-[12rem]">
+    <td className={`${cellClassName} align-top min-w-[12rem]`}>
       <div className="space-y-0.5 text-xs leading-relaxed">
         <LabelValue label="Customer ID">
           {sale.customer_id && sale.customer_link ? (

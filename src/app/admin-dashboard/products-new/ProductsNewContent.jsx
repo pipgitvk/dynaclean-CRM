@@ -9,10 +9,18 @@ import {
   sortInventorySidebarRows,
 } from "@/lib/inventorySidebarSort";
 import React from "react";
-import { Search } from "lucide-react";
+import { Search, ChevronDown } from "lucide-react";
 import Link from "next/link";
 import InventoryPriceEditMenu from "@/components/inventory/InventoryPriceEditMenu";
 import InventorySaleCustomerCells from "@/components/inventory/InventorySaleCustomerCells";
+
+const INVENTORY_TYPE_FILTER_OPTIONS = [
+  { value: "Purchase", label: "Purchase" },
+  { value: "Sale", label: "Sale" },
+  { value: "Transfer", label: "Transfer" },
+  { value: "Invoice", label: "Invoice" },
+  { value: "Quotation", label: "Quotation" },
+];
 
 async function fetchJson(url, { timeoutMs = 120_000 } = {}) {
   const controller = new AbortController();
@@ -23,6 +31,159 @@ async function fetchJson(url, { timeoutMs = 120_000 } = {}) {
   } finally {
     clearTimeout(timer);
   }
+}
+
+function inventoryHistoryTdClass(boxPosition, colIndex) {
+  const first = colIndex === 0;
+  const last = colIndex === 7;
+  if (boxPosition === "groupTop") {
+    return [
+      "p-3 bg-white border-gray-200 border-x border-t",
+      first && "rounded-tl-lg",
+      last && "rounded-tr-lg",
+    ]
+      .filter(Boolean)
+      .join(" ");
+  }
+  if (boxPosition === "groupBottom") {
+    return [
+      "p-3 bg-red-50/40 border-gray-200 border-x border-b border-t",
+      first && "rounded-bl-lg",
+      last && "rounded-br-lg",
+    ]
+      .filter(Boolean)
+      .join(" ");
+  }
+  if (boxPosition === "groupMiddle") {
+    return "p-3 bg-red-50/30 border-gray-200 border-x border-t";
+  }
+  return "p-3 border-t border-gray-200";
+}
+
+function InventoryHistoryTableRow({ item, boxPosition, dispatchDate }) {
+  const isChild = Boolean(item.isChild);
+  const isOrderSale = item.rowRole === "order" && item.type === "Sale";
+  const isOutChild = isChild && item.rowRole === "stock_out";
+  const formattedRowDate = item.display.date
+    ? formatCrmDateOnly(item.display.date)
+    : null;
+  const formattedDispatchDate = dispatchDate
+    ? formatCrmDateOnly(dispatchDate)
+    : null;
+  const hideDateColumn = isOutChild;
+
+  return (
+    <tr className="hover:bg-gray-50/80">
+      <td className={`${inventoryHistoryTdClass(boxPosition, 0)} ${isChild ? "pl-5" : ""}`}>
+        <span
+          className={`px-2 py-1 rounded text-xs font-medium ${item.typeColor}`}
+        >
+          {isChild ? "└ OUT" : item.type}
+        </span>
+      </td>
+      <td
+        className={`${inventoryHistoryTdClass(boxPosition, 1)} ${
+          isChild ? "pl-6 text-gray-700 font-medium" : "font-semibold"
+        }`}
+      >
+        {isChild && item.sortOrderId ? (
+          <span>
+            {item.data?.product_code || item.display.main.split(" · ")[0]}
+            <span className="text-gray-500 font-normal">
+              {" "}
+              ·{" "}
+              <Link
+                href={`/admin-dashboard/order/${encodeURIComponent(item.sortOrderId)}`}
+                className="text-blue-600 hover:underline font-semibold"
+              >
+                {item.sortOrderId}
+              </Link>
+            </span>
+          </span>
+        ) : item.type === "Purchase" ? (
+          <div className="leading-snug">
+            <div>{item.display.main}</div>
+            <div className="text-xs text-gray-500 mt-1">
+              <span className="text-gray-400">invoice-date: </span>
+              {item.display.invoice_date
+                ? formatCrmDateOnly(item.display.invoice_date)
+                : "—"}
+            </div>
+            <div className="text-xs text-gray-500 mt-0.5">
+              <span className="text-gray-400">invoice-number: </span>
+              {item.display.invoice_number || "—"}
+            </div>
+          </div>
+        ) : (
+          item.display.main
+        )}
+      </td>
+      <td className={inventoryHistoryTdClass(boxPosition, 2)}>
+        {isOrderSale ? (
+          <div className="leading-snug">
+            <div>{item.display.sub1 || "—"}</div>
+            {formattedRowDate ? (
+              <div className="text-xs text-gray-500 mt-1">
+                <span className="text-gray-400">order-date: </span>
+                {formattedRowDate}
+              </div>
+            ) : null}
+          </div>
+        ) : isOutChild ? (
+          <span className="text-gray-400">—</span>
+        ) : (
+          item.display.sub1
+        )}
+      </td>
+      <td className={inventoryHistoryTdClass(boxPosition, 3)}>{item.display.sub2}</td>
+      <td className={inventoryHistoryTdClass(boxPosition, 4)}>
+        {item.display.quantity !== undefined ? item.display.quantity : "-"}
+      </td>
+      <td className={inventoryHistoryTdClass(boxPosition, 5)}>
+        {isOrderSale ? (
+          formattedDispatchDate ? (
+            <span className="text-sm text-gray-800 whitespace-nowrap">
+              {formattedDispatchDate}
+            </span>
+          ) : (
+            <span className="text-gray-400">—</span>
+          )
+        ) : hideDateColumn ? (
+          <span className="text-gray-400">—</span>
+        ) : formattedRowDate ? (
+          formattedRowDate
+        ) : (
+          "-"
+        )}
+      </td>
+      <InventorySaleCustomerCells
+        type={isChild ? "OUT" : item.type}
+        sale={item.sale}
+        cellClassName={inventoryHistoryTdClass(boxPosition, 6)}
+      />
+      <td className={inventoryHistoryTdClass(boxPosition, 7)}>
+        {(item.type === "Invoice" || item.type === "Quotation") &&
+        item.display.id ? (
+          <button
+            type="button"
+            onClick={() =>
+              window.open(
+                item.type === "Invoice"
+                  ? `/admin-dashboard/invoices/${encodeURIComponent(item.display.id)}`
+                  : `/admin-dashboard/quotations/${encodeURIComponent(item.display.id)}`,
+                "_blank",
+              )
+            }
+            className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm"
+          >
+            View
+          </button>
+        ) : (
+          <span className="text-gray-400 text-sm">-</span>
+        )}
+      </td>
+    </tr>
+  );
 }
 
 export default function ProductsNewContent() {
@@ -41,7 +202,8 @@ export default function ProductsNewContent() {
   const [masterPurchasePrice, setMasterPurchasePrice] = useState(0);
   const [salePricePerUnit, setSalePricePerUnit] = useState(0);
   const [combinedSearch, setCombinedSearch] = useState("");
-  const [typeFilter, setTypeFilter] = useState("all");
+  const [typeFilters, setTypeFilters] = useState([]);
+  const [typeFilterOpen, setTypeFilterOpen] = useState(false);
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [showTransferModal, setShowTransferModal] = useState(false);
@@ -167,6 +329,92 @@ export default function ProductsNewContent() {
 
   const formatInr = (n) =>
     Number(n || 0).toLocaleString("en-IN", { maximumFractionDigits: 0 });
+
+  const passesInventoryTypeFilter = (item) => {
+    if (!typeFilters.length) return true;
+    const t = item.type;
+    if (typeFilters.includes("Sale") && t === "Sale") return true;
+    return typeFilters.includes(t);
+  };
+
+  const toggleTypeFilter = (value) => {
+    setTypeFilters((prev) =>
+      prev.includes(value)
+        ? prev.filter((v) => v !== value)
+        : [...prev, value],
+    );
+  };
+
+  const typeFilterButtonLabel =
+    typeFilters.length === 0
+      ? "All Types"
+      : typeFilters.length <= 2
+        ? typeFilters.join(", ")
+        : `${typeFilters.length} types`;
+
+  const filterCombinedRow = (item) => {
+    if (combinedSearch) {
+      const searchLower = combinedSearch.toLowerCase();
+      const hit =
+        item.type.toLowerCase().includes(searchLower) ||
+        item.display.main.toLowerCase().includes(searchLower) ||
+        item.display.sub1.toLowerCase().includes(searchLower) ||
+        item.display.sub2.toLowerCase().includes(searchLower);
+      if (!hit) return false;
+    }
+    if (!passesInventoryTypeFilter(item)) return false;
+    if (fromDate || toDate) {
+      const itemDate = item.display.date ? new Date(item.display.date) : null;
+      if (!itemDate) return false;
+      if (fromDate && itemDate < new Date(fromDate)) return false;
+      if (toDate && itemDate > new Date(toDate)) return false;
+    }
+    return true;
+  };
+
+  const filteredCombinedRows = useMemo(
+    () =>
+      combinedData.filter(
+        (item) => filterCombinedRow(item) && !item.isChild,
+      ),
+    [combinedData, combinedSearch, typeFilters, fromDate, toDate],
+  );
+
+  /** One row per sale order; dispatch date shown on parent (from child OUT in API data). */
+  const inventoryTableBlocks = useMemo(() => {
+    const dispatchByOrderId = new Map();
+    for (const item of combinedData) {
+      if (item.isChild && item.sortOrderId && item.display?.date) {
+        dispatchByOrderId.set(item.sortOrderId, item.display.date);
+      }
+    }
+
+    const blocks = [];
+    for (const item of filteredCombinedRows) {
+      if (item.rowRole === "order") {
+        blocks.push({
+          kind: "saleGroup",
+          rows: [item],
+          dispatchDate: dispatchByOrderId.get(item.sortOrderId),
+          id: `grp-${item.sortOrderId}-${blocks.length}`,
+        });
+      } else {
+        blocks.push({
+          kind: "single",
+          rows: [item],
+          id: `single-${item.display.main}-${blocks.length}`,
+        });
+      }
+    }
+    return blocks;
+  }, [combinedData, filteredCombinedRows]);
+
+  function boxPositionForIndex(index, length) {
+    if (length <= 1) return "single";
+    if (index === 0) return "groupTop";
+    if (index === length - 1) return "groupBottom";
+    return "groupMiddle";
+  }
 
   const fetchProductsListQuiet = useCallback(async () => {
     try {
@@ -553,24 +801,61 @@ export default function ProductsNewContent() {
                   onChange={(e) => setCombinedSearch(e.target.value)}
                   className="max-w-md px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
-                <select
-                  value={typeFilter}
-                  onChange={(e) => setTypeFilter(e.target.value)}
-                  className="max-w-xs px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="all">All Types</option>
-                  <option value="Purchase">Purchase</option>
-                  <option value="Sale">Sale</option>
-                  <option value="Transfer">Transfer</option>
-                  <option value="Invoice">Invoice</option>
-                  <option value="Quotation">Quotation</option>
-                </select>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setTypeFilterOpen((o) => !o)}
+                    className="flex min-w-[10.5rem] max-w-xs items-center justify-between gap-2 px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <span className="truncate">{typeFilterButtonLabel}</span>
+                    <ChevronDown className="h-4 w-4 shrink-0 text-gray-500" />
+                  </button>
+                  {typeFilterOpen ? (
+                    <>
+                      <button
+                        type="button"
+                        className="fixed inset-0 z-10 cursor-default"
+                        aria-label="Close type filter"
+                        onClick={() => setTypeFilterOpen(false)}
+                      />
+                      <div className="absolute left-0 z-20 mt-1 min-w-[11rem] rounded-lg border border-gray-200 bg-white py-2 shadow-lg">
+                        <button
+                          type="button"
+                          className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-gray-50 ${
+                            !typeFilters.length ? "font-medium text-blue-700" : ""
+                          }`}
+                          onClick={() => setTypeFilters([])}
+                        >
+                          All Types
+                        </button>
+                        <div className="my-1 border-t border-gray-100" />
+                        {INVENTORY_TYPE_FILTER_OPTIONS.map((opt) => (
+                          <label
+                            key={opt.value}
+                            className="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-sm hover:bg-gray-50"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={typeFilters.includes(opt.value)}
+                              onChange={() => toggleTypeFilter(opt.value)}
+                              className="rounded border-gray-300"
+                            />
+                            {opt.label}
+                          </label>
+                        ))}
+                      </div>
+                    </>
+                  ) : null}
+                </div>
                 <TypeableDateFilterInput value={fromDate} onChange={setFromDate} className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"/>
                 <TypeableDateFilterInput value={toDate} onChange={setToDate} className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"/>
               </div>
+              <p className="text-xs text-gray-500 mb-3">
+                Sorted by date (newest first).
+              </p>
 
               <div className="overflow-x-auto">
-                <table className="min-w-full text-sm border border-gray-200">
+                <table className="min-w-full text-sm border-separate border-spacing-y-2">
                   <thead className="bg-gray-100">
                     <tr>
                       <th className="p-3 border-b text-left font-semibold">Type</th>
@@ -578,112 +863,51 @@ export default function ProductsNewContent() {
                       <th className="p-3 border-b text-left font-semibold">Name</th>
                       <th className="p-3 border-b text-left font-semibold">Price/Unit</th>
                       <th className="p-3 border-b text-left font-semibold">Quantity</th>
-                      <th className="p-3 border-b text-left font-semibold">Date</th>
+                      <th className="p-3 border-b text-left font-semibold">In/Out Date</th>
                       <th className="p-3 border-b text-left font-semibold min-w-[12rem]">
                         Customer / Order
                       </th>
                       <th className="p-3 border-b text-left font-semibold">Action</th>
                     </tr>
                   </thead>
-                  <tbody>
-                    {combinedData
-                      .filter(item => {
-                        if (!combinedSearch) return true;
-                        const searchLower = combinedSearch.toLowerCase();
-                        return (
-                          item.type.toLowerCase().includes(searchLower) ||
-                          item.display.main.toLowerCase().includes(searchLower) ||
-                          item.display.sub1.toLowerCase().includes(searchLower) ||
-                          item.display.sub2.toLowerCase().includes(searchLower)
-                        );
-                      })
-                      .filter(item => {
-                        if (typeFilter === "all") return true;
-                        return item.type === typeFilter;
-                      })
-                      .filter(item => {
-                        if (!fromDate && !toDate) return true;
-                        const itemDate = item.display.date ? new Date(item.display.date) : null;
-                        if (!itemDate) return false;
-                        
-                        if (fromDate && itemDate < new Date(fromDate)) return false;
-                        if (toDate && itemDate > new Date(toDate)) return false;
-                        
-                        return true;
-                      })
-                      .length === 0 ? (
+                  {filteredCombinedRows.length === 0 ? (
+                    <tbody>
                       <tr>
-                        <td colSpan="8" className="p-4 text-center text-gray-500">
+                        <td colSpan={8} className="p-4 text-center text-gray-500">
                           No records found for this product
                         </td>
                       </tr>
-                    ) : (
-                      combinedData
-                        .filter(item => {
-                          if (!combinedSearch) return true;
-                          const searchLower = combinedSearch.toLowerCase();
-                          return (
-                            item.type.toLowerCase().includes(searchLower) ||
-                            item.display.main.toLowerCase().includes(searchLower) ||
-                            item.display.sub1.toLowerCase().includes(searchLower) ||
-                            item.display.sub2.toLowerCase().includes(searchLower)
-                          );
-                        })
-                        .filter(item => {
-                          if (typeFilter === "all") return true;
-                          return item.type === typeFilter;
-                        })
-                        .filter(item => {
-                          if (!fromDate && !toDate) return true;
-                          const itemDate = item.display.date ? new Date(item.display.date) : null;
-                          if (!itemDate) return false;
-                          
-                          if (fromDate && itemDate < new Date(fromDate)) return false;
-                          if (toDate && itemDate > new Date(toDate)) return false;
-                          
-                          return true;
-                        })
-                        .map((item, idx) => (
-                          <tr key={idx} className="border-t hover:bg-gray-50">
-                            <td className="p-3">
-                              <span className={`px-2 py-1 rounded text-xs font-medium ${item.typeColor}`}>
-                                {item.type}
-                              </span>
-                            </td>
-                            <td className="p-3 font-semibold">{item.display.main}</td>
-                            <td className="p-3">{item.display.sub1}</td>
-                            <td className="p-3">{item.display.sub2}</td>
-                            <td className="p-3">{item.display.quantity !== undefined ? item.display.quantity : '-'}</td>
-                            <td className="p-3">
-                              {item.display.date
-                                ? formatCrmDateOnly(item.display.date)
-                                : "-"}
-                            </td>
-                            <InventorySaleCustomerCells
-                              type={item.type}
-                              sale={item.sale}
+                    </tbody>
+                  ) : (
+                    inventoryTableBlocks.map((block) => {
+                      const rowList = block.rows;
+                      const isGroup = false;
+                      const groupDispatchDate =
+                        block.dispatchDate ??
+                        rowList.find(
+                          (r) => r.isChild && r.rowRole === "stock_out",
+                        )?.display?.date;
+
+                      return (
+                        <tbody key={block.id} className={isGroup ? "shadow-sm" : ""}>
+                          {rowList.map((item, ri) => (
+                            <InventoryHistoryTableRow
+                              key={`${block.id}-${ri}`}
+                              item={item}
+                              dispatchDate={
+                                item.rowRole === "order" ? groupDispatchDate : undefined
+                              }
+                              boxPosition={
+                                isGroup
+                                  ? boxPositionForIndex(ri, rowList.length)
+                                  : "single"
+                              }
                             />
-                            <td className="p-3">
-                              {(item.type === 'Invoice' || item.type === 'Quotation') && item.display.id ? (
-                                <button
-                                  onClick={() => window.open(
-                                    item.type === 'Invoice'
-                                      ? `/admin-dashboard/invoices/${encodeURIComponent(item.display.id)}`
-                                      : `/admin-dashboard/quotations/${encodeURIComponent(item.display.id)}`,
-                                    '_blank'
-                                  )}
-                                  className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm"
-                                >
-                                  View
-                                </button>
-                              ) : (
-                                <span className="text-gray-400 text-sm">-</span>
-                              )}
-                            </td>
-                          </tr>
-                        ))
-                    )}
-                  </tbody>
+                          ))}
+                        </tbody>
+                      );
+                    })
+                  )}
                 </table>
               </div>
             </div>

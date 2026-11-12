@@ -1,8 +1,10 @@
 export function buildInventorySaleCustomerInfo(orderRow) {
   const o = orderRow || {};
+  const rawCustomer =
+    o.customer_id ?? o.quote_customer_id ?? o.resolved_customer_id;
   const customerId =
-    o.customer_id != null && String(o.customer_id).trim() !== ""
-      ? String(o.customer_id).trim()
+    rawCustomer != null && String(rawCustomer).trim() !== ""
+      ? String(rawCustomer).trim()
       : null;
   const orderId =
     o.order_id != null && String(o.order_id).trim() !== ""
