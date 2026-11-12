@@ -646,10 +646,8 @@ export default function PatStatementView() {
     });
     try {
       const q = new URLSearchParams({ quote_number: quoteNumber });
-      const section = String(patSection ?? "").trim();
-      if (section && section !== "revenue_sales") {
-        q.set("pat_section", section);
-      }
+      const section = String(patSection ?? "revenue_sales").trim() || "revenue_sales";
+      q.set("pat_section", section);
       const res = await fetch(`/api/orders/items?${q.toString()}`);
       const data = await res.json();
       if (!data.success) {

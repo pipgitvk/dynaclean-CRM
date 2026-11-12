@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { patQuotationItemFilterSql } from "@/lib/patQuotationItemFilters";
+import { applyPatRevenueSalesBatteryDisplay } from "@/lib/patRevenueSalesQuotationItems";
 
 export async function GET(request) {
   try {
@@ -24,7 +25,7 @@ export async function GET(request) {
 
     const sectionFilter = patQuotationItemFilterSql(patSection);
     const conn = await getDbConnection();
-    const [items] = await conn.execute(
+    const [rows] = await conn.execute(
       `SELECT qi.id, qi.item_name, qi.item_code, qi.quantity, qi.unit,
               qi.price_per_unit, qi.taxable_price, qi.total_price, qi.total_taxable_amt
        FROM quotation_items qi
@@ -33,6 +34,12 @@ export async function GET(request) {
        ORDER BY qi.id ASC`,
       [quote_number]
     );
+
+    const patSectionKey = String(patSection ?? "").trim();
+    const items =
+      patSectionKey === "revenue_sales"
+        ? await applyPatRevenueSalesBatteryDisplay(conn, rows, patSectionKey)
+        : rows;
 
     return NextResponse.json({ success: true, items });
   } catch (err) {
