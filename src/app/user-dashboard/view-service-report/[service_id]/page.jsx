@@ -7,6 +7,11 @@ import dayjs from "dayjs";
 import { generateServiceReportPDF, downloadPDF } from "@/utils/pdfGenerator";
 import { isInstallationReportLayout } from "@/utils/reportLayout";
 import ServiceReportPrintModal from "@/components/services/ServiceReportPrintModal";
+import {
+  parseCompletionImageList,
+  resolveCompletionImageDisplayUrl,
+  resolveCompletionImageFetchUrl,
+} from "@/components/services/serviceCompletionImageUtils";
 import "./print.css";
 
 // Lightweight image component with prioritized fallbacks for signatures
@@ -77,47 +82,7 @@ const formatDate = (date) => {
   return date ? dayjs(date).format("YYYY-MM-DD") : "-";
 };
 
-const parseImageList = (value) =>
-  value
-    ? String(value)
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean)
-    : [];
-
-const normalizeAttachmentPath = (filePath) => {
-  if (!filePath) return "";
-  let path = String(filePath).trim();
-  if (path.startsWith("http")) {
-    try {
-      path = new URL(path).pathname;
-    } catch {
-      // keep original path
-    }
-  }
-  path = path.replace(/^\/public\//, "/").replace(/^public\//, "");
-  if (!path.startsWith("/")) path = `/${path}`;
-  if (!path.includes("/completion_files/") && !path.includes("/attachments/")) {
-    const cleanPath = path.replace(/^\/+/, "");
-    path = `/completion_files/${cleanPath}`;
-  }
-  return path;
-};
-
-const resolveAttachmentUrl = async (filePath) => {
-  const pathOnly = normalizeAttachmentPath(filePath);
-  const fallback = `https://service.dynacleanindustries.com${pathOnly}`;
-  try {
-    const res = await fetch(
-      `/api/resolve-attachment?path=${encodeURIComponent(pathOnly)}`,
-      { cache: "no-store" }
-    );
-    const data = await res.json();
-    return data?.url || fallback;
-  } catch {
-    return fallback;
-  }
-};
+const parseImageList = parseCompletionImageList;
 
 const buildPhotosPrintSection = async (preImages, postImages, serviceId, serialNumber) => {
   const resolveAll = async (paths) =>
@@ -126,7 +91,7 @@ const buildPhotosPrintSection = async (preImages, postImages, serviceId, serialN
         const fileName = path.split("/").pop() || `Photo ${index + 1}`;
         return {
           label: fileName,
-          url: await resolveAttachmentUrl(path),
+          url: await resolveCompletionImageDisplayUrl(path),
         };
       })
     );
@@ -164,6 +129,65 @@ const buildPhotosPrintSection = async (preImages, postImages, serviceId, serialN
   `;
 
   return section;
+};
+
+const pdfFormatFromBlob = (blob) => {
+  const t = String(blob?.type || "").toLowerCase();
+  if (t.includes("png")) return "PNG";
+  if (t.includes("webp")) return "WEBP";
+  return "JPEG";
+};
+
+const embedCompletionImageInPdf = async (
+  pdf,
+  filePath,
+  x,
+  yRef,
+  maxWidth = 70,
+) => {
+  try {
+    const fetchUrl = await resolveCompletionImageFetchUrl(filePath);
+    if (!fetchUrl) return yRef.value;
+
+    const response = await fetch(fetchUrl);
+    if (!response.ok) {
+      console.warn("PDF image fetch failed:", fetchUrl, response.status);
+      return yRef.value;
+    }
+
+    const blob = await response.blob();
+    if (!blob.size) return yRef.value;
+
+    const dataUrl = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+
+    const format = pdfFormatFromBlob(blob);
+    const img = new Image();
+    await new Promise((resolve) => {
+      img.onload = () => resolve();
+      img.onerror = () => resolve();
+      img.src = dataUrl;
+    });
+    if (!img.width || !img.height) return yRef.value;
+
+    const imgWidth = maxWidth;
+    const imgHeight = (img.height * imgWidth) / img.width;
+    let y = yRef.value;
+    if (y + imgHeight > 270) {
+      pdf.addPage();
+      y = 10;
+    }
+    pdf.addImage(dataUrl, format, x, y, imgWidth, imgHeight);
+    yRef.value = y + imgHeight + 5;
+    return yRef.value;
+  } catch (e) {
+    console.error("embedCompletionImageInPdf:", filePath, e);
+    return yRef.value;
+  }
 };
 
 export default function ViewServiceReport({ params }) {
@@ -396,40 +420,6 @@ export default function ViewServiceReport({ params }) {
     if (!report || !product) return;
 
     setIsGeneratingPDF(true);
-    
-    const normalizeAttachmentPath = (filePath) => {
-      if (!filePath) return "";
-      let path = String(filePath).trim();
-      if (path.startsWith("http")) {
-        try {
-          path = new URL(path).pathname;
-        } catch {
-          // keep original path
-        }
-      }
-      path = path.replace(/^\/public\//, "/").replace(/^public\//, "");
-      if (!path.startsWith("/")) path = `/${path}`;
-      if (!path.includes("/completion_files/") && !path.includes("/attachments/")) {
-        const cleanPath = path.replace(/^\/+/, "");
-        path = `/completion_files/${cleanPath}`;
-      }
-      return path;
-    };
-
-    const resolveAttachmentUrl = async (filePath) => {
-      const pathOnly = normalizeAttachmentPath(filePath);
-      const fallback = `https://service.dynacleanindustries.com${pathOnly}`;
-      try {
-        const res = await fetch(
-          `/api/resolve-attachment?path=${encodeURIComponent(pathOnly)}`,
-          { cache: "no-store" }
-        );
-        const data = await res.json();
-        return data?.url || fallback;
-      } catch {
-        return fallback;
-      }
-    };
 
     try {
       // Resolve filenames for signatures (works for filename, path, or full URL)
@@ -548,171 +538,44 @@ export default function ViewServiceReport({ params }) {
         { isInstallationLayout: pdfInstallationLayout }
       );
 
-      // Add images if "with images" mode is selected
       if (printMode === "withImages" && hasPhotos) {
-        const preImages = parseImageList(report?.pre_completion);
-        const postImages = parseImageList(report?.after_completion);
-        
-        console.log("📸 Image data:", { preImages, postImages, hasPhotos });
+        const preImagePaths = parseImageList(report?.pre_completion);
+        const postImagePaths = parseImageList(report?.after_completion);
 
-        // Add photos page
-        if (preImages.length > 0 || postImages.length > 0) {
+        if (preImagePaths.length > 0 || postImagePaths.length > 0) {
           pdf.addPage();
-          
-          // Title for photos
           const pageWidth = pdf.internal.pageSize.getWidth();
           pdf.setFontSize(16);
           pdf.text("SERVICE PHOTOS", pageWidth / 2, 15, { align: "center" });
-          
           pdf.setFontSize(10);
-          pdf.text(`Service ID: ${report.service_id} | Serial: ${report.serial_number || "-"}`, pageWidth / 2, 22, { align: "center" });
-          
-          let yPosition = 30;
-          
-          // Pre-completion photos
-          if (preImages.length > 0) {
+          pdf.text(
+            `Service ID: ${report.service_id} | Serial: ${report.serial_number || "-"}`,
+            pageWidth / 2,
+            22,
+            { align: "center" },
+          );
+
+          const yRef = { value: 30 };
+
+          if (preImagePaths.length > 0) {
             pdf.setFontSize(12);
             pdf.setFont(undefined, "bold");
-            pdf.text("Pre-Completion Photos", 10, yPosition);
-            yPosition += 8;
-            
-            for (let i = 0; i < preImages.length; i++) {
-              const imgPath = preImages[i];
-              console.log(`Processing pre-image ${i}:`, imgPath);
-              
-              try {
-                // Use API proxy instead of direct URL
-                const response = await fetch(`/api/image-proxy?url=${encodeURIComponent(imgPath)}`);
-                if (!response.ok) {
-                  console.warn(`Failed to fetch image ${i} via proxy:`, response.status);
-                  continue;
-                }
-                
-                const blob = await response.blob();
-                console.log(`Fetched blob for image ${i}, size:`, blob.size);
-                
-                const reader = new FileReader();
-                
-                await new Promise((resolve) => {
-                  reader.onload = () => {
-                    try {
-                      const imgData = reader.result;
-                      const img = new Image();
-                      img.onload = () => {
-                        try {
-                          const imgWidth = 70;
-                          const imgHeight = (img.height * imgWidth) / img.width;
-                          
-                          console.log(`Image ${i} loaded, size: ${imgWidth}x${imgHeight}`);
-                          
-                          // Check if we need a new page
-                          if (yPosition + imgHeight > 270) {
-                            pdf.addPage();
-                            yPosition = 10;
-                          }
-                          
-                          pdf.addImage(imgData, "JPEG", 10, yPosition, imgWidth, imgHeight);
-                          yPosition += imgHeight + 5;
-                          resolve();
-                        } catch (e) {
-                          console.error("Error adding image to PDF:", e);
-                          resolve();
-                        }
-                      };
-                      img.onerror = () => {
-                        console.error("Failed to decode image");
-                        resolve();
-                      };
-                      img.src = imgData;
-                    } catch (e) {
-                      console.error("Error processing image data:", e);
-                      resolve();
-                    }
-                  };
-                  reader.onerror = () => {
-                    console.error("FileReader error");
-                    resolve();
-                  };
-                  reader.readAsDataURL(blob);
-                });
-              } catch (e) {
-                console.error(`Error processing pre-completion image ${i}:`, e);
-              }
+            pdf.text("Pre-Completion Photos", 10, yRef.value);
+            yRef.value += 8;
+            for (const imgPath of preImagePaths) {
+              await embedCompletionImageInPdf(pdf, imgPath, 10, yRef);
             }
           }
-          
-          // Add space before post-completion
-          yPosition += 10;
-          
-          // Post-completion photos
-          if (postImages.length > 0) {
+
+          yRef.value += 10;
+
+          if (postImagePaths.length > 0) {
             pdf.setFontSize(12);
             pdf.setFont(undefined, "bold");
-            pdf.text("Post-Completion Photos", 10, yPosition);
-            yPosition += 8;
-            
-            for (let i = 0; i < postImages.length; i++) {
-              const imgPath = postImages[i];
-              console.log(`Processing post-image ${i}:`, imgPath);
-              
-              try {
-                // Use API proxy instead of direct URL
-                const response = await fetch(`/api/image-proxy?url=${encodeURIComponent(imgPath)}`);
-                if (!response.ok) {
-                  console.warn(`Failed to fetch image ${i} via proxy:`, response.status);
-                  continue;
-                }
-                
-                const blob = await response.blob();
-                console.log(`Fetched blob for image ${i}, size:`, blob.size);
-                
-                const reader = new FileReader();
-                
-                await new Promise((resolve) => {
-                  reader.onload = () => {
-                    try {
-                      const imgData = reader.result;
-                      const img = new Image();
-                      img.onload = () => {
-                        try {
-                          const imgWidth = 70;
-                          const imgHeight = (img.height * imgWidth) / img.width;
-                          
-                          console.log(`Image ${i} loaded, size: ${imgWidth}x${imgHeight}`);
-                          
-                          // Check if we need a new page
-                          if (yPosition + imgHeight > 270) {
-                            pdf.addPage();
-                            yPosition = 10;
-                          }
-                          
-                          pdf.addImage(imgData, "JPEG", 10, yPosition, imgWidth, imgHeight);
-                          yPosition += imgHeight + 5;
-                          resolve();
-                        } catch (e) {
-                          console.error("Error adding image to PDF:", e);
-                          resolve();
-                        }
-                      };
-                      img.onerror = () => {
-                        console.error("Failed to decode image");
-                        resolve();
-                      };
-                      img.src = imgData;
-                    } catch (e) {
-                      console.error("Error processing image data:", e);
-                      resolve();
-                    }
-                  };
-                  reader.onerror = () => {
-                    console.error("FileReader error");
-                    resolve();
-                  };
-                  reader.readAsDataURL(blob);
-                });
-              } catch (e) {
-                console.error(`Error processing post-completion image ${i}:`, e);
-              }
+            pdf.text("Post-Completion Photos", 10, yRef.value);
+            yRef.value += 8;
+            for (const imgPath of postImagePaths) {
+              await embedCompletionImageInPdf(pdf, imgPath, 10, yRef);
             }
           }
         }
