@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import toast from "react-hot-toast";
 import { ArrowLeft } from "lucide-react";
+import AmcCmcProductLookupFields from "@/components/amc-cmc/AmcCmcProductLookupFields";
 
 const DEFAULT_TERMS_AND_CONDITIONS = `Terms & Conditions
 
@@ -69,8 +70,6 @@ All disputes shall be subject to jurisdiction of the courts at Delhi.`;
 export default function AddUserAMCCMCPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const [serialSuggestions, setSerialSuggestions] = useState([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
   const [formData, setFormData] = useState({
     contract_type: "",
     serial_number: "",
@@ -93,47 +92,6 @@ export default function AddUserAMCCMCPage() {
     invoice: null,
     payment_proof: null,
   });
-
-  // Fetch serial number suggestions
-  const fetchSerialSuggestions = useCallback(async (searchTerm) => {
-    if (!searchTerm || searchTerm.length < 1) {
-      setSerialSuggestions([]);
-      return;
-    }
-
-    try {
-      const res = await fetch(
-        `/api/warranty/serial-numbers?search=${encodeURIComponent(searchTerm)}`
-      );
-      if (!res.ok) throw new Error("Failed to fetch suggestions");
-      const data = await res.json();
-      setSerialSuggestions(data.data || []);
-    } catch (error) {
-      console.error("Error fetching suggestions:", error);
-      setSerialSuggestions([]);
-    }
-  }, []);
-
-  const handleSerialChange = (e) => {
-    const value = e.target.value;
-    setFormData((prev) => ({ ...prev, serial_number: value }));
-    fetchSerialSuggestions(value);
-    setShowSuggestions(true);
-  };
-
-  const handleSelectSuggestion = (suggestion) => {
-    setFormData((prev) => ({
-      ...prev,
-      serial_number: suggestion.serial_number,
-      model: suggestion.model || prev.model,
-      company_name: suggestion.customer_name || prev.company_name,
-      contact: suggestion.contact || prev.contact,
-      email: suggestion.email || prev.email,
-      company_address: suggestion.customer_address || prev.company_address,
-    }));
-    setShowSuggestions(false);
-    setSerialSuggestions([]);
-  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -222,40 +180,11 @@ export default function AddUserAMCCMCPage() {
                   <option value="CMC">CMC</option>
                 </select>
               </div>
-              <div className="relative">
-                <label className="block text-sm font-medium mb-1">Serial Number *</label>
-                <input
-                  type="text"
-                  name="serial_number"
-                  value={formData.serial_number}
-                  onChange={handleSerialChange}
-                  onFocus={() => showSuggestions && serialSuggestions.length > 0 && setShowSuggestions(true)}
-                  required
-                  autoComplete="off"
-                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Start typing to search..."
-                />
-                
-                {/* Suggestions Dropdown */}
-                {showSuggestions && serialSuggestions.length > 0 && (
-                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                    {serialSuggestions.map((suggestion, index) => (
-                      <div
-                        key={index}
-                        onClick={() => handleSelectSuggestion(suggestion)}
-                        className="px-4 py-3 hover:bg-blue-50 cursor-pointer border-b last:border-b-0 transition-colors"
-                      >
-                        <div className="font-semibold text-gray-900">{suggestion.serial_number}</div>
-                        <div className="text-sm text-gray-600">
-                          {suggestion.product_name && <div>Product: {suggestion.product_name}</div>}
-                          {suggestion.model && <div>Model: {suggestion.model}</div>}
-                          {suggestion.customer_name && <div>Company: {suggestion.customer_name}</div>}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <AmcCmcProductLookupFields
+                formData={formData}
+                setFormData={setFormData}
+                dashboardBase="user-dashboard"
+              />
               <div>
                 <label className="block text-sm font-medium mb-1">Model</label>
                 <input
