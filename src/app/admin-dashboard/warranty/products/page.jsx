@@ -437,19 +437,26 @@ export default function WarrantyPage() {
   const [stateFilter, setStateFilter] = useState("");
   const [geoTagFilter, setGeoTagFilter] = useState("");
   const [warrantyFilter, setWarrantyFilter] = useState(""); // "all", "in-warranty", "out-of-warranty"
+  const [serialFilter, setSerialFilter] = useState("");
+  const [serialStats, setSerialStats] = useState({
+    total: 0,
+    missingSerial: 0,
+    withSerial: 0,
+  });
   const [modal, setModal] = useState(null); // { type: "install"|"complaint", serial: string }
 
   const fetchProducts = useCallback(
     async (page, search = "") => {
       setLoading(true);
       try {
-        const url = `/api/warranty/all?page=${page}&limit=${pageSize}&search=${encodeURIComponent(search)}&model=${encodeURIComponent(modelFilter)}&state=${encodeURIComponent(stateFilter)}&geoTag=${encodeURIComponent(geoTagFilter)}&warranty=${encodeURIComponent(warrantyFilter)}`;
+        const url = `/api/warranty/all?page=${page}&limit=${pageSize}&search=${encodeURIComponent(search)}&model=${encodeURIComponent(modelFilter)}&state=${encodeURIComponent(stateFilter)}&geoTag=${encodeURIComponent(geoTagFilter)}&warranty=${encodeURIComponent(warrantyFilter)}&serial=${encodeURIComponent(serialFilter)}`;
         const res = await fetch(url);
         const data = await res.json();
         setProducts(data.products || []);
         setTotalPages(data.totalPages || 1);
         setTotal(data.total || 0);
         setCurrentPage(data.currentPage || 1);
+        if (data.serialStats) setSerialStats(data.serialStats);
       } catch (error) {
         console.error("Error fetching products:", error);
         setProducts([]);
@@ -457,7 +464,7 @@ export default function WarrantyPage() {
         setLoading(false);
       }
     },
-    [pageSize, modelFilter, stateFilter, geoTagFilter, warrantyFilter]
+    [pageSize, modelFilter, stateFilter, geoTagFilter, warrantyFilter, serialFilter]
   );
 
   useEffect(() => {
@@ -470,7 +477,7 @@ export default function WarrantyPage() {
       fetchProducts(1, searchQuery);
     }, 500);
     return () => clearTimeout(timer);
-  }, [searchQuery, modelFilter, stateFilter, geoTagFilter, warrantyFilter, fetchProducts]);
+  }, [searchQuery, modelFilter, stateFilter, geoTagFilter, warrantyFilter, serialFilter, fetchProducts]);
 
   function closeModal() { setModal(null); }
   function handleModalSuccess() {
@@ -566,8 +573,11 @@ export default function WarrantyPage() {
 
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-3xl font-bold">Warranty Records</h2>
-        <div className="text-sm text-gray-600">
-          Total: {total} products
+        <div className="text-sm text-gray-600 text-right">
+          <div>Total: {serialStats.total || total} products</div>
+          <div className={serialStats.missingSerial > 0 ? "text-red-600 font-semibold" : "text-green-600"}>
+            Without serial: {serialStats.missingSerial ?? "—"}
+          </div>
         </div>
       </div>
 
@@ -592,6 +602,18 @@ export default function WarrantyPage() {
           <option value="">All</option>
           <option value="in-warranty">In-Warranty</option>
           <option value="out-of-warranty">Out of Warranty</option>
+        </select>
+        <select
+          value={serialFilter}
+          onChange={(e) => {
+            setSerialFilter(e.target.value);
+            setCurrentPage(1);
+          }}
+          className="w-full md:w-auto px-4 py-2 border rounded shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+        >
+          <option value="">All serials</option>
+          <option value="with">With serial number</option>
+          <option value="without">Without serial number</option>
         </select>
         <select
           value={geoTagFilter}

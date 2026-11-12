@@ -23,6 +23,10 @@ export async function GET(req) {
     searchParams.get("warranty") ||
     searchParams.get("warrantyFilter") ||
     "";
+  const serialFilter =
+    searchParams.get("serial") ||
+    searchParams.get("serialFilter") ||
+    "";
 
   const offset = (page - 1) * limit;
 
@@ -91,7 +95,29 @@ export async function GET(req) {
       conditions.push(`NOT ${inWarrantySql}`);
     }
 
+    const missingSerialSql = `(wp.serial_number IS NULL OR TRIM(wp.serial_number) = '')`;
+    const withSerialSql = `(wp.serial_number IS NOT NULL AND TRIM(wp.serial_number) <> '')`;
+
+    if (serialFilter === "without" || serialFilter === "missing") {
+      conditions.push(missingSerialSql);
+    } else if (serialFilter === "with") {
+      conditions.push(withSerialSql);
+    }
+
     const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+
+    const [serialStatsRows] = await pool.execute(
+      `SELECT
+         COUNT(*) AS total,
+         SUM(CASE WHEN ${missingSerialSql} THEN 1 ELSE 0 END) AS missing_serial,
+         SUM(CASE WHEN ${withSerialSql} THEN 1 ELSE 0 END) AS with_serial
+       FROM warranty_products wp`,
+    );
+    const serialStats = {
+      total: Number(serialStatsRows[0]?.total) || 0,
+      missingSerial: Number(serialStatsRows[0]?.missing_serial) || 0,
+      withSerial: Number(serialStatsRows[0]?.with_serial) || 0,
+    };
 
     // Get total count (distinct warranty products matching filters)
     const [countResult] = await pool.execute(
@@ -157,12 +183,13 @@ export async function GET(req) {
       })
     );
 
-    return NextResponse.json({ 
-      products: productsWithAMC, 
-      total, 
+    return NextResponse.json({
+      products: productsWithAMC,
+      total,
       totalPages,
       currentPage: page,
-      pageSize: limit
+      pageSize: limit,
+      serialStats,
     });
   } catch (error) {
     console.error("Error fetching warranty products:", error);
