@@ -45,6 +45,27 @@ export function getCompletionImageSrc(filePath) {
   return `/api/image-proxy?url=${encodeURIComponent(trimmed)}`;
 }
 
+function proxyExternalUrlForClientFetch(trimmed, resolvedUrl) {
+  if (resolvedUrl?.startsWith("/")) return resolvedUrl;
+  const raw = String(resolvedUrl || trimmed || "").trim();
+  if (!raw) return "";
+  if (raw.includes("res.cloudinary.com")) {
+    return `/api/cloudinary-proxy?url=${encodeURIComponent(raw)}`;
+  }
+  if (raw.startsWith("http://") || raw.startsWith("https://")) {
+    try {
+      const pathname = new URL(raw).pathname.replace(/^\/+/, "");
+      if (pathname) {
+        return `/api/image-proxy?url=${encodeURIComponent(pathname)}`;
+      }
+    } catch {
+      /* use raw token below */
+    }
+    return `/api/image-proxy?url=${encodeURIComponent(raw)}`;
+  }
+  return getCompletionImageSrc(trimmed);
+}
+
 /** Same-origin or proxied URL suitable for fetch() (PDF embed, print resolver). */
 export async function resolveCompletionImageFetchUrl(filePath) {
   const trimmed = String(filePath || "").trim();
@@ -53,35 +74,41 @@ export async function resolveCompletionImageFetchUrl(filePath) {
   if (trimmed.includes("res.cloudinary.com")) {
     return `/api/cloudinary-proxy?url=${encodeURIComponent(trimmed)}`;
   }
-  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
-    return trimmed;
-  }
 
-  const pathParam = completionImageStoragePath(trimmed);
-  try {
-    const res = await fetch(
-      `/api/resolve-attachment?path=${encodeURIComponent(pathParam)}`,
-      { cache: "no-store" },
-    );
-    const data = await res.json();
-    const url = String(data?.url || "").trim();
-    if (url) {
-      if (url.includes("res.cloudinary.com")) {
-        return `/api/cloudinary-proxy?url=${encodeURIComponent(url)}`;
+  if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://")) {
+    const pathParam = completionImageStoragePath(trimmed);
+    try {
+      const res = await fetch(
+        `/api/resolve-attachment?path=${encodeURIComponent(pathParam)}`,
+        { cache: "no-store", credentials: "include" },
+      );
+      const data = await res.json();
+      const url = String(data?.url || "").trim();
+      if (url) {
+        return proxyExternalUrlForClientFetch(trimmed, url);
       }
-      return url;
+    } catch {
+      /* fallback below */
     }
-  } catch {
-    /* fallback below */
   }
 
-  return getCompletionImageSrc(trimmed);
+  return proxyExternalUrlForClientFetch(trimmed, getCompletionImageSrc(trimmed));
 }
 
-/** Resolved absolute/proxied URL for print preview <img src>. */
+/** Resolved absolute/proxied URL for <img src> (print / on-screen). */
+export function resolveCompletionImageDisplayUrlSync(filePath) {
+  const src = getCompletionImageSrc(filePath);
+  if (!src) return "";
+  if (typeof window !== "undefined" && src.startsWith("/")) {
+    return new URL(src, window.location.origin).toString();
+  }
+  return src;
+}
+
+/** @deprecated Prefer resolveCompletionImageDisplayUrlSync — kept for callers that await */
 export async function resolveCompletionImageDisplayUrl(filePath) {
   const fetchUrl = await resolveCompletionImageFetchUrl(filePath);
-  if (!fetchUrl) return "";
+  if (!fetchUrl) return resolveCompletionImageDisplayUrlSync(filePath);
   if (fetchUrl.startsWith("/")) {
     if (typeof window !== "undefined") {
       return new URL(fetchUrl, window.location.origin).toString();

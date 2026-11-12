@@ -9,9 +9,11 @@ import { isInstallationReportLayout } from "@/utils/reportLayout";
 import ServiceReportPrintModal from "@/components/services/ServiceReportPrintModal";
 import {
   parseCompletionImageList,
-  resolveCompletionImageDisplayUrl,
+  getCompletionImageSrc,
+  resolveCompletionImageDisplayUrlSync,
   resolveCompletionImageFetchUrl,
 } from "@/components/services/serviceCompletionImageUtils";
+import ServiceCompletionPhotosPanel from "@/components/services/ServiceCompletionPhotosPanel";
 import "./print.css";
 
 // Lightweight image component with prioritized fallbacks for signatures
@@ -84,20 +86,20 @@ const formatDate = (date) => {
 
 const parseImageList = parseCompletionImageList;
 
-const buildPhotosPrintSection = async (preImages, postImages, serviceId, serialNumber) => {
-  const resolveAll = async (paths) =>
-    Promise.all(
-      paths.map(async (path, index) => {
-        const fileName = path.split("/").pop() || `Photo ${index + 1}`;
-        return {
-          label: fileName,
-          url: await resolveCompletionImageDisplayUrl(path),
-        };
-      })
-    );
+const buildPhotosPrintSection = (preImages, postImages, serviceId, serialNumber) => {
+  const resolveAll = (paths) =>
+    paths.map((path, index) => {
+      const fileName = path.split("/").pop() || `Photo ${index + 1}`;
+      const proxied = getCompletionImageSrc(path);
+      const url =
+        proxied.startsWith("/") && typeof window !== "undefined"
+          ? new URL(proxied, window.location.origin).href
+          : proxied || resolveCompletionImageDisplayUrlSync(path);
+      return { label: fileName, url };
+    });
 
-  const preResolved = await resolveAll(preImages);
-  const postResolved = await resolveAll(postImages);
+  const preResolved = resolveAll(preImages);
+  const postResolved = resolveAll(postImages);
 
   const renderPhotoItem = (item, title) =>
     `<figure class="print-photo-item">
@@ -149,7 +151,7 @@ const embedCompletionImageInPdf = async (
     const fetchUrl = await resolveCompletionImageFetchUrl(filePath);
     if (!fetchUrl) return yRef.value;
 
-    const response = await fetch(fetchUrl);
+    const response = await fetch(fetchUrl, { credentials: "include" });
     if (!response.ok) {
       console.warn("PDF image fetch failed:", fetchUrl, response.status);
       return yRef.value;
@@ -337,7 +339,7 @@ export default function ViewServiceReport({ params }) {
       }
 
       if (includeImages && hasPhotos) {
-        photosEl = await buildPhotosPrintSection(
+        photosEl = buildPhotosPrintSection(
           preImages,
           postImages,
           report.service_id,
@@ -1178,6 +1180,13 @@ export default function ViewServiceReport({ params }) {
           )}
         </div>
         </div>
+
+        <ServiceCompletionPhotosPanel
+          preCompletion={report?.pre_completion}
+          afterCompletion={report?.after_completion}
+          serviceId={report.service_id}
+          serialNumber={report.serial_number}
+        />
 
         {/* Print and Download Buttons */}
         <div className="flex flex-col sm:flex-row gap-4 justify-center sm:justify-end mt-8 no-print">
