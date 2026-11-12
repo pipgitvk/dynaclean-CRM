@@ -26,6 +26,7 @@ import {
   isServiceRecordPendingOver48Hours,
   getServiceTableFiltersFromSearchParams,
 } from "@/lib/serviceRecordsPendingOver48h";
+import { isServiceRecordAssigned } from "@/lib/serviceRecordAssignment";
 
 /** completed_date may be ISO from DB or already shown as DD-MM-YYYY. */
 function completedDateToIso(value) {
@@ -537,10 +538,16 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
       return false;
     }
 
-    if (appliedAssignedFilter === "NOT_ASSIGNED" && record.assigned_to) {
+    if (
+      appliedAssignedFilter === "NOT_ASSIGNED" &&
+      isServiceRecordAssigned(record.assigned_to)
+    ) {
       return false;
     }
-    if (appliedAssignedFilter === "ASSIGNED" && !record.assigned_to) {
+    if (
+      appliedAssignedFilter === "ASSIGNED" &&
+      !isServiceRecordAssigned(record.assigned_to)
+    ) {
       return false;
     }
 
@@ -632,7 +639,11 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
     ...new Set(records.map((r) => r.status).filter(Boolean)),
   ];
   const uniqueEngineers = [
-    ...new Set(records.map((r) => r.assigned_to).filter(Boolean)),
+    ...new Set(
+      records
+        .map((r) => r.assigned_to)
+        .filter((a) => isServiceRecordAssigned(a)),
+    ),
   ].sort();
 
   // Status options for the change-status modal (ensure Pending By Customer is available)
