@@ -3,11 +3,31 @@
  * Used by adminPatSummary aggregations and order item drill-down API.
  */
 
-/**
- * AMC/CAMC lines: quotation item_code may be SKU (AMC/CAMC) or products_list.item_code
- * (e.g. 1002500173) with item_name AMC/CAMC.
- */
-export const AMC_ITEM_MATCH_SQL = `
+/** Machine / product master lines (not AMC/CAMC service SKUs). */
+export const PAT_PHYSICAL_PRODUCT_LINE_SQL = `
+  (
+    EXISTS (
+      SELECT 1
+      FROM products_list pl
+      WHERE (
+          TRIM(pl.item_code) = TRIM(qi.item_code)
+          OR CAST(pl.product_number AS CHAR) = TRIM(qi.item_code)
+        )
+        AND UPPER(TRIM(COALESCE(pl.item_name, ''))) NOT IN ('AMC', 'CAMC')
+        AND UPPER(TRIM(COALESCE(pl.item_code, ''))) NOT IN ('AMC', 'CAMC', 'CMC')
+    )
+    OR (
+      TRIM(COALESCE(qi.item_code, '')) REGEXP '[A-Za-z]'
+      AND UPPER(TRIM(qi.item_code)) NOT IN ('AMC', 'CAMC', 'CMC')
+      AND UPPER(TRIM(COALESCE(qi.item_name, ''))) NOT IN ('AMC', 'CAMC')
+      AND UPPER(COALESCE(qi.item_name, '')) NOT LIKE '%CAMC%'
+      AND UPPER(COALESCE(qi.item_name, '')) NOT LIKE '%COMPREHENSIVE MAINTENANCE%'
+      AND UPPER(COALESCE(qi.item_name, '')) NOT LIKE '%ANNUAL MAINTENANCE CONTRACT%'
+    )
+  )
+`;
+
+const AMC_CAMC_LINE_CORE_SQL = `
   (
     UPPER(TRIM(qi.item_code)) IN ('AMC', 'CAMC', 'CMC')
     OR UPPER(TRIM(qi.item_name)) IN ('AMC', 'CAMC')
@@ -26,6 +46,17 @@ export const AMC_ITEM_MATCH_SQL = `
           OR UPPER(TRIM(pl.item_code)) IN ('AMC', 'CAMC', 'CMC')
         )
     )
+  )
+`;
+
+/**
+ * AMC/CAMC lines: quotation item_code may be SKU (AMC/CAMC) or products_list.item_code
+ * (e.g. 1002500173) with item_name AMC/CAMC. Physical products are excluded.
+ */
+export const AMC_ITEM_MATCH_SQL = `
+  (
+    ${AMC_CAMC_LINE_CORE_SQL}
+    AND NOT (${PAT_PHYSICAL_PRODUCT_LINE_SQL})
   )
 `;
 
@@ -115,7 +146,7 @@ export const FREIGHT_RECOVERED_MATCH_SQL = `
   )
 `;
 
-/** Spare-parts sales: spare_list lines (excludes AMC & service-charge spares). */
+/** Spare-parts sales: spare_list lines only (no machines/products from products_list). */
 export const SPARE_PARTS_SALES_MATCH_SQL = `
   (
     EXISTS (
@@ -126,6 +157,7 @@ export const SPARE_PARTS_SALES_MATCH_SQL = `
           OR CAST(sl.id AS CHAR) = TRIM(qi.item_code)
         )
     )
+    AND NOT (${PAT_PHYSICAL_PRODUCT_LINE_SQL})
     AND NOT (${AMC_ITEM_MATCH_SQL})
     AND NOT (${MACHINE_REPAIR_SPARE_MATCH_SQL})
     AND NOT (${INSTALLATION_CHARGES_MATCH_SQL})
