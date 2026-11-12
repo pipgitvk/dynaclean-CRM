@@ -5,6 +5,8 @@ import { getDbConnection } from "@/lib/db";
 import { DASHBOARD_MAP } from "@/components/Dashboards";
 import { getReportingManagerForEmployee } from "@/lib/reportingManager";
 import { countWarehouseDispatchPending } from "@/lib/warehouseDispatchPendingCount";
+import { normalizeRoleKey } from "@/lib/roleKeyUtils";
+import HrDashboard from "@/components/Dashboards/HrDashboard";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret";
 
@@ -85,7 +87,16 @@ export default async function UserDashboardPage() {
       return <p className="text-red-600">User not found</p>;
     }
 
-    const DashboardComponent = DASHBOARD_MAP[role] || DASHBOARD_MAP["DEFAULT"];
+    const roleKey = normalizeRoleKey(role);
+    const userRoleKey = normalizeRoleKey(user?.userRole);
+    const DashboardComponent =
+      DASHBOARD_MAP[role] ||
+      DASHBOARD_MAP[roleKey] ||
+      DASHBOARD_MAP[user?.userRole] ||
+      DASHBOARD_MAP[userRoleKey] ||
+      (roleKey.includes("HR") || userRoleKey.includes("HR")
+        ? HrDashboard
+        : DASHBOARD_MAP["DEFAULT"]);
 
     const counts = {
       dispatch: dispatchPendingsCount,

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Check, X, RefreshCcw, Eye } from "lucide-react";
 import Link from "next/link";
 import toast from "react-hot-toast";
@@ -58,10 +59,20 @@ function getChangedFieldLabels(submission) {
   }
 }
 
+const VALID_TABS = new Set(TABS.map((t) => t.key));
+
 export default function ProfileApprovalsPage() {
+  const searchParams = useSearchParams();
+  const tabFromUrl = String(searchParams.get("tab") || "").trim();
+  const initialTab = VALID_TABS.has(tabFromUrl) ? tabFromUrl : "pending";
+
   const [submissions, setSubmissions] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState("pending");
+  const [tab, setTab] = useState(initialTab);
+
+  useEffect(() => {
+    if (VALID_TABS.has(tabFromUrl)) setTab(tabFromUrl);
+  }, [tabFromUrl]);
 
   const load = async () => {
     setLoading(true);

@@ -22,6 +22,8 @@ export const DASHBOARD_MAP = {
   "HR": HrDashboard,
   "HR HEAD": HrDashboard,
   "HR EXECUTIVE": HrDashboard,
+  "JUNIOR HR EXECUTIVE": HrDashboard,
+  "HR RECRUITER": HrDashboard,
   "DIRECTOR": DirectorDashboard,
   "ACCOUNTANT": AccountantDashboard,
   "PRODUCTION ACCOUNTANT": AccountantDashboard,

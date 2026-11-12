@@ -4,6 +4,7 @@ import HrTargetVsCompletedChart from "@/components/empcrm/HrTargetVsCompletedCha
 import HiringCandidatesFollowUpSection from "@/components/empcrm/hiring/HiringCandidatesFollowUpSection";
 import { canAccessHiringModule, canViewHrTargetChart } from "@/lib/hrTargetEligibleRoles";
 import UpcomingFollowupsWidget from "@/components/service/UpcomingFollowupsWidget";
+import HrProfileApprovalsDashboardCard from "@/components/empcrm/HrProfileApprovalsDashboardCard";
 
 const salesCard =
   "flex min-h-0 flex-col rounded-xl border border-slate-100 bg-white p-4 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.08),0_2px_4px_-2px_rgba(0,0,0,0.05)] md:p-5";
@@ -14,6 +15,10 @@ export default function HrDashboard({ user }) {
 
   return (
     <div className="space-y-4 md:space-y-5">
+      <div className="w-fit max-w-[11rem]">
+        <HrProfileApprovalsDashboardCard />
+      </div>
+
       {showHrTargetChart && (
         <div className={salesCard}>
           <HrTargetVsCompletedChart />
