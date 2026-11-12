@@ -3,11 +3,13 @@
 import { formatCrmDateOnly } from "@/lib/crmDateFormat";
 
 import { useState, useEffect } from "react";
-import { useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
+import { getEmpCrmProfileApprovalsBase } from "@/lib/hrEmployeeCrmAccess";
 import { Search, FileText, History, X, TrendingUp } from "lucide-react";
 import ProfileForm from "./ProfileForm";
 
 export default function ProfileManagement() {
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const presetUsername = searchParams.get("username") || "";
 
@@ -115,7 +117,10 @@ export default function ProfileManagement() {
                 Salary History
               </button>
             )}
-            <a href="/empcrm/admin-dashboard/profile/approvals" className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">
+            <a
+              href={getEmpCrmProfileApprovalsBase(pathname)}
+              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+            >
               Go to Approvals
             </a>
           </div>

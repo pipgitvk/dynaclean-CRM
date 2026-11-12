@@ -18,8 +18,12 @@ export function getDirectorHrProfileApprovalsAdminBase(pathname = "") {
 }
 
 export function getDirectorHrProfileApprovalDetailPath(id, pathname = "", from = "admin") {
-  if (String(pathname).startsWith("/director-dashboard/final-profile-approval")) {
+  const path = String(pathname || "");
+  if (path.startsWith("/director-dashboard/final-profile-approval")) {
     return `/director-dashboard/final-profile-approval/${id}?from=${from}`;
+  }
+  if (path.startsWith("/hr-dashboard")) {
+    return `/hr-dashboard/admin-crm/profile/approvals/${id}?from=${from}`;
   }
   return `/empcrm/admin-dashboard/profile/approvals/${id}?from=${from}`;
 }

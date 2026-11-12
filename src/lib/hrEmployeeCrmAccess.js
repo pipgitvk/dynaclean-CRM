@@ -63,6 +63,34 @@ export function mapEmpCrmAdminPathToHrDashboard(path) {
   return `${HR_PREFIX}${p.slice(EMP_PREFIX.length)}`;
 }
 
+/** HR profile approvals list (empcrm vs hr-dashboard admin-crm mirror). */
+export function getEmpCrmProfileApprovalsBase(pathname = "") {
+  const path = String(pathname || "");
+  if (path.startsWith("/hr-dashboard")) {
+    return "/hr-dashboard/admin-crm/profile/approvals";
+  }
+  return "/empcrm/admin-dashboard/profile/approvals";
+}
+
+export function getEmpCrmProfileManagementBase(pathname = "") {
+  const path = String(pathname || "");
+  if (path.startsWith("/hr-dashboard")) {
+    return "/hr-dashboard/admin-crm/profile";
+  }
+  return "/empcrm/admin-dashboard/profile";
+}
+
+export function getEmpCrmProfileApprovalDetailPath(id, pathname = "", search = "") {
+  const base = getEmpCrmProfileApprovalsBase(pathname);
+  const suffix =
+    search && String(search).trim()
+      ? String(search).trim().startsWith("?")
+        ? String(search).trim()
+        : `?${String(search).trim()}`
+      : "";
+  return `${base}/${encodeURIComponent(String(id))}${suffix}`;
+}
+
 export function shouldHideEmployeesGroupLeafForHrRole(moduleKey) {
   return HR_ADMIN_EMPLOYEE_CRM_KEY_SET.has(moduleKey);
 }

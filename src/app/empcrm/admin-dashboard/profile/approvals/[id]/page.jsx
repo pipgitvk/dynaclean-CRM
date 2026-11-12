@@ -11,6 +11,7 @@ import { labelForReassignKey } from "@/lib/profileReassignFields";
 import { parseReassignKeys } from "@/lib/reassignFieldVisibility";
 import { isEmpCrmHrAdmin } from "@/lib/hrTargetEligibleRoles";
 import { getDirectorHrProfileApprovalsAdminBase } from "@/lib/directorHrPaths";
+import { getEmpCrmProfileApprovalsBase } from "@/lib/hrEmployeeCrmAccess";
 
 export default function SubmissionDetailsPage() {
     const { id } = useParams();
@@ -28,7 +29,7 @@ export default function SubmissionDetailsPage() {
     const [reassignSubmitting, setReassignSubmitting] = useState(false);
 
     const adminApprovalsBase = getDirectorHrProfileApprovalsAdminBase(pathname);
-    const hrApprovalsBase = "/empcrm/admin-dashboard/profile/approvals";
+    const hrApprovalsBase = getEmpCrmProfileApprovalsBase(pathname);
     const listBackPath = fromAdminQueue ? adminApprovalsBase : hrApprovalsBase;
 
     useEffect(() => {

@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
+import {
+  getEmpCrmProfileApprovalDetailPath,
+  getEmpCrmProfileManagementBase,
+} from "@/lib/hrEmployeeCrmAccess";
 import { Check, X, RefreshCcw, Eye } from "lucide-react";
 import Link from "next/link";
 import toast from "react-hot-toast";
@@ -62,6 +66,7 @@ function getChangedFieldLabels(submission) {
 const VALID_TABS = new Set(TABS.map((t) => t.key));
 
 export default function ProfileApprovalsPage() {
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const tabFromUrl = String(searchParams.get("tab") || "").trim();
   const initialTab = VALID_TABS.has(tabFromUrl) ? tabFromUrl : "pending";
@@ -224,13 +229,14 @@ export default function ProfileApprovalsPage() {
                     )}
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <Link href={`/empcrm/admin-dashboard/profile/approvals/${s.id}`}
+                        <Link
+                          href={getEmpCrmProfileApprovalDetailPath(s.id, pathname)}
                           className="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-1 w-fit">
                           <Eye className="w-4 h-4" /> View
                         </Link>
                         {tab === "approved" && s.username && (
                           <Link
-                            href={`/empcrm/admin-dashboard/profile?username=${encodeURIComponent(s.username.trim())}`}
+                            href={`${getEmpCrmProfileManagementBase(pathname)}?username=${encodeURIComponent(s.username.trim())}`}
                             className="px-3 py-1 bg-purple-600 text-white rounded-md hover:bg-purple-700 flex items-center gap-1 w-fit"
                           >
                             Open Profile
