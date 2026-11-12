@@ -125,8 +125,12 @@ export default function OrderTable({
   userRole,
   orderBasePath = "/user-dashboard/order",
   warehouseInchargeItemExpand = false,
+  /** Customer-scoped order lists: show all dates until user picks a range. */
+  defaultEmptyDateFilter = false,
   onWarehouseDispatchItem,
 }) {
+  const useEmptyDateDefaults =
+    warehouseInchargeItemExpand || defaultEmptyDateFilter;
   const showPaymentTerms = !warehouseInchargeItemExpand;
   const tableColCount = showPaymentTerms
     ? ORDER_TABLE_COL_COUNT
@@ -139,11 +143,11 @@ export default function OrderTable({
   const [paymentTermsFilter, setPaymentTermsFilter] = useState("");
   const [appliedPaymentTermsFilter, setAppliedPaymentTermsFilter] = useState("");
   const [dateFrom, setDateFrom] = useState(() =>
-    warehouseInchargeItemExpand ? "" : getOrderTableDefaultDateFrom(),
+    useEmptyDateDefaults ? "" : getOrderTableDefaultDateFrom(),
   );
   const [appliedDateFrom, setAppliedDateFrom] = useState("");
   const [dateTo, setDateTo] = useState(() =>
-    warehouseInchargeItemExpand ? "" : getOrderTableDefaultDateTo(),
+    useEmptyDateDefaults ? "" : getOrderTableDefaultDateTo(),
   );
   const [appliedDateTo, setAppliedDateTo] = useState("");
   const [createdByFilter, setCreatedByFilter] = useState("");

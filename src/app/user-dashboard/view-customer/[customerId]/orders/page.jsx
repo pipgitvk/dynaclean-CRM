@@ -132,7 +132,11 @@ export default async function CustomerOrdersPage({ params }) {
         </div>
       </div>
 
-      <OrderTable orders={orders} userRole={userRole} />
+      <OrderTable
+        orders={orders}
+        userRole={userRole}
+        defaultEmptyDateFilter
+      />
     </div>
   );
 }
