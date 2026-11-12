@@ -6,7 +6,6 @@ import {
   isWithinLoginTimeWindow,
   LOGIN_TIME_RESTRICTION_RANGE_LABEL,
 } from "@/lib/loginTimeRestriction";
-import { ensureLoginTimeRestrictionColumn } from "@/lib/ensureLoginTimeRestrictionColumn";
 import { verifyThirdPartyEngineerPassword } from "@/lib/thirdPartyEngineerPassword";
 import { THIRD_PARTY_ENGINEER_ROLE } from "@/lib/thirdPartyEngineerPortalSession";
 
@@ -47,11 +46,6 @@ export async function POST(request) {
   try {
     const { username, password } = await request.json();
     console.log("🟡 Login request received:", username);
-
-    // Schema check uses the pool. Do it before holding a connection, and only
-    // until the column exists — an ALTER on every login locks emplist and
-    // exhausts the 5-connection pool until the gateway returns 504 HTML.
-    await ensureLoginTimeRestrictionColumn();
 
     pool = await getDbConnection();
     conn = await pool.getConnection();
@@ -191,7 +185,7 @@ export async function POST(request) {
 
     // Time-based restriction when enabled per employee (not for SUPERADMIN)
     const isTimeRestrictionEnabled =
-      !isSuperAdmin && user.login_time_restriction_enabled !== 0;
+      !isSuperAdmin && Number(user.login_time_restriction_enabled) === 1;
     if (isTimeRestrictionEnabled) {
       const { hour, minute } = getCurrentISTTime();
       const currentTimeMinutes = hour * 60 + minute;

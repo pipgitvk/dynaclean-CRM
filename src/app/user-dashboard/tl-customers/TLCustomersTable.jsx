@@ -162,6 +162,7 @@ export default function TLCustomersTable({
   const [searchSuggestHighlight, setSearchSuggestHighlight] = useState(-1);
   const searchSuggestRef = useRef(null);
   const searchSuggestDebounceRef = useRef(null);
+  const searchSuggestAbortRef = useRef(null);
   const [customerQuickViewModal, setCustomerQuickViewModal] = useState(null);
 
   const fetchSearchSuggestions = useCallback((q) => {
@@ -169,7 +170,7 @@ export default function TLCustomersTable({
       clearTimeout(searchSuggestDebounceRef.current);
     }
     const trimmed = String(q ?? "").trim();
-    if (trimmed.length < 1) {
+    if (trimmed.length < 2) {
       setSearchSuggestions([]);
       setSearchSuggestOpen(false);
       setSearchSuggestLoading(false);
@@ -177,10 +178,16 @@ export default function TLCustomersTable({
     }
 
     searchSuggestDebounceRef.current = setTimeout(async () => {
+      if (searchSuggestAbortRef.current) {
+        searchSuggestAbortRef.current.abort();
+      }
+      const controller = new AbortController();
+      searchSuggestAbortRef.current = controller;
       setSearchSuggestLoading(true);
       try {
         const res = await fetch(
           `/api/tl-customers/search-suggestions?q=${encodeURIComponent(trimmed)}`,
+          { cache: "no-store", signal: controller.signal },
         );
         const data = await res.json();
         if (data.success && Array.isArray(data.suggestions)) {
@@ -191,13 +198,16 @@ export default function TLCustomersTable({
           setSearchSuggestions([]);
           setSearchSuggestOpen(false);
         }
-      } catch {
+      } catch (err) {
+        if (err?.name === "AbortError") return;
         setSearchSuggestions([]);
         setSearchSuggestOpen(false);
       } finally {
-        setSearchSuggestLoading(false);
+        if (!controller.signal.aborted) {
+          setSearchSuggestLoading(false);
+        }
       }
-    }, 220);
+    }, 400);
   }, []);
 
   useEffect(() => {
@@ -790,7 +800,7 @@ export default function TLCustomersTable({
                     ) : null}
                     {searchSuggestOpen && searchSuggestions.length > 0 ? (
                       <ul
-                        className="absolute left-0 right-0 sm:right-auto top-full z-[101] mt-1 w-full sm:min-w-full sm:w-[min(40rem,calc(100vw-2rem))] max-h-[min(70vh,28rem)] sm:max-h-[min(24rem,70vh)] overflow-y-auto overflow-x-hidden bg-white border border-gray-200 rounded-lg shadow-xl overscroll-contain [-webkit-overflow-scrolling:touch]"
+                        className="absolute left-0 right-0 top-full z-[101] mt-1 w-full max-h-[min(70vh,28rem)] sm:max-h-[min(24rem,70vh)] overflow-y-auto overflow-x-hidden bg-white border border-gray-200 rounded-lg shadow-xl overscroll-contain [-webkit-overflow-scrolling:touch]"
                         role="listbox"
                       >
                         {searchSuggestions.map((s, index) => (
@@ -826,7 +836,7 @@ export default function TLCustomersTable({
                     searchTerm.trim() &&
                     !searchSuggestLoading &&
                     searchSuggestions.length === 0 ? (
-                      <div className="absolute left-0 right-0 sm:right-auto top-full z-[101] mt-1 w-full sm:min-w-full sm:w-[min(40rem,calc(100vw-2rem))] px-3 py-2 text-xs text-gray-500 bg-white border border-gray-200 rounded-md shadow">
+                      <div className="absolute left-0 right-0 top-full z-[101] mt-1 w-full px-3 py-2 text-xs text-gray-500 bg-white border border-gray-200 rounded-md shadow">
                         No matching customers
                       </div>
                     ) : null}
