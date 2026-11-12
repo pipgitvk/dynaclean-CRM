@@ -34,6 +34,8 @@ export default async function ViewServiceReportsPage() {
         sr.*,
         wp.customer_name AS customer_name_from_wp,
         wp.contact_person AS contact_person_from_wp,
+        wp.site_person,
+        wp.site_contact,
         wp.installed_address AS installed_address_from_wp,
         wp.id AS machine_id, wp.email, wp.contact, wp.invoice_date, wp.product_name, wp.specification, wp.model, wp.state,
         (

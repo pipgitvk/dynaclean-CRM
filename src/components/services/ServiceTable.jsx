@@ -28,6 +28,32 @@ import {
 } from "@/lib/serviceRecordsPendingOver48h";
 import { isServiceRecordAssigned } from "@/lib/serviceRecordAssignment";
 
+function ServiceRecordCompanyCell({ record }) {
+  const company = String(record.customer_name || "").trim() || "N/A";
+  const sitePerson = String(
+    record.site_person || record.contact_person_from_wp || "",
+  ).trim();
+  const siteContact = String(record.site_contact || record.contact || "").trim();
+
+  return (
+    <div className="space-y-0.5 text-sm max-w-[240px]">
+      <div className="font-medium text-gray-900 break-words">{company}</div>
+      {sitePerson ? (
+        <div className="text-xs text-gray-600 break-words">
+          <span className="font-semibold text-gray-700">Site person:</span>{" "}
+          {sitePerson}
+        </div>
+      ) : null}
+      {siteContact ? (
+        <div className="text-xs text-gray-600">
+          <span className="font-semibold text-gray-700">Contact:</span>{" "}
+          {siteContact}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 /** completed_date may be ISO from DB or already shown as DD-MM-YYYY. */
 function completedDateToIso(value) {
   if (value == null || value === "") return null;
@@ -1452,8 +1478,8 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
                       <td className="px-6 py-3">
                         {formatDate(record.complaint_date)}
                       </td>
-                      <td className="px-6 py-3">
-                        {record.customer_name || "N/A"}
+                      <td className="px-6 py-3 align-top">
+                        <ServiceRecordCompanyCell record={record} />
                       </td>
                       <td className="px-6 py-3 max-w-[160px] whitespace-normal break-words">
                         <div className="text-sm text-gray-700">
@@ -1685,12 +1711,12 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
                       </span>{" "}
                       {formatDate(record.complaint_date)}
                     </p>
-                    <p className="text-gray-500">
-                      <span className="font-semibold text-gray-700">
-                        Company:
-                      </span>{" "}
-                      {record.customer_name || "N/A"}
-                    </p>
+                    <div className="text-gray-500">
+                      <span className="font-semibold text-gray-700">Company:</span>
+                      <div className="mt-0.5">
+                        <ServiceRecordCompanyCell record={record} />
+                      </div>
+                    </div>
                     <p className="text-gray-500">
                       <span className="font-semibold text-gray-700">
                         Assigned To:
