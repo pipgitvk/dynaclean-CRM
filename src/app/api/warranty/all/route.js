@@ -19,6 +19,10 @@ export async function GET(req) {
   const stateFilter = searchParams.get("state") || "";
   const geoTagFilter =
     searchParams.get("geoTag") || searchParams.get("geo_tag") || "";
+  const warrantyFilter =
+    searchParams.get("warranty") ||
+    searchParams.get("warrantyFilter") ||
+    "";
 
   const offset = (page - 1) * limit;
 
@@ -69,6 +73,22 @@ export async function GET(req) {
       conditions.push(geoTaggedSql);
     } else if (geoTagFilter === "without") {
       conditions.push(`NOT ${geoTaggedSql}`);
+    }
+
+    const inWarrantySql = `(
+      wp.installation_date IS NOT NULL
+      AND wp.warranty_period IS NOT NULL
+      AND TRIM(CAST(wp.warranty_period AS CHAR)) <> ''
+      AND DATE_ADD(DATE(wp.installation_date), INTERVAL CAST(wp.warranty_period AS UNSIGNED) MONTH) >= CURDATE()
+    )`;
+
+    if (warrantyFilter === "in-warranty" || warrantyFilter === "in") {
+      conditions.push(inWarrantySql);
+    } else if (
+      warrantyFilter === "out-of-warranty" ||
+      warrantyFilter === "out"
+    ) {
+      conditions.push(`NOT ${inWarrantySql}`);
     }
 
     const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";

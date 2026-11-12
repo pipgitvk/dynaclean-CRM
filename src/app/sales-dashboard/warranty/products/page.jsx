@@ -12,6 +12,8 @@ export default function WarrantyPage() {
   const [pageSize] = useState(50);
   const [modelFilter, setModelFilter] = useState("");
   const [stateFilter, setStateFilter] = useState("");
+  const [geoTagFilter, setGeoTagFilter] = useState("");
+  const [warrantyFilter, setWarrantyFilter] = useState("");
 
   const fetchProducts = useCallback(
     async (page, search = "") => {
@@ -19,7 +21,7 @@ export default function WarrantyPage() {
       try {
         const url = `/api/warranty/all?page=${page}&limit=${pageSize}&search=${encodeURIComponent(
           search
-        )}&model=${encodeURIComponent(modelFilter)}&state=${encodeURIComponent(stateFilter)}`;
+        )}&model=${encodeURIComponent(modelFilter)}&state=${encodeURIComponent(stateFilter)}&geoTag=${encodeURIComponent(geoTagFilter)}&warranty=${encodeURIComponent(warrantyFilter)}`;
         const res = await fetch(url);
         const data = await res.json();
 
@@ -34,7 +36,7 @@ export default function WarrantyPage() {
         setLoading(false);
       }
     },
-    [pageSize, modelFilter, stateFilter]
+    [pageSize, modelFilter, stateFilter, geoTagFilter, warrantyFilter]
   );
 
   useEffect(() => {
@@ -49,7 +51,7 @@ export default function WarrantyPage() {
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [searchQuery, modelFilter, stateFilter, fetchProducts]);
+  }, [searchQuery, modelFilter, stateFilter, geoTagFilter, warrantyFilter, fetchProducts]);
 
   // Skeleton component for a single table row
   const SkeletonRow = () => (
@@ -257,6 +259,32 @@ export default function WarrantyPage() {
           onChange={(e) => setStateFilter(e.target.value)}
           className="w-full md:w-1/4 px-4 py-2 border rounded shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
+        <select
+          value={warrantyFilter}
+          onChange={(e) => {
+            setWarrantyFilter(e.target.value);
+            setCurrentPage(1);
+          }}
+          className="w-full md:w-auto px-4 py-2 border rounded shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+          aria-label="Warranty status"
+        >
+          <option value="">Warranty — All</option>
+          <option value="in-warranty">In Warranty</option>
+          <option value="out-of-warranty">Out of Warranty</option>
+        </select>
+        <select
+          value={geoTagFilter}
+          onChange={(e) => {
+            setGeoTagFilter(e.target.value);
+            setCurrentPage(1);
+          }}
+          className="w-full md:w-auto px-4 py-2 border rounded shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+          aria-label="Geo tag Site"
+        >
+          <option value="">Geo tag Site — All</option>
+          <option value="with">With geo tag (Lat/Long)</option>
+          <option value="without">Without geo tag</option>
+        </select>
       </div>
 
       <div className="flex flex-col w-full">
