@@ -435,7 +435,7 @@ export default function WarrantyPage() {
   const [pageSize] = useState(50);
   const [modelFilter, setModelFilter] = useState("");
   const [stateFilter, setStateFilter] = useState("");
-  const [latFilter, setLatFilter] = useState("");
+  const [geoTagFilter, setGeoTagFilter] = useState("");
   const [warrantyFilter, setWarrantyFilter] = useState(""); // "all", "in-warranty", "out-of-warranty"
   const [modal, setModal] = useState(null); // { type: "install"|"complaint", serial: string }
 
@@ -443,7 +443,7 @@ export default function WarrantyPage() {
     async (page, search = "") => {
       setLoading(true);
       try {
-        const url = `/api/warranty/all?page=${page}&limit=${pageSize}&search=${encodeURIComponent(search)}&model=${encodeURIComponent(modelFilter)}&state=${encodeURIComponent(stateFilter)}`;
+        const url = `/api/warranty/all?page=${page}&limit=${pageSize}&search=${encodeURIComponent(search)}&model=${encodeURIComponent(modelFilter)}&state=${encodeURIComponent(stateFilter)}&geoTag=${encodeURIComponent(geoTagFilter)}`;
         const res = await fetch(url);
         const data = await res.json();
         setProducts(data.products || []);
@@ -457,7 +457,7 @@ export default function WarrantyPage() {
         setLoading(false);
       }
     },
-    [pageSize, modelFilter, stateFilter]
+    [pageSize, modelFilter, stateFilter, geoTagFilter]
   );
 
   useEffect(() => {
@@ -470,7 +470,7 @@ export default function WarrantyPage() {
       fetchProducts(1, searchQuery);
     }, 500);
     return () => clearTimeout(timer);
-  }, [searchQuery, modelFilter, stateFilter, warrantyFilter, fetchProducts]);
+  }, [searchQuery, modelFilter, stateFilter, geoTagFilter, warrantyFilter, fetchProducts]);
 
   function closeModal() { setModal(null); }
   function handleModalSuccess() {
@@ -518,24 +518,17 @@ export default function WarrantyPage() {
     "Company", "Installation", "Location", "Site", "Invoice", "Reports", "Actions",
   ];
 
-  const displayProducts = latFilter === "with"
-    ? products.filter(r => r.lat && r.longt)
-    : latFilter === "without"
-    ? products.filter(r => !r.lat || !r.longt)
-    : products;
-
-  // Apply warranty filter
   const filteredProducts = warrantyFilter === "in-warranty"
-    ? displayProducts.filter(r => {
+    ? products.filter(r => {
         const { status } = getWarrantyStatus(r.installation_date, r.warranty_period);
         return status === "In Warranty";
       })
     : warrantyFilter === "out-of-warranty"
-    ? displayProducts.filter(r => {
+    ? products.filter(r => {
         const { status } = getWarrantyStatus(r.installation_date, r.warranty_period);
         return status === "Out of Warranty" || status === "—";
       })
-    : displayProducts;
+    : products;
 
   const renderPagination = () => {
     const pages = [];
@@ -555,8 +548,8 @@ export default function WarrantyPage() {
       <div className="flex items-center justify-between mt-4 flex-wrap gap-4">
         <div className="text-sm text-gray-600">
           Showing {filteredProducts.length > 0 ? (currentPage - 1) * pageSize + 1 : 0} to{" "}
-          {Math.min(currentPage * pageSize, filteredProducts.length)} of {filteredProducts.length} records
-          {warrantyFilter && ` (filtered from ${total} total)`}
+          {(currentPage - 1) * pageSize + filteredProducts.length} of{" "}
+          {warrantyFilter ? `${filteredProducts.length} on this page` : total} records
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => handlePageChange(1)} disabled={currentPage === 1}
@@ -587,8 +580,8 @@ export default function WarrantyPage() {
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-3xl font-bold">Warranty Records</h2>
         <div className="text-sm text-gray-600">
-          Total: {filteredProducts.length} products
-          {warrantyFilter && ` (filtered from ${total})`}
+          Total: {total} products
+          {warrantyFilter && ` · ${filteredProducts.length} on this page after warranty filter`}
         </div>
       </div>
 
@@ -608,11 +601,18 @@ export default function WarrantyPage() {
           <option value="in-warranty">In-Warranty</option>
           <option value="out-of-warranty">Out of Warranty</option>
         </select>
-        <select value={latFilter} onChange={(e) => setLatFilter(e.target.value)}
-          className="w-full md:w-auto px-4 py-2 border rounded shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
-          <option value="">All (Lat/Long)</option>
-          <option value="with">With Latitude</option>
-          <option value="without">Without Latitude</option>
+        <select
+          value={geoTagFilter}
+          onChange={(e) => {
+            setGeoTagFilter(e.target.value);
+            setCurrentPage(1);
+          }}
+          className="w-full md:w-auto px-4 py-2 border rounded shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+          aria-label="Geo tag Site"
+        >
+          <option value="">Geo tag Site — All</option>
+          <option value="with">With geo tag (Lat/Long)</option>
+          <option value="without">Without geo tag</option>
         </select>
       </div>
 

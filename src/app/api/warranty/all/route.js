@@ -17,6 +17,8 @@ export async function GET(req) {
   const search = searchParams.get("search") || "";
   const modelFilter = searchParams.get("model") || "";
   const stateFilter = searchParams.get("state") || "";
+  const geoTagFilter =
+    searchParams.get("geoTag") || searchParams.get("geo_tag") || "";
 
   const offset = (page - 1) * limit;
 
@@ -52,6 +54,21 @@ export async function GET(req) {
     if (stateFilter) {
       conditions.push(`wp.state LIKE ?`);
       params.push(`%${stateFilter}%`);
+    }
+
+    const geoTaggedSql = `(
+      wp.lat IS NOT NULL
+      AND wp.longt IS NOT NULL
+      AND TRIM(CAST(wp.lat AS CHAR)) <> ''
+      AND TRIM(CAST(wp.longt AS CHAR)) <> ''
+      AND TRIM(CAST(wp.lat AS CHAR)) NOT IN ('0', '0.0', '0.000000')
+      AND TRIM(CAST(wp.longt AS CHAR)) NOT IN ('0', '0.0', '0.000000')
+    )`;
+
+    if (geoTagFilter === "with") {
+      conditions.push(geoTaggedSql);
+    } else if (geoTagFilter === "without") {
+      conditions.push(`NOT ${geoTaggedSql}`);
     }
 
     const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
