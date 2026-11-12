@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
+import { patQuotationItemFilterSql } from "@/lib/patQuotationItemFilters";
 
 export async function GET(request) {
   try {
@@ -11,6 +12,8 @@ export async function GET(request) {
 
     const { searchParams } = new URL(request.url);
     const quote_number = searchParams.get("quote_number");
+    const patSection =
+      searchParams.get("pat_section") ?? searchParams.get("patSection");
 
     if (!quote_number) {
       return NextResponse.json(
@@ -19,13 +22,15 @@ export async function GET(request) {
       );
     }
 
+    const sectionFilter = patQuotationItemFilterSql(patSection);
     const conn = await getDbConnection();
     const [items] = await conn.execute(
-      `SELECT id, item_name, item_code, quantity, unit,
-              price_per_unit, taxable_price, total_price, total_taxable_amt
-       FROM quotation_items 
-       WHERE quote_number = ?
-       ORDER BY id ASC`,
+      `SELECT qi.id, qi.item_name, qi.item_code, qi.quantity, qi.unit,
+              qi.price_per_unit, qi.taxable_price, qi.total_price, qi.total_taxable_amt
+       FROM quotation_items qi
+       WHERE TRIM(qi.quote_number) = TRIM(?)
+       ${sectionFilter ? `AND (${sectionFilter})` : ""}
+       ORDER BY qi.id ASC`,
       [quote_number]
     );
 

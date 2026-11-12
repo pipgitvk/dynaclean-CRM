@@ -1,6 +1,13 @@
 import dayjs from "dayjs";
 import { sqlHasInvoiceReportClause } from "@/lib/orderReportVisibility";
 import { ensureProductListPurchasePriceColumn } from "@/lib/productsListSchema";
+import {
+  AMC_ITEM_MATCH_SQL,
+  FREIGHT_RECOVERED_MATCH_SQL,
+  INSTALLATION_CHARGES_MATCH_SQL,
+  MACHINE_REPAIR_SPARE_MATCH_SQL,
+  SPARE_PARTS_SALES_MATCH_SQL,
+} from "@/lib/patQuotationItemFilters";
 
 const ORDER_APPROVED_SQL = `
   (
@@ -327,32 +334,6 @@ export async function fetchApprovedOrderTaxableRevenue(conn, dateFrom, dateTo) {
   return Number(result[0]?.taxable_amount) || 0;
 }
 
-/**
- * AMC/CAMC lines: quotation item_code may be SKU (AMC/CAMC) or products_list.item_code
- * (e.g. 1002500173) with item_name AMC/CAMC.
- */
-const AMC_ITEM_MATCH_SQL = `
-  (
-    UPPER(TRIM(qi.item_code)) IN ('AMC', 'CAMC', 'CMC')
-    OR UPPER(TRIM(qi.item_name)) IN ('AMC', 'CAMC')
-    OR UPPER(qi.item_name) LIKE '%CAMC%'
-    OR UPPER(qi.item_name) LIKE '%COMPREHENSIVE MAINTENANCE%'
-    OR UPPER(qi.item_name) LIKE '%ANNUAL MAINTENANCE CONTRACT%'
-    OR EXISTS (
-      SELECT 1
-      FROM products_list pl
-      WHERE (
-          TRIM(pl.item_code) = TRIM(qi.item_code)
-          OR CAST(pl.product_number AS CHAR) = TRIM(qi.item_code)
-        )
-        AND (
-          UPPER(TRIM(pl.item_name)) IN ('AMC', 'CAMC')
-          OR UPPER(TRIM(pl.item_code)) IN ('AMC', 'CAMC', 'CMC')
-        )
-    )
-  )
-`;
-
 const ORDER_QUOTATION_HEADER_JOIN = `
   INNER JOIN quotations_records qr ON (
     (no.quotation_id IS NOT NULL AND no.quotation_id > 0 AND qr.\`S.No.\` = no.quotation_id)
@@ -370,65 +351,9 @@ const AMC_QUOTATION_ITEMS_JOIN = `
    AND ${AMC_ITEM_MATCH_SQL}
 `;
 
-/** Service / repair income spares (e.g. spare_number 1110 Service Maintenance Charges). */
-const MACHINE_REPAIR_SPARE_MATCH_SQL = `
-  (
-    NOT (${AMC_ITEM_MATCH_SQL})
-    AND (
-      EXISTS (
-        SELECT 1
-        FROM spare_list sl
-        WHERE (
-            CAST(sl.spare_number AS CHAR) = TRIM(qi.item_code)
-            OR CAST(sl.id AS CHAR) = TRIM(qi.item_code)
-          )
-          AND (
-            UPPER(sl.item_name) LIKE '%SERVICE%MAINTEN%'
-            OR UPPER(sl.item_name) LIKE '%MAINTENECE%CHARGE%'
-            OR UPPER(sl.item_name) LIKE '%REPARING CHARGE%'
-            OR UPPER(sl.item_name) LIKE '%REPAIRING CHARGE%'
-            OR UPPER(sl.item_name) LIKE '%REPAIR CHARGE%'
-          )
-      )
-      OR UPPER(qi.item_name) LIKE '%SERVICE%MAINTEN%'
-      OR UPPER(qi.item_name) LIKE '%MAINTENECE%CHARGE%'
-      OR UPPER(qi.item_name) LIKE '%REPARING CHARGE%'
-    )
-  )
-`;
-
 const MACHINE_REPAIR_QUOTATION_ITEMS_JOIN = `
   ${ORDER_QUOTATION_HEADER_JOIN}
    AND ${MACHINE_REPAIR_SPARE_MATCH_SQL}
-`;
-
-/** Installation / commissioning / related service spares on quotations (e.g. spare 1545 Transportation Charges). */
-const INSTALLATION_CHARGES_MATCH_SQL = `
-  (
-    NOT (${AMC_ITEM_MATCH_SQL})
-    AND NOT (${MACHINE_REPAIR_SPARE_MATCH_SQL})
-    AND (
-      EXISTS (
-        SELECT 1
-        FROM spare_list sl
-        WHERE (
-            CAST(sl.spare_number AS CHAR) = TRIM(qi.item_code)
-            OR CAST(sl.id AS CHAR) = TRIM(qi.item_code)
-          )
-          AND (
-            UPPER(sl.item_name) LIKE '%INSTALL%'
-            OR UPPER(sl.item_name) LIKE '%COMMISSION%'
-            OR UPPER(sl.item_name) LIKE '%TRANSPORTATION%CHARGE%'
-            OR UPPER(sl.item_name) LIKE '%LOADING%UNLOAD%'
-          )
-      )
-      OR UPPER(qi.item_name) LIKE '%INSTALL%CHARGE%'
-      OR UPPER(qi.item_name) LIKE '%INSTALLATION%'
-      OR UPPER(qi.item_name) LIKE '%COMMISSION%CHARGE%'
-      OR UPPER(qi.item_name) LIKE '%COMMISSIONING%'
-      OR UPPER(qi.item_name) LIKE '%TRANSPORTATION%CHARGE%'
-    )
-  )
 `;
 
 const INSTALLATION_CHARGES_QUOTATION_ITEMS_JOIN = `
@@ -436,57 +361,9 @@ const INSTALLATION_CHARGES_QUOTATION_ITEMS_JOIN = `
    AND ${INSTALLATION_CHARGES_MATCH_SQL}
 `;
 
-/** Freight / courier / porter etc. recovered on customer orders (spare_list lines). */
-const FREIGHT_RECOVERED_MATCH_SQL = `
-  (
-    NOT (${AMC_ITEM_MATCH_SQL})
-    AND NOT (${MACHINE_REPAIR_SPARE_MATCH_SQL})
-    AND NOT (${INSTALLATION_CHARGES_MATCH_SQL})
-    AND (
-      EXISTS (
-        SELECT 1
-        FROM spare_list sl
-        WHERE (
-            CAST(sl.spare_number AS CHAR) = TRIM(qi.item_code)
-            OR CAST(sl.id AS CHAR) = TRIM(qi.item_code)
-          )
-          AND (
-            UPPER(sl.item_name) LIKE '%FREIGHT%'
-            OR UPPER(sl.item_name) LIKE '%COURIER%'
-            OR UPPER(sl.item_name) LIKE '%PORTER%'
-            OR UPPER(sl.item_name) LIKE '%DELIVERY%CHARGE%'
-            OR UPPER(sl.item_name) LIKE '%FORWARDING%'
-          )
-      )
-      OR UPPER(qi.item_name) LIKE '%FREIGHT%'
-      OR UPPER(qi.item_name) LIKE '%COURIER%'
-      OR UPPER(qi.item_name) LIKE '%PORTER%'
-      OR UPPER(qi.item_name) LIKE '%DELIVERY%CHARGE%'
-    )
-  )
-`;
-
 const FREIGHT_RECOVERED_QUOTATION_ITEMS_JOIN = `
   ${ORDER_QUOTATION_HEADER_JOIN}
    AND ${FREIGHT_RECOVERED_MATCH_SQL}
-`;
-
-/** Spare-parts sales: any spare_list line on the order quotation (excludes AMC & service-charge spares). */
-const SPARE_PARTS_SALES_MATCH_SQL = `
-  (
-    EXISTS (
-      SELECT 1
-      FROM spare_list sl
-      WHERE (
-          CAST(sl.spare_number AS CHAR) = TRIM(qi.item_code)
-          OR CAST(sl.id AS CHAR) = TRIM(qi.item_code)
-        )
-    )
-    AND NOT (${AMC_ITEM_MATCH_SQL})
-    AND NOT (${MACHINE_REPAIR_SPARE_MATCH_SQL})
-    AND NOT (${INSTALLATION_CHARGES_MATCH_SQL})
-    AND NOT (${FREIGHT_RECOVERED_MATCH_SQL})
-  )
 `;
 
 const SPARE_PARTS_QUOTATION_ITEMS_JOIN = `

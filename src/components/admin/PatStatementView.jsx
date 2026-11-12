@@ -514,6 +514,7 @@ function PatRow({
                                   onOpenOrderItems(
                                     d.orderId ?? d.col1,
                                     d.quoteNumber ?? d.col2,
+                                    row.drillSection,
                                   )
                                 }
                               >
@@ -616,7 +617,7 @@ export default function PatStatementView() {
     error: null,
   });
 
-  const openOrderItems = useCallback(async (orderId, quoteNumberRaw) => {
+  const openOrderItems = useCallback(async (orderId, quoteNumberRaw, patSection) => {
     const quoteNumber = String(quoteNumberRaw ?? "").trim();
     if (!quoteNumber || quoteNumber === "—") {
       setOrderItemsModal({
@@ -638,9 +639,12 @@ export default function PatStatementView() {
       error: null,
     });
     try {
-      const res = await fetch(
-        `/api/orders/items?quote_number=${encodeURIComponent(quoteNumber)}`,
-      );
+      const q = new URLSearchParams({ quote_number: quoteNumber });
+      const section = String(patSection ?? "").trim();
+      if (section && section !== "revenue_sales") {
+        q.set("pat_section", section);
+      }
+      const res = await fetch(`/api/orders/items?${q.toString()}`);
       const data = await res.json();
       if (!data.success) {
         setOrderItemsModal((prev) => ({
