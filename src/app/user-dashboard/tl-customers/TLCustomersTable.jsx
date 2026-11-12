@@ -738,7 +738,7 @@ export default function TLCustomersTable({
           {/* Left side - Search filters */}
           <div className="w-full flex-1">
             <form onSubmit={handleSearch}>
-              <div className="flex flex-wrap items-end gap-3">
+              <div className="flex flex-wrap items-end gap-3 w-full min-w-0">
                 {/* Search */}
                 <div className="w-full min-w-0 basis-full sm:basis-auto sm:min-w-[14rem] sm:flex-1 sm:max-w-md">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -834,7 +834,7 @@ export default function TLCustomersTable({
                 </div>
 
                 {/* Employee */}
-                <div>
+                <div className="w-full min-w-0 sm:w-auto sm:min-w-[9.5rem] sm:flex-1 sm:max-w-[12rem]">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Employee
                   </label>
@@ -853,7 +853,7 @@ export default function TLCustomersTable({
                 </div>
 
                 {/* Status */}
-                <div>
+                <div className="w-full min-w-0 sm:w-auto sm:min-w-[9.5rem] sm:flex-1 sm:max-w-[12rem]">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Status
                   </label>
@@ -891,7 +891,7 @@ export default function TLCustomersTable({
                 </div>
 
                 {/* Stage */}
-                <div>
+                <div className="w-full min-w-0 sm:w-auto sm:min-w-[9.5rem] sm:flex-1 sm:max-w-[12rem]">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Stage
                   </label>
@@ -936,7 +936,7 @@ export default function TLCustomersTable({
                 </div>
 
                 {/* Tag */}
-                <div>
+                <div className="w-full min-w-0 sm:w-auto sm:min-w-[9rem] sm:flex-1 sm:max-w-[12rem]">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Tag
                   </label>
@@ -966,7 +966,7 @@ export default function TLCustomersTable({
                 </div>
 
                 {/* Notes language */}
-                <div>
+                <div className="w-full min-w-0 sm:w-auto sm:min-w-[9rem] sm:flex-1 sm:max-w-[12rem]">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Notes Language
                   </label>
@@ -993,21 +993,21 @@ export default function TLCustomersTable({
                 </div>
 
                 {/* Next Followup (same value as table column "Next Followup") */}
-                <div>
+                <div className="w-full min-w-0 sm:w-auto sm:min-w-[9.5rem] sm:max-w-[11.5rem]">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Next Followup from
                   </label>
                   <TypeableDateFilterInput value={nextFromDate} onChange={setNextFromDate} placeholder="dd/mm/yyyy" className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"/>
                 </div>
 
-                <div>
+                <div className="w-full min-w-0 sm:w-auto sm:min-w-[9.5rem] sm:max-w-[11.5rem]">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Next Followup to
                   </label>
                   <TypeableDateFilterInput value={nextToDate} onChange={setNextToDate} placeholder="dd/mm/yyyy" className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"/>
                 </div>
 
-                <div>
+                <div className="w-full min-w-0 sm:w-auto sm:min-w-[9.5rem] sm:max-w-[11.5rem]">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Followed date from
                   </label>
@@ -1019,7 +1019,7 @@ export default function TLCustomersTable({
                   />
                 </div>
 
-                <div>
+                <div className="w-full min-w-0 sm:w-auto sm:min-w-[9.5rem] sm:max-w-[11.5rem]">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Followed date to
                   </label>
@@ -1032,7 +1032,7 @@ export default function TLCustomersTable({
                 </div>
 
                 {/* Products / Models filter - Dropdown */}
-                <div className="relative">
+                <div className="relative w-full min-w-0 sm:w-auto sm:min-w-[11rem] sm:max-w-xs">
                   <label className="block text-xs md:text-sm font-medium text-gray-700 mb-1">
                     Products / Models
                   </label>
@@ -1169,11 +1169,12 @@ export default function TLCustomersTable({
                   )}
                 </div>
 
-                <div className="flex shrink-0 flex-wrap items-center gap-2 pb-0.5">
+                <div className="w-full min-w-0 basis-full flex flex-col gap-3 pb-0.5">
+                  <div className="grid grid-cols-2 gap-2 w-full sm:flex sm:flex-wrap sm:items-center sm:gap-2">
                   <button
                     type="submit"
                     disabled={isPending}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full sm:w-auto px-4 py-2.5 sm:py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation text-sm font-medium"
                   >
                     {isPending ? (
                       <Loader2 size={18} className="animate-spin" />
@@ -1186,7 +1187,7 @@ export default function TLCustomersTable({
                     type="button"
                     onClick={handleReset}
                     disabled={isPending}
-                    className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full sm:w-auto px-4 py-2.5 sm:py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation text-sm font-medium"
                   >
                     {isPending ? (
                       <Loader2 size={18} className="animate-spin" />
@@ -1202,7 +1203,7 @@ export default function TLCustomersTable({
                         type="button"
                         onClick={() => handleExport("excel")}
                         disabled={Boolean(exportingFormat) || isPending}
-                        className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="w-full sm:w-auto px-4 py-2.5 sm:py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation text-sm font-medium"
                       >
                         {exportingFormat === "excel" ? (
                           <Loader2 size={18} className="animate-spin" />
@@ -1215,7 +1216,7 @@ export default function TLCustomersTable({
                         type="button"
                         onClick={() => handleExport("pdf")}
                         disabled={Boolean(exportingFormat) || isPending}
-                        className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="w-full sm:w-auto px-4 py-2.5 sm:py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation text-sm font-medium"
                       >
                         {exportingFormat === "pdf" ? (
                           <Loader2 size={18} className="animate-spin" />
@@ -1226,10 +1227,11 @@ export default function TLCustomersTable({
                       </button>
                     </>
                   )}
+                  </div>
 
-                  <div className="flex flex-wrap items-center gap-3 sm:gap-4 sm:ml-2 sm:pl-4 sm:border-l border-gray-200">
-                  <div className="flex items-center gap-2">
-                    <label className="text-sm font-medium text-gray-700">
+                  <div className="flex w-full flex-col gap-3 border-t border-gray-200 pt-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3 sm:border-t-0 sm:pt-0 sm:ml-0 sm:pl-0 lg:ml-2 lg:pl-4 lg:border-t-0 lg:border-l lg:border-gray-200">
+                  <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-start">
+                    <label className="text-xs sm:text-sm font-medium text-gray-700 shrink-0">
                       Show TL Entries Only:
                     </label>
                     <button
@@ -1277,8 +1279,8 @@ export default function TLCustomersTable({
                   </div>
 
                   {isSuperAdmin && (
-                    <div className="flex items-center gap-2">
-                      <label className="text-sm font-medium text-gray-700">
+                    <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-start">
+                      <label className="text-xs sm:text-sm font-medium text-gray-700 shrink-0">
                         Pre-Booking Only:
                       </label>
                       <button
@@ -1336,16 +1338,16 @@ export default function TLCustomersTable({
           </div>
 
           {/* Right side - Filter indicators */}
-          <div className="w-full lg:w-auto flex flex-wrap justify-center lg:justify-end items-center gap-4">
+          <div className="w-full lg:w-auto grid grid-cols-4 gap-2 sm:flex sm:flex-wrap sm:justify-center lg:justify-end sm:gap-4 max-w-sm mx-auto lg:max-w-none lg:mx-0 px-1">
             {/* Total/All Filter */}
             <div
               onClick={() => handleFilterClick("all")}
-              className={`flex flex-col items-center cursor-pointer transition-all duration-200 ${
-                activeFilter === "all" ? "scale-110" : "hover:scale-105"
+              className={`flex flex-col items-center cursor-pointer transition-all duration-200 touch-manipulation ${
+                activeFilter === "all" ? "sm:scale-110" : "sm:hover:scale-105"
               }`}
             >
               <div
-                className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-lg ${
+                className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center text-white font-bold text-xs sm:text-sm shadow-lg ${
                   activeFilter === "all"
                     ? "bg-blue-600 ring-2 ring-blue-200"
                     : "bg-gray-400 hover:bg-gray-500"
@@ -1365,12 +1367,12 @@ export default function TLCustomersTable({
             {/* Upcoming Filter */}
             <div
               onClick={() => handleFilterClick("upcoming")}
-              className={`flex flex-col items-center cursor-pointer transition-all duration-200 ${
-                activeFilter === "upcoming" ? "scale-110" : "hover:scale-105"
+              className={`flex flex-col items-center cursor-pointer transition-all duration-200 touch-manipulation ${
+                activeFilter === "upcoming" ? "sm:scale-110" : "sm:hover:scale-105"
               }`}
             >
               <div
-                className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-lg ${
+                className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center text-white font-bold text-xs sm:text-sm shadow-lg ${
                   activeFilter === "upcoming"
                     ? "bg-green-600 ring-2 ring-green-200"
                     : "bg-gray-400 hover:bg-gray-500"
@@ -1392,12 +1394,12 @@ export default function TLCustomersTable({
             {/* Due/Overdue Filter */}
             <div
               onClick={() => handleFilterClick("due")}
-              className={`flex flex-col items-center cursor-pointer transition-all duration-200 ${
-                activeFilter === "due" ? "scale-110" : "hover:scale-105"
+              className={`flex flex-col items-center cursor-pointer transition-all duration-200 touch-manipulation ${
+                activeFilter === "due" ? "sm:scale-110" : "sm:hover:scale-105"
               }`}
             >
               <div
-                className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-lg ${
+                className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center text-white font-bold text-xs sm:text-sm shadow-lg ${
                   activeFilter === "due"
                     ? "bg-red-600 ring-2 ring-red-200"
                     : "bg-gray-400 hover:bg-gray-500"
@@ -1417,12 +1419,12 @@ export default function TLCustomersTable({
             {/* Prime Filter */}
             <div
               onClick={() => handleFilterClick("prime")}
-              className={`flex flex-col items-center cursor-pointer transition-all duration-200 ${
-                activeFilter === "prime" ? "scale-110" : "hover:scale-105"
+              className={`flex flex-col items-center cursor-pointer transition-all duration-200 touch-manipulation ${
+                activeFilter === "prime" ? "sm:scale-110" : "sm:hover:scale-105"
               }`}
             >
               <div
-                className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-lg ${
+                className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center text-white font-bold text-xs sm:text-sm shadow-lg ${
                   activeFilter === "prime"
                     ? "bg-purple-600 ring-2 ring-purple-200"
                     : "bg-gray-400 hover:bg-gray-500"
@@ -1451,8 +1453,9 @@ export default function TLCustomersTable({
           </p>
           {isSuperAdmin && (
             <button
+              type="button"
               onClick={() => setPreBookingModal({ isOpen: true, customerId: null, customerName: null })}
-              className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-md hover:from-purple-700 hover:to-pink-700 transition-all duration-200 flex items-center gap-2 font-medium text-sm shadow-md hover:shadow-lg"
+              className="w-full sm:w-auto justify-center px-4 py-2.5 sm:py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-md hover:from-purple-700 hover:to-pink-700 transition-all duration-200 flex items-center gap-2 font-medium text-sm shadow-md hover:shadow-lg touch-manipulation"
             >
               <UserPlus size={18} />
               Pre-Booking
