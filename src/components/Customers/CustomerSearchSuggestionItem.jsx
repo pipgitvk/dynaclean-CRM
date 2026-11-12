@@ -85,21 +85,20 @@ export default function CustomerSearchSuggestionItem({
         </div>
       </div>
       {note || followedLabel ? (
-        <div className="mx-2.5 sm:mx-3 mb-3 flex flex-col gap-2 rounded-md border border-amber-200/90 bg-[#FFF9E6] px-2.5 sm:px-3 py-2.5 text-[11px] sm:text-xs text-gray-800 shadow-sm sm:flex-row sm:items-center">
+        <div className="mx-2.5 sm:mx-3 mb-3 flex flex-col gap-2 rounded-md border border-yellow-500 bg-yellow-300 px-2.5 sm:px-3 py-2.5 shadow-sm sm:flex-row sm:items-center">
           <div className="flex min-w-0 flex-1 items-start gap-2">
             <StickyNote
-              size={16}
-              className="text-amber-600 shrink-0 mt-0.5"
+              size={18}
+              className="text-yellow-900 shrink-0 mt-0.5"
               aria-hidden
             />
-            <p className="leading-snug max-sm:line-clamp-6 sm:line-clamp-5 break-words">
-              <span className="font-semibold text-amber-950">Last Note:</span>{" "}
-              {note || "—"}
+            <p className="text-sm sm:text-base font-bold text-yellow-950 leading-snug max-sm:line-clamp-6 sm:line-clamp-5 break-words">
+              <span>Last Note:</span> {note || "—"}
             </p>
           </div>
           {followedLabel ? (
-            <div className="flex shrink-0 items-center gap-1.5 text-gray-700 border-t border-amber-300/80 pt-2 sm:border-t-0 sm:border-l sm:pt-0 sm:pl-3 max-sm:w-full font-medium">
-              <Calendar size={14} className="text-amber-700/80 shrink-0" aria-hidden />
+            <div className="flex shrink-0 items-center gap-1.5 text-yellow-950 border-t border-yellow-600/50 pt-2 sm:border-t-0 sm:border-l sm:border-yellow-600/50 sm:pt-0 sm:pl-3 max-sm:w-full text-sm font-bold">
+              <Calendar size={14} className="text-yellow-900 shrink-0" aria-hidden />
               <span className="break-words sm:whitespace-nowrap leading-snug">
                 {followedLabel}
               </span>
