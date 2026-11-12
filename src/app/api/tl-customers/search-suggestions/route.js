@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
+import { pickLatestNoteForSearch } from "@/lib/tlSearchSuggestionNote";
 
 export const dynamic = "force-dynamic";
 
@@ -54,15 +55,24 @@ export async function GET(req) {
          c.phone,
          c.lead_source,
          tlf.followed_date AS tl_followed_date,
+         tlf.created_at AS tl_created_at,
          tlf.next_followup_date AS tl_next_followup,
          tlf.notes AS tl_notes,
-         tlf.followed_by AS tl_followed_by
+         tlf.followed_by AS tl_followed_by,
+         cf.notes AS cf_notes,
+         cf.followed_date AS cf_followed_date,
+         cf.time_stamp AS cf_time_stamp
        FROM customers c
        LEFT JOIN (
-         SELECT customer_id, followed_date, next_followup_date, notes, followed_by,
+         SELECT customer_id, followed_date, created_at, next_followup_date, notes, followed_by,
                 ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY created_at DESC) AS rn
          FROM TL_followups
        ) tlf ON c.customer_id = tlf.customer_id AND tlf.rn = 1
+       LEFT JOIN (
+         SELECT customer_id, notes, followed_date, time_stamp,
+                ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY time_stamp DESC) AS rn
+         FROM customers_followup
+       ) cf ON c.customer_id = cf.customer_id AND cf.rn = 1
        WHERE (
          c.customer_id = ?
          OR c.phone LIKE ?
@@ -81,6 +91,7 @@ export async function GET(req) {
         [row.first_name, row.last_name].filter(Boolean).join(" ").trim() ||
         row.company ||
         "";
+      const { last_note, last_note_at } = pickLatestNoteForSearch(row);
       return {
         customer_id: row.customer_id,
         name,
@@ -91,6 +102,8 @@ export async function GET(req) {
         tl_next_followup: row.tl_next_followup || null,
         tl_notes: row.tl_notes || "",
         tl_followed_by: row.tl_followed_by || "",
+        last_note,
+        last_note_at,
       };
     });
 

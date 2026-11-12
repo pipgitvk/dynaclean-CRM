@@ -12,6 +12,7 @@ import {
 import { useRouter } from "next/navigation";
 import {
   Search,
+  X,
   UserPlus,
   Edit,
   Eye,
@@ -22,7 +23,7 @@ import {
   FileText,
 } from "lucide-react";
 import CustomerQuickViewModal from "@/components/Customers/CustomerQuickViewModal";
-import CustomerSearchPopupActions from "@/components/Customers/CustomerSearchPopupActions";
+import CustomerSearchSuggestionItem from "@/components/Customers/CustomerSearchSuggestionItem";
 import { applyTLCustomersChipFilter } from "@/lib/tlCustomersChipFilter";
 import Link from "next/link";
 import { NOTES_LANGUAGE_OPTIONS } from "@/constants/notesLanguageOptions";
@@ -732,18 +733,18 @@ export default function TLCustomersTable({
   return (
     <div className="bg-white rounded-lg shadow-md">
       {/* Search and Filters */}
-      <div className="p-6 border-b border-gray-200">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+      <div className="p-4 sm:p-6 border-b border-gray-200 overflow-x-hidden">
+        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 sm:gap-6">
           {/* Left side - Search filters */}
           <div className="w-full flex-1">
             <form onSubmit={handleSearch}>
               <div className="flex flex-wrap items-end gap-3">
                 {/* Search */}
-                <div className="min-w-[14rem] flex-1 sm:max-w-md">
+                <div className="w-full min-w-0 basis-full sm:basis-auto sm:min-w-[14rem] sm:flex-1 sm:max-w-md">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Search (ID, Phone, Name, Company)
                   </label>
-                  <div className="relative z-30" ref={searchSuggestRef}>
+                  <div className="relative z-[100]" ref={searchSuggestRef}>
                     <input
                       type="search"
                       value={searchTerm}
@@ -757,11 +758,11 @@ export default function TLCustomersTable({
                         }
                       }}
                       onKeyDown={onSearchInputKeyDown}
-                      placeholder="Type ID, phone, name or company…"
+                      placeholder="Search (ID, Phone, Name, Company)"
                       autoComplete="off"
                       aria-autocomplete="list"
                       aria-expanded={searchSuggestOpen}
-                      className="w-full pl-10 pr-9 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full pl-10 pr-9 py-2.5 sm:py-2 text-base sm:text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-400"
                     />
                     <Search
                       className="absolute left-3 top-2.5 text-gray-400 pointer-events-none"
@@ -772,10 +773,24 @@ export default function TLCustomersTable({
                         className="absolute right-3 top-2.5 text-blue-500 animate-spin"
                         size={18}
                       />
+                    ) : searchTerm.trim() ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSearchTerm("");
+                          setSearchSuggestions([]);
+                          setSearchSuggestOpen(false);
+                          setSearchSuggestHighlight(-1);
+                        }}
+                        className="absolute right-2.5 top-2 p-0.5 text-blue-700 hover:text-blue-900 rounded"
+                        aria-label="Clear search"
+                      >
+                        <X size={18} />
+                      </button>
                     ) : null}
                     {searchSuggestOpen && searchSuggestions.length > 0 ? (
                       <ul
-                        className="absolute left-0 right-0 mt-1 max-h-64 overflow-y-auto bg-white border border-gray-200 rounded-md shadow-lg"
+                        className="absolute left-0 right-0 sm:right-auto top-full z-[101] mt-1 w-full sm:min-w-full sm:w-[min(40rem,calc(100vw-2rem))] max-h-[min(70vh,28rem)] sm:max-h-[min(24rem,70vh)] overflow-y-auto overflow-x-hidden bg-white border border-gray-200 rounded-lg shadow-xl overscroll-contain [-webkit-overflow-scrolling:touch]"
                         role="listbox"
                       >
                         {searchSuggestions.map((s, index) => (
@@ -783,60 +798,26 @@ export default function TLCustomersTable({
                             key={s.customer_id}
                             role="option"
                             aria-selected={index === searchSuggestHighlight}
-                            className={`border-b border-gray-100 last:border-b-0 text-sm ${
-                              index === searchSuggestHighlight
-                                ? "bg-blue-50"
-                                : "bg-white"
-                            }`}
+                            className="border-b border-gray-100 last:border-b-0"
                             onMouseEnter={() =>
                               setSearchSuggestHighlight(index)
                             }
                           >
-                            <div className="flex justify-between items-start gap-2 px-3 py-2">
-                              <button
-                                type="button"
-                                className="min-w-0 flex-1 text-left text-gray-800 hover:text-blue-900"
-                                onClick={() => pickSearchSuggestion(s)}
-                              >
-                                <div className="font-medium">
-                                  {s.name || s.company || "Customer"}{" "}
-                                  <span className="text-gray-500 font-normal">
-                                    #{s.customer_id}
-                                  </span>
-                                </div>
-                                <div className="text-xs text-gray-500 mt-0.5">
-                                  {s.phone ? `${s.phone}` : ""}
-                                  {s.phone && s.company ? " · " : ""}
-                                  {s.company || ""}
-                                </div>
-                                {s.lead_source ? (
-                                  <div className="text-xs text-gray-400 mt-1 truncate">
-                                    Lead source: {s.lead_source}
-                                  </div>
-                                ) : null}
-                                {String(s.tl_notes || "").trim() ? (
-                                  <div className="text-xs text-gray-700 mt-1 line-clamp-2 leading-snug">
-                                    {String(s.tl_notes).trim()}
-                                  </div>
-                                ) : null}
-                              </button>
-                              {isSuperAdmin && isAdmin ? (
-                                <CustomerSearchPopupActions
-                                  onTl={() =>
-                                    openCustomerQuickViewModal(
-                                      "tl",
-                                      s.customer_id,
-                                    )
-                                  }
-                                  onView={() =>
-                                    openCustomerQuickViewModal(
-                                      "view",
-                                      s.customer_id,
-                                    )
-                                  }
-                                />
-                              ) : null}
-                            </div>
+                            <CustomerSearchSuggestionItem
+                              suggestion={s}
+                              highlighted={index === searchSuggestHighlight}
+                              showPopupActions={Boolean(isAdmin)}
+                              onPick={pickSearchSuggestion}
+                              onTl={() =>
+                                openCustomerQuickViewModal("tl", s.customer_id)
+                              }
+                              onView={() =>
+                                openCustomerQuickViewModal(
+                                  "view",
+                                  s.customer_id,
+                                )
+                              }
+                            />
                           </li>
                         ))}
                       </ul>
@@ -845,7 +826,7 @@ export default function TLCustomersTable({
                     searchTerm.trim() &&
                     !searchSuggestLoading &&
                     searchSuggestions.length === 0 ? (
-                      <div className="absolute left-0 right-0 mt-1 px-3 py-2 text-xs text-gray-500 bg-white border border-gray-200 rounded-md shadow">
+                      <div className="absolute left-0 right-0 sm:right-auto top-full z-[101] mt-1 w-full sm:min-w-full sm:w-[min(40rem,calc(100vw-2rem))] px-3 py-2 text-xs text-gray-500 bg-white border border-gray-200 rounded-md shadow">
                         No matching customers
                       </div>
                     ) : null}
