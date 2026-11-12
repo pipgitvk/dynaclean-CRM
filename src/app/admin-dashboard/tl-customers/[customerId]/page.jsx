@@ -98,7 +98,7 @@ export default async function AdminTLCustomerDetailPage({
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="container mx-auto px-4 py-8 max-w-7xl">
+      <div className="w-full max-w-none py-2 sm:py-4">
         {/* <Link
           href="/admin-dashboard/tl-customers"
           className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-800 mb-6 transition-colors"
@@ -407,12 +407,23 @@ export default async function AdminTLCustomerDetailPage({
                               </Link>
                             )}
                           </div>
-                          <div className="flex flex-wrap items-center gap-2 mt-2 text-xs">
-                            <span className="text-gray-600">
-                              <strong>Notes:</strong>{" "}
-                              {followup.notes || "No notes"}
-                            </span>
-                          </div>
+                          {isTLFollowup ? (
+                            <div className="mt-2 rounded-md border border-yellow-500 bg-yellow-300 px-3 py-2.5">
+                              <p className="text-base font-bold text-yellow-950 mb-1">
+                                TL Follow-up Note:
+                              </p>
+                              <p className="text-lg font-bold text-yellow-950 whitespace-pre-wrap break-words leading-snug">
+                                {followup.notes || "No notes"}
+                              </p>
+                            </div>
+                          ) : (
+                            <div className="flex flex-wrap items-center gap-2 mt-2 text-xs">
+                              <span className="text-gray-600">
+                                <strong>Notes:</strong>{" "}
+                                {followup.notes || "No notes"}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
