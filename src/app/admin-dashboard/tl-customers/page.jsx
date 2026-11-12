@@ -49,7 +49,7 @@ export default async function AdminTLCustomersPage({ searchParams }) {
   );
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="w-full max-w-none py-2 sm:py-4">
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
         <h1 className="text-3xl font-bold text-gray-800">
           TL Customer Management (Admin)
