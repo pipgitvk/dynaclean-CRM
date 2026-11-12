@@ -267,6 +267,8 @@ function ComplaintModal({ serialNumber, onClose, onSuccess }) {
   const [users, setUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [attachmentFiles, setAttachmentFiles] = useState([]);
+  const [attachmentPreviews, setAttachmentPreviews] = useState([]);
 
   useEffect(() => {
     setValue("serial_number", serialNumber);
@@ -277,22 +279,49 @@ function ComplaintModal({ serialNumber, onClose, onSuccess }) {
       .finally(() => setLoadingUsers(false));
   }, [serialNumber, setValue]);
 
+  useEffect(() => {
+    const previews = attachmentFiles.map((file) => ({
+      name: file.name,
+      url: file.type.startsWith("image/")
+        ? URL.createObjectURL(file)
+        : null,
+    }));
+    setAttachmentPreviews(previews);
+    return () => {
+      previews.forEach((p) => {
+        if (p.url) URL.revokeObjectURL(p.url);
+      });
+    };
+  }, [attachmentFiles]);
+
+  const handleAttachmentsChange = (e) => {
+    const picked = Array.from(e.target.files || []);
+    if (!picked.length) return;
+    setAttachmentFiles((prev) => [...prev, ...picked]);
+    setValue("attachments", picked);
+  };
+
+  const removeAttachmentAt = (index) => {
+    setAttachmentFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const onSubmit = async (data) => {
     if (isSubmitting) return;
     setIsSubmitting(true);
     const formData = new FormData();
     for (const key in data) {
-      if (key === "attachments" && data[key]?.length > 0) {
-        for (let i = 0; i < data[key].length; i++) formData.append("attachments", data[key][i]);
-      } else {
-        formData.append(key, data[key]);
-      }
+      if (key === "attachments") continue;
+      formData.append(key, data[key]);
+    }
+    for (const file of attachmentFiles) {
+      formData.append("attachments", file);
     }
     try {
       const res = await fetch("/api/complaints", { method: "POST", body: formData });
       if (res.ok) {
         toast.success("Complaint added successfully!");
         reset();
+        setAttachmentFiles([]);
         onSuccess();
       } else {
         const err = await res.json();
@@ -342,9 +371,49 @@ function ComplaintModal({ serialNumber, onClose, onSuccess }) {
           </select>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Attach images (Optional)</label>
-          <input type="file" {...register("attachments")} multiple
-            className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Attach files (optional, multiple)
+          </label>
+          <input
+            type="file"
+            multiple
+            accept="image/*,video/*,application/pdf"
+            onChange={handleAttachmentsChange}
+            className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+          />
+          <p className="mt-1 text-xs text-gray-500">
+            Images, videos, or PDF — uploaded to Cloudinary. You can add more than one file.
+          </p>
+          {attachmentPreviews.length > 0 ? (
+            <ul className="mt-2 space-y-2 max-h-40 overflow-y-auto rounded border border-gray-200 p-2 bg-gray-50">
+              {attachmentPreviews.map((item, idx) => (
+                <li
+                  key={`${item.name}-${idx}`}
+                  className="flex items-center gap-2 text-sm text-gray-800"
+                >
+                  {item.url ? (
+                    <img
+                      src={item.url}
+                      alt=""
+                      className="h-10 w-10 rounded object-cover border border-gray-200"
+                    />
+                  ) : (
+                    <span className="h-10 w-10 flex items-center justify-center rounded bg-white border border-gray-200 text-[10px] text-gray-500">
+                      FILE
+                    </span>
+                  )}
+                  <span className="flex-1 truncate">{item.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeAttachmentAt(idx)}
+                    className="text-red-600 hover:text-red-800 text-xs font-semibold"
+                  >
+                    Remove
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
         </div>
         <button type="submit" disabled={isSubmitting}
           className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-2 rounded disabled:opacity-50">

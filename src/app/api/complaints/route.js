@@ -2,8 +2,7 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { sendTemplatedEmail } from "@/lib/template-utils";
-import path from "path";
-import fs from "fs/promises"; // For file system operations
+import { uploadComplaintAttachmentsToCloudinary } from "@/lib/uploadComplaintAttachments";
 
 export async function POST(req) {
   try {
@@ -39,22 +38,19 @@ export async function POST(req) {
 
     const conn = await getDbConnection();
 
-    // Handle file uploads
-    const attachments = [];
-    const files = formData.getAll("attachments"); // Use getAll for multiple files
+    const files = formData.getAll("attachments").filter((f) => f?.size > 0);
+    const preUploaded = String(formData.get("attachment_urls") || "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
 
-    const uploadDirectory = path.join(process.cwd(), "public", "attachments"); // Store in public/attachments
-    await fs.mkdir(uploadDirectory, { recursive: true }); // Ensure directory exists
-
-    for (const file of files) {
-      if (file.size > 0) {
-        // Check if a file was actually uploaded
-        const uniqueFilename = `${path.parse(file.name).name}_${Date.now()}_${Math.floor(Math.random() * 10000)}${path.parse(file.name).ext}`;
-        const filePath = path.join(uploadDirectory, uniqueFilename);
-        const buffer = Buffer.from(await file.arrayBuffer());
-        await fs.writeFile(filePath, buffer);
-        attachments.push(`/attachments/${uniqueFilename}`); // Store public path
-      }
+    let attachments = [...preUploaded];
+    if (files.length > 0) {
+      const uploaded = await uploadComplaintAttachmentsToCloudinary(
+        files,
+        serial_number,
+      );
+      attachments = attachments.concat(uploaded);
     }
 
     const attachmentsString = attachments.join(",");
