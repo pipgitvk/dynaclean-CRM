@@ -23,11 +23,26 @@ export function getCompletionImageSrc(filePath) {
   if (trimmed.includes("res.cloudinary.com")) {
     return `/api/cloudinary-proxy?url=${encodeURIComponent(trimmed)}`;
   }
-  if (trimmed.startsWith("http")) return trimmed;
 
-  const storage = completionImageStoragePath(trimmed);
-  const path = storage.startsWith("/") ? storage : `/${storage}`;
-  return `https://service.dynacleanindustries.com${path}`;
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+    try {
+      const host = new URL(trimmed).hostname.toLowerCase();
+      if (
+        host.includes("dynacleanindustries.com") ||
+        host === "localhost" ||
+        host === "127.0.0.1"
+      ) {
+        const pathname = new URL(trimmed).pathname;
+        const token = pathname.replace(/^\/+/, "") || trimmed;
+        return `/api/image-proxy?url=${encodeURIComponent(token)}`;
+      }
+    } catch {
+      /* use trimmed below */
+    }
+    return trimmed;
+  }
+
+  return `/api/image-proxy?url=${encodeURIComponent(trimmed)}`;
 }
 
 /** Same-origin or proxied URL suitable for fetch() (PDF embed, print resolver). */
@@ -60,11 +75,7 @@ export async function resolveCompletionImageFetchUrl(filePath) {
     /* fallback below */
   }
 
-  const fallback = getCompletionImageSrc(trimmed);
-  if (fallback.includes("res.cloudinary.com")) {
-    return `/api/cloudinary-proxy?url=${encodeURIComponent(fallback)}`;
-  }
-  return `/api/image-proxy?url=${encodeURIComponent(fallback)}`;
+  return getCompletionImageSrc(trimmed);
 }
 
 /** Resolved absolute/proxied URL for print preview <img src>. */
