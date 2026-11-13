@@ -7,6 +7,7 @@ import FollowUpHistory from "@/components/Leads/FollowUpHistory";
 import CustomerContactsModal from "@/components/Customers/CustomerContactsModal";
 import ContactHierarchyContactActions from "@/components/Customers/ContactHierarchyContactActions";
 import ViewCustomerQuotationsLink from "@/components/Customers/ViewCustomerQuotationsLink";
+import CustomerWhatsAppLink from "@/components/Customers/CustomerWhatsAppLink";
 import CustomerPerformaInvoiceButton from "@/components/invoice/CustomerPerformaInvoiceButton";
 import ScheduleVisitModal from "@/components/scheduleVisit/ScheduleVisitModal";
 import { canShowScheduleVisitOnCustomerProfile } from "@/lib/scheduleVisitScope";
@@ -234,8 +235,13 @@ export default async function CustomerPage({ params, searchParams }) {
 
       <div>
         <dt className="text-sm font-medium text-gray-500">Phone</dt>
-        <dd className="mt-1 text-blue-600 font-medium">
-          {customer.phone || "-"}
+        <dd className="mt-1 flex flex-wrap items-center gap-2">
+          <span className="text-blue-600 font-medium">
+            {customer.phone || "-"}
+          </span>
+          {customer.phone ? (
+            <CustomerWhatsAppLink phone={customer.phone} />
+          ) : null}
         </dd>
       </div>
 
