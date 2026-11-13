@@ -5,7 +5,7 @@ import { ensureCustomersFollowupNotesText } from "@/lib/ensureCustomersFollowupN
 import dayjs from "dayjs";
 import FollowUpHistory from "@/components/Leads/FollowUpHistory";
 import CustomerContactsModal from "@/components/Customers/CustomerContactsModal";
-import ContactHierarchyContactActions from "@/components/Customers/ContactHierarchyContactActions";
+import CustomerContactHierarchyList from "@/components/Customers/CustomerContactHierarchyList";
 import ViewCustomerQuotationsLink from "@/components/Customers/ViewCustomerQuotationsLink";
 import CustomerWhatsAppLink from "@/components/Customers/CustomerWhatsAppLink";
 import CustomerPerformaInvoiceButton from "@/components/invoice/CustomerPerformaInvoiceButton";
@@ -387,81 +387,25 @@ export default async function CustomerPage({ params, searchParams }) {
     </div>
 
     {/* Contact Hierarchy Section */}
-    <div className="p-2 rounded-xl h-fit max-h-96 overflow-y-auto">
-      <h3 className="text-lg font-semibold text-gray-800 mb-3">
+    <div className="flex max-h-[min(32rem,70vh)] min-h-0 flex-col rounded-xl p-2">
+      <h3 className="mb-3 shrink-0 text-lg font-semibold text-gray-800">
         Contact Hierarchy
       </h3>
-      <div className="space-y-2">
-        {/* Parent */}
-        {parentContact && (
-          <div className="p-3 bg-blue-50 rounded border border-blue-200">
-            <p className="text-xs text-blue-600 font-medium mb-2">Parent:</p>
-            <div className="flex items-center justify-between gap-2">
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-gray-800">
-                  {[parentContact.first_name, parentContact.last_name].filter(Boolean).join(" ") || "—"}
-                </p>
-                <p className="text-sm text-gray-600">{parentContact.phone || "—"}</p>
-              </div>
-              <ContactHierarchyContactActions
-                customerId={parentContact.customer_id}
-                displayName={[parentContact.first_name, parentContact.last_name].filter(Boolean).join(" ")}
-                followHref={`/admin-dashboard/view-customer/${parentContact.customer_id}/follow-up`}
-                userRole={userRole}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Siblings */}
-        {siblingContacts && siblingContacts.length > 0 && (
-          <>
-            <p className="text-xs text-gray-600 font-medium">Siblings ({siblingContacts.length}):</p>
-            {siblingContacts.map((contact) => (
-              <div key={contact.customer_id} className="flex items-center justify-between p-3 bg-gray-50 rounded border border-gray-200">
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-800">
-                    {[contact.first_name, contact.last_name].filter(Boolean).join(" ") || "—"}
-                  </p>
-                  <p className="text-sm text-gray-600">{contact.phone || "—"}</p>
-                </div>
-                <ContactHierarchyContactActions
-                  customerId={contact.customer_id}
-                  displayName={[contact.first_name, contact.last_name].filter(Boolean).join(" ")}
-                  followHref={`/admin-dashboard/view-customer/${contact.customer_id}/follow-up`}
-                  userRole={userRole}
-                />
-              </div>
-            ))}
-          </>
-        )}
-
-        {/* Children */}
-        {childContacts && childContacts.length > 0 && (
-          <>
-            <p className="text-xs text-gray-600 font-medium">Members ({childContacts.length}):</p>
-            {childContacts.map((contact) => (
-              <div key={contact.customer_id} className="flex items-center justify-between p-3 bg-purple-50 rounded border border-purple-200">
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-800">
-                    {[contact.first_name, contact.last_name].filter(Boolean).join(" ") || "—"}
-                  </p>
-                  <p className="text-sm text-gray-600">{contact.phone || "—"}</p>
-                </div>
-                <ContactHierarchyContactActions
-                  customerId={contact.customer_id}
-                  displayName={[contact.first_name, contact.last_name].filter(Boolean).join(" ")}
-                  followHref={`/admin-dashboard/view-customer/${contact.customer_id}/follow-up`}
-                  userRole={userRole}
-                />
-              </div>
-            ))}
-          </>
-        )}
-
-        {!parentContact && (!childContacts || childContacts.length === 0) && (!siblingContacts || siblingContacts.length === 0) && (
-          <p className="text-sm text-gray-600">No contact hierarchy available.</p>
-        )}
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain pr-1">
+        <CustomerContactHierarchyList
+          layout="sidebar"
+          parentContact={parentContact}
+          siblingContacts={siblingContacts}
+          childContacts={childContacts}
+          currentCustomer={{
+            customer_id: customer.customer_id,
+            first_name: customer.first_name,
+            last_name: customer.last_name,
+            phone: customer.phone,
+          }}
+          dashboardBase="admin-dashboard"
+          userRole={userRole}
+        />
       </div>
     </div>
   </div>
@@ -513,7 +457,10 @@ export default async function CustomerPage({ params, searchParams }) {
                 Demo Registration
               </a>
               <div className="w-full md:w-auto">
-                <CustomerContactsModal customerId={customerId} />
+                <CustomerContactsModal
+                  customerId={customerId}
+                  userRole={userRole}
+                />
               </div>
               <ViewCustomerQuotationsLink
                 customerId={customerId}

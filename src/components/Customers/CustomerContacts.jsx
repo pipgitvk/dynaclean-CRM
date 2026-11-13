@@ -5,14 +5,21 @@ import { usePathname } from "next/navigation";
 import { Plus, List, Network } from "lucide-react";
 import AddContactForm from "./AddContactForm";
 import EditContactForm from "./EditContactForm";
-import ViewContactsHierarchy from "./ViewContactsHierarchy";
+import CustomerContactHierarchyList from "./CustomerContactHierarchyList";
+import CustomerContactHierarchyChart from "./CustomerContactHierarchyChart";
 import ContactTableView from "./ContactTableView";
 
-export default function CustomerContacts({ customerId }) {
+export default function CustomerContacts({ customerId, userRole = "" }) {
   const pathname = usePathname();
   const basePath = pathname?.includes("admin-dashboard") ? "admin-dashboard" : "user-dashboard";
   const [contacts, setContacts] = useState([]);
+  const [chartContacts, setChartContacts] = useState([]);
   const [memberCustomers, setMemberCustomers] = useState([]);
+  const [hierarchyParent, setHierarchyParent] = useState(null);
+  const [hierarchySiblings, setHierarchySiblings] = useState([]);
+  const [hierarchyMembers, setHierarchyMembers] = useState([]);
+  const [hierarchyCurrent, setHierarchyCurrent] = useState(null);
+  const [hierarchyFamilyRoot, setHierarchyFamilyRoot] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [view, setView] = useState("hierarchy"); // "hierarchy", "table", "add", "edit"
@@ -30,7 +37,13 @@ export default function CustomerContacts({ customerId }) {
 
       if (data.success) {
         setContacts(data.contacts || []);
+        setChartContacts(data.chartContacts || data.contacts || []);
         setMemberCustomers(data.memberCustomers || []);
+        setHierarchyParent(data.hierarchyParent || null);
+        setHierarchySiblings(data.hierarchySiblings || []);
+        setHierarchyMembers(data.hierarchyMembers || []);
+        setHierarchyCurrent(data.hierarchyCurrent || null);
+        setHierarchyFamilyRoot(data.hierarchyFamilyRoot || null);
       } else {
         setError(data.error || "Failed to fetch contacts");
       }
@@ -147,12 +160,36 @@ export default function CustomerContacts({ customerId }) {
         )}
 
         {view === "hierarchy" && (
-          <ViewContactsHierarchy
-            contacts={contacts}
-            memberCustomers={memberCustomers}
-            basePath={basePath}
-            onEdit={handleEdit}
-          />
+          <div className="space-y-6">
+            <div className="rounded-lg bg-white p-4 sm:p-6 shadow-md border border-gray-200">
+              <h3 className="mb-4 text-lg font-semibold text-gray-800 sm:text-xl">
+                Parent · child chart
+              </h3>
+              <CustomerContactHierarchyChart
+                contacts={chartContacts.length ? chartContacts : contacts}
+                hierarchyParent={hierarchyParent}
+                hierarchyFamilyRoot={hierarchyFamilyRoot}
+                siblingContacts={hierarchySiblings}
+                hierarchyMembers={hierarchyMembers}
+                currentCustomer={hierarchyCurrent}
+                dashboardBase={basePath}
+              />
+            </div>
+            <div className="rounded-lg bg-gray-50 p-4 sm:p-6 shadow-md">
+              <h3 className="mb-4 text-lg font-semibold text-gray-800 sm:text-xl">
+                Contact Hierarchy
+              </h3>
+              <CustomerContactHierarchyList
+                layout="grid"
+                parentContact={hierarchyParent}
+                siblingContacts={hierarchySiblings}
+                childContacts={hierarchyMembers}
+                currentCustomer={hierarchyCurrent}
+                dashboardBase={basePath}
+                userRole={userRole}
+              />
+            </div>
+          </div>
         )}
 
         {view === "table" && (

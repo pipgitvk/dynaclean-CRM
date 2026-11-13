@@ -3,7 +3,7 @@
 import { useState } from "react";
 import CustomerContacts from "./CustomerContacts";
 
-export default function CustomerContactsModal({ customerId }) {
+export default function CustomerContactsModal({ customerId, userRole = "" }) {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
@@ -68,7 +68,7 @@ export default function CustomerContactsModal({ customerId }) {
 
               {/* Content */}
               <div className="p-3 sm:p-6 overflow-y-auto max-h-[calc(95vh-60px)] sm:max-h-[calc(90vh-80px)]">
-                <CustomerContacts customerId={customerId} />
+                <CustomerContacts customerId={customerId} userRole={userRole} />
               </div>
             </div>
           </div>

@@ -36,10 +36,10 @@ export async function GET(request) {
     }
 
     // Fetch member customers (contacts) from customers table with report_to, working, designation
-    const [memberRows] = await connection.execute(
-      `SELECT 
+    const memberSelect = `SELECT 
         c.customer_id as id,
         c.customer_id,
+        c.parent_customer_id,
         c.first_name,
         c.last_name,
         CONCAT(TRIM(c.first_name), ' ', TRIM(COALESCE(c.last_name, ''))) as name,
@@ -50,7 +50,10 @@ export async function GET(request) {
         COALESCE(c.working, 1) as working,
         c.date_created as created_at,
         c.date_created as updated_at,
-        CONCAT(TRIM(rc.first_name), ' ', TRIM(COALESCE(rc.last_name, ''))) as report_to_name
+        CONCAT(TRIM(rc.first_name), ' ', TRIM(COALESCE(rc.last_name, ''))) as report_to_name`;
+
+    const [memberRows] = await connection.execute(
+      `${memberSelect}
       FROM customers c
       LEFT JOIN customers rc ON c.report_to = rc.customer_id
       WHERE c.parent_customer_id = ?
@@ -58,16 +61,62 @@ export async function GET(request) {
       [customerId],
     );
 
-    let contacts = memberRows || [];
+    const [reportChildRows] = await connection.execute(
+      `${memberSelect}
+      FROM customers c
+      LEFT JOIN customers rc ON c.report_to = rc.customer_id
+      WHERE c.report_to = ?
+      ORDER BY c.date_created ASC`,
+      [customerId],
+    );
+
+    const mergeContactRows = (base, extra) => {
+      const seen = new Set(
+        (base || []).map((r) => String(r.customer_id ?? r.id)),
+      );
+      const out = [...(base || [])];
+      for (const row of extra || []) {
+        const sid = String(row.customer_id ?? row.id);
+        if (!seen.has(sid)) {
+          seen.add(sid);
+          out.push(row);
+        }
+      }
+      return out;
+    };
+
+    let contacts = mergeContactRows(memberRows, reportChildRows);
 
     // When viewing a contact who has a parent, include full ancestor chain + current
     // e.g. Vaccum Cleaners → show Ravindra → shalini → Vaccum Cleaners
     const [currentRows] = await connection.execute(
-      `SELECT c.customer_id, c.parent_customer_id, c.first_name, c.last_name, c.phone, c.email, c.designation, COALESCE(c.working, 1) as working
-       FROM customers c WHERE c.customer_id = ?`,
+      `SELECT c.customer_id, c.parent_customer_id, c.report_to, c.first_name, c.last_name, c.phone, c.email, c.designation, COALESCE(c.working, 1) as working,
+        CONCAT(TRIM(rc.first_name), ' ', TRIM(COALESCE(rc.last_name, ''))) as report_to_name
+       FROM customers c
+       LEFT JOIN customers rc ON c.report_to = rc.customer_id
+       WHERE c.customer_id = ?`,
       [customerId],
     );
     const currentCustomer = currentRows?.[0];
+    let hierarchyFamilyRoot = null;
+
+    const toContactRow = (row, reportToId, reportToName) => {
+      const name = [row.first_name, row.last_name].filter(Boolean).join(" ").trim() || "Unnamed";
+      return {
+        id: row.customer_id,
+        customer_id: row.customer_id,
+        name,
+        contact: row.phone || "",
+        email: row.email || "",
+        designation: row.designation || null,
+        report_to: reportToId ?? null,
+        working: row.working ?? 1,
+        report_to_name: reportToName ?? null,
+        created_at: null,
+        updated_at: null,
+      };
+    };
+
     if (currentCustomer?.parent_customer_id) {
       // Walk up parent_customer_id chain to get full ancestor list (root first)
       const ancestors = [];
@@ -106,6 +155,15 @@ export async function GET(request) {
       });
       const immediateParent = ancestors[ancestors.length - 1];
       const immediateParentName = immediateParent ? [immediateParent.first_name, immediateParent.last_name].filter(Boolean).join(" ").trim() || "Unnamed" : null;
+      const reportToId =
+        currentCustomer.report_to != null && currentCustomer.report_to !== ""
+          ? currentCustomer.report_to
+          : immediateParent?.customer_id ?? null;
+      const reportToName =
+        currentCustomer.report_to_name?.trim() ||
+        immediateParentName ||
+        null;
+
       const currentContact = {
         id: currentCustomer.customer_id,
         customer_id: currentCustomer.customer_id,
@@ -113,13 +171,73 @@ export async function GET(request) {
         contact: currentCustomer.phone || "",
         email: currentCustomer.email || "",
         designation: currentCustomer.designation || null,
-        report_to: immediateParent?.customer_id ?? null,
+        report_to: reportToId,
         working: currentCustomer.working ?? 1,
-        report_to_name: immediateParentName,
+        report_to_name: reportToName,
         created_at: null,
         updated_at: null,
       };
-      contacts = [...ancestorContacts, currentContact, ...contacts];
+      const withoutDup = contacts.filter(
+        (c) => String(c.customer_id ?? c.id) !== String(customerId),
+      );
+      contacts = [...ancestorContacts, currentContact, ...withoutDup];
+      hierarchyFamilyRoot = ancestors[0] || null;
+
+      const familyAccountId =
+        ancestors[0]?.customer_id ?? currentCustomer.parent_customer_id;
+      if (familyAccountId) {
+        const [familyRows] = await connection.execute(
+          `${memberSelect}
+          FROM customers c
+          LEFT JOIN customers rc ON c.report_to = rc.customer_id
+          WHERE c.parent_customer_id = ?
+          ORDER BY c.date_created ASC`,
+          [familyAccountId],
+        );
+        contacts = mergeContactRows(contacts, familyRows);
+      }
+    } else if (currentCustomer) {
+      const reportUplink = [];
+      let reportId = currentCustomer.report_to;
+      const reportSeen = new Set();
+      while (reportId && !reportSeen.has(reportId)) {
+        reportSeen.add(reportId);
+        const [uRows] = await connection.execute(
+          `SELECT customer_id, report_to, first_name, last_name, phone, email, designation, COALESCE(working, 1) as working
+           FROM customers WHERE customer_id = ?`,
+          [reportId],
+        );
+        const u = uRows?.[0];
+        if (!u) break;
+        reportUplink.unshift(u);
+        reportId = u.report_to;
+      }
+
+      const uplinkContacts = reportUplink.map((a, i) => {
+        const prev = i === 0 ? null : reportUplink[i - 1];
+        const prevName = prev
+          ? [prev.first_name, prev.last_name].filter(Boolean).join(" ").trim() || "Unnamed"
+          : null;
+        return toContactRow(a, prev?.customer_id ?? null, prevName);
+      });
+
+      const immediateReport = reportUplink[reportUplink.length - 1];
+      const immediateReportName = immediateReport
+        ? [immediateReport.first_name, immediateReport.last_name].filter(Boolean).join(" ").trim() || "Unnamed"
+        : currentCustomer.report_to_name || null;
+
+      const currentContact = toContactRow(
+        currentCustomer,
+        immediateReport?.customer_id ?? currentCustomer.report_to ?? null,
+        immediateReportName,
+      );
+
+      const selfId = String(currentCustomer.customer_id);
+      const withoutSelf = (contacts || []).filter(
+        (c) => String(c.customer_id ?? c.id) !== selfId,
+      );
+      contacts = [...uplinkContacts, currentContact, ...withoutSelf];
+      hierarchyFamilyRoot = reportUplink[0] || currentCustomer;
     }
     const memberCustomers = memberRows?.map((r) => ({
       customer_id: r.customer_id,
@@ -131,7 +249,65 @@ export async function GET(request) {
       date_created: r.created_at,
     })) || [];
 
-    return NextResponse.json({ success: true, contacts, memberCustomers });
+    const hierarchyMembers = (memberRows || []).map((r) => ({
+      customer_id: r.customer_id,
+      first_name: r.first_name || "",
+      last_name: r.last_name || "",
+      phone: r.contact || r.phone || "",
+    }));
+
+    let hierarchyParent = null;
+    let hierarchySiblings = [];
+    if (currentCustomer?.parent_customer_id) {
+      const [parentRows] = await connection.execute(
+        `SELECT customer_id, first_name, last_name, phone
+         FROM customers WHERE customer_id = ?`,
+        [currentCustomer.parent_customer_id],
+      );
+      hierarchyParent = parentRows?.[0] || null;
+      const [siblingRows] = await connection.execute(
+        `SELECT customer_id, first_name, last_name, phone
+         FROM customers
+         WHERE parent_customer_id = ? AND customer_id != ?
+         ORDER BY first_name ASC`,
+        [currentCustomer.parent_customer_id, customerId],
+      );
+      hierarchySiblings = siblingRows || [];
+    }
+
+    const hierarchyCurrent = currentCustomer
+      ? {
+          customer_id: currentCustomer.customer_id,
+          first_name: currentCustomer.first_name || "",
+          last_name: currentCustomer.last_name || "",
+          phone: currentCustomer.phone || "",
+          parent_customer_id: currentCustomer.parent_customer_id ?? null,
+          report_to: currentCustomer.report_to ?? null,
+        }
+      : null;
+
+  if (!hierarchyFamilyRoot && currentCustomer) {
+      hierarchyFamilyRoot = {
+        customer_id: currentCustomer.customer_id,
+        first_name: currentCustomer.first_name || "",
+        last_name: currentCustomer.last_name || "",
+        phone: currentCustomer.phone || "",
+      };
+    }
+
+    const chartContacts = contacts;
+
+    return NextResponse.json({
+      success: true,
+      contacts,
+      chartContacts,
+      memberCustomers,
+      hierarchyParent,
+      hierarchySiblings,
+      hierarchyMembers,
+      hierarchyCurrent,
+      hierarchyFamilyRoot,
+    });
   } catch (error) {
     console.error("Error fetching contacts:", error);
     return NextResponse.json(
