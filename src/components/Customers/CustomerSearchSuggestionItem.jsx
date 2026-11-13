@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2, Calendar, StickyNote } from "lucide-react";
+import { Building2, Calendar, Phone, StickyNote } from "lucide-react";
 import CustomerSearchPopupActions from "@/components/Customers/CustomerSearchPopupActions";
 import CustomerWhatsAppLink from "@/components/Customers/CustomerWhatsAppLink";
 import { formatCrmDatetimeForISTDisplay } from "@/lib/timezone";
@@ -60,6 +60,28 @@ export default function CustomerSearchSuggestionItem({
               </span>
             </div>
           </button>
+          {suggestion.phone ||
+          (suggestion.company?.trim() &&
+            displayName !== suggestion.company.trim()) ? (
+            <div className="mt-0.5 flex min-w-0 flex-row items-center gap-2 text-sm leading-snug">
+              {suggestion.company?.trim() &&
+              displayName !== suggestion.company.trim() ? (
+                <span className="min-w-0 truncate text-xs text-gray-500">
+                  {suggestion.company.trim()}
+                </span>
+              ) : null}
+              {suggestion.phone ? (
+                <span className="inline-flex shrink-0 items-center gap-1 font-medium text-black">
+                  <Phone
+                    size={14}
+                    className="text-gray-400 shrink-0"
+                    aria-hidden
+                  />
+                  <span className="whitespace-nowrap">{suggestion.phone}</span>
+                </span>
+              ) : null}
+            </div>
+          ) : null}
           {suggestion.lead_source ? (
             <div className="flex items-start gap-1.5 text-sm text-black mt-0.5">
               <Building2

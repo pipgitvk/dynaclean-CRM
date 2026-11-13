@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2, Calendar, StickyNote } from "lucide-react";
+import { Building2, Calendar, Phone, StickyNote } from "lucide-react";
 import CustomerSearchResultActions from "@/components/Customers/CustomerSearchResultActions";
 import { formatCrmDatetimeForISTDisplay } from "@/lib/timezone";
 
@@ -86,10 +86,25 @@ export default function CustomerHeaderSearchResultCard({
               ID-{customer.customer_id}
             </span>
           </div>
-          {company && displayName !== company ? (
-            <p className="text-sm text-gray-500 mt-0.5 line-clamp-2 leading-snug">
-              {company}
-            </p>
+          {customer.phone ||
+          (company && displayName !== company) ? (
+            <div className="mt-0.5 flex min-w-0 flex-row items-center gap-2 text-sm leading-snug">
+              {company && displayName !== company ? (
+                <span className="min-w-0 truncate text-xs text-gray-500">
+                  {company}
+                </span>
+              ) : null}
+              {customer.phone ? (
+                <span className="inline-flex shrink-0 items-center gap-1 font-medium text-black">
+                  <Phone
+                    size={14}
+                    className="text-gray-400 shrink-0"
+                    aria-hidden
+                  />
+                  <span className="whitespace-nowrap">{customer.phone}</span>
+                </span>
+              ) : null}
+            </div>
           ) : null}
           {customer.lead_source ? (
             <div className="flex items-start gap-1.5 text-sm text-black mt-1.5">
