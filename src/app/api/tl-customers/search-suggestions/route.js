@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
-import { pickLatestNoteForSearch } from "@/lib/tlSearchSuggestionNote";
+import {
+  attachHeaderFollowupFields,
+  latestEmployeeFollowupsByCustomerIds,
+  latestTlFollowupsByCustomerIds,
+} from "@/lib/customerHeaderSearchFollowup";
 
 export const dynamic = "force-dynamic";
 
@@ -14,35 +18,6 @@ const PRIVILEGED_ROLES = new Set([
 ]);
 
 const MIN_QUERY_LEN = 2;
-
-function latestByCustomerId(rows, idKey = "customer_id") {
-  const map = new Map();
-  for (const row of rows || []) {
-    const id = row[idKey];
-    if (id == null) continue;
-    map.set(String(id), row);
-  }
-  return map;
-}
-
-async function latestTlFollowupsByCustomerIds(conn, customerIds) {
-  if (!customerIds.length) return new Map();
-  const placeholders = customerIds.map(() => "?").join(",");
-  const [rows] = await conn.execute(
-    `SELECT t.customer_id, t.notes, t.followed_date, t.created_at,
-            t.next_followup_date, t.followed_by
-     FROM TL_followups t
-     INNER JOIN (
-       SELECT customer_id, MAX(created_at) AS max_created
-       FROM TL_followups
-       WHERE customer_id IN (${placeholders})
-       GROUP BY customer_id
-     ) latest
-       ON t.customer_id = latest.customer_id AND t.created_at = latest.max_created`,
-    customerIds,
-  );
-  return latestByCustomerId(rows);
-}
 
 export async function GET(req) {
   try {
@@ -65,7 +40,7 @@ export async function GET(req) {
     const isEA = role === "EA";
 
     const searchTerm = `%${q}%`;
-    const params = [q, searchTerm, searchTerm, searchTerm, searchTerm];
+    const params = [q, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm];
     let scopeSql = "";
     if (!isPrivileged) {
       scopeSql = ` AND (c.assigned_to = ? OR c.lead_source = ?)`;
@@ -87,6 +62,7 @@ export async function GET(req) {
          OR c.first_name LIKE ?
          OR c.last_name LIKE ?
          OR c.company LIKE ?
+         OR c.gstin LIKE ?
        )
        ${scopeSql}
        ORDER BY c.date_created DESC
@@ -99,41 +75,37 @@ export async function GET(req) {
     }
 
     const customerIds = customers.map((c) => c.customer_id);
-    const tlById = await latestTlFollowupsByCustomerIds(conn, customerIds);
+    const [tlById, empById] = await Promise.all([
+      latestTlFollowupsByCustomerIds(conn, customerIds),
+      latestEmployeeFollowupsByCustomerIds(conn, customerIds),
+    ]);
 
     const suggestions = customers.map((c) => {
       const cid = String(c.customer_id);
       const tlf = tlById.get(cid) || {};
-      const row = {
-        customer_id: c.customer_id,
-        first_name: c.first_name,
-        last_name: c.last_name,
-        company: c.company,
-        phone: c.phone,
-        lead_source: c.lead_source,
-        tl_followed_date: tlf.followed_date || null,
-        tl_created_at: tlf.created_at || null,
-        tl_next_followup: tlf.next_followup_date || null,
-        tl_notes: tlf.notes || "",
-        tl_followed_by: tlf.followed_by || "",
-      };
       const name =
         [c.first_name, c.last_name].filter(Boolean).join(" ").trim() ||
         c.company ||
         "";
-      const { last_note, last_note_at } = pickLatestNoteForSearch(row);
+      const merged = attachHeaderFollowupFields(
+        {
+          customer_id: c.customer_id,
+          first_name: c.first_name,
+          last_name: c.last_name,
+          name,
+          company: c.company || "",
+          phone: c.phone || "",
+          lead_source: c.lead_source || "",
+          tl_next_followup: tlf.next_followup_date || null,
+          tl_followed_by: tlf.followed_by || "",
+        },
+        tlf,
+        empById.get(cid),
+      );
       return {
-        customer_id: c.customer_id,
-        name,
-        company: c.company || "",
-        phone: c.phone || "",
-        lead_source: c.lead_source || "",
-        tl_followed_date: row.tl_followed_date,
-        tl_next_followup: row.tl_next_followup,
-        tl_notes: row.tl_notes,
-        tl_followed_by: row.tl_followed_by,
-        last_note,
-        last_note_at,
+        ...merged,
+        last_note: merged.last_followup_note,
+        last_note_at: merged.last_followup_at,
       };
     });
 

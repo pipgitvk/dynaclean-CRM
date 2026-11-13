@@ -52,44 +52,47 @@ export default function CustomerSearchSuggestionItem({
             className="min-w-0 w-full text-left hover:text-blue-900 touch-manipulation"
             onClick={() => onPick?.(suggestion)}
           >
-            <div className="font-semibold text-[13px] sm:text-sm text-gray-900 leading-snug break-words">
+            <div className="font-semibold text-base text-gray-900 leading-snug break-words">
               {displayName}{" "}
-              <span className="text-gray-400 font-normal whitespace-nowrap">
-                #{suggestion.customer_id}
+              <span className="text-red-600 font-normal whitespace-nowrap">
+                {" "}
+                ID-{suggestion.customer_id}
               </span>
             </div>
           </button>
           {suggestion.lead_source ? (
-            <div className="flex items-start gap-1.5 text-xs text-black mt-0.5">
+            <div className="flex items-start gap-1.5 text-sm text-black mt-0.5">
               <Building2
                 size={13}
                 className="text-gray-400 shrink-0 mt-0.5"
               />
               <span className="break-words leading-snug">
-                Lead source: {suggestion.lead_source}
+                Lead source:{" "}
+                <span className="text-green-700 font-medium">
+                  {suggestion.lead_source}
+                </span>
               </span>
             </div>
           ) : null}
         </div>
       </div>
       {note || followedLabel ? (
-        <div className="mx-2.5 sm:mx-3 mb-3 flex flex-col gap-2 rounded-md border border-yellow-500 bg-yellow-300 px-2.5 sm:px-3 py-2.5 shadow-sm sm:flex-row sm:items-center">
-          <div className="flex min-w-0 flex-1 items-start gap-2">
+        <div className="mx-2.5 sm:mx-3 mb-3 rounded-md border border-yellow-500 bg-yellow-300 px-2.5 sm:px-3 py-2.5 shadow-sm">
+          <div className="flex w-full items-start gap-2">
             <StickyNote
               size={18}
               className="text-yellow-900 shrink-0 mt-0.5"
               aria-hidden
             />
-            <p className="text-sm sm:text-base font-bold text-yellow-950 leading-snug max-sm:line-clamp-6 sm:line-clamp-5 break-words">
-              <span>Last TL follow-up:</span> {note || "—"}
+            <p className="min-w-0 flex-1 text-base font-bold text-yellow-950 leading-relaxed">
+              <span className="whitespace-nowrap">Last TL follow-up:</span>{" "}
+              <span className="break-words">{note || "—"}</span>
             </p>
           </div>
           {followedLabel ? (
-            <div className="flex shrink-0 items-center gap-1.5 text-yellow-950 border-t border-yellow-600/50 pt-2 sm:border-t-0 sm:border-l sm:border-yellow-600/50 sm:pt-0 sm:pl-3 max-sm:w-full text-sm font-bold">
+            <div className="mt-2 flex items-center gap-1.5 pl-7 text-sm font-bold text-yellow-950">
               <Calendar size={14} className="text-yellow-900 shrink-0" aria-hidden />
-              <span className="break-words sm:whitespace-nowrap leading-snug">
-                {followedLabel}
-              </span>
+              <span className="leading-snug">{followedLabel}</span>
             </div>
           ) : null}
         </div>

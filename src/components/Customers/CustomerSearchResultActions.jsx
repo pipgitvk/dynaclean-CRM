@@ -12,33 +12,39 @@ export default function CustomerSearchResultActions({
   phone,
 }) {
   return (
-    <div className="flex items-center gap-1 flex-shrink-0">
-      {phone ? (
-        <span onClick={(e) => e.stopPropagation()} role="presentation">
-          <CustomerWhatsAppLink phone={phone} />
-        </span>
-      ) : null}
-      <a
-        href={viewHref}
-        target="_blank"
-        rel="noopener noreferrer"
-        onClick={(e) => e.stopPropagation()}
-        className="p-1.5 text-gray-600 hover:text-blue-700 hover:bg-blue-50 rounded border border-transparent hover:border-blue-200"
-        title="Open in new tab"
-        aria-label="Open customer in new tab"
-      >
-        <ExternalLink size={16} />
-      </a>
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          onView?.();
-        }}
-        className="text-xs px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
-      >
-        View
-      </button>
+    <div className="grid w-full grid-cols-3 items-center gap-1 px-5">
+      <div className="flex justify-start pl-2">
+        {phone ? (
+          <span onClick={(e) => e.stopPropagation()} role="presentation">
+            <CustomerWhatsAppLink phone={phone} />
+          </span>
+        ) : null}
+      </div>
+      <div className="flex justify-center">
+        <a
+          href={viewHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className="inline-flex items-center justify-center rounded-md border border-gray-200 bg-white p-2 text-gray-600 shadow-sm hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200"
+          title="Open in new tab"
+          aria-label="Open customer in new tab"
+        >
+          <ExternalLink size={16} />
+        </a>
+      </div>
+      <div className="flex justify-end pr-2">
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onView?.();
+          }}
+          className="text-xs font-medium px-3 py-1.5 bg-blue-600 text-white rounded-md shadow-sm hover:bg-blue-700"
+        >
+          View
+        </button>
+      </div>
     </div>
   );
 }

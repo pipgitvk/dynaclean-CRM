@@ -11,7 +11,6 @@ import {
   Bell,
   X,
   DollarSign,
-  ExternalLink,
 } from "lucide-react";
 import HeaderLogoutButton from "@/components/HeaderLogoutButton";
 import { useTheme } from "@/context/ThemeContext";
@@ -20,8 +19,7 @@ import Link from "next/link";
 import AttendanceStatusTracker from "@/components/AttendanceStatusTracker";
 import ProspectHeaderButton from "@/components/prospects/ProspectHeaderButton";
 import CustomerQuickViewModal from "@/components/Customers/CustomerQuickViewModal";
-import CustomerSearchResultActions from "@/components/Customers/CustomerSearchResultActions";
-import CustomerWhatsAppLink from "@/components/Customers/CustomerWhatsAppLink";
+import CustomerHeaderSearchResultCard from "@/components/Customers/CustomerHeaderSearchResultCard";
 
 export default function Navbar({ onToggleSidebar, showSalesMeta = false }) {
   const router = useRouter();
@@ -327,107 +325,39 @@ export default function Navbar({ onToggleSidebar, showSalesMeta = false }) {
       results.length > 0 ? (
         <div
           data-header-search-dropdown
-          className="fixed bg-white border rounded-lg shadow-xl z-[9999] max-h-[min(18rem,70vh)] overflow-y-auto"
+          className="fixed z-[9999] max-h-[min(24rem,75vh)] overflow-y-auto overflow-x-hidden rounded-xl border border-slate-200 bg-white shadow-2xl ring-1 ring-black/5"
           style={{
             top: dropdownPosition.top,
             left: dropdownPosition.left,
-            width: dropdownPosition.width,
+            width: Math.max(dropdownPosition.width, 320),
           }}
         >
           {results.map((c) => (
-            <div
+            <CustomerHeaderSearchResultCard
               key={c.customer_id}
-              className="px-3 py-2 hover:bg-gray-100 border-b last:border-b-0"
-            >
-              <div className="text-sm min-w-0">
-                <div className="font-medium truncate">
-                  {isSuperAdminSearch
-                    ? c.name ||
-                      c.company?.trim() ||
-                      [c.first_name, c.last_name].filter(Boolean).join(" ").trim() ||
-                      "Unnamed"
-                    : c.company?.trim() ||
-                      [c.first_name, c.last_name].filter(Boolean).join(" ").trim() ||
-                      "Unnamed"}
-                </div>
-                <div className="text-xs text-gray-500 truncate">
-                  ID: {c.customer_id}
-                  {isSuperAdminSearch && c.company ? ` • ${c.company}` : ""}
-                </div>
-                {c.lead_source ? (
-                  <div className="text-xs text-black truncate mt-0.5">
-                    Lead source: {c.lead_source}
-                  </div>
-                ) : null}
-                {isSuperAdminSearch &&
-                String(c.tl_notes || "").trim() ? (
-                  <div className="text-xs text-gray-700 mt-1.5 line-clamp-3 leading-snug">
-                    {String(c.tl_notes).trim()}
-                  </div>
-                ) : null}
-                {!isSuperAdminSearch &&
-                String(c.latest_followup_notes || "").trim() ? (
-                  <div className="text-xs text-gray-700 mt-1.5 line-clamp-3 leading-snug">
-                    <span className="font-medium text-black">Last follow-up:</span>{" "}
-                    {String(c.latest_followup_notes).trim()}
-                  </div>
-                ) : null}
-              </div>
-              <div
-                className="mt-2 flex flex-wrap items-center gap-2"
-                onClick={(e) => e.stopPropagation()}
-                role="presentation"
-              >
-                {isSuperAdminSearch ? (
-                  <>
-                    {c.phone ? (
-                      <CustomerWhatsAppLink phone={c.phone} />
-                    ) : null}
-                    <a
-                      href={customerViewHref(c.customer_id)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center justify-center rounded border border-gray-200 bg-white p-1.5 text-gray-600 hover:bg-blue-50 hover:text-blue-700"
-                      title="Open in new tab"
-                      aria-label="Open customer in new tab"
-                    >
-                      <ExternalLink size={16} />
-                    </a>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        openHeaderCustomerModal("view", c.customer_id)
-                      }
-                      className="text-xs px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700"
-                      title="View customer (popup)"
-                    >
-                      View
-                    </button>
-                  </>
-                ) : (
-                  <CustomerSearchResultActions
-                    phone={c.phone}
-                    viewHref={customerViewHref(c.customer_id)}
-                    onView={() => {
-                      setShowDropdown(false);
-                      setResults([]);
-                      setQuery("");
-                      router.push(customerViewHref(c.customer_id));
-                    }}
-                  />
-                )}
-              </div>
-            </div>
+              customer={c}
+              isSuperAdminSearch={isSuperAdminSearch}
+              viewHref={customerViewHref(c.customer_id)}
+              onSuperAdminPopupView={(customerId) =>
+                openHeaderCustomerModal("view", customerId)
+              }
+              onView={() => {
+                setShowDropdown(false);
+                setResults([]);
+                setQuery("");
+                router.push(customerViewHref(c.customer_id));
+              }}
+            />
           ))}
         </div>
       ) : loading ? (
         <div
           data-header-search-dropdown
-          className="fixed bg-white border rounded-lg shadow-xl z-[9999] p-3 text-sm text-gray-500"
+          className="fixed z-[9999] rounded-xl border border-slate-200 bg-white p-4 text-sm text-gray-500 shadow-2xl ring-1 ring-black/5"
           style={{
             top: dropdownPosition.top,
             left: dropdownPosition.left,
-            width: dropdownPosition.width,
+            width: Math.max(dropdownPosition.width, 320),
           }}
         >
           Searching...
@@ -435,11 +365,11 @@ export default function Navbar({ onToggleSidebar, showSalesMeta = false }) {
       ) : (
         <div
           data-header-search-dropdown
-          className="fixed bg-white border rounded-lg shadow-xl z-[9999] p-3 text-sm text-gray-500"
+          className="fixed z-[9999] rounded-xl border border-slate-200 bg-white p-4 text-sm text-gray-500 shadow-2xl ring-1 ring-black/5"
           style={{
             top: dropdownPosition.top,
             left: dropdownPosition.left,
-            width: dropdownPosition.width,
+            width: Math.max(dropdownPosition.width, 320),
           }}
         >
           No results found
@@ -475,8 +405,8 @@ export default function Navbar({ onToggleSidebar, showSalesMeta = false }) {
           type="text"
           placeholder={
             showSalesMeta
-              ? "Search customers by name, phone, etc..."
-              : "Search customers by name, phone, company, or ID..."
+              ? "Search customers by name, phone, GSTIN..."
+              : "Search customers by name, phone, company, ID, or GSTIN..."
           }
           value={query}
           onChange={(e) => setQuery(e.target.value)}

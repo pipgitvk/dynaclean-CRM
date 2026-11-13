@@ -14,31 +14,11 @@ import {
   sqlServiceSupportCustomerScope,
   SQL_ACTIVE_SERVICE_SUPPORT_USERNAMES,
 } from "@/lib/serviceSupportTeamScope";
-
-async function latestEmployeeFollowupsByCustomerIds(conn, customerIds) {
-  if (!customerIds?.length) return new Map();
-  const placeholders = customerIds.map(() => "?").join(",");
-  const [rows] = await conn.execute(
-    `SELECT cf.customer_id, cf.notes, cf.followed_date
-     FROM customers_followup cf
-     INNER JOIN (
-       SELECT customer_id, MAX(followed_date) AS max_followed
-       FROM customers_followup
-       WHERE customer_id IN (${placeholders})
-       GROUP BY customer_id
-     ) latest
-       ON cf.customer_id = latest.customer_id
-       AND cf.followed_date = latest.max_followed
-     ORDER BY cf.time_stamp DESC`,
-    customerIds,
-  );
-  const map = new Map();
-  for (const row of rows) {
-    const id = String(row.customer_id);
-    if (!map.has(id)) map.set(id, row);
-  }
-  return map;
-}
+import {
+  attachHeaderFollowupFields,
+  latestEmployeeFollowupsByCustomerIds,
+  latestTlFollowupsByCustomerIds,
+} from "@/lib/customerHeaderSearchFollowup";
 
 export async function GET(req) {
   const conn = await getDbConnection();
@@ -150,7 +130,7 @@ export async function GET(req) {
     }
 
     
-    // search functionality (ID, phone, name, email - matches All Clients)
+    // search functionality (ID, phone, name, email, GSTIN - matches All Clients)
     const search = searchParams.get("search");
 
     if (search && search.trim()) {
@@ -167,10 +147,11 @@ export async function GET(req) {
       OR lead_source LIKE ?
       OR sales_representative LIKE ?
       OR assigned_to LIKE ?
+      OR gstin LIKE ?
     )
   `;
 
-      params.push(like, like, like, like, like, like, like, like, like);
+      params.push(like, like, like, like, like, like, like, like, like, like);
     }
 
     if (mode === "charts") {
@@ -253,17 +234,18 @@ export async function GET(req) {
 
     let rowsForResponse = customerRows;
     if (globalSearch && search?.trim() && customerRows.length > 0) {
-      const followupById = await latestEmployeeFollowupsByCustomerIds(
-        conn,
-        customerRows.map((c) => c.customer_id),
-      );
+      const ids = customerRows.map((c) => c.customer_id);
+      const [empById, tlById] = await Promise.all([
+        latestEmployeeFollowupsByCustomerIds(conn, ids),
+        latestTlFollowupsByCustomerIds(conn, ids),
+      ]);
       rowsForResponse = customerRows.map((c) => {
-        const latest = followupById.get(String(c.customer_id));
-        return {
-          ...c,
-          latest_followup_notes: latest?.notes ?? "",
-          latest_followed_date: latest?.followed_date ?? null,
-        };
+        const key = String(c.customer_id);
+        return attachHeaderFollowupFields(
+          c,
+          tlById.get(key),
+          empById.get(key),
+        );
       });
     }
 
