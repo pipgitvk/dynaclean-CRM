@@ -44,24 +44,6 @@ async function latestTlFollowupsByCustomerIds(conn, customerIds) {
   return latestByCustomerId(rows);
 }
 
-async function latestCfFollowupsByCustomerIds(conn, customerIds) {
-  if (!customerIds.length) return new Map();
-  const placeholders = customerIds.map(() => "?").join(",");
-  const [rows] = await conn.execute(
-    `SELECT t.customer_id, t.notes, t.followed_date, t.time_stamp
-     FROM customers_followup t
-     INNER JOIN (
-       SELECT customer_id, MAX(time_stamp) AS max_ts
-       FROM customers_followup
-       WHERE customer_id IN (${placeholders})
-       GROUP BY customer_id
-     ) latest
-       ON t.customer_id = latest.customer_id AND t.time_stamp = latest.max_ts`,
-    customerIds,
-  );
-  return latestByCustomerId(rows);
-}
-
 export async function GET(req) {
   try {
     const payload = await getSessionPayload();
@@ -117,15 +99,11 @@ export async function GET(req) {
     }
 
     const customerIds = customers.map((c) => c.customer_id);
-    const [tlById, cfById] = await Promise.all([
-      latestTlFollowupsByCustomerIds(conn, customerIds),
-      latestCfFollowupsByCustomerIds(conn, customerIds),
-    ]);
+    const tlById = await latestTlFollowupsByCustomerIds(conn, customerIds);
 
     const suggestions = customers.map((c) => {
       const cid = String(c.customer_id);
       const tlf = tlById.get(cid) || {};
-      const cf = cfById.get(cid) || {};
       const row = {
         customer_id: c.customer_id,
         first_name: c.first_name,
@@ -138,9 +116,6 @@ export async function GET(req) {
         tl_next_followup: tlf.next_followup_date || null,
         tl_notes: tlf.notes || "",
         tl_followed_by: tlf.followed_by || "",
-        cf_notes: cf.notes || "",
-        cf_followed_date: cf.followed_date || null,
-        cf_time_stamp: cf.time_stamp || null,
       };
       const name =
         [c.first_name, c.last_name].filter(Boolean).join(" ").trim() ||

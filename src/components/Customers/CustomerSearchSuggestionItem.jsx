@@ -26,9 +26,7 @@ export default function CustomerSearchSuggestionItem({
 }) {
   const displayName =
     suggestion.name || suggestion.company?.trim() || "Customer";
-  const note = String(
-    suggestion.last_note || suggestion.tl_notes || "",
-  ).trim();
+  const note = String(suggestion.tl_notes ?? suggestion.last_note ?? "").trim();
   const noteAt = suggestion.last_note_at || suggestion.tl_followed_date;
   const followedLabel = noteAt
     ? formatCrmDatetimeForISTDisplay(noteAt, "D MMM YYYY, hh:mm A")
@@ -93,7 +91,7 @@ export default function CustomerSearchSuggestionItem({
               aria-hidden
             />
             <p className="text-sm sm:text-base font-bold text-yellow-950 leading-snug max-sm:line-clamp-6 sm:line-clamp-5 break-words">
-              <span>Last Note:</span> {note || "—"}
+              <span>Last TL follow-up:</span> {note || "—"}
             </p>
           </div>
           {followedLabel ? (
