@@ -67,7 +67,7 @@ export default async function CustomerPage({ params }) {
 
   // Explicitly select all columns including service_lead_source
   const [custs] = await conn.execute(
-    `SELECT c.customer_id, c.first_name, c.last_name, c.email, c.phone, c.company, c.address, c.tags, c.status, c.stage, c.lead_source, c.assigned_to, c.service_lead_source, c.lead_campaign, c.date_created, c.notes, c.parent_customer_id, c.products_interest,
+    `SELECT c.customer_id, c.first_name, c.last_name, c.email, c.phone, c.company, c.address, c.gstin, c.tags, c.status, c.stage, c.lead_source, c.assigned_to, c.service_lead_source, c.lead_campaign, c.date_created, c.notes, c.parent_customer_id, c.products_interest,
       (
         SELECT cf.multi_tag
         FROM customers_followup cf
@@ -353,6 +353,13 @@ export default async function CustomerPage({ params }) {
         <dt className="text-sm font-medium text-gray-500">Address</dt>
         <dd className="mt-1 text-gray-800 break-words">
           {customer.address || "-"}
+        </dd>
+      </div>
+
+      <div>
+        <dt className="text-sm font-medium text-gray-500">GSTIN</dt>
+        <dd className="mt-1 text-gray-800 break-words">
+          {customer.gstin?.trim() ? customer.gstin : "-"}
         </dd>
       </div>
 

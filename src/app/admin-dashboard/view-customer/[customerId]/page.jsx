@@ -44,7 +44,7 @@ export default async function CustomerPage({ params, searchParams }) {
 
   // Explicitly select all columns including service_lead_source
   const [custs] = await conn.execute(
-    `SELECT c.customer_id, c.first_name, c.last_name, c.email, c.phone, c.company, c.address, c.tags, c.status, c.stage, c.lead_source, c.assigned_to, c.service_lead_source, c.lead_campaign, c.date_created, c.notes, c.parent_customer_id,
+    `SELECT c.customer_id, c.first_name, c.last_name, c.email, c.phone, c.company, c.address, c.gstin, c.tags, c.status, c.stage, c.lead_source, c.assigned_to, c.service_lead_source, c.lead_campaign, c.date_created, c.notes, c.parent_customer_id,
       p.customer_id AS parent_id,
       CONCAT(TRIM(p.first_name), ' ', TRIM(COALESCE(p.last_name, ''))) AS parent_name,
       p.phone AS parent_phone,
@@ -324,6 +324,13 @@ export default async function CustomerPage({ params, searchParams }) {
         <dt className="text-sm font-medium text-gray-500">Address</dt>
         <dd className="mt-1 text-gray-800 break-words">
           {customer.address || "-"}
+        </dd>
+      </div>
+
+      <div>
+        <dt className="text-sm font-medium text-gray-500">GSTIN</dt>
+        <dd className="mt-1 text-gray-800 break-words">
+          {customer.gstin?.trim() ? customer.gstin : "-"}
         </dd>
       </div>
 
