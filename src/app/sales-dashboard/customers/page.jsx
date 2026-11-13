@@ -33,6 +33,17 @@ function resolveStatusForQuery(raw) {
   return STATUS_QUERY_ALIASES[raw] ?? raw;
 }
 
+/** Extra URL filters on TL reporting view → normal list with employee (cf) follow-ups */
+function salesCustomerListHasExtraFilters(params) {
+  const skip = new Set(["filter", "page"]);
+  for (const [key, raw] of Object.entries(params || {})) {
+    if (skip.has(key)) continue;
+    if (raw == null) continue;
+    if (String(raw).trim() !== "") return true;
+  }
+  return false;
+}
+
 export default async function CustomersPage({ searchParams }) {
   const searchParamsResolved = await searchParams;
   const {
@@ -60,6 +71,9 @@ export default async function CustomersPage({ searchParams }) {
   const status = resolveStatusForQuery(statusParam);
   const isVeryGoodFollowupToday = filter === "very_good_followup_today";
   const todayIst = getTodayYmdIST();
+  const isTodayReportingTlList =
+    filter === "today_reporting" &&
+    !salesCustomerListHasExtraFilters(searchParamsResolved);
 
   if (
     !isVeryGoodFollowupToday &&
@@ -131,7 +145,7 @@ export default async function CustomersPage({ searchParams }) {
   }
 
   // TL reporting: latest TL follow-up with next date on or before today (IST)
-  if (filter === "today_reporting") {
+  if (isTodayReportingTlList) {
     joinClause = `
       INNER JOIN (
         SELECT customer_id, MAX(id) as latest_id
@@ -149,7 +163,7 @@ export default async function CustomersPage({ searchParams }) {
 
   // Latest customers_followup row is exposed as cf (or tlf for today_reporting).
   if (next_follow_date) {
-    if (filter === "today_reporting") {
+    if (isTodayReportingTlList) {
       followupConditions.push("DATE(tlf.next_followup_date) = ?");
       followupParams.push(next_follow_date);
     } else {
@@ -160,7 +174,7 @@ export default async function CustomersPage({ searchParams }) {
 
   if (tags) {
     const tagPattern = `%${tags}%`;
-    if (filter === "today_reporting") {
+    if (isTodayReportingTlList) {
       followupConditions.push("tlf.multi_tag LIKE ?");
       followupParams.push(tagPattern);
     } else {
@@ -212,7 +226,7 @@ export default async function CustomersPage({ searchParams }) {
   }
 
   if (reporting_date_from && reporting_date_to) {
-    const reportingTable = filter === "today_reporting" ? "tlf" : "tl_report";
+    const reportingTable = isTodayReportingTlList ? "tlf" : "tl_report";
     customerConditions.push(`DATE(${reportingTable}.next_followup_date) BETWEEN ? AND ?`);
     customerParams.push(reporting_date_from, reporting_date_to);
   }
@@ -249,13 +263,13 @@ export default async function CustomersPage({ searchParams }) {
       c.lead_campaign,
       c.products_interest,
       COALESCE(c.tags, '') AS tags,
-      COALESCE(${filter === "today_reporting" ? "tlf.multi_tag" : "cf.multi_tag"}, '') AS multi_tag,
-      ${filter === "today_reporting" ? "tlf.next_followup_date" : "cf.next_followup_date"} AS next_follow_date,
-      ${filter === "today_reporting" ? "tlf.notes" : "cf.notes"} AS latest_followup_notes,
-      COALESCE(${filter === "today_reporting" ? "tlf" : "tl_report"}.next_followup_date, '') AS reporting_date,
+      COALESCE(${isTodayReportingTlList ? "tlf.multi_tag" : "cf.multi_tag"}, '') AS multi_tag,
+      ${isTodayReportingTlList ? "tlf.next_followup_date" : "cf.next_followup_date"} AS next_follow_date,
+      ${isTodayReportingTlList ? "tlf.notes" : "cf.notes"} AS latest_followup_notes,
+      COALESCE(${isTodayReportingTlList ? "tlf" : "tl_report"}.next_followup_date, '') AS reporting_date,
       ${latestFollowedDateSelectSql}
     FROM customers c
-    ${filter === "today_reporting" ? "" : `
+    ${isTodayReportingTlList ? "" : `
     LEFT JOIN (
       SELECT 
         customer_id,
@@ -292,7 +306,7 @@ export default async function CustomersPage({ searchParams }) {
     let countSql = `
       SELECT COUNT(*) as total
       FROM customers c
-      ${filter === "today_reporting" ? "" : `
+      ${isTodayReportingTlList ? "" : `
       LEFT JOIN (
         SELECT 
           customer_id,
