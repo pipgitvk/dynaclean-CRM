@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
+import { getTodayYmdIST } from "@/lib/prospectCommitmentRules";
+import { mysqlUpperBoundIstDayEnd } from "@/lib/timezone";
 
 export async function GET(request) {
   try {
@@ -12,10 +14,11 @@ export async function GET(request) {
     const username = payload.username;
     const connection = await getDbConnection();
 
-    // Get today's date in YYYY-MM-DD format (IST)
-    const today = new Date().toISOString().split("T")[0];
+    const today = getTodayYmdIST();
+    const reportingThrough =
+      mysqlUpperBoundIstDayEnd(today) ?? `${today} 23:59:59`;
 
-    // Count customers where the latest TL_followup's next_followup_date matches today, assigned to current user
+    // Latest TL follow-up with reporting date on or before end of today (IST)
     const [rows] = await connection.execute(
       `SELECT COUNT(DISTINCT c.customer_id) as count 
        FROM customers c
@@ -26,8 +29,9 @@ export async function GET(request) {
        ) tlf_latest ON c.customer_id = tlf_latest.customer_id
        INNER JOIN TL_followups tlf ON tlf.id = tlf_latest.latest_id
        WHERE c.sales_representative = ? 
-       AND DATE(tlf.next_followup_date) = ?`,
-      [username, today]
+       AND tlf.next_followup_date IS NOT NULL
+       AND tlf.next_followup_date <= ?`,
+      [username, reportingThrough]
     );
 
     const count = rows[0]?.count || 0;

@@ -3,7 +3,10 @@ import CustomerTable from "./CustomerTable";
 import { redirect } from "next/navigation";
 import { getSessionPayload } from "@/lib/auth";
 import { notesLanguageExistsSql } from "@/constants/notesLanguageOptions";
-import { mysqlBoundsForIstDateRange } from "@/lib/timezone";
+import {
+  mysqlBoundsForIstDateRange,
+  mysqlUpperBoundIstDayEnd,
+} from "@/lib/timezone";
 import { appendVeryGoodFollowupTodayFilter } from "@/lib/veryGoodFollowupTodaySql";
 import { getTodayYmdIST } from "@/lib/prospectCommitmentRules";
 import {
@@ -127,9 +130,8 @@ export default async function CustomersPage({ searchParams }) {
     });
   }
 
-  // Handle today_reporting filter - show customers with today's TL followup
+  // TL reporting: latest TL follow-up with next date on or before today (IST)
   if (filter === "today_reporting") {
-    const today = new Date().toISOString().split("T")[0];
     joinClause = `
       INNER JOIN (
         SELECT customer_id, MAX(id) as latest_id
@@ -138,8 +140,11 @@ export default async function CustomersPage({ searchParams }) {
       ) tlf_latest ON c.customer_id = tlf_latest.customer_id
       INNER JOIN TL_followups tlf ON tlf.id = tlf_latest.latest_id
     `;
-    followupConditions.push("DATE(tlf.next_followup_date) = ?");
-    followupParams.push(today);
+    const reportingThrough = mysqlUpperBoundIstDayEnd(todayIst) ?? `${todayIst} 23:59:59`;
+    followupConditions.push(
+      "tlf.next_followup_date IS NOT NULL AND tlf.next_followup_date <= ?",
+    );
+    followupParams.push(reportingThrough);
   }
 
   // Latest customers_followup row is exposed as cf (or tlf for today_reporting).
