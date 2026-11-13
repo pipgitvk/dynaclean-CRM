@@ -1,33 +1,68 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
+import SearchableSelect from "@/components/ui/SearchableSelect";
 import AttendanceAutoCheckoutApprovalsCard from "@/components/AttendanceAutoCheckoutApprovalsCard";
 import { ArrowLeft } from "lucide-react";
 
-function toYmd(date) {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
-
-function currentMonthRange() {
-  const now = new Date();
-  const first = new Date(now.getFullYear(), now.getMonth(), 1);
-  return { from: toYmd(first), to: toYmd(now) };
-}
-
 export default function AutoCheckoutApprovalsPage() {
-  const initialRange = currentMonthRange();
-  const [fromDate, setFromDate] = useState(initialRange.from);
-  const [toDate, setToDate] = useState(initialRange.to);
-  const [applied, setApplied] = useState(null);
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const [employeeFilter, setEmployeeFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("pending");
+  const [employees, setEmployees] = useState([]);
+  const [queueCount, setQueueCount] = useState(null);
 
-  const runSearch = () => {
-    if (!fromDate || !toDate) return;
-    setApplied({ from: fromDate, to: toDate, n: Date.now() });
+  const [activeFrom, setActiveFrom] = useState("");
+  const [activeTo, setActiveTo] = useState("");
+  const [activeEmployee, setActiveEmployee] = useState("");
+  const [activeStatus, setActiveStatus] = useState("pending");
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/empcrm/employees");
+        const data = await res.json();
+        if (data?.success) setEmployees(data.employees || []);
+      } catch (e) {
+        console.error("auto-checkout-approvals employees:", e);
+      }
+    })();
+  }, []);
+
+  const employeeOptions = useMemo(() => {
+    const placeholder = { value: "", label: "All employees" };
+    const seen = new Set();
+    const opts = employees
+      .filter((emp) => emp?.username)
+      .map((emp) => {
+        if (seen.has(emp.username)) return null;
+        seen.add(emp.username);
+        return {
+          value: emp.username,
+          label: `${emp.full_name ? `${emp.full_name} — ` : ""}${emp.username}`,
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.label.localeCompare(b.label));
+    return [placeholder, ...opts];
+  }, [employees]);
+
+  const applyFilters = () => {
+    setActiveFrom(fromDate);
+    setActiveTo(toDate);
+    setActiveEmployee(employeeFilter);
+    setActiveStatus(statusFilter);
+    setRefreshKey((n) => n + 1);
+  };
+
+  const setStatusAndApply = (next) => {
+    setStatusFilter(next);
+    setActiveStatus(next);
+    setRefreshKey((n) => n + 1);
   };
 
   return (
@@ -64,7 +99,7 @@ export default function AutoCheckoutApprovalsPage() {
 
         <div className="mb-6 flex flex-wrap items-end gap-4 rounded-lg border border-slate-200 bg-slate-50/80 p-4">
           <label className="flex flex-col gap-1 text-sm font-medium text-gray-700">
-            From
+            From <span className="text-xs font-normal text-gray-500">(optional)</span>
             <TypeableDateFilterInput
               value={fromDate}
               onChange={setFromDate}
@@ -72,33 +107,70 @@ export default function AutoCheckoutApprovalsPage() {
             />
           </label>
           <label className="flex flex-col gap-1 text-sm font-medium text-gray-700">
-            To
+            To <span className="text-xs font-normal text-gray-500">(optional)</span>
             <TypeableDateFilterInput
               value={toDate}
               onChange={setToDate}
+              min={fromDate || undefined}
               className="min-w-[160px]"
             />
           </label>
+          <div className="flex min-w-[200px] flex-col gap-1 text-sm font-medium text-gray-700">
+            Employee
+            <SearchableSelect
+              options={employeeOptions}
+              value={employeeFilter}
+              onChange={setEmployeeFilter}
+              placeholder="All employees"
+              searchPlaceholder="Search employee…"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-sm font-medium text-gray-700">Status</span>
+            <div className="flex rounded-lg border border-slate-300 bg-white p-0.5 text-sm">
+            {[
+              { id: "pending", label: "Pending" },
+              { id: "rejected", label: "Rejected" },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setStatusAndApply(tab.id)}
+                className={`rounded-md px-3 py-2 font-medium transition-colors ${
+                  statusFilter === tab.id
+                    ? "bg-indigo-600 text-white"
+                    : "text-gray-700 hover:bg-slate-50"
+                }`}
+              >
+                {tab.label}
+                {tab.id === "pending" &&
+                queueCount != null &&
+                activeStatus === "pending" ? (
+                  <span className="ml-1.5 inline-flex min-w-[1.25rem] justify-center rounded-full bg-white/25 px-1.5 text-xs">
+                    {queueCount}
+                  </span>
+                ) : null}
+              </button>
+            ))}
+            </div>
+          </div>
           <button
             type="button"
-            onClick={runSearch}
+            onClick={applyFilters}
             className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
           >
-            Search
+            Apply filters
           </button>
         </div>
 
-        {applied ? (
-          <AttendanceAutoCheckoutApprovalsCard
-            key={applied.n}
-            fromDate={applied.from}
-            toDate={applied.to}
-          />
-        ) : (
-          <p className="rounded-lg border border-dashed border-slate-200 bg-slate-50 py-8 text-center text-sm text-slate-600">
-            Choose a date range and click Search.
-          </p>
-        )}
+        <AttendanceAutoCheckoutApprovalsCard
+          key={`${refreshKey}-${activeStatus}`}
+          fromDate={activeFrom || undefined}
+          toDate={activeTo || undefined}
+          username={activeEmployee || undefined}
+          statusFilter={activeStatus}
+          onQueueCountChange={setQueueCount}
+        />
       </div>
     </div>
   );

@@ -83,12 +83,14 @@ export async function GET(request) {
     const fromDate = parseYmd(searchParams.get("from"));
     const toDate = parseYmd(searchParams.get("to"));
     const status = searchParams.get("status") || "pending";
+    const username = String(searchParams.get("username") ?? "").trim() || null;
     const countOnly = searchParams.get("countOnly") === "1";
+    const runSync = searchParams.get("sync") === "1";
 
-    // Sync opens its own connection. Do not run it inside withDbConnection —
-    // a second checkout (or a pool rebuild) closes this connection, and the
-    // next query throws "Can't add new command when connection is in closed state".
-    await applyAutomaticCheckouts();
+    // Full-company auto-checkout is heavy; cron + attendance APIs handle sync.
+    if (runSync) {
+      await applyAutomaticCheckouts();
+    }
 
     if (countOnly) {
       const pendingItems = await withDbConnection((conn) =>
@@ -96,6 +98,7 @@ export async function GET(request) {
           fromDate,
           toDate,
           statusFilter: "pending",
+          username,
         }),
       );
       return NextResponse.json({ pendingCount: pendingItems.length });
@@ -106,6 +109,7 @@ export async function GET(request) {
         fromDate,
         toDate,
         statusFilter: status,
+        username,
       }),
     );
 

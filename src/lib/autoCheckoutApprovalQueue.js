@@ -14,6 +14,9 @@ import {
 } from "@/lib/attendanceMachineMerge";
 import { ensureAttendanceAutoCheckoutApprovalsTable } from "@/lib/ensureAttendanceAutoCheckoutApprovalsTable";
 
+const PRUNE_STALE_INTERVAL_MS = 10 * 60 * 1000;
+let lastStalePruneAt = 0;
+
 function parseYmd(value) {
   if (!value || typeof value !== "string") return null;
   const s = value.trim();
@@ -32,7 +35,38 @@ function checkoutTimeFromDb(value) {
   return `${String(parseInt(m[1], 10)).padStart(2, "0")}:${m[2]}:${(m[3] || "00").padStart(2, "0")}`;
 }
 
-async function loadLeaveAndScheduleMaps(conn, fromDate, toDate) {
+function dateKeyFromRow(value) {
+  if (value == null || value === "") return "";
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    const y = value.getFullYear();
+    const m = String(value.getMonth() + 1).padStart(2, "0");
+    const d = String(value.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
+  const s = String(value).trim();
+  return /^\d{4}-\d{2}-\d{2}/.test(s) ? s.slice(0, 10) : "";
+}
+
+function resolveLeaveBounds(fromDate, toDate, rows) {
+  let from = fromDate ? String(fromDate).trim() : "";
+  let to = toDate ? String(toDate).trim() : "";
+  if (!from || !to) {
+    for (const row of rows || []) {
+      const d = dateKeyFromRow(row.date);
+      if (!d) continue;
+      if (!from || d < from) from = d;
+      if (!to || d > to) to = d;
+    }
+  }
+  return {
+    from: from || "1970-01-01",
+    to: to || "2099-12-31",
+  };
+}
+
+async function loadLeaveAndScheduleMaps(conn, fromDate, toDate, usernames) {
+  const leaveTo = toDate || "2099-12-31";
+  const leaveFrom = fromDate || "1970-01-01";
   const [leaves] = await conn.query(
     `SELECT username, from_date, to_date, leave_type, is_half_day, half_day_type,
             start_time, end_time, status
@@ -40,14 +74,22 @@ async function loadLeaveAndScheduleMaps(conn, fromDate, toDate) {
      WHERE status IN ('pending', 'approved')
        AND from_date <= ?
        AND to_date >= ?`,
-    [toDate || "2099-12-31", fromDate || "1970-01-01"],
+    [leaveTo, leaveFrom],
   );
+
+  const scheduleByUser = new Map();
+  const users = [...new Set((usernames || []).map((u) => String(u || "").trim()).filter(Boolean))];
+  if (!users.length) {
+    return { leaves, scheduleByUser };
+  }
+  const placeholders = users.map(() => "?").join(",");
   const [scheduleRows] = await conn.query(
     `SELECT username, checkin_time, checkout_time, break_lunch,
             lunch_duration_minutes, half_day_checkin_time
-     FROM employee_attendance_schedule`,
+     FROM employee_attendance_schedule
+     WHERE username IN (${placeholders})`,
+    users,
   );
-  const scheduleByUser = new Map();
   for (const row of scheduleRows || []) {
     if (row?.username) scheduleByUser.set(row.username, row);
   }
@@ -108,7 +150,12 @@ export function qualifiesForAutoCheckoutApprovalQueue(row, statusFilter = "pendi
   return true;
 }
 
-async function fetchAutomaticCheckoutRows(conn, { fromDate, toDate, statusFilter }) {
+async function fetchAutomaticCheckoutRows(conn, {
+  fromDate,
+  toDate,
+  statusFilter,
+  username,
+}) {
   const params = [AUTO_CHECKOUT_ATTENDANCE_ADDRESS];
   let dateSql = "";
   if (fromDate) {
@@ -118,6 +165,11 @@ async function fetchAutomaticCheckoutRows(conn, { fromDate, toDate, statusFilter
   if (toDate) {
     dateSql += " AND a.date <= ?";
     params.push(toDate);
+  }
+  const user = String(username || "").trim();
+  if (user) {
+    dateSql += " AND a.username = ?";
+    params.push(user);
   }
 
   let statusSql = "";
@@ -147,9 +199,9 @@ async function fetchAutomaticCheckoutRows(conn, { fromDate, toDate, statusFilter
     FROM attendance_logs a
     LEFT JOIN attendance_auto_checkout_approvals ap
       ON ap.username = a.username AND ap.log_date = a.date
-    WHERE TRIM(COALESCE(a.checkout_address, '')) = ?
+    WHERE a.checkout_address = ?
       AND a.checkout_time IS NOT NULL
-      AND TRIM(a.checkout_time) <> ''
+      AND a.checkout_time <> ''
     ${dateSql}
     ${statusSql}
     ORDER BY a.date DESC, a.username ASC
@@ -159,19 +211,30 @@ async function fetchAutomaticCheckoutRows(conn, { fromDate, toDate, statusFilter
   return rows;
 }
 
-async function attachMachineSuppression(conn, items) {
+async function attachMachineSuppression(conn, items, { fromDate, toDate } = {}) {
   if (!items.length) return items;
   const { usernameToMachineCode, machineCodeToUsername } =
     await loadMachineCodeMaps(conn);
   const empCodes = new Set();
+  let minD = fromDate || "";
+  let maxD = toDate || "";
   for (const row of items) {
     const code = usernameToMachineCode.get(row.username);
     if (code) empCodes.add(code);
+    const d = dateKeyFromRow(row.date);
+    if (d) {
+      if (!minD || d < minD) minD = d;
+      if (!maxD || d > maxD) maxD = d;
+    }
   }
   const machineByUserDate = await loadMachineDailyByUsername(
     conn,
     machineCodeToUsername,
-    { empCodes: [...empCodes] },
+    {
+      empCodes: [...empCodes],
+      fromDate: minD || undefined,
+      toDate: maxD || undefined,
+    },
   );
   return items.map((row) => {
     const key = `${row.username}|${row.date}`;
@@ -189,27 +252,41 @@ async function attachMachineSuppression(conn, items) {
 /**
  * Rows that still need automatic check-out HR action (after machine revert + stale cleanup).
  */
+async function maybePruneStaleAutoCheckoutApprovals(conn) {
+  const now = Date.now();
+  if (now - lastStalePruneAt < PRUNE_STALE_INTERVAL_MS) return;
+  lastStalePruneAt = now;
+  await pruneStaleAutoCheckoutApprovals(conn);
+}
+
 export async function buildAutoCheckoutApprovalItems(
   conn,
-  { fromDate, toDate, statusFilter = "pending" },
+  { fromDate, toDate, statusFilter = "pending", username },
 ) {
   await ensureAttendanceAutoCheckoutApprovalsTable(conn);
-  await pruneStaleAutoCheckoutApprovals(conn);
+  await maybePruneStaleAutoCheckoutApprovals(conn);
 
   const rawItems = await fetchAutomaticCheckoutRows(conn, {
     fromDate,
     toDate,
     statusFilter,
+    username,
   });
+  const bounds = resolveLeaveBounds(fromDate, toDate, rawItems);
+  const usernames = rawItems.map((r) => r.username);
   const { leaves, scheduleByUser } = await loadLeaveAndScheduleMaps(
     conn,
-    fromDate,
-    toDate,
+    bounds.from,
+    bounds.to,
+    usernames,
   );
   let items = rawItems.map((row) =>
     enrichAutoCheckoutRow(row, leaves, scheduleByUser),
   );
-  items = await attachMachineSuppression(conn, items);
+  items = await attachMachineSuppression(conn, items, {
+    fromDate: bounds.from,
+    toDate: bounds.to,
+  });
   return items.filter((row) =>
     qualifiesForAutoCheckoutApprovalQueue(row, statusFilter),
   );

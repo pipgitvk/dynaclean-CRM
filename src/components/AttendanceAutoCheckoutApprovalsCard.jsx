@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import { AlertTriangle, Check, Loader2, X } from "lucide-react";
+import { Check, Loader2, X } from "lucide-react";
 import { formatAttendanceTimeForDisplay as formatTime } from "@/lib/istDateTime";
 
 function attendanceDateYmd(value) {
@@ -27,11 +27,13 @@ function wallTimeToInput(value) {
 export default function AttendanceAutoCheckoutApprovalsCard({
   fromDate,
   toDate,
+  username,
+  statusFilter = "pending",
   onApproved,
+  onQueueCountChange,
 }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState("pending");
   const [actingKey, setActingKey] = useState(null);
   const [approveModal, setApproveModal] = useState(null);
   const [approveCheckoutTime, setApproveCheckoutTime] = useState("");
@@ -43,19 +45,25 @@ export default function AttendanceAutoCheckoutApprovalsCard({
       const qs = new URLSearchParams({ status: statusFilter });
       if (fromDate) qs.set("from", fromDate);
       if (toDate) qs.set("to", toDate);
+      if (username) qs.set("username", username);
       const res = await fetch(
         `/api/empcrm/attendance/auto-checkout-approvals?${qs.toString()}`
       );
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Failed to load approvals");
-      setItems(data.items || []);
+      const next = data.items || [];
+      setItems(next);
+      onQueueCountChange?.(
+        statusFilter === "pending" ? next.length : null,
+      );
     } catch (e) {
       toast.error(e.message || "Could not load automatic check-out queue");
       setItems([]);
+      onQueueCountChange?.(null);
     } finally {
       setLoading(false);
     }
-  }, [fromDate, toDate, statusFilter]);
+  }, [fromDate, toDate, username, statusFilter, onQueueCountChange]);
 
   useEffect(() => {
     load();
@@ -125,73 +133,27 @@ export default function AttendanceAutoCheckoutApprovalsCard({
     });
   };
 
-  const pendingCount =
-    statusFilter === "pending" ? items.length : null;
-
   return (
-    <div
-      id="auto-checkout-approvals"
-      className="mb-6 rounded-xl border border-red-200 bg-red-50/60 p-4 sm:p-5 shadow-sm scroll-mt-4"
-    >
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-100">
-            <AlertTriangle className="h-5 w-5 text-red-600" aria-hidden />
-          </div>
-          <div>
-            <h2 className="text-lg font-semibold text-red-900">
-              Automatic check-out approval
-            </h2>
-            <p className="mt-0.5 text-sm text-red-800/90">
-              System check-out is usually 9:00 PM IST. Employees with{" "}
-              <strong>pending or approved</strong> leave on that day are{" "}
-              <strong>not</strong> auto checked out. After leave is{" "}
-              <strong>rejected</strong>, normal auto check-out applies. Approve
-              remaining rows with the time and remark below.
-            </p>
-          </div>
-        </div>
-        <div className="flex rounded-lg border border-red-200 bg-white p-0.5 text-sm">
-          {[
-            { id: "pending", label: "Pending" },
-            { id: "rejected", label: "Rejected" },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setStatusFilter(tab.id)}
-              className={`rounded-md px-3 py-1.5 font-medium transition-colors ${
-                statusFilter === tab.id
-                  ? "bg-red-600 text-white"
-                  : "text-red-800 hover:bg-red-50"
-              }`}
-            >
-              {tab.label}
-              {tab.id === "pending" && pendingCount != null && !loading ? (
-                <span className="ml-1.5 inline-flex min-w-[1.25rem] justify-center rounded-full bg-white/20 px-1.5 text-xs">
-                  {pendingCount}
-                </span>
-              ) : null}
-            </button>
-          ))}
-        </div>
-      </div>
-
+    <div id="auto-checkout-approvals" className="scroll-mt-4">
       {loading ? (
-        <div className="mt-4 flex items-center justify-center gap-2 py-8 text-sm text-red-900/80">
+        <div className="flex items-center justify-center gap-2 py-12 text-sm text-gray-600">
           <Loader2 className="h-5 w-5 animate-spin" />
           Loading queue…
         </div>
       ) : items.length === 0 ? (
-        <p className="mt-4 rounded-lg border border-dashed border-red-200 bg-white/70 py-6 text-center text-sm text-red-900/70">
+        <p className="rounded-lg border border-dashed border-slate-200 bg-slate-50 py-8 text-center text-sm text-slate-600">
           {statusFilter === "pending"
-            ? "No automatic check-outs waiting for approval in this date range."
-            : "No rejected automatic check-outs in this date range."}
+            ? fromDate || toDate || username
+              ? "No automatic check-outs waiting for approval for these filters."
+              : "No automatic check-outs waiting for approval."
+            : fromDate || toDate || username
+              ? "No rejected automatic check-outs for these filters."
+              : "No rejected automatic check-outs."}
         </p>
       ) : (
-        <div className="mt-4 overflow-x-auto rounded-lg border border-red-100 bg-white">
+        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
           <table className="min-w-full text-left text-sm">
-            <thead className="bg-red-50/80 text-xs uppercase tracking-wide text-red-900/80">
+            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-gray-600">
               <tr>
                 <th className="px-3 py-2.5 font-semibold">Date</th>
                 <th className="px-3 py-2.5 font-semibold">Employee</th>
@@ -208,7 +170,7 @@ export default function AttendanceAutoCheckoutApprovalsCard({
                 ) : null}
               </tr>
             </thead>
-            <tbody className="divide-y divide-red-50">
+            <tbody className="divide-y divide-slate-100">
               {items.map((item) => {
                 const dateKey = attendanceDateYmd(item.date);
                 const rowKey = `${item.username}-${dateKey}`;
@@ -221,19 +183,19 @@ export default function AttendanceAutoCheckoutApprovalsCard({
                     <td className="px-3 py-2.5">
                       {formatTime(item.checkin_time) || "—"}
                     </td>
-                    <td className="px-3 py-2.5 text-red-700 font-medium">
+                    <td className="px-3 py-2.5 font-medium text-red-700">
                       {formatTime(item.checkout_time) || "—"}
                       {item.suggested_checkout_time &&
                       wallTimeToInput(item.suggested_checkout_time) !==
                         wallTimeToInput(item.current_checkout_time) ? (
-                        <div className="text-[10px] font-normal text-amber-700 mt-0.5">
+                        <div className="mt-0.5 text-[10px] font-normal text-amber-700">
                           Suggested: {formatTime(item.suggested_checkout_time)}
                         </div>
                       ) : null}
                     </td>
                     <td className="px-3 py-2.5 text-xs">
                       {item.has_active_leave ? (
-                        <span className="inline-flex rounded-full bg-orange-100 px-2 py-0.5 font-medium text-orange-800 capitalize">
+                        <span className="inline-flex rounded-full bg-orange-100 px-2 py-0.5 font-medium capitalize text-orange-800">
                           {item.leave_status || "leave"}
                           {item.leave_type ? ` · ${item.leave_type}` : ""}
                         </span>
@@ -256,7 +218,7 @@ export default function AttendanceAutoCheckoutApprovalsCard({
                     </td>
                     {statusFilter === "rejected" ? (
                       <td
-                        className="px-3 py-2.5 text-xs text-gray-600 max-w-[200px] truncate"
+                        className="max-w-[200px] truncate px-3 py-2.5 text-xs text-gray-600"
                         title={item.note || ""}
                       >
                         {item.note || "—"}
