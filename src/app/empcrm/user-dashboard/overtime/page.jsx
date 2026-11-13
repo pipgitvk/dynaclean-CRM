@@ -33,16 +33,6 @@ function isAttendanceComplete(attendance) {
   return true;
 }
 
-// Helper function to check if attendance has issues
-function hasAttendanceIssues(attendance) {
-  if (!attendance) return true;
-  
-  const hasCheckIn = attendance.checkin_time && attendance.checkin_time.trim() !== "";
-  const hasCheckOut = attendance.checkout_time && attendance.checkout_time.trim() !== "";
-  
-  return !hasCheckIn || !hasCheckOut;
-}
-
 // Helper function to check regularization status
 function hasPendingRegularization(regularization) {
   return regularization && regularization.status === 'pending';
@@ -61,6 +51,27 @@ function formatDateHeader(dateStr) {
   const date = new Date(dateStr + 'T00:00:00');
   const options = { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' };
   return date.toLocaleDateString('en-IN', options);
+}
+
+function toTimeInputValue(value) {
+  if (value == null || value === "") return "";
+  const s = String(value).trim();
+  const m = s.match(/(\d{1,2}):(\d{2})(?::\d{2})?/);
+  if (!m) return "";
+  return `${String(parseInt(m[1], 10)).padStart(2, "0")}:${m[2]}`;
+}
+
+function openRegularizeForm(attendance, username, date, setters) {
+  const att = attendance || {};
+  setters.setSelectedEmployee(username);
+  setters.setSelectedDate(date);
+  setters.setRegularizationForm({
+    checkin_time: toTimeInputValue(att.checkin_time),
+    checkout_time: toTimeInputValue(att.checkout_time),
+    reason: "",
+    attachment: null,
+  });
+  setters.setShowForm(true);
 }
 
 export default function OvertimeManagementPage() {
@@ -436,26 +447,39 @@ export default function OvertimeManagementPage() {
                                 >
                                   View
                                 </button>
-                              ) : hasRejectedRegularization(employee.regularization) ? (
-                                <button
-                                  onClick={() => showRemarks(employee.regularization.reviewer_comment)}
-                                  className="text-blue-600 hover:text-blue-800 font-medium"
-                                >
-                                  View
-                                </button>
-                              ) : hasAttendanceIssues(employee.attendance) ? (
-                                <button
-                                  onClick={() => {
-                                    setSelectedEmployee(employee.username);
-                                    setSelectedDate(date);
-                                    setShowForm(true);
-                                  }}
-                                  className="text-blue-600 hover:text-blue-800 font-medium"
-                                >
-                                  Regularize
-                                </button>
                               ) : (
-                                <span className="text-gray-400 text-xs">—</span>
+                                <div className="flex flex-col items-center gap-1 sm:flex-row sm:justify-center sm:gap-2">
+                                  {hasRejectedRegularization(employee.regularization) ? (
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        showRemarks(employee.regularization.reviewer_comment)
+                                      }
+                                      className="text-blue-600 hover:text-blue-800 font-medium text-xs sm:text-sm"
+                                    >
+                                      View
+                                    </button>
+                                  ) : null}
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      openRegularizeForm(
+                                        employee.attendance,
+                                        employee.username,
+                                        date,
+                                        {
+                                          setSelectedEmployee,
+                                          setSelectedDate,
+                                          setRegularizationForm,
+                                          setShowForm,
+                                        },
+                                      )
+                                    }
+                                    className="text-blue-600 hover:text-blue-800 font-medium"
+                                  >
+                                    Regularize
+                                  </button>
+                                </div>
                               )}
                             </td>
                           </tr>
