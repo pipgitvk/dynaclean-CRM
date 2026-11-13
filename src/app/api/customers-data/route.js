@@ -15,6 +15,31 @@ import {
   SQL_ACTIVE_SERVICE_SUPPORT_USERNAMES,
 } from "@/lib/serviceSupportTeamScope";
 
+async function latestEmployeeFollowupsByCustomerIds(conn, customerIds) {
+  if (!customerIds?.length) return new Map();
+  const placeholders = customerIds.map(() => "?").join(",");
+  const [rows] = await conn.execute(
+    `SELECT cf.customer_id, cf.notes, cf.followed_date
+     FROM customers_followup cf
+     INNER JOIN (
+       SELECT customer_id, MAX(followed_date) AS max_followed
+       FROM customers_followup
+       WHERE customer_id IN (${placeholders})
+       GROUP BY customer_id
+     ) latest
+       ON cf.customer_id = latest.customer_id
+       AND cf.followed_date = latest.max_followed
+     ORDER BY cf.time_stamp DESC`,
+    customerIds,
+  );
+  const map = new Map();
+  for (const row of rows) {
+    const id = String(row.customer_id);
+    if (!map.has(id)) map.set(id, row);
+  }
+  return map;
+}
+
 export async function GET(req) {
   const conn = await getDbConnection();
 
@@ -226,8 +251,24 @@ export async function GET(req) {
     const dataParams = [...params, ...orderByParams, pageSize, offset];
     const [customerRows] = await conn.execute(dataSql, dataParams);
 
+    let rowsForResponse = customerRows;
+    if (globalSearch && search?.trim() && customerRows.length > 0) {
+      const followupById = await latestEmployeeFollowupsByCustomerIds(
+        conn,
+        customerRows.map((c) => c.customer_id),
+      );
+      rowsForResponse = customerRows.map((c) => {
+        const latest = followupById.get(String(c.customer_id));
+        return {
+          ...c,
+          latest_followup_notes: latest?.notes ?? "",
+          latest_followed_date: latest?.followed_date ?? null,
+        };
+      });
+    }
+
     // Apply contacted time filter in application layer
-    let filteredCustomers = customerRows;
+    let filteredCustomers = rowsForResponse;
     if (contactedTimeFilter && contactedTimeFilter !== "all") {
       const timeLimits = {
         "1min": 1,

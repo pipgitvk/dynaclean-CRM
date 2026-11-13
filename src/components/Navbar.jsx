@@ -21,6 +21,7 @@ import AttendanceStatusTracker from "@/components/AttendanceStatusTracker";
 import ProspectHeaderButton from "@/components/prospects/ProspectHeaderButton";
 import CustomerQuickViewModal from "@/components/Customers/CustomerQuickViewModal";
 import CustomerSearchResultActions from "@/components/Customers/CustomerSearchResultActions";
+import CustomerWhatsAppLink from "@/components/Customers/CustomerWhatsAppLink";
 
 export default function Navbar({ onToggleSidebar, showSalesMeta = false }) {
   const router = useRouter();
@@ -336,9 +337,9 @@ export default function Navbar({ onToggleSidebar, showSalesMeta = false }) {
           {results.map((c) => (
             <div
               key={c.customer_id}
-              className="flex justify-between items-start gap-2 px-3 py-2 hover:bg-gray-100 border-b last:border-b-0 cursor-pointer"
+              className="px-3 py-2 hover:bg-gray-100 border-b last:border-b-0"
             >
-              <div className="text-sm min-w-0 flex-1">
+              <div className="text-sm min-w-0">
                 <div className="font-medium truncate">
                   {isSuperAdminSearch
                     ? c.name ||
@@ -351,30 +352,42 @@ export default function Navbar({ onToggleSidebar, showSalesMeta = false }) {
                 </div>
                 <div className="text-xs text-gray-500 truncate">
                   ID: {c.customer_id}
-                  {c.phone ? ` • ${c.phone}` : ""}
                   {isSuperAdminSearch && c.company ? ` • ${c.company}` : ""}
                 </div>
                 {c.lead_source ? (
-                  <div className="text-xs text-gray-400 truncate">
+                  <div className="text-xs text-black truncate mt-0.5">
                     Lead source: {c.lead_source}
                   </div>
                 ) : null}
                 {isSuperAdminSearch &&
                 String(c.tl_notes || "").trim() ? (
-                  <div className="text-xs text-gray-700 mt-0.5 line-clamp-2 leading-snug">
+                  <div className="text-xs text-gray-700 mt-1.5 line-clamp-3 leading-snug">
                     {String(c.tl_notes).trim()}
                   </div>
                 ) : null}
+                {!isSuperAdminSearch &&
+                String(c.latest_followup_notes || "").trim() ? (
+                  <div className="text-xs text-gray-700 mt-1.5 line-clamp-3 leading-snug">
+                    <span className="font-medium text-black">Last follow-up:</span>{" "}
+                    {String(c.latest_followup_notes).trim()}
+                  </div>
+                ) : null}
               </div>
-              <div className="flex items-center gap-1 flex-shrink-0">
+              <div
+                className="mt-2 flex flex-wrap items-center gap-2"
+                onClick={(e) => e.stopPropagation()}
+                role="presentation"
+              >
                 {isSuperAdminSearch ? (
                   <>
+                    {c.phone ? (
+                      <CustomerWhatsAppLink phone={c.phone} />
+                    ) : null}
                     <a
                       href={customerViewHref(c.customer_id)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      onClick={(e) => e.stopPropagation()}
-                      className="p-1.5 text-gray-600 hover:text-blue-700 hover:bg-blue-50 rounded border border-transparent hover:border-blue-200"
+                      className="inline-flex items-center justify-center rounded border border-gray-200 bg-white p-1.5 text-gray-600 hover:bg-blue-50 hover:text-blue-700"
                       title="Open in new tab"
                       aria-label="Open customer in new tab"
                     >
@@ -382,11 +395,10 @@ export default function Navbar({ onToggleSidebar, showSalesMeta = false }) {
                     </a>
                     <button
                       type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openHeaderCustomerModal("view", c.customer_id);
-                      }}
-                      className="text-xs px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+                      onClick={() =>
+                        openHeaderCustomerModal("view", c.customer_id)
+                      }
+                      className="text-xs px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700"
                       title="View customer (popup)"
                     >
                       View
@@ -394,6 +406,7 @@ export default function Navbar({ onToggleSidebar, showSalesMeta = false }) {
                   </>
                 ) : (
                   <CustomerSearchResultActions
+                    phone={c.phone}
                     viewHref={customerViewHref(c.customer_id)}
                     onView={() => {
                       setShowDropdown(false);

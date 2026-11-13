@@ -1,6 +1,7 @@
 "use client";
 
 import { ExternalLink } from "lucide-react";
+import CustomerWhatsAppLink from "@/components/Customers/CustomerWhatsAppLink";
 
 /**
  * Header search & TL customers search: new tab + full-page View (no iframe popup).
@@ -8,9 +9,15 @@ import { ExternalLink } from "lucide-react";
 export default function CustomerSearchResultActions({
   viewHref,
   onView,
+  phone,
 }) {
   return (
     <div className="flex items-center gap-1 flex-shrink-0">
+      {phone ? (
+        <span onClick={(e) => e.stopPropagation()} role="presentation">
+          <CustomerWhatsAppLink phone={phone} />
+        </span>
+      ) : null}
       <a
         href={viewHref}
         target="_blank"

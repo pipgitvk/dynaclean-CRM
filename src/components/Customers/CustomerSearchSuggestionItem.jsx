@@ -1,7 +1,8 @@
 "use client";
 
-import { Building2, Calendar, Phone, StickyNote } from "lucide-react";
+import { Building2, Calendar, StickyNote } from "lucide-react";
 import CustomerSearchPopupActions from "@/components/Customers/CustomerSearchPopupActions";
+import CustomerWhatsAppLink from "@/components/Customers/CustomerWhatsAppLink";
 import { formatCrmDatetimeForISTDisplay } from "@/lib/timezone";
 
 function customerInitials(name, company) {
@@ -46,31 +47,20 @@ export default function CustomerSearchSuggestionItem({
           {customerInitials(displayName, suggestion.company)}
         </div>
         <div className="min-w-0 flex-1">
-          <div className="flex flex-col gap-1.5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-x-2 sm:gap-y-1">
-            <button
-              type="button"
-              className="min-w-0 w-full sm:flex-1 text-left hover:text-blue-900 sm:pr-1 touch-manipulation"
-              onClick={() => onPick?.(suggestion)}
-            >
-              <div className="font-semibold text-[13px] sm:text-sm text-gray-900 leading-snug break-words">
-                {displayName}{" "}
-                <span className="text-gray-400 font-normal whitespace-nowrap">
-                  #{suggestion.customer_id}
-                </span>
-              </div>
-            </button>
-            {showPopupActions ? (
-              <CustomerSearchPopupActions onTl={onTl} onView={onView} />
-            ) : null}
-          </div>
-          {suggestion.phone ? (
-            <div className="flex items-center gap-1.5 text-xs text-gray-600 mt-1.5 break-all">
-              <Phone size={13} className="text-gray-400 shrink-0" />
-              <span>{suggestion.phone}</span>
+          <button
+            type="button"
+            className="min-w-0 w-full text-left hover:text-blue-900 touch-manipulation"
+            onClick={() => onPick?.(suggestion)}
+          >
+            <div className="font-semibold text-[13px] sm:text-sm text-gray-900 leading-snug break-words">
+              {displayName}{" "}
+              <span className="text-gray-400 font-normal whitespace-nowrap">
+                #{suggestion.customer_id}
+              </span>
             </div>
-          ) : null}
+          </button>
           {suggestion.lead_source ? (
-            <div className="flex items-start gap-1.5 text-xs text-gray-500 mt-0.5">
+            <div className="flex items-start gap-1.5 text-xs text-black mt-0.5">
               <Building2
                 size={13}
                 className="text-gray-400 shrink-0 mt-0.5"
@@ -102,6 +92,18 @@ export default function CustomerSearchSuggestionItem({
               </span>
             </div>
           ) : null}
+        </div>
+      ) : null}
+      {showPopupActions ? (
+        <div
+          className="mx-2.5 sm:mx-3 mb-3 flex flex-wrap items-center gap-2"
+          onClick={(e) => e.stopPropagation()}
+          role="presentation"
+        >
+          {suggestion.phone ? (
+            <CustomerWhatsAppLink phone={suggestion.phone} />
+          ) : null}
+          <CustomerSearchPopupActions onTl={onTl} onView={onView} />
         </div>
       ) : (
         <div className="pb-2" />
