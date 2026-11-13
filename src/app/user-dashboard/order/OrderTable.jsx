@@ -27,11 +27,15 @@ import { deriveOrderListPaymentStatus } from "@/lib/paymentOrderStatus";
 import {
   OrderListSearchInput,
   OrderListSearchApplyButton,
+  OrderListSearchResetButton,
 } from "@/components/orders/OrderListSearchFilterControls";
+import { canViewAllOrders } from "@/lib/dataScope";
 import {
-  getOrderTableDefaultDateFrom,
-  getOrderTableDefaultDateTo,
-} from "@/lib/orderTableDateDefaults";
+  clearUserOrderTableFilters,
+  defaultUserOrderTableFilters,
+  readUserOrderTableFilters,
+  writeUserOrderTableFilters,
+} from "@/lib/userOrderTableFilterStorage";
 import { formatMobileMaskedLast4 } from "@/lib/formatMobileLast4";
 
 import DeleteButton from "@/components/accounts/DeleteButton";
@@ -136,30 +140,78 @@ export default function OrderTable({
     ? ORDER_TABLE_COL_COUNT
     : ORDER_TABLE_COL_COUNT - 1;
   const hidePendingInvoiceFilter = isPostAccountPipelineRole(userRole);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [appliedSearchQuery, setAppliedSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [appliedStatusFilter, setAppliedStatusFilter] = useState("");
-  const [paymentTermsFilter, setPaymentTermsFilter] = useState("");
-  const [appliedPaymentTermsFilter, setAppliedPaymentTermsFilter] = useState("");
-  const [dateFrom, setDateFrom] = useState(() =>
-    useEmptyDateDefaults ? "" : getOrderTableDefaultDateFrom(),
+  const persistListFilters = canViewAllOrders(userRole);
+  const initialFilters = defaultUserOrderTableFilters(useEmptyDateDefaults);
+
+  const [searchQuery, setSearchQuery] = useState(initialFilters.searchQuery);
+  const [appliedSearchQuery, setAppliedSearchQuery] = useState(
+    initialFilters.searchQuery,
   );
-  const [appliedDateFrom, setAppliedDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState(() =>
-    useEmptyDateDefaults ? "" : getOrderTableDefaultDateTo(),
+  const [statusFilter, setStatusFilter] = useState(initialFilters.statusFilter);
+  const [appliedStatusFilter, setAppliedStatusFilter] = useState(
+    initialFilters.statusFilter,
   );
-  const [appliedDateTo, setAppliedDateTo] = useState("");
-  const [createdByFilter, setCreatedByFilter] = useState("");
-  const [appliedCreatedByFilter, setAppliedCreatedByFilter] = useState("");
+  const [paymentTermsFilter, setPaymentTermsFilter] = useState(
+    initialFilters.paymentTermsFilter,
+  );
+  const [appliedPaymentTermsFilter, setAppliedPaymentTermsFilter] = useState(
+    initialFilters.paymentTermsFilter,
+  );
+  const [dateFrom, setDateFrom] = useState(initialFilters.dateFrom);
+  const [appliedDateFrom, setAppliedDateFrom] = useState(initialFilters.dateFrom);
+  const [dateTo, setDateTo] = useState(initialFilters.dateTo);
+  const [appliedDateTo, setAppliedDateTo] = useState(initialFilters.dateTo);
+  const [createdByFilter, setCreatedByFilter] = useState(
+    initialFilters.createdByFilter,
+  );
+  const [appliedCreatedByFilter, setAppliedCreatedByFilter] = useState(
+    initialFilters.createdByFilter,
+  );
+
+  const applyFilterState = useCallback((filters) => {
+    setSearchQuery(filters.searchQuery);
+    setAppliedSearchQuery(filters.searchQuery);
+    setStatusFilter(filters.statusFilter);
+    setAppliedStatusFilter(filters.statusFilter);
+    setPaymentTermsFilter(filters.paymentTermsFilter);
+    setAppliedPaymentTermsFilter(filters.paymentTermsFilter);
+    setDateFrom(filters.dateFrom);
+    setAppliedDateFrom(filters.dateFrom);
+    setDateTo(filters.dateTo);
+    setAppliedDateTo(filters.dateTo);
+    setCreatedByFilter(filters.createdByFilter);
+    setAppliedCreatedByFilter(filters.createdByFilter);
+  }, []);
+
+  useEffect(() => {
+    if (!persistListFilters) return;
+    applyFilterState(readUserOrderTableFilters(useEmptyDateDefaults));
+  }, [persistListFilters, useEmptyDateDefaults, applyFilterState]);
 
   const handleApplySearch = useCallback(() => {
+    let nextFrom = dateFrom;
+    let nextTo = dateTo;
+    if (nextFrom && nextTo && nextFrom > nextTo) {
+      [nextFrom, nextTo] = [nextTo, nextFrom];
+      setDateFrom(nextFrom);
+      setDateTo(nextTo);
+    }
     setAppliedSearchQuery(searchQuery);
     setAppliedStatusFilter(statusFilter);
     setAppliedPaymentTermsFilter(paymentTermsFilter);
-    setAppliedDateFrom(dateFrom);
-    setAppliedDateTo(dateTo);
+    setAppliedDateFrom(nextFrom);
+    setAppliedDateTo(nextTo);
     setAppliedCreatedByFilter(createdByFilter);
+    if (persistListFilters) {
+      writeUserOrderTableFilters({
+        searchQuery,
+        statusFilter,
+        paymentTermsFilter,
+        dateFrom: nextFrom,
+        dateTo: nextTo,
+        createdByFilter,
+      });
+    }
   }, [
     searchQuery,
     statusFilter,
@@ -167,7 +219,28 @@ export default function OrderTable({
     dateFrom,
     dateTo,
     createdByFilter,
+    persistListFilters,
   ]);
+
+  const handleResetFilters = useCallback(() => {
+    const cleared = defaultUserOrderTableFilters(useEmptyDateDefaults);
+    setSearchQuery(cleared.searchQuery);
+    setAppliedSearchQuery(cleared.searchQuery);
+    setStatusFilter(cleared.statusFilter);
+    setAppliedStatusFilter(cleared.statusFilter);
+    setPaymentTermsFilter(cleared.paymentTermsFilter);
+    setAppliedPaymentTermsFilter(cleared.paymentTermsFilter);
+    setDateFrom(cleared.dateFrom);
+    setAppliedDateFrom(cleared.dateFrom);
+    setDateTo(cleared.dateTo);
+    setAppliedDateTo(cleared.dateTo);
+    setCreatedByFilter(cleared.createdByFilter);
+    setAppliedCreatedByFilter(cleared.createdByFilter);
+    if (persistListFilters) {
+      clearUserOrderTableFilters();
+      writeUserOrderTableFilters(cleared);
+    }
+  }, [persistListFilters, useEmptyDateDefaults]);
   const [openMenuId, setOpenMenuId] = useState(null); // State to track which menu is open
   const [whExpandedId, setWhExpandedId] = useState(null);
   const [whLinesByOrder, setWhLinesByOrder] = useState({});
@@ -436,41 +509,41 @@ export default function OrderTable({
         return false;
       }
 
-      if (statusFilter) {
-        if (orderStatusKey !== statusFilter.toLowerCase()) return false;
+      if (appliedStatusFilter) {
+        if (orderStatusKey !== appliedStatusFilter.toLowerCase()) return false;
       }
 
-      if (dateFrom || dateTo) {
+      if (appliedDateFrom || appliedDateTo) {
         const created = order.created_at ? new Date(order.created_at) : null;
         if (!created || isNaN(created)) return false;
-        if (dateFrom) {
-          const from = new Date(dateFrom + "T00:00:00");
+        if (appliedDateFrom) {
+          const from = new Date(appliedDateFrom + "T00:00:00");
           if (created < from) return false;
         }
-        if (dateTo) {
-          const to = new Date(dateTo + "T23:59:59");
+        if (appliedDateTo) {
+          const to = new Date(appliedDateTo + "T23:59:59");
           if (created > to) return false;
         }
       }
 
       if (
         !omitCreatedBy &&
-        createdByFilter &&
+        appliedCreatedByFilter &&
         String(order.created_by ?? "").trim() !==
-          String(createdByFilter).trim()
+          String(appliedCreatedByFilter).trim()
       ) {
         return false;
       }
 
       if (
         showPaymentTerms &&
-        paymentTermsFilter &&
-        order.payment_terms !== paymentTermsFilter
+        appliedPaymentTermsFilter &&
+        order.payment_terms !== appliedPaymentTermsFilter
       ) {
         return false;
       }
 
-      const lowercasedQuery = searchQuery.toLowerCase();
+      const lowercasedQuery = appliedSearchQuery.toLowerCase();
       if (!lowercasedQuery) return true;
 
       return (
@@ -482,12 +555,12 @@ export default function OrderTable({
       );
     },
     [
-      searchQuery,
-      statusFilter,
-      paymentTermsFilter,
-      dateFrom,
-      dateTo,
-      createdByFilter,
+      appliedSearchQuery,
+      appliedStatusFilter,
+      appliedPaymentTermsFilter,
+      appliedDateFrom,
+      appliedDateTo,
+      appliedCreatedByFilter,
       showPaymentTerms,
       warehouseInchargeItemExpand,
     ],
@@ -606,8 +679,16 @@ export default function OrderTable({
           </div>
         )}
         <OrderListSearchApplyButton onApply={handleApplySearch} />
+        {persistListFilters ? (
+          <OrderListSearchResetButton onReset={handleResetFilters} />
+        ) : null}
       </div>
-      <p className="text-xs text-gray-500">Set filters, then click Search to update the list.</p>
+      <p className="text-xs text-gray-500">
+        Set filters, then click Search to update the list.
+        {persistListFilters
+          ? " Your filters stay saved until you click Reset."
+          : null}
+      </p>
       {warehouseInchargeItemExpand && (
         <p className="text-xs text-gray-600">
           Click a row or use the{" "}
