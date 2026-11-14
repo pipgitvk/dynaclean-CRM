@@ -48,7 +48,7 @@ const buildLabel = (row, rows) => {
   return `${row.username} (${formatShortDate(row.target_end_date)})`;
 };
 
-const APPROVED_BADGE_R = 13;
+const APPROVED_BADGE_R = 17;
 
 const XAxisTick = ({ x, y, payload, chartData, onSelectRow }) => {
   const row = chartData?.find((d) => d.label === payload?.value);
@@ -59,8 +59,8 @@ const XAxisTick = ({ x, y, payload, chartData, onSelectRow }) => {
     if (row) onSelectRow?.(row);
   };
 
-  const badgeCx = -6;
-  const badgeCy = 50;
+  const badgeCx = -8;
+  const badgeCy = 54;
 
   return (
     <g transform={`translate(${x},${y})`}>
@@ -95,7 +95,7 @@ const XAxisTick = ({ x, y, payload, chartData, onSelectRow }) => {
           r={APPROVED_BADGE_R}
           fill="#fef08a"
           stroke="#eab308"
-          strokeWidth={1.25}
+          strokeWidth={1.5}
         />
         <text
           x={badgeCx}
@@ -103,7 +103,7 @@ const XAxisTick = ({ x, y, payload, chartData, onSelectRow }) => {
           textAnchor="middle"
           dominantBaseline="middle"
           fill="#dc2626"
-          fontSize={11}
+          fontSize={13}
           fontWeight={700}
           pointerEvents="none"
         >
@@ -275,13 +275,13 @@ const TargetMonitorChart = ({
             <ResponsiveContainer width="100%" height={400}>
               <BarChart
                 data={chartData}
-                margin={{ top: 16, right: 16, left: 8, bottom: 96 }}
+                margin={{ top: 16, right: 16, left: 8, bottom: 100 }}
               >
                 <CartesianGrid strokeDasharray="3 3" className="stroke-gray-200" />
                 <XAxis
                   dataKey="label"
                   interval={0}
-                  height={108}
+                  height={112}
                   tick={(props) => (
                     <XAxisTick
                       {...props}
