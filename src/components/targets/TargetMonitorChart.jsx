@@ -13,6 +13,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
+import TargetChartOrdersModal from "./TargetChartOrdersModal";
 
 const formatShortDate = (dateString) => {
   if (!dateString) return "";
@@ -33,10 +34,77 @@ const buildLabel = (row, rows) => {
   return `${row.username} (${formatShortDate(row.target_end_date)})`;
 };
 
+const APPROVED_BADGE_R = 13;
+
+const XAxisTick = ({ x, y, payload, chartData, onSelectRow }) => {
+  const row = chartData?.find((d) => d.label === payload?.value);
+  const approved = row?.approvedOrderCount ?? 0;
+
+  const handleBadgeSelect = (e) => {
+    e.stopPropagation();
+    if (row) onSelectRow?.(row);
+  };
+
+  const badgeCx = -6;
+  const badgeCy = 50;
+
+  return (
+    <g transform={`translate(${x},${y})`}>
+      <text
+        x={0}
+        y={0}
+        dy={8}
+        textAnchor="end"
+        fill="#374151"
+        fontSize={10}
+        transform="rotate(-35)"
+        pointerEvents="none"
+      >
+        {payload?.value}
+      </text>
+      <g
+        role="button"
+        tabIndex={row ? 0 : -1}
+        aria-label={`${payload?.value}: ${approved} approved orders. Click for details.`}
+        style={{ cursor: row ? "pointer" : "default" }}
+        onClick={handleBadgeSelect}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            handleBadgeSelect(e);
+          }
+        }}
+      >
+        <circle
+          cx={badgeCx}
+          cy={badgeCy}
+          r={APPROVED_BADGE_R}
+          fill="#fef08a"
+          stroke="#eab308"
+          strokeWidth={1.25}
+        />
+        <text
+          x={badgeCx}
+          y={badgeCy + 0.5}
+          textAnchor="middle"
+          dominantBaseline="middle"
+          fill="#dc2626"
+          fontSize={11}
+          fontWeight={700}
+          pointerEvents="none"
+        >
+          {approved}
+        </text>
+      </g>
+    </g>
+  );
+};
+
 const TargetMonitorChart = ({ rows, periodLabel, dateFrom, dateTo }) => {
   const [chartData, setChartData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [ordersModal, setOrdersModal] = useState(null);
 
   const rowsFingerprint =
     rows
@@ -77,14 +145,24 @@ const TargetMonitorChart = ({ rows, periodLabel, dateFrom, dateTo }) => {
           if (s.status === "fulfilled") {
             return {
               label: buildLabel(row, rows),
+              targetId: row.id,
+              username: row.username,
               target: s.value.target ?? 0,
               achieved: s.value.completed_amount ?? 0,
+              approvedOrderCount: s.value.approved_order_count ?? 0,
+              rejectedOrderCount: s.value.rejected_order_count ?? 0,
+              cancelledOrderCount: s.value.cancelled_order_count ?? 0,
             };
           }
           return {
             label: buildLabel(row, rows),
+            targetId: row.id,
+            username: row.username,
             target: Number(row.target) || 0,
             achieved: 0,
+            approvedOrderCount: 0,
+            rejectedOrderCount: 0,
+            cancelledOrderCount: 0,
           };
         });
 
@@ -115,6 +193,15 @@ const TargetMonitorChart = ({ rows, periodLabel, dateFrom, dateTo }) => {
 
   const chartWidth = Math.max(640, rows.length * 72);
 
+  const openOrdersModal = (payload) => {
+    if (!payload?.targetId && !payload?.username) return;
+    setOrdersModal({
+      targetId: payload.targetId ?? null,
+      username: payload.username ?? null,
+      label: payload.label || payload.username,
+    });
+  };
+
   return (
     <div className="mb-6 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
       <h2 className="mb-1 text-center text-lg font-semibold text-gray-800">
@@ -122,8 +209,8 @@ const TargetMonitorChart = ({ rows, periodLabel, dateFrom, dateTo }) => {
       </h2>
       <p className="mb-4 text-center text-xs text-gray-500">
         {periodLabel
-          ? `${periodLabel}: assignments active in this range; achieved = approved, non-cancelled orders in this range (within assignment dates). Search applies.`
-          : "Per assignment period; respects the current search filter."}
+          ? `${periodLabel}: achieved ₹ = approved orders only. Click the yellow circle for the order list. Search applies.`
+          : "Per assignment period; respects the current search filter. Click the yellow circle for order breakdown."}
       </p>
 
       {loading && (
@@ -142,19 +229,23 @@ const TargetMonitorChart = ({ rows, periodLabel, dateFrom, dateTo }) => {
       {!loading && chartData.length > 0 && (
         <div className="w-full overflow-x-auto pb-2">
           <div style={{ minWidth: chartWidth }}>
-            <ResponsiveContainer width="100%" height={360}>
+            <ResponsiveContainer width="100%" height={400}>
               <BarChart
                 data={chartData}
-                margin={{ top: 16, right: 16, left: 8, bottom: 64 }}
+                margin={{ top: 16, right: 16, left: 8, bottom: 96 }}
               >
                 <CartesianGrid strokeDasharray="3 3" className="stroke-gray-200" />
                 <XAxis
                   dataKey="label"
-                  tick={{ fontSize: 11 }}
                   interval={0}
-                  angle={-35}
-                  textAnchor="end"
-                  height={70}
+                  height={108}
+                  tick={(props) => (
+                    <XAxisTick
+                      {...props}
+                      chartData={chartData}
+                      onSelectRow={openOrdersModal}
+                    />
+                  )}
                 />
                 <YAxis
                   tick={{ fontSize: 11 }}
@@ -162,9 +253,20 @@ const TargetMonitorChart = ({ rows, periodLabel, dateFrom, dateTo }) => {
                   width={56}
                 />
                 <Tooltip
-                  formatter={(value) =>
-                    typeof value === "number" ? `₹${value.toLocaleString("en-IN")}` : value
-                  }
+                  formatter={(value, name) => {
+                    if (typeof value !== "number") return value;
+                    if (name === "Target" || name === "Target achieved") {
+                      return `₹${value.toLocaleString("en-IN")}`;
+                    }
+                    return value;
+                  }}
+                  labelFormatter={(label) => {
+                    const row = chartData.find((d) => d.label === label);
+                    if (!row) return label;
+                    return `${label} · Approved orders: ${
+                      row.approvedOrderCount ?? 0
+                    }`;
+                  }}
                   contentStyle={{ borderRadius: 8, fontSize: 12 }}
                 />
                 <Legend wrapperStyle={{ paddingTop: 8 }} />
@@ -187,6 +289,16 @@ const TargetMonitorChart = ({ rows, periodLabel, dateFrom, dateTo }) => {
           </div>
         </div>
       )}
+
+      <TargetChartOrdersModal
+        isOpen={Boolean(ordersModal)}
+        onClose={() => setOrdersModal(null)}
+        employeeLabel={ordersModal?.label || ""}
+        targetId={ordersModal?.targetId}
+        username={ordersModal?.username}
+        dateFrom={dateFrom}
+        dateTo={dateTo}
+      />
     </div>
   );
 };
