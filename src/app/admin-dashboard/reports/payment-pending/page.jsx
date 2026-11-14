@@ -26,6 +26,118 @@ function formatPaymentLineDate(value) {
   return d.isValid() ? d.format("DD-MM-YYYY") : value;
 }
 
+const PAYMENT_AMOUNT_SORT_KEYS = [
+  "total_amount",
+  "paid_amount",
+  "remaining_amount",
+];
+
+const PAYMENT_AMOUNT_SORT_LABELS = {
+  total_amount: "Total",
+  paid_amount: "Paid",
+  remaining_amount: "Pending",
+};
+
+const SCHEDULE_DATE_SORT_KEYS = [
+  "delivery_dates",
+  "installation_dates",
+  "due_date",
+];
+
+const SCHEDULE_DATE_SORT_LABELS = {
+  delivery_dates: "Delivery",
+  installation_dates: "Installation",
+  due_date: "Due",
+};
+
+function OrderScheduleDatesCell({ order, isOverdue }) {
+  return (
+    <div className="space-y-1.5 text-xs text-gray-800 min-w-[6.5rem]">
+      <div>
+        <div className="text-[10px] font-medium uppercase tracking-wide text-gray-500">
+          Delivery
+        </div>
+        {order.delivery_dates?.length ? (
+          <div className="space-y-0.5 mt-0.5">
+            {order.delivery_dates.map((d) => (
+              <div key={d}>{dayjs(d).format("DD-MM-YYYY")}</div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-gray-400 mt-0.5">—</div>
+        )}
+      </div>
+      <div>
+        <div className="text-[10px] font-medium uppercase tracking-wide text-gray-500">
+          Installation
+        </div>
+        {order.installation_dates?.length ? (
+          <div className="space-y-0.5 mt-0.5">
+            {order.installation_dates.map((d) => (
+              <div key={d}>{dayjs(d).format("DD-MM-YYYY")}</div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-gray-400 mt-0.5">—</div>
+        )}
+      </div>
+      <div>
+        <div className="text-[10px] font-medium uppercase tracking-wide text-gray-500">
+          Due
+        </div>
+        {order.due_date ? (
+          <span
+            className={`mt-0.5 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+              isOverdue
+                ? "bg-red-100 text-red-800"
+                : "bg-yellow-100 text-yellow-800"
+            }`}
+          >
+            {dayjs(order.due_date).format("DD-MM-YYYY")}
+            {isOverdue ? " ⚠️" : ""}
+          </span>
+        ) : (
+          <div className="text-gray-400 mt-0.5">—</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PaymentAmountSummaryCell({ order }) {
+  return (
+    <div className="space-y-1 text-right text-xs">
+      <div className="flex items-center justify-end gap-1.5 text-gray-800">
+        <span className="text-[10px] font-medium uppercase tracking-wide text-gray-500">
+          Total
+        </span>
+        <span className="font-medium whitespace-nowrap">
+          {formatPaymentPendingInr(order.total_amount)}
+        </span>
+      </div>
+      <div className="flex items-center justify-end gap-1.5 text-green-600">
+        <span className="text-[10px] font-medium uppercase tracking-wide text-gray-500">
+          Paid
+        </span>
+        <PaidAmountWithPaymentsInfo order={order} />
+      </div>
+      <div className="flex items-center justify-end gap-1.5 text-red-600 font-semibold">
+        <span className="text-[10px] font-medium uppercase tracking-wide text-gray-500 font-normal">
+          Pending
+        </span>
+        <span className="whitespace-nowrap">
+          {formatPaymentPendingInr(order.remaining_amount)}
+        </span>
+      </div>
+      {Number(order.deduction_amount || 0) > 0 && (
+        <div className="text-[11px] font-medium text-orange-600">
+          Deducted {formatPaymentPendingInr(order.deduction_amount)}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PaidAmountWithPaymentsInfo({ order }) {
   const [open, setOpen] = useState(false);
   const lines = order.payment_lines || [];
@@ -217,6 +329,36 @@ export default function PaymentPendingReport() {
     }));
   };
 
+  const handlePaymentAmountSort = () => {
+    setSortConfig((prev) => {
+      if (!PAYMENT_AMOUNT_SORT_KEYS.includes(prev.key)) {
+        return { key: "remaining_amount", direction: "asc" };
+      }
+      if (prev.direction === "asc") {
+        return { ...prev, direction: "desc" };
+      }
+      const idx = PAYMENT_AMOUNT_SORT_KEYS.indexOf(prev.key);
+      const nextKey =
+        PAYMENT_AMOUNT_SORT_KEYS[(idx + 1) % PAYMENT_AMOUNT_SORT_KEYS.length];
+      return { key: nextKey, direction: "asc" };
+    });
+  };
+
+  const handleScheduleDateSort = () => {
+    setSortConfig((prev) => {
+      if (!SCHEDULE_DATE_SORT_KEYS.includes(prev.key)) {
+        return { key: "due_date", direction: "asc" };
+      }
+      if (prev.direction === "asc") {
+        return { ...prev, direction: "desc" };
+      }
+      const idx = SCHEDULE_DATE_SORT_KEYS.indexOf(prev.key);
+      const nextKey =
+        SCHEDULE_DATE_SORT_KEYS[(idx + 1) % SCHEDULE_DATE_SORT_KEYS.length];
+      return { key: nextKey, direction: "asc" };
+    });
+  };
+
   const SortIcon = ({ columnKey }) => {
     if (sortConfig.key !== columnKey) return null;
     return sortConfig.direction === 'asc' ? 
@@ -303,15 +445,23 @@ export default function PaymentPendingReport() {
       <td className="px-4 py-3 border-b"><div className="h-4 bg-gray-300 rounded w-32"></div></td>
       <td className="px-4 py-3 border-b"><div className="h-4 bg-gray-300 rounded w-24"></div></td>
       <td className="px-4 py-3 border-b"><div className="h-4 bg-gray-300 rounded w-24"></div></td>
-      <td className="px-4 py-3 border-b"><div className="h-4 bg-gray-300 rounded w-20"></div></td>
-      <td className="px-4 py-3 border-b"><div className="h-4 bg-gray-300 rounded w-16"></div></td>
-      <td className="px-4 py-3 border-b"><div className="h-4 bg-gray-300 rounded w-16"></div></td>
-      <td className="px-4 py-3 border-b"><div className="h-4 bg-gray-300 rounded w-20"></div></td>
-      <td className="px-4 py-3 border-b"><div className="h-4 bg-gray-300 rounded w-20"></div></td>
-      <td className="px-4 py-3 border-b"><div className="h-4 bg-gray-300 rounded w-20"></div></td>
+      <td className="px-4 py-3 border-b">
+        <div className="space-y-1.5 flex flex-col items-end">
+          <div className="h-3 bg-gray-300 rounded w-24"></div>
+          <div className="h-3 bg-gray-300 rounded w-20"></div>
+          <div className="h-3 bg-gray-300 rounded w-24"></div>
+        </div>
+      </td>
+      <td className="px-4 py-3 border-b">
+        <div className="space-y-1.5">
+          <div className="h-3 bg-gray-300 rounded w-20"></div>
+          <div className="h-3 bg-gray-300 rounded w-20"></div>
+          <div className="h-3 bg-gray-300 rounded w-16"></div>
+        </div>
+      </td>
       <td className="px-4 py-3 border-b"><div className="h-4 bg-gray-300 rounded w-16"></div></td>
       <td className="px-4 py-3 border-b"><div className="h-4 bg-gray-300 rounded w-24"></div></td>
-      <td className="px-4 py-3 border-b"><div className="h-4 bg-gray-300 rounded w-48"></div></td>
+      <td className="px-2 py-3 border-b w-[7.5rem]"><div className="h-4 bg-gray-300 rounded w-20"></div></td>
       <td className="px-4 py-3 border-b"><div className="h-8 bg-gray-300 rounded w-28"></div></td>
     </tr>
   );
@@ -545,41 +695,43 @@ export default function PaymentPendingReport() {
                 >
                   Employee <SortIcon columnKey="created_by" />
                 </th>
-                <th 
-                  className="px-4 py-3 text-right font-semibold cursor-pointer hover:bg-gray-700 transition-colors"
-                  onClick={() => handleSort('total_amount')}
+                <th
+                  className="px-4 py-3 text-right font-semibold cursor-pointer hover:bg-gray-700 transition-colors min-w-[9rem]"
+                  onClick={handlePaymentAmountSort}
+                  title="Click to sort: Pending → Total → Paid"
                 >
-                  Total Amount <SortIcon columnKey="total_amount" />
-                </th>
-                <th 
-                  className="px-4 py-3 text-right font-semibold cursor-pointer hover:bg-gray-700 transition-colors"
-                  onClick={() => handleSort('paid_amount')}
-                >
-                  Paid <SortIcon columnKey="paid_amount" />
-                </th>
-                <th 
-                  className="px-4 py-3 text-right font-semibold cursor-pointer hover:bg-gray-700 transition-colors"
-                  onClick={() => handleSort('remaining_amount')}
-                >
-                  Remaining <SortIcon columnKey="remaining_amount" />
+                  <span className="block text-xs font-semibold leading-tight">
+                    Total / Paid / Pending
+                  </span>
+                  {PAYMENT_AMOUNT_SORT_KEYS.includes(sortConfig.key) ? (
+                    <span className="mt-0.5 flex items-center justify-end gap-0.5 text-[10px] font-normal text-gray-300">
+                      Sort: {PAYMENT_AMOUNT_SORT_LABELS[sortConfig.key]}
+                      {sortConfig.direction === "asc" ? (
+                        <ArrowUp size={12} />
+                      ) : (
+                        <ArrowDown size={12} />
+                      )}
+                    </span>
+                  ) : null}
                 </th>
                 <th
-                  className="px-4 py-3 text-center font-semibold cursor-pointer hover:bg-gray-700 transition-colors"
-                  onClick={() => handleSort("delivery_dates")}
+                  className="px-4 py-3 text-center font-semibold cursor-pointer hover:bg-gray-700 transition-colors min-w-[7rem]"
+                  onClick={handleScheduleDateSort}
+                  title="Click to sort: Due → Delivery → Installation"
                 >
-                  Delivery Date <SortIcon columnKey="delivery_dates" />
-                </th>
-                <th
-                  className="px-4 py-3 text-center font-semibold cursor-pointer hover:bg-gray-700 transition-colors"
-                  onClick={() => handleSort("installation_dates")}
-                >
-                  Installation Date <SortIcon columnKey="installation_dates" />
-                </th>
-                <th 
-                  className="px-4 py-3 text-center font-semibold cursor-pointer hover:bg-gray-700 transition-colors"
-                  onClick={() => handleSort('due_date')}
-                >
-                  Due Date <SortIcon columnKey="due_date" />
+                  <span className="block text-xs font-semibold leading-tight">
+                    Delivery / Installation / Due
+                  </span>
+                  {SCHEDULE_DATE_SORT_KEYS.includes(sortConfig.key) ? (
+                    <span className="mt-0.5 flex items-center justify-center gap-0.5 text-[10px] font-normal text-gray-300">
+                      Sort: {SCHEDULE_DATE_SORT_LABELS[sortConfig.key]}
+                      {sortConfig.direction === "asc" ? (
+                        <ArrowUp size={12} />
+                      ) : (
+                        <ArrowDown size={12} />
+                      )}
+                    </span>
+                  ) : null}
                 </th>
                 <th
                   className="px-4 py-3 text-center font-semibold cursor-pointer hover:bg-gray-700 transition-colors"
@@ -594,10 +746,11 @@ export default function PaymentPendingReport() {
                   Next Followup <SortIcon columnKey="next_followup_date" />
                 </th>
                 <th
-                  className="px-4 py-3 text-left font-semibold cursor-pointer hover:bg-gray-700 transition-colors"
+                  className="px-2 py-3 text-left font-semibold cursor-pointer hover:bg-gray-700 transition-colors w-[7.5rem] max-w-[7.5rem]"
                   onClick={() => handleSort('latest_remark')}
                 >
-                  Last Remark <SortIcon columnKey="latest_remark" />
+                  <span className="text-xs leading-tight">Last Remark</span>{" "}
+                  <SortIcon columnKey="latest_remark" />
                 </th>
                 <th className="px-4 py-3 text-center font-semibold">Actions</th>
               </tr>
@@ -656,53 +809,14 @@ export default function PaymentPendingReport() {
                       </td>
                       <td className="px-4 py-3 border-b text-gray-700">{order.contact}</td>
                       <td className="px-4 py-3 border-b text-gray-700">{order.created_by}</td>
-                      <td className="px-4 py-3 border-b text-right font-medium text-gray-800 whitespace-nowrap">
-                        {formatPaymentPendingInr(order.total_amount)}
+                      <td className="px-4 py-3 border-b align-top">
+                        <PaymentAmountSummaryCell order={order} />
                       </td>
-                      <td className="px-4 py-3 border-b text-right text-green-600 whitespace-nowrap">
-                        <PaidAmountWithPaymentsInfo order={order} />
-                      </td>
-                      <td className="px-4 py-3 border-b text-right font-semibold text-red-600 whitespace-nowrap">
-                        <div>{formatPaymentPendingInr(order.remaining_amount)}</div>
-                        {Number(order.deduction_amount || 0) > 0 && (
-                          <div className="text-[11px] font-medium text-orange-600">
-                            Deducted {formatPaymentPendingInr(order.deduction_amount)}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 border-b text-center text-xs text-gray-800 whitespace-normal min-w-[7rem]">
-                        {order.delivery_dates?.length ? (
-                          <div className="space-y-0.5">
-                            {order.delivery_dates.map((d) => (
-                              <div key={d}>{dayjs(d).format("DD-MM-YYYY")}</div>
-                            ))}
-                          </div>
-                        ) : (
-                          <span className="text-gray-400">—</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 border-b text-center text-xs text-gray-800 whitespace-normal min-w-[7rem]">
-                        {order.installation_dates?.length ? (
-                          <div className="space-y-0.5">
-                            {order.installation_dates.map((d) => (
-                              <div key={d}>{dayjs(d).format("DD-MM-YYYY")}</div>
-                            ))}
-                          </div>
-                        ) : (
-                          <span className="text-gray-400">—</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 border-b text-center">
-                        {order.due_date ? (
-                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                            isOverdue ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
-                          }`}>
-                            {dayjs(order.due_date).format("DD-MM-YYYY")}
-                            {isOverdue && " ⚠️"}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">—</span>
-                        )}
+                      <td className="px-4 py-3 border-b align-top text-center">
+                        <OrderScheduleDatesCell
+                          order={order}
+                          isOverdue={isOverdue}
+                        />
                       </td>
                       <td className="px-4 py-3 border-b text-center">
                         {order.latest_deduction ? (
@@ -723,9 +837,12 @@ export default function PaymentPendingReport() {
                           ? dayjs(order.next_followup_date).format("DD-MM-YYYY hh:mm A")
                           : "-"}
                       </td>
-                      <td className="px-4 py-3 border-b text-sm text-gray-700 min-w-xs">
+                      <td className="px-2 py-3 border-b text-xs text-gray-700 w-[7.5rem] max-w-[7.5rem] align-top">
                         {order.latest_remark ? (
-                          <div className="line-clamp-3 hover:line-clamp-none hover:whitespace-normal cursor-help" title={order.latest_remark}>
+                          <div
+                            className="line-clamp-2 break-words hover:line-clamp-none hover:whitespace-normal cursor-help"
+                            title={order.latest_remark}
+                          >
                             {order.latest_remark}
                           </div>
                         ) : (
@@ -780,7 +897,7 @@ export default function PaymentPendingReport() {
                 })
               ) : (
                 <tr>
-                  <td colSpan={14} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={11} className="px-6 py-8 text-center text-gray-500">
                     No pending payments found
                   </td>
                 </tr>
