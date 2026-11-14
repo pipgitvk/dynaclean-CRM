@@ -55,6 +55,7 @@ const TargetTable = () => {
   const [isCompletionModalOpen, setIsCompletionModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+  const [monthlyAvgAchieved, setMonthlyAvgAchieved] = useState(null);
 
   const router = useRouter(); // Initialize the router
   const { user } = useUser();
@@ -138,6 +139,12 @@ const TargetTable = () => {
   );
 
   const periodLabel = `${formatDate(appliedDateRange.dateFrom)} to ${formatDate(appliedDateRange.dateTo)}`;
+
+  useEffect(() => {
+    if (filteredTargets.length === 0) {
+      setMonthlyAvgAchieved(null);
+    }
+  }, [filteredTargets.length]);
 
   const applyMonthRange = (year, month) => {
     const range = monthDateRange(year, month);
@@ -268,15 +275,38 @@ const TargetTable = () => {
           )}
         </div>
 
-        <div className="relative w-full max-w-sm sm:ml-auto">
-          <input
-            type="text"
-            placeholder="Search by username..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border rounded-full focus:outline-none focus:ring-2 focus:ring-gray-600 transition-colors"
-          />
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+        <div className="flex w-full flex-col gap-2 sm:ml-auto sm:w-auto sm:flex-row sm:items-center sm:gap-3">
+          {monthlyAvgAchieved ? (
+            <div className="flex shrink-0 flex-col justify-center rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-left text-xs sm:text-sm">
+              <span className="font-semibold text-emerald-950">
+                Monthly avg achieved:{" "}
+                <span className="text-emerald-800">
+                  ₹
+                  {Math.round(monthlyAvgAchieved.monthlyAvg).toLocaleString(
+                    "en-IN",
+                  )}
+                </span>
+              </span>
+              <span className="mt-0.5 text-[10px] text-emerald-800/85 sm:text-xs">
+                ₹
+                {Math.round(monthlyAvgAchieved.totalAchieved).toLocaleString(
+                  "en-IN",
+                )}{" "}
+                ÷ {monthlyAvgAchieved.monthCount}{" "}
+                {monthlyAvgAchieved.monthCount === 1 ? "month" : "months"}
+              </span>
+            </div>
+          ) : null}
+          <div className="relative w-full min-w-[12rem] max-w-sm">
+            <input
+              type="text"
+              placeholder="Search by username..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full rounded-full border py-2 pl-10 pr-4 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-600"
+            />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 transform text-gray-400" />
+          </div>
         </div>
       </div>
 
@@ -285,6 +315,7 @@ const TargetTable = () => {
         periodLabel={periodLabel}
         dateFrom={appliedDateRange.dateFrom}
         dateTo={appliedDateRange.dateTo}
+        onMonthlyAvgStatsChange={setMonthlyAvgAchieved}
       />
 
       {/* Desktop Table View */}

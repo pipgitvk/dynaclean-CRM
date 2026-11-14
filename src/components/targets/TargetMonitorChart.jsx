@@ -2,7 +2,7 @@
 
 import { formatCrmDateOnly } from "@/lib/crmDateFormat";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   BarChart,
   Bar,
@@ -27,6 +27,20 @@ const formatCompact = (n) => {
   if (n >= 1e3) return `₹${(n / 1e3).toFixed(1)}k`;
   return `₹${Math.round(n)}`;
 };
+
+/** Inclusive calendar months between YYYY-MM-DD bounds (filter range). */
+function countFilteredCalendarMonths(dateFrom, dateTo) {
+  const from = String(dateFrom || "").slice(0, 10);
+  const to = String(dateTo || "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
+    return 0;
+  }
+  const [y1, m1] = from.split("-").map(Number);
+  const [y2, m2] = to.split("-").map(Number);
+  const start = from <= to ? { y: y1, m: m1 } : { y: y2, m: m2 };
+  const end = from <= to ? { y: y2, m: m2 } : { y: y1, m: m1 };
+  return (end.y - start.y) * 12 + (end.m - start.m) + 1;
+}
 
 const buildLabel = (row, rows) => {
   const sameName = rows.filter((r) => r.username === row.username).length;
@@ -100,7 +114,13 @@ const XAxisTick = ({ x, y, payload, chartData, onSelectRow }) => {
   );
 };
 
-const TargetMonitorChart = ({ rows, periodLabel, dateFrom, dateTo }) => {
+const TargetMonitorChart = ({
+  rows,
+  periodLabel,
+  dateFrom,
+  dateTo,
+  onMonthlyAvgStatsChange,
+}) => {
   const [chartData, setChartData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -187,6 +207,29 @@ const TargetMonitorChart = ({ rows, periodLabel, dateFrom, dateTo }) => {
     };
   }, [rowsFingerprint]);
 
+  const monthlyAvgStats = useMemo(() => {
+    const monthCount = countFilteredCalendarMonths(dateFrom, dateTo);
+    if (!monthCount || !chartData.length) return null;
+    const totalAchieved = chartData.reduce(
+      (sum, row) => sum + (Number(row.achieved) || 0),
+      0,
+    );
+    return {
+      totalAchieved,
+      monthCount,
+      monthlyAvg: totalAchieved / monthCount,
+    };
+  }, [chartData, dateFrom, dateTo]);
+
+  useEffect(() => {
+    if (!onMonthlyAvgStatsChange) return;
+    if (loading) {
+      onMonthlyAvgStatsChange(null);
+      return;
+    }
+    onMonthlyAvgStatsChange(monthlyAvgStats);
+  }, [loading, monthlyAvgStats, onMonthlyAvgStatsChange]);
+
   if (!rows.length) {
     return null;
   }
@@ -207,7 +250,7 @@ const TargetMonitorChart = ({ rows, periodLabel, dateFrom, dateTo }) => {
       <h2 className="mb-1 text-center text-lg font-semibold text-gray-800">
         Target vs achieved
       </h2>
-      <p className="mb-4 text-center text-xs text-gray-500">
+      <p className="mb-3 text-center text-xs text-gray-500">
         {periodLabel
           ? `${periodLabel}: achieved ₹ = approved orders only. Click the yellow circle for the order list. Search applies.`
           : "Per assignment period; respects the current search filter. Click the yellow circle for order breakdown."}
