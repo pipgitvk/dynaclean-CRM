@@ -1,102 +1,207 @@
 "use client";
 
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
-import { useState, useEffect } from "react";
-import { X } from "lucide-react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { X, Loader2 } from "lucide-react";
 
-const emptyForm = () => ({
-  username: "",
-  target: "",
-  target_start_date: "",
-  target_end_date: "",
-});
+const MONTH_NAMES = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
+const monthDateRange = (year, month) => {
+  const pad = (n) => String(n).padStart(2, "0");
+  const format = (date) =>
+    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  return {
+    dateFrom: format(new Date(year, month - 1, 1)),
+    dateTo: format(new Date(year, month, 0)),
+  };
+};
+
+const defaultPeriod = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1;
+  const range = monthDateRange(year, month);
+  return { year, month, ...range };
+};
 
 export default function AssignTargetModal({ isOpen, onClose, onSuccess }) {
-  const [formData, setFormData] = useState(emptyForm);
-  const [usernames, setUsernames] = useState([]);
-  const [allUsernames, setAllUsernames] = useState([]);
+  const initial = defaultPeriod();
+  const [filterMonth, setFilterMonth] = useState(initial.month);
+  const [filterYear, setFilterYear] = useState(initial.year);
+  const [startDate, setStartDate] = useState(initial.dateFrom);
+  const [endDate, setEndDate] = useState(initial.dateTo);
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
-  const [submitting, setSubmitting] = useState(false);
+  const [messageOk, setMessageOk] = useState(false);
+
+  const yearOptions = useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    return Array.from({ length: 8 }, (_, index) => currentYear - 5 + index);
+  }, []);
+
+  const applyMonthRange = useCallback((year, month) => {
+    const range = monthDateRange(year, month);
+    setStartDate(range.dateFrom);
+    setEndDate(range.dateTo);
+  }, []);
+
+  const loadBulkTargets = useCallback(async (fromYmd, toYmd) => {
+    const from = String(fromYmd || "").trim();
+    const to = String(toYmd || "").trim();
+    if (!from || !to) return;
+    const start = from <= to ? from : to;
+    const end = from <= to ? to : from;
+    setLoading(true);
+    setMessage("");
+    try {
+      const qs = new URLSearchParams({
+        startDate: start,
+        endDate: end,
+      });
+      const res = await fetch(`/api/assign-target/bulk?${qs.toString()}`, {
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || "Failed to load targets");
+      }
+      setRows(
+        (data.employees || []).map((e) => ({
+          username: e.username,
+          id: e.id ?? null,
+          target: e.target ?? "",
+        })),
+      );
+    } catch (error) {
+      setMessage(error.message || "Failed to load employees.");
+      setMessageOk(false);
+      setRows([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (!isOpen) return;
-    setFormData(emptyForm());
+    const period = defaultPeriod();
+    setFilterMonth(period.month);
+    setFilterYear(period.year);
+    setStartDate(period.dateFrom);
+    setEndDate(period.dateTo);
     setMessage("");
-    setSubmitting(false);
-    let cancelled = false;
-    (async () => {
-      try {
-        const resUsers = await fetch("/api/target-usrname");
-        if (!resUsers.ok) throw new Error("Failed to fetch usernames.");
-        const users = await resUsers.json();
-        if (!cancelled) {
-          setAllUsernames(users);
-          setUsernames(users);
-        }
-      } catch (error) {
-        if (!cancelled) setMessage("Error loading users. Try again.");
-        console.error(error);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
+    setMessageOk(false);
+    setSaving(false);
   }, [isOpen]);
 
   useEffect(() => {
-    if (!isOpen) return;
-    const fetchAvailableUsers = async () => {
-      if (formData.target_start_date && formData.target_end_date) {
-        try {
-          const resUsers = await fetch(
-            `/api/target-usrname?startDate=${formData.target_start_date}&endDate=${formData.target_end_date}`
-          );
-          if (!resUsers.ok) throw new Error("Failed to fetch available usernames.");
-          const users = await resUsers.json();
-          setUsernames(users);
-          setFormData((prev) =>
-            prev.username && !users.includes(prev.username)
-              ? { ...prev, username: "" }
-              : prev
-          );
-        } catch (error) {
-          console.error("Error fetching available users:", error);
-        }
-      } else {
-        setUsernames(allUsernames);
-      }
-    };
-    fetchAvailableUsers();
-  }, [isOpen, formData.target_start_date, formData.target_end_date, allUsernames]);
+    if (!isOpen || !startDate || !endDate) return;
+    loadBulkTargets(startDate, endDate);
+  }, [isOpen, startDate, endDate, loadBulkTargets]);
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+  const handleMonthChange = (value) => {
+    const month = Number(value);
+    setFilterMonth(month);
+    applyMonthRange(filterYear, month);
   };
 
-  const handleSubmit = async (e) => {
+  const handleYearChange = (value) => {
+    const year = Number(value);
+    setFilterYear(year);
+    applyMonthRange(year, filterMonth);
+  };
+
+  const handleStartChange = (value) => {
+    setStartDate(value);
+    if (value && endDate && value > endDate) {
+      setEndDate(value);
+    }
+  };
+
+  const handleEndChange = (value) => {
+    setEndDate(value);
+    if (value && startDate && value < startDate) {
+      setStartDate(value);
+    }
+  };
+
+  const handleTargetChange = (username, value) => {
+    setRows((prev) =>
+      prev.map((r) =>
+        r.username === username ? { ...r, target: value } : r,
+      ),
+    );
+  };
+
+  const handleSaveAll = async (e) => {
     e.preventDefault();
-    setMessage("Submitting...");
-    setSubmitting(true);
+    if (!startDate || !endDate) {
+      setMessage("Select start and end dates.");
+      setMessageOk(false);
+      return;
+    }
+
+    const withValue = rows.filter((r) => {
+      const n = Number(r.target);
+      return r.target !== "" && Number.isFinite(n) && n > 0;
+    });
+    if (!withValue.length) {
+      setMessage("Enter at least one target amount before saving.");
+      setMessageOk(false);
+      return;
+    }
+
+    const start = startDate <= endDate ? startDate : endDate;
+    const end = startDate <= endDate ? endDate : startDate;
+
+    setSaving(true);
+    setMessage("Saving...");
+    setMessageOk(false);
     try {
-      const response = await fetch("/api/assign-target", {
+      const res = await fetch("/api/assign-target/bulk", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        credentials: "include",
+        body: JSON.stringify({
+          target_start_date: start,
+          target_end_date: end,
+          rows: rows.map((r) => ({
+            username: r.username,
+            target: r.target,
+            id: r.id,
+          })),
+        }),
       });
-      const data = await response.json();
-      if (response.ok) {
-        setMessage("");
-        onSuccess?.();
-        onClose();
-      } else {
-        setMessage(data.message || "Something went wrong.");
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || "Save failed");
       }
+      setMessage(
+        data.message ||
+          `Saved (${data.updated ?? 0} updated, ${data.inserted ?? 0} new).`,
+      );
+      setMessageOk(true);
+      await loadBulkTargets(start, end);
+      onSuccess?.();
     } catch (error) {
-      setMessage("Network error. Please try again.");
-      console.error("Submission error:", error);
+      setMessage(error.message || "Network error. Please try again.");
+      setMessageOk(false);
     } finally {
-      setSubmitting(false);
+      setSaving(false);
     }
   };
 
@@ -108,22 +213,31 @@ export default function AssignTargetModal({ isOpen, onClose, onSuccess }) {
         type="button"
         className="absolute inset-0 bg-black/50"
         aria-label="Close modal"
-        onClick={() => !submitting && onClose()}
+        onClick={() => !saving && onClose()}
       />
       <div
-        className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl bg-white p-6 shadow-xl"
+        className="relative flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl bg-white shadow-xl"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
         aria-labelledby="assign-target-title"
       >
-        <div className="mb-4 flex items-start justify-between gap-4">
-          <h2 id="assign-target-title" className="text-2xl font-extrabold text-gray-800">
-            Assign Target
-          </h2>
+        <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-4">
+          <div>
+            <h2
+              id="assign-target-title"
+              className="text-2xl font-extrabold text-gray-800"
+            >
+              Assign Targets (Bulk)
+            </h2>
+            <p className="mt-1 text-sm text-gray-500">
+              Month or date range for all employees · edit targets and save
+              together
+            </p>
+          </div>
           <button
             type="button"
-            onClick={() => !submitting && onClose()}
+            onClick={() => !saving && onClose()}
             className="rounded p-1 text-gray-500 hover:bg-gray-100"
             aria-label="Close"
           >
@@ -131,88 +245,155 @@ export default function AssignTargetModal({ isOpen, onClose, onSuccess }) {
           </button>
         </div>
 
-        {message && (
-          <div
-            className={`mb-4 rounded-lg p-3 text-center text-sm font-medium ${
-              message === "Submitting..."
-                ? "bg-gray-100 text-gray-800"
-                : "bg-red-600 text-white"
-            }`}
-          >
-            {message}
-          </div>
-        )}
+        <form onSubmit={handleSaveAll} className="flex min-h-0 flex-1 flex-col">
+          <div className="space-y-4 border-b border-gray-100 px-6 py-4">
+            <div className="flex flex-wrap items-end gap-4">
+              <div>
+                <label
+                  htmlFor="bulk-target-month"
+                  className="mb-1 block text-sm font-medium text-gray-800"
+                >
+                  Month
+                </label>
+                <select
+                  id="bulk-target-month"
+                  value={filterMonth}
+                  onChange={(e) => handleMonthChange(e.target.value)}
+                  disabled={saving}
+                  className="min-w-[140px] rounded-lg border border-gray-600 bg-white px-3 py-3 text-sm text-gray-900 disabled:opacity-60"
+                >
+                  {MONTH_NAMES.map((name, index) => (
+                    <option key={name} value={index + 1}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label
+                  htmlFor="bulk-target-year"
+                  className="mb-1 block text-sm font-medium text-gray-800"
+                >
+                  Year
+                </label>
+                <select
+                  id="bulk-target-year"
+                  value={filterYear}
+                  onChange={(e) => handleYearChange(e.target.value)}
+                  disabled={saving}
+                  className="min-w-[100px] rounded-lg border border-gray-600 bg-white px-3 py-3 text-sm text-gray-900 disabled:opacity-60"
+                >
+                  {yearOptions.map((year) => (
+                    <option key={year} value={year}>
+                      {year}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-800">Start Date</label>
-            <TypeableDateFilterInput value={formData.target_start_date} onChange={(v) => handleChange({ target: { name: "target_start_date", value: v } })} required
-              disabled={submitting}
-              className="w-full rounded-lg border border-gray-600 px-4 py-3 disabled:opacity-60"/>
+            <div className="flex flex-wrap gap-4">
+              <div className="min-w-[10rem] flex-1">
+                <label
+                  htmlFor="bulk-target-start"
+                  className="mb-1 block text-sm font-medium text-gray-800"
+                >
+                  Start date (all employees)
+                </label>
+                <TypeableDateFilterInput
+                  id="bulk-target-start"
+                  value={startDate}
+                  onChange={handleStartChange}
+                  disabled={saving}
+                  className="w-full rounded-lg border border-gray-600 px-4 py-3 disabled:opacity-60"
+                />
+              </div>
+              <div className="min-w-[10rem] flex-1">
+                <label
+                  htmlFor="bulk-target-end"
+                  className="mb-1 block text-sm font-medium text-gray-800"
+                >
+                  End date (all employees)
+                </label>
+                <TypeableDateFilterInput
+                  id="bulk-target-end"
+                  value={endDate}
+                  onChange={handleEndChange}
+                  disabled={saving}
+                  className="w-full rounded-lg border border-gray-600 px-4 py-3 disabled:opacity-60"
+                />
+              </div>
+            </div>
+
+            {message ? (
+              <div
+                className={`rounded-lg p-3 text-center text-sm font-medium ${
+                  messageOk
+                    ? "bg-green-600 text-white"
+                    : message === "Saving..."
+                      ? "bg-gray-100 text-gray-800"
+                      : "bg-red-600 text-white"
+                }`}
+              >
+                {message}
+              </div>
+            ) : null}
           </div>
 
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-800">End Date</label>
-            <TypeableDateFilterInput value={formData.target_end_date} onChange={(v) => handleChange({ target: { name: "target_end_date", value: v } })} required
-              disabled={submitting}
-              className="w-full rounded-lg border border-gray-600 px-4 py-3 disabled:opacity-60"/>
+          <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+            {loading ? (
+              <div className="flex items-center justify-center gap-2 py-12 text-gray-600">
+                <Loader2 className="h-5 w-5 animate-spin" />
+                Loading employees…
+              </div>
+            ) : rows.length === 0 ? (
+              <p className="py-8 text-center text-gray-500">
+                No active employees found.
+              </p>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-200 text-left text-xs font-semibold uppercase tracking-wide text-gray-600">
+                    <th className="py-2 pr-4">Employee</th>
+                    <th className="py-2 pl-2">Target</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {rows.map((row) => (
+                    <tr key={row.username} className="hover:bg-gray-50/80">
+                      <td className="py-2.5 pr-4 font-medium text-gray-900">
+                        {row.username}
+                      </td>
+                      <td className="py-2 pl-2">
+                        <input
+                          type="number"
+                          min="0"
+                          step="any"
+                          value={row.target}
+                          onChange={(e) =>
+                            handleTargetChange(row.username, e.target.value)
+                          }
+                          disabled={saving}
+                          placeholder="—"
+                          className="w-full min-w-[8rem] rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-600 disabled:opacity-60"
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
 
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-800">Username</label>
-            <select
-              name="username"
-              value={formData.username}
-              onChange={handleChange}
-              required
-              disabled={submitting || !formData.target_start_date || !formData.target_end_date}
-              className="w-full rounded-lg border border-gray-800 px-4 py-3 disabled:cursor-not-allowed disabled:bg-gray-100"
+          <div className="border-t border-gray-100 px-6 py-4">
+            <button
+              type="submit"
+              disabled={saving || loading || rows.length === 0}
+              className="w-full rounded-lg bg-gray-700 px-4 py-3 text-lg font-bold text-white hover:bg-gray-800 disabled:opacity-60"
             >
-              <option value="" disabled>
-                {!formData.target_start_date || !formData.target_end_date
-                  ? "Please select dates first"
-                  : usernames.length === 0
-                    ? "No users available for this period"
-                    : "Select user"}
-              </option>
-              {usernames.map((u) => (
-                <option key={u} value={u}>
-                  {u}
-                </option>
-              ))}
-            </select>
-            {formData.target_start_date &&
-              formData.target_end_date &&
-              usernames.length === 0 && (
-                <p className="mt-1 text-sm text-orange-600">
-                  All users already have targets for this period.
-                </p>
-              )}
+              {saving ? "Saving…" : "Save All Targets"}
+            </button>
           </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-800">Target Amount</label>
-            <input
-              type="number"
-              name="target"
-              value={formData.target}
-              onChange={handleChange}
-              placeholder="Enter target amount"
-              min="1"
-              step="any"
-              required
-              disabled={submitting}
-              className="w-full rounded-lg border border-gray-600 px-4 py-3 disabled:opacity-60"
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={submitting}
-            className="w-full rounded-lg bg-gray-600 px-4 py-3 text-lg font-bold text-white hover:bg-gray-700 disabled:opacity-60"
-          >
-            Assign Target
-          </button>
         </form>
       </div>
     </div>
