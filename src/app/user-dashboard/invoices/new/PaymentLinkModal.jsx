@@ -80,6 +80,10 @@ export default function PaymentLinkModal({
   onApply,
   lockedTransIds = [],
   currentInvoiceNumber = "",
+  applyButtonLabel = "Apply to Invoice",
+  suppressApplySuccessToast = false,
+  amountFieldLabel = "Total Amount (₹)",
+  maxSelectHint = "",
 }) {
   const customerId = defaultCustomerId;
   const totalAmount = defaultAmount;
@@ -91,6 +95,7 @@ export default function PaymentLinkModal({
   const [fetched, setFetched] = useState(false);
   const [copied, setCopied] = useState(false);
   const [deductedIds, setDeductedIds] = useState(new Set());
+  const [applying, setApplying] = useState(false);
 
   const fetchStatements = useCallback(async () => {
     setLoading(true);
@@ -178,7 +183,11 @@ export default function PaymentLinkModal({
           .filter((s) => next.has(s.id))
           .reduce((sum, s) => sum + Number(s.amount || 0), 0);
         if (currentDeducted + rowAmount > totalAmount) {
-          toast.error("Deducted amount cannot exceed total amount");
+          toast.error(
+            maxSelectHint
+              ? "Selected amount cannot exceed pending balance"
+              : "Deducted amount cannot exceed total amount",
+          );
           return prev;
         }
         next.add(id);
@@ -248,7 +257,7 @@ export default function PaymentLinkModal({
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Total Amount (₹)
+                {amountFieldLabel}
               </label>
               <input
                 type="text"
@@ -477,24 +486,46 @@ export default function PaymentLinkModal({
             </button>
             {onApply && (
               <button
-                onClick={() => {
+                type="button"
+                disabled={applying || deductedIds.size === 0}
+                onClick={async () => {
                   const selectedTransIds = filteredStatements
                     .filter((s) => deductedIds.has(s.id))
                     .map((s) => s.trans_id)
                     .filter(Boolean);
                   const paymentStatus =
-                      deductedTotal >= totalAmount
-                        ? "Settled"
-                        : deductedTotal > 0
+                    deductedTotal >= totalAmount
+                      ? "Settled"
+                      : deductedTotal > 0
                         ? "Partial Paid"
                         : "Unsettled";
-                  onApply(selectedTransIds, paymentStatus, deductedTotal);
-                  toast.success(`${selectedTransIds.length} Trans ID(s) linked to invoice`);
-                  onClose();
+                  setApplying(true);
+                  try {
+                    const out = onApply(
+                      selectedTransIds,
+                      paymentStatus,
+                      deductedTotal,
+                    );
+                    if (out && typeof out.then === "function") {
+                      await out;
+                    }
+                    if (!suppressApplySuccessToast) {
+                      toast.success(
+                        `${selectedTransIds.length} Trans ID(s) linked to invoice`,
+                      );
+                    }
+                    onClose();
+                  } catch (err) {
+                    console.error(err);
+                  } finally {
+                    setApplying(false);
+                  }
                 }}
-                className="px-5 py-2 bg-green-600 text-white rounded text-sm hover:bg-green-700 font-medium"
+                className="px-5 py-2 bg-green-600 text-white rounded text-sm hover:bg-green-700 font-medium disabled:opacity-50"
               >
-                Apply to Invoice ({deductedIds.size})
+                {applying
+                  ? "Saving…"
+                  : `${applyButtonLabel} (${deductedIds.size})`}
               </button>
             )}
           </div>

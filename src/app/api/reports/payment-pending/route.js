@@ -3,7 +3,10 @@ import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { ensurePaymentPendingFollowupsTable } from "@/lib/ensurePaymentPendingFollowupsTable";
 import { ensurePaymentDeductionsTable } from "@/lib/ensurePaymentDeductionsTable";
-import { PAYMENT_PENDING_ORDER_SQL_WHERE } from "@/lib/paymentPendingFilters";
+import {
+    PAYMENT_PENDING_ORDER_SQL_WHERE,
+    PAYMENT_PENDING_ORDER_SQL_WHERE_INCLUDE_PAID,
+} from "@/lib/paymentPendingFilters";
 import {
   calculateAdjustedOrderTotal,
   computeOrderPaymentRemaining,
@@ -155,6 +158,11 @@ export async function GET(request) {
 
         const { searchParams } = new URL(request.url);
         const completionFilter = (searchParams.get("completion") || "pending").toLowerCase();
+        const includePaidOrders =
+            completionFilter === "all" || completionFilter === "completed";
+        const orderWhereSql = includePaidOrders
+            ? PAYMENT_PENDING_ORDER_SQL_WHERE_INCLUDE_PAID
+            : PAYMENT_PENDING_ORDER_SQL_WHERE;
 
         const pool = await getDbConnection();
         await ensurePaymentPendingFollowupsTable();
@@ -204,7 +212,7 @@ export async function GET(request) {
           GROUP BY order_id
         ) t ON t.order_id = ppf.order_id AND t.max_id = ppf.id
       ) ppf_latest ON ppf_latest.order_id COLLATE utf8mb4_unicode_ci = o.order_id COLLATE utf8mb4_unicode_ci
-      WHERE ${PAYMENT_PENDING_ORDER_SQL_WHERE}
+      WHERE ${orderWhereSql}
     `;
 
         // Filter for SALES and GEM roles - only their own orders

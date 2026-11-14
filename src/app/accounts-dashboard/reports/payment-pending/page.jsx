@@ -18,7 +18,34 @@ import {
   getOrderTableDefaultDateFrom,
   getOrderTableDefaultDateTo,
 } from "@/lib/orderTableDateDefaults";
-import { Download, Search, Calendar, DollarSign, ArrowUp, ArrowDown, Trash2, X, PhoneCall, History, Loader2, MinusCircle, List } from "lucide-react";
+import {
+  Download,
+  Search,
+  Calendar,
+  DollarSign,
+  ArrowUp,
+  ArrowDown,
+  Trash2,
+  X,
+  PhoneCall,
+  History,
+  Loader2,
+  MinusCircle,
+  List,
+  Link2,
+} from "lucide-react";
+import PaymentPendingOrderLinkModal from "@/components/reports/PaymentPendingOrderLinkModal";
+import {
+  nextPaymentAmountSortConfig,
+  PaymentAmountColumnHeader,
+  PaymentAmountSummaryCell,
+} from "@/components/reports/PaymentPendingAmountColumn";
+import {
+  nextScheduleDateSortConfig,
+  PaymentScheduleColumnHeader,
+  PaymentScheduleDatesCell,
+} from "@/components/reports/PaymentPendingScheduleColumn";
+import toast from "react-hot-toast";
 
 export default function PaymentPendingReport() {
   const [orders, setOrders] = useState([]);
@@ -48,7 +75,17 @@ export default function PaymentPendingReport() {
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [deductionOrderId, setDeductionOrderId] = useState(null);
+  const [paymentLinkModalOpen, setPaymentLinkModalOpen] = useState(false);
   const canAddDeduction = ["ACCOUNTANT", "PRODUCTION ACCOUNTANT", "ADMIN", "SUPERADMIN"].includes(userRole);
+  const canLinkPayment = [
+    "SUPERADMIN",
+    "ADMIN",
+    "ACCOUNTANT",
+    "PRODUCTION ACCOUNTANT",
+    "DIRECTOR",
+    "HR HEAD",
+    "SALES CUM BACKOFFICE",
+  ].includes(userRole);
 
   const fetchReport = useCallback(async (completion) => {
     try {
@@ -115,6 +152,14 @@ export default function PaymentPendingReport() {
       key,
       direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
     }));
+  };
+
+  const handlePaymentAmountSort = () => {
+    setSortConfig((prev) => nextPaymentAmountSortConfig(prev));
+  };
+
+  const handleScheduleDateSort = () => {
+    setSortConfig((prev) => nextScheduleDateSortConfig(prev));
   };
 
   const SortIcon = ({ columnKey }) => {
@@ -201,9 +246,7 @@ export default function PaymentPendingReport() {
       <td className="px-4 py-3 border-b"><div className="h-4 bg-gray-300 rounded w-24"></div></td>
       <td className="px-4 py-3 border-b"><div className="h-4 bg-gray-300 rounded w-24"></div></td>
       <td className="px-4 py-3 border-b"><div className="h-4 bg-gray-300 rounded w-20"></div></td>
-      <td className="px-4 py-3 border-b"><div className="h-4 bg-gray-300 rounded w-16"></div></td>
-      <td className="px-4 py-3 border-b"><div className="h-4 bg-gray-300 rounded w-16"></div></td>
-      <td className="px-4 py-3 border-b"><div className="h-4 bg-gray-300 rounded w-20"></div></td>
+      <td className="px-4 py-3 border-b"><div className="h-12 bg-gray-300 rounded w-24"></div></td>
       <td className="px-4 py-3 border-b"><div className="h-4 bg-gray-300 rounded w-16"></div></td>
       <td className="px-4 py-3 border-b"><div className="h-4 bg-gray-300 rounded w-24"></div></td>
       <td className="px-4 py-3 border-b"><div className="h-4 bg-gray-300 rounded w-48"></div></td>
@@ -353,30 +396,14 @@ export default function PaymentPendingReport() {
                 >
                   Employee <SortIcon columnKey="created_by" />
                 </th>
-                <th 
-                  className="px-4 py-3 text-right font-semibold cursor-pointer hover:bg-gray-700 transition-colors"
-                  onClick={() => handleSort('total_amount')}
-                >
-                  Total Amount <SortIcon columnKey="total_amount" />
-                </th>
-                <th 
-                  className="px-4 py-3 text-right font-semibold cursor-pointer hover:bg-gray-700 transition-colors"
-                  onClick={() => handleSort('paid_amount')}
-                >
-                  Paid <SortIcon columnKey="paid_amount" />
-                </th>
-                <th 
-                  className="px-4 py-3 text-right font-semibold cursor-pointer hover:bg-gray-700 transition-colors"
-                  onClick={() => handleSort('remaining_amount')}
-                >
-                  Remaining <SortIcon columnKey="remaining_amount" />
-                </th>
-                <th 
-                  className="px-4 py-3 text-center font-semibold cursor-pointer hover:bg-gray-700 transition-colors"
-                  onClick={() => handleSort('due_date')}
-                >
-                  Due Date <SortIcon columnKey="due_date" />
-                </th>
+                <PaymentAmountColumnHeader
+                  sortConfig={sortConfig}
+                  onSort={handlePaymentAmountSort}
+                />
+                <PaymentScheduleColumnHeader
+                  sortConfig={sortConfig}
+                  onSort={handleScheduleDateSort}
+                />
                 <th
                   className="px-4 py-3 text-center font-semibold cursor-pointer hover:bg-gray-700 transition-colors"
                   onClick={() => handleSort('latest_deduction')}
@@ -403,7 +430,9 @@ export default function PaymentPendingReport() {
                 Array.from({ length: 10 }).map((_, idx) => <SkeletonRow key={idx} />)
               ) : filteredOrders.length > 0 ? (
                 filteredOrders.map((order, index) => {
-                  const isOverdue = dayjs(order.due_date).isBefore(dayjs(), 'day');
+                  const isOverdue =
+                    order.due_date &&
+                    dayjs(order.due_date).isBefore(dayjs(), "day");
                   return (
                     <tr key={index} className="hover:bg-gray-50 transition-colors">
                       <td className="px-4 py-3 border-b font-medium text-gray-800">
@@ -426,27 +455,14 @@ export default function PaymentPendingReport() {
                       </td>
                       <td className="px-4 py-3 border-b text-gray-700">{order.contact}</td>
                       <td className="px-4 py-3 border-b text-gray-700">{order.created_by}</td>
-                      <td className="px-4 py-3 border-b text-right font-medium text-gray-800 whitespace-nowrap">
-                        {formatPaymentPendingInr(order.total_amount)}
+                      <td className="px-4 py-3 border-b align-top">
+                        <PaymentAmountSummaryCell order={order} />
                       </td>
-                      <td className="px-4 py-3 border-b text-right text-green-600 whitespace-nowrap">
-                        {formatPaymentPendingInr(order.paid_amount)}
-                      </td>
-                      <td className="px-4 py-3 border-b text-right font-semibold text-red-600 whitespace-nowrap">
-                        <div>{formatPaymentPendingInr(order.remaining_amount)}</div>
-                        {Number(order.deduction_amount || 0) > 0 && (
-                          <div className="text-[11px] font-medium text-orange-600">
-                            Deducted {formatPaymentPendingInr(order.deduction_amount)}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 border-b text-center">
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                          isOverdue ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
-                        }`}>
-                          {dayjs(order.due_date).format("DD-MM-YYYY")}
-                          {isOverdue && " ⚠️"}
-                        </span>
+                      <td className="px-4 py-3 border-b align-top text-center">
+                        <PaymentScheduleDatesCell
+                          order={order}
+                          isOverdue={isOverdue}
+                        />
                       </td>
                       <td className="px-4 py-3 border-b text-center">
                         {order.latest_deduction ? (
@@ -502,6 +518,25 @@ export default function PaymentPendingReport() {
                             <History size={12} />
                             History
                           </button>
+                          {canLinkPayment && (
+                            <button
+                              type="button"
+                              disabled={Number(order.remaining_amount) <= 0}
+                              onClick={() => {
+                                setSelectedOrder(order);
+                                setPaymentLinkModalOpen(true);
+                              }}
+                              className="inline-flex items-center justify-center gap-1 rounded-md bg-emerald-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-45"
+                              title={
+                                Number(order.remaining_amount) <= 0
+                                  ? "No pending balance to link"
+                                  : "Link bank credit up to pending balance"
+                              }
+                            >
+                              <Link2 size={12} />
+                              Payment Link
+                            </button>
+                          )}
                           {canAddDeduction && (
                             <button
                               type="button"
@@ -520,7 +555,7 @@ export default function PaymentPendingReport() {
                 })
               ) : (
                 <tr>
-                  <td colSpan={12} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={10} className="px-6 py-8 text-center text-gray-500">
                     No pending payments found
                   </td>
                 </tr>
@@ -558,6 +593,31 @@ export default function PaymentPendingReport() {
         onSaved={() => {
           setDeductionOrderId(null);
           fetchReport(appliedCompletionFilter);
+        }}
+      />
+
+      <PaymentPendingOrderLinkModal
+        open={paymentLinkModalOpen}
+        order={selectedOrder}
+        onClose={() => {
+          setPaymentLinkModalOpen(false);
+          setSelectedOrder(null);
+        }}
+        onLinked={(linkResult) => {
+          setPaymentLinkModalOpen(false);
+          setSelectedOrder(null);
+          const fullyPaid = Boolean(linkResult?.is_fully_paid);
+          if (fullyPaid && appliedCompletionFilter === "pending") {
+            setCompletionFilter("all");
+            setAppliedCompletionFilter("all");
+            fetchReport("all");
+            toast(
+              "Payment settled — list set to All so this order stays visible.",
+              { icon: "✓" },
+            );
+          } else {
+            fetchReport(appliedCompletionFilter);
+          }
         }}
       />
     </div>

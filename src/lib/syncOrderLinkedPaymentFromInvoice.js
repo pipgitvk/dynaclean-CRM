@@ -52,7 +52,7 @@ function derivePaymentStatus(paid, total) {
   return "pending";
 }
 
-function mergeLinkedPaymentsJson(order, invoicePayments) {
+export function mergeLinkedPaymentsJson(order, invoicePayments) {
   const existing = parseOrderLinkedPayments(order);
   const merged = [...existing];
   const seen = new Set(

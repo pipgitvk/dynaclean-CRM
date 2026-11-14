@@ -1,5 +1,6 @@
 {
   "BACKOFFICE": "/user-dashboard",
   "BDM": "/sales-dashboard",
+  "HELPER": "/user-dashboard",
   "OFFICE-BOY": "/user-dashboard"
 }
