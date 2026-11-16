@@ -16,7 +16,17 @@ import {
   getOrderTableDefaultDateFrom,
   getOrderTableDefaultDateTo,
 } from "@/lib/orderTableDateDefaults";
-import { Download, Search, Calendar, DollarSign, ArrowUp, ArrowDown, Trash2, X, PhoneCall, History, Loader2 } from "lucide-react";
+import {
+  Download,
+  Search,
+  ArrowUp,
+  ArrowDown,
+  X,
+  PhoneCall,
+  History,
+  Loader2,
+  RotateCcw,
+} from "lucide-react";
 
 export default function PaymentPendingReport() {
   const [orders, setOrders] = useState([]);
@@ -201,29 +211,32 @@ export default function PaymentPendingReport() {
         </p>
       </div>
 
-      {/* Cards and Filters Layout */}
-      <div className="mb-4 flex flex-col lg:flex-row gap-3">
-        {/* Cards - Left Side */}
-        <div className="flex-shrink-0 w-full lg:max-w-md">
-          <PaymentPendingStatsBar
-            orders={filteredOrders}
-            onOrdersClick={handleTotalOrdersCardClick}
-            totalOrdersCardClicks={totalOrdersCardClicks}
-            showDeleteAll
-            deletingAll={deletingAll}
-            onDeleteAll={handleDeleteAllData}
-          />
-        </div>
+      <div className="mb-4 space-y-3 rounded-lg bg-white p-3 shadow">
+        <PaymentPendingStatsBar
+          orders={filteredOrders}
+          onOrdersClick={handleTotalOrdersCardClick}
+          totalOrdersCardClicks={totalOrdersCardClicks}
+          showDeleteAll
+          deletingAll={deletingAll}
+          onDeleteAll={handleDeleteAllData}
+        />
 
-        {/* Filters - Right Side */}
-        <div className="flex-1 bg-white rounded-lg shadow p-3 max-w-2xl">
-          <div className="space-y-2">
-            {/* Row 1: Search Box */}
-            <div className="relative max-w-md">
-              <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400" size={14} />
+        <p className="text-xs text-gray-500">{MANUAL_FILTER_HINT}</p>
+
+        <div className="flex flex-col gap-3 xl:flex-row xl:flex-wrap xl:items-end">
+          <div className="min-w-[12rem] flex-1 xl:max-w-sm">
+            <label className="mb-1 block text-[11px] font-medium text-gray-600">
+              Search
+            </label>
+            <div className="relative">
+              <Search
+                className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400"
+                size={14}
+                aria-hidden
+              />
               <input
                 type="text"
-                placeholder="Search..."
+                placeholder="Order, customer, phone…"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={(e) => {
@@ -232,71 +245,84 @@ export default function PaymentPendingReport() {
                     handleApplySearch();
                   }
                 }}
-                className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full min-w-0 rounded-md border border-gray-300 py-2 pl-8 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
-            <p className="text-xs text-gray-500">{MANUAL_FILTER_HINT}</p>
+          </div>
 
-            {/* Row 2: Date Filters + Status + Buttons */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-2 items-end">
-              {/* Due Date From */}
-              <div>
-                <TypeableDateFilterInput value={dueDateFrom} onChange={setDueDateFrom} className="w-full px-3 py-2.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  title="From Date"/>
-              </div>
+          <div className="min-w-[8.5rem] w-full sm:w-[9.5rem] flex-shrink-0">
+            <label className="mb-1 block text-[11px] font-medium text-gray-600">
+              Due date from
+            </label>
+            <TypeableDateFilterInput
+              value={dueDateFrom}
+              onChange={setDueDateFrom}
+              placeholder="dd/mm/yyyy"
+              className="w-full min-w-0 rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
 
-              {/* Due Date To */}
-              <div>
-                <TypeableDateFilterInput value={dueDateTo} onChange={setDueDateTo} className="w-full px-3 py-2.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  title="To Date"/>
-              </div>
+          <div className="min-w-[8.5rem] w-full sm:w-[9.5rem] flex-shrink-0">
+            <label className="mb-1 block text-[11px] font-medium text-gray-600">
+              Due date to
+            </label>
+            <TypeableDateFilterInput
+              value={dueDateTo}
+              onChange={setDueDateTo}
+              placeholder="dd/mm/yyyy"
+              className="w-full min-w-0 rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
 
-              {/* Status Filter */}
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full px-3 py-2.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="all">All</option>
-                <option value="due">Overdue</option>
-                <option value="no-due">Not Due</option>
-              </select>
+          <div className="min-w-[7rem] w-full sm:w-[8.5rem] flex-shrink-0">
+            <label className="mb-1 block text-[11px] font-medium text-gray-600">
+              Due status
+            </label>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="w-full min-w-0 rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">All</option>
+              <option value="due">Overdue</option>
+              <option value="no-due">Not overdue</option>
+            </select>
+          </div>
 
-              <ManualFilterSearchButton
-                onClick={handleApplySearch}
-                className="w-full px-3 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded"
-              />
-
-              {/* Clear Button */}
-              {(dueDateFrom || dueDateTo || statusFilter !== "all" || searchQuery) && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDueDateFrom(getOrderTableDefaultDateFrom());
-                    setDueDateTo(getOrderTableDefaultDateTo());
-                    setStatusFilter("all");
-                    setSearchQuery("");
-                    setAppliedDueDateFrom(getOrderTableDefaultDateFrom());
-                    setAppliedDueDateTo(getOrderTableDefaultDateTo());
-                    setAppliedStatusFilter("all");
-                    setAppliedSearchQuery("");
-                  }}
-                  className="flex items-center justify-center gap-1 bg-gray-500 hover:bg-gray-600 text-white px-3 py-2.5 rounded text-xs font-semibold transition-colors"
-                >
-                  <X size={12} />
-                  Clear
-                </button>
-              )}
-
-              {/* Export Button */}
-              <button
-                onClick={exportToCSV}
-                className="flex items-center justify-center gap-1 bg-green-600 hover:bg-green-700 text-white px-3 py-2.5 rounded text-xs font-semibold transition-colors"
-              >
-                <Download size={12} />
-                CSV
-              </button>
-            </div>
+          <div className="flex flex-shrink-0 flex-wrap items-center gap-2 pb-0.5">
+            <ManualFilterSearchButton
+              onClick={handleApplySearch}
+              className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                const from = getOrderTableDefaultDateFrom();
+                const to = getOrderTableDefaultDateTo();
+                setDueDateFrom(from);
+                setDueDateTo(to);
+                setStatusFilter("all");
+                setSearchQuery("");
+                setAppliedDueDateFrom(from);
+                setAppliedDueDateTo(to);
+                setAppliedStatusFilter("all");
+                setAppliedSearchQuery("");
+              }}
+              className="inline-flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-md border border-gray-300 bg-white text-gray-700 transition-colors hover:bg-gray-50"
+              title="Reset filters"
+              aria-label="Reset filters"
+            >
+              <RotateCcw size={18} />
+            </button>
+            <button
+              type="button"
+              onClick={exportToCSV}
+              className="inline-flex items-center justify-center gap-1 rounded-md bg-green-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-green-700"
+              title="Export to CSV"
+            >
+              <Download size={14} />
+              Export
+            </button>
           </div>
         </div>
       </div>
