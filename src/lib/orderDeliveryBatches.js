@@ -1,4 +1,10 @@
 import { orderRemainBookingBatchDone } from "@/lib/orderDeliveryEligibility";
+import {
+  countSavedDeliveryBatches,
+  getDeliveryBatchBySequence,
+  getRequiredDeliveryProofCount,
+  orderNeedsAnotherDeliverySave,
+} from "@/lib/orderDeliverySlots";
 
 /** @param {import("mysql2/promise").PoolConnection} conn */
 
@@ -109,14 +115,18 @@ export async function persistOrderDeliveryBatch(
 }
 
 export function getDeliveryBatchForView(order, which) {
+  if (typeof which === "number" || /^\d+$/.test(String(which))) {
+    return getDeliveryBatchBySequence(order, which);
+  }
   const batches = order?.delivery_batches || [];
   if (!batches.length) return null;
   if (which === "first" || which === "1") {
-    return batches.find((b) => b.sequence_no === 1) || batches[0];
+    return getDeliveryBatchBySequence(order, 1) || batches[0];
   }
   if (which === "remain" || which === "latest") {
-    if (batches.length >= 2) {
-      return batches[batches.length - 1];
+    const saved = countSavedDeliveryBatches(order);
+    if (saved >= 2) {
+      return getDeliveryBatchBySequence(order, saved) || batches[batches.length - 1];
     }
     return null;
   }
@@ -124,12 +134,14 @@ export function getDeliveryBatchForView(order, which) {
 }
 
 export function orderHasSecondDeliveryBatch(order) {
-  const batches = order?.delivery_batches || [];
-  return batches.length >= 2 || batches.some((b) => Number(b.sequence_no) >= 2);
+  return countSavedDeliveryBatches(order) >= 2;
 }
 
-/** 2nd booking batch saved but fewer than 2 delivery proofs on file. */
+/** More dispatch waves / booking batches than saved delivery proofs. */
 export function orderNeedsRemainDeliverySave(order) {
+  if (orderNeedsAnotherDeliverySave(order)) return true;
   if (!orderRemainBookingBatchDone(order)) return false;
   return !orderHasSecondDeliveryBatch(order);
 }
+
+export { getRequiredDeliveryProofCount, countSavedDeliveryBatches };

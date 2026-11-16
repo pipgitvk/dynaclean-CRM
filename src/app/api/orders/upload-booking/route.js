@@ -10,6 +10,10 @@ import {
   persistOrderBookingBatch,
 } from "@/lib/orderBookingBatches";
 import { persistOrderTrackingFromBooking } from "@/lib/orderTrackingIdPersist";
+import {
+  DELIVERY_STATUS_FULL,
+  DELIVERY_STATUS_PARTIAL,
+} from "@/lib/orderDeliveryStatus";
 
 export async function POST(req) {
   try {
@@ -178,6 +182,13 @@ export async function POST(req) {
       bookingUrl: booking_url,
       batchSequenceNo,
     });
+
+    if (Number(batchSequenceNo) >= 2) {
+      await conn.execute(
+        `UPDATE neworder SET delivery_status = ? WHERE order_id = ?`,
+        [DELIVERY_STATUS_PARTIAL, orderId],
+      );
+    }
 
     // ✅ Step 3: Send email with custom template (not from database)
     try {

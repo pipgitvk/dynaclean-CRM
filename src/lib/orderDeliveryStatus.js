@@ -31,7 +31,11 @@ export async function resolveDeliveryStatusAfterUpdate(
   conn,
   orderId,
   _dispatchStatus,
-  { requiresSecondDeliveryProof = false, deliveryBatchCountBeforeSave = 0 } = {},
+  {
+    requiresSecondDeliveryProof = false,
+    deliveryBatchCountBeforeSave = 0,
+    requiredDeliveryProofCount = 1,
+  } = {},
 ) {
   const { fetchOrderDispatchLineOptions } = await import(
     "@/lib/dispatchPartialSelection"
@@ -50,12 +54,24 @@ export async function resolveDeliveryStatusAfterUpdate(
   );
   const fullyDispatched = pendingDispatch === 0 && hasDispatchedStock;
 
-  if (
-    requiresSecondDeliveryProof &&
-    deliveryBatchCountBeforeSave + 1 < 2
-  ) {
+  const required = Math.max(
+    1,
+    Number(requiredDeliveryProofCount) || 0,
+    requiresSecondDeliveryProof ? 2 : 0,
+  );
+  const afterSave = deliveryBatchCountBeforeSave + 1;
+
+  if (afterSave < required) {
     return DELIVERY_STATUS_PARTIAL;
   }
 
-  return fullyDispatched ? DELIVERY_STATUS_FULL : DELIVERY_STATUS_PARTIAL;
+  if (fullyDispatched) {
+    return DELIVERY_STATUS_FULL;
+  }
+
+  if (requiresSecondDeliveryProof || required > 1) {
+    return DELIVERY_STATUS_FULL;
+  }
+
+  return DELIVERY_STATUS_PARTIAL;
 }

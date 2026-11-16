@@ -15,6 +15,7 @@ import {
   attachDispatchPendingToOrders,
 } from "@/lib/orderBookingBatches";
 import { attachDeliveryBatchesToOrders } from "@/lib/orderDeliveryBatches";
+import { attachDispatchShipmentWavesToOrders } from "@/lib/orderDeliverySlots";
 import { sqlOrderCreatedByEquals } from "@/lib/sqlCreatedByScope";
 import { normalizeOrderListDateRange } from "@/lib/orderTableDateDefaults";
 import { ensureDocumentFromCompanyColumns } from "@/lib/ensureDocumentFromCompanyColumns";
@@ -265,6 +266,10 @@ export async function fetchAccountsOrderListPage(
     });
   }
   enrichedOrders = await attachDeliveryBatchesToOrders(conn, enrichedOrders);
+  enrichedOrders = await attachDispatchShipmentWavesToOrders(
+    conn,
+    enrichedOrders,
+  );
 
   return {
     orders: enrichedOrders,

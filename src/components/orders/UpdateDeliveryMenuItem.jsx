@@ -20,8 +20,19 @@ import {
   canViewOrderDeliveryDetailsRole,
   isSuperAdminRole,
 } from "@/lib/roleKeyUtils";
+import {
+  countSavedDeliveryBatches,
+  deliveryMenuLabelForBatch,
+  getRequiredDeliveryProofCount,
+} from "@/lib/orderDeliverySlots";
 
-export default function UpdateDeliveryMenuItem({ order, userRole, variant = "auto", layout = "menu" }) {
+export default function UpdateDeliveryMenuItem({
+  order,
+  userRole,
+  variant = "auto",
+  layout = "menu",
+  batchSequence = 1,
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -186,6 +197,22 @@ export default function UpdateDeliveryMenuItem({ order, userRole, variant = "aut
     }
   } else if (variant === "view") {
     if (!canShowOrderDeliveryActions(order) || !hasDeliveryRecord) return null;
+  } else if (variant === "view_batch") {
+    const batch = getDeliveryBatchForView(order, batchSequence);
+    if (!canShowOrderDeliveryActions(order)) return null;
+    if (!batch && !(batchSequence === 1 && hasDeliveryRecord)) return null;
+  } else if (variant === "update_batch") {
+    const required = getRequiredDeliveryProofCount(order);
+    const saved = countSavedDeliveryBatches(order);
+    if (
+      !canShowOrderDeliveryActions(order) ||
+      batchSequence !== saved + 1 ||
+      saved >= required ||
+      (isFullyDelivered && !orderNeedsRemainDeliverySave(order))
+    ) {
+      return null;
+    }
+    if (!shouldShow()) return null;
   } else if (variant === "update") {
     if (!canShowOrderDeliveryActions(order) || isFullyDelivered) return null;
   } else if (!shouldShow()) {
@@ -197,7 +224,9 @@ export default function UpdateDeliveryMenuItem({ order, userRole, variant = "aut
       ? getDeliveryBatchForView(order, "first")
       : variant === "view_remain"
         ? getDeliveryBatchForView(order, "remain")
-        : null;
+        : variant === "view_batch"
+          ? getDeliveryBatchForView(order, batchSequence)
+          : null;
   const displayOrder = batchForModal
     ? {
         ...order,
@@ -210,21 +239,26 @@ export default function UpdateDeliveryMenuItem({ order, userRole, variant = "aut
   const readOnlyDeliveryModal =
     variant === "view_first" ||
     variant === "view_remain" ||
+    variant === "view_batch" ||
     variant === "view" ||
     (variant === "auto" && (viewOnly || isFullyDelivered));
 
   const menuLabel =
-    variant === "view_first"
-      ? "View Delivery"
-      : variant === "view_remain"
-        ? "View Delivery (Remain)"
-        : variant === "update_remain"
-          ? "Update Delivery (Remain)"
-          : variant === "update"
-            ? "Update Delivery"
-            : readOnlyDeliveryModal
-              ? "View Delivery"
-              : "Update Delivery";
+    variant === "view_batch"
+      ? deliveryMenuLabelForBatch(batchSequence, "view")
+      : variant === "update_batch"
+        ? deliveryMenuLabelForBatch(batchSequence, "update")
+        : variant === "view_first"
+          ? "View Delivery"
+          : variant === "view_remain"
+            ? "View Delivery (Remain)"
+            : variant === "update_remain"
+              ? "Update Delivery (Remain)"
+              : variant === "update"
+                ? "Update Delivery"
+                : readOnlyDeliveryModal
+                  ? "View Delivery"
+                  : "Update Delivery";
 
   const formatDate = (d) => {
     if (!d) return "-";
@@ -256,12 +290,16 @@ export default function UpdateDeliveryMenuItem({ order, userRole, variant = "aut
           >
             <h3 className="text-lg font-semibold mb-4">
               {readOnlyDeliveryModal
-                ? variant === "view_remain"
-                  ? "Delivery Details (Remain)"
-                  : "Delivery Details"
-                : variant === "update_remain"
-                  ? "Update Delivery (Remain)"
-                  : "Update Delivery Status"}
+                ? variant === "view_batch" && batchSequence > 1
+                  ? `Delivery Details (Batch ${batchSequence})`
+                  : variant === "view_remain"
+                    ? "Delivery Details (Remain)"
+                    : "Delivery Details"
+                : variant === "update_batch"
+                  ? deliveryMenuLabelForBatch(batchSequence, "update")
+                  : variant === "update_remain"
+                    ? "Update Delivery (Remain)"
+                    : "Update Delivery Status"}
             </h3>
 
             <div className="space-y-4">

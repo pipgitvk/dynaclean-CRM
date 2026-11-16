@@ -2,19 +2,15 @@
 
 import { canShowOrderDeliveryActions } from "@/lib/orderDeliveryEligibility";
 import {
-  orderHasSecondDeliveryBatch,
-  orderNeedsRemainDeliverySave,
-} from "@/lib/orderDeliveryBatches";
+  countSavedDeliveryBatches,
+  getRequiredDeliveryProofCount,
+} from "@/lib/orderDeliverySlots";
 import {
-  isOrderFullyDelivered,
   orderHasDeliveryRecord,
 } from "@/lib/orderDeliveryStatus";
 
 /**
- * Partial / two-round delivery:
- * - 1st save → View Delivery + Update Delivery (Remain)
- * - 2nd save → View Delivery + View Delivery (Remain)
- * - Before any save → Update Delivery only
+ * One delivery proof per dispatch wave (and per extra booking batch when applicable).
  */
 export default function OrderDeliveryMenuLinks({
   order,
@@ -23,57 +19,41 @@ export default function OrderDeliveryMenuLinks({
 }) {
   if (!canShowOrderDeliveryActions(order)) return null;
 
+  const required = getRequiredDeliveryProofCount(order);
+  const saved = countSavedDeliveryBatches(order);
   const hasRecord = orderHasDeliveryRecord(order);
-  const fully = isOrderFullyDelivered(order);
-  const hasSecond = orderHasSecondDeliveryBatch(order);
-  const needsRemainSave = orderNeedsRemainDeliverySave(order);
 
-  if (hasRecord && fully && needsRemainSave) {
+  if (!hasRecord) {
     return (
-      <>
-        <DeliveryMenuItem order={order} userRole={userRole} variant="view_first" />
-        <DeliveryMenuItem
-          order={order}
-          userRole={userRole}
-          variant="update_remain"
-        />
-      </>
+      <DeliveryMenuItem order={order} userRole={userRole} variant="auto" />
     );
   }
 
-  if (hasRecord && fully && hasSecond) {
-    return (
-      <>
-        <DeliveryMenuItem order={order} userRole={userRole} variant="view_first" />
-        <DeliveryMenuItem
-          order={order}
-          userRole={userRole}
-          variant="view_remain"
-        />
-      </>
+  const items = [];
+
+  for (let seq = 1; seq <= saved; seq += 1) {
+    items.push(
+      <DeliveryMenuItem
+        key={`view-${seq}`}
+        order={order}
+        userRole={userRole}
+        variant="view_batch"
+        batchSequence={seq}
+      />,
     );
   }
 
-  if (hasRecord && !fully) {
-    return (
-      <>
-        <DeliveryMenuItem order={order} userRole={userRole} variant="view_first" />
-        <DeliveryMenuItem
-          order={order}
-          userRole={userRole}
-          variant="update_remain"
-        />
-      </>
+  if (saved < required) {
+    items.push(
+      <DeliveryMenuItem
+        key={`update-${saved + 1}`}
+        order={order}
+        userRole={userRole}
+        variant="update_batch"
+        batchSequence={saved + 1}
+      />,
     );
   }
 
-  if (hasRecord && fully) {
-    return (
-      <DeliveryMenuItem order={order} userRole={userRole} variant="view_first" />
-    );
-  }
-
-  return (
-    <DeliveryMenuItem order={order} userRole={userRole} variant="auto" />
-  );
+  return <>{items}</>;
 }

@@ -10,6 +10,7 @@ import {
   attachDispatchPendingToOrders,
 } from "@/lib/orderBookingBatches";
 import { attachDeliveryBatchesToOrders } from "@/lib/orderDeliveryBatches";
+import { attachDispatchShipmentWavesToOrders } from "@/lib/orderDeliverySlots";
 import { getAccountsOrderListUserRole } from "@/lib/accountsOrderListFetch";
 import { sqlOrderCreatedByEquals } from "@/lib/sqlCreatedByScope";
 import { normalizeOrderListDateRange } from "@/lib/orderTableDateDefaults";
@@ -238,6 +239,10 @@ export async function fetchAdminOrderListPage(
     skipDbSync: true,
   });
   enrichedOrders = await attachDeliveryBatchesToOrders(conn, enrichedOrders);
+  enrichedOrders = await attachDispatchShipmentWavesToOrders(
+    conn,
+    enrichedOrders,
+  );
 
   return {
     orders: enrichedOrders,

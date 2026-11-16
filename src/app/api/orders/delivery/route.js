@@ -16,10 +16,12 @@ import {
 import { attachBookingBatchesToOrders } from "@/lib/orderBookingBatches";
 import {
   attachDeliveryBatchesToOrders,
+  countSavedDeliveryBatches,
   ensureOrderDeliveryBatchesTable,
-  orderHasSecondDeliveryBatch,
+  getRequiredDeliveryProofCount,
   persistOrderDeliveryBatch,
 } from "@/lib/orderDeliveryBatches";
+import { attachDispatchShipmentWavesToOrders } from "@/lib/orderDeliverySlots";
 
 export async function POST(request) {
   try {
@@ -95,12 +97,12 @@ export async function POST(request) {
       { order_id, booking_id: order.booking_id },
     ]);
     [orderMeta] = await attachDeliveryBatchesToOrders(conn, [orderMeta]);
+    [orderMeta] = await attachDispatchShipmentWavesToOrders(conn, [orderMeta]);
     const requiresSecondDeliveryProof = orderRemainBookingBatchDone(orderMeta);
-    const deliveryBatchCountBeforeSave = (orderMeta.delivery_batches || [])
-      .length;
+    const requiredDeliveryProofCount = getRequiredDeliveryProofCount(orderMeta);
+    const deliveryBatchCountBeforeSave = countSavedDeliveryBatches(orderMeta);
     const canSaveRemainWhileMarkedFull =
-      requiresSecondDeliveryProof &&
-      !orderHasSecondDeliveryBatch(orderMeta);
+      deliveryBatchCountBeforeSave < requiredDeliveryProofCount;
 
     const isFullyDelivered = Number(order.delivery_status) === DELIVERY_STATUS_FULL;
 
@@ -144,6 +146,7 @@ export async function POST(request) {
       {
         requiresSecondDeliveryProof,
         deliveryBatchCountBeforeSave,
+        requiredDeliveryProofCount,
       },
     );
 

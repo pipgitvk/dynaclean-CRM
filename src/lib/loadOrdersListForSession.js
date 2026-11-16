@@ -15,6 +15,7 @@ import {
   attachDispatchPendingToOrders,
 } from "@/lib/orderBookingBatches";
 import { attachDeliveryBatchesToOrders } from "@/lib/orderDeliveryBatches";
+import { attachDispatchShipmentWavesToOrders } from "@/lib/orderDeliverySlots";
 import { sqlOrderCreatedByEquals } from "@/lib/sqlCreatedByScope";
 
 /** Shared order list query for user-dashboard and warehouse-incharge order pages. */
@@ -129,6 +130,10 @@ export async function loadOrdersListForSession() {
     skipDbSync: true,
   });
   ordersWithBatches = await attachDeliveryBatchesToOrders(conn, ordersWithBatches);
+  ordersWithBatches = await attachDispatchShipmentWavesToOrders(
+    conn,
+    ordersWithBatches,
+  );
 
   return { orders: ordersWithBatches, userRole, username };
 }
