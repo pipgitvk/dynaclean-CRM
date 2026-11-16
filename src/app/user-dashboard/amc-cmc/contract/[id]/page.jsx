@@ -1,13 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, usePathname } from "next/navigation";
+import { amcCmcPath } from "@/lib/amcCmcDashboardPaths";
 import toast from "react-hot-toast";
 import AmcCmcContractViewer from "@/components/amc-cmc/AmcCmcContractViewer";
 
 export default function UserAmcCmcContractPage() {
   const params = useParams();
   const router = useRouter();
+  const pathname = usePathname();
+  const amcListHref = amcCmcPath(pathname);
   const id = params?.id;
   const [record, setRecord] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -21,7 +24,7 @@ export default function UserAmcCmcContractPage() {
         setRecord(await res.json());
       } catch {
         toast.error("Failed to load contract");
-        router.push("/user-dashboard/amc-cmc");
+        router.push(amcListHref);
       } finally {
         setLoading(false);
       }
@@ -34,7 +37,7 @@ export default function UserAmcCmcContractPage() {
   return (
     <AmcCmcContractViewer
       record={record}
-      backHref="/user-dashboard/amc-cmc"
+      backHref={amcListHref}
     />
   );
 }

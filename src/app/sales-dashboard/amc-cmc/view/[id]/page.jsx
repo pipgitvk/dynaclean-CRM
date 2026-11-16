@@ -1,0 +1,1 @@
+export { default } from "@/app/user-dashboard/amc-cmc/view/[id]/page";

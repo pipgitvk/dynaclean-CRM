@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
+import { amcCmcPath } from "@/lib/amcCmcDashboardPaths";
 import toast from "react-hot-toast";
 import { ArrowLeft } from "lucide-react";
 import AmcCmcProductLookupFields from "@/components/amc-cmc/AmcCmcProductLookupFields";
@@ -69,6 +70,8 @@ All disputes shall be subject to jurisdiction of the courts at Delhi.`;
 
 export default function AddUserAMCCMCPage() {
   const router = useRouter();
+  const pathname = usePathname();
+  const amcListHref = amcCmcPath(pathname);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     contract_type: "",
@@ -137,7 +140,7 @@ export default function AddUserAMCCMCPage() {
       }
 
       toast.success("AMC/CMC request submitted successfully");
-      router.push("/user-dashboard/amc-cmc");
+      router.push(amcListHref);
     } catch (error) {
       toast.error(error.message);
     } finally {
@@ -148,7 +151,7 @@ export default function AddUserAMCCMCPage() {
   return (
     <div className="p-6 max-w-4xl mx-auto">
       <Link
-        href="/user-dashboard/amc-cmc"
+        href={amcListHref}
         className="flex items-center gap-2 text-blue-600 hover:text-blue-800 mb-6"
       >
         <ArrowLeft size={18} />
@@ -397,7 +400,7 @@ export default function AddUserAMCCMCPage() {
               {loading ? "Submitting..." : "Submit Request"}
             </button>
             <Link
-              href="/user-dashboard/amc-cmc"
+              href={amcListHref}
               className="bg-gray-300 hover:bg-gray-400 text-gray-800 px-6 py-2 rounded-lg"
             >
               Cancel

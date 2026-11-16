@@ -405,6 +405,7 @@ export const ROLE_DEFAULT_MODULE_KEYS = {
     "service-map",
     "return-products",
     "third-party-engineers",
+    "amc-cmc",
   ],
   DIRECTOR: [
     "dashboard-home",

@@ -1,13 +1,16 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams } from "next/navigation";
+import { useParams, usePathname } from "next/navigation";
 import Link from "next/link";
+import { amcCmcPath } from "@/lib/amcCmcDashboardPaths";
 import { ArrowLeft, Eye } from "lucide-react";
 import toast from "react-hot-toast";
 
 export default function ViewUserAMCCMCPage() {
   const params = useParams();
+  const pathname = usePathname();
+  const amcListHref = amcCmcPath(pathname);
   const id = params.id;
   const [record, setRecord] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -94,7 +97,7 @@ export default function ViewUserAMCCMCPage() {
   return (
     <div className="p-6 max-w-4xl mx-auto">
       <Link
-        href="/user-dashboard/amc-cmc"
+        href={amcListHref}
         className="flex items-center gap-2 text-blue-600 hover:text-blue-800 mb-6"
       >
         <ArrowLeft size={18} />
@@ -275,7 +278,7 @@ export default function ViewUserAMCCMCPage() {
 
         <div className="mt-6">
           <Link
-            href="/user-dashboard/amc-cmc"
+            href={amcListHref}
             className="bg-gray-300 hover:bg-gray-400 text-gray-800 px-6 py-2 rounded-lg"
           >
             Back to Requests

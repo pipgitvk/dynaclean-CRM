@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
+import { amcCmcPath } from "@/lib/amcCmcDashboardPaths";
 import toast from "react-hot-toast";
 import { ArrowLeft, Eye } from "lucide-react";
 
@@ -14,6 +15,8 @@ function normalizeContractType(value) {
 export default function EditUserAMCCMCPage() {
   const params = useParams();
   const router = useRouter();
+  const pathname = usePathname();
+  const amcListHref = amcCmcPath(pathname);
   const id = params.id;
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -94,7 +97,7 @@ export default function EditUserAMCCMCPage() {
         // Check if record is pending
         if (data.status !== "pending") {
           toast.error("Only pending requests can be edited");
-          router.push("/user-dashboard/amc-cmc");
+          router.push(amcListHref);
           return;
         }
 
@@ -117,7 +120,7 @@ export default function EditUserAMCCMCPage() {
         });
       } catch (error) {
         toast.error("Failed to fetch record details");
-        router.push("/user-dashboard/amc-cmc");
+        router.push(amcListHref);
       } finally {
         setLoading(false);
       }
@@ -187,7 +190,7 @@ export default function EditUserAMCCMCPage() {
       }
 
       toast.success("AMC/CMC request updated successfully");
-      router.push("/user-dashboard/amc-cmc");
+      router.push(amcListHref);
     } catch (error) {
       toast.error(error.message);
     } finally {
@@ -220,7 +223,7 @@ export default function EditUserAMCCMCPage() {
   return (
     <div className="p-6 max-w-4xl mx-auto">
       <Link
-        href="/user-dashboard/amc-cmc"
+        href={amcListHref}
         className="flex items-center gap-2 text-blue-600 hover:text-blue-800 mb-6"
       >
         <ArrowLeft size={18} />
@@ -537,7 +540,7 @@ export default function EditUserAMCCMCPage() {
               {saving ? "Saving..." : "Save Changes"}
             </button>
             <Link
-              href="/user-dashboard/amc-cmc"
+              href={amcListHref}
               className="bg-gray-300 hover:bg-gray-400 text-gray-800 px-6 py-2 rounded-lg"
             >
               Cancel

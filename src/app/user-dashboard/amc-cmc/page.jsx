@@ -4,6 +4,8 @@ import { formatCrmDateOnly } from "@/lib/crmDateFormat";
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { amcCmcPath } from "@/lib/amcCmcDashboardPaths";
 import { Search, Edit, Eye, ClipboardList, History, X } from "lucide-react";
 import toast from "react-hot-toast";
 import dayjs from "dayjs";
@@ -178,6 +180,7 @@ function HistoryModal({ serialNumber, onClose }) {
 }
 
 export default function UserAMCCMCPage() {
+  const pathname = usePathname();
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
@@ -246,7 +249,7 @@ export default function UserAMCCMCPage() {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">My AMC/CMC Requests</h1>
         <Link
-          href="/user-dashboard/amc-cmc/add"
+          href={amcCmcPath(pathname, "add")}
           className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"
         >
           Add AMC/CMC Request
@@ -354,7 +357,7 @@ export default function UserAMCCMCPage() {
                   </td>
                   <td className="p-3 text-center">
                     <Link
-                      href={`/user-dashboard/amc-cmc/contract/${record.id}`}
+                      href={amcCmcPath(pathname, "contract", record.id)}
                       target="_blank"
                       className="inline-flex items-center rounded-md bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-800 hover:bg-slate-200"
                     >
@@ -364,7 +367,7 @@ export default function UserAMCCMCPage() {
                   <td className="p-3">
                     <div className="flex gap-2 justify-center">
                       <Link
-                        href={`/user-dashboard/amc-cmc/view/${record.id}`}
+                        href={amcCmcPath(pathname, "view", record.id)}
                         className="text-blue-600 hover:text-blue-800"
                         title="View"
                       >
@@ -387,7 +390,7 @@ export default function UserAMCCMCPage() {
                       {record.status === "pending" && (
                         <>
                           <Link
-                            href={`/user-dashboard/amc-cmc/edit/${record.id}`}
+                            href={amcCmcPath(pathname, "edit", record.id)}
                             className="text-yellow-600 hover:text-yellow-800"
                             title="Edit"
                           >
