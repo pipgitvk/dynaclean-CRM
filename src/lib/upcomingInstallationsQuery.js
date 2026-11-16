@@ -1,14 +1,11 @@
 import { UNREGISTERED_PRODUCT_ORDER_SQL } from "@/lib/pendingProductRegistrationCount";
 import { sqlTrimUtf8EqColumns, sqlUtf8TrimExpr } from "@/lib/sqlUtf8Compare";
+import {
+  dispatchSerialEligibleForInstallation,
+  pendingNeworderPredicates,
+} from "@/lib/upcomingInstallationOrderEligibility";
 
-function pendingNeworderPredicates(alias = "no_p") {
-  return `
-    ${alias}.installation_status = 0
-    AND (${alias}.is_returned = 0 OR ${alias}.is_returned = 2 OR ${alias}.is_returned IS NULL)
-    AND (${alias}.is_cancelled = 0 OR ${alias}.is_cancelled IS NULL)
-    AND ${alias}.delivery_date IS NOT NULL
-    AND ${alias}.dispatch_status = 1`;
-}
+export { pendingNeworderPredicates } from "@/lib/upcomingInstallationOrderEligibility";
 
 /** Restrict rows to quotes that still have a pending installation order */
 function joinPendingOrderOnQuote(quoteColumnExpr) {
@@ -88,8 +85,8 @@ export function buildUpcomingInstallationsQuery({ type = "products", registratio
       ${dispatchTypeJoin(type)}
       LEFT JOIN warranty_products wp
         ON ${sqlTrimUtf8EqColumns("wp.serial_number", "d.serial_no")}
-      WHERE d.serial_no IS NOT NULL
-        AND TRIM(d.serial_no) <> ''
+      WHERE 1=1
+        ${dispatchSerialEligibleForInstallation("d", "no_p")}
       GROUP BY quote_key
     ) agg ON ${sqlTrimUtf8EqColumns("agg.quote_key", "no.quote_number")}
     LEFT JOIN (
@@ -115,8 +112,8 @@ export function buildUpcomingInstallationsQuery({ type = "products", registratio
       ${joinPendingOrderOnQuote("d2.quote_number")}
       INNER JOIN service_records sr2
         ON ${sqlTrimUtf8EqColumns("sr2.serial_number", "d2.serial_no")}
-      WHERE d2.serial_no IS NOT NULL
-        AND TRIM(d2.serial_no) <> ''
+      WHERE 1=1
+        ${dispatchSerialEligibleForInstallation("d2", "no_p")}
       GROUP BY quote_key
     ) svc ON ${sqlTrimUtf8EqColumns("svc.quote_key", "no.quote_number")}
     LEFT JOIN (

@@ -1,4 +1,5 @@
 import { sqlTrimUtf8EqColumns } from "@/lib/sqlUtf8Compare";
+import { pendingNeworderPredicates } from "@/lib/upcomingInstallationOrderEligibility";
 
 /**
  * Item is a product (exists in products_list).
@@ -19,8 +20,12 @@ export const UNREGISTERED_PRODUCT_ORDER_SQL = `
     FROM dispatch d_unreg
     WHERE ${sqlTrimUtf8EqColumns("d_unreg.quote_number", "no.quote_number")}
       AND d_unreg.serial_no IS NOT NULL
-      AND d_unreg.serial_no <> ''
+      AND TRIM(d_unreg.serial_no) <> ''
       AND ${IS_PRODUCT_DISPATCH_ITEM_SQL("d_unreg")}
+      AND (
+        COALESCE(no.dispatch_status, 0) = 1
+        OR COALESCE(d_unreg.stock_deducted, 0) = 1
+      )
       AND NOT EXISTS (
         SELECT 1 FROM warranty_products wp
         WHERE ${sqlTrimUtf8EqColumns("wp.serial_number", "d_unreg.serial_no")}
@@ -37,11 +42,7 @@ export async function getPendingProductRegistrationCount(connection) {
     `
     SELECT COUNT(DISTINCT no.id) AS count
     FROM neworder no
-    WHERE no.installation_status = 0
-      AND (no.is_returned = 0 OR no.is_returned = 2 OR no.is_returned IS NULL)
-      AND (no.is_cancelled = 0 OR no.is_cancelled IS NULL)
-      AND no.delivery_date IS NOT NULL
-      AND no.dispatch_status = 1
+    WHERE ${pendingNeworderPredicates("no")}
       AND ${UNREGISTERED_PRODUCT_ORDER_SQL}
     `
   );

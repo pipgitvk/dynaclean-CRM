@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
+import { sqlTrimUtf8EqColumns } from "@/lib/sqlUtf8Compare";
 
 export async function GET(req) {
   let conn;
@@ -71,25 +72,26 @@ export async function GET(req) {
       );
     }
 
-    // STEP 6: Check serial number validity
-    const hasSerial = dispatchCheck.some(
-      (d) => d.serial_no !== null && d.serial_no.trim() !== ""
+    const shippedRows = dispatchCheck.filter(
+      (d) => Number(d?.stock_deducted) === 1,
     );
-
-    if (!hasSerial) {
+    if (shippedRows.length === 0) {
       return NextResponse.json(
-        { success: false, error: "Dispatch found but serial number missing" },
-        { status: 400 }
+        {
+          success: false,
+          error: "No dispatched (booked) items found for this Order ID yet",
+        },
+        { status: 404 },
       );
     }
 
-    // STEP 7: MAIN QUERY (only if all conditions pass)
+    // STEP 6: MAIN QUERY (only shipped / eligible rows)
     const [rows] = await conn.execute(
       `SELECT
          d.id AS dispatch_id,
          d.serial_no AS serial_number,
-         qi.item_name AS product_name,
-         qi.item_code AS model,
+         COALESCE(NULLIF(TRIM(qi.item_name), ""), d.item_name) AS product_name,
+         COALESCE(NULLIF(TRIM(qi.item_code), ""), d.item_code) AS model,
          qi.specification AS specification,
          COALESCE(qr.gstin, '') AS gstin,
          COALESCE(no.state, qr.state, '') AS state,
@@ -99,19 +101,41 @@ export async function GET(req) {
          no.contact AS contact,
          no.company_address AS customer_address,
          no.invoice_number AS invoice_number,
-         no.invoice_date AS invoice_date
+         no.invoice_date AS invoice_date,
+         CASE
+           WHEN EXISTS (
+             SELECT 1 FROM products_list pl
+             WHERE ${sqlTrimUtf8EqColumns("pl.item_code", "d.item_code")}
+           ) THEN 'product'
+           WHEN EXISTS (
+             SELECT 1 FROM spare_list sl
+             WHERE ${sqlTrimUtf8EqColumns("sl.spare_number", "d.item_code")}
+           ) THEN 'spare'
+           ELSE 'other'
+         END AS item_kind
        FROM neworder no
        JOIN dispatch d
          ON CONVERT(d.quote_number USING utf8mb3) COLLATE utf8mb3_unicode_ci = no.quote_number
-       JOIN quotation_items qi
-         ON qi.quote_number = no.quote_number
-        AND qi.item_code = CONVERT(d.item_code USING utf8mb3) COLLATE utf8mb3_unicode_ci
+       LEFT JOIN quotation_items qi
+         ON ${sqlTrimUtf8EqColumns("qi.quote_number", "no.quote_number")}
+        AND ${sqlTrimUtf8EqColumns("qi.item_code", "d.item_code")}
        LEFT JOIN quotations_records qr
          ON qr.quote_number = no.quote_number
        LEFT JOIN warranty_products wp
          ON wp.serial_number = CONVERT(d.serial_no USING utf8mb3) COLLATE utf8mb3_unicode_ci
        WHERE BINARY no.order_id = BINARY ?
          AND wp.serial_number IS NULL
+         AND COALESCE(d.stock_deducted, 0) = 1
+         AND (
+           NOT EXISTS (
+             SELECT 1 FROM products_list pl2
+             WHERE ${sqlTrimUtf8EqColumns("pl2.item_code", "d.item_code")}
+           )
+           OR (
+             d.serial_no IS NOT NULL
+             AND TRIM(d.serial_no) <> ""
+           )
+         )
        ORDER BY d.id DESC`,
       [orderId]
     );
@@ -120,9 +144,10 @@ export async function GET(req) {
       return NextResponse.json(
         {
           success: false,
-          error: "Dispatch found but serial number already registered in warranty",
+          error:
+            "No eligible dispatched items to register (already in warranty or not yet dispatched with serial)",
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
