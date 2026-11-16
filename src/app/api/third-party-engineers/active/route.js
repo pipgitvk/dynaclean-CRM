@@ -1,6 +1,7 @@
 import { getDbConnection } from "@/lib/db";
 import { NextResponse } from "next/server";
 import { getSessionPayload } from "@/lib/auth";
+import { normalizeRoleKey } from "@/lib/roleKeyUtils";
 
 /**
  * GET /api/third-party-engineers/active
@@ -14,20 +15,18 @@ export async function GET(req) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const roleNorm = String(payload.role || payload.userRole || "")
-      .toUpperCase()
-      .trim();
+    const roleNorm = normalizeRoleKey(payload.role || payload.userRole || "");
 
-    // Allow SUPERADMIN, ADMIN, DIRECTOR, SERVICE HEAD, EA to view active engineers
-    const allowed = [
+    const allowed = new Set([
       "SUPERADMIN",
       "ADMIN",
       "DIRECTOR",
       "SERVICE HEAD",
       "SERVICE SUPPORT",
+      "SALES CUM BACKOFFICE",
       "EA",
-    ];
-    if (!allowed.includes(roleNorm)) {
+    ]);
+    if (!allowed.has(roleNorm)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
