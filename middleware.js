@@ -389,6 +389,7 @@ export async function middleware(request) {
           roleNorm === "DIRECTOR" ||
           roleNorm === "SERVICE HEAD" ||
           roleNorm === "SERVICE SUPPORT" ||
+          roleNorm === "SALES CUM BACKOFFICE" ||
           roleNorm === "ADMIN"
         ) {
           return NextResponse.next();

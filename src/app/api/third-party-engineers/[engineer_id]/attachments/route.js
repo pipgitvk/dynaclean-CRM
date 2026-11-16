@@ -23,7 +23,7 @@ async function verifyAccess() {
     .toUpperCase()
     .trim();
 
-  const allowed = ["SUPERADMIN", "ADMIN", "SERVICE SUPPORT"];
+  const allowed = ["SUPERADMIN", "ADMIN", "SERVICE SUPPORT", "SALES CUM BACKOFFICE"];
   if (!allowed.includes(roleNorm)) {
     return { authorized: false, error: "Forbidden: Only Super Admin, Admin, and Service Support can access this resource", status: 403 };
   }

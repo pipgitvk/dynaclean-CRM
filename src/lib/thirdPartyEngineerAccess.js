@@ -7,7 +7,12 @@ import {
 
 export function isThirdPartyEngineerModuleRole(role) {
   const k = normalizeRoleKey(role);
-  return k === "SUPERADMIN" || k === "ADMIN" || k === "SERVICE SUPPORT";
+  return (
+    k === "SUPERADMIN" ||
+    k === "ADMIN" ||
+    k === "SERVICE SUPPORT" ||
+    k === "SALES CUM BACKOFFICE"
+  );
 }
 
 export async function verifyThirdPartyEngineerModuleAccess() {
@@ -21,7 +26,8 @@ export async function verifyThirdPartyEngineerModuleAccess() {
   if (!isThirdPartyEngineerModuleRole(roleNorm)) {
     return {
       authorized: false,
-      error: "Forbidden: Only Super Admin, Admin, and Service Support can access this resource",
+      error:
+        "Forbidden: Only Super Admin, Admin, Service Support, and Sales cum Backoffice can access this resource",
       status: 403,
       payload: null,
     };
@@ -38,7 +44,7 @@ export function buildThirdPartyEngineerCreatedByWhere({
 }) {
   const roleKey = normalizeRoleKey(roleNorm);
 
-  if (roleKey === "SUPERADMIN") {
+  if (roleKey === "SUPERADMIN" || roleKey === "SALES CUM BACKOFFICE") {
     return { sql: "", params: [] };
   }
   if (isServiceSupportRole(roleKey)) {

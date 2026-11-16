@@ -23,6 +23,7 @@ export async function GET() {
       "DIRECTOR",
       "SERVICE HEAD",
       "SERVICE SUPPORT",
+      "SALES CUM BACKOFFICE",
       "EA",
       "SERVICE ENGINEER",
     ];

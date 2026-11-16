@@ -1,0 +1,1 @@
+export { default } from "@/app/user-dashboard/service-followups/page";

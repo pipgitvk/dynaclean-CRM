@@ -296,7 +296,8 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
       roleNorm === "SUPERADMIN" ||
       roleNorm === "TEAM LEADER" ||
       roleNorm === "SERVICE HEAD" ||
-      roleNorm === "SERVICE SUPPORT"
+      roleNorm === "SERVICE SUPPORT" ||
+      roleNorm === "SALES CUM BACKOFFICE"
     );
   };
 
@@ -380,7 +381,8 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
         role === "SUPERADMIN" ||
         role === "TEAM LEADER" ||
         role === "SERVICE HEAD" ||
-        role === "SERVICE SUPPORT") &&
+        role === "SERVICE SUPPORT" ||
+        role === "SALES CUM BACKOFFICE") &&
         record.status?.toUpperCase() !== "COMPLETED" && (
           <button
             type="button"
