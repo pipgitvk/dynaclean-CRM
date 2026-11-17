@@ -509,7 +509,7 @@ function LeadsSourcePie({ pieData, pieTotal, loading }) {
           </>
         )}
       </div>
-      <ul className="w-full sm:flex-1 space-y-3 pr-1 max-h-[260px] overflow-y-auto">
+      <ul className="w-full sm:flex-1 space-y-3 pr-1">
         {pieData.map((d) => {
           const pct = pieTotal ? Math.round((d.value / pieTotal) * 1000) / 10 : 0;
           return (
