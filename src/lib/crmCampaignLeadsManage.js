@@ -1,0 +1,327 @@
+import { getDbConnection } from "@/lib/db";
+import { getCurrentMonthRangeIso } from "@/lib/crmDateFormat";
+import { buildCustomerListSearchClause } from "@/lib/customerListSearch";
+import { buildGemCustomerScopeWhere } from "@/lib/dataScope";
+import { sqlServiceSupportCustomerScope } from "@/lib/serviceSupportTeamScope";
+import { CUSTOMER_MANUAL_ASSIGNED_TO_SQL } from "@/lib/customerManualAssignment";
+
+export const CAMPAIGN_LEAD_SQL = {
+  google_ads: `LOWER(TRIM(c.lead_campaign)) IN ('google_ads', 'google', 'google adwords', 'googleads')`,
+  indiamart: `LOWER(TRIM(c.lead_campaign)) IN ('india_mart', 'indiamart', 'india-mart')`,
+  website_direct: `LOWER(TRIM(c.lead_campaign)) IN ('website_visit', 'website', 'website_direct')`,
+};
+
+/** Manager manually assigned (not Automatic / empty assigned_to). */
+export const MANAGER_ASSIGNED_LEAD_SQL = CUSTOMER_MANUAL_ASSIGNED_TO_SQL;
+
+const CRM_CUSTOMER_CANCEL_SQL = `(
+  LOWER(TRIM(c.status)) IN ('denied', 'invalid')
+  OR LOWER(TRIM(c.status)) LIKE '%denied%'
+  OR LOWER(TRIM(c.status)) LIKE '%invalid%'
+)`;
+
+const WON_ORDER_PREDICATE = `
+  COALESCE(no.account_status, 0) = 1
+  AND COALESCE(no.dispatch_status, 0) = 1
+  AND COALESCE(no.is_cancelled, 0) = 0
+`;
+
+const LIST_SELECT = `
+  c.customer_id, c.first_name, c.last_name, c.email, c.phone, c.company,
+  c.lead_source, c.assigned_to, c.sales_representative, c.lead_campaign,
+  c.status, c.stage, c.date_created, c.products_interest
+`;
+
+function normalizeOutcomeTag(raw) {
+  const t = String(raw || "all").trim().toLowerCase();
+  if (t === "won" || t === "cancel") return t;
+  return "all";
+}
+
+function normalizeLeadFilters(filters = {}) {
+  let { startDate, endDate } = filters;
+  if (!startDate || !endDate) {
+    const month = getCurrentMonthRangeIso();
+    startDate = startDate || month.from;
+    endDate = endDate || month.to;
+  }
+  const q = String(filters.search || "").trim();
+  return {
+    ...filters,
+    startDate,
+    endDate,
+    search: q || undefined,
+  };
+}
+
+function appendRoleScope(conditions, params, { username, userRole }) {
+  const role = String(userRole || "").trim().toUpperCase();
+  if (role === "SERVICE SUPPORT") {
+    conditions.push(sqlServiceSupportCustomerScope("c"));
+  } else if (role === "GEM") {
+    const gemScope = buildGemCustomerScopeWhere({ username, tableAlias: "c" });
+    conditions.push(gemScope.sql);
+    params.push(...gemScope.params);
+  } else if (
+    role !== "ADMIN" &&
+    role !== "SUPERADMIN" &&
+    role !== "SERVICE HEAD" &&
+    role !== "TEAM LEADER" &&
+    role !== "EA"
+  ) {
+    conditions.push(
+      "(c.lead_source = ? OR c.sales_representative = ? OR c.assigned_to = ?)",
+    );
+    params.push(username, username, username);
+  }
+}
+
+function createBuildBaseWhere(campaignSql) {
+  return function buildBaseWhere(filters, access) {
+    const conditions = [campaignSql];
+    const params = [];
+
+    appendRoleScope(conditions, params, access);
+
+    if (filters.startDate) {
+      conditions.push("c.date_created >= ?");
+      params.push(`${filters.startDate} 00:00:00`);
+    }
+    if (filters.endDate) {
+      conditions.push("c.date_created < DATE_ADD(?, INTERVAL 1 DAY)");
+      params.push(filters.endDate);
+    }
+
+    if (filters.assignedTo) {
+      conditions.push("c.assigned_to = ?");
+      params.push(filters.assignedTo);
+    }
+    if (filters.leadSource) {
+      conditions.push("c.lead_source = ?");
+      params.push(filters.leadSource);
+    }
+
+    const searchClause = buildCustomerListSearchClause(filters.search);
+    if (searchClause) {
+      conditions.push(searchClause.sql);
+      params.push(...searchClause.params);
+    }
+
+    const tag = normalizeOutcomeTag(filters.outcomeTag);
+    if (tag === "cancel") {
+      conditions.push(CRM_CUSTOMER_CANCEL_SQL);
+    } else if (tag === "won") {
+      conditions.push(`NOT ${CRM_CUSTOMER_CANCEL_SQL}`);
+      conditions.push(`EXISTS (
+        SELECT 1 FROM neworder no
+        WHERE no.customer_id = c.customer_id
+          AND ${WON_ORDER_PREDICATE}
+      )`);
+    }
+
+    return {
+      whereSql: conditions.length ? `WHERE ${conditions.join(" AND ")}` : "",
+      params,
+    };
+  };
+}
+
+async function attachWonFlags(conn, rows) {
+  const ids = [
+    ...new Set(rows.map((r) => r.customer_id).filter((id) => id != null && id !== "")),
+  ];
+  if (ids.length === 0) {
+    return rows.map((r) => ({ ...r, has_dispatched_order: 0 }));
+  }
+  const placeholders = ids.map(() => "?").join(", ");
+  const [wonRows] = await conn.execute(
+    `SELECT DISTINCT cid AS customer_id
+     FROM (
+       SELECT no.customer_id AS cid
+       FROM neworder no
+       WHERE no.customer_id IN (${placeholders})
+         AND ${WON_ORDER_PREDICATE}
+       UNION
+       SELECT qr.customer_id AS cid
+       FROM neworder no
+       INNER JOIN quotations_records qr ON no.quote_number = qr.quote_number
+       WHERE qr.customer_id IN (${placeholders})
+         AND ${WON_ORDER_PREDICATE}
+     ) won_page`,
+    [...ids, ...ids],
+  );
+  const wonSet = new Set(wonRows.map((r) => Number(r.customer_id)));
+  return rows.map((r) => ({
+    ...r,
+    has_dispatched_order:
+      r.customer_id && wonSet.has(Number(r.customer_id)) ? 1 : 0,
+  }));
+}
+
+export function createCrmCampaignLeadsManage(campaignSql) {
+  const buildBaseWhere = createBuildBaseWhere(campaignSql);
+
+  async function listLeads(filters, access) {
+    filters = normalizeLeadFilters(filters);
+    const conn = await getDbConnection();
+    const { whereSql, params } = buildBaseWhere(filters, access);
+    const limit = filters.limit ?? 50;
+    const skip = filters.skip ?? 0;
+
+    const [rows] = await conn.execute(
+      `SELECT ${LIST_SELECT}
+       FROM customers c
+       ${whereSql}
+       ORDER BY c.date_created DESC
+       LIMIT ? OFFSET ?`,
+      [...params, limit, skip],
+    );
+
+    const tag = normalizeOutcomeTag(filters.outcomeTag);
+    const data =
+      tag === "won"
+        ? rows.map((r) => ({ ...r, has_dispatched_order: 1 }))
+        : await attachWonFlags(conn, rows);
+
+    return { data };
+  }
+
+  async function countLeads(conn, filters, access) {
+    const { whereSql, params } = buildBaseWhere(filters, access);
+    const [[row]] = await conn.execute(
+      `SELECT COUNT(*) AS cnt FROM customers c ${whereSql}`,
+      params,
+    );
+    return Number(row?.cnt || 0);
+  }
+
+  async function getSummary(filters, access) {
+    filters = normalizeLeadFilters(filters);
+    const conn = await getDbConnection();
+    const total = await countLeads(conn, filters, access);
+    return { total };
+  }
+
+  async function getFilterOptions(filters, access) {
+    filters = normalizeLeadFilters(filters);
+    const conn = await getDbConnection();
+    const scoped = { ...filters };
+    delete scoped.assignedTo;
+    delete scoped.leadSource;
+    delete scoped.outcomeTag;
+    delete scoped.search;
+
+    const { whereSql, params } = buildBaseWhere(scoped, access);
+
+    const [assigneeResult, sourceResult] = await Promise.all([
+      conn.execute(
+        `SELECT DISTINCT c.assigned_to
+         FROM customers c
+         ${whereSql}
+           AND TRIM(COALESCE(c.assigned_to, '')) != ''
+         ORDER BY c.assigned_to ASC
+         LIMIT 300`,
+        params,
+      ),
+      conn.execute(
+        `SELECT DISTINCT c.lead_source
+         FROM customers c
+         ${whereSql}
+           AND TRIM(COALESCE(c.lead_source, '')) != ''
+         ORDER BY c.lead_source ASC
+         LIMIT 300`,
+        params,
+      ),
+    ]);
+
+    return {
+      assignees: assigneeResult[0].map((r) => ({
+        assignedTo: r.assigned_to,
+        employeeName: r.assigned_to,
+      })),
+      leadSources: sourceResult[0]
+        .map((r) => String(r.lead_source || "").trim())
+        .filter(Boolean),
+    };
+  }
+
+  async function fetchLeadsPage(
+    filters,
+    access,
+    { includeOptions = true, includeSummary = true, optionsOnly = false } = {},
+  ) {
+    filters = normalizeLeadFilters(filters);
+    const skip = filters.skip ?? 0;
+
+    if (optionsOnly && skip === 0) {
+      const filterOptions = includeOptions
+        ? await getFilterOptions(filters, access)
+        : null;
+      return {
+        summary: null,
+        filterOptions,
+        data: [],
+        pagination: {
+          total: 0,
+          limit: filters.limit ?? 50,
+          skip: 0,
+          hasMore: false,
+        },
+      };
+    }
+
+    if (skip > 0) {
+      const listResult = await listLeads(filters, access);
+      const limit = filters.limit ?? 50;
+      return {
+        summary: null,
+        filterOptions: null,
+        data: listResult.data,
+        pagination: {
+          total: 0,
+          limit,
+          skip,
+          hasMore: listResult.data.length >= limit,
+        },
+      };
+    }
+
+    const [listResult, summary, filterOptions] = await Promise.all([
+      listLeads(filters, access),
+      includeSummary ? getSummary(filters, access) : Promise.resolve(null),
+      includeOptions ? getFilterOptions(filters, access) : Promise.resolve(null),
+    ]);
+
+    const listTotal = summary?.total ?? 0;
+
+    return {
+      summary: summary ? { ...summary, total: listTotal } : null,
+      filterOptions,
+      data: listResult.data,
+      pagination: {
+        total: listTotal,
+        limit: filters.limit ?? 50,
+        skip: 0,
+        hasMore: listResult.data.length < listTotal,
+      },
+    };
+  }
+
+  return {
+    normalizeLeadFilters,
+    listLeads,
+    getSummary,
+    getFilterOptions,
+    fetchLeadsPage,
+  };
+}
+
+const googleAdsApi = createCrmCampaignLeadsManage(CAMPAIGN_LEAD_SQL.google_ads);
+const indiamartApi = createCrmCampaignLeadsManage(CAMPAIGN_LEAD_SQL.indiamart);
+const websiteDirectApi = createCrmCampaignLeadsManage(CAMPAIGN_LEAD_SQL.website_direct);
+const managerAssignedApi = createCrmCampaignLeadsManage(MANAGER_ASSIGNED_LEAD_SQL);
+
+export const googleAdsLeadsManage = googleAdsApi;
+export const indiamartLeadsManage = indiamartApi;
+export const websiteDirectLeadsManage = websiteDirectApi;
+export const managerAssignedLeadsManage = managerAssignedApi;

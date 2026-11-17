@@ -1,0 +1,5 @@
+import WebsiteDirectLeadsManageClient from "@/components/Leads/WebsiteDirectLeadsManageClient";
+
+export default function Page() {
+  return <WebsiteDirectLeadsManageClient dashboardBase="user-dashboard" />;
+}

@@ -247,7 +247,7 @@ function filterByRole(list, roleKey) {
 
 /**
  * Top-level order mirrors super-admin (`getAdminSidebarMenuItems.js`): Dashboard → TL → Reports →
- * Leads Management → Activities → Sales → Service → Products → Procurement → Production →
+ * Leads Manage → Leads Management → Activities → Sales → Service → Products → Procurement → Production →
  * Accounting → Main Expenses → Employees → Employee CRM → HR Operations → Targets → Resource Center.
  * Paths stay under user CRM (`/user-dashboard`, `/empcrm/...`) except where only an admin route exists.
  */
@@ -324,6 +324,13 @@ const allMenuItems = [
         icon: "FileText",
       },
     ],
+  },
+  {
+    path: "/user-dashboard/leads-manage",
+    name: "Leads Manage",
+    moduleKey: "leads-manage",
+    roles: ["ALL"],
+    icon: "LayoutGrid",
   },
   {
     name: "Leads Management",

@@ -26,6 +26,7 @@ export const MODULE_KEY_TO_URL = {
   "tl-customers": "/admin-dashboard/tl-customers",
   "add-customer": "/admin-dashboard/add-customer",
   "view-customers": "/admin-dashboard/customers",
+  "leads-manage": "/admin-dashboard/leads-manage",
   "my-leads": "/admin-dashboard/my-leads",
   "dm-fresh-leads": "/user-dashboard/digital-marketer-leads",
   "lead-distribution": "/admin-dashboard/lead-distribution",

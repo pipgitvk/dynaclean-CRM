@@ -1,7 +1,8 @@
 'use client';
 
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
-import { useState, useEffect } from 'react';
+import { getCurrentMonthRangeIso } from "@/lib/crmDateFormat";
+import { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import { Loader2, User, Calendar, CheckCircle, XCircle, Filter, X, ChevronLeft, ChevronRight, Tag } from 'lucide-react';
 
@@ -19,12 +20,13 @@ function ProductInterestBadge({ value, className = '' }) {
 }
 
 export default function MetaFormLeadsTable({ formIds, productInterestByFormId = {} }) {
+  const monthDefault = useMemo(() => getCurrentMonthRangeIso(), []);
   const [leadsData, setLeadsData] = useState({});
   const [leadCounts, setLeadCounts] = useState({});
   const [loading, setLoading] = useState({});
   const [importFilter, setImportFilter] = useState('all');
-  const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
-  const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
+  const [startDate, setStartDate] = useState(monthDefault.from);
+  const [endDate, setEndDate] = useState(monthDefault.to);
   const [pagination, setPagination] = useState({});
   const [currentPage, setCurrentPage] = useState(0);
 
@@ -129,10 +131,14 @@ export default function MetaFormLeadsTable({ formIds, productInterestByFormId = 
 
   const clearFilters = () => {
     setImportFilter('all');
-    setStartDate('');
-    setEndDate('');
+    setStartDate(monthDefault.from);
+    setEndDate(monthDefault.to);
     setCurrentPage(0);
   };
+
+  const formTotalsSum = useMemo(() => {
+    return formIds.reduce((sum, formId) => sum + (pagination[formId]?.total ?? 0), 0);
+  }, [formIds, pagination]);
 
   const handleNextPage = () => {
     setCurrentPage(prev => prev + 1);
@@ -217,6 +223,13 @@ export default function MetaFormLeadsTable({ formIds, productInterestByFormId = 
             Clear Filters
           </button>
         </div>
+        {formIds.length > 1 && formTotalsSum > 0 && (
+          <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 mt-3">
+            Har form ka count alag hai — sab forms ko add karne se overlap ho sakta hai. Leads Manage →
+            Social Media par total unique <code className="font-mono">leadgen_id</code> (us month) se
+            match karein; abhi forms ka sum ≈ {formTotalsSum}.
+          </p>
+        )}
       </div>
 
       {formIds.map((formId, index) => {

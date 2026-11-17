@@ -262,6 +262,13 @@ const allMenuItems = [
     ],
   },
   {
+    path: "/admin-dashboard/leads-manage",
+    name: "Leads Manage",
+    moduleKey: "leads-manage",
+    roles: ["ALL"],
+    icon: "LayoutGrid",
+  },
+  {
     name: "Leads Management",
     moduleKey: "leads-management",
     roles: ["ALL"],

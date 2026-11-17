@@ -152,6 +152,10 @@ async function getAllLeads(filters = {}) {
     query += ` AND ${tablePrefix}is_imported_to_crm = ?`;
     values.push(filters.isImported ? 1 : 0);
   }
+  if (filters.campaignName) {
+    query += ` AND ${tablePrefix}campaign_name = ?`;
+    values.push(filters.campaignName);
+  }
   if (filters.startDate) {
     query += ` AND DATE(${tablePrefix}created_at) >= ?`;
     values.push(filters.startDate);
@@ -208,6 +212,10 @@ async function countLeads(filters = {}) {
       query += ' AND is_imported_to_crm = ?';
       values.push(filters.isImported ? 1 : 0);
     }
+    if (filters.campaignName) {
+      query += ' AND campaign_name = ?';
+      values.push(filters.campaignName);
+    }
     if (filters.startDate) {
       query += ' AND DATE(created_at) >= ?';
       values.push(filters.startDate);
@@ -230,6 +238,10 @@ async function countLeads(filters = {}) {
     if (filters.isImported !== undefined) {
       where += ' AND is_imported_to_crm = ?';
       values.push(filters.isImported ? 1 : 0);
+    }
+    if (filters.campaignName) {
+      where += ' AND campaign_name = ?';
+      values.push(filters.campaignName);
     }
     if (filters.startDate) {
       where += ' AND DATE(created_at) >= ?';

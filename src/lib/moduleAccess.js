@@ -53,6 +53,11 @@ export const MODULE_TREE = [
     ],
   },
   {
+    key: "leads-manage-hub",
+    label: "Leads Manage",
+    children: [{ key: "leads-manage", label: "Leads Manage" }],
+  },
+  {
     key: "tl-management",
     label: "Leads Management",
     children: [
@@ -281,6 +286,12 @@ export const SUPERADMIN_MODULE_UI_NODES = [
       { kind: "leaf", key: "item-wise-sales", label: "Item Wise Sales" },
       { kind: "leaf", key: "customer-payment-behavior", label: "Customer Payment Behavior" },
     ],
+  },
+  {
+    kind: "group",
+    id: "leads-manage",
+    label: "Leads Manage",
+    children: [{ kind: "leaf", key: "leads-manage", label: "Leads Manage Hub" }],
   },
   {
     kind: "group",
