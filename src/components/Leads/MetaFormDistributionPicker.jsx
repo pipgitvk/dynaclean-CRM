@@ -1,9 +1,108 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import axios from "axios";
-import { Loader2, Settings2, X } from "lucide-react";
+import { ChevronDown, Loader2, Settings2, X } from "lucide-react";
 import MetaFormAssignments from "@/components/MetaFormAssignments";
+
+function FormDistributionMenu({
+  open,
+  onClose,
+  triggerRef,
+  forms,
+  formLabel,
+  onPick,
+  loading,
+}) {
+  const menuRef = useRef(null);
+  const [rect, setRect] = useState(null);
+
+  const updatePosition = useCallback(() => {
+    const trigger = triggerRef.current;
+    if (!trigger) return;
+    const r = trigger.getBoundingClientRect();
+    const margin = 12;
+    const viewportW = window.innerWidth;
+    setRect({
+      top: r.bottom + 8,
+      right: Math.max(margin, viewportW - r.right),
+      minWidth: r.width,
+      maxWidth: Math.min(512, viewportW - margin * 2),
+    });
+  }, [triggerRef]);
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [open, updatePosition, forms.length]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e) => {
+      const t = e.target;
+      if (menuRef.current?.contains(t) || triggerRef.current?.contains(t)) return;
+      onClose();
+    };
+    const onKey = (e) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open, onClose, triggerRef]);
+
+  if (!open || !rect || typeof document === "undefined") return null;
+
+  return createPortal(
+    <ul
+      ref={menuRef}
+      role="listbox"
+      aria-label="Form distribution options"
+      className="fixed z-[10050] max-h-[min(18rem,50vh)] overflow-y-auto rounded-md border border-slate-300 bg-white py-1 text-base text-slate-900 shadow-xl"
+      style={{
+        top: rect.top,
+        right: rect.right,
+        left: "auto",
+        minWidth: rect.minWidth,
+        maxWidth: rect.maxWidth,
+        width: "max-content",
+      }}
+    >
+      {loading && forms.length === 0 ? (
+        <li className="px-3 py-2 text-slate-500">Loading forms…</li>
+      ) : null}
+      {forms.map((f) => {
+        const label = formLabel(f);
+        return (
+          <li key={f.formId} role="presentation">
+            <button
+              type="button"
+              role="option"
+              className="w-full whitespace-normal px-3 py-2 text-left text-slate-900 transition hover:bg-blue-700 hover:text-white focus:bg-blue-700 focus:text-white focus:outline-none"
+              onClick={() => {
+                onPick(f.formId);
+                onClose();
+              }}
+            >
+              {label}
+            </button>
+          </li>
+        );
+      })}
+    </ul>,
+    document.body,
+  );
+}
 
 export default function MetaFormDistributionPicker() {
   const [forms, setForms] = useState([]);
@@ -12,7 +111,8 @@ export default function MetaFormDistributionPicker() {
   const [loadingEmployees, setLoadingEmployees] = useState(true);
   const [forbidden, setForbidden] = useState(false);
   const [modalFormId, setModalFormId] = useState(null);
-  const [pickerValue, setPickerValue] = useState("");
+  const [menuOpen, setMenuOpen] = useState(false);
+  const triggerRef = useRef(null);
 
   const loadForms = useCallback(async () => {
     setLoadingForms(true);
@@ -51,34 +151,41 @@ export default function MetaFormDistributionPicker() {
     return f.formId;
   };
 
+  const pickerDisabled = loadingForms || loadingEmployees;
+
   return (
     <>
-      <div className="relative inline-flex min-w-[12rem] max-w-[22rem] items-center sm:min-w-[14rem]">
-        <Settings2 className="pointer-events-none absolute left-3 z-10 h-[1.125rem] w-[1.125rem] text-violet-700" />
-        <select
-          value={pickerValue}
-          disabled={loadingForms || loadingEmployees}
-          onChange={(e) => {
-            const v = e.target.value;
-            setPickerValue(v);
-            if (v) {
-              setModalFormId(v);
-              setPickerValue("");
-            }
-          }}
-          className="w-full cursor-pointer appearance-none rounded-xl border border-violet-400/70 bg-violet-200/95 py-2.5 pl-10 pr-8 text-base font-semibold text-slate-900 shadow-sm hover:border-violet-500/80 hover:bg-violet-300/90 focus:outline-none focus:ring-2 focus:ring-violet-500/30 disabled:opacity-60"
+      <div className="w-[12rem] shrink-0 sm:w-[14rem]">
+        <button
+          ref={triggerRef}
+          type="button"
+          disabled={pickerDisabled}
+          onClick={() => setMenuOpen((o) => !o)}
+          className="relative flex w-full cursor-pointer items-center justify-between gap-2 rounded-xl border border-violet-400/70 bg-violet-200/95 py-2.5 pl-10 pr-3 text-left text-base font-semibold text-slate-900 shadow-sm hover:border-violet-500/80 hover:bg-violet-300/90 focus:outline-none focus:ring-2 focus:ring-violet-500/30 disabled:cursor-not-allowed disabled:opacity-60"
+          aria-haspopup="listbox"
+          aria-expanded={menuOpen}
           aria-label="Open form lead distribution"
         >
-          <option value="">
+          <Settings2 className="pointer-events-none absolute left-3 top-1/2 h-[1.125rem] w-[1.125rem] -translate-y-1/2 text-violet-700" />
+          <span className="truncate">
             {loadingForms ? "Loading forms…" : "Form distribution"}
-          </option>
-          {forms.map((f) => (
-            <option key={f.formId} value={f.formId}>
-              {formLabel(f)}
-            </option>
-          ))}
-        </select>
+          </span>
+          <ChevronDown
+            className={`h-4 w-4 shrink-0 text-violet-800/80 transition-transform ${menuOpen ? "rotate-180" : ""}`}
+            aria-hidden
+          />
+        </button>
       </div>
+
+      <FormDistributionMenu
+        open={menuOpen && !pickerDisabled}
+        onClose={() => setMenuOpen(false)}
+        triggerRef={triggerRef}
+        forms={forms}
+        formLabel={formLabel}
+        loading={loadingForms}
+        onPick={setModalFormId}
+      />
 
       {modalFormId ? (
         <div

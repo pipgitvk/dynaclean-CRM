@@ -500,8 +500,8 @@ export default function SocialMediaLeadsManageClient({
                 className="w-full rounded-xl border border-slate-200 px-3 py-2 text-base"
               >
                 <option value="all">All leads</option>
-                <option value="distributed">Distributed only</option>
-                <option value="duplicate">Duplicate only</option>
+                <option value="distributed">Distributed</option>
+                <option value="duplicate">Duplicate</option>
               </select>
             </FilterField>
             <FilterField label="Tag">
