@@ -441,15 +441,21 @@ function mapListRows(rows) {
   });
 }
 
+function shouldUseLightCustomerJoin(filters) {
+  const tag = normalizeOutcomeTag(filters.outcomeTag);
+  // Duplicate rows usually have no crm_customer_id — phone/JSON join against all customers is the bottleneck.
+  if (filters.isImported === false) return true;
+  if (filters.isImported === true) return true;
+  if (tag === "cancel" || tag === "won") return true;
+  return false;
+}
+
 async function fetchLeadsByMetaIds(conn, filters, metaIds) {
   if (metaIds.length === 0) return [];
   const placeholders = metaIds.map(() => "?").join(", ");
-  const tag = normalizeOutcomeTag(filters.outcomeTag);
-  // Page-sized fetch: prefer PK join for Tag filters; full phone join only for "all".
-  const customerJoin =
-    tag === "cancel" || tag === "won"
-      ? `LEFT JOIN customers c ON c.customer_id = ml.crm_customer_id`
-      : META_LEAD_CUSTOMER_JOIN;
+  const customerJoin = shouldUseLightCustomerJoin(filters)
+    ? `LEFT JOIN customers c ON c.customer_id = ml.crm_customer_id`
+    : META_LEAD_CUSTOMER_JOIN;
   const [rows] = await conn.execute(
     `SELECT ${LIST_SELECT},
       COALESCE(NULLIF(ml.crm_customer_id, 0), c.customer_id) AS resolved_customer_id,
@@ -474,11 +480,17 @@ async function listSocialMediaLeadsFastPaginated(filters, { withTotal = false } 
   const skip = filters.skip ?? 0;
 
   const [idRows] = await conn.execute(
-    `SELECT ml.id
-     FROM meta_leads ml
-     ${joinSql}
-     ORDER BY ml.created_at DESC
-     LIMIT ? OFFSET ?`,
+    withTotal
+      ? `SELECT ml.id, COUNT(*) OVER() AS filter_total
+         FROM meta_leads ml
+         ${joinSql}
+         ORDER BY ml.created_at DESC
+         LIMIT ? OFFSET ?`
+      : `SELECT ml.id
+         FROM meta_leads ml
+         ${joinSql}
+         ORDER BY ml.created_at DESC
+         LIMIT ? OFFSET ?`,
     [...values, limit, skip],
   );
   const metaIds = idRows.map((r) => r.id);
@@ -486,14 +498,22 @@ async function listSocialMediaLeadsFastPaginated(filters, { withTotal = false } 
 
   let filterTotal = null;
   if (withTotal) {
-    filterTotal = await countFastMonthScopedLeads(conn, filters);
+    filterTotal =
+      idRows.length > 0
+        ? Number(idRows[0].filter_total || 0)
+        : skip > 0
+          ? await countFastMonthScopedLeads(conn, filters)
+          : 0;
   }
 
   let data = mapListRows(rows);
-  if (!needsWonJoin(filters)) {
-    data = await attachWonFlags(conn, data);
-  } else {
+  // Duplicates are not CRM-imported — skip won-order lookup.
+  if (filters.isImported === false) {
+    data = data.map((r) => ({ ...r, has_dispatched_order: 0 }));
+  } else if (needsWonJoin(filters)) {
     data = data.map((r) => ({ ...r, has_dispatched_order: 1 }));
+  } else {
+    data = await attachWonFlags(conn, data);
   }
   return { data, filterTotal };
 }
