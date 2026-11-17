@@ -53,8 +53,8 @@ export default function MetaFormDistributionPicker() {
 
   return (
     <>
-      <div className="relative inline-flex min-w-[12rem] max-w-[20rem] items-center">
-        <Settings2 className="pointer-events-none absolute left-3 z-10 h-4 w-4 text-violet-500" />
+      <div className="relative inline-flex min-w-[12rem] max-w-[22rem] items-center sm:min-w-[14rem]">
+        <Settings2 className="pointer-events-none absolute left-3 z-10 h-4 w-4 text-violet-700" />
         <select
           value={pickerValue}
           disabled={loadingForms || loadingEmployees}
@@ -66,7 +66,7 @@ export default function MetaFormDistributionPicker() {
               setPickerValue("");
             }
           }}
-          className="w-full cursor-pointer appearance-none rounded-lg border border-violet-200 bg-white py-2 pl-9 pr-8 text-sm font-semibold text-slate-800 shadow-sm hover:border-violet-300 focus:outline-none focus:ring-2 focus:ring-violet-500/25 disabled:opacity-60"
+          className="w-full cursor-pointer appearance-none rounded-xl border border-violet-300/80 bg-violet-100/90 py-2.5 pl-9 pr-8 text-sm font-semibold text-slate-900 shadow-sm hover:border-violet-400 hover:bg-violet-200/80 focus:outline-none focus:ring-2 focus:ring-violet-500/30 disabled:opacity-60"
           aria-label="Open form lead distribution"
         >
           <option value="">

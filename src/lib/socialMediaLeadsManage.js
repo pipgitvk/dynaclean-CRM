@@ -512,6 +512,62 @@ export async function getSocialMediaLeadsSummary(filters = {}) {
   };
 }
 
+/** All-time assignees + unique-lead count in the active list date filter. */
+async function querySocialMediaAssigneeOptions(conn, filters = {}) {
+  const normalized = normalizeSocialMediaLeadFilters(filters);
+  const metaChannel = normalized.metaChannel || "social_media";
+  const channelAllTime = getMetaLeadChannelSql(metaChannel, "meta_leads");
+  const channelScoped = getMetaLeadChannelSql(metaChannel, "ml0");
+
+  const inner = [
+    "ml0.leadgen_id IS NOT NULL",
+    "ml0.leadgen_id != ''",
+    "TRIM(COALESCE(ml0.assigned_to, '')) != ''",
+  ];
+  const values = [];
+  pushDateRange(inner, values, normalized, "ml0.created_at");
+  inner.push(channelScoped);
+
+  const [rows] = await conn.execute(
+    `SELECT
+       all_a.assigned_to,
+       all_a.employee_name,
+       COALESCE(scoped.lead_count, 0) AS lead_count
+     FROM (
+       SELECT
+         assigned_to,
+         MAX(NULLIF(TRIM(employee_name), '')) AS employee_name
+       FROM meta_leads
+       WHERE leadgen_id IS NOT NULL AND leadgen_id != ''
+         AND TRIM(COALESCE(assigned_to, '')) != ''
+         AND ${channelAllTime}
+       GROUP BY assigned_to
+     ) all_a
+     LEFT JOIN (
+       SELECT
+         ml.assigned_to,
+         COUNT(*) AS lead_count
+       FROM meta_leads ml
+       INNER JOIN (
+         SELECT MIN(ml0.id) AS min_id
+         FROM meta_leads ml0
+         WHERE ${inner.join(" AND ")}
+         GROUP BY ml0.leadgen_id
+       ) unique_leads ON ml.id = unique_leads.min_id
+       GROUP BY ml.assigned_to
+     ) scoped ON scoped.assigned_to = all_a.assigned_to
+     ORDER BY all_a.employee_name ASC, all_a.assigned_to ASC
+     LIMIT 500`,
+    values,
+  );
+
+  return rows.map((r) => ({
+    assignedTo: r.assigned_to,
+    employeeName: r.employee_name,
+    leadCount: Number(r.lead_count || 0),
+  }));
+}
+
 /** Fast dropdown options — meta_leads only (no CRM / won joins). */
 export async function getSocialMediaLeadFilterOptions(filters = {}) {
   filters = normalizeSocialMediaLeadFilters(filters);
@@ -523,16 +579,8 @@ export async function getSocialMediaLeadFilterOptions(filters = {}) {
 
   const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
 
-  const [assigneeResult, campaignResult] = await Promise.all([
-    conn.execute(
-      `SELECT DISTINCT assigned_to, employee_name
-       FROM meta_leads
-       ${whereSql}
-         AND TRIM(COALESCE(assigned_to, '')) != ''
-       ORDER BY employee_name ASC, assigned_to ASC
-       LIMIT 300`,
-      values,
-    ),
+  const [assignees, campaignResult] = await Promise.all([
+    querySocialMediaAssigneeOptions(conn, filters),
     conn.execute(
       `SELECT DISTINCT campaign_name
        FROM meta_leads
@@ -545,10 +593,7 @@ export async function getSocialMediaLeadFilterOptions(filters = {}) {
   ]);
 
   return {
-    assignees: assigneeResult[0].map((r) => ({
-      assignedTo: r.assigned_to,
-      employeeName: r.employee_name,
-    })),
+    assignees,
     campaigns: campaignResult[0]
       .map((r) => String(r.campaign_name || "").trim())
       .filter(Boolean),

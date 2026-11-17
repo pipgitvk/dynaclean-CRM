@@ -388,10 +388,9 @@ export default function SocialMediaLeadsManageClient({
     const items = (filterOptions.assignees || []).map((a) => {
       const user = String(a.assignedTo || "").trim();
       const name = String(a.employeeName || "").trim();
-      const label =
-        name && user && name.toLowerCase() !== user.toLowerCase()
-          ? `${name} (${user})`
-          : name || user || "—";
+      const display = name || user || "—";
+      const count = Number(a.leadCount ?? 0);
+      const label = `${display} (${count.toLocaleString("en-IN")})`;
       return { value: user, label };
     });
     return [{ value: "", label: "All users" }, ...items];
@@ -426,11 +425,9 @@ export default function SocialMediaLeadsManageClient({
               </p>
             </div>
           </div>
-          <Megaphone
-            className="hidden h-16 w-16 shrink-0 text-violet-300/40 sm:block"
-            strokeWidth={1.25}
-            aria-hidden
-          />
+          <div className="relative z-30 flex shrink-0 flex-col items-stretch sm:items-end sm:pt-1">
+            <MetaFormDistributionPicker />
+          </div>
         </header>
 
         <SocialMediaSummaryCards
@@ -448,7 +445,6 @@ export default function SocialMediaLeadsManageClient({
               Filters
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <MetaFormDistributionPicker />
               <button
                 type="button"
                 onClick={resetFilters}
