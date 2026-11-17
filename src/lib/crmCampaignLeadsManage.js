@@ -1,9 +1,12 @@
 import { getDbConnection } from "@/lib/db";
-import { getCurrentMonthRangeIso } from "@/lib/crmDateFormat";
+import { getCurrentMonthThroughTodayIso } from "@/lib/crmDateFormat";
 import { buildCustomerListSearchClause } from "@/lib/customerListSearch";
 import { buildGemCustomerScopeWhere } from "@/lib/dataScope";
 import { sqlServiceSupportCustomerScope } from "@/lib/serviceSupportTeamScope";
-import { CUSTOMER_MANUAL_ASSIGNED_TO_SQL } from "@/lib/customerManualAssignment";
+import {
+  CUSTOMER_MANUAL_ASSIGNED_TO_SQL,
+  customerManualAssignedToSql,
+} from "@/lib/customerManualAssignment";
 
 export const CAMPAIGN_LEAD_SQL = {
   google_ads: `LOWER(TRIM(c.lead_campaign)) IN ('google_ads', 'google', 'google adwords', 'googleads')`,
@@ -41,7 +44,7 @@ function normalizeOutcomeTag(raw) {
 function normalizeLeadFilters(filters = {}) {
   let { startDate, endDate } = filters;
   if (!startDate || !endDate) {
-    const month = getCurrentMonthRangeIso();
+    const month = getCurrentMonthThroughTodayIso();
     startDate = startDate || month.from;
     endDate = endDate || month.to;
   }
@@ -198,8 +201,23 @@ export function createCrmCampaignLeadsManage(campaignSql) {
   async function getSummary(filters, access) {
     filters = normalizeLeadFilters(filters);
     const conn = await getDbConnection();
-    const total = await countLeads(conn, filters, access);
-    return { total };
+    const { whereSql, params } = buildBaseWhere(filters, access);
+    const manualSql = customerManualAssignedToSql("c");
+    const [[row]] = await conn.execute(
+      `SELECT
+         COUNT(*) AS total,
+         SUM(CASE WHEN ${manualSql} THEN 1 ELSE 0 END) AS assigned
+       FROM customers c
+       ${whereSql}`,
+      params,
+    );
+    const total = Number(row?.total || 0);
+    const assigned = Number(row?.assigned || 0);
+    return {
+      total,
+      assigned,
+      pending: Math.max(0, total - assigned),
+    };
   }
 
   async function getFilterOptions(filters, access) {

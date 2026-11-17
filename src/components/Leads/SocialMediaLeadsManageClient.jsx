@@ -5,19 +5,73 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import SearchableSelect from "@/components/ui/SearchableSelect";
+import dayjs from "dayjs";
+import {
+  Area,
+  AreaChart,
+  ResponsiveContainer,
+} from "recharts";
 import {
   ArrowLeft,
-  CheckCircle,
+  Ban,
+  CalendarDays,
   ChevronLeft,
   ChevronRight,
+  Download,
+  Eye,
+  Filter,
   Loader2,
+  Mail,
+  Megaphone,
+  MoreVertical,
+  Pencil,
+  Phone,
   Search,
-  XCircle,
+  TrendingUp,
+  User,
+  Users,
 } from "lucide-react";
-import { getCurrentMonthRangeIso } from "@/lib/crmDateFormat";
+import { formatCrmDateOnly, getCurrentMonthThroughTodayIso } from "@/lib/crmDateFormat";
 import { resolveSocialMediaLeadOutcomeStatus } from "@/lib/socialMediaLeadOutcomeStatus";
 
 const PAGE_SIZE = 50;
+
+function previousPeriodRange(from, to) {
+  const start = dayjs(from);
+  const end = dayjs(to);
+  const span = Math.max(1, end.diff(start, "day") + 1);
+  const prevEnd = start.subtract(1, "day");
+  const prevStart = prevEnd.subtract(span - 1, "day");
+  return {
+    from: prevStart.format("YYYY-MM-DD"),
+    to: prevEnd.format("YYYY-MM-DD"),
+  };
+}
+
+function pctChange(current, previous) {
+  const cur = Number(current) || 0;
+  const prev = Number(previous) || 0;
+  if (prev === 0) return cur > 0 ? 100 : 0;
+  return Math.round(((cur - prev) / prev) * 1000) / 10;
+}
+
+function leadInitials(name) {
+  const parts = String(name || "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (!parts.length) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+}
+
+function sparkSeries(seed, value) {
+  const base = Math.max(1, Number(value) || 0);
+  return Array.from({ length: 12 }, (_, i) => ({
+    i,
+    v: Math.round(base * (0.55 + ((seed + i * 7) % 40) / 100)),
+  }));
+}
 
 function defaultSocialMediaFilters(monthDefault) {
   return {
@@ -103,7 +157,7 @@ export default function SocialMediaLeadsManageClient({
   pageTitle = "Social Media Leads",
   pageSubtitle = "Meta unique enquiries (month + DATE filter). Saari social-channel leads — manual CRM assign bhi include.",
 }) {
-  const monthDefault = useMemo(() => getCurrentMonthRangeIso(), []);
+  const monthDefault = useMemo(() => getCurrentMonthThroughTodayIso(), []);
   const hubHref = `/${dashboardBase}/leads-manage`;
 
   const initialFilters = useMemo(
@@ -118,6 +172,7 @@ export default function SocialMediaLeadsManageClient({
   const [tableLoading, setTableLoading] = useState(true);
   const [rows, setRows] = useState([]);
   const [summary, setSummary] = useState({ total: 0, imported: 0, notImported: 0 });
+  const [prevSummary, setPrevSummary] = useState({ total: 0, imported: 0, notImported: 0 });
   const [filterOptions, setFilterOptions] = useState({ assignees: [], campaigns: [] });
   const [pagination, setPagination] = useState({ total: 0, hasMore: false });
 
@@ -131,7 +186,7 @@ export default function SocialMediaLeadsManageClient({
   }, [draftFilters]);
 
   const buildListParams = useCallback(
-    (overrides = {}) => {
+    (filters, pageNum, overrides = {}) => {
       const {
         from,
         to,
@@ -140,14 +195,14 @@ export default function SocialMediaLeadsManageClient({
         assignedTo,
         campaign,
         search,
-      } = appliedFilters;
+      } = filters;
       const params = {
         from: from || monthDefault.from,
         to: to || monthDefault.to,
         importStatus,
         outcomeTag,
         limit: PAGE_SIZE,
-        skip: page * PAGE_SIZE,
+        skip: pageNum * PAGE_SIZE,
         ...overrides,
       };
       if (assignedTo) params.assignedTo = assignedTo;
@@ -155,8 +210,14 @@ export default function SocialMediaLeadsManageClient({
       if (search?.trim()) params.search = search.trim();
       return params;
     },
-    [appliedFilters, monthDefault.from, monthDefault.to, page],
+    [monthDefault.from, monthDefault.to],
   );
+
+  const resetFilters = useCallback(() => {
+    setDraftFilters(initialFilters);
+    setAppliedFilters(initialFilters);
+    setPage(0);
+  }, [initialFilters]);
 
   const fetchData = useCallback(async () => {
     const pagingOnly = page > 0;
@@ -165,17 +226,40 @@ export default function SocialMediaLeadsManageClient({
       setSummaryLoading(true);
     }
     try {
-      const listParams = buildListParams({
+      const listParams = buildListParams(appliedFilters, page, {
         includeOptions: 0,
         includeSummary: page === 0 ? 1 : 0,
       });
-      const listRes = await axios.get(apiPath, { params: listParams });
-      if (listRes.data?.success) {
-        setRows(listRes.data.data || []);
-        if (listRes.data.summary) {
-          setSummary(listRes.data.summary);
+      let prevRes = null;
+      if (page === 0) {
+        const prev = previousPeriodRange(
+          appliedFilters.from || monthDefault.from,
+          appliedFilters.to || monthDefault.to,
+        );
+        const prevParams = buildListParams(
+          { ...appliedFilters, from: prev.from, to: prev.to },
+          0,
+          { includeOptions: 0, includeSummary: 1, limit: 1 },
+        );
+        const [listResult, prevResult] = await Promise.all([
+          axios.get(apiPath, { params: listParams }),
+          axios.get(apiPath, { params: prevParams }),
+        ]);
+        prevRes = prevResult;
+        if (listResult.data?.success) {
+          setRows(listResult.data.data || []);
+          if (listResult.data.summary) setSummary(listResult.data.summary);
+          setPagination(listResult.data.pagination || { total: 0, hasMore: false });
         }
-        setPagination(listRes.data.pagination || { total: 0, hasMore: false });
+      } else {
+        const listResult = await axios.get(apiPath, { params: listParams });
+        if (listResult.data?.success) {
+          setRows(listResult.data.data || []);
+          setPagination(listResult.data.pagination || { total: 0, hasMore: false });
+        }
+      }
+      if (prevRes?.data?.success && prevRes.data.summary) {
+        setPrevSummary(prevRes.data.summary);
       }
 
     } catch (err) {
@@ -188,7 +272,7 @@ export default function SocialMediaLeadsManageClient({
     }
 
     if (page === 0) {
-      const optionsParams = buildListParams({
+      const optionsParams = buildListParams(appliedFilters, 0, {
         skip: 0,
         includeSummary: 0,
         includeOptions: 1,
@@ -203,7 +287,7 @@ export default function SocialMediaLeadsManageClient({
         })
         .catch((err) => console.error(err));
     }
-  }, [apiPath, buildListParams, page]);
+  }, [apiPath, appliedFilters, buildListParams, monthDefault.from, monthDefault.to, page]);
 
   useEffect(() => {
     fetchData();
@@ -233,19 +317,66 @@ export default function SocialMediaLeadsManageClient({
   const totalPages = Math.max(1, Math.ceil((pagination.total || 0) / PAGE_SIZE));
 
   return (
-    <div className="min-h-screen bg-gray-100 p-4 sm:p-6 lg:p-8">
-      <div className="max-w-[1400px] mx-auto space-y-6">
+    <div className="min-h-screen bg-gradient-to-b from-violet-50/80 via-slate-50 to-white px-2 sm:px-4 pb-6 pt-3 sm:pt-4">
+      <div className="mx-auto max-w-[1440px] space-y-5">
         <LeadsManageBackLink hubHref={hubHref} />
 
-        <h1 className="text-3xl font-semibold text-gray-900">{pageTitle}</h1>
-        <p className="text-gray-600 -mt-4">{pageSubtitle}</p>
+        <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex items-start gap-3.5">
+            <div className="shrink-0 rounded-[14px] bg-gradient-to-br from-pink-500 to-violet-600 p-3 shadow-md shadow-violet-500/25">
+              <Megaphone className="h-6 w-6 text-white" strokeWidth={2.25} aria-hidden />
+            </div>
+            <div className="min-w-0 pt-0.5">
+              <h1 className="text-xl font-bold tracking-tight text-indigo-950 sm:text-2xl">
+                {pageTitle}
+              </h1>
+              <p className="mt-1 max-w-2xl text-[13px] leading-snug text-slate-500 sm:text-sm">
+                {pageSubtitle}
+              </p>
+            </div>
+          </div>
+          <Megaphone
+            className="hidden h-16 w-16 shrink-0 text-violet-300/40 sm:block"
+            strokeWidth={1.25}
+            aria-hidden
+          />
+        </header>
 
-        <SocialMediaSummaryCards summary={summary} loading={summaryLoading} />
+        <SocialMediaSummaryCards
+          summary={summary}
+          prevSummary={prevSummary}
+          loading={summaryLoading}
+        />
 
-        <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 sm:p-6">
-          <h2 className="text-sm font-semibold text-gray-800 mb-4">Filters</h2>
-          <div className="mb-4">
-            <label className="text-xs font-medium text-gray-600 mb-1 block">Search</label>
+        <div className="rounded-2xl border border-slate-200/90 bg-white/95 p-4 shadow-sm backdrop-blur-sm sm:p-6">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
+            <div className="inline-flex items-center gap-2 text-sm font-bold text-slate-800">
+              <Filter className="h-4 w-4 text-violet-600" />
+              Filters
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={resetFilters}
+                className="rounded-lg border border-violet-200 bg-white px-4 py-2 text-sm font-semibold text-violet-700 hover:bg-violet-50"
+              >
+                Reset
+              </button>
+              <button
+                type="button"
+                onClick={runSearch}
+                disabled={tableLoading || summaryLoading}
+                className="inline-flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-60"
+              >
+                {(tableLoading || summaryLoading) && (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                )}
+                Apply Filters
+              </button>
+            </div>
+          </div>
+          <div className="relative mb-4">
+            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               type="search"
               value={draftFilters.search}
@@ -257,52 +388,47 @@ export default function SocialMediaLeadsManageClient({
                 }
               }}
               placeholder="Customer ID, phone, name, email, Meta lead ID, campaign, assignee…"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-xl border border-slate-200 py-2.5 pl-10 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/25"
             />
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
-            <div>
-              <label className="text-xs font-medium text-gray-600 mb-1 block">From</label>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+            <FilterField label="From">
               <TypeableDateFilterInput
                 value={draftFilters.from}
                 onChange={(v) => patchDraft({ from: v })}
-                className="w-full px-3 py-2 border rounded-lg text-sm"
+                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
               />
-            </div>
-            <div>
-              <label className="text-xs font-medium text-gray-600 mb-1 block">To</label>
+            </FilterField>
+            <FilterField label="To">
               <TypeableDateFilterInput
                 value={draftFilters.to}
                 onChange={(v) => patchDraft({ to: v })}
-                className="w-full px-3 py-2 border rounded-lg text-sm"
+                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
               />
-            </div>
-            <div>
-              <label className="text-xs font-medium text-gray-600 mb-1 block">Import status</label>
+            </FilterField>
+            <FilterField label="Import Status">
               <select
                 value={draftFilters.importStatus}
                 onChange={(e) => patchDraft({ importStatus: e.target.value })}
-                className="w-full px-3 py-2 border rounded-lg text-sm"
+                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
               >
                 <option value="all">All leads</option>
                 <option value="imported">Imported only</option>
                 <option value="not_imported">Not imported only</option>
               </select>
-            </div>
-            <div>
-              <label className="text-xs font-medium text-gray-600 mb-1 block">Tag</label>
+            </FilterField>
+            <FilterField label="Tag">
               <select
                 value={draftFilters.outcomeTag}
                 onChange={(e) => patchDraft({ outcomeTag: e.target.value })}
-                className="w-full px-3 py-2 border rounded-lg text-sm"
+                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
               >
                 <option value="all">All</option>
                 <option value="won">Won</option>
                 <option value="cancel">Cancel</option>
               </select>
-            </div>
-            <div>
-              <label className="text-xs font-medium text-gray-600 mb-1 block">Assigned user</label>
+            </FilterField>
+            <FilterField label="Assigned User">
               <SearchableSelect
                 options={assigneeSelectOptions}
                 value={draftFilters.assignedTo}
@@ -310,9 +436,8 @@ export default function SocialMediaLeadsManageClient({
                 placeholder="All users"
                 searchPlaceholder="Search user..."
               />
-            </div>
-            <div>
-              <label className="text-xs font-medium text-gray-600 mb-1 block">Ads campaign</label>
+            </FilterField>
+            <FilterField label="Ads Campaign">
               <SearchableSelect
                 options={campaignSelectOptions}
                 value={draftFilters.campaign}
@@ -320,22 +445,7 @@ export default function SocialMediaLeadsManageClient({
                 placeholder="All campaigns"
                 searchPlaceholder="Search campaign..."
               />
-            </div>
-          </div>
-          <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-gray-100 pt-4">
-            <button
-              type="button"
-              onClick={runSearch}
-              disabled={tableLoading || summaryLoading}
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
-            >
-              {tableLoading || summaryLoading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Search className="w-4 h-4" />
-              )}
-              Search
-            </button>
+            </FilterField>
           </div>
         </div>
 
@@ -353,139 +463,309 @@ export default function SocialMediaLeadsManageClient({
   );
 }
 
+function FilterField({ label, children }) {
+  return (
+    <div>
+      <label className="mb-1 block text-xs font-semibold text-slate-500">{label}</label>
+      {children}
+    </div>
+  );
+}
+
 function LeadsManageBackLink({ hubHref }) {
   return (
     <Link
       href={hubHref}
-      className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-800 text-sm font-medium"
+      className="inline-flex items-center gap-2 text-sm font-semibold text-violet-700 hover:text-violet-900"
     >
-      <ArrowLeft className="w-4 h-4" />
+      <ArrowLeft className="h-4 w-4" />
       Back to Leads Manage
     </Link>
   );
 }
 
-function SocialMediaSummaryCards({ summary, loading }) {
-  const cards = [
-    { label: "Total Leads", value: summary.total, className: "text-gray-900" },
-    { label: "Imported", value: summary.imported, className: "text-green-600" },
-    { label: "Not Imported", value: summary.notImported, className: "text-red-600" },
-  ];
+function SummarySparkline({ color, value, seed }) {
+  const data = sparkSeries(seed, value);
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-      {cards.map((c) => (
-        <div key={c.label} className="bg-white rounded-xl shadow-md border border-gray-100 p-6">
-          <div className="text-sm text-gray-500">{c.label}</div>
-          <div className={`text-3xl font-bold mt-1 tabular-nums ${c.className}`}>
-            {loading ? "…" : c.value}
-          </div>
-        </div>
-      ))}
+    <div className="h-14 w-28 opacity-90">
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={data}>
+          <Area
+            type="monotone"
+            dataKey="v"
+            stroke={color}
+            fill={color}
+            fillOpacity={0.18}
+            strokeWidth={2}
+            dot={false}
+          />
+        </AreaChart>
+      </ResponsiveContainer>
     </div>
   );
 }
 
+function SocialMediaSummaryCards({ summary, prevSummary, loading }) {
+  const cards = [
+    {
+      label: "Total Leads",
+      value: summary.total,
+      prev: prevSummary.total,
+      icon: Users,
+      iconBg: "bg-violet-100 text-violet-700",
+      valueClass: "text-slate-900",
+      spark: "#7c3aed",
+      seed: 1,
+    },
+    {
+      label: "Imported",
+      value: summary.imported,
+      prev: prevSummary.imported,
+      icon: Download,
+      iconBg: "bg-emerald-100 text-emerald-700",
+      valueClass: "text-emerald-700",
+      spark: "#10b981",
+      seed: 2,
+    },
+    {
+      label: "Not Imported",
+      value: summary.notImported,
+      prev: prevSummary.notImported,
+      icon: Ban,
+      iconBg: "bg-rose-100 text-rose-700",
+      valueClass: "text-rose-600",
+      spark: "#f43f5e",
+      seed: 3,
+    },
+  ];
+
+  return (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      {cards.map((c) => {
+        const change = pctChange(c.value, c.prev);
+        const up = change >= 0;
+        const Icon = c.icon;
+        return (
+          <div
+            key={c.label}
+            className="rounded-2xl border border-slate-200/90 bg-white/95 p-5 shadow-sm backdrop-blur-sm"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className={`rounded-xl p-2.5 ${c.iconBg}`}>
+                <Icon className="h-5 w-5" aria-hidden />
+              </div>
+              {!loading && (
+                <SummarySparkline color={c.spark} value={c.value} seed={c.seed} />
+              )}
+            </div>
+            <div className="mt-3 text-sm font-medium text-slate-500">{c.label}</div>
+            <div className={`mt-1 text-3xl font-bold tabular-nums ${c.valueClass}`}>
+              {loading ? "…" : Number(c.value || 0).toLocaleString("en-IN")}
+            </div>
+            <p
+              className={`mt-2 inline-flex items-center gap-1 text-xs font-semibold ${
+                up ? "text-emerald-600" : "text-rose-600"
+              }`}
+            >
+              <TrendingUp className={`h-3.5 w-3.5 ${up ? "" : "rotate-180"}`} />
+              {up ? "+" : ""}
+              {change}% vs previous period
+            </p>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function ImportStatusPill({ lead }) {
+  const imported = lead.is_imported_to_crm || lead.isImportedToCRM;
+  return (
+    <span
+      className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+        imported ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"
+      }`}
+    >
+      {imported ? "Imported" : "Not Imported"}
+    </span>
+  );
+}
+
+function exportLeadsCsv(rows) {
+  const header = ["Name", "Leadgen ID", "Phone", "Email", "Campaign", "Created"];
+  const lines = rows.map((lead) =>
+    [
+      getLeadName(lead),
+      lead.leadgen_id || "",
+      getLeadPhone(lead),
+      getLeadEmail(lead),
+      lead.campaign_name || "",
+      lead.created_at || "",
+    ]
+      .map((v) => `"${String(v).replace(/"/g, '""')}"`)
+      .join(","),
+  );
+  const blob = new Blob([[header.join(","), ...lines].join("\n")], {
+    type: "text/csv;charset=utf-8",
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "social-media-leads.csv";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 function SocialMediaLeadsTable({ loading, rows, dashboardBase, page, setPage, totalPages, pagination }) {
   return (
-    <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
-      <div className="px-4 py-3 border-b bg-gray-50 flex items-center justify-between">
-        <span className="text-sm font-medium text-gray-700">
-          {pagination.total ?? 0} lead{pagination.total === 1 ? "" : "s"} (filtered)
+    <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white/95 shadow-sm backdrop-blur-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 sm:px-5">
+        <span className="text-sm font-bold text-slate-800">
+          {pagination.total ?? 0} Leads (Filtered)
         </span>
-        {loading && <Loader2 className="w-5 h-5 animate-spin text-blue-600" />}
+        <div className="flex items-center gap-2">
+          {loading && <Loader2 className="h-5 w-5 animate-spin text-violet-600" />}
+          <button
+            type="button"
+            onClick={() => exportLeadsCsv(rows)}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            <Download className="h-3.5 w-3.5" />
+            Export
+          </button>
+        </div>
       </div>
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200 text-sm">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
-                Lead
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
-                Contact
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
-                Meta assignee
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
-                Distribution
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
-                Status
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
-                Ads campaign
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
-                Created
-              </th>
+        <table className="min-w-full text-sm">
+          <thead>
+            <tr className="bg-slate-50/90 text-left text-[11px] font-bold uppercase tracking-wide text-slate-500">
+              <th className="px-4 py-3 w-10">#</th>
+              <th className="px-4 py-3">Lead</th>
+              <th className="px-4 py-3">Contact</th>
+              <th className="px-4 py-3">Meta Assignee</th>
+              <th className="px-4 py-3">Distribution</th>
+              <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3">Ads Campaign</th>
+              <th className="px-4 py-3">Created</th>
+              <th className="px-4 py-3 text-right">Actions</th>
             </tr>
           </thead>
           <tbody
-            className={`divide-y divide-gray-100 ${
-              loading && rows.length > 0 ? "opacity-50 pointer-events-none" : ""
+            className={`divide-y divide-slate-100 ${
+              loading && rows.length > 0 ? "pointer-events-none opacity-50" : ""
             }`}
           >
             {!loading && rows.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-12 text-center text-gray-500">
+                <td colSpan={9} className="px-4 py-14 text-center text-slate-500">
                   No leads match these filters
                 </td>
               </tr>
             ) : (
-              rows.map((lead) => {
+              rows.map((lead, idx) => {
                 const dist = distributionLabel(lead);
+                const name = getLeadName(lead);
+                const customerId = lead.crm_customer_id;
                 const customerHref =
-                  lead.crm_customer_id &&
-                  `/${dashboardBase}/view-customer/${encodeURIComponent(lead.crm_customer_id)}`;
+                  customerId &&
+                  `/${dashboardBase}/view-customer/${encodeURIComponent(customerId)}`;
+                const editHref =
+                  customerId &&
+                  `/${dashboardBase}/view-customer/${encodeURIComponent(customerId)}/edit`;
                 return (
-                  <tr key={lead.id || lead.leadgen_id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3">
-                      <div className="font-medium text-gray-900">{getLeadName(lead)}</div>
-                      <div className="text-xs text-gray-400 font-mono truncate max-w-[180px]">
-                        {lead.leadgen_id}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-gray-700">
-                      <div>{getLeadPhone(lead)}</div>
-                      <div className="text-xs text-gray-500 break-all">{getLeadEmail(lead)}</div>
-                    </td>
-                    <td className="px-4 py-3 text-gray-800">
-                      <div>{lead.employee_name || "—"}</div>
-                      <div className="text-xs text-gray-500">{lead.assigned_to || "—"}</div>
+                  <tr key={lead.id || lead.leadgen_id} className="hover:bg-violet-50/20">
+                    <td className="px-4 py-3 text-slate-400 tabular-nums">
+                      {page * PAGE_SIZE + idx + 1}
                     </td>
                     <td className="px-4 py-3">
-                      <div
-                        className={`inline-flex items-center gap-1 text-xs font-medium ${
-                          dist.tone === "green" ? "text-green-700" : "text-red-700"
-                        }`}
-                      >
-                        {dist.tone === "green" ? (
-                          <CheckCircle className="w-3.5 h-3.5" />
-                        ) : (
-                          <XCircle className="w-3.5 h-3.5" />
-                        )}
-                        {dist.status}
+                      <div className="flex items-center gap-2.5">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-violet-100 text-xs font-bold text-violet-800">
+                          {leadInitials(name)}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="font-semibold text-slate-900">{name}</div>
+                          <div className="max-w-[180px] truncate font-mono text-[11px] text-slate-400">
+                            {lead.leadgen_id}
+                          </div>
+                        </div>
                       </div>
-                      <div className="text-xs text-gray-600 mt-0.5">To: {dist.assignee}</div>
+                    </td>
+                    <td className="px-4 py-3 text-slate-700">
+                      <div className="flex items-center gap-1.5">
+                        <Phone className="h-3.5 w-3.5 text-slate-400" />
+                        {getLeadPhone(lead)}
+                      </div>
+                      <div className="mt-0.5 flex items-start gap-1.5 break-all text-xs text-slate-500">
+                        <Mail className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
+                        {getLeadEmail(lead)}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-slate-800">
+                      <div className="flex items-center gap-1.5 font-medium">
+                        <User className="h-3.5 w-3.5 text-violet-500" />
+                        {lead.employee_name || "—"}
+                      </div>
+                      <div className="text-xs text-slate-500">{lead.assigned_to || "—"}</div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <ImportStatusPill lead={lead} />
+                      <div className="mt-1 text-xs text-slate-600">To: {dist.assignee}</div>
                       {customerHref && (
-                        <Link href={customerHref} className="text-xs text-blue-600 hover:underline">
-                          CRM #{lead.crm_customer_id}
+                        <Link href={customerHref} className="text-xs font-medium text-violet-700 hover:underline">
+                          CRM #{customerId}
                         </Link>
                       )}
                     </td>
                     <td className="px-4 py-3">
                       <OutcomeStatusBadge lead={lead} />
                     </td>
-                    <td className="px-4 py-3 text-gray-700 max-w-[200px]">
+                    <td className="max-w-[200px] px-4 py-3 text-slate-700">
                       <span className="line-clamp-2">{lead.campaign_name || "—"}</span>
                     </td>
-                    <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
-                      {lead.created_at
-                        ? new Date(lead.created_at).toLocaleString("en-IN", {
-                            timeZone: "Asia/Kolkata",
-                          })
-                        : "—"}
+                    <td className="whitespace-nowrap px-4 py-3 text-slate-600">
+                      <div className="flex items-center gap-1.5 text-xs">
+                        <CalendarDays className="h-3.5 w-3.5 text-slate-400" />
+                        {lead.created_at
+                          ? formatCrmDateOnly(String(lead.created_at).slice(0, 10))
+                          : "—"}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-end gap-1">
+                        {customerHref ? (
+                          <Link
+                            href={customerHref}
+                            className="rounded-lg p-1.5 text-slate-500 hover:bg-violet-50 hover:text-violet-700"
+                            title="View"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Link>
+                        ) : (
+                          <span className="rounded-lg p-1.5 text-slate-300">
+                            <Eye className="h-4 w-4" />
+                          </span>
+                        )}
+                        {editHref ? (
+                          <Link
+                            href={editHref}
+                            className="rounded-lg p-1.5 text-slate-500 hover:bg-violet-50 hover:text-violet-700"
+                            title="Edit"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Link>
+                        ) : (
+                          <span className="rounded-lg p-1.5 text-slate-300">
+                            <Pencil className="h-4 w-4" />
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"
+                          aria-label="More"
+                        >
+                          <MoreVertical className="h-4 w-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -494,27 +774,27 @@ function SocialMediaLeadsTable({ loading, rows, dashboardBase, page, setPage, to
           </tbody>
         </table>
       </div>
-      <div className="px-4 py-3 border-t flex items-center justify-between bg-gray-50">
+      <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/80 px-4 py-3">
         <button
           type="button"
           disabled={page <= 0 || loading}
           onClick={() => setPage((p) => Math.max(0, p - 1))}
-          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border text-sm disabled:opacity-40"
+          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm disabled:opacity-40"
         >
-          <ChevronLeft className="w-4 h-4" />
+          <ChevronLeft className="h-4 w-4" />
           Prev
         </button>
-        <span className="text-sm text-gray-600">
+        <span className="text-sm text-slate-600">
           Page {page + 1} of {totalPages}
         </span>
         <button
           type="button"
           disabled={!pagination.hasMore || loading}
           onClick={() => setPage((p) => p + 1)}
-          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border text-sm disabled:opacity-40"
+          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm disabled:opacity-40"
         >
           Next
-          <ChevronRight className="w-4 h-4" />
+          <ChevronRight className="h-4 w-4" />
         </button>
       </div>
     </div>

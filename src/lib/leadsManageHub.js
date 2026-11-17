@@ -11,6 +11,11 @@ export function getLeadsManageCards(dashboardBase) {
       countKey: "social_media",
       href: `${base}/leads-manage/social-media`,
       accent: "from-pink-500 to-rose-600",
+      surface:
+        "bg-white/80 backdrop-blur-xl border-pink-200/40 shadow-[0_8px_30px_-8px_rgba(236,72,153,0.35)]",
+      glow: "bg-pink-400/25",
+      iconSurface: "bg-gradient-to-br from-pink-500 to-rose-600",
+      chartColor: "#ec4899",
     },
     {
       id: "google_ads",
@@ -19,6 +24,11 @@ export function getLeadsManageCards(dashboardBase) {
       countKey: "google_ads",
       href: `${base}/leads-manage/google-ads`,
       accent: "from-violet-500 to-purple-600",
+      surface:
+        "bg-white/80 backdrop-blur-xl border-violet-200/40 shadow-[0_8px_30px_-8px_rgba(139,92,246,0.35)]",
+      glow: "bg-violet-400/25",
+      iconSurface: "bg-gradient-to-br from-violet-500 to-purple-600",
+      chartColor: "#8b5cf6",
     },
     {
       id: "indiamart",
@@ -27,6 +37,11 @@ export function getLeadsManageCards(dashboardBase) {
       countKey: "indiamart",
       href: `${base}/leads-manage/indiamart`,
       accent: "from-emerald-500 to-teal-600",
+      surface:
+        "bg-white/80 backdrop-blur-xl border-emerald-200/40 shadow-[0_8px_30px_-8px_rgba(16,185,129,0.3)]",
+      glow: "bg-emerald-400/25",
+      iconSurface: "bg-gradient-to-br from-emerald-500 to-teal-600",
+      chartColor: "#10b981",
     },
     {
       id: "website_direct",
@@ -35,6 +50,11 @@ export function getLeadsManageCards(dashboardBase) {
       countKey: "website_direct",
       href: `${base}/leads-manage/website-direct`,
       accent: "from-cyan-500 to-sky-600",
+      surface:
+        "bg-white/80 backdrop-blur-xl border-sky-200/40 shadow-[0_8px_30px_-8px_rgba(6,182,212,0.3)]",
+      glow: "bg-sky-400/25",
+      iconSurface: "bg-gradient-to-br from-cyan-500 to-sky-600",
+      chartColor: "#06b6d4",
     },
     {
       id: "manager_assigned",
@@ -43,6 +63,11 @@ export function getLeadsManageCards(dashboardBase) {
       countKey: "manager_assigned",
       href: `${base}/leads-manage/manager-assigned`,
       accent: "from-amber-500 to-orange-600",
+      surface:
+        "bg-white/80 backdrop-blur-xl border-amber-200/40 shadow-[0_8px_30px_-8px_rgba(245,158,11,0.35)]",
+      glow: "bg-amber-400/25",
+      iconSurface: "bg-gradient-to-br from-amber-500 to-orange-600",
+      chartColor: "#f59e0b",
     },
   ];
 }

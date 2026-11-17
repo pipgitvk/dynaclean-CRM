@@ -1,5 +1,8 @@
 import { getSessionPayload } from "@/lib/auth";
-import { fetchLeadsManageCounts } from "@/lib/fetchLeadsManageCounts";
+import {
+  attachHubSourceRows,
+  fetchLeadsManageHubDashboard,
+} from "@/lib/fetchLeadsManageHubDashboard";
 import LeadsManageClient from "@/components/Leads/LeadsManageClient";
 
 export const dynamic = "force-dynamic";
@@ -10,22 +13,22 @@ export default async function LeadsManagePage({ dashboardBase }) {
     return <p className="text-red-600 p-4">Unauthorized</p>;
   }
 
-  let counts = {
-    social_media: 0,
-    google_ads: 0,
-    indiamart: 0,
-    website_direct: 0,
-    manager_assigned: 0,
-  };
+  let initialDashboard = null;
 
   try {
-    counts = await fetchLeadsManageCounts({
-      username: payload.username,
-      userRole: payload.role,
-    });
+    initialDashboard = attachHubSourceRows(
+      await fetchLeadsManageHubDashboard({
+        username: payload.username,
+        userRole: payload.role,
+        range: "month",
+      }),
+      dashboardBase,
+    );
   } catch (err) {
-    console.error("[leads-manage] count fetch failed:", err?.message);
+    console.error("[leads-manage] dashboard fetch failed:", err?.message);
   }
 
-  return <LeadsManageClient counts={counts} dashboardBase={dashboardBase} />;
+  return (
+    <LeadsManageClient dashboardBase={dashboardBase} initialDashboard={initialDashboard} />
+  );
 }

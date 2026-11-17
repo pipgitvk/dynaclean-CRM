@@ -1,5 +1,5 @@
 import { getDbConnection } from "@/lib/db";
-import { getCurrentMonthRangeIso } from "@/lib/crmDateFormat";
+import { getCurrentMonthThroughTodayIso } from "@/lib/crmDateFormat";
 import { getMetaLeadChannelSql } from "@/lib/metaLeadChannelFilters";
 import {
   customerPhoneLast10Sql,
@@ -125,7 +125,7 @@ function buildInnerDateScopedSearch(filters) {
 export function normalizeSocialMediaLeadFilters(filters = {}) {
   let { startDate, endDate } = filters;
   if (!startDate || !endDate) {
-    const month = getCurrentMonthRangeIso();
+    const month = getCurrentMonthThroughTodayIso();
     startDate = startDate || month.from;
     endDate = endDate || month.to;
   }

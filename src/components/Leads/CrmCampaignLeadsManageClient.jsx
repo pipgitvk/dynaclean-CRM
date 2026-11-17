@@ -3,19 +3,86 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
+import dayjs from "dayjs";
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import SearchableSelect from "@/components/ui/SearchableSelect";
 import {
+  Area,
+  AreaChart,
+  ResponsiveContainer,
+} from "recharts";
+import {
   ArrowLeft,
+  CalendarDays,
   ChevronLeft,
   ChevronRight,
+  Download,
+  Eye,
+  Filter,
+  Globe,
   Loader2,
+  Mail,
+  MoreVertical,
+  MousePointerClick,
+  Pencil,
+  Phone,
   Search,
+  Store,
+  TrendingUp,
+  User,
+  UserCheck,
+  Users,
+  UserPlus,
+  Clock,
 } from "lucide-react";
-import { getCurrentMonthRangeIso } from "@/lib/crmDateFormat";
+import { formatCrmDateOnly, getCurrentMonthThroughTodayIso } from "@/lib/crmDateFormat";
 import { resolveSocialMediaLeadOutcomeStatus } from "@/lib/socialMediaLeadOutcomeStatus";
 
 const PAGE_SIZE = 50;
+
+const PAGE_ICONS = {
+  globe: Globe,
+  store: Store,
+  click: MousePointerClick,
+  usercheck: UserCheck,
+};
+
+function previousPeriodRange(from, to) {
+  const start = dayjs(from);
+  const end = dayjs(to);
+  const span = Math.max(1, end.diff(start, "day") + 1);
+  const prevEnd = start.subtract(1, "day");
+  const prevStart = prevEnd.subtract(span - 1, "day");
+  return {
+    from: prevStart.format("YYYY-MM-DD"),
+    to: prevEnd.format("YYYY-MM-DD"),
+  };
+}
+
+function pctChange(current, previous) {
+  const cur = Number(current) || 0;
+  const prev = Number(previous) || 0;
+  if (prev === 0) return cur > 0 ? 100 : 0;
+  return Math.round(((cur - prev) / prev) * 1000) / 10;
+}
+
+function leadInitials(name) {
+  const parts = String(name || "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (!parts.length) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+}
+
+function sparkSeries(seed, value) {
+  const base = Math.max(1, Number(value) || 0);
+  return Array.from({ length: 12 }, (_, i) => ({
+    i,
+    v: Math.round(base * (0.55 + ((seed + i * 7) % 40) / 100)),
+  }));
+}
 
 function defaultFilters(monthDefault) {
   return {
@@ -61,12 +128,141 @@ function formatCampaign(raw) {
   return s.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+function FilterField({ label, children }) {
+  return (
+    <div>
+      <label className="mb-1 block text-xs font-semibold text-slate-500">{label}</label>
+      {children}
+    </div>
+  );
+}
+
+function SummarySparkline({ color, value, seed }) {
+  const data = sparkSeries(seed, value);
+  return (
+    <div className="h-14 w-28 opacity-90">
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={data}>
+          <Area
+            type="monotone"
+            dataKey="v"
+            stroke={color}
+            fill={color}
+            fillOpacity={0.18}
+            strokeWidth={2}
+            dot={false}
+          />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function CampaignSummaryCards({ summary, prevSummary, loading, sparkColor }) {
+  const cards = [
+    {
+      label: "Total Leads",
+      value: summary.total,
+      prev: prevSummary.total,
+      icon: Users,
+      iconBg: "bg-violet-100 text-violet-700",
+      valueClass: "text-slate-900",
+      spark: sparkColor,
+      seed: 1,
+    },
+    {
+      label: "Assigned",
+      value: summary.assigned,
+      prev: prevSummary.assigned,
+      icon: UserPlus,
+      iconBg: "bg-emerald-100 text-emerald-700",
+      valueClass: "text-emerald-700",
+      spark: "#10b981",
+      seed: 2,
+    },
+    {
+      label: "Pending",
+      value: summary.pending,
+      prev: prevSummary.pending,
+      icon: Clock,
+      iconBg: "bg-amber-100 text-amber-700",
+      valueClass: "text-amber-700",
+      spark: "#f59e0b",
+      seed: 3,
+    },
+  ];
+
+  return (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      {cards.map((c) => {
+        const change = pctChange(c.value, c.prev);
+        const up = change >= 0;
+        const Icon = c.icon;
+        return (
+          <div
+            key={c.label}
+            className="rounded-2xl border border-slate-200/90 bg-white/95 p-5 shadow-sm backdrop-blur-sm"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className={`rounded-xl p-2.5 ${c.iconBg}`}>
+                <Icon className="h-5 w-5" aria-hidden />
+              </div>
+              {!loading && <SummarySparkline color={c.spark} value={c.value} seed={c.seed} />}
+            </div>
+            <div className="mt-3 text-sm font-medium text-slate-500">{c.label}</div>
+            <div className={`mt-1 text-3xl font-bold tabular-nums ${c.valueClass}`}>
+              {loading ? "…" : Number(c.value || 0).toLocaleString("en-IN")}
+            </div>
+            <p
+              className={`mt-2 inline-flex items-center gap-1 text-xs font-semibold ${
+                up ? "text-emerald-600" : "text-rose-600"
+              }`}
+            >
+              <TrendingUp className={`h-3.5 w-3.5 ${up ? "" : "rotate-180"}`} />
+              {up ? "+" : ""}
+              {change}% vs previous period
+            </p>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function exportCrmRowsCsv(rows) {
+  const header = ["Customer ID", "Name", "Phone", "Email", "Assigned", "Campaign", "Created"];
+  const lines = rows.map((row) =>
+    [
+      row.customer_id,
+      displayName(row),
+      row.phone || "",
+      row.email || "",
+      row.assigned_to || "",
+      row.lead_campaign || "",
+      row.date_created || "",
+    ]
+      .map((v) => `"${String(v).replace(/"/g, '""')}"`)
+      .join(","),
+  );
+  const blob = new Blob([[header.join(","), ...lines].join("\n")], {
+    type: "text/csv;charset=utf-8",
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "crm-leads.csv";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export default function CrmCampaignLeadsManageClient({
   dashboardBase = "admin-dashboard",
   pageConfig,
 }) {
-  const { apiPath, title, subtitle, emptyMessage, accent } = pageConfig;
-  const monthDefault = useMemo(() => getCurrentMonthRangeIso(), []);
+  const { apiPath, title, subtitle, emptyMessage, accent, icon, iconGradient, sparkColor } =
+    pageConfig;
+  const HeaderIcon = PAGE_ICONS[icon] || Globe;
+  const monthDefault = useMemo(() => getCurrentMonthThroughTodayIso(), []);
   const hubHref = `/${dashboardBase}/leads-manage`;
 
   const initialFilters = useMemo(() => defaultFilters(monthDefault), [monthDefault]);
@@ -77,7 +273,8 @@ export default function CrmCampaignLeadsManageClient({
   const [summaryLoading, setSummaryLoading] = useState(true);
   const [tableLoading, setTableLoading] = useState(true);
   const [rows, setRows] = useState([]);
-  const [summary, setSummary] = useState({ total: 0 });
+  const [summary, setSummary] = useState({ total: 0, assigned: 0, pending: 0 });
+  const [prevSummary, setPrevSummary] = useState({ total: 0, assigned: 0, pending: 0 });
   const [filterOptions, setFilterOptions] = useState({ assignees: [], leadSources: [] });
   const [pagination, setPagination] = useState({ total: 0, hasMore: false });
 
@@ -90,15 +287,21 @@ export default function CrmCampaignLeadsManageClient({
     setPage(0);
   }, [draftFilters]);
 
+  const resetFilters = useCallback(() => {
+    setDraftFilters(initialFilters);
+    setAppliedFilters(initialFilters);
+    setPage(0);
+  }, [initialFilters]);
+
   const buildListParams = useCallback(
-    (overrides = {}) => {
-      const { from, to, outcomeTag, assignedTo, leadSource, search } = appliedFilters;
+    (filters, pageNum, overrides = {}) => {
+      const { from, to, outcomeTag, assignedTo, leadSource, search } = filters;
       const params = {
         from: from || monthDefault.from,
         to: to || monthDefault.to,
         outcomeTag,
         limit: PAGE_SIZE,
-        skip: page * PAGE_SIZE,
+        skip: pageNum * PAGE_SIZE,
         ...overrides,
       };
       if (assignedTo) params.assignedTo = assignedTo;
@@ -106,7 +309,7 @@ export default function CrmCampaignLeadsManageClient({
       if (search?.trim()) params.search = search.trim();
       return params;
     },
-    [appliedFilters, monthDefault.from, monthDefault.to, page],
+    [monthDefault.from, monthDefault.to],
   );
 
   const fetchData = useCallback(async () => {
@@ -114,23 +317,38 @@ export default function CrmCampaignLeadsManageClient({
     setTableLoading(true);
     if (!pagingOnly) setSummaryLoading(true);
     try {
-      const listParams = buildListParams({
+      const listParams = buildListParams(appliedFilters, page, {
         includeOptions: 0,
         includeSummary: page === 0 ? 1 : 0,
       });
-      const listRes = await axios.get(apiPath, { params: listParams });
-      if (listRes.data?.success) {
-        setRows(listRes.data.data || []);
-        if (listRes.data.summary) {
-          setSummary(listRes.data.summary);
+      if (page === 0) {
+        const prev = previousPeriodRange(
+          appliedFilters.from || monthDefault.from,
+          appliedFilters.to || monthDefault.to,
+        );
+        const prevParams = buildListParams(
+          { ...appliedFilters, from: prev.from, to: prev.to },
+          0,
+          { includeOptions: 0, includeSummary: 1, limit: 1 },
+        );
+        const [listRes, prevRes] = await Promise.all([
+          axios.get(apiPath, { params: listParams }),
+          axios.get(apiPath, { params: prevParams }),
+        ]);
+        if (listRes.data?.success) {
+          setRows(listRes.data.data || []);
+          if (listRes.data.summary) setSummary(listRes.data.summary);
+          setPagination(listRes.data.pagination || { total: 0, hasMore: false });
         }
-        setPagination((prev) => {
-          const next = listRes.data.pagination || { total: 0, hasMore: false };
-          return {
-            ...next,
-            total: next.total > 0 ? next.total : prev.total,
-          };
-        });
+        if (prevRes.data?.success && prevRes.data.summary) {
+          setPrevSummary(prevRes.data.summary);
+        }
+      } else {
+        const listRes = await axios.get(apiPath, { params: listParams });
+        if (listRes.data?.success) {
+          setRows(listRes.data.data || []);
+          setPagination(listRes.data.pagination || { total: 0, hasMore: false });
+        }
       }
     } catch (err) {
       console.error(err);
@@ -140,7 +358,7 @@ export default function CrmCampaignLeadsManageClient({
     }
 
     if (page === 0) {
-      const optionsParams = buildListParams({
+      const optionsParams = buildListParams(appliedFilters, 0, {
         skip: 0,
         includeSummary: 0,
         includeOptions: 1,
@@ -155,7 +373,7 @@ export default function CrmCampaignLeadsManageClient({
         })
         .catch((err) => console.error(err));
     }
-  }, [apiPath, buildListParams, page]);
+  }, [apiPath, appliedFilters, buildListParams, monthDefault.from, monthDefault.to, page]);
 
   useEffect(() => {
     fetchData();
@@ -180,30 +398,75 @@ export default function CrmCampaignLeadsManageClient({
   const totalPages = Math.max(1, Math.ceil((pagination.total || 0) / PAGE_SIZE));
 
   return (
-    <div className="min-h-screen bg-gray-100 p-4 sm:p-6 lg:p-8">
-      <div className="max-w-[1400px] mx-auto space-y-6">
+    <div className="min-h-screen bg-gradient-to-b from-violet-50/80 via-slate-50 to-white px-2 sm:px-4 pb-6 pt-3 sm:pt-4">
+      <div className="mx-auto max-w-[1440px] space-y-5">
         <Link
           href={hubHref}
-          className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-800 text-sm font-medium"
+          className="inline-flex items-center gap-2 text-sm font-semibold text-violet-700 hover:text-violet-900"
         >
-          <ArrowLeft className="w-4 h-4" />
+          <ArrowLeft className="h-4 w-4" />
           Back to Leads Manage
         </Link>
 
-        <h1 className="text-3xl font-semibold text-gray-900">{title}</h1>
-        <p className="text-gray-600 -mt-4">{subtitle}</p>
-
-        <div className="bg-white rounded-xl shadow-md border border-gray-100 p-6">
-          <div className="text-sm text-gray-500">Total leads (filtered)</div>
-          <div className={`text-3xl font-bold mt-1 tabular-nums ${accent.summary}`}>
-            {summaryLoading ? "…" : summary.total ?? 0}
+        <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex items-start gap-3.5">
+            <div
+              className={`shrink-0 rounded-[14px] bg-gradient-to-br p-3 shadow-md shadow-violet-500/20 ${iconGradient}`}
+            >
+              <HeaderIcon className="h-6 w-6 text-white" strokeWidth={2.25} aria-hidden />
+            </div>
+            <div className="min-w-0 pt-0.5">
+              <h1 className="text-xl font-bold tracking-tight text-indigo-950 sm:text-2xl">
+                {title}
+              </h1>
+              <p className="mt-1 max-w-2xl text-[13px] leading-snug text-slate-500 sm:text-sm">
+                {subtitle}
+              </p>
+            </div>
           </div>
-        </div>
+          <HeaderIcon
+            className="hidden h-16 w-16 shrink-0 text-violet-300/40 sm:block"
+            strokeWidth={1.25}
+            aria-hidden
+          />
+        </header>
 
-        <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 sm:p-6">
-          <h2 className="text-sm font-semibold text-gray-800 mb-4">Filters</h2>
-          <div className="mb-4">
-            <label className="text-xs font-medium text-gray-600 mb-1 block">Search</label>
+        <CampaignSummaryCards
+          summary={summary}
+          prevSummary={prevSummary}
+          loading={summaryLoading}
+          sparkColor={sparkColor || "#8b5cf6"}
+        />
+
+        <div className="rounded-2xl border border-slate-200/90 bg-white/95 p-4 shadow-sm backdrop-blur-sm sm:p-6">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
+            <div className="inline-flex items-center gap-2 text-sm font-bold text-slate-800">
+              <Filter className="h-4 w-4 text-violet-600" />
+              Filters
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={resetFilters}
+                className={`rounded-lg border bg-white px-4 py-2 text-sm font-semibold ${accent.resetBorder} ${accent.resetText} ${accent.resetHover}`}
+              >
+                Reset
+              </button>
+              <button
+                type="button"
+                onClick={runSearch}
+                disabled={tableLoading || summaryLoading}
+                className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-60 ${accent.button}`}
+              >
+                {(tableLoading || summaryLoading) && (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                )}
+                Apply Filters
+              </button>
+            </div>
+          </div>
+          <div className="relative mb-4">
+            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               type="search"
               value={draftFilters.search}
@@ -215,40 +478,36 @@ export default function CrmCampaignLeadsManageClient({
                 }
               }}
               placeholder="Customer ID, phone, name, email, company, assignee…"
-              className={`w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 ${accent.focus}`}
+              className={`w-full rounded-xl border border-slate-200 py-2.5 pl-10 pr-3 text-sm focus:outline-none focus:ring-2 ${accent.ring}`}
             />
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-            <div>
-              <label className="text-xs font-medium text-gray-600 mb-1 block">From</label>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <FilterField label="From">
               <TypeableDateFilterInput
                 value={draftFilters.from}
                 onChange={(v) => patchDraft({ from: v })}
-                className="w-full px-3 py-2 border rounded-lg text-sm"
+                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
               />
-            </div>
-            <div>
-              <label className="text-xs font-medium text-gray-600 mb-1 block">To</label>
+            </FilterField>
+            <FilterField label="To">
               <TypeableDateFilterInput
                 value={draftFilters.to}
                 onChange={(v) => patchDraft({ to: v })}
-                className="w-full px-3 py-2 border rounded-lg text-sm"
+                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
               />
-            </div>
-            <div>
-              <label className="text-xs font-medium text-gray-600 mb-1 block">Tag</label>
+            </FilterField>
+            <FilterField label="Tag">
               <select
                 value={draftFilters.outcomeTag}
                 onChange={(e) => patchDraft({ outcomeTag: e.target.value })}
-                className="w-full px-3 py-2 border rounded-lg text-sm"
+                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
               >
                 <option value="all">All</option>
                 <option value="won">Won</option>
                 <option value="cancel">Cancel</option>
               </select>
-            </div>
-            <div>
-              <label className="text-xs font-medium text-gray-600 mb-1 block">Assigned to</label>
+            </FilterField>
+            <FilterField label="Assigned To">
               <SearchableSelect
                 options={assigneeSelectOptions}
                 value={draftFilters.assignedTo}
@@ -256,9 +515,8 @@ export default function CrmCampaignLeadsManageClient({
                 placeholder="All assignees"
                 searchPlaceholder="Search assignee..."
               />
-            </div>
-            <div>
-              <label className="text-xs font-medium text-gray-600 mb-1 block">Lead source</label>
+            </FilterField>
+            <FilterField label="Lead Source">
               <SearchableSelect
                 options={leadSourceSelectOptions}
                 value={draftFilters.leadSource}
@@ -266,112 +524,158 @@ export default function CrmCampaignLeadsManageClient({
                 placeholder="All lead sources"
                 searchPlaceholder="Search source..."
               />
-            </div>
-          </div>
-          <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-gray-100 pt-4">
-            <button
-              type="button"
-              onClick={runSearch}
-              disabled={tableLoading || summaryLoading}
-              className={`inline-flex items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60 ${accent.button}`}
-            >
-              {tableLoading || summaryLoading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Search className="w-4 h-4" />
-              )}
-              Search
-            </button>
+            </FilterField>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
-          <div className="px-4 py-3 border-b bg-gray-50 flex items-center justify-between">
-            <span className="text-sm font-medium text-gray-700">
-              {pagination.total ?? 0} lead{pagination.total === 1 ? "" : "s"}
+        <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white/95 shadow-sm backdrop-blur-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 sm:px-5">
+            <span className="text-sm font-bold text-slate-800">
+              {pagination.total ?? 0} Leads (Filtered)
             </span>
-            {tableLoading && <Loader2 className={`w-5 h-5 animate-spin ${accent.spinner}`} />}
+            <div className="flex items-center gap-2">
+              {tableLoading && <Loader2 className={`h-5 w-5 animate-spin ${accent.spinner}`} />}
+              <button
+                type="button"
+                onClick={() => exportCrmRowsCsv(rows)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                <Download className="h-3.5 w-3.5" />
+                Export
+              </button>
+            </div>
           </div>
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 text-sm">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
-                    Client
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
-                    Contact
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
-                    Assigned
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
-                    Status
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
-                    Lead source
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
-                    Campaign
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
-                    Created
-                  </th>
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="bg-slate-50/90 text-left text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                  <th className="w-10 px-4 py-3">#</th>
+                  <th className="px-4 py-3">Client</th>
+                  <th className="px-4 py-3">Contact</th>
+                  <th className="px-4 py-3">Assigned</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Lead Source</th>
+                  <th className="px-4 py-3">Campaign</th>
+                  <th className="px-4 py-3">Created</th>
+                  <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody
-                className={`divide-y divide-gray-100 ${
-                  tableLoading && rows.length > 0 ? "opacity-50 pointer-events-none" : ""
+                className={`divide-y divide-slate-100 ${
+                  tableLoading && rows.length > 0 ? "pointer-events-none opacity-50" : ""
                 }`}
               >
                 {!tableLoading && rows.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-12 text-center text-gray-500">
+                    <td colSpan={9} className="px-4 py-14 text-center text-slate-500">
                       {emptyMessage}
                     </td>
                   </tr>
                 ) : (
-                  rows.map((row) => {
+                  rows.map((row, idx) => {
+                    const name = displayName(row);
                     const customerHref = row.customer_id
                       ? `/${dashboardBase}/view-customer/${encodeURIComponent(row.customer_id)}`
                       : null;
+                    const editHref = customerHref ? `${customerHref}/edit` : null;
                     return (
-                      <tr key={row.customer_id} className="hover:bg-gray-50">
+                      <tr key={row.customer_id} className="hover:bg-violet-50/20">
+                        <td className="px-4 py-3 text-slate-400 tabular-nums">
+                          {page * PAGE_SIZE + idx + 1}
+                        </td>
                         <td className="px-4 py-3">
-                          {customerHref ? (
-                            <Link href={customerHref} className={`font-medium ${accent.link}`}>
-                              {displayName(row)}
-                            </Link>
-                          ) : (
-                            <span className="font-medium text-gray-900">{displayName(row)}</span>
-                          )}
-                          <div className="text-xs text-gray-400">#{row.customer_id}</div>
+                          <div className="flex items-center gap-2.5">
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-violet-100 text-xs font-bold text-violet-800">
+                              {leadInitials(name)}
+                            </div>
+                            <div className="min-w-0">
+                              {customerHref ? (
+                                <Link
+                                  href={customerHref}
+                                  className={`font-semibold ${accent.link}`}
+                                >
+                                  {name}
+                                </Link>
+                              ) : (
+                                <span className="font-semibold text-slate-900">{name}</span>
+                              )}
+                              <div className="text-[11px] text-slate-400">#{row.customer_id}</div>
+                            </div>
+                          </div>
                         </td>
-                        <td className="px-4 py-3 text-gray-700">
-                          <div>{row.phone || "—"}</div>
-                          <div className="text-xs text-gray-500 break-all">{row.email || "—"}</div>
+                        <td className="px-4 py-3 text-slate-700">
+                          <div className="flex items-center gap-1.5">
+                            <Phone className="h-3.5 w-3.5 text-slate-400" />
+                            {row.phone || "—"}
+                          </div>
+                          <div className="mt-0.5 flex items-start gap-1.5 break-all text-xs text-slate-500">
+                            <Mail className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
+                            {row.email || "—"}
+                          </div>
                         </td>
-                        <td className="px-4 py-3 text-gray-800">
-                          <div>{row.assigned_to || "—"}</div>
+                        <td className="px-4 py-3 text-slate-800">
+                          <div className="flex items-center gap-1.5 font-medium">
+                            <User className="h-3.5 w-3.5 text-violet-500" />
+                            {row.assigned_to || "—"}
+                          </div>
                           {row.sales_representative &&
                             row.sales_representative !== row.assigned_to && (
-                              <div className="text-xs text-gray-500">
+                              <div className="text-xs text-slate-500">
                                 Rep: {row.sales_representative}
                               </div>
                             )}
                         </td>
                         <td className="px-4 py-3">
-                          <div className="text-gray-800">{row.status || "—"}</div>
                           <OutcomeStatusBadge row={row} />
                         </td>
-                        <td className="px-4 py-3 text-gray-700">{row.lead_source || "—"}</td>
-                        <td className="px-4 py-3 text-gray-700">{formatCampaign(row.lead_campaign)}</td>
-                        <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
-                          {row.date_created
-                            ? new Date(row.date_created).toLocaleString("en-IN", {
-                                timeZone: "Asia/Kolkata",
-                              })
-                            : "—"}
+                        <td className="px-4 py-3 text-slate-700">{row.lead_source || "—"}</td>
+                        <td className="px-4 py-3 text-slate-700">
+                          {formatCampaign(row.lead_campaign)}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3 text-slate-600">
+                          <div className="flex items-center gap-1.5 text-xs">
+                            <CalendarDays className="h-3.5 w-3.5 text-slate-400" />
+                            {row.date_created
+                              ? formatCrmDateOnly(String(row.date_created).slice(0, 10))
+                              : "—"}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center justify-end gap-1">
+                            {customerHref ? (
+                              <Link
+                                href={customerHref}
+                                className="rounded-lg p-1.5 text-slate-500 hover:bg-violet-50 hover:text-violet-700"
+                                title="View"
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Link>
+                            ) : (
+                              <span className="rounded-lg p-1.5 text-slate-300">
+                                <Eye className="h-4 w-4" />
+                              </span>
+                            )}
+                            {editHref ? (
+                              <Link
+                                href={editHref}
+                                className="rounded-lg p-1.5 text-slate-500 hover:bg-violet-50 hover:text-violet-700"
+                                title="Edit"
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Link>
+                            ) : (
+                              <span className="rounded-lg p-1.5 text-slate-300">
+                                <Pencil className="h-4 w-4" />
+                              </span>
+                            )}
+                            <button
+                              type="button"
+                              className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"
+                              aria-label="More"
+                            >
+                              <MoreVertical className="h-4 w-4" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -380,27 +684,27 @@ export default function CrmCampaignLeadsManageClient({
               </tbody>
             </table>
           </div>
-          <div className="px-4 py-3 border-t flex items-center justify-between bg-gray-50">
+          <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/80 px-4 py-3">
             <button
               type="button"
               disabled={page <= 0 || tableLoading}
               onClick={() => setPage((p) => Math.max(0, p - 1))}
-              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border text-sm disabled:opacity-40"
+              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm disabled:opacity-40"
             >
-              <ChevronLeft className="w-4 h-4" />
+              <ChevronLeft className="h-4 w-4" />
               Prev
             </button>
-            <span className="text-sm text-gray-600">
+            <span className="text-sm text-slate-600">
               Page {page + 1} of {totalPages}
             </span>
             <button
               type="button"
               disabled={!pagination.hasMore || tableLoading}
               onClick={() => setPage((p) => p + 1)}
-              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border text-sm disabled:opacity-40"
+              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm disabled:opacity-40"
             >
               Next
-              <ChevronRight className="w-4 h-4" />
+              <ChevronRight className="h-4 w-4" />
             </button>
           </div>
         </div>

@@ -56,3 +56,13 @@ export function getCurrentMonthRangeIso() {
     to: end.format("YYYY-MM-DD"),
   };
 }
+
+/** Month start through today (inclusive) — Leads Manage default filters. */
+export function getCurrentMonthThroughTodayIso() {
+  const start = dayjs().startOf("month");
+  const end = dayjs().startOf("day");
+  return {
+    from: start.format("YYYY-MM-DD"),
+    to: end.format("YYYY-MM-DD"),
+  };
+}
