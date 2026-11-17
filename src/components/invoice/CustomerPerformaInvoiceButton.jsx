@@ -7,13 +7,20 @@ export default function CustomerPerformaInvoiceButton({
   href,
   quotationNumber,
   className = "",
+  label = "Performa Invoice",
+  icon: Icon = null,
 }) {
-  const label = "Performa Invoice";
+  const content = (
+    <>
+      {Icon ? <Icon className="h-4 w-4 shrink-0" aria-hidden /> : null}
+      {label}
+    </>
+  );
 
   if (quotationNumber) {
     return (
       <Link href={href} className={className}>
-        {label}
+        {content}
       </Link>
     );
   }
@@ -26,7 +33,7 @@ export default function CustomerPerformaInvoiceButton({
         toast.error("No quotation found for this customer. Create a quotation first.")
       }
     >
-      {label}
+      {content}
     </button>
   );
 }

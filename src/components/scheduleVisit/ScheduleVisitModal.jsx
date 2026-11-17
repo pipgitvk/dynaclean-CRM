@@ -15,6 +15,8 @@ export default function ScheduleVisitModal({
   variant = "action",
   moduleGated = false,
   prefillVisitAddress = true,
+  triggerClassName = "",
+  TriggerIcon = null,
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [moduleAllowed, setModuleAllowed] = useState(!moduleGated);
@@ -121,10 +123,11 @@ export default function ScheduleVisitModal({
   const contact = selected?.phone || initialContact;
   const address = selected?.address || initialAddress;
 
-  const buttonClass =
+  const defaultButtonClass =
     variant === "primary"
       ? "px-4 py-2 bg-violet-600 text-white rounded-md text-sm font-medium hover:bg-violet-700 whitespace-nowrap"
       : "btn w-full md:w-auto md:flex-shrink-0 whitespace-nowrap text-white bg-violet-600 hover:bg-violet-700 py-2 px-4 rounded-md transition duration-300 text-center";
+  const buttonClass = triggerClassName || defaultButtonClass;
 
   if (moduleGated && (moduleLoading || !moduleAllowed)) {
     return null;
@@ -138,6 +141,9 @@ export default function ScheduleVisitModal({
           onClick={openModal}
           className={buttonClass}
         >
+          {TriggerIcon ? (
+            <TriggerIcon className="h-4 w-4 shrink-0" aria-hidden />
+          ) : null}
           {buttonLabel}
         </button>
       )}

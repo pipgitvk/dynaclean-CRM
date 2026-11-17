@@ -3,30 +3,43 @@
 import { useState } from "react";
 import CustomerContacts from "./CustomerContacts";
 
-export default function CustomerContactsModal({ customerId, userRole = "" }) {
+export default function CustomerContactsModal({
+  customerId,
+  userRole = "",
+  triggerClassName = "",
+  triggerLabel = "View Contacts",
+  TriggerIcon = null,
+}) {
   const [isOpen, setIsOpen] = useState(false);
+
+  const defaultTriggerClass =
+    "btn w-full md:w-auto md:flex-shrink-0 whitespace-nowrap text-white bg-purple-600 hover:bg-purple-700 py-2 px-4 rounded-md transition duration-300 flex items-center justify-center gap-2";
 
   return (
     <>
       {/* Trigger Button */}
       <button
         onClick={() => setIsOpen(true)}
-        className="btn w-full md:w-auto md:flex-shrink-0 whitespace-nowrap text-white bg-purple-600 hover:bg-purple-700 py-2 px-4 rounded-md transition duration-300 flex items-center justify-center gap-2"
+        className={triggerClassName || defaultTriggerClass}
       >
-        <svg
-          className="w-5 h-5"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"
-          />
-        </svg>
-        View Contacts
+        {TriggerIcon ? (
+          <TriggerIcon className="h-4 w-4 shrink-0" aria-hidden />
+        ) : (
+          <svg
+            className="h-5 w-5 shrink-0"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"
+            />
+          </svg>
+        )}
+        {triggerLabel}
       </button>
 
       {/* Modal */}

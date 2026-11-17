@@ -3,7 +3,7 @@ import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useTransition } from "react";
 import { format } from "date-fns";
 import { useRouter } from "next/navigation";
-import { Eye, Pencil, Search, RefreshCw, Loader2 } from "lucide-react";
+import { Eye, Pencil, Search, RefreshCw, Loader2, LayoutDashboard } from "lucide-react";
 import Link from "next/link";
 import { NOTES_LANGUAGE_OPTIONS } from "@/constants/notesLanguageOptions";
 import { getCurrentMonthRangeIso } from "@/lib/crmDateFormat";
@@ -268,6 +268,15 @@ export default function CustomerTable({
                 </div>
               </div>
               <div className="flex gap-2 flex-shrink-0">
+                <button
+                  title="CRM Profile"
+                  onClick={() =>
+                    router.push(`/admin-dashboard/customers/${row.customer_id}`)
+                  }
+                  className="p-2 rounded-lg bg-violet-50 hover:bg-violet-100 border border-violet-100"
+                >
+                  <LayoutDashboard className="w-5 h-5 text-violet-400" />
+                </button>
                 {(userRole === "ADMIN" || userRole === "SUPERADMIN" || userRole === "EA") && (
                   <button
                     title="View"
@@ -337,6 +346,16 @@ export default function CustomerTable({
                         : "---"}
                     </td>
                     <td className="px-4 py-2 flex items-center gap-2">
+                    <button
+                      title="CRM Profile"
+                      onClick={() =>
+                        router.push(
+                          `/admin-dashboard/customers/${row.customer_id}`
+                        )
+                      }
+                    >
+                      <LayoutDashboard className="w-5 h-5 text-violet-400 hover:text-violet-500" />
+                    </button>
                     {(userRole === "ADMIN" || userRole === "SUPERADMIN" || userRole === "EA") && (
                       <button
                         title="View"
