@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import SearchableSelect from "@/components/ui/SearchableSelect";
@@ -32,6 +32,7 @@ import {
   Users,
 } from "lucide-react";
 import { formatCrmDateOnly, getCurrentMonthThroughTodayIso } from "@/lib/crmDateFormat";
+import { formatCrmDatetimeForISTDisplay } from "@/lib/timezone";
 import { resolveSocialMediaLeadOutcomeStatus } from "@/lib/socialMediaLeadOutcomeStatus";
 
 const PAGE_SIZE = 50;
@@ -85,6 +86,45 @@ function defaultSocialMediaFilters(monthDefault) {
   };
 }
 
+function socialMediaFiltersStorageKey(dashboardBase) {
+  return `leads-manage:social-media:filters:${dashboardBase || "admin-dashboard"}`;
+}
+
+function readStoredSocialMediaFilters(dashboardBase, monthDefault) {
+  const defaults = defaultSocialMediaFilters(monthDefault);
+  if (typeof window === "undefined") return defaults;
+  try {
+    const raw = sessionStorage.getItem(socialMediaFiltersStorageKey(dashboardBase));
+    if (!raw) return defaults;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return defaults;
+    return { ...defaults, ...parsed };
+  } catch {
+    return defaults;
+  }
+}
+
+function writeStoredSocialMediaFilters(dashboardBase, filters) {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.setItem(
+      socialMediaFiltersStorageKey(dashboardBase),
+      JSON.stringify(filters),
+    );
+  } catch {
+    /* ignore quota */
+  }
+}
+
+function clearStoredSocialMediaFilters(dashboardBase) {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.removeItem(socialMediaFiltersStorageKey(dashboardBase));
+  } catch {
+    /* ignore */
+  }
+}
+
 function getLeadName(lead) {
   const fieldData = lead.fieldData || lead.field_data || [];
   if (!Array.isArray(fieldData)) {
@@ -126,11 +166,21 @@ function OutcomeStatusBadge({ lead }) {
       ? "bg-emerald-100 text-emerald-800 ring-emerald-200"
       : "bg-rose-100 text-rose-800 ring-rose-200";
   return (
-    <span
-      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ${styles}`}
-    >
-      {outcome.label}
-    </span>
+    <div className="min-w-0">
+      <span
+        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ${styles}`}
+      >
+        {outcome.label}
+      </span>
+      {outcome.tone === "cancel" && outcome.crmStatus ? (
+        <div
+          className="mt-1 max-w-[12rem] truncate text-[11px] font-medium text-slate-600"
+          title={outcome.crmStatus}
+        >
+          {outcome.crmStatus}
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -142,10 +192,10 @@ function distributionLabel(lead) {
       lead.crm_sales_rep ||
       lead.assigned_to ||
       "—";
-    return { status: "Imported", tone: "green", assignee: who };
+    return { status: "Distributed", tone: "green", assignee: who };
   }
   return {
-    status: "Not imported",
+    status: "Duplicate",
     tone: "red",
     assignee: lead.assigned_to || lead.employee_name || "—",
   };
@@ -161,12 +211,16 @@ export default function SocialMediaLeadsManageClient({
   const monthDefault = useMemo(() => getCurrentMonthThroughTodayIso(), []);
   const hubHref = `/${dashboardBase}/leads-manage`;
 
-  const initialFilters = useMemo(
+  const defaultFilters = useMemo(
     () => defaultSocialMediaFilters(monthDefault),
     [monthDefault],
   );
-  const [draftFilters, setDraftFilters] = useState(initialFilters);
-  const [appliedFilters, setAppliedFilters] = useState(initialFilters);
+  const [draftFilters, setDraftFilters] = useState(() =>
+    readStoredSocialMediaFilters(dashboardBase, monthDefault),
+  );
+  const [appliedFilters, setAppliedFilters] = useState(() =>
+    readStoredSocialMediaFilters(dashboardBase, monthDefault),
+  );
   const [page, setPage] = useState(0);
 
   const [summaryLoading, setSummaryLoading] = useState(true);
@@ -177,14 +231,45 @@ export default function SocialMediaLeadsManageClient({
   const [filterOptions, setFilterOptions] = useState({ assignees: [], campaigns: [] });
   const [pagination, setPagination] = useState({ total: 0, hasMore: false });
 
+  const draftFiltersRef = useRef(draftFilters);
+  useEffect(() => {
+    draftFiltersRef.current = draftFilters;
+  }, [draftFilters]);
+
+  useEffect(() => {
+    writeStoredSocialMediaFilters(dashboardBase, {
+      ...appliedFilters,
+      from: draftFilters.from || appliedFilters.from,
+      to: draftFilters.to || appliedFilters.to,
+    });
+  }, [appliedFilters, draftFilters.from, draftFilters.to, dashboardBase]);
+
   const patchDraft = useCallback((patch) => {
-    setDraftFilters((prev) => ({ ...prev, ...patch }));
+    setDraftFilters((prev) => {
+      const next = { ...prev, ...patch };
+      draftFiltersRef.current = next;
+      return next;
+    });
   }, []);
 
   const runSearch = useCallback(() => {
-    setAppliedFilters({ ...draftFilters });
+    const next = { ...draftFiltersRef.current };
+    setAppliedFilters(next);
     setPage(0);
-  }, [draftFilters]);
+  }, []);
+
+  const applyImportStatusFromCard = useCallback((importStatus) => {
+    setDraftFilters((prev) => {
+      const next = { ...prev, importStatus };
+      draftFiltersRef.current = next;
+      return next;
+    });
+    setAppliedFilters((prev) => {
+      const next = { ...prev, importStatus };
+      return next;
+    });
+    setPage(0);
+  }, []);
 
   const buildListParams = useCallback(
     (filters, pageNum, overrides = {}) => {
@@ -197,9 +282,11 @@ export default function SocialMediaLeadsManageClient({
         campaign,
         search,
       } = filters;
+      const fromIso = String(from || "").trim();
+      const toIso = String(to || "").trim();
       const params = {
-        from: from || monthDefault.from,
-        to: to || monthDefault.to,
+        from: fromIso || monthDefault.from,
+        to: toIso || monthDefault.to,
         importStatus,
         outcomeTag,
         limit: PAGE_SIZE,
@@ -215,10 +302,12 @@ export default function SocialMediaLeadsManageClient({
   );
 
   const resetFilters = useCallback(() => {
-    setDraftFilters(initialFilters);
-    setAppliedFilters(initialFilters);
+    clearStoredSocialMediaFilters(dashboardBase);
+    setDraftFilters(defaultFilters);
+    draftFiltersRef.current = defaultFilters;
+    setAppliedFilters(defaultFilters);
     setPage(0);
-  }, [initialFilters]);
+  }, [dashboardBase, defaultFilters]);
 
   const fetchData = useCallback(async () => {
     const pagingOnly = page > 0;
@@ -318,8 +407,8 @@ export default function SocialMediaLeadsManageClient({
   const totalPages = Math.max(1, Math.ceil((pagination.total || 0) / PAGE_SIZE));
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-violet-50/80 via-slate-50 to-white px-2 sm:px-4 pb-6 pt-3 sm:pt-4">
-      <div className="mx-auto max-w-[1440px] space-y-5">
+    <div className="min-h-screen w-full max-w-none bg-gradient-to-b from-violet-50/80 via-slate-50 to-white pb-6 pt-3 sm:pt-4 -mx-2 w-[calc(100%+1rem)] sm:-mx-3 sm:w-[calc(100%+1.5rem)] md:-mx-4 md:w-[calc(100%+2rem)] px-1 sm:px-2">
+      <div className="w-full space-y-5">
         <LeadsManageBackLink hubHref={hubHref} />
 
         <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -347,9 +436,11 @@ export default function SocialMediaLeadsManageClient({
           summary={summary}
           prevSummary={prevSummary}
           loading={summaryLoading}
+          activeImportStatus={appliedFilters.importStatus}
+          onSelectImportStatus={applyImportStatusFromCard}
         />
 
-        <div className="rounded-2xl border border-slate-200/90 bg-white/95 p-4 shadow-sm backdrop-blur-sm sm:p-6">
+        <div className="relative z-20 overflow-visible rounded-2xl border border-slate-200/90 bg-white/95 p-4 shadow-sm backdrop-blur-sm sm:p-6">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
             <div className="inline-flex items-center gap-2 text-sm font-bold text-slate-800">
               <Filter className="h-4 w-4 text-violet-600" />
@@ -407,15 +498,15 @@ export default function SocialMediaLeadsManageClient({
                 className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
               />
             </FilterField>
-            <FilterField label="Import Status">
+            <FilterField label="Distribution Status">
               <select
                 value={draftFilters.importStatus}
                 onChange={(e) => patchDraft({ importStatus: e.target.value })}
                 className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
               >
                 <option value="all">All leads</option>
-                <option value="imported">Imported only</option>
-                <option value="not_imported">Not imported only</option>
+                <option value="distributed">Distributed only</option>
+                <option value="duplicate">Duplicate only</option>
               </select>
             </FilterField>
             <FilterField label="Tag">
@@ -436,6 +527,7 @@ export default function SocialMediaLeadsManageClient({
                 onChange={(v) => patchDraft({ assignedTo: v })}
                 placeholder="All users"
                 searchPlaceholder="Search user..."
+                className="rounded-xl border-slate-200"
               />
             </FilterField>
             <FilterField label="Ads Campaign">
@@ -445,6 +537,7 @@ export default function SocialMediaLeadsManageClient({
                 onChange={(v) => patchDraft({ campaign: v })}
                 placeholder="All campaigns"
                 searchPlaceholder="Search campaign..."
+                className="rounded-xl border-slate-200"
               />
             </FilterField>
           </div>
@@ -506,10 +599,24 @@ function SummarySparkline({ color, value, seed }) {
   );
 }
 
-function SocialMediaSummaryCards({ summary, prevSummary, loading }) {
+function SocialMediaSummaryCards({
+  summary,
+  prevSummary,
+  loading,
+  activeImportStatus = "all",
+  onSelectImportStatus,
+}) {
+  const active =
+    activeImportStatus === "imported"
+      ? "distributed"
+      : activeImportStatus === "not_imported"
+        ? "duplicate"
+        : activeImportStatus;
+
   const cards = [
     {
       label: "Total Leads",
+      importStatus: "all",
       value: summary.total,
       prev: prevSummary.total,
       icon: Users,
@@ -517,9 +624,11 @@ function SocialMediaSummaryCards({ summary, prevSummary, loading }) {
       valueClass: "text-slate-900",
       spark: "#7c3aed",
       seed: 1,
+      activeRing: "ring-violet-500/60",
     },
     {
-      label: "Imported",
+      label: "Distributed",
+      importStatus: "distributed",
       value: summary.imported,
       prev: prevSummary.imported,
       icon: Download,
@@ -527,9 +636,11 @@ function SocialMediaSummaryCards({ summary, prevSummary, loading }) {
       valueClass: "text-emerald-700",
       spark: "#10b981",
       seed: 2,
+      activeRing: "ring-emerald-500/60",
     },
     {
-      label: "Not Imported",
+      label: "Duplicate",
+      importStatus: "duplicate",
       value: summary.notImported,
       prev: prevSummary.notImported,
       icon: Ban,
@@ -537,6 +648,7 @@ function SocialMediaSummaryCards({ summary, prevSummary, loading }) {
       valueClass: "text-rose-600",
       spark: "#f43f5e",
       seed: 3,
+      activeRing: "ring-rose-500/60",
     },
   ];
 
@@ -546,10 +658,19 @@ function SocialMediaSummaryCards({ summary, prevSummary, loading }) {
         const change = pctChange(c.value, c.prev);
         const up = change >= 0;
         const Icon = c.icon;
+        const isActive = active === c.importStatus;
         return (
-          <div
+          <button
             key={c.label}
-            className="rounded-2xl border border-slate-200/90 bg-white/95 p-5 shadow-sm backdrop-blur-sm"
+            type="button"
+            disabled={loading}
+            onClick={() => onSelectImportStatus?.(c.importStatus)}
+            className={`cursor-pointer rounded-2xl border bg-white/95 p-5 text-left shadow-sm backdrop-blur-sm transition hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 disabled:cursor-not-allowed disabled:pointer-events-none disabled:opacity-70 ${
+              isActive
+                ? `border-violet-300 ring-2 ${c.activeRing} shadow-md`
+                : "border-slate-200/90 hover:border-violet-200"
+            }`}
+            aria-pressed={isActive}
           >
             <div className="flex items-start justify-between gap-3">
               <div className={`rounded-xl p-2.5 ${c.iconBg}`}>
@@ -572,22 +693,22 @@ function SocialMediaSummaryCards({ summary, prevSummary, loading }) {
               {up ? "+" : ""}
               {change}% vs previous period
             </p>
-          </div>
+          </button>
         );
       })}
     </div>
   );
 }
 
-function ImportStatusPill({ lead }) {
-  const imported = lead.is_imported_to_crm || lead.isImportedToCRM;
+function DistributionStatusPill({ lead }) {
+  const distributed = lead.is_imported_to_crm || lead.isImportedToCRM;
   return (
     <span
       className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-        imported ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"
+        distributed ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"
       }`}
     >
-      {imported ? "Imported" : "Not Imported"}
+      {distributed ? "Distributed" : "Duplicate"}
     </span>
   );
 }
@@ -709,7 +830,7 @@ function SocialMediaLeadsTable({ loading, rows, dashboardBase, page, setPage, to
                       <div className="text-xs text-slate-500">{lead.assigned_to || "—"}</div>
                     </td>
                     <td className="px-4 py-3">
-                      <ImportStatusPill lead={lead} />
+                      <DistributionStatusPill lead={lead} />
                       <div className="mt-1 text-xs text-slate-600">To: {dist.assignee}</div>
                       {customerHref && (
                         <Link href={customerHref} className="text-xs font-medium text-violet-700 hover:underline">
@@ -724,11 +845,14 @@ function SocialMediaLeadsTable({ loading, rows, dashboardBase, page, setPage, to
                       <span className="line-clamp-2">{lead.campaign_name || "—"}</span>
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-slate-600">
-                      <div className="flex items-center gap-1.5 text-xs">
-                        <CalendarDays className="h-3.5 w-3.5 text-slate-400" />
-                        {lead.created_at
-                          ? formatCrmDateOnly(String(lead.created_at).slice(0, 10))
-                          : "—"}
+                      <div className="text-xs">
+                        <div className="flex items-center gap-1.5 font-medium text-slate-700">
+                          <CalendarDays className="h-3.5 w-3.5 text-slate-400" />
+                          {lead.created_at
+                            ? formatCrmDatetimeForISTDisplay(lead.created_at) ||
+                              formatCrmDateOnly(String(lead.created_at).slice(0, 10))
+                            : "—"}
+                        </div>
                       </div>
                     </td>
                     <td className="px-4 py-3">

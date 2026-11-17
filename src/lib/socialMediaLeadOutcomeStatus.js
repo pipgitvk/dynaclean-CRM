@@ -18,7 +18,12 @@ export function resolveSocialMediaLeadOutcomeStatus(lead) {
   );
 
   if (hasCustomer && isCustomerCancelStatus(crmStatus)) {
-    return { label: "Cancel", tone: "cancel" };
+    const crmStatusLabel = String(crmStatus || "").trim();
+    return {
+      label: "Cancel",
+      tone: "cancel",
+      crmStatus: crmStatusLabel || undefined,
+    };
   }
 
   const wonOrder =

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import dayjs from "dayjs";
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
@@ -36,6 +36,7 @@ import {
   Clock,
 } from "lucide-react";
 import { formatCrmDateOnly, getCurrentMonthThroughTodayIso } from "@/lib/crmDateFormat";
+import { formatCrmDatetimeForISTDisplay } from "@/lib/timezone";
 import { resolveSocialMediaLeadOutcomeStatus } from "@/lib/socialMediaLeadOutcomeStatus";
 
 const PAGE_SIZE = 50;
@@ -114,11 +115,21 @@ function OutcomeStatusBadge({ row }) {
       ? "bg-emerald-100 text-emerald-800 ring-emerald-200"
       : "bg-rose-100 text-rose-800 ring-rose-200";
   return (
-    <span
-      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ${styles}`}
-    >
-      {outcome.label}
-    </span>
+    <div className="min-w-0">
+      <span
+        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ${styles}`}
+      >
+        {outcome.label}
+      </span>
+      {outcome.tone === "cancel" && outcome.crmStatus ? (
+        <div
+          className="mt-1 max-w-[12rem] truncate text-[11px] font-medium text-slate-600"
+          title={outcome.crmStatus}
+        >
+          {outcome.crmStatus}
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -278,14 +289,24 @@ export default function CrmCampaignLeadsManageClient({
   const [filterOptions, setFilterOptions] = useState({ assignees: [], leadSources: [] });
   const [pagination, setPagination] = useState({ total: 0, hasMore: false });
 
+  const draftFiltersRef = useRef(initialFilters);
+  useEffect(() => {
+    draftFiltersRef.current = draftFilters;
+  }, [draftFilters]);
+
   const patchDraft = useCallback((patch) => {
-    setDraftFilters((prev) => ({ ...prev, ...patch }));
+    setDraftFilters((prev) => {
+      const next = { ...prev, ...patch };
+      draftFiltersRef.current = next;
+      return next;
+    });
   }, []);
 
   const runSearch = useCallback(() => {
-    setAppliedFilters({ ...draftFilters });
+    const next = { ...draftFiltersRef.current };
+    setAppliedFilters(next);
     setPage(0);
-  }, [draftFilters]);
+  }, []);
 
   const resetFilters = useCallback(() => {
     setDraftFilters(initialFilters);
@@ -398,8 +419,8 @@ export default function CrmCampaignLeadsManageClient({
   const totalPages = Math.max(1, Math.ceil((pagination.total || 0) / PAGE_SIZE));
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-violet-50/80 via-slate-50 to-white px-2 sm:px-4 pb-6 pt-3 sm:pt-4">
-      <div className="mx-auto max-w-[1440px] space-y-5">
+    <div className="min-h-screen w-full max-w-none bg-gradient-to-b from-violet-50/80 via-slate-50 to-white pb-6 pt-3 sm:pt-4 -mx-2 w-[calc(100%+1rem)] sm:-mx-3 sm:w-[calc(100%+1.5rem)] md:-mx-4 md:w-[calc(100%+2rem)] px-1 sm:px-2">
+      <div className="w-full space-y-5">
         <Link
           href={hubHref}
           className="inline-flex items-center gap-2 text-sm font-semibold text-violet-700 hover:text-violet-900"
@@ -438,7 +459,7 @@ export default function CrmCampaignLeadsManageClient({
           sparkColor={sparkColor || "#8b5cf6"}
         />
 
-        <div className="rounded-2xl border border-slate-200/90 bg-white/95 p-4 shadow-sm backdrop-blur-sm sm:p-6">
+        <div className="relative z-20 overflow-visible rounded-2xl border border-slate-200/90 bg-white/95 p-4 shadow-sm backdrop-blur-sm sm:p-6">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
             <div className="inline-flex items-center gap-2 text-sm font-bold text-slate-800">
               <Filter className="h-4 w-4 text-violet-600" />
@@ -514,6 +535,7 @@ export default function CrmCampaignLeadsManageClient({
                 onChange={(v) => patchDraft({ assignedTo: v })}
                 placeholder="All assignees"
                 searchPlaceholder="Search assignee..."
+                className="rounded-xl border-slate-200"
               />
             </FilterField>
             <FilterField label="Lead Source">
@@ -523,6 +545,7 @@ export default function CrmCampaignLeadsManageClient({
                 onChange={(v) => patchDraft({ leadSource: v })}
                 placeholder="All lead sources"
                 searchPlaceholder="Search source..."
+                className="rounded-xl border-slate-200"
               />
             </FilterField>
           </div>
@@ -633,11 +656,14 @@ export default function CrmCampaignLeadsManageClient({
                           {formatCampaign(row.lead_campaign)}
                         </td>
                         <td className="whitespace-nowrap px-4 py-3 text-slate-600">
-                          <div className="flex items-center gap-1.5 text-xs">
-                            <CalendarDays className="h-3.5 w-3.5 text-slate-400" />
-                            {row.date_created
-                              ? formatCrmDateOnly(String(row.date_created).slice(0, 10))
-                              : "—"}
+                          <div className="text-xs">
+                            <div className="flex items-center gap-1.5 font-medium text-slate-700">
+                              <CalendarDays className="h-3.5 w-3.5 text-slate-400" />
+                              {row.date_created
+                                ? formatCrmDatetimeForISTDisplay(row.date_created) ||
+                                  formatCrmDateOnly(String(row.date_created).slice(0, 10))
+                                : "—"}
+                            </div>
                           </div>
                         </td>
                         <td className="px-4 py-3">

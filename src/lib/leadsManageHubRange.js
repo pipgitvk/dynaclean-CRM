@@ -5,11 +5,37 @@ export const LEADS_HUB_RANGE_OPTIONS = [
   { id: "month", label: "Current Month (till today)" },
   { id: "7d", label: "Last 7 Days" },
   { id: "30d", label: "Last 30 Days" },
+  { id: "custom", label: "Custom date range" },
 ];
 
 /** Inclusive YYYY-MM-DD bounds + previous period of equal length (for % change). */
-export function resolveLeadsHubRange(rangeKey = "month") {
+export function resolveLeadsHubRange(rangeKey = "month", { from: customFrom, to: customTo } = {}) {
   const key = String(rangeKey || "month").trim().toLowerCase();
+
+  if (key === "custom" && customFrom && customTo) {
+    let start = dayjs(String(customFrom).trim());
+    let end = dayjs(String(customTo).trim());
+    if (!start.isValid() || !end.isValid()) {
+      return resolveLeadsHubRange("month");
+    }
+    if (end.isBefore(start, "day")) {
+      const swap = start;
+      start = end;
+      end = swap;
+    }
+    const spanDays = end.diff(start, "day") + 1;
+    const prevTo = start.subtract(1, "day");
+    const prevFrom = prevTo.subtract(spanDays - 1, "day");
+    return {
+      from: start.format("YYYY-MM-DD"),
+      to: end.format("YYYY-MM-DD"),
+      prevFrom: prevFrom.format("YYYY-MM-DD"),
+      prevTo: prevTo.format("YYYY-MM-DD"),
+      rangeKey: "custom",
+      rangeLabel: `${start.format("DD-MM-YYYY")} – ${end.format("DD-MM-YYYY")}`,
+    };
+  }
+
   const today = dayjs().startOf("day");
 
   if (key === "7d") {
@@ -18,12 +44,14 @@ export function resolveLeadsHubRange(rangeKey = "month") {
     const span = 7;
     const prevTo = from.subtract(1, "day");
     const prevFrom = prevTo.subtract(span - 1, "day");
+    const label = LEADS_HUB_RANGE_OPTIONS.find((o) => o.id === key)?.label || "Last 7 Days";
     return {
       from: from.format("YYYY-MM-DD"),
       to: to.format("YYYY-MM-DD"),
       prevFrom: prevFrom.format("YYYY-MM-DD"),
       prevTo: prevTo.format("YYYY-MM-DD"),
       rangeKey: key,
+      rangeLabel: label,
     };
   }
 
@@ -33,12 +61,14 @@ export function resolveLeadsHubRange(rangeKey = "month") {
     const span = 30;
     const prevTo = from.subtract(1, "day");
     const prevFrom = prevTo.subtract(span - 1, "day");
+    const label = LEADS_HUB_RANGE_OPTIONS.find((o) => o.id === key)?.label || "Last 30 Days";
     return {
       from: from.format("YYYY-MM-DD"),
       to: to.format("YYYY-MM-DD"),
       prevFrom: prevFrom.format("YYYY-MM-DD"),
       prevTo: prevTo.format("YYYY-MM-DD"),
       rangeKey: key,
+      rangeLabel: label,
     };
   }
 
@@ -49,12 +79,15 @@ export function resolveLeadsHubRange(rangeKey = "month") {
   const prevTo = from.subtract(1, "day");
   const prevFrom = prevTo.subtract(spanDays - 1, "day");
 
+  const label =
+    LEADS_HUB_RANGE_OPTIONS.find((o) => o.id === "month")?.label || "Current Month (till today)";
   return {
     from: month.from,
     to: month.to,
     prevFrom: prevFrom.format("YYYY-MM-DD"),
     prevTo: prevTo.format("YYYY-MM-DD"),
     rangeKey: "month",
+    rangeLabel: label,
   };
 }
 

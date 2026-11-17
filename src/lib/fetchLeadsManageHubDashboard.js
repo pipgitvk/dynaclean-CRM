@@ -178,10 +178,13 @@ export async function fetchLeadsManageHubDashboard({
   username,
   userRole,
   range = "month",
+  from: customFrom,
+  to: customTo,
 }) {
   const conn = await getDbConnection();
   const scope = buildCustomerScope({ username, userRole });
-  const { from, to, prevFrom, prevTo, rangeKey } = resolveLeadsHubRange(range);
+  const { from, to, prevFrom, prevTo, rangeKey, rangeLabel: resolvedLabel } =
+    resolveLeadsHubRange(range, { from: customFrom, to: customTo });
 
   const [
     socialNow,
@@ -225,7 +228,9 @@ export async function fetchLeadsManageHubDashboard({
     mergeTrendDays(crmTrendPrev, socialTrendPrev).reduce((sum, d) => sum + d.total, 0) || 0;
 
   const rangeLabel =
-    LEADS_HUB_RANGE_OPTIONS.find((o) => o.id === rangeKey)?.label || "Current Month";
+    resolvedLabel ||
+    LEADS_HUB_RANGE_OPTIONS.find((o) => o.id === rangeKey)?.label ||
+    "Current Month";
 
   return {
     range: rangeKey,

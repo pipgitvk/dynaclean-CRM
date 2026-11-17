@@ -7,8 +7,8 @@ import {
 
 function parseImportFilter(raw) {
   if (!raw || raw === "all") return undefined;
-  if (raw === "imported" || raw === "true") return true;
-  if (raw === "not_imported" || raw === "false") return false;
+  if (raw === "imported" || raw === "distributed" || raw === "true") return true;
+  if (raw === "not_imported" || raw === "duplicate" || raw === "false") return false;
   return undefined;
 }
 

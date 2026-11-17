@@ -14,6 +14,8 @@ export async function GET(request) {
 
     const { searchParams } = new URL(request.url);
     const range = searchParams.get("range") || "month";
+    const from = searchParams.get("from") || "";
+    const to = searchParams.get("to") || "";
     const dashboardBase = searchParams.get("dashboardBase") || "admin-dashboard";
 
     const dashboard = attachHubSourceRows(
@@ -21,6 +23,8 @@ export async function GET(request) {
         username: payload.username,
         userRole: payload.role,
         range,
+        from: from || undefined,
+        to: to || undefined,
       }),
       dashboardBase,
     );

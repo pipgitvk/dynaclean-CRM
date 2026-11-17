@@ -28,6 +28,8 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
+import { getCurrentMonthThroughTodayIso } from "@/lib/crmDateFormat";
 import { getLeadsManageCards } from "@/lib/leadsManageHub";
 import { LEADS_HUB_RANGE_OPTIONS } from "@/lib/leadsManageHubRange";
 
@@ -152,17 +154,33 @@ export default function LeadsManageClient({
   initialDashboard,
 }) {
   const cards = useMemo(() => getLeadsManageCards(dashboardBase), [dashboardBase]);
+  const monthDefault = useMemo(() => getCurrentMonthThroughTodayIso(), []);
   const [range, setRange] = useState(initialDashboard?.range || "month");
   const [data, setData] = useState(initialDashboard);
   const [loading, setLoading] = useState(false);
   const skipInitialFetch = useRef(Boolean(initialDashboard));
+  const [customFrom, setCustomFrom] = useState(
+    initialDashboard?.from || monthDefault.from,
+  );
+  const [customTo, setCustomTo] = useState(initialDashboard?.to || monthDefault.to);
+  const [appliedCustom, setAppliedCustom] = useState({
+    from: initialDashboard?.from || monthDefault.from,
+    to: initialDashboard?.to || monthDefault.to,
+  });
+  const customDraftRef = useRef(appliedCustom);
+  useEffect(() => {
+    customDraftRef.current = { from: customFrom, to: customTo };
+  }, [customFrom, customTo]);
 
   const loadDashboard = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await axios.get("/api/leads-manage/hub", {
-        params: { range, dashboardBase },
-      });
+      const params = { range, dashboardBase };
+      if (range === "custom") {
+        params.from = appliedCustom.from;
+        params.to = appliedCustom.to;
+      }
+      const res = await axios.get("/api/leads-manage/hub", { params });
       if (res.data?.success) {
         const { success: _s, ...payload } = res.data;
         setData(payload);
@@ -172,15 +190,34 @@ export default function LeadsManageClient({
     } finally {
       setLoading(false);
     }
-  }, [range, dashboardBase]);
+  }, [range, dashboardBase, appliedCustom.from, appliedCustom.to]);
 
   useEffect(() => {
     if (skipInitialFetch.current) {
       skipInitialFetch.current = false;
       return;
     }
+    if (range === "custom") return;
     loadDashboard();
   }, [range, loadDashboard]);
+
+  const applyCustomRange = useCallback(() => {
+    const { from, to } = customDraftRef.current;
+    setAppliedCustom({ from, to });
+    setLoading(true);
+    axios
+      .get("/api/leads-manage/hub", {
+        params: { range: "custom", dashboardBase, from, to },
+      })
+      .then((res) => {
+        if (res.data?.success) {
+          const { success: _s, ...payload } = res.data;
+          setData(payload);
+        }
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, [dashboardBase]);
 
   const counts = data?.counts || {};
   const changes = data?.changes || {};
@@ -198,12 +235,13 @@ export default function LeadsManageClient({
   );
 
   const pieTotal = pieData.reduce((s, d) => s + d.value, 0);
-  const rangeLabel =
-    LEADS_HUB_RANGE_OPTIONS.find((o) => o.id === range)?.label || data?.rangeLabel;
+  const rangeLabel = data?.rangeLabel ||
+    LEADS_HUB_RANGE_OPTIONS.find((o) => o.id === range)?.label ||
+    "Current Month (till today)";
 
   return (
-    <div className="min-h-0 bg-gradient-to-b from-slate-100/90 via-slate-50 to-violet-50/30 px-1 sm:px-2 pb-4 sm:pb-6 pt-3 sm:pt-4">
-      <div className="max-w-[1440px] mx-auto space-y-5">
+    <div className="min-h-0 w-full max-w-none bg-gradient-to-b from-slate-100/90 via-slate-50 to-violet-50/30 pb-4 sm:pb-6 pt-3 sm:pt-4 -mx-2 w-[calc(100%+1rem)] sm:-mx-3 sm:w-[calc(100%+1.5rem)] md:-mx-4 md:w-[calc(100%+2rem)] px-1 sm:px-2">
+      <div className="w-full space-y-5">
         <header className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
           <div className="flex items-start gap-3.5 sm:gap-4">
             <div className="shrink-0 rounded-[14px] bg-gradient-to-br from-violet-600 to-purple-600 p-3 shadow-md shadow-violet-500/30">
@@ -219,7 +257,16 @@ export default function LeadsManageClient({
               </p>
             </div>
           </div>
-          <RangeSelect range={range} setRange={setRange} loading={loading} />
+          <HubDateRangeControl
+            range={range}
+            setRange={setRange}
+            loading={loading}
+            customFrom={customFrom}
+            customTo={customTo}
+            onCustomFromChange={setCustomFrom}
+            onCustomToChange={setCustomTo}
+            onApplyCustom={applyCustomRange}
+          />
         </header>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5 gap-4">
@@ -266,25 +313,68 @@ function CardPanel({ className, children }) {
   );
 }
 
-function RangeSelect({ range, setRange, loading }) {
+function HubDateRangeControl({
+  range,
+  setRange,
+  loading,
+  customFrom,
+  customTo,
+  onCustomFromChange,
+  onCustomToChange,
+  onApplyCustom,
+}) {
   return (
-    <div className="relative flex items-center gap-2">
-      {loading && <Loader2 className="w-5 h-5 animate-spin text-violet-600 shrink-0" />}
-      <div className="relative inline-flex items-center">
-        <CalendarDays className="absolute left-3.5 w-4 h-4 text-violet-500 pointer-events-none z-10" />
-        <select
-          value={range}
-          onChange={(e) => setRange(e.target.value)}
-          className="appearance-none rounded-xl border border-slate-200 bg-white pl-10 pr-10 py-2.5 text-sm font-semibold text-slate-800 shadow-sm hover:border-violet-200 focus:outline-none focus:ring-2 focus:ring-violet-500/25 min-w-[11.5rem]"
-        >
-          {LEADS_HUB_RANGE_OPTIONS.map((opt) => (
-            <option key={opt.id} value={opt.id}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
-        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+    <div className="flex flex-col items-stretch gap-2 sm:items-end">
+      <div className="relative flex flex-wrap items-center justify-end gap-2">
+        {loading && <Loader2 className="h-5 w-5 shrink-0 animate-spin text-violet-600" />}
+        <div className="relative inline-flex items-center">
+          <CalendarDays className="pointer-events-none absolute left-3.5 z-10 h-4 w-4 text-violet-500" />
+          <select
+            value={range}
+            onChange={(e) => setRange(e.target.value)}
+            className="min-w-[11.5rem] appearance-none rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-10 text-sm font-semibold text-slate-800 shadow-sm hover:border-violet-200 focus:outline-none focus:ring-2 focus:ring-violet-500/25"
+          >
+            {LEADS_HUB_RANGE_OPTIONS.map((opt) => (
+              <option key={opt.id} value={opt.id}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+          <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        </div>
       </div>
+      {range === "custom" ? (
+        <div className="flex flex-wrap items-end justify-end gap-2 rounded-xl border border-violet-100 bg-white/95 p-3 shadow-sm">
+          <div className="min-w-[9.5rem]">
+            <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+              From
+            </label>
+            <TypeableDateFilterInput
+              value={customFrom}
+              onChange={onCustomFromChange}
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            />
+          </div>
+          <div className="min-w-[9.5rem]">
+            <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+              To
+            </label>
+            <TypeableDateFilterInput
+              value={customTo}
+              onChange={onCustomToChange}
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={onApplyCustom}
+            disabled={loading}
+            className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-60"
+          >
+            Apply
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }
