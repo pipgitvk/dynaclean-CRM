@@ -34,6 +34,7 @@ import {
 import { formatCrmDateOnly, getCurrentMonthThroughTodayIso } from "@/lib/crmDateFormat";
 import { formatCrmDatetimeForISTDisplay } from "@/lib/timezone";
 import { resolveSocialMediaLeadOutcomeStatus } from "@/lib/socialMediaLeadOutcomeStatus";
+import MetaFormDistributionPicker from "@/components/Leads/MetaFormDistributionPicker";
 
 const PAGE_SIZE = 50;
 
@@ -447,6 +448,7 @@ export default function SocialMediaLeadsManageClient({
               Filters
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              <MetaFormDistributionPicker />
               <button
                 type="button"
                 onClick={resetFilters}

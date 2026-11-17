@@ -5,7 +5,7 @@ import axios from 'axios';
 import toast from 'react-hot-toast';
 import { Plus, Trash2, Users } from 'lucide-react';
 
-export default function MetaFormAssignments({ formIds, employees }) {
+export default function MetaFormAssignments({ formIds, employees, embedded = false }) {
   const [assignments, setAssignments] = useState({});
   const [loading, setLoading] = useState(false);
   const [savingUsernames, setSavingUsernames] = useState({});
@@ -97,7 +97,7 @@ export default function MetaFormAssignments({ formIds, employees }) {
   }
 
   return (
-    <div className="mt-6 border-t pt-6">
+    <div className={embedded ? "" : "mt-6 border-t pt-6"}>
       <div className="flex items-center gap-2 mb-4">
         <Users className="w-5 h-5 text-blue-600" />
         <h3 className="text-lg font-semibold text-gray-900">Form-Specific Lead Distribution</h3>
