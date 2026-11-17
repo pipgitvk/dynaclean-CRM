@@ -155,7 +155,8 @@ export default function SocialMediaLeadsManageClient({
   dashboardBase = "admin-dashboard",
   apiPath = "/api/leads-manage/social-media",
   pageTitle = "Social Media Leads",
-  pageSubtitle = "Meta unique enquiries (month + DATE filter). Saari social-channel leads — manual CRM assign bhi include.",
+  pageSubtitle =
+    "Unique Meta enquiries (month + date filter). All social-channel leads, including manual CRM assignments.",
 }) {
   const monthDefault = useMemo(() => getCurrentMonthThroughTodayIso(), []);
   const hubHref = `/${dashboardBase}/leads-manage`;

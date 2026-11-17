@@ -3,7 +3,7 @@ export const CRM_CAMPAIGN_PAGE_CONFIG = {
     apiPath: "/api/leads-manage/google-ads",
     title: "Google Ads Leads",
     subtitle:
-      "CRM customers — lead_campaign Google Ads — month start se aaj tak, filters ke hisaab se.",
+      "CRM customers with Google Ads lead_campaign — from the start of the month through today, based on your filters.",
     emptyMessage: "No Google Ads leads match these filters",
     icon: "globe",
     iconGradient: "from-violet-500 to-purple-600",
@@ -23,7 +23,7 @@ export const CRM_CAMPAIGN_PAGE_CONFIG = {
   indiamart: {
     apiPath: "/api/leads-manage/indiamart",
     title: "Indiamart Leads",
-    subtitle: "Indiamart portal CRM enquiries — month start se aaj tak.",
+    subtitle: "Indiamart portal CRM enquiries — from the start of the month through today.",
     emptyMessage: "No Indiamart leads match these filters",
     icon: "store",
     iconGradient: "from-emerald-500 to-teal-600",
@@ -43,7 +43,7 @@ export const CRM_CAMPAIGN_PAGE_CONFIG = {
   website_direct: {
     apiPath: "/api/leads-manage/website-direct",
     title: "Website Direct Leads",
-    subtitle: "Website direct CRM enquiries — month start se aaj tak.",
+    subtitle: "Website direct CRM enquiries — from the start of the month through today.",
     emptyMessage: "No website direct leads match these filters",
     icon: "click",
     iconGradient: "from-cyan-500 to-sky-600",
@@ -63,7 +63,8 @@ export const CRM_CAMPAIGN_PAGE_CONFIG = {
   manager_assigned: {
     apiPath: "/api/leads-manage/manager-assigned",
     title: "Manager Assigned Leads",
-    subtitle: "Manual manager assignment (Automatic / auto exclude) — month start se aaj tak.",
+    subtitle:
+      "Manually assigned managers (automatic/auto excluded) — from the start of the month through today.",
     emptyMessage: "No manager-assigned leads match these filters",
     icon: "usercheck",
     iconGradient: "from-amber-500 to-orange-600",

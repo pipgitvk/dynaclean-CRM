@@ -214,8 +214,8 @@ export default function LeadsManageClient({
                 Leads Manage
               </h1>
               <p className="mt-1 text-[13px] sm:text-sm text-slate-500 max-w-xl leading-snug">
-                Inquiry sources ek jagah se — card par click karke filtered customers ya assigned
-                leads dekhein.
+                All inquiry sources in one place — click a card to view filtered customers or
+                assigned leads.
               </p>
             </div>
           </div>
