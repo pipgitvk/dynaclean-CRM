@@ -22,6 +22,7 @@ export async function GET(request) {
       searchParams.get("tagStatus") ||
       searchParams.get("statusTag") ||
       "all";
+    const assignmentFilter = searchParams.get("assignmentFilter") || "all";
     const search = (searchParams.get("search") || searchParams.get("q") || "").trim();
     const limit = Math.min(parseInt(searchParams.get("limit") || "50", 10) || 50, 200);
     const skip = parseInt(searchParams.get("skip") || "0", 10) || 0;
@@ -42,6 +43,7 @@ export async function GET(request) {
       endDate: endDate || undefined,
       assignedTo: assignedTo || undefined,
       leadSource: leadSource || undefined,
+      assignmentFilter: assignmentFilter || undefined,
       outcomeTag,
       search: search || undefined,
       limit,

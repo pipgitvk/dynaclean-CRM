@@ -49,11 +49,15 @@ function normalizeLeadFilters(filters = {}) {
     endDate = endDate || month.to;
   }
   const q = String(filters.search || "").trim();
+  const assignmentRaw = String(filters.assignmentFilter || "all").trim().toLowerCase();
+  const assignmentFilter =
+    assignmentRaw === "assigned" || assignmentRaw === "pending" ? assignmentRaw : "all";
   return {
     ...filters,
     startDate,
     endDate,
     search: q || undefined,
+    assignmentFilter,
   };
 }
 
@@ -102,6 +106,12 @@ function createBuildBaseWhere(campaignSql) {
     if (filters.leadSource) {
       conditions.push("c.lead_source = ?");
       params.push(filters.leadSource);
+    }
+
+    if (filters.assignmentFilter === "assigned") {
+      conditions.push(customerManualAssignedToSql("c"));
+    } else if (filters.assignmentFilter === "pending") {
+      conditions.push(`NOT (${customerManualAssignedToSql("c")})`);
     }
 
     const searchClause = buildCustomerListSearchClause(filters.search);
@@ -223,32 +233,66 @@ export function createCrmCampaignLeadsManage(campaignSql) {
   async function getFilterOptions(filters, access) {
     filters = normalizeLeadFilters(filters);
     const conn = await getDbConnection();
-    const scoped = { ...filters };
-    delete scoped.assignedTo;
-    delete scoped.leadSource;
-    delete scoped.outcomeTag;
-    delete scoped.search;
 
-    const { whereSql, params } = buildBaseWhere(scoped, access);
+    const scopeConditions = [campaignSql];
+    const scopeParams = [];
+    appendRoleScope(scopeConditions, scopeParams, access);
+    const scopeWhere = scopeConditions.length ? `WHERE ${scopeConditions.join(" AND ")}` : "";
+
+    const dateConditions = [...scopeConditions];
+    const dateParams = [...scopeParams];
+    if (filters.startDate) {
+      dateConditions.push("c.date_created >= ?");
+      dateParams.push(`${filters.startDate} 00:00:00`);
+    }
+    if (filters.endDate) {
+      dateConditions.push("c.date_created < DATE_ADD(?, INTERVAL 1 DAY)");
+      dateParams.push(filters.endDate);
+    }
+    const dateWhere = dateConditions.length ? `WHERE ${dateConditions.join(" AND ")}` : "";
 
     const [assigneeResult, sourceResult] = await Promise.all([
       conn.execute(
-        `SELECT DISTINCT c.assigned_to
-         FROM customers c
-         ${whereSql}
-           AND TRIM(COALESCE(c.assigned_to, '')) != ''
-         ORDER BY c.assigned_to ASC
-         LIMIT 300`,
-        params,
+        `SELECT
+           all_a.assigned_to,
+           COALESCE(scoped.lead_count, 0) AS lead_count
+         FROM (
+           SELECT DISTINCT c.assigned_to
+           FROM customers c
+           ${scopeWhere}
+             AND TRIM(COALESCE(c.assigned_to, '')) != ''
+         ) all_a
+         LEFT JOIN (
+           SELECT c.assigned_to, COUNT(*) AS lead_count
+           FROM customers c
+           ${dateWhere}
+             AND TRIM(COALESCE(c.assigned_to, '')) != ''
+           GROUP BY c.assigned_to
+         ) scoped ON scoped.assigned_to = all_a.assigned_to
+         ORDER BY all_a.assigned_to ASC
+         LIMIT 500`,
+        [...scopeParams, ...dateParams],
       ),
       conn.execute(
-        `SELECT DISTINCT c.lead_source
-         FROM customers c
-         ${whereSql}
-           AND TRIM(COALESCE(c.lead_source, '')) != ''
-         ORDER BY c.lead_source ASC
-         LIMIT 300`,
-        params,
+        `SELECT
+           all_s.lead_source,
+           COALESCE(scoped.lead_count, 0) AS lead_count
+         FROM (
+           SELECT DISTINCT c.lead_source
+           FROM customers c
+           ${scopeWhere}
+             AND TRIM(COALESCE(c.lead_source, '')) != ''
+         ) all_s
+         LEFT JOIN (
+           SELECT c.lead_source, COUNT(*) AS lead_count
+           FROM customers c
+           ${dateWhere}
+             AND TRIM(COALESCE(c.lead_source, '')) != ''
+           GROUP BY c.lead_source
+         ) scoped ON scoped.lead_source = all_s.lead_source
+         ORDER BY all_s.lead_source ASC
+         LIMIT 500`,
+        [...scopeParams, ...dateParams],
       ),
     ]);
 
@@ -256,10 +300,12 @@ export function createCrmCampaignLeadsManage(campaignSql) {
       assignees: assigneeResult[0].map((r) => ({
         assignedTo: r.assigned_to,
         employeeName: r.assigned_to,
+        leadCount: Number(r.lead_count || 0),
       })),
-      leadSources: sourceResult[0]
-        .map((r) => String(r.lead_source || "").trim())
-        .filter(Boolean),
+      leadSources: sourceResult[0].map((r) => ({
+        source: String(r.lead_source || "").trim(),
+        leadCount: Number(r.lead_count || 0),
+      })),
     };
   }
 

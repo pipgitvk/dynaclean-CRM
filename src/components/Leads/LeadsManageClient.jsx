@@ -51,7 +51,7 @@ function ChangePill({ value, className = "" }) {
   const Icon = up ? TrendingUp : TrendingDown;
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold border ${
+      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-sm font-semibold border ${
         up
           ? "bg-emerald-50 text-emerald-700 border-emerald-100"
           : "bg-rose-50 text-rose-700 border-rose-100"
@@ -119,17 +119,17 @@ function SourceKpiCard({ card, total, changePct, Icon }) {
             <Icon className="h-5 w-5" strokeWidth={2.25} aria-hidden />
           </div>
           <div className="min-w-0 flex-1 pt-0.5">
-            <h2 className="text-[15px] sm:text-base font-extrabold leading-snug text-slate-900">
+            <h2 className="text-base font-bold leading-snug text-slate-900 sm:text-lg">
               {card.title}
             </h2>
-            <p className="mt-1 text-[11px] leading-snug text-slate-500 line-clamp-2">
+            <p className="mt-1 line-clamp-2 text-sm leading-snug text-slate-500 sm:text-[15px]">
               {card.subtitle}
             </p>
           </div>
         </div>
 
         <div className="mt-auto flex items-end justify-between gap-2 pt-5">
-          <span className="text-[1.65rem] sm:text-[1.85rem] font-bold tabular-nums tracking-tight text-slate-900">
+          <span className="text-3xl font-bold tabular-nums tracking-tight text-slate-900 sm:text-4xl">
             {formatNum(total)}
           </span>
           <Icon
@@ -240,7 +240,7 @@ export default function LeadsManageClient({
     "Current Month (till today)";
 
   return (
-    <div className="min-h-0 w-full max-w-none bg-gradient-to-b from-slate-100/90 via-slate-50 to-violet-50/30 pb-4 sm:pb-6 pt-3 sm:pt-4 -mx-2 w-[calc(100%+1rem)] sm:-mx-3 sm:w-[calc(100%+1.5rem)] md:-mx-4 md:w-[calc(100%+2rem)] px-1 sm:px-2">
+    <div className="min-h-screen w-full max-w-none bg-gradient-to-b from-violet-50/80 via-slate-50 to-white pb-6 pt-3 sm:pt-4 -mx-2 w-[calc(100%+1rem)] sm:-mx-3 sm:w-[calc(100%+1.5rem)] md:-mx-4 md:w-[calc(100%+2rem)] px-1 sm:px-2">
       <div className="w-full space-y-5">
         <header className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
           <div className="flex items-start gap-3.5 sm:gap-4">
@@ -248,10 +248,10 @@ export default function LeadsManageClient({
               <Target className="h-6 w-6 text-white" strokeWidth={2.25} aria-hidden />
             </div>
             <div className="min-w-0 pt-0.5">
-              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-indigo-950">
+              <h1 className="text-2xl font-bold tracking-tight text-indigo-950 sm:text-3xl">
                 Leads Manage
               </h1>
-              <p className="mt-1 text-[13px] sm:text-sm text-slate-500 max-w-xl leading-snug">
+              <p className="mt-1 max-w-2xl text-sm leading-snug text-slate-500 sm:text-base">
                 All inquiry sources in one place — click a card to view filtered customers or
                 assigned leads.
               </p>
@@ -332,7 +332,7 @@ function HubDateRangeControl({
           <select
             value={range}
             onChange={(e) => setRange(e.target.value)}
-            className="min-w-[11.5rem] appearance-none rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-10 text-sm font-semibold text-slate-800 shadow-sm hover:border-violet-200 focus:outline-none focus:ring-2 focus:ring-violet-500/25"
+            className="min-w-[11.5rem] appearance-none rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-10 text-base font-semibold text-slate-800 shadow-sm hover:border-violet-200 focus:outline-none focus:ring-2 focus:ring-violet-500/25"
           >
             {LEADS_HUB_RANGE_OPTIONS.map((opt) => (
               <option key={opt.id} value={opt.id}>
@@ -346,30 +346,30 @@ function HubDateRangeControl({
       {range === "custom" ? (
         <div className="flex flex-wrap items-end justify-end gap-2 rounded-xl border border-violet-100 bg-white/95 p-3 shadow-sm">
           <div className="min-w-[9.5rem]">
-            <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+            <label className="mb-1 block text-sm font-semibold text-slate-500">
               From
             </label>
             <TypeableDateFilterInput
               value={customFrom}
               onChange={onCustomFromChange}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-base"
             />
           </div>
           <div className="min-w-[9.5rem]">
-            <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+            <label className="mb-1 block text-sm font-semibold text-slate-500">
               To
             </label>
             <TypeableDateFilterInput
               value={customTo}
               onChange={onCustomToChange}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-base"
             />
           </div>
           <button
             type="button"
             onClick={onApplyCustom}
             disabled={loading}
-            className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-60"
+            className="rounded-lg bg-violet-600 px-4 py-2 text-base font-semibold text-white hover:bg-violet-700 disabled:opacity-60"
           >
             Apply
           </button>
@@ -384,22 +384,22 @@ function LeadsTrendCard({ trend, trendTotal, trendChange, rangeLabel, loading })
     <>
       <div className="flex flex-wrap items-start justify-between gap-4 mb-2">
         <div>
-          <h3 className="text-lg font-bold text-slate-900">Leads Trend</h3>
-          <p className="text-xs text-slate-500 mt-1">
+          <h3 className="text-xl font-bold text-slate-900">Leads Trend</h3>
+          <p className="mt-1 text-sm text-slate-500 sm:text-base">
             Total leads from all sources ({rangeLabel})
           </p>
         </div>
         <div className="rounded-xl border border-violet-100 bg-violet-50/60 px-4 py-2 text-right">
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-violet-600">
+          <div className="text-xs font-semibold uppercase tracking-wider text-violet-600">
             Total Leads
           </div>
-          <div className="text-2xl font-bold text-slate-900 tabular-nums">{formatNum(trendTotal)}</div>
+          <div className="text-3xl font-bold text-slate-900 tabular-nums">{formatNum(trendTotal)}</div>
           <ChangePill value={trendChange} className="mt-1" />
         </div>
       </div>
       <div className="h-[300px] w-full mt-2">
         {loading && !trend.length ? (
-          <div className="h-full flex items-center justify-center text-slate-400 text-sm">
+          <div className="h-full flex items-center justify-center text-base text-slate-400">
             Loading…
           </div>
         ) : (
@@ -414,14 +414,14 @@ function LeadsTrendCard({ trend, trendTotal, trendChange, rangeLabel, loading })
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
               <XAxis
                 dataKey="label"
-                tick={{ fontSize: 11, fill: "#64748b" }}
+                tick={{ fontSize: 12, fill: "#64748b" }}
                 interval="preserveStartEnd"
                 tickLine={false}
                 axisLine={false}
               />
               <YAxis
                 allowDecimals={false}
-                tick={{ fontSize: 11, fill: "#64748b" }}
+                tick={{ fontSize: 12, fill: "#64748b" }}
                 width={40}
                 tickLine={false}
                 axisLine={false}
@@ -431,7 +431,7 @@ function LeadsTrendCard({ trend, trendTotal, trendChange, rangeLabel, loading })
                   borderRadius: 12,
                   border: "1px solid #e9d5ff",
                   background: "#faf5ff",
-                  fontSize: 12,
+                  fontSize: 13,
                   boxShadow: "0 4px 14px rgba(124,58,237,0.12)",
                 }}
                 formatter={(val) => [`${formatNum(val)} Leads`, ""]}
@@ -459,15 +459,15 @@ function LeadsSourcePie({ pieData, pieTotal, loading }) {
 
   return (
   <div className="h-full flex flex-col">
-    <h3 className="text-lg font-bold text-slate-900 mb-4">Leads by Source</h3>
+    <h3 className="mb-4 text-xl font-bold text-slate-900">Leads by Source</h3>
     <div className="flex flex-col sm:flex-row items-center gap-4 flex-1 min-h-[300px]">
       <div className="relative w-full sm:w-[55%] h-[260px] shrink-0">
         {loading && !legend.length ? (
-          <div className="h-full flex items-center justify-center text-slate-400 text-sm">
+          <div className="h-full flex items-center justify-center text-base text-slate-400">
             Loading…
           </div>
         ) : legend.length === 0 ? (
-          <div className="h-full flex items-center justify-center text-slate-400 text-sm">
+          <div className="h-full flex items-center justify-center text-base text-slate-400">
             No leads in this range
           </div>
         ) : (
@@ -500,10 +500,10 @@ function LeadsSourcePie({ pieData, pieTotal, loading }) {
             </ResponsiveContainer>
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <div className="text-center">
-                <div className="text-2xl font-bold text-slate-900 tabular-nums">
+                <div className="text-3xl font-bold text-slate-900 tabular-nums">
                   {formatNum(pieTotal)}
                 </div>
-                <div className="text-[11px] font-medium text-slate-500">Total Leads</div>
+                <div className="text-sm font-medium text-slate-500">Total Leads</div>
               </div>
             </div>
           </>
@@ -513,14 +513,14 @@ function LeadsSourcePie({ pieData, pieTotal, loading }) {
         {pieData.map((d) => {
           const pct = pieTotal ? Math.round((d.value / pieTotal) * 1000) / 10 : 0;
           return (
-            <li key={d.id} className="flex items-start gap-2.5 text-sm">
+            <li key={d.id} className="flex items-start gap-2.5 text-base">
               <span
                 className="w-3 h-3 rounded-full shrink-0 mt-1"
                 style={{ backgroundColor: d.color }}
               />
               <div className="flex-1 min-w-0">
-                <div className="font-medium text-slate-800 truncate">{d.name}</div>
-                <div className="text-xs text-slate-500 tabular-nums">
+                <div className="truncate font-semibold text-slate-900">{d.name}</div>
+                <div className="text-sm tabular-nums text-slate-500">
                   {pct}% ({formatNum(d.value)})
                 </div>
               </div>

@@ -18,13 +18,10 @@ import {
   ChevronLeft,
   ChevronRight,
   Download,
-  Eye,
   Filter,
   Loader2,
   Mail,
   Megaphone,
-  MoreVertical,
-  Pencil,
   Phone,
   Search,
   TrendingUp,
@@ -767,7 +764,6 @@ function SocialMediaLeadsTable({ loading, rows, dashboardBase, page, setPage, to
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3">Ads Campaign</th>
               <th className="px-4 py-3">Created</th>
-              <th className="px-4 py-3 text-right">Actions</th>
             </tr>
           </thead>
           <tbody
@@ -777,7 +773,7 @@ function SocialMediaLeadsTable({ loading, rows, dashboardBase, page, setPage, to
           >
             {!loading && rows.length === 0 ? (
               <tr>
-                <td colSpan={9} className="px-4 py-14 text-center text-slate-500">
+                <td colSpan={8} className="px-4 py-14 text-center text-slate-500">
                   No leads match these filters
                 </td>
               </tr>
@@ -789,9 +785,6 @@ function SocialMediaLeadsTable({ loading, rows, dashboardBase, page, setPage, to
                 const customerHref =
                   customerId &&
                   `/${dashboardBase}/view-customer/${encodeURIComponent(customerId)}`;
-                const editHref =
-                  customerId &&
-                  `/${dashboardBase}/view-customer/${encodeURIComponent(customerId)}/edit`;
                 return (
                   <tr key={lead.id || lead.leadgen_id} className="hover:bg-violet-50/20">
                     <td className="px-4 py-3 text-slate-400 tabular-nums">
@@ -851,43 +844,6 @@ function SocialMediaLeadsTable({ loading, rows, dashboardBase, page, setPage, to
                               formatCrmDateOnly(String(lead.created_at).slice(0, 10))
                             : "—"}
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-end gap-1">
-                        {customerHref ? (
-                          <Link
-                            href={customerHref}
-                            className="rounded-lg p-1.5 text-slate-500 hover:bg-violet-50 hover:text-violet-700"
-                            title="View"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Link>
-                        ) : (
-                          <span className="rounded-lg p-1.5 text-slate-300">
-                            <Eye className="h-4 w-4" />
-                          </span>
-                        )}
-                        {editHref ? (
-                          <Link
-                            href={editHref}
-                            className="rounded-lg p-1.5 text-slate-500 hover:bg-violet-50 hover:text-violet-700"
-                            title="Edit"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Link>
-                        ) : (
-                          <span className="rounded-lg p-1.5 text-slate-300">
-                            <Pencil className="h-4 w-4" />
-                          </span>
-                        )}
-                        <button
-                          type="button"
-                          className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"
-                          aria-label="More"
-                        >
-                          <MoreVertical className="h-4 w-4" />
-                        </button>
                       </div>
                     </td>
                   </tr>

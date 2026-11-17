@@ -17,14 +17,11 @@ import {
   ChevronLeft,
   ChevronRight,
   Download,
-  Eye,
   Filter,
   Globe,
   Loader2,
   Mail,
-  MoreVertical,
   MousePointerClick,
-  Pencil,
   Phone,
   Search,
   Store,
@@ -92,6 +89,7 @@ function defaultFilters(monthDefault) {
     assignedTo: "",
     leadSource: "",
     outcomeTag: "all",
+    assignmentFilter: "all",
     search: "",
   };
 }
@@ -169,10 +167,18 @@ function SummarySparkline({ color, value, seed }) {
   );
 }
 
-function CampaignSummaryCards({ summary, prevSummary, loading, sparkColor }) {
+function CampaignSummaryCards({
+  summary,
+  prevSummary,
+  loading,
+  sparkColor,
+  activeAssignmentFilter = "all",
+  onSelectAssignmentFilter,
+}) {
   const cards = [
     {
       label: "Total Leads",
+      assignmentFilter: "all",
       value: summary.total,
       prev: prevSummary.total,
       icon: Users,
@@ -180,9 +186,11 @@ function CampaignSummaryCards({ summary, prevSummary, loading, sparkColor }) {
       valueClass: "text-slate-900",
       spark: sparkColor,
       seed: 1,
+      activeRing: "ring-violet-500/60",
     },
     {
       label: "Assigned",
+      assignmentFilter: "assigned",
       value: summary.assigned,
       prev: prevSummary.assigned,
       icon: UserPlus,
@@ -190,9 +198,11 @@ function CampaignSummaryCards({ summary, prevSummary, loading, sparkColor }) {
       valueClass: "text-emerald-700",
       spark: "#10b981",
       seed: 2,
+      activeRing: "ring-emerald-500/60",
     },
     {
       label: "Pending",
+      assignmentFilter: "pending",
       value: summary.pending,
       prev: prevSummary.pending,
       icon: Clock,
@@ -200,6 +210,7 @@ function CampaignSummaryCards({ summary, prevSummary, loading, sparkColor }) {
       valueClass: "text-amber-700",
       spark: "#f59e0b",
       seed: 3,
+      activeRing: "ring-amber-500/60",
     },
   ];
 
@@ -209,10 +220,19 @@ function CampaignSummaryCards({ summary, prevSummary, loading, sparkColor }) {
         const change = pctChange(c.value, c.prev);
         const up = change >= 0;
         const Icon = c.icon;
+        const isActive = activeAssignmentFilter === c.assignmentFilter;
         return (
-          <div
+          <button
             key={c.label}
-            className="rounded-2xl border border-slate-200/90 bg-white/95 p-5 shadow-sm backdrop-blur-sm"
+            type="button"
+            disabled={loading}
+            onClick={() => onSelectAssignmentFilter?.(c.assignmentFilter)}
+            className={`cursor-pointer rounded-2xl border bg-white/95 p-5 text-left shadow-sm backdrop-blur-sm transition hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 disabled:pointer-events-none disabled:opacity-70 ${
+              isActive
+                ? `border-violet-300 ring-2 ${c.activeRing} shadow-md`
+                : "border-slate-200/90 hover:border-violet-200"
+            }`}
+            aria-pressed={isActive}
           >
             <div className="flex items-start justify-between gap-3">
               <div className={`rounded-xl p-2.5 ${c.iconBg}`}>
@@ -233,7 +253,7 @@ function CampaignSummaryCards({ summary, prevSummary, loading, sparkColor }) {
               {up ? "+" : ""}
               {change}% vs previous period
             </p>
-          </div>
+          </button>
         );
       })}
     </div>
@@ -308,6 +328,19 @@ export default function CrmCampaignLeadsManageClient({
     setPage(0);
   }, []);
 
+  const applyAssignmentFilterFromCard = useCallback((assignmentFilter) => {
+    setDraftFilters((prev) => {
+      const next = { ...prev, assignmentFilter };
+      draftFiltersRef.current = next;
+      return next;
+    });
+    setAppliedFilters((prev) => {
+      const next = { ...prev, assignmentFilter };
+      return next;
+    });
+    setPage(0);
+  }, []);
+
   const resetFilters = useCallback(() => {
     setDraftFilters(initialFilters);
     setAppliedFilters(initialFilters);
@@ -316,11 +349,13 @@ export default function CrmCampaignLeadsManageClient({
 
   const buildListParams = useCallback(
     (filters, pageNum, overrides = {}) => {
-      const { from, to, outcomeTag, assignedTo, leadSource, search } = filters;
+      const { from, to, outcomeTag, assignedTo, leadSource, assignmentFilter, search } =
+        filters;
       const params = {
         from: from || monthDefault.from,
         to: to || monthDefault.to,
         outcomeTag,
+        assignmentFilter: assignmentFilter || "all",
         limit: PAGE_SIZE,
         skip: pageNum * PAGE_SIZE,
         ...overrides,
@@ -403,7 +438,9 @@ export default function CrmCampaignLeadsManageClient({
   const assigneeSelectOptions = useMemo(() => {
     const items = (filterOptions.assignees || []).map((a) => {
       const user = String(a.assignedTo || "").trim();
-      return { value: user, label: user || "—" };
+      const count = Number(a.leadCount ?? 0);
+      const label = user ? `${user} (${count.toLocaleString("en-IN")})` : "—";
+      return { value: user, label };
     });
     return [{ value: "", label: "All assignees" }, ...items];
   }, [filterOptions.assignees]);
@@ -411,7 +448,15 @@ export default function CrmCampaignLeadsManageClient({
   const leadSourceSelectOptions = useMemo(
     () => [
       { value: "", label: "All lead sources" },
-      ...(filterOptions.leadSources || []).map((s) => ({ value: s, label: s })),
+      ...(filterOptions.leadSources || []).map((item) => {
+        const source =
+          typeof item === "string" ? item : String(item?.source || "").trim();
+        const count = Number(typeof item === "object" ? item?.leadCount : 0) || 0;
+        return {
+          value: source,
+          label: `${source} (${count.toLocaleString("en-IN")})`,
+        };
+      }),
     ],
     [filterOptions.leadSources],
   );
@@ -457,6 +502,8 @@ export default function CrmCampaignLeadsManageClient({
           prevSummary={prevSummary}
           loading={summaryLoading}
           sparkColor={sparkColor || "#8b5cf6"}
+          activeAssignmentFilter={appliedFilters.assignmentFilter || "all"}
+          onSelectAssignmentFilter={applyAssignmentFilterFromCard}
         />
 
         <div className="relative z-20 overflow-visible rounded-2xl border border-slate-200/90 bg-white/95 p-4 shadow-sm backdrop-blur-sm sm:p-6">
@@ -580,7 +627,6 @@ export default function CrmCampaignLeadsManageClient({
                   <th className="px-4 py-3">Lead Source</th>
                   <th className="px-4 py-3">Campaign</th>
                   <th className="px-4 py-3">Created</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody
@@ -590,7 +636,7 @@ export default function CrmCampaignLeadsManageClient({
               >
                 {!tableLoading && rows.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-4 py-14 text-center text-slate-500">
+                    <td colSpan={8} className="px-4 py-14 text-center text-slate-500">
                       {emptyMessage}
                     </td>
                   </tr>
@@ -600,7 +646,6 @@ export default function CrmCampaignLeadsManageClient({
                     const customerHref = row.customer_id
                       ? `/${dashboardBase}/view-customer/${encodeURIComponent(row.customer_id)}`
                       : null;
-                    const editHref = customerHref ? `${customerHref}/edit` : null;
                     return (
                       <tr key={row.customer_id} className="hover:bg-violet-50/20">
                         <td className="px-4 py-3 text-slate-400 tabular-nums">
@@ -664,43 +709,6 @@ export default function CrmCampaignLeadsManageClient({
                                   formatCrmDateOnly(String(row.date_created).slice(0, 10))
                                 : "—"}
                             </div>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center justify-end gap-1">
-                            {customerHref ? (
-                              <Link
-                                href={customerHref}
-                                className="rounded-lg p-1.5 text-slate-500 hover:bg-violet-50 hover:text-violet-700"
-                                title="View"
-                              >
-                                <Eye className="h-4 w-4" />
-                              </Link>
-                            ) : (
-                              <span className="rounded-lg p-1.5 text-slate-300">
-                                <Eye className="h-4 w-4" />
-                              </span>
-                            )}
-                            {editHref ? (
-                              <Link
-                                href={editHref}
-                                className="rounded-lg p-1.5 text-slate-500 hover:bg-violet-50 hover:text-violet-700"
-                                title="Edit"
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </Link>
-                            ) : (
-                              <span className="rounded-lg p-1.5 text-slate-300">
-                                <Pencil className="h-4 w-4" />
-                              </span>
-                            )}
-                            <button
-                              type="button"
-                              className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"
-                              aria-label="More"
-                            >
-                              <MoreVertical className="h-4 w-4" />
-                            </button>
                           </div>
                         </td>
                       </tr>
