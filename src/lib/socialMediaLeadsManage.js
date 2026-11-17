@@ -11,31 +11,31 @@ import {
   TARGET_ELIGIBLE_EMPLOYEE_ROLE_PARAMS,
 } from "@/lib/targetEligibleEmployeesSql";
 
+/** Cancel statuses — keep predicates simple (joined rows are already date-scoped). */
 const CRM_CUSTOMER_CANCEL_SQL = `(
-  LOWER(TRIM(c.status)) IN ('denied', 'invalid')
-  OR LOWER(TRIM(c.status)) LIKE '%denied%'
-  OR LOWER(TRIM(c.status)) LIKE '%invalid%'
+  c.status IN ('denied', 'invalid', 'Denied', 'Invalid', 'DENIED', 'INVALID')
+  OR c.status LIKE '%denied%'
+  OR c.status LIKE '%Denied%'
+  OR c.status LIKE '%invalid%'
+  OR c.status LIKE '%Invalid%'
 )`;
 
-const WON_CUSTOMERS_DERIVED = `
-  SELECT DISTINCT cid AS customer_id
-  FROM (
-    SELECT no.customer_id AS cid
-    FROM neworder no
-    WHERE no.customer_id IS NOT NULL
-      AND COALESCE(no.account_status, 0) = 1
-      AND COALESCE(no.dispatch_status, 0) = 1
-      AND COALESCE(no.is_cancelled, 0) = 0
-    UNION
-    SELECT qr.customer_id AS cid
-    FROM neworder no
-    INNER JOIN quotations_records qr ON no.quote_number = qr.quote_number
-    WHERE qr.customer_id IS NOT NULL
-      AND COALESCE(no.account_status, 0) = 1
-      AND COALESCE(no.dispatch_status, 0) = 1
-      AND COALESCE(no.is_cancelled, 0) = 0
-  ) won_union
+/** Indexed CRM link only — avoids expensive phone/JSON join for Tag filters. */
+const META_LEAD_CUSTOMER_BY_ID_JOIN = `
+  INNER JOIN customers c
+    ON c.customer_id = ml.crm_customer_id
+   AND ml.crm_customer_id IS NOT NULL
+   AND ml.crm_customer_id != 0
 `;
+
+const WON_EXISTS_SQL = `EXISTS (
+  SELECT 1
+  FROM neworder no
+  WHERE no.customer_id = c.customer_id
+    AND COALESCE(no.account_status, 0) = 1
+    AND COALESCE(no.dispatch_status, 0) = 1
+    AND COALESCE(no.is_cancelled, 0) = 0
+)`;
 
 const LIST_SELECT = `
   ml.id, ml.leadgen_id, ml.assigned_to, ml.employee_name, ml.form_id, ml.page_id,
@@ -157,27 +157,27 @@ function appendOutcomeFilter(filters) {
   const tag = normalizeOutcomeTag(filters.outcomeTag);
   if (tag === "cancel") {
     return {
-      sql: ` AND c.customer_id IS NOT NULL AND ${CRM_CUSTOMER_CANCEL_SQL}`,
+      sql: ` AND ${CRM_CUSTOMER_CANCEL_SQL}`,
       values: [],
     };
   }
   if (tag === "won") {
     return {
-      sql: ` AND c.customer_id IS NOT NULL AND NOT ${CRM_CUSTOMER_CANCEL_SQL} AND won_cust.customer_id IS NOT NULL`,
+      sql: ` AND NOT ${CRM_CUSTOMER_CANCEL_SQL} AND ${WON_EXISTS_SQL}`,
       values: [],
     };
   }
   return { sql: "", values: [] };
 }
 
-/** Same DATE bounds as meta-credentials → /api/meta-leads (MetaFormLeadsTable). */
+/** Date bounds as datetime range so created_at index can be used (avoids DATE() wrap). */
 function pushDateRange(inner, values, filters, createdAtCol = "created_at") {
   if (filters.startDate) {
-    inner.push(`DATE(${createdAtCol}) >= ?`);
-    values.push(filters.startDate);
+    inner.push(`${createdAtCol} >= ?`);
+    values.push(`${filters.startDate} 00:00:00`);
   }
   if (filters.endDate) {
-    inner.push(`DATE(${createdAtCol}) <= ?`);
+    inner.push(`${createdAtCol} < DATE_ADD(?, INTERVAL 1 DAY)`);
     values.push(filters.endDate);
   }
 }
@@ -222,23 +222,6 @@ function buildScopedUniqueJoin(filters, options = {}) {
     ) unique_leads ON ml.id = unique_leads.min_id
   `;
   return { joinSql, values };
-}
-
-function scopedFromClause(filters, options = {}) {
-  const { joinSql, values } = buildScopedUniqueJoin(filters, options);
-  const outcome = appendOutcomeFilter(filters);
-  const wonJoin = needsWonJoin(filters)
-    ? `LEFT JOIN (${WON_CUSTOMERS_DERIVED}) won_cust ON won_cust.customer_id = c.customer_id`
-    : "";
-
-  const fromSql = `
-    FROM meta_leads ml
-    ${joinSql}
-    ${META_LEAD_CUSTOMER_JOIN}
-    ${wonJoin}
-    WHERE 1=1${outcome.sql}
-  `;
-  return { fromSql, values: [...values, ...outcome.values] };
 }
 
 function parseJsonValue(rawValue, fallback) {
@@ -309,6 +292,97 @@ async function countFastMonthScopedLeads(conn, filters, options = {}) {
   return Number(row?.cnt || 0);
 }
 
+function buildDateScopedOutcomeSql(filters, options = {}) {
+  const { joinSql, values } = buildScopedUniqueJoin(filters, options);
+  const outcome = appendOutcomeFilter(filters);
+  // Tag filters only need imported CRM rows (crm_customer_id) — PK join, no phone match.
+  const baseSql = `
+    FROM meta_leads ml
+    ${joinSql}
+    ${META_LEAD_CUSTOMER_BY_ID_JOIN}
+    WHERE 1=1${outcome.sql}`;
+  return {
+    baseSql,
+    values: [...values, ...outcome.values],
+  };
+}
+
+async function countDateScopedOutcomeLeads(conn, filters, options = {}) {
+  const { baseSql, values } = buildDateScopedOutcomeSql(filters, options);
+  const [[row]] = await conn.execute(`SELECT COUNT(*) AS cnt ${baseSql}`, values);
+  return Number(row?.cnt || 0);
+}
+
+/** Date-scoped unique leads first, then CRM / won–cancel tag filter (avoids full-table joins). */
+async function listSocialMediaLeadsDateScopedWithOutcome(
+  filters,
+  { withTotal = false } = {},
+) {
+  const conn = await getDbConnection();
+  const { baseSql, values } = buildDateScopedOutcomeSql(filters);
+  const limit = filters.limit ?? 50;
+  const skip = filters.skip ?? 0;
+
+  const [idRows] = await conn.execute(
+    withTotal
+      ? `SELECT ml.id, COUNT(*) OVER() AS filter_total ${baseSql} ORDER BY ml.created_at DESC LIMIT ? OFFSET ?`
+      : `SELECT ml.id ${baseSql} ORDER BY ml.created_at DESC LIMIT ? OFFSET ?`,
+    [...values, limit, skip],
+  );
+  const metaIds = idRows.map((r) => r.id);
+  const rows = metaIds.length ? await fetchLeadsByMetaIds(conn, filters, metaIds) : [];
+
+  let filterTotal = null;
+  if (withTotal) {
+    filterTotal =
+      idRows.length > 0
+        ? Number(idRows[0].filter_total || 0)
+        : skip > 0
+          ? await countDateScopedOutcomeLeads(conn, filters)
+          : 0;
+  }
+
+  let data = mapListRows(rows);
+  const tag = normalizeOutcomeTag(filters.outcomeTag);
+  if (tag === "won") {
+    data = data.map((r) => ({ ...r, has_dispatched_order: 1 }));
+  } else if (tag === "cancel") {
+    data = data.map((r) => ({ ...r, has_dispatched_order: 0 }));
+  } else {
+    data = await attachWonFlags(conn, data);
+  }
+  return { data, filterTotal };
+}
+
+async function summaryDateScopedWithOutcome(conn, filters) {
+  const forCards = { ...filters };
+  delete forCards.isImported;
+
+  const { baseSql, values } = buildDateScopedOutcomeSql(forCards, {
+    includeImportFilter: false,
+  });
+  let importSql = "";
+  const importValues = [];
+  if (filters.isImported !== undefined) {
+    importSql = " AND ml.is_imported_to_crm = ?";
+    importValues.push(filters.isImported ? 1 : 0);
+  }
+
+  const [[row]] = await conn.execute(
+    `SELECT
+       COUNT(*) AS total,
+       SUM(ml.is_imported_to_crm = 1) AS imported,
+       SUM(ml.is_imported_to_crm = 0) AS not_imported
+     ${baseSql}${importSql}`,
+    [...values, ...importValues],
+  );
+  return {
+    total: Number(row?.total || 0),
+    imported: Number(row?.imported || 0),
+    notImported: Number(row?.not_imported || 0),
+  };
+}
+
 async function summaryFastMonthScoped(conn, filters) {
   const scoped = {
     metaChannel: filters.metaChannel || "social_media",
@@ -370,10 +444,12 @@ function mapListRows(rows) {
 async function fetchLeadsByMetaIds(conn, filters, metaIds) {
   if (metaIds.length === 0) return [];
   const placeholders = metaIds.map(() => "?").join(", ");
-  const wonJoin = needsWonJoin(filters)
-    ? `LEFT JOIN (${WON_CUSTOMERS_DERIVED}) won_cust ON won_cust.customer_id = c.customer_id`
-    : "";
-  const outcome = appendOutcomeFilter(filters);
+  const tag = normalizeOutcomeTag(filters.outcomeTag);
+  // Page-sized fetch: prefer PK join for Tag filters; full phone join only for "all".
+  const customerJoin =
+    tag === "cancel" || tag === "won"
+      ? `LEFT JOIN customers c ON c.customer_id = ml.crm_customer_id`
+      : META_LEAD_CUSTOMER_JOIN;
   const [rows] = await conn.execute(
     `SELECT ${LIST_SELECT},
       COALESCE(NULLIF(ml.crm_customer_id, 0), c.customer_id) AS resolved_customer_id,
@@ -382,11 +458,10 @@ async function fetchLeadsByMetaIds(conn, filters, metaIds) {
       c.sales_representative AS crm_sales_rep,
       c.status AS crm_status
     FROM meta_leads ml
-    ${META_LEAD_CUSTOMER_JOIN}
-    ${wonJoin}
-    WHERE ml.id IN (${placeholders})${outcome.sql}
+    ${customerJoin}
+    WHERE ml.id IN (${placeholders})
     ORDER BY ml.created_at DESC`,
-    [...metaIds, ...outcome.values],
+    metaIds,
   );
   return rows;
 }
@@ -428,44 +503,7 @@ export async function listSocialMediaLeads(filters = {}, { withTotal = false } =
   if (canUseFastScopedSql(filters)) {
     return listSocialMediaLeadsFastPaginated(filters, { withTotal });
   }
-
-  const conn = await getDbConnection();
-  const { fromSql, values } = scopedFromClause(filters);
-  const limit = filters.limit ?? 50;
-  const skip = filters.skip ?? 0;
-
-  const [rows] = await conn.execute(
-    `SELECT ${LIST_SELECT},
-      COALESCE(NULLIF(ml.crm_customer_id, 0), c.customer_id) AS resolved_customer_id,
-      c.assigned_to AS crm_assigned_to,
-      c.lead_source AS crm_lead_source,
-      c.sales_representative AS crm_sales_rep,
-      c.status AS crm_status
-    ${fromSql}
-    ORDER BY ml.created_at DESC
-    LIMIT ? OFFSET ?`,
-    [...values, limit, skip],
-  );
-
-  let filterTotal = null;
-  if (withTotal) {
-    filterTotal = await countSocialMediaLeadsFull(conn, filters);
-  }
-
-  let data = mapListRows(rows);
-  if (!needsWonJoin(filters)) {
-    data = await attachWonFlags(conn, data);
-  } else {
-    data = data.map((r) => ({ ...r, has_dispatched_order: 1 }));
-  }
-
-  return { data, filterTotal };
-}
-
-async function countSocialMediaLeadsFull(conn, filters) {
-  const { fromSql, values } = scopedFromClause(filters);
-  const [[row]] = await conn.execute(`SELECT COUNT(*) AS cnt ${fromSql}`, values);
-  return Number(row?.cnt || 0);
+  return listSocialMediaLeadsDateScopedWithOutcome(filters, { withTotal });
 }
 
 export async function countSocialMediaLeadsQuick(filters = {}) {
@@ -474,7 +512,7 @@ export async function countSocialMediaLeadsQuick(filters = {}) {
   if (canUseFastScopedSql(filters)) {
     return countFastMonthScopedLeads(conn, filters);
   }
-  return countSocialMediaLeadsFull(conn, filters);
+  return countDateScopedOutcomeLeads(conn, filters);
 }
 
 export async function getSocialMediaLeadsSummary(filters = {}) {
@@ -484,36 +522,7 @@ export async function getSocialMediaLeadsSummary(filters = {}) {
   if (canUseFastScopedSql(filters)) {
     return summaryFastMonthScoped(conn, filters);
   }
-
-  const scoped = {
-    metaChannel: filters.metaChannel || "social_media",
-    startDate: filters.startDate,
-    endDate: filters.endDate,
-    assignedTo: filters.assignedTo,
-    campaignName: filters.campaignName,
-    outcomeTag: filters.outcomeTag,
-    isImported: filters.isImported,
-    search: filters.search,
-  };
-
-  const forImportSplit = { ...scoped };
-  delete forImportSplit.isImported;
-
-  const splitFrom = scopedFromClause(forImportSplit, { includeImportFilter: false });
-  const [[splitRow]] = await conn.execute(
-    `SELECT
-      COUNT(*) AS total,
-      SUM(CASE WHEN ml.is_imported_to_crm = 1 THEN 1 ELSE 0 END) AS imported,
-      SUM(CASE WHEN ml.is_imported_to_crm = 0 THEN 1 ELSE 0 END) AS not_imported
-     ${splitFrom.fromSql}`,
-    splitFrom.values,
-  );
-
-  return {
-    total: Number(splitRow?.total || 0),
-    imported: Number(splitRow?.imported || 0),
-    notImported: Number(splitRow?.not_imported || 0),
-  };
+  return summaryDateScopedWithOutcome(conn, filters);
 }
 
 /** All-time assignees + unique-lead count in the active list date filter. */
