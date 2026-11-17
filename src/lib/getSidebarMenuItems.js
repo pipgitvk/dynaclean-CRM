@@ -1327,8 +1327,17 @@ export default async function getSidebarMenuItems() {
         "attendance-sheet",
         "payment-deductions",
         "credit-notes",
+        "upcoming-installations",
       ]) {
         if (!allowedModules.includes(key)) allowedModules.push(key);
+      }
+    }
+    if (
+      (roleKey === "SALES CUM BACKOFFICE" || roleKey === "ADMIN") &&
+      Array.isArray(allowedModules)
+    ) {
+      if (!allowedModules.includes("upcoming-installations")) {
+        allowedModules.push("upcoming-installations");
       }
     }
     if (/\bACCOUNTANT\b/.test(roleKey) && roleKey !== "ACCOUNTANT" && Array.isArray(allowedModules)) {

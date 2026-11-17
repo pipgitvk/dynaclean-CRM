@@ -2,6 +2,7 @@
 
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { useState, useEffect } from "react";
+import { X } from "lucide-react";
 import toast from "react-hot-toast";
 import Link from "next/link";
 
@@ -137,6 +138,44 @@ export default function WarrantyForm() {
     }
   };
 
+  const productDispatches = orderDispatches.filter(
+    (d) =>
+      d.item_kind === "product" &&
+      String(d.serial_number || "").trim() !== "",
+  );
+  const spareDispatches = orderDispatches.filter(
+    (d) => d.item_kind !== "product",
+  );
+
+  const renderDispatchPickList = (items, sectionTitle) => {
+    if (!items.length) return null;
+    return (
+      <div className="space-y-1">
+        <p className="px-1 text-xs font-bold uppercase tracking-wide text-gray-500">
+          {sectionTitle}{" "}
+          <span className="font-semibold text-gray-400">({items.length})</span>
+        </p>
+        <div className="border rounded-md max-h-44 overflow-y-auto text-sm">
+          {items.map((d) => (
+            <button
+              type="button"
+              key={d.dispatch_id}
+              onClick={() => applyDispatchToForm(d)}
+              className="w-full text-left px-3 py-2 hover:bg-blue-50 border-b last:border-b-0"
+            >
+              <div className="font-medium text-gray-800">
+                {d.product_name} ({d.model})
+              </div>
+              <div className="text-xs text-gray-600">
+                Serial: {d.serial_number} · Customer: {d.customer_name}
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   const applyDispatchToForm = (d) => {
     setForm((prev) => ({
       ...prev,
@@ -164,7 +203,15 @@ export default function WarrantyForm() {
     <div className="max-w-7xl mx-auto mt-10 px-4 sm:px-6 lg:px-8">
       {showModeModal && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg">
+          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg relative">
+            <button
+              type="button"
+              onClick={() => setShowModeModal(false)}
+              className="absolute top-3 right-3 text-gray-400 hover:text-gray-700 transition-colors"
+              aria-label="Close"
+            >
+              <X size={20} />
+            </button>
             <h3 className="text-lg font-semibold mb-2">Warranty Registration</h3>
             <p className="text-sm text-gray-600 mb-4">
               Choose how you want to register the warranty.
@@ -215,22 +262,9 @@ export default function WarrantyForm() {
                   <p className="text-xs text-red-600">{orderError}</p>
                 )}
                 {orderDispatches.length > 0 && (
-                  <div className="border rounded-md max-h-52 overflow-y-auto text-sm">
-                    {orderDispatches.map((d) => (
-                      <button
-                        type="button"
-                        key={d.dispatch_id}
-                        onClick={() => applyDispatchToForm(d)}
-                        className="w-full text-left px-3 py-2 hover:bg-blue-50 border-b last:border-b-0"
-                      >
-                        <div className="font-medium text-gray-800">
-                          {d.product_name} ({d.model})
-                        </div>
-                        <div className="text-xs text-gray-600">
-                          Serial: {d.serial_number}  b7 Customer: {d.customer_name}
-                        </div>
-                      </button>
-                    ))}
+                  <div className="max-h-[min(22rem,55vh)] space-y-3 overflow-y-auto pr-0.5">
+                    {renderDispatchPickList(productDispatches, "Products")}
+                    {renderDispatchPickList(spareDispatches, "Spares")}
                   </div>
                 )}
               </div>
@@ -266,7 +300,7 @@ export default function WarrantyForm() {
               Fill from Order ID
             </button>
             <Link
-              href="/user-dashboard/warranty/products"
+              href="/sales-dashboard/warranty/products"
               className="inline-block bg-gradient-to-r from-blue-600 to-indigo-600
             text-white rounded-lg px-5 py-3 shadow-md
             hover:shadow-xl hover:scale-105 transition-all duration-300"
@@ -298,14 +332,19 @@ export default function WarrantyForm() {
             placeholder="Model"
             className="input-sleek border border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-md p-2"
           />
-          <textarea
-            name="specification"
-            value={form.specification || ""}
+          <select
+            name="state"
+            value={form.state || ""}
             onChange={handleChange}
-            placeholder="Specification"
-            rows={1}
-            className="input-sleek resize-none border border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-md p-2"
-          />
+            className="input-sleek border border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-md p-2"
+          >
+            <option value="">Select State</option>
+            {STATES.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
           <input
             name="serial_number"
             value={form.serial_number || ""}
@@ -370,26 +409,21 @@ export default function WarrantyForm() {
             className="input-sleek border border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-md p-2"
           />
           <textarea
+            name="specification"
+            value={form.specification || ""}
+            onChange={handleChange}
+            placeholder="Specification"
+            rows={4}
+            className="input-sleek resize-none border border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-md p-2"
+          />
+          <textarea
             name="customer_address"
             value={form.customer_address || ""}
             onChange={handleChange}
             placeholder="Company Address"
-            rows={1}
+            rows={4}
             className="input-sleek resize-none border border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-md p-2"
           />
-          <select
-            name="state"
-            value={form.state || ""}
-            onChange={handleChange}
-            className="input-sleek border border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-md p-2"
-          >
-            <option value="">Select State</option>
-            {STATES.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
           <input
             name="invoice_number"
             value={form.invoice_number || ""}

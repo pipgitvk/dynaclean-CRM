@@ -1,0 +1,580 @@
+"use client";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import Link from "next/link";
+import { Eye } from "lucide-react";
+import UpcomingInstallationStatusFilter from "@/components/installation/UpcomingInstallationStatusFilter";
+import UpcomingInstallationReferenceIds from "@/components/installation/UpcomingInstallationReferenceIds";
+import UpcomingInstallationServiceStatusColumn from "@/components/installation/UpcomingInstallationServiceStatusColumn";
+import {
+  getUpcomingInstallationExpectedDateDisplay,
+  getUpcomingInstallationActualDeliveryDisplay,
+  getUpcomingInstallationRowClass,
+  installationStatusDateColor,
+  matchesUpcomingInstallationStatusFilter,
+  formatUpcomingInstallationDays,
+  getUpcomingInstallationEarlyDelayDisplay,
+} from "@/lib/upcomingInstallationDeliveryDisplay";
+
+function UpcomingInstallationDeliveryColumn({ record }) {
+  const expected = getUpcomingInstallationExpectedDateDisplay(record);
+  const actual = getUpcomingInstallationActualDeliveryDisplay(record);
+  const earlyDelay = getUpcomingInstallationEarlyDelayDisplay(record);
+  return (
+    <div className="space-y-0.5 text-xs sm:text-sm leading-snug min-w-[9rem]">
+      <div>
+        <span className="text-gray-500 font-medium">Exp:</span>{" "}
+        <span className={expected.className}>{expected.text}</span>
+      </div>
+      <div>
+        <span className="text-gray-500 font-medium">Act:</span>{" "}
+        <span className={actual.className}>{actual.text}</span>
+      </div>
+      <div>
+        <span className="text-gray-500 font-medium">Early/Delay:</span>{" "}
+        <span className={earlyDelay.className}>{earlyDelay.text}</span>
+      </div>
+    </div>
+  );
+}
+
+export default function UpcomingInstallationsClient({
+  orderLinkBase = "/admin-dashboard",
+}) {
+  const orderHref = (orderId) => `${orderLinkBase}/order/${orderId}`;
+
+  const [searchQuery, setSearchQuery] = useState("");
+  const [typeFilter, setTypeFilter] = useState("products");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [records, setRecords] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [pageSize] = useState(50);
+
+  const [showReturnModal, setShowReturnModal] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [returnableItems, setReturnableItems] = useState([]);
+  const [selectedItems, setSelectedItems] = useState([]);
+  const [returnReasons, setReturnReasons] = useState({});
+  const [modalLoading, setModalLoading] = useState(false);
+
+  const handleAction = async (orderId, action) => {
+    if (!orderId || !action) return;
+    try {
+      setLoading(true);
+      const res = await fetch("/api/installation/action", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ order_id: orderId, action }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.success === false) {
+        alert(data.error || "Action failed");
+      } else {
+        alert(data.message || "Action completed successfully");
+      }
+      await fetchData(typeFilter);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to perform action");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const openReturnModal = async (orderId) => {
+    setSelectedOrder(orderId);
+    setShowReturnModal(true);
+    setModalLoading(true);
+    setSelectedItems([]);
+    setReturnReasons({});
+
+    try {
+      const res = await fetch(`/api/installation/returnable-items?order_id=${orderId}`);
+      const data = await res.json();
+
+      if (data.success) {
+        setReturnableItems(data.items || []);
+      } else {
+        alert(data.error || "Failed to fetch returnable items");
+        setShowReturnModal(false);
+      }
+    } catch (err) {
+      alert("Failed to fetch returnable items");
+      setShowReturnModal(false);
+    } finally {
+      setModalLoading(false);
+    }
+  };
+
+  const handleItemSelection = (id, checked) => {
+    setSelectedItems((prev) =>
+      checked ? [...prev, id] : prev.filter((x) => x !== id),
+    );
+  };
+
+  const handleReasonChange = (id, reason) => {
+    setReturnReasons({ ...returnReasons, [id]: reason });
+  };
+
+  const submitPartialReturn = async () => {
+    if (selectedItems.length === 0) {
+      alert("Select at least one item");
+      return;
+    }
+
+    const itemsToReturn = selectedItems.map((dispatchId) => ({
+      dispatch_id: dispatchId,
+      reason: returnReasons[dispatchId] || "",
+    }));
+
+    try {
+      setModalLoading(true);
+      const res = await fetch("/api/installation/action", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          order_id: selectedOrder,
+          action: "PARTIAL_RETURN",
+          items_to_return: itemsToReturn,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        alert(data.message || "Items returned successfully");
+        setShowReturnModal(false);
+        await fetchData(typeFilter);
+      } else {
+        alert(data.error || "Failed to return items");
+      }
+    } catch (err) {
+      alert("Failed to return items");
+    } finally {
+      setModalLoading(false);
+    }
+  };
+
+  const fetchData = useCallback(async (filter) => {
+    setLoading(true);
+    setFetchError("");
+    try {
+      const res = await fetch(`/api/installation/upcoming?type=${filter}`, {
+        cache: "no-store",
+      });
+      const isJson = (res.headers.get("content-type") || "").includes(
+        "application/json",
+      );
+      if (!isJson) {
+        const msg =
+          res.status === 504
+            ? "Server timed out loading installations. Try again or ask admin to optimize."
+            : `Server error (${res.status}). Could not load installations.`;
+        setFetchError(msg);
+        setRecords([]);
+        return;
+      }
+      const data = await res.json();
+      if (!res.ok) {
+        console.error("Upcoming installations API error:", data);
+        setFetchError(
+          data.error || data.message || "Failed to load installations",
+        );
+        setRecords([]);
+        return;
+      }
+
+      setRecords(data.installations || []);
+      setTotalPages(data.totalPages || 1);
+      setTotal(data.total || 0);
+      setCurrentPage(data.currentPage || 1);
+    } catch (err) {
+      console.error("Fetch error", err);
+      setFetchError("Network error while loading installations");
+      setRecords([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchData(typeFilter);
+  }, [typeFilter, fetchData]);
+
+  const filteredRecords = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return records.filter((r) => {
+      if (!matchesUpcomingInstallationStatusFilter(r, statusFilter)) return false;
+      if (!q) return true;
+      return [
+        r.model,
+        r.name,
+        r.company_name,
+        r.emp_name,
+        r.delivery_address,
+        r.contact,
+        String(r.order_id),
+        String(r.invoice_number ?? ""),
+        String(r.service_id ?? ""),
+      ].some((val) => val && String(val).toLowerCase().includes(q));
+    });
+  }, [records, searchQuery, statusFilter]);
+
+  const dateColor = installationStatusDateColor;
+
+  return (
+    <div className="w-full max-w-full p-6">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-3xl font-bold">Upcoming Installations</h2>
+        <p className="text-sm text-gray-600">
+          Total: {filteredRecords.length}
+          {searchQuery || statusFilter !== "all"
+            ? ` (filtered from ${total})`
+            : ` records`}
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-4 mb-6">
+        <input
+          type="text"
+          placeholder="Search by invoice, order, service ID, model, company, contact..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="px-4 py-2 border rounded shadow-sm"
+        />
+
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={() => setTypeFilter("all")}
+            className={`px-4 py-2 rounded font-medium transition ${
+              typeFilter === "all"
+                ? "bg-blue-600 text-white"
+                : "bg-gray-200 text-gray-800 hover:bg-gray-300"
+            }`}
+          >
+            All
+          </button>
+          <button
+            type="button"
+            onClick={() => setTypeFilter("products")}
+            className={`px-4 py-2 rounded font-medium transition ${
+              typeFilter === "products"
+                ? "bg-blue-600 text-white"
+                : "bg-gray-200 text-gray-800 hover:bg-gray-300"
+            }`}
+          >
+            Products
+          </button>
+          <button
+            type="button"
+            onClick={() => setTypeFilter("spares")}
+            className={`px-4 py-2 rounded font-medium transition ${
+              typeFilter === "spares"
+                ? "bg-blue-600 text-white"
+                : "bg-gray-200 text-gray-800 hover:bg-gray-300"
+            }`}
+          >
+            Spares
+          </button>
+        </div>
+
+        <UpcomingInstallationStatusFilter
+          value={statusFilter}
+          onChange={setStatusFilter}
+        />
+
+        <div className="flex flex-wrap gap-6">
+          <div className="flex items-center">
+            <div className="w-4 h-4 bg-red-100 mr-2" />
+            Overdue
+          </div>
+          <div className="flex items-center">
+            <div className="w-4 h-4 bg-yellow-100 mr-2" />
+            Within 10 Days
+          </div>
+          <div className="flex items-center">
+            <div className="w-4 h-4 bg-green-100 mr-2" />
+            Actual Delivery Done
+          </div>
+          <div className="flex items-center">
+            <div className="w-4 h-4 bg-white border mr-2" />
+            Scheduled
+          </div>
+        </div>
+      </div>
+
+      {loading && (
+        <div className="text-center py-10 text-gray-500">Loading...</div>
+      )}
+
+      {!loading && fetchError && (
+        <div className="text-center py-10 text-red-600">{fetchError}</div>
+      )}
+
+      {!loading && !fetchError && filteredRecords.length === 0 && (
+        <div className="text-center py-10 text-gray-500">No records found.</div>
+      )}
+
+      {!loading && (
+        <div className="md:hidden space-y-4">
+          {filteredRecords.map((r, i) => (
+            <div
+              key={i}
+              className={`rounded-xl shadow p-4 border ${getUpcomingInstallationRowClass(
+                r,
+              )}`}
+            >
+              <div className="mb-2">
+                <UpcomingInstallationReferenceIds
+                  record={r}
+                  className="text-sm"
+                />
+              </div>
+
+              <div className="space-y-1 text-sm">
+                <p>
+                  <b>Model:</b> {r.model}
+                </p>
+                <p>
+                  <b>Name:</b> {r.name}
+                </p>
+                <p>
+                  <b>Company:</b> {r.company_name}
+                </p>
+                <p>
+                  <b>Contact:</b> {r.contact}
+                </p>
+                <p>
+                  <b>Emp:</b> {r.emp_name}
+                </p>
+                <p>
+                  <b>Address:</b> {r.delivery_address}
+                </p>
+                <div className="mt-1">
+                  <b>Delivery:</b>
+                  <UpcomingInstallationDeliveryColumn record={r} />
+                </div>
+                <div className="mt-1">
+                  <b>Status:</b>
+                  <UpcomingInstallationServiceStatusColumn record={r} />
+                </div>
+                <p className={`${dateColor(r.installation_status)}`}>
+                  <b>Days:</b> {formatUpcomingInstallationDays(r)}
+                </p>
+                <p className="mt-1">
+                  <b>Warranty:</b>{" "}
+                  {Number(r.warranty_registered) === 1 ? (
+                    <span className="text-green-600 font-semibold">
+                      ✔ Registered
+                    </span>
+                  ) : (
+                    <span className="text-gray-400">Not Registered</span>
+                  )}
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-2 mt-3">
+                <Link
+                  href={orderHref(r.order_id)}
+                  className="flex items-center justify-center px-3 py-2 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
+                  title="View Report"
+                >
+                  <Eye size={14} className="mr-1" /> View
+                </Link>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {!loading && (
+        <div className="hidden md:block overflow-x-auto shadow bg-white rounded">
+          <table className="w-full text-sm table-auto border-collapse">
+            <thead className="bg-gray-800 text-white">
+              <tr>
+                <th className="p-3">Inv | Ord | Ser</th>
+                <th className="p-3">Model</th>
+                <th className="p-3">Name</th>
+                <th className="p-3">Delivery Address</th>
+                <th className="p-3">Company</th>
+                <th className="p-3">Contact</th>
+                <th className="p-3">Emp</th>
+                <th
+                  className="p-3"
+                  title="Expected and actual delivery dates, early or delay vs expected"
+                >
+                  Delivery
+                </th>
+                <th className="p-3">Days</th>
+                <th className="p-3" title="Service record status">
+                  Status
+                </th>
+                <th className="p-3">Warranty</th>
+                <th className="p-3">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredRecords.map((r, i) => (
+                <tr key={i} className={getUpcomingInstallationRowClass(r)}>
+                  <td className="p-3 font-semibold">
+                    <UpcomingInstallationReferenceIds record={r} />
+                  </td>
+                  <td className="p-3">{r.model}</td>
+                  <td className="p-3">{r.name}</td>
+                  <td className="p-3">{r.delivery_address}</td>
+                  <td className="p-3">{r.company_name}</td>
+                  <td className="p-3">{r.contact}</td>
+                  <td className="p-3">{r.emp_name}</td>
+                  <td className="p-3 align-top">
+                    <UpcomingInstallationDeliveryColumn record={r} />
+                  </td>
+                  <td className={`p-3 ${dateColor(r.installation_status)}`}>
+                    {formatUpcomingInstallationDays(r)}
+                  </td>
+                  <td className="p-3 align-top">
+                    <UpcomingInstallationServiceStatusColumn record={r} />
+                  </td>
+                  <td className="p-3 text-center">
+                    {Number(r.warranty_registered) === 1 ? (
+                      <span
+                        title="Registered in Warranty"
+                        className="inline-flex items-center gap-1 text-green-600 font-semibold text-xs"
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="w-4 h-4"
+                          viewBox="0 0 20 20"
+                          fill="currentColor"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                        Registered
+                      </span>
+                    ) : (
+                      <span className="text-gray-400 text-xs">—</span>
+                    )}
+                  </td>
+                  <td className="p-3">
+                    <div className="flex flex-col gap-2 items-stretch">
+                      <Link
+                        href={orderHref(r.order_id)}
+                        className="inline-flex justify-center items-center px-3 py-1.5 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
+                        title="View Order / Report"
+                      >
+                        <Eye size={14} className="mr-1" /> View
+                      </Link>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {showReturnModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="p-5 border-b">
+              <h3 className="text-xl font-bold">
+                Partial Return - #{selectedOrder}
+              </h3>
+              <p className="text-sm text-gray-600">Select items to return</p>
+            </div>
+
+            <div className="p-5 overflow-y-auto flex-1">
+              {modalLoading ? (
+                <div className="text-center py-6">Loading items...</div>
+              ) : (
+                <div className="space-y-4">
+                  {returnableItems.map((item) => (
+                    <div
+                      key={item.dispatch_id}
+                      className="border rounded-lg p-4 bg-white shadow-sm"
+                    >
+                      <div className="flex gap-3">
+                        <input
+                          type="checkbox"
+                          disabled={!item.can_return}
+                          checked={selectedItems.includes(item.dispatch_id)}
+                          onChange={(e) =>
+                            handleItemSelection(
+                              item.dispatch_id,
+                              e.target.checked,
+                            )
+                          }
+                        />
+
+                        <div className="flex-1 text-sm">
+                          <p>
+                            <b>Item:</b> {item.item_name}
+                          </p>
+                          <p>
+                            <b>Item Code:</b> {item.item_code}
+                          </p>
+                          <p>
+                            <b>Serial:</b> {item.serial_no || "N/A"}
+                          </p>
+                          <p>
+                            <b>Warehouse:</b> {item.godown}
+                          </p>
+
+                          {!item.can_return && (
+                            <p className="text-red-600 mt-2">
+                              Already Returned or Not Eligible
+                            </p>
+                          )}
+
+                          {selectedItems.includes(item.dispatch_id) && (
+                            <input
+                              type="text"
+                              className="mt-3 w-full border rounded px-3 py-2"
+                              placeholder="Return reason (optional)"
+                              value={returnReasons[item.dispatch_id] || ""}
+                              onChange={(e) =>
+                                handleReasonChange(
+                                  item.dispatch_id,
+                                  e.target.value,
+                                )
+                              }
+                            />
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="p-5 border-t flex justify-end gap-2 bg-gray-50">
+              <button
+                type="button"
+                onClick={() => setShowReturnModal(false)}
+                className="px-4 py-2 bg-gray-200 rounded"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={submitPartialReturn}
+                disabled={modalLoading || selectedItems.length === 0}
+                className="px-4 py-2 bg-blue-600 text-white rounded disabled:opacity-50"
+              >
+                {modalLoading ? "Processing..." : "Submit"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

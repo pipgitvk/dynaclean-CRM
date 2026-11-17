@@ -507,7 +507,8 @@ const allMenuItems = [
         {
           path: "/admin-dashboard/view_service_reports/upcoming-installation",
           name: "Upcoming Installations",
-          roles: ["SUPERADMIN"],
+          moduleKey: "upcoming-installations",
+          roles: ["SUPERADMIN", "ADMIN"],
           icon: "BookOpen",
         },
         {
@@ -1148,6 +1149,15 @@ export default async function getSidebarMenuItems() {
     if (String(roleKeyNormalized).includes("ACCOUNTANT")) {
       for (const key of ["salary-management", "salary-sheet", "attendance-sheet"]) {
         if (!allowedModules.includes(key)) allowedModules.push(key);
+      }
+    }
+    if (
+      (roleKeyNormalized === "ADMIN" ||
+        String(roleKeyNormalized).includes("ACCOUNTANT")) &&
+      Array.isArray(allowedModules)
+    ) {
+      if (!allowedModules.includes("upcoming-installations")) {
+        allowedModules.push("upcoming-installations");
       }
     }
   }

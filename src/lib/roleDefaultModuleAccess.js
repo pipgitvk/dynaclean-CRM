@@ -76,6 +76,7 @@ export const ROLE_DEFAULT_MODULE_KEYS = {
     "tl-customers",
     "attendance-log",
     "third-party-engineers",
+    "upcoming-installations",
   ],
   "BACK OFFICE": [
     "dashboard-home",
@@ -166,6 +167,7 @@ export const ROLE_DEFAULT_MODULE_KEYS = {
     "company-documents",
     "assets",
     "attendance-log",
+    "upcoming-installations",
   ],
   "TEAM LEADER": [
     "dashboard-home",
