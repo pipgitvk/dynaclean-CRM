@@ -7,6 +7,10 @@ import {
   CUSTOMER_MANUAL_ASSIGNED_TO_SQL,
   customerManualAssignedToSql,
 } from "@/lib/customerManualAssignment";
+import {
+  sqlActiveTargetEligibleEmployees,
+  TARGET_ELIGIBLE_EMPLOYEE_ROLE_PARAMS,
+} from "@/lib/targetEligibleEmployeesSql";
 
 export const CAMPAIGN_LEAD_SQL = {
   google_ads: `LOWER(TRIM(c.lead_campaign)) IN ('google_ads', 'google', 'google adwords', 'googleads')`,
@@ -251,6 +255,8 @@ export function createCrmCampaignLeadsManage(campaignSql) {
     }
     const dateWhere = dateConditions.length ? `WHERE ${dateConditions.join(" AND ")}` : "";
 
+    const salesEligibleSql = sqlActiveTargetEligibleEmployees("rl");
+
     const [assigneeResult, sourceResult] = await Promise.all([
       conn.execute(
         `SELECT
@@ -259,8 +265,11 @@ export function createCrmCampaignLeadsManage(campaignSql) {
          FROM (
            SELECT DISTINCT c.assigned_to
            FROM customers c
+           INNER JOIN rep_list rl
+             ON rl.username COLLATE utf8mb4_unicode_ci = c.assigned_to COLLATE utf8mb4_unicode_ci
            ${scopeWhere}
              AND TRIM(COALESCE(c.assigned_to, '')) != ''
+             AND ${salesEligibleSql}
          ) all_a
          LEFT JOIN (
            SELECT c.assigned_to, COUNT(*) AS lead_count
@@ -271,7 +280,12 @@ export function createCrmCampaignLeadsManage(campaignSql) {
          ) scoped ON scoped.assigned_to = all_a.assigned_to
          ORDER BY all_a.assigned_to ASC
          LIMIT 500`,
-        [...scopeParams, ...dateParams],
+        [
+          ...scopeParams,
+          ...TARGET_ELIGIBLE_EMPLOYEE_ROLE_PARAMS,
+          ...scopeParams,
+          ...dateParams,
+        ],
       ),
       conn.execute(
         `SELECT

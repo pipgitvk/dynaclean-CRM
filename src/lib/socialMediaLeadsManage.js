@@ -6,6 +6,10 @@ import {
   metaLeadPhoneLast10Sql,
   META_LEAD_CUSTOMER_JOIN,
 } from "@/lib/metaLeadCustomerPhoneMatch";
+import {
+  sqlActiveTargetEligibleEmployees,
+  TARGET_ELIGIBLE_EMPLOYEE_ROLE_PARAMS,
+} from "@/lib/targetEligibleEmployeesSql";
 
 const CRM_CUSTOMER_CANCEL_SQL = `(
   LOWER(TRIM(c.status)) IN ('denied', 'invalid')
@@ -516,8 +520,9 @@ export async function getSocialMediaLeadsSummary(filters = {}) {
 async function querySocialMediaAssigneeOptions(conn, filters = {}) {
   const normalized = normalizeSocialMediaLeadFilters(filters);
   const metaChannel = normalized.metaChannel || "social_media";
-  const channelAllTime = getMetaLeadChannelSql(metaChannel, "meta_leads");
+  const channelAllTime = getMetaLeadChannelSql(metaChannel, "ml");
   const channelScoped = getMetaLeadChannelSql(metaChannel, "ml0");
+  const salesEligibleSql = sqlActiveTargetEligibleEmployees("rl");
 
   const inner = [
     "ml0.leadgen_id IS NOT NULL",
@@ -535,13 +540,16 @@ async function querySocialMediaAssigneeOptions(conn, filters = {}) {
        COALESCE(scoped.lead_count, 0) AS lead_count
      FROM (
        SELECT
-         assigned_to,
-         MAX(NULLIF(TRIM(employee_name), '')) AS employee_name
-       FROM meta_leads
-       WHERE leadgen_id IS NOT NULL AND leadgen_id != ''
-         AND TRIM(COALESCE(assigned_to, '')) != ''
+         ml.assigned_to,
+         MAX(NULLIF(TRIM(ml.employee_name), '')) AS employee_name
+       FROM meta_leads ml
+       INNER JOIN rep_list rl
+         ON rl.username COLLATE utf8mb4_unicode_ci = ml.assigned_to COLLATE utf8mb4_unicode_ci
+       WHERE ml.leadgen_id IS NOT NULL AND ml.leadgen_id != ''
+         AND TRIM(COALESCE(ml.assigned_to, '')) != ''
          AND ${channelAllTime}
-       GROUP BY assigned_to
+         AND ${salesEligibleSql}
+       GROUP BY ml.assigned_to
      ) all_a
      LEFT JOIN (
        SELECT
@@ -558,7 +566,7 @@ async function querySocialMediaAssigneeOptions(conn, filters = {}) {
      ) scoped ON scoped.assigned_to = all_a.assigned_to
      ORDER BY all_a.employee_name ASC, all_a.assigned_to ASC
      LIMIT 500`,
-    values,
+    [...TARGET_ELIGIBLE_EMPLOYEE_ROLE_PARAMS, ...values],
   );
 
   return rows.map((r) => ({
