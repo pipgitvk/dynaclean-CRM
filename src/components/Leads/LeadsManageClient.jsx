@@ -119,17 +119,17 @@ function SourceKpiCard({ card, total, changePct, Icon }) {
             <Icon className="h-5 w-5" strokeWidth={2.25} aria-hidden />
           </div>
           <div className="min-w-0 flex-1 pt-0.5">
-            <h2 className="text-base font-bold leading-snug text-slate-900 sm:text-lg">
+            <h2 className="text-lg font-bold leading-snug text-slate-900 sm:text-xl">
               {card.title}
             </h2>
-            <p className="mt-1 line-clamp-2 text-sm leading-snug text-slate-500 sm:text-[15px]">
+            <p className="mt-1 line-clamp-2 text-base leading-snug text-slate-500 sm:text-[17px]">
               {card.subtitle}
             </p>
           </div>
         </div>
 
         <div className="mt-auto flex items-end justify-between gap-2 pt-5">
-          <span className="text-3xl font-bold tabular-nums tracking-tight text-slate-900 sm:text-4xl">
+          <span className="text-4xl font-bold tabular-nums tracking-tight text-slate-900 sm:text-[2.75rem]">
             {formatNum(total)}
           </span>
           <Icon

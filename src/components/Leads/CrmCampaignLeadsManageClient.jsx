@@ -115,13 +115,13 @@ function OutcomeStatusBadge({ row }) {
   return (
     <div className="min-w-0">
       <span
-        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ${styles}`}
+        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-sm font-semibold ring-1 ${styles}`}
       >
         {outcome.label}
       </span>
       {outcome.tone === "cancel" && outcome.crmStatus ? (
         <div
-          className="mt-1 max-w-[12rem] truncate text-[11px] font-medium text-slate-600"
+          className="mt-1 max-w-[12rem] truncate text-xs font-medium text-slate-600 sm:text-sm"
           title={outcome.crmStatus}
         >
           {outcome.crmStatus}
@@ -140,7 +140,7 @@ function formatCampaign(raw) {
 function FilterField({ label, children }) {
   return (
     <div>
-      <label className="mb-1 block text-xs font-semibold text-slate-500">{label}</label>
+      <label className="mb-1 block text-sm font-semibold text-slate-500">{label}</label>
       {children}
     </div>
   );
@@ -240,12 +240,12 @@ function CampaignSummaryCards({
               </div>
               {!loading && <SummarySparkline color={c.spark} value={c.value} seed={c.seed} />}
             </div>
-            <div className="mt-3 text-sm font-medium text-slate-500">{c.label}</div>
-            <div className={`mt-1 text-3xl font-bold tabular-nums ${c.valueClass}`}>
+            <div className="mt-3 text-base font-medium text-slate-500">{c.label}</div>
+            <div className={`mt-1 text-4xl font-bold tabular-nums ${c.valueClass}`}>
               {loading ? "…" : Number(c.value || 0).toLocaleString("en-IN")}
             </div>
             <p
-              className={`mt-2 inline-flex items-center gap-1 text-xs font-semibold ${
+              className={`mt-2 inline-flex items-center gap-1 text-sm font-semibold ${
                 up ? "text-emerald-600" : "text-rose-600"
               }`}
             >
@@ -468,7 +468,7 @@ export default function CrmCampaignLeadsManageClient({
       <div className="w-full space-y-5">
         <Link
           href={hubHref}
-          className="inline-flex items-center gap-2 text-sm font-semibold text-violet-700 hover:text-violet-900"
+          className="inline-flex items-center gap-2 text-base font-semibold text-violet-700 hover:text-violet-900"
         >
           <ArrowLeft className="h-4 w-4" />
           Back to Leads Manage
@@ -482,10 +482,10 @@ export default function CrmCampaignLeadsManageClient({
               <HeaderIcon className="h-6 w-6 text-white" strokeWidth={2.25} aria-hidden />
             </div>
             <div className="min-w-0 pt-0.5">
-              <h1 className="text-xl font-bold tracking-tight text-indigo-950 sm:text-2xl">
+              <h1 className="text-2xl font-bold tracking-tight text-indigo-950 sm:text-3xl">
                 {title}
               </h1>
-              <p className="mt-1 max-w-2xl text-[13px] leading-snug text-slate-500 sm:text-sm">
+              <p className="mt-1 max-w-2xl text-sm leading-snug text-slate-500 sm:text-base">
                 {subtitle}
               </p>
             </div>
@@ -508,7 +508,7 @@ export default function CrmCampaignLeadsManageClient({
 
         <div className="relative z-20 overflow-visible rounded-2xl border border-slate-200/90 bg-white/95 p-4 shadow-sm backdrop-blur-sm sm:p-6">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
-            <div className="inline-flex items-center gap-2 text-sm font-bold text-slate-800">
+            <div className="inline-flex items-center gap-2 text-base font-bold text-slate-800">
               <Filter className="h-4 w-4 text-violet-600" />
               Filters
             </div>
@@ -516,7 +516,7 @@ export default function CrmCampaignLeadsManageClient({
               <button
                 type="button"
                 onClick={resetFilters}
-                className={`rounded-lg border bg-white px-4 py-2 text-sm font-semibold ${accent.resetBorder} ${accent.resetText} ${accent.resetHover}`}
+                className={`rounded-lg border bg-white px-4 py-2 text-base font-semibold ${accent.resetBorder} ${accent.resetText} ${accent.resetHover}`}
               >
                 Reset
               </button>
@@ -524,7 +524,7 @@ export default function CrmCampaignLeadsManageClient({
                 type="button"
                 onClick={runSearch}
                 disabled={tableLoading || summaryLoading}
-                className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-60 ${accent.button}`}
+                className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-base font-semibold text-white disabled:opacity-60 ${accent.button}`}
               >
                 {(tableLoading || summaryLoading) && (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -546,7 +546,7 @@ export default function CrmCampaignLeadsManageClient({
                 }
               }}
               placeholder="Customer ID, phone, name, email, company, assignee…"
-              className={`w-full rounded-xl border border-slate-200 py-2.5 pl-10 pr-3 text-sm focus:outline-none focus:ring-2 ${accent.ring}`}
+              className={`w-full rounded-xl border border-slate-200 py-2.5 pl-10 pr-3 text-base focus:outline-none focus:ring-2 ${accent.ring}`}
             />
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
@@ -554,21 +554,21 @@ export default function CrmCampaignLeadsManageClient({
               <TypeableDateFilterInput
                 value={draftFilters.from}
                 onChange={(v) => patchDraft({ from: v })}
-                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-base"
               />
             </FilterField>
             <FilterField label="To">
               <TypeableDateFilterInput
                 value={draftFilters.to}
                 onChange={(v) => patchDraft({ to: v })}
-                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-base"
               />
             </FilterField>
             <FilterField label="Tag">
               <select
                 value={draftFilters.outcomeTag}
                 onChange={(e) => patchDraft({ outcomeTag: e.target.value })}
-                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-base"
               >
                 <option value="all">All</option>
                 <option value="won">Won</option>
@@ -600,7 +600,7 @@ export default function CrmCampaignLeadsManageClient({
 
         <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white/95 shadow-sm backdrop-blur-sm">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 sm:px-5">
-            <span className="text-sm font-bold text-slate-800">
+            <span className="text-base font-bold text-slate-800">
               {pagination.total ?? 0} Leads (Filtered)
             </span>
             <div className="flex items-center gap-2">
@@ -608,7 +608,7 @@ export default function CrmCampaignLeadsManageClient({
               <button
                 type="button"
                 onClick={() => exportCrmRowsCsv(rows)}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
               >
                 <Download className="h-3.5 w-3.5" />
                 Export
@@ -616,9 +616,9 @@ export default function CrmCampaignLeadsManageClient({
             </div>
           </div>
           <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
+            <table className="min-w-full text-base">
               <thead>
-                <tr className="bg-slate-50/90 text-left text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                <tr className="bg-slate-50/90 text-left text-xs font-bold uppercase tracking-wide text-slate-500 sm:text-sm">
                   <th className="w-10 px-4 py-3">#</th>
                   <th className="px-4 py-3">Client</th>
                   <th className="px-4 py-3">Contact</th>
@@ -653,7 +653,7 @@ export default function CrmCampaignLeadsManageClient({
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2.5">
-                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-violet-100 text-xs font-bold text-violet-800">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-violet-100 text-sm font-bold text-violet-800">
                               {leadInitials(name)}
                             </div>
                             <div className="min-w-0">
@@ -667,7 +667,7 @@ export default function CrmCampaignLeadsManageClient({
                               ) : (
                                 <span className="font-semibold text-slate-900">{name}</span>
                               )}
-                              <div className="text-[11px] text-slate-400">#{row.customer_id}</div>
+                              <div className="text-xs text-slate-400 sm:text-sm">#{row.customer_id}</div>
                             </div>
                           </div>
                         </td>
@@ -676,7 +676,7 @@ export default function CrmCampaignLeadsManageClient({
                             <Phone className="h-3.5 w-3.5 text-slate-400" />
                             {row.phone || "—"}
                           </div>
-                          <div className="mt-0.5 flex items-start gap-1.5 break-all text-xs text-slate-500">
+                          <div className="mt-0.5 flex items-start gap-1.5 break-all text-sm text-slate-500">
                             <Mail className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
                             {row.email || "—"}
                           </div>
@@ -688,7 +688,7 @@ export default function CrmCampaignLeadsManageClient({
                           </div>
                           {row.sales_representative &&
                             row.sales_representative !== row.assigned_to && (
-                              <div className="text-xs text-slate-500">
+                              <div className="text-sm text-slate-500">
                                 Rep: {row.sales_representative}
                               </div>
                             )}
@@ -701,7 +701,7 @@ export default function CrmCampaignLeadsManageClient({
                           {formatCampaign(row.lead_campaign)}
                         </td>
                         <td className="whitespace-nowrap px-4 py-3 text-slate-600">
-                          <div className="text-xs">
+                          <div className="text-sm">
                             <div className="flex items-center gap-1.5 font-medium text-slate-700">
                               <CalendarDays className="h-3.5 w-3.5 text-slate-400" />
                               {row.date_created
@@ -723,19 +723,19 @@ export default function CrmCampaignLeadsManageClient({
               type="button"
               disabled={page <= 0 || tableLoading}
               onClick={() => setPage((p) => Math.max(0, p - 1))}
-              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm disabled:opacity-40"
+              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-base disabled:opacity-40"
             >
               <ChevronLeft className="h-4 w-4" />
               Prev
             </button>
-            <span className="text-sm text-slate-600">
+            <span className="text-base text-slate-600">
               Page {page + 1} of {totalPages}
             </span>
             <button
               type="button"
               disabled={!pagination.hasMore || tableLoading}
               onClick={() => setPage((p) => p + 1)}
-              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm disabled:opacity-40"
+              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-base disabled:opacity-40"
             >
               Next
               <ChevronRight className="h-4 w-4" />

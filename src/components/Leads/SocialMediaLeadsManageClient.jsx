@@ -166,13 +166,13 @@ function OutcomeStatusBadge({ lead }) {
   return (
     <div className="min-w-0">
       <span
-        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ${styles}`}
+        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-sm font-semibold ring-1 ${styles}`}
       >
         {outcome.label}
       </span>
       {outcome.tone === "cancel" && outcome.crmStatus ? (
         <div
-          className="mt-1 max-w-[12rem] truncate text-[11px] font-medium text-slate-600"
+          className="mt-1 max-w-[12rem] truncate text-xs font-medium text-slate-600 sm:text-sm"
           title={outcome.crmStatus}
         >
           {outcome.crmStatus}
@@ -414,10 +414,10 @@ export default function SocialMediaLeadsManageClient({
               <Megaphone className="h-6 w-6 text-white" strokeWidth={2.25} aria-hidden />
             </div>
             <div className="min-w-0 pt-0.5">
-              <h1 className="text-xl font-bold tracking-tight text-indigo-950 sm:text-2xl">
+              <h1 className="text-2xl font-bold tracking-tight text-indigo-950 sm:text-3xl">
                 {pageTitle}
               </h1>
-              <p className="mt-1 max-w-2xl text-[13px] leading-snug text-slate-500 sm:text-sm">
+              <p className="mt-1 max-w-2xl text-sm leading-snug text-slate-500 sm:text-base">
                 {pageSubtitle}
               </p>
             </div>
@@ -437,7 +437,7 @@ export default function SocialMediaLeadsManageClient({
 
         <div className="relative z-20 overflow-visible rounded-2xl border border-slate-200/90 bg-white/95 p-4 shadow-sm backdrop-blur-sm sm:p-6">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
-            <div className="inline-flex items-center gap-2 text-sm font-bold text-slate-800">
+            <div className="inline-flex items-center gap-2 text-base font-bold text-slate-800">
               <Filter className="h-4 w-4 text-violet-600" />
               Filters
             </div>
@@ -445,7 +445,7 @@ export default function SocialMediaLeadsManageClient({
               <button
                 type="button"
                 onClick={resetFilters}
-                className="rounded-lg border border-violet-200 bg-white px-4 py-2 text-sm font-semibold text-violet-700 hover:bg-violet-50"
+                className="rounded-lg border border-violet-200 bg-white px-4 py-2 text-base font-semibold text-violet-700 hover:bg-violet-50"
               >
                 Reset
               </button>
@@ -453,7 +453,7 @@ export default function SocialMediaLeadsManageClient({
                 type="button"
                 onClick={runSearch}
                 disabled={tableLoading || summaryLoading}
-                className="inline-flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-60"
+                className="inline-flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-base font-semibold text-white hover:bg-violet-700 disabled:opacity-60"
               >
                 {(tableLoading || summaryLoading) && (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -475,7 +475,7 @@ export default function SocialMediaLeadsManageClient({
                 }
               }}
               placeholder="Customer ID, phone, name, email, Meta lead ID, campaign, assignee…"
-              className="w-full rounded-xl border border-slate-200 py-2.5 pl-10 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/25"
+              className="w-full rounded-xl border border-slate-200 py-2.5 pl-10 pr-3 text-base focus:outline-none focus:ring-2 focus:ring-violet-500/25"
             />
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
@@ -483,21 +483,21 @@ export default function SocialMediaLeadsManageClient({
               <TypeableDateFilterInput
                 value={draftFilters.from}
                 onChange={(v) => patchDraft({ from: v })}
-                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-base"
               />
             </FilterField>
             <FilterField label="To">
               <TypeableDateFilterInput
                 value={draftFilters.to}
                 onChange={(v) => patchDraft({ to: v })}
-                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-base"
               />
             </FilterField>
             <FilterField label="Distribution Status">
               <select
                 value={draftFilters.importStatus}
                 onChange={(e) => patchDraft({ importStatus: e.target.value })}
-                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-base"
               >
                 <option value="all">All leads</option>
                 <option value="distributed">Distributed only</option>
@@ -508,7 +508,7 @@ export default function SocialMediaLeadsManageClient({
               <select
                 value={draftFilters.outcomeTag}
                 onChange={(e) => patchDraft({ outcomeTag: e.target.value })}
-                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-base"
               >
                 <option value="all">All</option>
                 <option value="won">Won</option>
@@ -555,7 +555,7 @@ export default function SocialMediaLeadsManageClient({
 function FilterField({ label, children }) {
   return (
     <div>
-      <label className="mb-1 block text-xs font-semibold text-slate-500">{label}</label>
+      <label className="mb-1 block text-sm font-semibold text-slate-500">{label}</label>
       {children}
     </div>
   );
@@ -565,7 +565,7 @@ function LeadsManageBackLink({ hubHref }) {
   return (
     <Link
       href={hubHref}
-      className="inline-flex items-center gap-2 text-sm font-semibold text-violet-700 hover:text-violet-900"
+      className="inline-flex items-center gap-2 text-base font-semibold text-violet-700 hover:text-violet-900"
     >
       <ArrowLeft className="h-4 w-4" />
       Back to Leads Manage
@@ -675,12 +675,12 @@ function SocialMediaSummaryCards({
                 <SummarySparkline color={c.spark} value={c.value} seed={c.seed} />
               )}
             </div>
-            <div className="mt-3 text-sm font-medium text-slate-500">{c.label}</div>
-            <div className={`mt-1 text-3xl font-bold tabular-nums ${c.valueClass}`}>
+            <div className="mt-3 text-base font-medium text-slate-500">{c.label}</div>
+            <div className={`mt-1 text-4xl font-bold tabular-nums ${c.valueClass}`}>
               {loading ? "…" : Number(c.value || 0).toLocaleString("en-IN")}
             </div>
             <p
-              className={`mt-2 inline-flex items-center gap-1 text-xs font-semibold ${
+              className={`mt-2 inline-flex items-center gap-1 text-sm font-semibold ${
                 up ? "text-emerald-600" : "text-rose-600"
               }`}
             >
@@ -699,7 +699,7 @@ function DistributionStatusPill({ lead }) {
   const distributed = lead.is_imported_to_crm || lead.isImportedToCRM;
   return (
     <span
-      className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+      className={`inline-flex rounded-full px-2.5 py-0.5 text-sm font-semibold ${
         distributed ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"
       }`}
     >
@@ -737,7 +737,7 @@ function SocialMediaLeadsTable({ loading, rows, dashboardBase, page, setPage, to
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white/95 shadow-sm backdrop-blur-sm">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 sm:px-5">
-        <span className="text-sm font-bold text-slate-800">
+        <span className="text-base font-bold text-slate-800">
           {pagination.total ?? 0} Leads (Filtered)
         </span>
         <div className="flex items-center gap-2">
@@ -745,7 +745,7 @@ function SocialMediaLeadsTable({ loading, rows, dashboardBase, page, setPage, to
           <button
             type="button"
             onClick={() => exportLeadsCsv(rows)}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
           >
             <Download className="h-3.5 w-3.5" />
             Export
@@ -753,9 +753,9 @@ function SocialMediaLeadsTable({ loading, rows, dashboardBase, page, setPage, to
         </div>
       </div>
       <div className="overflow-x-auto">
-        <table className="min-w-full text-sm">
+        <table className="min-w-full text-base">
           <thead>
-            <tr className="bg-slate-50/90 text-left text-[11px] font-bold uppercase tracking-wide text-slate-500">
+            <tr className="bg-slate-50/90 text-left text-xs font-bold uppercase tracking-wide text-slate-500 sm:text-sm">
               <th className="px-4 py-3 w-10">#</th>
               <th className="px-4 py-3">Lead</th>
               <th className="px-4 py-3">Contact</th>
@@ -792,12 +792,12 @@ function SocialMediaLeadsTable({ loading, rows, dashboardBase, page, setPage, to
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2.5">
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-violet-100 text-xs font-bold text-violet-800">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-violet-100 text-sm font-bold text-violet-800">
                           {leadInitials(name)}
                         </div>
                         <div className="min-w-0">
                           <div className="font-semibold text-slate-900">{name}</div>
-                          <div className="max-w-[180px] truncate font-mono text-[11px] text-slate-400">
+                          <div className="max-w-[180px] truncate font-mono text-xs text-slate-400 sm:text-sm">
                             {lead.leadgen_id}
                           </div>
                         </div>
@@ -808,7 +808,7 @@ function SocialMediaLeadsTable({ loading, rows, dashboardBase, page, setPage, to
                         <Phone className="h-3.5 w-3.5 text-slate-400" />
                         {getLeadPhone(lead)}
                       </div>
-                      <div className="mt-0.5 flex items-start gap-1.5 break-all text-xs text-slate-500">
+                      <div className="mt-0.5 flex items-start gap-1.5 break-all text-sm text-slate-500">
                         <Mail className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
                         {getLeadEmail(lead)}
                       </div>
@@ -818,13 +818,13 @@ function SocialMediaLeadsTable({ loading, rows, dashboardBase, page, setPage, to
                         <User className="h-3.5 w-3.5 text-violet-500" />
                         {lead.employee_name || "—"}
                       </div>
-                      <div className="text-xs text-slate-500">{lead.assigned_to || "—"}</div>
+                      <div className="text-sm text-slate-500">{lead.assigned_to || "—"}</div>
                     </td>
                     <td className="px-4 py-3">
                       <DistributionStatusPill lead={lead} />
-                      <div className="mt-1 text-xs text-slate-600">To: {dist.assignee}</div>
+                      <div className="mt-1 text-sm text-slate-600">To: {dist.assignee}</div>
                       {customerHref && (
-                        <Link href={customerHref} className="text-xs font-medium text-violet-700 hover:underline">
+                        <Link href={customerHref} className="text-sm font-medium text-violet-700 hover:underline">
                           CRM #{customerId}
                         </Link>
                       )}
@@ -836,7 +836,7 @@ function SocialMediaLeadsTable({ loading, rows, dashboardBase, page, setPage, to
                       <span className="line-clamp-2">{lead.campaign_name || "—"}</span>
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-slate-600">
-                      <div className="text-xs">
+                      <div className="text-sm">
                         <div className="flex items-center gap-1.5 font-medium text-slate-700">
                           <CalendarDays className="h-3.5 w-3.5 text-slate-400" />
                           {lead.created_at
@@ -858,19 +858,19 @@ function SocialMediaLeadsTable({ loading, rows, dashboardBase, page, setPage, to
           type="button"
           disabled={page <= 0 || loading}
           onClick={() => setPage((p) => Math.max(0, p - 1))}
-          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm disabled:opacity-40"
+          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-base disabled:opacity-40"
         >
           <ChevronLeft className="h-4 w-4" />
           Prev
         </button>
-        <span className="text-sm text-slate-600">
+        <span className="text-base text-slate-600">
           Page {page + 1} of {totalPages}
         </span>
         <button
           type="button"
           disabled={!pagination.hasMore || loading}
           onClick={() => setPage((p) => p + 1)}
-          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm disabled:opacity-40"
+          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-base disabled:opacity-40"
         >
           Next
           <ChevronRight className="h-4 w-4" />
