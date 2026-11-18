@@ -1,6 +1,7 @@
 export const CRM_CAMPAIGN_PAGE_CONFIG = {
   google_ads: {
     apiPath: "/api/leads-manage/google-ads",
+    summaryMode: "outcome",
     title: "Google Ads Leads",
     subtitle:
       "CRM customers with Google Ads lead_campaign — from the start of the month through today, based on your filters.",
@@ -22,6 +23,7 @@ export const CRM_CAMPAIGN_PAGE_CONFIG = {
   },
   indiamart: {
     apiPath: "/api/leads-manage/indiamart",
+    summaryMode: "outcome",
     title: "Indiamart Leads",
     subtitle: "Indiamart portal CRM enquiries — from the start of the month through today.",
     emptyMessage: "No Indiamart leads match these filters",
@@ -42,6 +44,7 @@ export const CRM_CAMPAIGN_PAGE_CONFIG = {
   },
   website_direct: {
     apiPath: "/api/leads-manage/website-direct",
+    summaryMode: "outcome",
     title: "Website Direct Leads",
     subtitle: "Website direct CRM enquiries — from the start of the month through today.",
     emptyMessage: "No website direct leads match these filters",
@@ -62,6 +65,7 @@ export const CRM_CAMPAIGN_PAGE_CONFIG = {
   },
   manager_assign: {
     apiPath: "/api/leads-manage/manager-assign",
+    summaryMode: "outcome",
     title: "Manager Assigned Leads",
     subtitle:
       "Leads uploaded with Manager Assign campaign — from the start of the month through today.",
@@ -83,6 +87,7 @@ export const CRM_CAMPAIGN_PAGE_CONFIG = {
   },
   manager_assigned: {
     apiPath: "/api/leads-manage/manually-assigned",
+    summaryMode: "outcome",
     title: "Manually Assigned Leads",
     subtitle:
       "Manually assigned leads (Automatic/auto excluded). Google Ads, Indiamart, and Manager Assign campaign leads have their own cards — from the start of the month through today.",

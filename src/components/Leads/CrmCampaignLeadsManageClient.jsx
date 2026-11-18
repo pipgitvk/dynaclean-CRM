@@ -31,6 +31,8 @@ import {
   Users,
   UserPlus,
   Clock,
+  CircleCheck,
+  CircleX,
 } from "lucide-react";
 import { formatCrmDateOnly, getCurrentMonthThroughTodayIso } from "@/lib/crmDateFormat";
 import { formatCrmDatetimeForISTDisplay } from "@/lib/timezone";
@@ -172,47 +174,90 @@ function CampaignSummaryCards({
   prevSummary,
   loading,
   sparkColor,
+  summaryMode = "assignment",
   activeAssignmentFilter = "all",
   onSelectAssignmentFilter,
+  activeOutcomeTag = "all",
+  onSelectOutcomeTag,
 }) {
-  const cards = [
-    {
-      label: "Total Leads",
-      assignmentFilter: "all",
-      value: summary.total,
-      prev: prevSummary.total,
-      icon: Users,
-      iconBg: "bg-violet-100 text-violet-700",
-      valueClass: "text-slate-900",
-      spark: sparkColor,
-      seed: 1,
-      activeRing: "ring-violet-500/60",
-    },
-    {
-      label: "Assigned",
-      assignmentFilter: "assigned",
-      value: summary.assigned,
-      prev: prevSummary.assigned,
-      icon: UserPlus,
-      iconBg: "bg-emerald-100 text-emerald-700",
-      valueClass: "text-emerald-700",
-      spark: "#10b981",
-      seed: 2,
-      activeRing: "ring-emerald-500/60",
-    },
-    {
-      label: "Pending",
-      assignmentFilter: "pending",
-      value: summary.pending,
-      prev: prevSummary.pending,
-      icon: Clock,
-      iconBg: "bg-amber-100 text-amber-700",
-      valueClass: "text-amber-700",
-      spark: "#f59e0b",
-      seed: 3,
-      activeRing: "ring-amber-500/60",
-    },
-  ];
+  const cards =
+    summaryMode === "outcome"
+      ? [
+          {
+            label: "Total Leads",
+            outcomeTag: "all",
+            value: summary.total,
+            prev: prevSummary.total,
+            icon: Users,
+            iconBg: "bg-violet-100 text-violet-700",
+            valueClass: "text-slate-900",
+            spark: sparkColor,
+            seed: 1,
+            activeRing: "ring-violet-500/60",
+          },
+          {
+            label: "Won",
+            outcomeTag: "won",
+            value: summary.won ?? summary.assigned ?? 0,
+            prev: prevSummary.won ?? prevSummary.assigned ?? 0,
+            icon: CircleCheck,
+            iconBg: "bg-emerald-100 text-emerald-700",
+            valueClass: "text-emerald-700",
+            spark: "#10b981",
+            seed: 2,
+            activeRing: "ring-emerald-500/60",
+          },
+          {
+            label: "Cancel",
+            outcomeTag: "cancel",
+            value: summary.cancel ?? summary.pending ?? 0,
+            prev: prevSummary.cancel ?? prevSummary.pending ?? 0,
+            icon: CircleX,
+            iconBg: "bg-rose-100 text-rose-700",
+            valueClass: "text-rose-700",
+            spark: "#f43f5e",
+            seed: 3,
+            activeRing: "ring-rose-500/60",
+          },
+        ]
+      : [
+          {
+            label: "Total Leads",
+            assignmentFilter: "all",
+            value: summary.total,
+            prev: prevSummary.total,
+            icon: Users,
+            iconBg: "bg-violet-100 text-violet-700",
+            valueClass: "text-slate-900",
+            spark: sparkColor,
+            seed: 1,
+            activeRing: "ring-violet-500/60",
+          },
+          {
+            label: "Assigned",
+            assignmentFilter: "assigned",
+            value: summary.assigned,
+            prev: prevSummary.assigned,
+            icon: UserPlus,
+            iconBg: "bg-emerald-100 text-emerald-700",
+            valueClass: "text-emerald-700",
+            spark: "#10b981",
+            seed: 2,
+            activeRing: "ring-emerald-500/60",
+          },
+          {
+            label: "Pending",
+            assignmentFilter: "pending",
+            value: summary.pending,
+            prev: prevSummary.pending,
+            icon: Clock,
+            iconBg: "bg-amber-100 text-amber-700",
+            valueClass: "text-amber-700",
+            spark: "#f59e0b",
+            seed: 3,
+            activeRing: "ring-amber-500/60",
+          },
+        ];
 
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -220,13 +265,22 @@ function CampaignSummaryCards({
         const change = pctChange(c.value, c.prev);
         const up = change >= 0;
         const Icon = c.icon;
-        const isActive = activeAssignmentFilter === c.assignmentFilter;
+        const isActive =
+          summaryMode === "outcome"
+            ? activeOutcomeTag === c.outcomeTag
+            : activeAssignmentFilter === c.assignmentFilter;
         return (
           <button
             key={c.label}
             type="button"
             disabled={loading}
-            onClick={() => onSelectAssignmentFilter?.(c.assignmentFilter)}
+            onClick={() => {
+              if (summaryMode === "outcome") {
+                onSelectOutcomeTag?.(c.outcomeTag);
+              } else {
+                onSelectAssignmentFilter?.(c.assignmentFilter);
+              }
+            }}
             className={`cursor-pointer rounded-2xl border bg-white/95 p-5 text-left shadow-sm backdrop-blur-sm transition hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 disabled:pointer-events-none disabled:opacity-70 ${
               isActive
                 ? `border-violet-300 ring-2 ${c.activeRing} shadow-md`
@@ -261,7 +315,16 @@ function CampaignSummaryCards({
 }
 
 function exportCrmRowsCsv(rows) {
-  const header = ["Customer ID", "Name", "Phone", "Email", "Assigned", "Campaign", "Created"];
+  const header = [
+    "Customer ID",
+    "Name",
+    "Phone",
+    "Email",
+    "Assigned By",
+    "Assigned To",
+    "Campaign",
+    "Created",
+  ];
   const lines = rows.map((row) =>
     [
       row.customer_id,
@@ -269,6 +332,7 @@ function exportCrmRowsCsv(rows) {
       row.phone || "",
       row.email || "",
       row.assigned_to || "",
+      row.lead_source || "",
       row.lead_campaign || "",
       row.date_created || "",
     ]
@@ -290,8 +354,17 @@ export default function CrmCampaignLeadsManageClient({
   dashboardBase = "admin-dashboard",
   pageConfig,
 }) {
-  const { apiPath, title, subtitle, emptyMessage, accent, icon, iconGradient, sparkColor } =
-    pageConfig;
+  const {
+    apiPath,
+    title,
+    subtitle,
+    emptyMessage,
+    accent,
+    icon,
+    iconGradient,
+    sparkColor,
+    summaryMode = "assignment",
+  } = pageConfig;
   const HeaderIcon = PAGE_ICONS[icon] || Globe;
   const monthDefault = useMemo(() => getCurrentMonthThroughTodayIso(), []);
   const hubHref = `/${dashboardBase}/leads-manage`;
@@ -304,8 +377,20 @@ export default function CrmCampaignLeadsManageClient({
   const [summaryLoading, setSummaryLoading] = useState(true);
   const [tableLoading, setTableLoading] = useState(true);
   const [rows, setRows] = useState([]);
-  const [summary, setSummary] = useState({ total: 0, assigned: 0, pending: 0 });
-  const [prevSummary, setPrevSummary] = useState({ total: 0, assigned: 0, pending: 0 });
+  const [summary, setSummary] = useState({
+    total: 0,
+    assigned: 0,
+    pending: 0,
+    won: 0,
+    cancel: 0,
+  });
+  const [prevSummary, setPrevSummary] = useState({
+    total: 0,
+    assigned: 0,
+    pending: 0,
+    won: 0,
+    cancel: 0,
+  });
   const [filterOptions, setFilterOptions] = useState({ assignees: [], leadSources: [] });
   const [pagination, setPagination] = useState({ total: 0, hasMore: false });
 
@@ -336,6 +421,19 @@ export default function CrmCampaignLeadsManageClient({
     });
     setAppliedFilters((prev) => {
       const next = { ...prev, assignmentFilter };
+      return next;
+    });
+    setPage(0);
+  }, []);
+
+  const applyOutcomeTagFromCard = useCallback((outcomeTag) => {
+    setDraftFilters((prev) => {
+      const next = { ...prev, outcomeTag };
+      draftFiltersRef.current = next;
+      return next;
+    });
+    setAppliedFilters((prev) => {
+      const next = { ...prev, outcomeTag };
       return next;
     });
     setPage(0);
@@ -442,12 +540,12 @@ export default function CrmCampaignLeadsManageClient({
       const label = user ? `${user} (${count.toLocaleString("en-IN")})` : "—";
       return { value: user, label };
     });
-    return [{ value: "", label: "All assignees" }, ...items];
+    return [{ value: "", label: "All assigned by" }, ...items];
   }, [filterOptions.assignees]);
 
   const leadSourceSelectOptions = useMemo(
     () => [
-      { value: "", label: "All lead sources" },
+      { value: "", label: "All assigned to" },
       ...(filterOptions.leadSources || []).map((item) => {
         const source =
           typeof item === "string" ? item : String(item?.source || "").trim();
@@ -502,8 +600,11 @@ export default function CrmCampaignLeadsManageClient({
           prevSummary={prevSummary}
           loading={summaryLoading}
           sparkColor={sparkColor || "#8b5cf6"}
+          summaryMode={summaryMode}
           activeAssignmentFilter={appliedFilters.assignmentFilter || "all"}
           onSelectAssignmentFilter={applyAssignmentFilterFromCard}
+          activeOutcomeTag={appliedFilters.outcomeTag || "all"}
+          onSelectOutcomeTag={applyOutcomeTagFromCard}
         />
 
         <div className="relative z-20 overflow-visible rounded-2xl border border-slate-200/90 bg-white/95 p-4 shadow-sm backdrop-blur-sm sm:p-6">
@@ -545,7 +646,7 @@ export default function CrmCampaignLeadsManageClient({
                   runSearch();
                 }
               }}
-              placeholder="Customer ID, phone, name, email, company, assignee…"
+              placeholder="Customer ID, phone, name, email, company, assigned by…"
               className={`w-full rounded-xl border border-slate-200 py-2.5 pl-10 pr-3 text-base focus:outline-none focus:ring-2 ${accent.ring}`}
             />
           </div>
@@ -575,23 +676,23 @@ export default function CrmCampaignLeadsManageClient({
                 <option value="cancel">Cancel</option>
               </select>
             </FilterField>
-            <FilterField label="Assigned To">
+            <FilterField label="Assigned By">
               <SearchableSelect
                 options={assigneeSelectOptions}
                 value={draftFilters.assignedTo}
                 onChange={(v) => patchDraft({ assignedTo: v })}
-                placeholder="All assignees"
-                searchPlaceholder="Search assignee..."
+                placeholder="All assigned by"
+                searchPlaceholder="Search assigned by..."
                 className="rounded-xl border-slate-200"
               />
             </FilterField>
-            <FilterField label="Lead Source">
+            <FilterField label="Assigned To">
               <SearchableSelect
                 options={leadSourceSelectOptions}
                 value={draftFilters.leadSource}
                 onChange={(v) => patchDraft({ leadSource: v })}
-                placeholder="All lead sources"
-                searchPlaceholder="Search source..."
+                placeholder="All assigned to"
+                searchPlaceholder="Search assigned to..."
                 className="rounded-xl border-slate-200"
               />
             </FilterField>
@@ -622,9 +723,9 @@ export default function CrmCampaignLeadsManageClient({
                   <th className="w-10 px-4 py-3">#</th>
                   <th className="px-4 py-3">Client</th>
                   <th className="px-4 py-3">Contact</th>
-                  <th className="px-4 py-3">Assigned</th>
+                  <th className="px-4 py-3">Assigned By</th>
                   <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Lead Source</th>
+                  <th className="px-4 py-3">Assigned To</th>
                   <th className="px-4 py-3">Campaign</th>
                   <th className="px-4 py-3">Created</th>
                 </tr>

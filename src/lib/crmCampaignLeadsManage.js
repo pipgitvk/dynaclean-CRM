@@ -39,6 +39,17 @@ const WON_ORDER_PREDICATE = `
   AND COALESCE(no.is_cancelled, 0) = 0
 `;
 
+const WON_CUSTOMER_EXISTS_SQL = `EXISTS (
+  SELECT 1 FROM neworder no
+  WHERE no.customer_id = c.customer_id
+    AND ${WON_ORDER_PREDICATE}
+)`;
+
+const CRM_CUSTOMER_WON_SQL = `(
+  NOT ${CRM_CUSTOMER_CANCEL_SQL}
+  AND ${WON_CUSTOMER_EXISTS_SQL}
+)`;
+
 const LIST_SELECT = `
   c.customer_id, c.first_name, c.last_name, c.email, c.phone, c.company,
   c.lead_source, c.assigned_to, c.sales_representative, c.lead_campaign,
@@ -134,12 +145,7 @@ function createBuildBaseWhere(campaignSql) {
     if (tag === "cancel") {
       conditions.push(CRM_CUSTOMER_CANCEL_SQL);
     } else if (tag === "won") {
-      conditions.push(`NOT ${CRM_CUSTOMER_CANCEL_SQL}`);
-      conditions.push(`EXISTS (
-        SELECT 1 FROM neworder no
-        WHERE no.customer_id = c.customer_id
-          AND ${WON_ORDER_PREDICATE}
-      )`);
+      conditions.push(CRM_CUSTOMER_WON_SQL);
     }
 
     return {
@@ -181,7 +187,10 @@ async function attachWonFlags(conn, rows) {
   }));
 }
 
-export function createCrmCampaignLeadsManage(campaignSql) {
+export function createCrmCampaignLeadsManage(
+  campaignSql,
+  { summaryMode = "assignment" } = {},
+) {
   const buildBaseWhere = createBuildBaseWhere(campaignSql);
 
   async function listLeads(filters, access) {
@@ -222,6 +231,23 @@ export function createCrmCampaignLeadsManage(campaignSql) {
     filters = normalizeLeadFilters(filters);
     const conn = await getDbConnection();
     const { whereSql, params } = buildBaseWhere(filters, access);
+
+    if (summaryMode === "outcome") {
+      const [[row]] = await conn.execute(
+        `SELECT
+           COUNT(*) AS total,
+           SUM(CASE WHEN ${CRM_CUSTOMER_WON_SQL} THEN 1 ELSE 0 END) AS won,
+           SUM(CASE WHEN ${CRM_CUSTOMER_CANCEL_SQL} THEN 1 ELSE 0 END) AS cancel
+         FROM customers c
+         ${whereSql}`,
+        params,
+      );
+      const total = Number(row?.total || 0);
+      const won = Number(row?.won || 0);
+      const cancel = Number(row?.cancel || 0);
+      return { total, won, cancel, assigned: won, pending: cancel };
+    }
+
     const manualSql = customerManualAssignedToSql("c");
     const [[row]] = await conn.execute(
       `SELECT
@@ -300,8 +326,11 @@ export function createCrmCampaignLeadsManage(campaignSql) {
          FROM (
            SELECT DISTINCT c.lead_source
            FROM customers c
+           INNER JOIN rep_list rl
+             ON rl.username COLLATE utf8mb4_unicode_ci = c.lead_source COLLATE utf8mb4_unicode_ci
            ${scopeWhere}
              AND TRIM(COALESCE(c.lead_source, '')) != ''
+             AND ${salesEligibleSql}
          ) all_s
          LEFT JOIN (
            SELECT c.lead_source, COUNT(*) AS lead_count
@@ -312,7 +341,12 @@ export function createCrmCampaignLeadsManage(campaignSql) {
          ) scoped ON scoped.lead_source = all_s.lead_source
          ORDER BY all_s.lead_source ASC
          LIMIT 500`,
-        [...scopeParams, ...dateParams],
+        [
+          ...scopeParams,
+          ...TARGET_ELIGIBLE_EMPLOYEE_ROLE_PARAMS,
+          ...scopeParams,
+          ...dateParams,
+        ],
       ),
     ]);
 
@@ -400,11 +434,26 @@ export function createCrmCampaignLeadsManage(campaignSql) {
   };
 }
 
-const googleAdsApi = createCrmCampaignLeadsManage(CAMPAIGN_LEAD_SQL.google_ads);
-const indiamartApi = createCrmCampaignLeadsManage(CAMPAIGN_LEAD_SQL.indiamart);
-const websiteDirectApi = createCrmCampaignLeadsManage(CAMPAIGN_LEAD_SQL.website_direct);
-const managerAssignedApi = createCrmCampaignLeadsManage(MANAGER_ASSIGNED_LEAD_SQL);
-const managerAssignCampaignApi = createCrmCampaignLeadsManage(CAMPAIGN_LEAD_SQL.manager_assign);
+const outcomeSummary = { summaryMode: "outcome" };
+const googleAdsApi = createCrmCampaignLeadsManage(
+  CAMPAIGN_LEAD_SQL.google_ads,
+  outcomeSummary,
+);
+const indiamartApi = createCrmCampaignLeadsManage(
+  CAMPAIGN_LEAD_SQL.indiamart,
+  outcomeSummary,
+);
+const websiteDirectApi = createCrmCampaignLeadsManage(
+  CAMPAIGN_LEAD_SQL.website_direct,
+  outcomeSummary,
+);
+const managerAssignedApi = createCrmCampaignLeadsManage(
+  MANAGER_ASSIGNED_LEAD_SQL,
+  outcomeSummary,
+);
+const managerAssignCampaignApi = createCrmCampaignLeadsManage(CAMPAIGN_LEAD_SQL.manager_assign, {
+  summaryMode: "outcome",
+});
 
 export const googleAdsLeadsManage = googleAdsApi;
 export const indiamartLeadsManage = indiamartApi;
