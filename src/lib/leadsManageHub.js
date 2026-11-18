@@ -59,7 +59,7 @@ export function getLeadsManageCards(dashboardBase) {
     {
       id: "manager_assigned",
       title: "Manually Assigned",
-      subtitle: "Manual CRM assignment (excl. Google Ads & Indiamart)",
+      subtitle: "Manual CRM assignment (excl. Google, Indiamart, Manager Assign)",
       countKey: "manager_assigned",
       href: `${base}/leads-manage/manually-assigned`,
       accent: "from-amber-500 to-orange-600",

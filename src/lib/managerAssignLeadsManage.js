@@ -1,6 +1,6 @@
 import { managerAssignLeadsManage } from "@/lib/crmCampaignLeadsManage";
 
-export const MANAGER_ASSIGN_CAMPAIGN_SQL = `LOWER(TRIM(c.lead_campaign)) IN ('manager_assigned', 'manager_assign', 'manager assign')`;
+export const MANAGER_ASSIGN_CAMPAIGN_SQL = `REPLACE(REPLACE(LOWER(TRIM(c.lead_campaign)), '_', ''), '-', '') IN ('managerassigned', 'managerassign')`;
 
 export const normalizeManagerAssignLeadFilters = managerAssignLeadsManage.normalizeLeadFilters;
 export const listManagerAssignLeads = managerAssignLeadsManage.listLeads;

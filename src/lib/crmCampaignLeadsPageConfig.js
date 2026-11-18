@@ -85,7 +85,7 @@ export const CRM_CAMPAIGN_PAGE_CONFIG = {
     apiPath: "/api/leads-manage/manually-assigned",
     title: "Manually Assigned Leads",
     subtitle:
-      "Manually assigned leads (Automatic/auto excluded). Google Ads and Indiamart are on their own cards — from the start of the month through today.",
+      "Manually assigned leads (Automatic/auto excluded). Google Ads, Indiamart, and Manager Assign campaign leads have their own cards — from the start of the month through today.",
     emptyMessage: "No manually assigned leads match these filters",
     icon: "usercheck",
     iconGradient: "from-amber-500 to-orange-600",

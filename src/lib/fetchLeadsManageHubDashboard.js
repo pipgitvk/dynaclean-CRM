@@ -12,7 +12,7 @@ import {
 const SQL_GOOGLE = `LOWER(TRIM(c.lead_campaign)) IN ('google_ads', 'google', 'google adwords', 'googleads')`;
 const SQL_INDIA = `LOWER(TRIM(c.lead_campaign)) IN ('india_mart', 'indiamart', 'india-mart')`;
 const SQL_WEB = `LOWER(TRIM(c.lead_campaign)) IN ('website_visit', 'website', 'website_direct')`;
-const SQL_MANAGER_ASSIGN = `LOWER(TRIM(c.lead_campaign)) IN ('manager_assigned', 'manager_assign', 'manager assign')`;
+const SQL_MANAGER_ASSIGN = `REPLACE(REPLACE(LOWER(TRIM(c.lead_campaign)), '_', ''), '-', '') IN ('managerassigned', 'managerassign')`;
 const SQL_MANUAL = CUSTOMER_MANUAL_ASSIGNED_TO_SQL.replace(/\s+/g, " ");
 const SQL_MANUAL_ASSIGNED_HUB = MANAGER_ASSIGNED_LEAD_SQL.replace(/\s+/g, " ");
 const SQL_ANY_CRM_HUB = `(${SQL_GOOGLE} OR ${SQL_INDIA} OR ${SQL_WEB} OR ${SQL_MANUAL} OR ${SQL_MANAGER_ASSIGN})`;

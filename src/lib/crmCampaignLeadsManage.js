@@ -16,14 +16,15 @@ export const CAMPAIGN_LEAD_SQL = {
   google_ads: `LOWER(TRIM(c.lead_campaign)) IN ('google_ads', 'google', 'google adwords', 'googleads')`,
   indiamart: `LOWER(TRIM(c.lead_campaign)) IN ('india_mart', 'indiamart', 'india-mart')`,
   website_direct: `LOWER(TRIM(c.lead_campaign)) IN ('website_visit', 'website', 'website_direct')`,
-  manager_assign: `LOWER(TRIM(c.lead_campaign)) IN ('manager_assigned', 'manager_assign', 'manager assign')`,
+  manager_assign: `REPLACE(REPLACE(LOWER(TRIM(c.lead_campaign)), '_', ''), '-', '') IN ('managerassigned', 'managerassign')`,
 };
 
-/** Manually assigned in CRM; excludes Google Ads & Indiamart (own hub cards). */
+/** Manually assigned in CRM; excludes channels with dedicated hub cards. */
 export const MANAGER_ASSIGNED_LEAD_SQL = `(
   ${CUSTOMER_MANUAL_ASSIGNED_TO_SQL}
   AND NOT (${CAMPAIGN_LEAD_SQL.google_ads})
   AND NOT (${CAMPAIGN_LEAD_SQL.indiamart})
+  AND NOT (${CAMPAIGN_LEAD_SQL.manager_assign})
 )`;
 
 const CRM_CUSTOMER_CANCEL_SQL = `(
