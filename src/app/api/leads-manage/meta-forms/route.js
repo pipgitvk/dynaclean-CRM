@@ -19,7 +19,7 @@ export async function GET() {
       );
     }
 
-    const credentials = await getAllCredentials(false);
+    const credentials = await getAllCredentials(true);
     const formIds = new Set();
     for (const cred of credentials) {
       (cred.formIds || []).forEach((id) => {

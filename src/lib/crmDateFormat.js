@@ -1,4 +1,15 @@
 import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc";
+import timezone from "dayjs/plugin/timezone";
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
+const CRM_FILTER_TZ = "Asia/Kolkata";
+
+function crmFilterToday() {
+  return dayjs().tz(CRM_FILTER_TZ).startOf("day");
+}
 
 /** Standard CRM calendar date display (India). */
 export const CRM_DATE_FORMAT = "DD-MM-YYYY";
@@ -57,10 +68,10 @@ export function getCurrentMonthRangeIso() {
   };
 }
 
-/** Month start through today (inclusive) — Leads Manage default filters. */
+/** Month start through today (inclusive, IST) — Leads Manage default filters. */
 export function getCurrentMonthThroughTodayIso() {
-  const start = dayjs().startOf("month");
-  const end = dayjs().startOf("day");
+  const end = crmFilterToday();
+  const start = end.startOf("month");
   return {
     from: start.format("YYYY-MM-DD"),
     to: end.format("YYYY-MM-DD"),

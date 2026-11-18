@@ -48,6 +48,14 @@ function appendCrmDateRange(conditions, params, from, to) {
   params.push(to);
 }
 
+/** Inclusive calendar day range on meta_leads.created_at (includes full “today”). */
+function appendMetaCreatedRange(conditions, params, from, to) {
+  conditions.push("ml0.created_at >= ?");
+  params.push(`${from} 00:00:00`);
+  conditions.push("ml0.created_at < DATE_ADD(?, INTERVAL 1 DAY)");
+  params.push(to);
+}
+
 function pctChange(current, previous) {
   const cur = Number(current) || 0;
   const prev = Number(previous) || 0;
@@ -63,6 +71,13 @@ function ratePart(numerator, denominator) {
 
 async function countSocialMeta(conn, from, to) {
   const socialChannelSql = metaLeadSocialChannelSql("ml0").replace(/\s+/g, " ");
+  const inner = [
+    "ml0.leadgen_id IS NOT NULL",
+    "ml0.leadgen_id != ''",
+    socialChannelSql,
+  ];
+  const innerParams = [];
+  appendMetaCreatedRange(inner, innerParams, from, to);
   const [[row]] = await conn.execute(
     `SELECT
        COUNT(*) AS total,
@@ -71,13 +86,10 @@ async function countSocialMeta(conn, from, to) {
      INNER JOIN (
        SELECT MIN(ml0.id) AS min_id
        FROM meta_leads ml0
-       WHERE ml0.leadgen_id IS NOT NULL AND ml0.leadgen_id != ''
-         AND DATE(ml0.created_at) >= ?
-         AND DATE(ml0.created_at) <= ?
-         AND ${socialChannelSql}
+       WHERE ${inner.join(" AND ")}
        GROUP BY ml0.leadgen_id
      ) unique_leads ON ml.id = unique_leads.min_id`,
-    [from, to],
+    innerParams,
   );
   const total = Number(row?.total || 0);
   const assigned = Number(row?.assigned || 0);
@@ -136,16 +148,20 @@ async function queryCrmTrend(conn, scope, from, to) {
 
 async function querySocialTrend(conn, from, to) {
   const socialChannelSql = metaLeadSocialChannelSql("ml0").replace(/\s+/g, " ");
+  const where = [
+    "ml0.leadgen_id IS NOT NULL",
+    "ml0.leadgen_id != ''",
+    socialChannelSql,
+  ];
+  const params = [];
+  appendMetaCreatedRange(where, params, from, to);
   const [rows] = await conn.execute(
     `SELECT DATE(ml0.created_at) AS d, COUNT(DISTINCT ml0.leadgen_id) AS total
      FROM meta_leads ml0
-     WHERE ml0.leadgen_id IS NOT NULL AND ml0.leadgen_id != ''
-       AND DATE(ml0.created_at) >= ?
-       AND DATE(ml0.created_at) <= ?
-       AND ${socialChannelSql}
+     WHERE ${where.join(" AND ")}
      GROUP BY DATE(ml0.created_at)
      ORDER BY d ASC`,
-    [from, to],
+    params,
   );
   return rows.map((r) => ({ date: String(r.d).slice(0, 10), total: Number(r.total || 0) }));
 }
