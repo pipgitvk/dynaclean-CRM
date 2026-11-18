@@ -98,11 +98,44 @@ function CardWave({ color = "#8b5cf6", gradientId = "hub-wave" }) {
   );
 }
 
-function SourceKpiCard({ card, total, changePct, Icon }) {
+function SourceKpiCard({ card, total, changePct, Icon, className = "", compact = false }) {
+  if (compact) {
+    return (
+      <Link
+        href={card.href}
+        className={`group relative flex min-h-0 items-stretch overflow-hidden rounded-xl border hover:shadow-md hover:-translate-y-px transition-all duration-200 ${card.surface} ${className}`}
+      >
+        <div
+          className={`absolute -top-8 -left-8 h-20 w-20 rounded-full blur-2xl opacity-80 ${card.glow}`}
+          aria-hidden
+        />
+        <div className="relative z-10 flex w-full items-center gap-2.5 px-3 py-2.5 sm:px-3.5">
+          <div
+            className={`shrink-0 rounded-lg p-1.5 text-white shadow-md shadow-black/10 ${card.iconSurface}`}
+          >
+            <Icon className="h-4 w-4" strokeWidth={2.25} aria-hidden />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h2 className="truncate text-sm font-bold text-slate-900">{card.title}</h2>
+            <div className="mt-0.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+              <span className="text-2xl font-bold tabular-nums leading-none tracking-tight text-slate-900">
+                {formatNum(total)}
+              </span>
+              <ChangePill value={changePct} className="bg-white/95 px-2 py-0.5 text-xs shadow-sm" />
+            </div>
+          </div>
+        </div>
+        <div className="pointer-events-none absolute bottom-0 left-0 h-8 w-full overflow-hidden opacity-60">
+          <CardWave color={card.chartColor} gradientId={`wave-${card.id}-compact`} />
+        </div>
+      </Link>
+    );
+  }
+
   return (
     <Link
       href={card.href}
-      className={`group relative block overflow-hidden rounded-2xl border hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200 min-h-[11.5rem] ${card.surface}`}
+      className={`group relative block overflow-hidden rounded-2xl border hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200 min-h-[11.5rem] ${card.surface} ${className}`}
     >
       <div
         className={`absolute -top-10 -left-10 h-28 w-28 rounded-full blur-3xl ${card.glow}`}
@@ -156,6 +189,14 @@ export default function LeadsManageClient({
   initialDashboard,
 }) {
   const cards = useMemo(() => getLeadsManageCards(dashboardBase), [dashboardBase]);
+  const manualAssignCard = useMemo(
+    () => cards.find((c) => c.id === "manager_assigned"),
+    [cards],
+  );
+  const sourceCards = useMemo(
+    () => cards.filter((c) => c.id !== "manager_assigned"),
+    [cards],
+  );
   const monthDefault = useMemo(() => getCurrentMonthThroughTodayIso(), []);
   const [range, setRange] = useState(initialDashboard?.range || "month");
   const [data, setData] = useState(initialDashboard);
@@ -259,20 +300,32 @@ export default function LeadsManageClient({
               </p>
             </div>
           </div>
-          <HubDateRangeControl
-            range={range}
-            setRange={setRange}
-            loading={loading}
-            customFrom={customFrom}
-            customTo={customTo}
-            onCustomFromChange={setCustomFrom}
-            onCustomToChange={setCustomTo}
-            onApplyCustom={applyCustomRange}
-          />
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+            {manualAssignCard ? (
+              <SourceKpiCard
+                compact
+                card={manualAssignCard}
+                total={counts[manualAssignCard.countKey] ?? 0}
+                changePct={changes[manualAssignCard.countKey]}
+                Icon={CARD_ICONS.manager_assigned}
+                className="w-full sm:w-auto sm:min-w-[11rem] sm:max-w-[15rem]"
+              />
+            ) : null}
+            <HubDateRangeControl
+              range={range}
+              setRange={setRange}
+              loading={loading}
+              customFrom={customFrom}
+              customTo={customTo}
+              onCustomFromChange={setCustomFrom}
+              onCustomToChange={setCustomTo}
+              onApplyCustom={applyCustomRange}
+            />
+          </div>
         </header>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
-          {cards.map((card) => {
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
+          {sourceCards.map((card) => {
             const Icon = CARD_ICONS[card.id] || Megaphone;
             return (
               <SourceKpiCard
