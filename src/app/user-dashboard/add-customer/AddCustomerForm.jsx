@@ -147,9 +147,8 @@ export default function AddCustomerForm() {
             <option value="india_mart">India Mart</option>
             <option value="social_media">Social Media</option>
             <option value="google_ads">Google Ads</option>
-            <option value="visit">Visit</option>
             <option value="website_visit">Website Visit</option>
-            <option value="reference">Reference</option>
+            <option value="manager_assigned">Manager Assign</option>
           </select>
         </div>
         <div>
