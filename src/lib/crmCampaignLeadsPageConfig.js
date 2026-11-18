@@ -82,11 +82,11 @@ export const CRM_CAMPAIGN_PAGE_CONFIG = {
     },
   },
   manager_assigned: {
-    apiPath: "/api/leads-manage/manager-assigned",
+    apiPath: "/api/leads-manage/manually-assigned",
     title: "Manually Assigned Leads",
     subtitle:
-      "Manually assigned managers (automatic/auto excluded) — from the start of the month through today.",
-    emptyMessage: "No manager-assigned leads match these filters",
+      "Manually assigned leads (Automatic/auto excluded). Google Ads and Indiamart are on their own cards — from the start of the month through today.",
+    emptyMessage: "No manually assigned leads match these filters",
     icon: "usercheck",
     iconGradient: "from-amber-500 to-orange-600",
     sparkColor: "#f59e0b",

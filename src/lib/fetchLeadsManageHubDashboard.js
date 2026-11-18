@@ -2,6 +2,7 @@ import { getDbConnection } from "@/lib/db";
 import { buildGemCustomerScopeWhere } from "@/lib/dataScope";
 import { sqlServiceSupportCustomerScope } from "@/lib/serviceSupportTeamScope";
 import { CUSTOMER_MANUAL_ASSIGNED_TO_SQL } from "@/lib/customerManualAssignment";
+import { MANAGER_ASSIGNED_LEAD_SQL } from "@/lib/crmCampaignLeadsManage";
 import { metaLeadSocialChannelSql } from "@/lib/metaLeadChannelFilters";
 import {
   fillDailySeries,
@@ -13,6 +14,7 @@ const SQL_INDIA = `LOWER(TRIM(c.lead_campaign)) IN ('india_mart', 'indiamart', '
 const SQL_WEB = `LOWER(TRIM(c.lead_campaign)) IN ('website_visit', 'website', 'website_direct')`;
 const SQL_MANAGER_ASSIGN = `LOWER(TRIM(c.lead_campaign)) IN ('manager_assigned', 'manager_assign', 'manager assign')`;
 const SQL_MANUAL = CUSTOMER_MANUAL_ASSIGNED_TO_SQL.replace(/\s+/g, " ");
+const SQL_MANUAL_ASSIGNED_HUB = MANAGER_ASSIGNED_LEAD_SQL.replace(/\s+/g, " ");
 const SQL_ANY_CRM_HUB = `(${SQL_GOOGLE} OR ${SQL_INDIA} OR ${SQL_WEB} OR ${SQL_MANUAL} OR ${SQL_MANAGER_ASSIGN})`;
 
 function buildCustomerScope({ username, userRole }) {
@@ -111,8 +113,8 @@ async function queryCrmBreakdown(conn, scope, from, to) {
        SUM(CASE WHEN ${SQL_INDIA} AND ${SQL_MANUAL} THEN 1 ELSE 0 END) AS indiamart_assigned,
        SUM(CASE WHEN ${SQL_WEB} THEN 1 ELSE 0 END) AS website_total,
        SUM(CASE WHEN ${SQL_WEB} AND ${SQL_MANUAL} THEN 1 ELSE 0 END) AS website_assigned,
-       SUM(CASE WHEN ${SQL_MANUAL} THEN 1 ELSE 0 END) AS manager_total,
-       SUM(CASE WHEN ${SQL_MANUAL} THEN 1 ELSE 0 END) AS manager_assigned,
+       SUM(CASE WHEN ${SQL_MANUAL_ASSIGNED_HUB} THEN 1 ELSE 0 END) AS manager_total,
+       SUM(CASE WHEN ${SQL_MANUAL_ASSIGNED_HUB} THEN 1 ELSE 0 END) AS manager_assigned,
        SUM(CASE WHEN ${SQL_MANAGER_ASSIGN} THEN 1 ELSE 0 END) AS manager_assign_total,
        SUM(CASE WHEN ${SQL_MANAGER_ASSIGN} AND ${SQL_MANUAL} THEN 1 ELSE 0 END) AS manager_assign_assigned
      FROM customers c
@@ -288,7 +290,7 @@ export function attachHubSourceRows(dashboard, dashboardBase) {
     {
       id: "manager_assigned",
       title: "Manually Assigned",
-      href: `${base}/leads-manage/manager-assigned`,
+      href: `${base}/leads-manage/manually-assigned`,
     },
     {
       id: "manager_assign",

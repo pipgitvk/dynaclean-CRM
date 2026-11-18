@@ -1,5 +1,5 @@
-import ManagerAssignedLeadsManageClient from "@/components/Leads/ManagerAssignedLeadsManageClient";
+import { redirect } from "next/navigation";
 
 export default function Page() {
-  return <ManagerAssignedLeadsManageClient dashboardBase="sales-dashboard" />;
+  redirect("/sales-dashboard/leads-manage/manually-assigned");
 }

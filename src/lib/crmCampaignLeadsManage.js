@@ -19,8 +19,12 @@ export const CAMPAIGN_LEAD_SQL = {
   manager_assign: `LOWER(TRIM(c.lead_campaign)) IN ('manager_assigned', 'manager_assign', 'manager assign')`,
 };
 
-/** Manager manually assigned (not Automatic / empty assigned_to). */
-export const MANAGER_ASSIGNED_LEAD_SQL = CUSTOMER_MANUAL_ASSIGNED_TO_SQL;
+/** Manually assigned in CRM; excludes Google Ads & Indiamart (own hub cards). */
+export const MANAGER_ASSIGNED_LEAD_SQL = `(
+  ${CUSTOMER_MANUAL_ASSIGNED_TO_SQL}
+  AND NOT (${CAMPAIGN_LEAD_SQL.google_ads})
+  AND NOT (${CAMPAIGN_LEAD_SQL.indiamart})
+)`;
 
 const CRM_CUSTOMER_CANCEL_SQL = `(
   LOWER(TRIM(c.status)) IN ('denied', 'invalid')
