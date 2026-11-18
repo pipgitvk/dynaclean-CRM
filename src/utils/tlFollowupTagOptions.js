@@ -23,6 +23,27 @@ export const BASE_TL_TAG_OPTIONS = [
   "Contractor",
 ];
 
+export function tagEquivalenceKey(raw) {
+  return String(raw)
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_/-]+/g, "")
+    .replace("recieved", "received");
+}
+
+/** Append TL tags that are not already represented in `base` (spelling variants deduped). */
+export function mergeMissingTagOptions(base, extras) {
+  const seen = new Set(base.map(tagEquivalenceKey));
+  const merged = [...base];
+  for (const tag of extras) {
+    const key = tagEquivalenceKey(tag);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    merged.push(tag);
+  }
+  return merged;
+}
+
 export function getTlTagOptions() {
   return [...BASE_TL_TAG_OPTIONS];
 }

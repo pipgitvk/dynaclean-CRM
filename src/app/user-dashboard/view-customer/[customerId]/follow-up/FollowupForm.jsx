@@ -7,12 +7,27 @@ import toast from "react-hot-toast";
 
 import { isGemRole } from "@/lib/isGemRole";
 import { isSalesRole } from "@/lib/isSalesRole";
+import {
+  getTlTagOptions,
+  mergeMissingTagOptions,
+  normalizeLegacyPostponingTagLabel,
+  tagEquivalenceKey,
+} from "@/utils/tlFollowupTagOptions";
 
 function parseTagList(raw) {
   return String(raw ?? "")
     .split(",")
     .map((tag) => tag.trim())
-    .filter(Boolean);
+    .filter(Boolean)
+    .map(normalizeLegacyPostponingTagLabel);
+}
+
+function isSameFollowupTag(a, b) {
+  return tagEquivalenceKey(a) === tagEquivalenceKey(b);
+}
+
+function isFollowupTagSelected(selectedTags, tag) {
+  return selectedTags.some((t) => isSameFollowupTag(t, tag));
 }
 
 function latestSalesTagsFromHistory(history) {
@@ -275,10 +290,20 @@ export default function FollowupForm({ customerId, userRole = "" }) {
   const tagOptions = useMemo(() => {
     const isSalesUser =
       isSalesRole(userRole) && !isServiceSupport && !isGEM;
-    if (!isSalesUser) return baseTagOptions;
-    const withoutNA = baseTagOptions.filter((tag) => tag !== "N/A");
-    return [...withoutNA, ...salesOnlyTags, "N/A"];
-  }, [userRole, isServiceSupport, isGEM]);
+    let options;
+    if (!isSalesUser) {
+      options = [...baseTagOptions];
+    } else {
+      const withoutNA = baseTagOptions.filter((tag) => tag !== "N/A");
+      options = [...withoutNA, ...salesOnlyTags, "N/A"];
+    }
+    if (isFromUpcoming && !isServiceSupport && !isGEM) {
+      const withoutNA = options.filter((tag) => tag !== "N/A");
+      const withTl = mergeMissingTagOptions(withoutNA, getTlTagOptions());
+      return [...withTl, "N/A"];
+    }
+    return options;
+  }, [userRole, isServiceSupport, isGEM, isFromUpcoming]);
   const stageOptions = [
     "New",
     "Contacted",
@@ -543,11 +568,10 @@ export default function FollowupForm({ customerId, userRole = "" }) {
           newTags = newTags.filter(t => t !== "N/A");
         }
 
-        if (newTags.includes(tag)) {
-          // Remove tag if already selected
-          newTags = newTags.filter(t => t !== tag);
+        if (isFollowupTagSelected(newTags, tag)) {
+          newTags = newTags.filter((t) => !isSameFollowupTag(t, tag));
         } else {
-          // Add tag
+          newTags = newTags.filter((t) => !isSameFollowupTag(t, tag));
           newTags.push(tag);
         }
       }
@@ -879,7 +903,7 @@ export default function FollowupForm({ customerId, userRole = "" }) {
             <label
               key={tag}
               className={`inline-flex items-center px-3 py-2 rounded-md cursor-pointer transition-colors ${
-                formData.multi_tag.includes(tag)
+                isFollowupTagSelected(formData.multi_tag, tag)
                   ? tag === "N/A"
                     ? "bg-gray-500 text-white"
                     : "bg-blue-600 text-white"
