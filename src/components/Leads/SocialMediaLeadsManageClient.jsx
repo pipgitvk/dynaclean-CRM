@@ -796,7 +796,24 @@ function SocialMediaLeadsTable({ loading, rows, dashboardBase, page, setPage, to
                           {leadInitials(name)}
                         </div>
                         <div className="min-w-0">
-                          <div className="font-semibold text-slate-900">{name}</div>
+                          {customerHref ? (
+                            <Link
+                              href={customerHref}
+                              className="font-semibold text-violet-700 hover:text-violet-900 hover:underline"
+                            >
+                              {name}
+                            </Link>
+                          ) : (
+                            <div className="font-semibold text-slate-900">{name}</div>
+                          )}
+                          {customerId ? (
+                            <Link
+                              href={customerHref}
+                              className="mt-0.5 block text-xs font-semibold text-violet-600 hover:text-violet-800 hover:underline sm:text-sm"
+                            >
+                              #{customerId}
+                            </Link>
+                          ) : null}
                           <div className="max-w-[180px] truncate font-mono text-xs text-slate-400 sm:text-sm">
                             {lead.leadgen_id}
                           </div>
@@ -823,11 +840,6 @@ function SocialMediaLeadsTable({ loading, rows, dashboardBase, page, setPage, to
                     <td className="px-4 py-3">
                       <DistributionStatusPill lead={lead} />
                       <div className="mt-1 text-sm text-slate-600">To: {dist.assignee}</div>
-                      {customerHref && (
-                        <Link href={customerHref} className="text-sm font-medium text-violet-700 hover:underline">
-                          CRM #{customerId}
-                        </Link>
-                      )}
                     </td>
                     <td className="px-4 py-3">
                       <OutcomeStatusBadge lead={lead} />
