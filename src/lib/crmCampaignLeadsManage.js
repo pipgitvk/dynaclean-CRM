@@ -16,6 +16,7 @@ export const CAMPAIGN_LEAD_SQL = {
   google_ads: `LOWER(TRIM(c.lead_campaign)) IN ('google_ads', 'google', 'google adwords', 'googleads')`,
   indiamart: `LOWER(TRIM(c.lead_campaign)) IN ('india_mart', 'indiamart', 'india-mart')`,
   website_direct: `LOWER(TRIM(c.lead_campaign)) IN ('website_visit', 'website', 'website_direct')`,
+  manager_assign: `LOWER(TRIM(c.lead_campaign)) IN ('manager_assigned', 'manager_assign', 'manager assign')`,
 };
 
 /** Manager manually assigned (not Automatic / empty assigned_to). */
@@ -398,8 +399,10 @@ const googleAdsApi = createCrmCampaignLeadsManage(CAMPAIGN_LEAD_SQL.google_ads);
 const indiamartApi = createCrmCampaignLeadsManage(CAMPAIGN_LEAD_SQL.indiamart);
 const websiteDirectApi = createCrmCampaignLeadsManage(CAMPAIGN_LEAD_SQL.website_direct);
 const managerAssignedApi = createCrmCampaignLeadsManage(MANAGER_ASSIGNED_LEAD_SQL);
+const managerAssignCampaignApi = createCrmCampaignLeadsManage(CAMPAIGN_LEAD_SQL.manager_assign);
 
 export const googleAdsLeadsManage = googleAdsApi;
 export const indiamartLeadsManage = indiamartApi;
 export const websiteDirectLeadsManage = websiteDirectApi;
 export const managerAssignedLeadsManage = managerAssignedApi;
+export const managerAssignLeadsManage = managerAssignCampaignApi;

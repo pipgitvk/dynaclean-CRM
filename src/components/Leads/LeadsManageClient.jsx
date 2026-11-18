@@ -15,6 +15,7 @@ import {
   TrendingDown,
   TrendingUp,
   UserCheck,
+  UserCog,
 } from "lucide-react";
 import {
   Area,
@@ -39,6 +40,7 @@ const CARD_ICONS = {
   indiamart: Store,
   website_direct: MousePointerClick,
   manager_assigned: UserCheck,
+  manager_assign: UserCog,
 };
 
 function formatNum(n) {
@@ -269,7 +271,7 @@ export default function LeadsManageClient({
           />
         </header>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
           {cards.map((card) => {
             const Icon = CARD_ICONS[card.id] || Megaphone;
             return (

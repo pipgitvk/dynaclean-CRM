@@ -60,9 +60,30 @@ export const CRM_CAMPAIGN_PAGE_CONFIG = {
       resetHover: "hover:bg-sky-50",
     },
   },
+  manager_assign: {
+    apiPath: "/api/leads-manage/manager-assign",
+    title: "Manager Assigned Leads",
+    subtitle:
+      "Leads uploaded with Manager Assign campaign — from the start of the month through today.",
+    emptyMessage: "No manager assigned campaign leads match these filters",
+    icon: "usercheck",
+    iconGradient: "from-rose-500 to-red-600",
+    sparkColor: "#e11d48",
+    accent: {
+      summary: "text-rose-700",
+      link: "text-rose-700 hover:underline",
+      button: "bg-rose-600 hover:bg-rose-700",
+      focus: "focus:ring-rose-500",
+      spinner: "text-rose-600",
+      ring: "focus:ring-rose-500/25",
+      resetBorder: "border-rose-200",
+      resetText: "text-rose-700",
+      resetHover: "hover:bg-rose-50",
+    },
+  },
   manager_assigned: {
     apiPath: "/api/leads-manage/manager-assigned",
-    title: "Manager Assigned Leads",
+    title: "Manually Assigned Leads",
     subtitle:
       "Manually assigned managers (automatic/auto excluded) — from the start of the month through today.",
     emptyMessage: "No manager-assigned leads match these filters",

@@ -58,8 +58,8 @@ export function getLeadsManageCards(dashboardBase) {
     },
     {
       id: "manager_assigned",
-      title: "Manager Assigned",
-      subtitle: "Leads with assigned manager",
+      title: "Manually Assigned",
+      subtitle: "Leads manually assigned in CRM",
       countKey: "manager_assigned",
       href: `${base}/leads-manage/manager-assigned`,
       accent: "from-amber-500 to-orange-600",
@@ -68,6 +68,19 @@ export function getLeadsManageCards(dashboardBase) {
       glow: "bg-amber-400/25",
       iconSurface: "bg-gradient-to-br from-amber-500 to-orange-600",
       chartColor: "#f59e0b",
+    },
+    {
+      id: "manager_assign",
+      title: "Manager Assigned",
+      subtitle: "Manager Assign campaign uploads",
+      countKey: "manager_assign",
+      href: `${base}/leads-manage/manager-assign`,
+      accent: "from-rose-500 to-red-600",
+      surface:
+        "bg-white/80 backdrop-blur-xl border-rose-200/40 shadow-[0_8px_30px_-8px_rgba(244,63,94,0.35)]",
+      glow: "bg-rose-400/25",
+      iconSurface: "bg-gradient-to-br from-rose-500 to-red-600",
+      chartColor: "#e11d48",
     },
   ];
 }

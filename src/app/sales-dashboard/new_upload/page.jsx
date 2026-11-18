@@ -70,7 +70,11 @@ export default function LeadDistributionPage() {
           Manually Assign Leads
         </button>
 
-        <ManualLeadModal show={showModal} onClose={() => setShowModal(false)} />
+        <ManualLeadModal
+          show={showModal}
+          onClose={() => setShowModal(false)}
+          includeManagerAssignCampaign
+        />
       </div>
       <div className="max-w-7xl mx-auto p-6 space-y-6">
         <h1 className="text-2xl font-bold text-gray-700 text-center">My Assigned Leads</h1>

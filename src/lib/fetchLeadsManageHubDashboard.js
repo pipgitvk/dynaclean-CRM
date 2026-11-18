@@ -11,8 +11,9 @@ import {
 const SQL_GOOGLE = `LOWER(TRIM(c.lead_campaign)) IN ('google_ads', 'google', 'google adwords', 'googleads')`;
 const SQL_INDIA = `LOWER(TRIM(c.lead_campaign)) IN ('india_mart', 'indiamart', 'india-mart')`;
 const SQL_WEB = `LOWER(TRIM(c.lead_campaign)) IN ('website_visit', 'website', 'website_direct')`;
+const SQL_MANAGER_ASSIGN = `LOWER(TRIM(c.lead_campaign)) IN ('manager_assigned', 'manager_assign', 'manager assign')`;
 const SQL_MANUAL = CUSTOMER_MANUAL_ASSIGNED_TO_SQL.replace(/\s+/g, " ");
-const SQL_ANY_CRM_HUB = `(${SQL_GOOGLE} OR ${SQL_INDIA} OR ${SQL_WEB} OR ${SQL_MANUAL})`;
+const SQL_ANY_CRM_HUB = `(${SQL_GOOGLE} OR ${SQL_INDIA} OR ${SQL_WEB} OR ${SQL_MANUAL} OR ${SQL_MANAGER_ASSIGN})`;
 
 function buildCustomerScope({ username, userRole }) {
   const conditions = [];
@@ -111,7 +112,9 @@ async function queryCrmBreakdown(conn, scope, from, to) {
        SUM(CASE WHEN ${SQL_WEB} THEN 1 ELSE 0 END) AS website_total,
        SUM(CASE WHEN ${SQL_WEB} AND ${SQL_MANUAL} THEN 1 ELSE 0 END) AS website_assigned,
        SUM(CASE WHEN ${SQL_MANUAL} THEN 1 ELSE 0 END) AS manager_total,
-       SUM(CASE WHEN ${SQL_MANUAL} THEN 1 ELSE 0 END) AS manager_assigned
+       SUM(CASE WHEN ${SQL_MANUAL} THEN 1 ELSE 0 END) AS manager_assigned,
+       SUM(CASE WHEN ${SQL_MANAGER_ASSIGN} THEN 1 ELSE 0 END) AS manager_assign_total,
+       SUM(CASE WHEN ${SQL_MANAGER_ASSIGN} AND ${SQL_MANUAL} THEN 1 ELSE 0 END) AS manager_assign_assigned
      FROM customers c
      ${whereSql}`,
     params,
@@ -128,6 +131,7 @@ async function queryCrmBreakdown(conn, scope, from, to) {
     indiamart: pack("indiamart_total", "indiamart_assigned"),
     website_direct: pack("website_total", "website_assigned"),
     manager_assigned: pack("manager_total", "manager_assigned"),
+    manager_assign: pack("manager_assign_total", "manager_assign_assigned"),
   };
 }
 
@@ -228,6 +232,7 @@ export async function fetchLeadsManageHubDashboard({
     indiamart: crmNow.indiamart.total,
     website_direct: crmNow.website_direct.total,
     manager_assigned: crmNow.manager_assigned.total,
+    manager_assign: crmNow.manager_assign.total,
   };
 
   const prevCounts = {
@@ -236,6 +241,7 @@ export async function fetchLeadsManageHubDashboard({
     indiamart: crmPrev.indiamart.total,
     website_direct: crmPrev.website_direct.total,
     manager_assigned: crmPrev.manager_assigned.total,
+    manager_assign: crmPrev.manager_assign.total,
   };
 
   const trend = fillDailySeries(from, to, mergeTrendDays(crmTrendNow, socialTrendNow));
@@ -260,6 +266,7 @@ export async function fetchLeadsManageHubDashboard({
       indiamart: pctChange(counts.indiamart, prevCounts.indiamart),
       website_direct: pctChange(counts.website_direct, prevCounts.website_direct),
       manager_assigned: pctChange(counts.manager_assigned, prevCounts.manager_assigned),
+      manager_assign: pctChange(counts.manager_assign, prevCounts.manager_assign),
       trend: pctChange(trendTotal, prevTrendTotal),
     },
     trend,
@@ -280,8 +287,13 @@ export function attachHubSourceRows(dashboard, dashboardBase) {
     { id: "website_direct", title: "Website Direct", href: `${base}/leads-manage/website-direct` },
     {
       id: "manager_assigned",
-      title: "Manager Assigned",
+      title: "Manually Assigned",
       href: `${base}/leads-manage/manager-assigned`,
+    },
+    {
+      id: "manager_assign",
+      title: "Manager Assigned",
+      href: `${base}/leads-manage/manager-assign`,
     },
   ];
 

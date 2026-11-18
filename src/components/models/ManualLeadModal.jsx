@@ -2,8 +2,13 @@ import { useState, useEffect } from "react";
 import { toast } from "react-hot-toast";
 import { useUser } from "../../context/UserContext";
 import SearchableSelect from "@/components/ui/SearchableSelect";
+import { normalizeRoleKey } from "@/lib/roleKeyUtils";
 
-export default function ManualLeadModal({ show, onClose }) {
+export default function ManualLeadModal({
+  show,
+  onClose,
+  includeManagerAssignCampaign = false,
+}) {
   const [rawText, setRawText] = useState("");
   const [analyzed, setAnalyzed] = useState(null);
   const [leadSources, setLeadSources] = useState([]);
@@ -13,6 +18,11 @@ export default function ManualLeadModal({ show, onClose }) {
   const [salesReps, setSalesReps] = useState([]);
   const [assignActiveTo, setAssignActiveTo] = useState("");
   const { user } = useUser();
+  const roleKey = normalizeRoleKey(user?.userRole || user?.role);
+  const showManagerAssignCampaign =
+    includeManagerAssignCampaign ||
+    roleKey === normalizeRoleKey("SALES CUM BACKOFFICE") ||
+    roleKey === normalizeRoleKey("SUPERADMIN");
 
   useEffect(() => {
     if (show) {
@@ -278,6 +288,9 @@ export default function ManualLeadModal({ show, onClose }) {
                   <option value="visit">Visit</option>
                   <option value="website_visit">Website Visit</option>
                   <option value="reference">Reference</option>
+                  {showManagerAssignCampaign ? (
+                    <option value="manager_assigned">Manager Assign</option>
+                  ) : null}
                 </select>
               </label>
               <label className="block text-sm sm:text-base">
