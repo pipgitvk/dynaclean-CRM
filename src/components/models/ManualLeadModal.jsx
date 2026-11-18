@@ -8,6 +8,7 @@ export default function ManualLeadModal({
   show,
   onClose,
   includeManagerAssignCampaign = false,
+  hideVisitReferenceCampaigns = false,
 }) {
   const [rawText, setRawText] = useState("");
   const [analyzed, setAnalyzed] = useState(null);
@@ -285,9 +286,13 @@ export default function ManualLeadModal({
                   <option value="india_mart">India Mart</option>
                   <option value="social_media">Social Media</option>
                   <option value="google_ads">Google Ads</option>
-                  <option value="visit">Visit</option>
+                  {hideVisitReferenceCampaigns ? null : (
+                    <>
+                      <option value="visit">Visit</option>
+                      <option value="reference">Reference</option>
+                    </>
+                  )}
                   <option value="website_visit">Website Visit</option>
-                  <option value="reference">Reference</option>
                   {showManagerAssignCampaign ? (
                     <option value="manager_assigned">Manager Assign</option>
                   ) : null}

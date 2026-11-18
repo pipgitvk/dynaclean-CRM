@@ -74,6 +74,7 @@ export default function LeadDistributionPage() {
           show={showModal}
           onClose={() => setShowModal(false)}
           includeManagerAssignCampaign
+          hideVisitReferenceCampaigns
         />
       </div>
       <div className="max-w-7xl mx-auto p-6 space-y-6">
