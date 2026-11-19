@@ -3,6 +3,10 @@ import {
   ensureBulkLeadReassignHistoryTable,
 } from "@/lib/bulkLeadReassignHistory";
 import { REASSIGN_NO_FOLLOWUP_DAYS } from "@/lib/reassignNoFollowupConstants";
+import {
+  pendingReassignCampaignFilterSqlForAlias,
+  pendingReassignStatusValues,
+} from "@/lib/pendingLeadReassignQueries";
 import { salesReassignHistoryScopeSql } from "@/lib/reassignSalesScope";
 
 export { REASSIGN_NO_FOLLOWUP_DAYS };
@@ -316,6 +320,34 @@ function buildReassignFollowupCohortWhere(filters, params, followupStatus) {
     params.push(term, term, term, term, term, term, term);
   }
 
+  const statusVariants = pendingReassignStatusValues(filters.status);
+  if (statusVariants?.length) {
+    sql += ` AND EXISTS (
+      SELECT 1 FROM customers c_sf
+      WHERE c_sf.customer_id = h.customer_id
+        AND c_sf.status IN (${statusVariants.map(() => "?").join(", ")})
+    )`;
+    params.push(...statusVariants);
+  }
+
+  if (filters.leadCampaign) {
+    const campSql = pendingReassignCampaignFilterSqlForAlias(filters.leadCampaign, "c_cf");
+    if (campSql) {
+      sql += ` AND EXISTS (
+        SELECT 1 FROM customers c_cf
+        WHERE c_cf.customer_id = h.customer_id
+          AND ${campSql}
+      )`;
+    } else {
+      sql += ` AND EXISTS (
+        SELECT 1 FROM customers c_cf
+        WHERE c_cf.customer_id = h.customer_id
+          AND c_cf.lead_campaign = ?
+      )`;
+      params.push(filters.leadCampaign);
+    }
+  }
+
   return sql;
 }
 
@@ -410,7 +442,9 @@ export async function fetchReassignFollowupSummary(conn, filters = {}) {
       filters.search ||
       filters.from ||
       filters.to ||
-      filters.assignedBy,
+      filters.assignedBy ||
+      filters.status ||
+      filters.leadCampaign,
   );
 
   const tasks = [
@@ -532,8 +566,11 @@ export async function fetchReassignNoFollowupPage(conn, filters = {}) {
            AND cf.time_stamp > '1999-12-31'
          ORDER BY cf.time_stamp DESC
          LIMIT 1
-       ) AS last_followup_assigned_to_notes
+       ) AS last_followup_assigned_to_notes,
+       c.status AS customer_status,
+       c.lead_campaign
      FROM ${BULK_LEAD_REASSIGN_HISTORY_TABLE} h
+     INNER JOIN customers c ON c.customer_id = h.customer_id
      ${where}
      ORDER BY h.valid_from ASC, h.id ASC
      LIMIT ? OFFSET ?`,

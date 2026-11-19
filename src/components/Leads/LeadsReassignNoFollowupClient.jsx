@@ -8,8 +8,10 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
+  ListChecks,
   ListFilter,
   Loader2,
+  Megaphone,
   User,
   UserPlus,
 } from "lucide-react";
@@ -33,6 +35,50 @@ const FOLLOWUP_STATUS_OPTIONS = [
   { value: "followed", label: "Followed" },
   { value: "not_followed", label: "Not followed" },
 ];
+
+const STATUS_FILTER_OPTIONS = [
+  { value: "", label: "All Status" },
+  { value: "New", label: "New" },
+  { value: "verygud", label: "Very Good" },
+  { value: "average", label: "Average" },
+  { value: "poor", label: "Poor" },
+  { value: "denied", label: "Denied" },
+  { value: "invalid", label: "Invalid" },
+  { value: "old_reassign", label: "Old Reassign" },
+];
+
+const CAMPAIGN_FILTER_OPTIONS = [
+  { value: "", label: "All Lead Campaigns" },
+  { value: "india_mart", label: "India Mart" },
+  { value: "social_media", label: "Social Media" },
+  { value: "google_ads", label: "Google Ads" },
+  { value: "website_visit", label: "Website Visit" },
+  { value: "direct_call", label: "Direct Call" },
+  { value: "manager_assigned", label: "Manager Assign" },
+];
+
+function formatStatusLabel(status) {
+  const s = String(status || "").trim();
+  if (!s) return "—";
+  const lower = s.toLowerCase();
+  if (lower === "verygud") return "Very Good";
+  if (lower === "old_reassign") return "Old Reassign";
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function statusBadgeClass(status) {
+  const s = String(status || "").toLowerCase();
+  if (s.includes("denied")) return "bg-rose-100 text-rose-800";
+  if (s.includes("invalid")) return "bg-amber-100 text-amber-900";
+  if (s === "new") return "bg-emerald-100 text-emerald-800";
+  return "bg-slate-100 text-slate-700";
+}
+
+function formatCampaign(raw) {
+  const s = String(raw || "").trim();
+  if (!s) return "—";
+  return s.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
 
 function formatTs(value) {
   if (!value) return "—";
@@ -60,10 +106,14 @@ export default function LeadsReassignNoFollowupClient({ dashboardBase = "admin-d
   const [assignedToDraft, setAssignedToDraft] = useState("");
   const [assignedFromDraft, setAssignedFromDraft] = useState("");
   const [followupStatusDraft, setFollowupStatusDraft] = useState("not_followed");
+  const [statusDraft, setStatusDraft] = useState("");
+  const [campaignDraft, setCampaignDraft] = useState("");
   const [appliedSearch, setAppliedSearch] = useState("");
   const [appliedAssignedTo, setAppliedAssignedTo] = useState("");
   const [appliedAssignedFrom, setAppliedAssignedFrom] = useState("");
   const [appliedFollowupStatus, setAppliedFollowupStatus] = useState("not_followed");
+  const [appliedStatus, setAppliedStatus] = useState("");
+  const [appliedCampaign, setAppliedCampaign] = useState("");
 
   const [toRepList, setToRepList] = useState([]);
   const [fromRepList, setFromRepList] = useState([]);
@@ -78,7 +128,9 @@ export default function LeadsReassignNoFollowupClient({ dashboardBase = "admin-d
     appliedSearch.trim() ||
       appliedAssignedTo ||
       appliedAssignedFrom ||
-      (appliedFollowupStatus && appliedFollowupStatus !== "not_followed"),
+      (appliedFollowupStatus && appliedFollowupStatus !== "not_followed") ||
+      appliedStatus ||
+      appliedCampaign,
   );
 
   useEffect(() => {
@@ -118,6 +170,8 @@ export default function LeadsReassignNoFollowupClient({ dashboardBase = "admin-d
       if (appliedAssignedTo) params.set("assigned_to", appliedAssignedTo);
       if (appliedAssignedFrom) params.set("assigned_from", appliedAssignedFrom);
       if (appliedFollowupStatus) params.set("followup_status", appliedFollowupStatus);
+      if (appliedStatus) params.set("status", appliedStatus);
+      if (appliedCampaign) params.set("lead_campaign", appliedCampaign);
       const res = await fetch(`/api/reassign-no-followup?${params.toString()}`);
       const data = await res.json();
       if (data.success) {
@@ -136,7 +190,16 @@ export default function LeadsReassignNoFollowupClient({ dashboardBase = "admin-d
     } finally {
       setLoading(false);
     }
-  }, [appliedSearch, appliedAssignedTo, appliedAssignedFrom, appliedFollowupStatus, page, pageSize]);
+  }, [
+    appliedSearch,
+    appliedAssignedTo,
+    appliedAssignedFrom,
+    appliedFollowupStatus,
+    appliedStatus,
+    appliedCampaign,
+    page,
+    pageSize,
+  ]);
 
   useEffect(() => {
     fetchRows();
@@ -147,6 +210,8 @@ export default function LeadsReassignNoFollowupClient({ dashboardBase = "admin-d
     setAppliedAssignedTo(assignedToDraft);
     setAppliedAssignedFrom(assignedFromDraft);
     setAppliedFollowupStatus(followupStatusDraft);
+    setAppliedStatus(statusDraft);
+    setAppliedCampaign(campaignDraft);
     setPage(0);
   };
 
@@ -155,10 +220,14 @@ export default function LeadsReassignNoFollowupClient({ dashboardBase = "admin-d
     setAssignedToDraft("");
     setAssignedFromDraft("");
     setFollowupStatusDraft("not_followed");
+    setStatusDraft("");
+    setCampaignDraft("");
     setAppliedSearch("");
     setAppliedAssignedTo("");
     setAppliedAssignedFrom("");
     setAppliedFollowupStatus("not_followed");
+    setAppliedStatus("");
+    setAppliedCampaign("");
     setPage(0);
   };
 
@@ -215,7 +284,7 @@ export default function LeadsReassignNoFollowupClient({ dashboardBase = "admin-d
               onApply={applyFilters}
               placeholder="Customer ID, name, company, phone, assigned from/to…"
             />
-            <LeadsFilterFieldsGrid columns={3}>
+            <LeadsFilterFieldsGrid columns={5}>
               <LeadsFilterField label="Follow-up status">
                 <LeadsFilterSelectShell theme="rose" icon={ListFilter}>
                   <SearchableSelect
@@ -252,6 +321,30 @@ export default function LeadsReassignNoFollowupClient({ dashboardBase = "admin-d
                   />
                 </LeadsFilterSelectShell>
               </LeadsFilterField>
+              <LeadsFilterField label="Status">
+                <LeadsFilterSelectShell theme="rose" icon={ListChecks}>
+                  <SearchableSelect
+                    options={STATUS_FILTER_OPTIONS}
+                    value={statusDraft}
+                    onChange={setStatusDraft}
+                    placeholder="All Status"
+                    searchPlaceholder="Search status…"
+                    className="min-w-0 flex-1 border-0 bg-transparent shadow-none"
+                  />
+                </LeadsFilterSelectShell>
+              </LeadsFilterField>
+              <LeadsFilterField label="Lead campaign">
+                <LeadsFilterSelectShell theme="rose" icon={Megaphone}>
+                  <SearchableSelect
+                    options={CAMPAIGN_FILTER_OPTIONS}
+                    value={campaignDraft}
+                    onChange={setCampaignDraft}
+                    placeholder="All Lead Campaigns"
+                    searchPlaceholder="Search campaign…"
+                    className="min-w-0 flex-1 border-0 bg-transparent shadow-none"
+                  />
+                </LeadsFilterSelectShell>
+              </LeadsFilterField>
             </LeadsFilterFieldsGrid>
             <LeadsFilterActions
               theme="rose"
@@ -273,20 +366,22 @@ export default function LeadsReassignNoFollowupClient({ dashboardBase = "admin-d
                   <th className="px-4 py-3.5">Last follow-up assigned from</th>
                   <th className="px-4 py-3.5">Assigned to</th>
                   <th className="px-4 py-3.5">Last follow-up assign to</th>
+                  <th className="px-4 py-3.5">Follow-up</th>
                   <th className="px-4 py-3.5">Status</th>
+                  <th className="px-4 py-3.5">Lead campaign</th>
                   <th className="px-4 py-3.5">Days since</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={10} className="px-4 py-16 text-center text-slate-500">
+                    <td colSpan={12} className="px-4 py-16 text-center text-slate-500">
                       <Loader2 className="mx-auto h-6 w-6 animate-spin text-rose-600" aria-hidden />
                     </td>
                   </tr>
                 ) : rows.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="px-4 py-14 text-center text-slate-500">
+                    <td colSpan={12} className="px-4 py-14 text-center text-slate-500">
                       No leads matching this rule right now.
                     </td>
                   </tr>
@@ -331,6 +426,14 @@ export default function LeadsReassignNoFollowupClient({ dashboardBase = "admin-d
                           {row.followup_status === "followed" ? "Followed" : "Not followed"}
                         </span>
                       </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${statusBadgeClass(row.customer_status)}`}
+                        >
+                          {formatStatusLabel(row.customer_status)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-slate-700">{formatCampaign(row.lead_campaign)}</td>
                       <td className="px-4 py-3 font-semibold tabular-nums text-rose-800">
                         {Number(row.days_since_reassign ?? 0)}
                       </td>

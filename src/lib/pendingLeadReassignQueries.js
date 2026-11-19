@@ -49,6 +49,13 @@ export function pendingReassignCampaignFilterSql(campaignParam) {
   return map[key] || null;
 }
 
+/** Same as {@link pendingReassignCampaignFilterSql} with a custom `customers` alias. */
+export function pendingReassignCampaignFilterSqlForAlias(campaignParam, alias = "c") {
+  const sql = pendingReassignCampaignFilterSql(campaignParam);
+  if (!sql) return null;
+  return sql.replace(/\bc\./g, `${alias}.`);
+}
+
 export function pendingReassignSearchSql(search) {
   const q = String(search || "").trim();
   if (!q) return { clause: "", params: [] };

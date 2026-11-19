@@ -39,6 +39,8 @@ export async function GET(request) {
       to: searchParams.get("to") || undefined,
       search: searchParams.get("search") || undefined,
       followupStatus: searchParams.get("followup_status") || undefined,
+      status: searchParams.get("status") || undefined,
+      leadCampaign: searchParams.get("lead_campaign") || undefined,
     };
 
     if (summary) {
@@ -60,7 +62,12 @@ export async function GET(request) {
       const counts = await fetchReassignFollowupSummary(conn, {
         assignedTo: filters.assignedTo,
         assignedFrom: filters.assignedFrom,
+        assignedBy: filters.assignedBy,
+        from: filters.from,
+        to: filters.to,
         search: filters.search,
+        status: filters.status,
+        leadCampaign: filters.leadCampaign,
       });
       const result = await fetchReassignNoFollowupPage(conn, {
         ...filters,
