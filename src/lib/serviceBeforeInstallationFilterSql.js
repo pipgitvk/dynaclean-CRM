@@ -5,6 +5,10 @@ import {
   sqlUtf8TrimExpr,
 } from "@/lib/sqlUtf8Compare";
 import { parseSbiFilters } from "@/lib/serviceBeforeInstallationFilters";
+import {
+  INSTALLED_AFTER_REGISTERED_SQL,
+  INSTALLATION_PENDING_AFTER_REGISTERED_SQL,
+} from "@/lib/serviceBeforeInstallationWpExpressions";
 
 const DISPATCH_ON_ORDER_QUOTE = sqlTrimUtf8EqColumns("d.quote_number", "no.quote_number");
 
@@ -13,6 +17,7 @@ export function buildWpFilterSql(
   {
     dateExpr = "COALESCE(wp.installation_date, wp.invoice_date)",
     omitTeamFilters = false,
+    omitRegisteredInstallation = false,
   } = {},
 ) {
   const f = parseSbiFilters(filters);
@@ -97,6 +102,14 @@ export function buildWpFilterSql(
           AND ${sqlUtf8TrimExpr("sr.assigned_to")} COLLATE ${UTF8_COLLATE} = ${nameEq}
       )`;
       params.push(f.thirdPartyEngineer);
+    }
+  }
+
+  if (!omitRegisteredInstallation) {
+    if (f.registeredInstallation === "pending") {
+      sql += ` AND ${INSTALLATION_PENDING_AFTER_REGISTERED_SQL}`;
+    } else if (f.registeredInstallation === "completed") {
+      sql += ` AND ${INSTALLED_AFTER_REGISTERED_SQL}`;
     }
   }
 

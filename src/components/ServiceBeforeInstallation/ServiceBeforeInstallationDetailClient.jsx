@@ -150,6 +150,10 @@ function salesPersonLabel(row) {
   return orderRep || registeredBy || "";
 }
 
+function registeredByLabel(row) {
+  return String(row.registered_by || "").trim();
+}
+
 function teamFilterOptionsFromRows(rows) {
   const salesPersons = new Set();
   const serviceEngineers = new Set();
@@ -326,6 +330,7 @@ function exportRowsCsv(rows, segment) {
     "total-registered": [
       "Customer / Serial / Model",
       "Registered Date",
+      "Registered By",
       "Company",
       "Site Contact",
       "State",
@@ -401,6 +406,7 @@ function exportRowsCsv(rows, segment) {
           .filter(Boolean)
           .join(" | "),
         formatDate(row.registered_at || row.invoice_date),
+        registeredByLabel(row),
         [
           row.customer_name,
           row.email,
@@ -546,6 +552,9 @@ function WarrantyProductRows({ rows, dashboardBase, page, pageSize, segment }) {
         </td>
         <td className="whitespace-nowrap px-4 py-3.5 text-sm text-slate-700">
           {formatDate(row.registered_at || row.invoice_date)}
+        </td>
+        <td className="px-4 py-3.5 text-sm text-slate-800">
+          <span className="font-medium">{registeredByLabel(row) || "—"}</span>
         </td>
         <td className="px-4 py-3.5 align-top">
           <CompanyDetailBlock row={row} />
@@ -766,6 +775,7 @@ function TableHead({ segment }) {
         <th className={th}>#</th>
         <th className={th}>Customer / Serial / Model</th>
         <th className={th}>Registered Date</th>
+        <th className={th}>Registered By</th>
         <th className={th}>Company</th>
         <th className={th}>Site Contact</th>
         <th className={th}>State</th>
@@ -824,7 +834,7 @@ function TableBody({ segment, rows, dashboardBase, page, pageSize }) {
 }
 
 function colSpanForSegment(segment) {
-  if (segment === "total-registered") return 11;
+  if (segment === "total-registered") return 12;
   if (isWarrantyProductSegment(segment)) return 9;
   if (segment === "open-completions") return 10;
   if (segment === "open-installation" || segment === "overdue-delayed-installation") return 11;
@@ -850,6 +860,11 @@ export default function ServiceBeforeInstallationDetailClient({
   const tableFilterOptionsFetchKeyRef = useRef(null);
   const [loading, setLoading] = useState(true);
   const [countLoading, setCountLoading] = useState(false);
+  const [installationBreakdown, setInstallationBreakdown] = useState({
+    total_registered: 0,
+    installation_pending: 0,
+    installation_completed: 0,
+  });
 
   useEffect(() => {
     setPage(0);
@@ -879,6 +894,9 @@ export default function ServiceBeforeInstallationDetailClient({
         const pag = res.data.pagination || { total: 0, hasMore: false };
         setRows(data);
         setPagination(pag);
+        if (res.data.installationBreakdown) {
+          setInstallationBreakdown(res.data.installationBreakdown);
+        }
         setCountLoading(false);
       }
     } catch (e) {
@@ -954,9 +972,15 @@ export default function ServiceBeforeInstallationDetailClient({
         {segment === "total-registered" ? (
           <ServiceBeforeInstallationDetailKpiStrip
             dashboardBase={dashboardBase}
-            activeSegment={segment}
-            total={pagination.total ?? 0}
-            loading={countLoading}
+            registeredInstallation={appliedFilters.registeredInstallation}
+            totals={installationBreakdown}
+            loading={loading && rows.length === 0}
+            onCardSelect={(registeredInstallation) => {
+              setPage(0);
+              const next = { ...appliedFilters, registeredInstallation };
+              setAppliedFilters(next);
+              setDraftFilters(next);
+            }}
           />
         ) : null}
 

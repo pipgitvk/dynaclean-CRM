@@ -1,36 +1,55 @@
 "use client";
 
 import { useMemo } from "react";
-import { getServiceBeforeInstallationCards } from "@/lib/serviceBeforeInstallationHub";
+import {
+  getTotalRegisteredDetailKpiCards,
+  registeredInstallationFromKpiCardId,
+  totalRegisteredKpiCardIdFromFilter,
+} from "@/lib/serviceBeforeInstallationHub";
 import ServiceBeforeInstallationKpiCard from "@/components/ServiceBeforeInstallation/ServiceBeforeInstallationKpiCard";
 
-/** Detail pages: only show the active segment KPI (Total Registered on that route). */
-const STRIP_SEGMENT_IDS = ["total-registered"];
+const COUNT_BY_CARD_ID = {
+  "total-registered": (totals) => totals.total_registered ?? totals.total ?? 0,
+  "registered-installation-pending": (totals) => totals.installation_pending ?? 0,
+  "registered-installation-completed": (totals) => totals.installation_completed ?? 0,
+};
 
 export default function ServiceBeforeInstallationDetailKpiStrip({
   dashboardBase,
-  activeSegment,
-  total = 0,
+  registeredInstallation = "",
+  totals = {},
   loading = false,
+  onCardSelect,
 }) {
-  const cards = useMemo(() => {
-    const all = getServiceBeforeInstallationCards(dashboardBase);
-    return STRIP_SEGMENT_IDS.map((id) => all.find((c) => c.id === id)).filter(Boolean);
-  }, [dashboardBase]);
+  const cards = useMemo(() => getTotalRegisteredDetailKpiCards(dashboardBase), [dashboardBase]);
+  const activeCardId = totalRegisteredKpiCardIdFromFilter(registeredInstallation);
 
   return (
-    <div className="mb-5 max-w-sm">
-      {cards.map((card) => (
-        <ServiceBeforeInstallationKpiCard
-          key={card.id}
-          card={card}
-          total={total}
-          loading={loading}
-          active={card.id === activeSegment}
-          variant="compact"
-          showTrend={false}
-        />
-      ))}
+    <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 lg:gap-4">
+      {cards.map((card) => {
+        const pick = COUNT_BY_CARD_ID[card.id];
+        const value = pick ? pick(totals) : 0;
+        return (
+          <ServiceBeforeInstallationKpiCard
+            key={card.id}
+            card={card}
+            total={value}
+            loading={loading}
+            active={card.id === activeCardId}
+            variant="compact"
+            showTrend={false}
+            onClick={
+              onCardSelect
+                ? () => {
+                    const next = registeredInstallationFromKpiCardId(card.id);
+                    const current = String(registeredInstallation || "").trim();
+                    onCardSelect(current === next && next ? "" : next);
+                  }
+                : undefined
+            }
+          />
+        );
+      })}
     </div>
   );
 }

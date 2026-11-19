@@ -39,6 +39,8 @@ export async function GET(request, { params }) {
       serviceEngineer: searchParams.get("serviceEngineer") ?? searchParams.get("service_engineer"),
       thirdPartyEngineer:
         searchParams.get("thirdPartyEngineer") ?? searchParams.get("third_party_engineer"),
+      registeredInstallation:
+        searchParams.get("registeredInstallation") ?? searchParams.get("registered_installation"),
     });
 
     const filterOptionsOnly =
@@ -98,6 +100,7 @@ export async function GET(request, { params }) {
       success: true,
       data: result.data,
       filterOptions,
+      installationBreakdown: result.installationBreakdown ?? null,
       pagination: {
         total,
         limit,

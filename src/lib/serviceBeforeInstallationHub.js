@@ -1,6 +1,34 @@
 /**
  * Service Before Installation hub — card definitions.
  */
+/** Detail strip on Total Registered — not separate hub routes. */
+export const TOTAL_REGISTERED_DETAIL_KPI_STRIP = [
+  {
+    id: "registered-installation-pending",
+    title: "Installation Pending",
+    subtitle: "After registration — not installed yet",
+    countKey: "registered_installation_pending",
+    accent: "from-amber-500 to-orange-600",
+    surface:
+      "bg-white/80 backdrop-blur-xl border-amber-200/40 shadow-[0_8px_30px_-8px_rgba(245,158,11,0.35)]",
+    glow: "bg-amber-400/25",
+    iconSurface: "bg-gradient-to-br from-amber-500 to-orange-600",
+    chartColor: "#f59e0b",
+  },
+  {
+    id: "registered-installation-completed",
+    title: "Installation Completed",
+    subtitle: "Registered products with installation done",
+    countKey: "registered_installation_completed",
+    accent: "from-emerald-500 to-teal-600",
+    surface:
+      "bg-white/80 backdrop-blur-xl border-emerald-200/40 shadow-[0_8px_30px_-8px_rgba(16,185,129,0.3)]",
+    glow: "bg-emerald-400/25",
+    iconSurface: "bg-gradient-to-br from-emerald-500 to-teal-600",
+    chartColor: "#10b981",
+  },
+];
+
 export const SERVICE_BEFORE_INSTALLATION_SEGMENTS = [
   {
     id: "total-registered",
@@ -106,6 +134,24 @@ const SEGMENT_SET = new Set(
 
 export function isServiceBeforeInstallationSegment(id) {
   return SEGMENT_SET.has(String(id || "").trim());
+}
+
+export function getTotalRegisteredDetailKpiCards(dashboardBase) {
+  const totalRegistered = getSegmentMeta("total-registered");
+  return [{ ...totalRegistered, href: null }, ...TOTAL_REGISTERED_DETAIL_KPI_STRIP.map((c) => ({ ...c, href: null }))];
+}
+
+export function registeredInstallationFromKpiCardId(cardId) {
+  if (cardId === "registered-installation-pending") return "pending";
+  if (cardId === "registered-installation-completed") return "completed";
+  return "";
+}
+
+export function totalRegisteredKpiCardIdFromFilter(registeredInstallation) {
+  const v = String(registeredInstallation || "").trim().toLowerCase();
+  if (v === "pending") return "registered-installation-pending";
+  if (v === "completed") return "registered-installation-completed";
+  return "total-registered";
 }
 
 export function getServiceBeforeInstallationCards(dashboardBase) {

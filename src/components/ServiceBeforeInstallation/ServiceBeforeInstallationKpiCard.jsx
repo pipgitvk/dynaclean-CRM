@@ -4,7 +4,9 @@ import Link from "next/link";
 import {
   AlertTriangle,
   CalendarClock,
+  CheckCircle2,
   ClipboardList,
+  Clock,
   Package,
   Shield,
   ShieldCheck,
@@ -16,6 +18,8 @@ import { Area, AreaChart, ResponsiveContainer } from "recharts";
 
 export const SBI_CARD_ICONS = {
   "total-registered": Package,
+  "registered-installation-pending": Clock,
+  "registered-installation-completed": CheckCircle2,
   "open-installation": Wrench,
   "open-completions": ClipboardList,
   "overdue-delayed-installation": AlertTriangle,
@@ -27,6 +31,8 @@ export const SBI_CARD_ICONS = {
 
 export const SBI_SPARK_SEED = {
   "total-registered": 3,
+  "registered-installation-pending": 6,
+  "registered-installation-completed": 9,
   "open-installation": 5,
   "open-completions": 7,
   "overdue-delayed-installation": 11,
@@ -162,6 +168,7 @@ export default function ServiceBeforeInstallationKpiCard({
   active = false,
   variant = "hub",
   showTrend = true,
+  onClick,
 }) {
   const Icon = SBI_CARD_ICONS[card.id] || Package;
   const seed = SBI_SPARK_SEED[card.id] ?? 1;
@@ -171,18 +178,24 @@ export default function ServiceBeforeInstallationKpiCard({
   const invertTrend = card.id === "overdue-delayed-installation" || card.id === "due-warranty-expiry";
   const isHub = variant === "hub";
 
+  const compactHover =
+    onClick || card.href
+      ? " cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_14px_32px_-12px_rgba(124,58,237,0.22)]"
+      : "";
   const shell = isHub
     ? `min-h-[12.5rem] border transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl ${card.surface}`
-    : `min-h-[8.25rem] border border-slate-200/75 bg-white/95 shadow-[0_10px_28px_-14px_rgba(15,23,42,0.18)] backdrop-blur-sm sm:min-h-[8.75rem] hover:shadow-[0_14px_32px_-12px_rgba(124,58,237,0.22)]`;
+    : `min-h-[8.25rem] border border-slate-200/75 bg-white/95 shadow-[0_10px_28px_-14px_rgba(15,23,42,0.18)] backdrop-blur-sm sm:min-h-[8.75rem]${compactHover}`;
 
-  return (
-    <Link
-      href={card.href}
-      className={`group relative block overflow-hidden rounded-2xl ${shell} ${
-        active ? "ring-2 ring-violet-500/75 ring-offset-2 ring-offset-violet-50/60" : ""
-      }`}
-      aria-current={active ? "page" : undefined}
-    >
+  const activeRing =
+    card.id === "registered-installation-pending"
+      ? "ring-2 ring-amber-500/75 ring-offset-2 ring-offset-amber-50/60"
+      : card.id === "registered-installation-completed"
+        ? "ring-2 ring-emerald-500/75 ring-offset-2 ring-offset-emerald-50/60"
+        : "ring-2 ring-violet-500/75 ring-offset-2 ring-offset-violet-50/60";
+  const className = `group relative block overflow-hidden rounded-2xl ${shell} ${active ? activeRing : ""}`;
+
+  const inner = (
+    <>
       <div className={`absolute rounded-full blur-3xl ${card.glow} ${isHub ? "-left-10 -top-10 h-28 w-28" : "-left-8 -top-8 h-24 w-24 blur-2xl"}`} aria-hidden />
       {isHub ? (
         <div
@@ -267,6 +280,33 @@ export default function ServiceBeforeInstallationKpiCard({
       )}
 
       <CardWave color={card.chartColor} gradientId={`sbi-wave-${card.id}`} tall={isHub} />
-    </Link>
+    </>
+  );
+
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className={`${className} w-full text-left`}
+        aria-pressed={active}
+      >
+        {inner}
+      </button>
+    );
+  }
+
+  if (card.href) {
+    return (
+      <Link href={card.href} className={className} aria-current={active ? "page" : undefined}>
+        {inner}
+      </Link>
+    );
+  }
+
+  return (
+    <div className={className} role="group" aria-label={title}>
+      {inner}
+    </div>
   );
 }

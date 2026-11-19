@@ -15,8 +15,18 @@ export const EMPTY_SBI_FILTERS = {
   salesPerson: "",
   serviceEngineer: "",
   thirdPartyEngineer: "",
+  /** total-registered KPI: "" | "pending" | "completed" */
+  registeredInstallation: "",
   range: SBI_RANGE_SELECT.id,
 };
+
+function normalizeRegisteredInstallation(raw) {
+  const v = String(raw ?? "")
+    .trim()
+    .toLowerCase();
+  if (v === "pending" || v === "completed") return v;
+  return "";
+}
 
 /** Hub header period dropdown */
 export const SBI_HUB_PERIOD_OPTIONS = [SBI_RANGE_SELECT, ...LEADS_HUB_RANGE_OPTIONS];
@@ -70,6 +80,9 @@ export function parseSbiFilters(input) {
     salesPerson: String(src.salesPerson ?? src.sales_person ?? "").trim(),
     serviceEngineer: String(src.serviceEngineer ?? src.service_engineer ?? "").trim(),
     thirdPartyEngineer: String(src.thirdPartyEngineer ?? src.third_party_engineer ?? "").trim(),
+    registeredInstallation: normalizeRegisteredInstallation(
+      src.registeredInstallation ?? src.registered_installation,
+    ),
   };
 }
 

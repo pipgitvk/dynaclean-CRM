@@ -26,6 +26,10 @@ import {
   fetchSimpleWarrantyProductPage,
   fetchTotalRegisteredBasePage,
 } from "@/lib/serviceBeforeInstallationWpList";
+import {
+  INSTALLED_AFTER_REGISTERED_SQL,
+  INSTALLATION_PENDING_AFTER_REGISTERED_SQL,
+} from "@/lib/serviceBeforeInstallationWpExpressions";
 
 function upcomingOverdueDelayedExtraSql() {
   return ` AND u.delivery_date < DATE_SUB(CURDATE(), INTERVAL ${OVERDUE_DELAYED_INSTALLATION_DAYS} DAY)`;
@@ -150,6 +154,24 @@ async function fetchUpcomingInstallationsPage(
 export const NOT_INSTALLED_SQL = `(
   wp.installed_address IS NULL OR TRIM(wp.installed_address) = ''
 )`;
+
+export { INSTALLED_AFTER_REGISTERED_SQL, INSTALLATION_PENDING_AFTER_REGISTERED_SQL };
+
+function wpTotalRegisteredAggregateSql(where) {
+  return `SELECT
+    COUNT(*) AS cnt,
+    SUM(CASE WHEN ${INSTALLED_AFTER_REGISTERED_SQL} THEN 1 ELSE 0 END) AS installation_completed,
+    SUM(CASE WHEN ${INSTALLATION_PENDING_AFTER_REGISTERED_SQL} THEN 1 ELSE 0 END) AS installation_pending
+  FROM warranty_products wp ${where}`;
+}
+
+function parseTotalRegisteredAggregateRow(row) {
+  return {
+    total: Number(row?.cnt || 0),
+    installation_completed: Number(row?.installation_completed || 0),
+    installation_pending: Number(row?.installation_pending || 0),
+  };
+}
 
 export const IN_WARRANTY_SQL = `(
   wp.installation_date IS NOT NULL
@@ -392,8 +414,14 @@ export async function fetchServiceBeforeInstallationSegmentPage(segment, options
   else if (segment === "due-warranty-expiry") filterSql = DUE_WARRANTY_EXPIRY_SQL;
 
   const wpFilter = buildWpFilterSql(filters);
+  const breakdownWpFilter =
+    segment === "total-registered"
+      ? buildWpFilterSql(filters, { omitRegisteredInstallation: true })
+      : wpFilter;
   const where = `WHERE ${filterSql} ${wpFilter.sql}`;
+  const breakdownWhere = `WHERE ${filterSql} ${breakdownWpFilter.sql}`;
   const baseParams = [...wpFilter.params];
+  const breakdownParams = [...breakdownWpFilter.params];
 
   const fetchLimit = deferTotal ? safeLimit + 1 : safeLimit;
 
@@ -418,25 +446,47 @@ export async function fetchServiceBeforeInstallationSegmentPage(segment, options
     return { rows: pageRows, hasExtra: deferTotal && rows.length > safeLimit };
   };
 
+  const runBreakdownAgg = async () => {
+    if (segment !== "total-registered") return null;
+    const [result] = await conn.execute(wpTotalRegisteredAggregateSql(breakdownWhere), breakdownParams);
+    const agg = parseTotalRegisteredAggregateRow(result[0]);
+    return {
+      total_registered: agg.total,
+      installation_pending: agg.installation_pending,
+      installation_completed: agg.installation_completed,
+    };
+  };
+
   if (deferTotal) {
-    const { rows, hasExtra } = await loadRows();
+    const countPromise = conn.execute(`SELECT COUNT(*) AS cnt FROM warranty_products wp ${where}`, baseParams);
+    const [{ rows, hasExtra }, countResult, installationBreakdown] = await Promise.all([
+      loadRows(),
+      countPromise,
+      runBreakdownAgg(),
+    ]);
+    const countRow = countResult[0]?.[0];
     return {
       total: null,
       data: rows,
       hasMore: hasExtra,
+      installationBreakdown: installationBreakdown ?? undefined,
+      listTotal: Number(countRow?.cnt || 0),
     };
   }
 
-  const [countResult, loaded] = await Promise.all([
+  const [countResult, loaded, installationBreakdown] = await Promise.all([
     conn.execute(`SELECT COUNT(*) AS cnt FROM warranty_products wp ${where}`, baseParams),
     loadRows(),
+    runBreakdownAgg(),
   ]);
   const countRow = countResult[0]?.[0];
+  const listTotal = Number(countRow?.cnt || 0);
 
   return {
-    total: Number(countRow?.cnt || 0),
+    total: listTotal,
     data: loaded.rows,
-    hasMore: safeSkip + loaded.rows.length < Number(countRow?.cnt || 0),
+    hasMore: safeSkip + loaded.rows.length < listTotal,
+    installationBreakdown: installationBreakdown ?? undefined,
   };
 }
 
@@ -448,11 +498,8 @@ export async function countWarrantyProductsSegment(conn, segment, filters = {}) 
 
   const wpFilter = buildWpFilterSql(filters);
   const where = `WHERE ${filterSql} ${wpFilter.sql}`;
-  const [[row]] = await conn.execute(
-    `SELECT COUNT(*) AS cnt FROM warranty_products wp ${where}`,
-    [...wpFilter.params],
-  );
-  return Number(row?.cnt || 0);
+  const [[row]] = await conn.execute(wpTotalRegisteredAggregateSql(where), [...wpFilter.params]);
+  return parseTotalRegisteredAggregateRow(row).total;
 }
 
 function wpSegmentBaseFilterSql(segment) {

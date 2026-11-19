@@ -66,6 +66,22 @@ export function wpThirdPartyEngineerExpr() {
   return wpInstallationEngineerSubquery({ engineerKind: "third_party" });
 }
 
+/**
+ * Registered product — installation completed (INSTALLATION SR status COMPLETED only).
+ * WORKED, PLANNED, PENDING, etc. count as pending.
+ */
+export const WP_INSTALLATION_SR_DONE_SQL = `EXISTS (
+  SELECT 1
+  FROM service_records sr
+  WHERE ${sqlTrimUtf8EqColumns("sr.serial_number", "wp.serial_number")}
+    AND UPPER(TRIM(COALESCE(sr.service_type, ''))) = 'INSTALLATION'
+    AND UPPER(TRIM(COALESCE(sr.status, ''))) = 'COMPLETED'
+)`;
+
+export const INSTALLED_AFTER_REGISTERED_SQL = `(${WP_INSTALLATION_SR_DONE_SQL})`;
+
+export const INSTALLATION_PENDING_AFTER_REGISTERED_SQL = `(NOT (${INSTALLED_AFTER_REGISTERED_SQL}))`;
+
 /** Combined engineer (legacy display) — internal preferred, else third party. */
 export function wpInstallationEngineerExpr() {
   return `COALESCE(${wpServiceEngineerExpr()}, ${wpThirdPartyEngineerExpr()})`;
