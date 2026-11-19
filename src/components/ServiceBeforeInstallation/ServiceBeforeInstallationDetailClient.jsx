@@ -296,7 +296,7 @@ function WarrantyProductRows({ rows, dashboardBase, page, pageSize }) {
             {formatDate(row.warranty_end_date)}
           </span>
         </td>
-        <td className="max-w-[220px] px-4 py-3.5">
+        <td className="max-w-[220px] px-4 py-3.5 xl:max-w-none">
           <span className="inline-flex max-w-full items-start gap-2 text-slate-700">
             <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-violet-500" aria-hidden />
             <span className="line-clamp-2">{row.installed_address || "—"}</span>
@@ -360,12 +360,12 @@ function ServiceRows({ rows, dashboardBase, page, pageSize, variant = "complaint
         </td>
         <td className="px-4 py-3.5">{row.customer_name || "—"}</td>
         {showServiceRecordLayout ? (
-          <td className="max-w-[160px] truncate px-4 py-3.5 font-mono text-xs">{row.model || "—"}</td>
+          <td className="max-w-[160px] truncate px-4 py-3.5 font-mono text-xs xl:max-w-none">{row.model || "—"}</td>
         ) : null}
         <td className="px-4 py-3.5">{row.service_type || "—"}</td>
         <td className="px-4 py-3.5">{row.status || "—"}</td>
         {showServiceRecordLayout ? (
-          <td className="max-w-[180px] truncate px-4 py-3.5 text-sm text-slate-800">
+          <td className="max-w-[180px] truncate px-4 py-3.5 text-sm text-slate-800 xl:max-w-none">
             {formatAssignedEngineer(row.assigned_to)}
           </td>
         ) : null}
@@ -412,11 +412,11 @@ function OpenInstallationRows({ rows, dashboardBase, page, pageSize }) {
             {row.order_id}
           </Link>
         </td>
-        <td className="max-w-[160px] truncate px-4 py-3.5 font-mono text-xs">{row.serial_number || "—"}</td>
-        <td className="max-w-[140px] truncate px-4 py-3.5 text-xs font-mono text-slate-800">
+        <td className="max-w-[160px] truncate px-4 py-3.5 font-mono text-xs xl:max-w-none">{row.serial_number || "—"}</td>
+        <td className="max-w-[140px] truncate px-4 py-3.5 text-xs font-mono text-slate-800 xl:max-w-none">
           {row.model || "—"}
         </td>
-        <td className="max-w-[180px] truncate px-4 py-3.5 text-sm">{row.name || "—"}</td>
+        <td className="max-w-[180px] truncate px-4 py-3.5 text-sm xl:max-w-none">{row.name || "—"}</td>
         <td className="px-4 py-3.5">{row.company_name || "—"}</td>
         <td className="px-4 py-3.5">{row.contact || "—"}</td>
         <td className="px-4 py-3.5">{formatDate(row.delivery_date)}</td>
@@ -426,7 +426,7 @@ function OpenInstallationRows({ rows, dashboardBase, page, pageSize }) {
         <td className="px-4 py-3.5 text-sm capitalize">
           {installationStatusLabel(row.installation_status)}
         </td>
-        <td className="max-w-[200px] truncate px-4 py-3.5">{row.delivery_address || "—"}</td>
+        <td className="max-w-[200px] truncate px-4 py-3.5 xl:max-w-none">{row.delivery_address || "—"}</td>
       </tr>
     );
   });
@@ -624,13 +624,13 @@ export default function ServiceBeforeInstallationDetailClient({
   }
 
   return (
-    <div className="relative min-h-screen w-full pb-10 pt-3 sm:px-1">
+    <div className="relative min-h-screen w-full pb-10 pt-2 sm:pt-3">
       <div
         className="pointer-events-none absolute inset-x-0 top-0 h-56 bg-gradient-to-b from-violet-100/50 via-violet-50/25 to-transparent"
         aria-hidden
       />
 
-      <div className="relative z-10 mx-auto max-w-[1400px] px-2 sm:px-3">
+      <div className="relative z-10 w-full min-w-0 px-1 sm:px-2">
         <Link
           href={hubHref}
           className="mb-4 inline-flex items-center gap-2 rounded-lg px-1 text-sm font-semibold text-violet-700 hover:text-violet-900"
