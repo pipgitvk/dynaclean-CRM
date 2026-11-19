@@ -178,7 +178,7 @@ function SourceKpiCard({ card, total, changePct, Icon, className = "", compact =
 
         <div className="relative z-20 mt-3">
           {card.noTrend ? (
-            <span className="inline-flex items-center rounded-full border border-sky-100 bg-white/95 px-2.5 py-1 text-sm font-semibold text-sky-700 shadow-sm">
+            <span className="inline-flex items-center rounded-full border border-emerald-100 bg-white/95 px-2.5 py-1 text-sm font-semibold text-emerald-700 shadow-sm">
               Open tool →
             </span>
           ) : (

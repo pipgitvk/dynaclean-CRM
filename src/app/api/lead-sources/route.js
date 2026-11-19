@@ -27,10 +27,23 @@ export async function GET(request) {
 
     const { searchParams } = new URL(request.url);
     const type = String(searchParams.get("type") || "sales").toLowerCase();
+    const salesFromRepList = searchParams.get("sales_from_rep_list") === "1";
     const connection = await getDbConnection();
     let employees = [];
 
-    if (type === "all") {
+    if (type === "sales" && salesFromRepList) {
+      const [rows] = await connection.execute(
+        `SELECT
+           username,
+           username AS name,
+           status,
+           'sales' AS leadType
+         FROM rep_list
+         WHERE UPPER(TRIM(userRole)) = 'SALES'
+         ORDER BY username ASC`,
+      );
+      employees = rows;
+    } else if (type === "all") {
       const [rows] = await connection.execute(
         `${distinctCustomerLeadSourcesSql("lead_source", "sales")}
          UNION ALL

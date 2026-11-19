@@ -90,12 +90,12 @@ export function getLeadsManageCards(dashboardBase) {
       href: `${base}/leads-manage/bulk-reassign`,
       noTrend: true,
       staticMetric: "Quick",
-      accent: "from-sky-500 to-blue-600",
+      accent: "from-emerald-500 to-green-600",
       surface:
-        "bg-white/80 backdrop-blur-xl border-sky-200/50 shadow-[0_8px_30px_-8px_rgba(14,165,233,0.35)]",
-      glow: "bg-sky-400/25",
-      iconSurface: "bg-gradient-to-br from-sky-500 to-blue-600",
-      chartColor: "#0ea5e9",
+        "bg-white/80 backdrop-blur-xl border-emerald-200/50 shadow-[0_8px_30px_-8px_rgba(16,185,129,0.35)]",
+      glow: "bg-emerald-400/25",
+      iconSurface: "bg-gradient-to-br from-emerald-500 to-green-600",
+      chartColor: "#10b981",
     },
   ];
 }

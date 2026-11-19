@@ -38,13 +38,15 @@ const STATUS_OPTIONS = [
   { value: "old_reassign", label: "Old Reassign" },
 ];
 
+/** Matches Add Customer → Lead Campaign options. */
 const CAMPAIGN_OPTIONS = [
   { value: "", label: "All Lead Campaigns" },
   { value: "india_mart", label: "India Mart" },
   { value: "social_media", label: "Social Media" },
   { value: "google_ads", label: "Google Ads" },
-  { value: "visit", label: "Visit" },
-  { value: "reference", label: "Reference" },
+  { value: "website_visit", label: "Website Visit" },
+  { value: "direct_call", label: "Direct Call" },
+  { value: "manager_assigned", label: "Manager Assign" },
 ];
 
 const STAGE_OPTIONS = [
@@ -64,22 +66,15 @@ const STAGE_OPTIONS = [
   { value: "Disqualified / Invalid Lead", label: "Disqualified / Invalid Lead" },
 ];
 
-const LEAD_TYPE_OPTIONS = [
-  { value: "", label: "Lead Type" },
-  { value: "sales", label: "Sales" },
-  { value: "service", label: "Service" },
-  { value: "gem", label: "GEM" },
-];
-
-const TABLE_STATUS_OPTIONS = [{ value: "", label: "Status" }, ...STATUS_OPTIONS.slice(1)];
 const TABLE_STAGE_OPTIONS = [{ value: "", label: "Stage" }, ...STAGE_OPTIONS.slice(1)];
 
 const PROFILE_OPTIONS = [
   { value: "active", label: "Active" },
-  { value: "all", label: "All profiles" },
+  { value: "inactive", label: "Inactive" },
+  { value: "all", label: "All" },
 ];
 
-const PAGE_SIZE_OPTIONS = [6, 10, 25, 50];
+const PAGE_SIZE_OPTIONS = [50, 100, 150];
 
 function customerName(row) {
   const name = [row.first_name, row.last_name].filter(Boolean).join(" ").trim();
@@ -90,7 +85,7 @@ function statusBadgeClass(status) {
   const s = String(status || "").toLowerCase();
   if (s.includes("denied")) return "bg-rose-100 text-rose-800 ring-1 ring-rose-200/80";
   if (s.includes("invalid") || s.includes("disqual")) return "bg-amber-100 text-amber-900 ring-1 ring-amber-200/80";
-  if (s === "new") return "bg-sky-100 text-sky-800 ring-1 ring-sky-200/80";
+  if (s === "new") return "bg-emerald-100 text-emerald-800 ring-1 ring-emerald-200/80";
   return "bg-slate-100 text-slate-700 ring-1 ring-slate-200/80";
 }
 
@@ -111,15 +106,24 @@ function formatCampaign(raw) {
   return s.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-function leadTypeForCustomer(row) {
-  if (row.lead_source) return "Sales";
-  if (row.service_lead_source) return "Service";
-  if (row.gem_lead_source) return "GEM";
-  return "—";
+function leadSourceForCustomer(row) {
+  const v = String(row.lead_source || "").trim();
+  return v || "—";
 }
 
-function leadSourceForCustomer(row) {
-  return row.lead_source || row.service_lead_source || row.gem_lead_source || "—";
+function isSalesLead(row) {
+  return Boolean(String(row.lead_source || "").trim());
+}
+
+function filterEmployeesByProfile(list, profile) {
+  const employees = Array.isArray(list) ? list : [];
+  if (profile === "inactive") {
+    return employees.filter((e) => Number(e.status) === 0);
+  }
+  if (profile === "active") {
+    return employees.filter((e) => Number(e.status) !== 0);
+  }
+  return employees;
 }
 
 const inputShellClass =
@@ -138,11 +142,11 @@ function IconSelect({ icon: Icon, value, onChange, options, className = "" }) {
   return (
     <label className={`block min-w-0 ${className}`}>
       <div className="relative flex items-center rounded-xl border border-slate-200 bg-white shadow-sm">
-        <Icon className="pointer-events-none absolute left-3 h-4 w-4 text-sky-500" aria-hidden />
+        <Icon className="pointer-events-none absolute left-3 h-4 w-4 text-emerald-500" aria-hidden />
         <select
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full appearance-none rounded-xl border-0 bg-transparent py-3 pl-10 pr-9 text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500/25"
+          className="w-full appearance-none rounded-xl border-0 bg-transparent py-3 pl-10 pr-9 text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/25"
         >
           {options.map((opt) => (
             <option key={opt.value || opt.label} value={opt.value}>
@@ -159,7 +163,7 @@ function IconSelect({ icon: Icon, value, onChange, options, className = "" }) {
 function IconSearchableSelect({ icon: Icon, options, value, onChange, placeholder, searchPlaceholder }) {
   return (
     <div className={`${inputShellClass} items-stretch`}>
-      <Icon className="ml-3 h-4 w-4 shrink-0 self-center text-sky-500" aria-hidden />
+      <Icon className="ml-3 h-4 w-4 shrink-0 self-center text-emerald-500" aria-hidden />
       <div className="min-w-0 flex-1 py-0.5 pr-1">
         <SearchableSelect
           options={options}
@@ -174,14 +178,10 @@ function IconSearchableSelect({ icon: Icon, options, value, onChange, placeholde
   );
 }
 
-function employeeToOptions(employees, profile) {
-  const list = Array.isArray(employees) ? employees : [];
-  const filtered =
-    profile === "active"
-      ? list.filter((e) => Number(e.status) !== 0)
-      : list;
+function employeeToOptions(employees, profile, emptyLabel = "Select employee") {
+  const filtered = filterEmployeesByProfile(employees, profile);
   return [
-    { value: "", label: "Select employee" },
+    { value: "", label: emptyLabel },
     ...filtered.map((e) => ({
       value: e.username,
       label:
@@ -209,18 +209,16 @@ export default function LeadsManageQuickBulkClient({ dashboardBase = "admin-dash
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [tableSearch, setTableSearch] = useState("");
   const [tableCustomer, setTableCustomer] = useState("");
-  const [tableStatus, setTableStatus] = useState("");
   const [tableStage, setTableStage] = useState("");
-  const [tableLeadType, setTableLeadType] = useState("");
   const [dateSort, setDateSort] = useState("desc");
   const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = useState(6);
+  const [pageSize, setPageSize] = useState(50);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/lead-sources?type=sales");
+        const res = await fetch("/api/lead-sources?type=sales&sales_from_rep_list=1");
         const data = await res.json();
         if (!cancelled && data.success) setEmployees(data.employees || []);
       } catch (e) {
@@ -233,27 +231,20 @@ export default function LeadsManageQuickBulkClient({ dashboardBase = "admin-dash
   }, []);
 
   const fromOptions = useMemo(
-    () => [
-      { value: "", label: "From salesperson" },
-      ...employees.map((e) => ({
-        value: e.username,
-        label:
-          Number(e.status) === 0 ? `${e.username} (Inactive)` : String(e.username),
-      })),
-    ],
-    [employees],
+    () => employeeToOptions(employees, profileFilter, "From salesperson"),
+    [employees, profileFilter],
   );
 
   const toOptions = useMemo(
-    () => {
-      const base = employeeToOptions(employees, profileFilter);
-      if (base[0]?.value === "") {
-        return [{ value: "", label: "Select Employee" }, ...base.slice(1)];
-      }
-      return base;
-    },
+    () => employeeToOptions(employees, profileFilter, "Select Employee"),
     [employees, profileFilter],
   );
+
+  useEffect(() => {
+    const allowed = new Set(filterEmployeesByProfile(employees, profileFilter).map((e) => e.username));
+    if (fromSalesperson && !allowed.has(fromSalesperson)) setFromSalesperson("");
+    if (toSalesperson && !allowed.has(toSalesperson)) setToSalesperson("");
+  }, [profileFilter, employees, fromSalesperson, toSalesperson]);
 
   const fetchLeads = useCallback(async () => {
     if (!fromSalesperson) {
@@ -265,6 +256,7 @@ export default function LeadsManageQuickBulkClient({ dashboardBase = "admin-dash
     try {
       const params = new URLSearchParams();
       params.set("lead_source", fromSalesperson);
+      params.set("sales_only", "1");
       if (statusFilter) params.set("status", statusFilter);
       if (campaignFilter) params.set("lead_campaign", campaignFilter);
       const res = await fetch(`/api/bulk-leads-data?${params.toString()}`);
@@ -297,20 +289,22 @@ export default function LeadsManageQuickBulkClient({ dashboardBase = "admin-dash
     const q = tableSearch.trim().toLowerCase();
     const cq = tableCustomer.trim().toLowerCase();
     const rows = allCustomers.filter((row) => {
-      if (tableStatus && String(row.status || "").toLowerCase() !== tableStatus.toLowerCase()) {
-        const mapped = tableStatus === "verygud" ? "very good" : tableStatus;
-        if (String(row.status || "").toLowerCase() !== mapped.toLowerCase()) return false;
-      }
+      if (!isSalesLead(row)) return false;
       if (tableStage && row.stage !== tableStage) return false;
-      if (tableLeadType) {
-        const t = tableLeadType;
-        if (t === "sales" && !row.lead_source) return false;
-        if (t === "service" && !row.service_lead_source) return false;
-        if (t === "gem" && !row.gem_lead_source) return false;
-      }
       if (cq) {
         const name = customerName(row).toLowerCase();
-        if (!name.includes(cq) && !String(row.customer_id || "").includes(cq)) return false;
+        const phone = String(row.phone || "").toLowerCase();
+        const email = String(row.email || "").toLowerCase();
+        const phoneDigits = phone.replace(/\D/g, "");
+        const cqDigits = cq.replace(/\D/g, "");
+        const id = String(row.customer_id || "");
+        const matchesCustomer =
+          name.includes(cq) ||
+          id.includes(cq) ||
+          email.includes(cq) ||
+          phone.includes(cq) ||
+          (cqDigits.length >= 3 && phoneDigits.includes(cqDigits));
+        if (!matchesCustomer) return false;
       }
       if (!q) return true;
       const hay = [
@@ -332,7 +326,7 @@ export default function LeadsManageQuickBulkClient({ dashboardBase = "admin-dash
       return dateSort === "asc" ? ta - tb : tb - ta;
     });
     return rows;
-  }, [allCustomers, tableSearch, tableCustomer, tableStatus, tableStage, tableLeadType, dateSort]);
+  }, [allCustomers, tableSearch, tableCustomer, tableStage, dateSort]);
 
   const totalRows = tableFiltered.length;
   const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
@@ -450,21 +444,21 @@ export default function LeadsManageQuickBulkClient({ dashboardBase = "admin-dash
   return (
     <div className="relative min-h-screen w-full pb-10 pt-2 sm:pt-3">
       <div
-        className="pointer-events-none absolute inset-x-0 top-0 h-48 bg-gradient-to-b from-sky-50 to-transparent"
+        className="pointer-events-none absolute inset-x-0 top-0 h-48 bg-gradient-to-b from-emerald-50 to-transparent"
         aria-hidden
       />
       <div className="relative z-10 w-full min-w-0 px-1 sm:px-2">
         <Link
           href={hubHref}
-          className="mb-4 inline-flex items-center gap-2 rounded-lg px-1 text-sm font-semibold text-sky-700 hover:text-sky-900"
+          className="mb-4 inline-flex items-center gap-2 rounded-lg px-1 text-sm font-semibold text-emerald-700 hover:text-emerald-900"
         >
           <ArrowLeft className="h-4 w-4" aria-hidden />
           Back to Leads Hub
         </Link>
 
-        <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_4px_24px_-8px_rgba(14,165,233,0.18)] sm:p-6 lg:p-8">
+        <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_4px_24px_-8px_rgba(16,185,129,0.18)] sm:p-6 lg:p-8">
           <div className="flex items-start gap-3">
-            <div className="rounded-xl bg-sky-50 p-2.5 text-sky-600">
+            <div className="rounded-xl bg-emerald-50 p-2.5 text-emerald-600">
               <ArrowLeftRight className="h-6 w-6" strokeWidth={2.2} aria-hidden />
             </div>
             <div>
@@ -524,7 +518,7 @@ export default function LeadsManageQuickBulkClient({ dashboardBase = "admin-dash
             </BulkFilterField>
             <BulkFilterField label="Number of Leads">
               <label className={`flex ${inputShellClass}`}>
-                <Hash className="ml-3 h-4 w-4 shrink-0 text-sky-500" aria-hidden />
+                <Hash className="ml-3 h-4 w-4 shrink-0 text-emerald-500" aria-hidden />
                 <input
                   type="number"
                   min={0}
@@ -533,7 +527,7 @@ export default function LeadsManageQuickBulkClient({ dashboardBase = "admin-dash
                   onChange={(e) => setTransferCount(e.target.value)}
                   placeholder="Number of leads"
                   aria-label="Number of leads to reassign"
-                  className="w-full rounded-xl border-0 bg-transparent py-3 pl-2 pr-8 text-sm font-medium text-slate-800 [appearance:textfield] focus:outline-none focus:ring-2 focus:ring-sky-500/25 [&::-webkit-inner-spin-button]:opacity-100"
+                  className="w-full rounded-xl border-0 bg-transparent py-3 pl-2 pr-8 text-sm font-medium text-slate-800 [appearance:textfield] focus:outline-none focus:ring-2 focus:ring-emerald-500/25 [&::-webkit-inner-spin-button]:opacity-100"
                 />
               </label>
             </BulkFilterField>
@@ -544,13 +538,13 @@ export default function LeadsManageQuickBulkClient({ dashboardBase = "admin-dash
               icon={Users}
               label="Available Leads"
               value={loading ? "…" : availableLeads}
-              tone="sky"
+              tone="accent"
             />
             <StatCell
               icon={ArrowLeftRight}
               label="Total to Transfer"
               value={loading ? "…" : transferN}
-              tone="sky"
+              tone="accent"
             />
             <StatCell
               icon={User}
@@ -566,7 +560,7 @@ export default function LeadsManageQuickBulkClient({ dashboardBase = "admin-dash
               submitting || loading || !fromSalesperson || !toSalesperson || transferN <= 0
             }
             onClick={handleReassign}
-            className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-sky-500 px-4 py-3.5 text-base font-semibold text-white shadow-sm hover:bg-sky-600 disabled:cursor-not-allowed disabled:opacity-55"
+            className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 py-3.5 text-base font-semibold text-white shadow-sm hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-55"
           >
             {submitting ? <Loader2 className="h-5 w-5 animate-spin" /> : <ArrowLeftRight className="h-5 w-5" />}
             {submitting
@@ -594,7 +588,7 @@ export default function LeadsManageQuickBulkClient({ dashboardBase = "admin-dash
                   className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 shadow-sm hover:bg-slate-50 disabled:opacity-50"
                 >
                   {allFilteredSelected ? (
-                    <CheckSquare className="h-4 w-4 text-sky-600" />
+                    <CheckSquare className="h-4 w-4 text-emerald-600" />
                   ) : (
                     <Square className="h-4 w-4 text-slate-500" />
                   )}
@@ -615,20 +609,8 @@ export default function LeadsManageQuickBulkClient({ dashboardBase = "admin-dash
                     setPage(0);
                   }}
                 />
-                <ToolbarFilterSelect
-                  value={tableLeadType}
-                  onChange={setTableLeadType}
-                  options={LEAD_TYPE_OPTIONS}
-                  onAfterChange={() => setPage(0)}
-                />
-                <ToolbarFilterSelect
-                  value={tableStatus}
-                  onChange={setTableStatus}
-                  options={TABLE_STATUS_OPTIONS}
-                  onAfterChange={() => setPage(0)}
-                />
-                <ToolbarFilterSelect
-                  value={tableStage}
+              <ToolbarFilterSelect
+                value={tableStage}
                   onChange={setTableStage}
                   options={TABLE_STAGE_OPTIONS}
                   onAfterChange={() => setPage(0)}
@@ -646,7 +628,7 @@ export default function LeadsManageQuickBulkClient({ dashboardBase = "admin-dash
                       setPage(0);
                     }}
                     placeholder="Search leads..."
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-2.5 pl-10 pr-3 text-sm text-slate-800 placeholder:text-slate-400 focus:border-sky-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500/15"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-2.5 pl-10 pr-3 text-sm text-slate-800 placeholder:text-slate-400 focus:border-emerald-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/15"
                   />
                 </label>
                 <span className="hidden shrink-0 text-sm text-slate-500 xl:inline">
@@ -686,7 +668,7 @@ export default function LeadsManageQuickBulkClient({ dashboardBase = "admin-dash
                 {loading ? (
                   <tr>
                     <td colSpan={9} className="px-4 py-16 text-center text-slate-500">
-                      <Loader2 className="mx-auto h-6 w-6 animate-spin text-sky-500" />
+                      <Loader2 className="mx-auto h-6 w-6 animate-spin text-emerald-500" />
                     </td>
                   </tr>
                 ) : null}
@@ -712,7 +694,7 @@ export default function LeadsManageQuickBulkClient({ dashboardBase = "admin-dash
                           key={row.customer_id}
                           className={`transition-colors ${
                             checked
-                              ? "bg-sky-50/90 ring-1 ring-inset ring-sky-200"
+                              ? "bg-emerald-50/90 ring-1 ring-inset ring-emerald-200"
                               : "hover:bg-slate-50/90"
                           }`}
                         >
@@ -721,7 +703,7 @@ export default function LeadsManageQuickBulkClient({ dashboardBase = "admin-dash
                               type="checkbox"
                               checked={checked}
                               onChange={() => toggleRow(row.customer_id)}
-                              className="h-[1.05rem] w-[1.05rem] rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                              className="h-[1.05rem] w-[1.05rem] rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
                             />
                           </td>
                           <td className="px-4 py-5 align-top">
@@ -745,14 +727,14 @@ export default function LeadsManageQuickBulkClient({ dashboardBase = "admin-dash
                             ) : null}
                           </td>
                           <td className="whitespace-nowrap px-4 py-5 align-top">
-                            <span className="inline-flex rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700">
-                              {leadTypeForCustomer(row)}
+                            <span className="inline-flex rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
+                              Sales
                             </span>
                           </td>
                           <td className="px-4 py-5 align-top">
                             <Link
                               href={`/${dashboardBase}/customers/${row.customer_id}`}
-                              className="font-medium text-sky-600 hover:text-sky-800 hover:underline"
+                              className="font-medium text-emerald-600 hover:text-emerald-800 hover:underline"
                             >
                               {leadSourceForCustomer(row)}
                             </Link>
@@ -849,11 +831,11 @@ export default function LeadsManageQuickBulkClient({ dashboardBase = "admin-dash
   );
 }
 
-function StatCell({ icon: Icon, label, value, tone = "sky" }) {
-  const valueClass = tone === "sky" ? "text-sky-600" : "text-slate-900";
+function StatCell({ icon: Icon, label, value, tone = "accent" }) {
+  const valueClass = tone === "accent" ? "text-emerald-600" : "text-slate-900";
   return (
     <div className="flex items-center gap-3 px-5 py-4">
-      <Icon className={`h-5 w-5 ${tone === "sky" ? "text-sky-500" : "text-slate-500"}`} aria-hidden />
+      <Icon className={`h-5 w-5 ${tone === "accent" ? "text-emerald-500" : "text-slate-500"}`} aria-hidden />
       <div>
         <div className="text-xs font-medium text-slate-500">{label}</div>
         <div className={`text-2xl font-bold tabular-nums ${valueClass}`}>{value}</div>
@@ -872,7 +854,7 @@ function ToolbarFilterSelect({ value, onChange, options, onAfterChange }) {
           onChange(e.target.value);
           onAfterChange?.();
         }}
-        className="w-full appearance-none rounded-xl border border-slate-200 bg-white py-2.5 pl-3.5 pr-9 text-sm font-semibold text-slate-800 shadow-sm hover:border-slate-300 focus:border-sky-300 focus:outline-none focus:ring-2 focus:ring-sky-500/15"
+        className="w-full appearance-none rounded-xl border border-slate-200 bg-white py-2.5 pl-3.5 pr-9 text-sm font-semibold text-slate-800 shadow-sm hover:border-slate-300 focus:border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/15"
         aria-label={current}
       >
         {options.map((opt) => (
@@ -901,7 +883,7 @@ function ToolbarCustomerFilter({ value, onChange }) {
           <ChevronDown className="h-4 w-4 text-slate-400" aria-hidden />
         </button>
       ) : (
-        <span className="inline-flex w-full items-center rounded-xl border border-sky-200 bg-sky-50/40 py-1 pl-3 pr-1 shadow-sm">
+        <span className="inline-flex w-full items-center rounded-xl border border-emerald-200 bg-emerald-50/40 py-1 pl-3 pr-1 shadow-sm">
           <User className="mr-1.5 h-4 w-4 shrink-0 text-slate-400" aria-hidden />
           <input
             type="search"
@@ -911,7 +893,7 @@ function ToolbarCustomerFilter({ value, onChange }) {
             onBlur={() => {
               if (!value.trim()) setOpen(false);
             }}
-            placeholder="Customer"
+            placeholder="Name, ID, phone, email"
             className="min-w-0 flex-1 border-0 bg-transparent py-1.5 text-sm font-medium text-slate-800 focus:outline-none"
           />
         </span>
@@ -928,7 +910,7 @@ function PagerBtn({ onClick, disabled, active = false, children, ...rest }) {
       onClick={onClick}
       className={`inline-flex h-9 min-w-9 items-center justify-center rounded-lg px-2.5 text-sm font-semibold disabled:opacity-40 ${
         active
-          ? "bg-sky-500 text-white shadow-sm"
+          ? "bg-emerald-500 text-white shadow-sm"
           : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
       }`}
       {...rest}

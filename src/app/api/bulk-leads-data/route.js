@@ -20,6 +20,24 @@ function statusValuesForFilter(statusParam) {
     return [key];
 }
 
+/** Canonical Add Customer campaign keys → SQL (legacy stored values included). */
+function leadCampaignFilterSql(campaignParam) {
+    const key = String(campaignParam || "").trim().toLowerCase();
+    if (!key) return null;
+    const map = {
+        india_mart: `LOWER(TRIM(c.lead_campaign)) IN ('india_mart', 'indiamart', 'india-mart')`,
+        social_media:
+            `LOWER(TRIM(c.lead_campaign)) IN ('social_media', 'facebook', 'instagram', 'meta', 'social')`,
+        google_ads:
+            `LOWER(TRIM(c.lead_campaign)) IN ('google_ads', 'google', 'google adwords', 'googleads')`,
+        website_visit:
+            `LOWER(TRIM(c.lead_campaign)) IN ('website_visit', 'website', 'website_direct', 'visit')`,
+        direct_call: `LOWER(TRIM(c.lead_campaign)) IN ('direct_call', 'direct call')`,
+        manager_assigned: `REPLACE(REPLACE(LOWER(TRIM(c.lead_campaign)), '_', ''), '-', '') IN ('managerassigned', 'managerassign')`,
+    };
+    return map[key] || null;
+}
+
 // GET - Fetch filtered leads for bulk operations
 export async function GET(request) {
     try {
@@ -41,6 +59,7 @@ export async function GET(request) {
         const lead_campaign = searchParams.get("lead_campaign");
         const products_interest = searchParams.get("products_interest");
         const notes_language = searchParams.get("notes_language");
+        const salesOnly = searchParams.get("sales_only") === "1";
 
         const connection = await getDbConnection();
 
@@ -94,9 +113,18 @@ export async function GET(request) {
             params.push(lead_source);
         }
 
+        if (salesOnly) {
+            query += ` AND c.lead_source IS NOT NULL AND TRIM(c.lead_source) <> ''`;
+        }
+
         if (lead_campaign) {
-            query += ` AND c.lead_campaign = ?`;
-            params.push(lead_campaign);
+            const campaignSql = leadCampaignFilterSql(lead_campaign);
+            if (campaignSql) {
+                query += ` AND ${campaignSql}`;
+            } else {
+                query += ` AND c.lead_campaign = ?`;
+                params.push(lead_campaign);
+            }
         }
 
         if (products_interest) {
