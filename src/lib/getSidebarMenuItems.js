@@ -63,7 +63,7 @@ function transformMenuItemPaths(item, roleKey) {
       "prospects-view": "/sales-dashboard/prospects",
       "prospects-add": "/sales-dashboard/prospects/add-manual",
       "prospects-new": "/sales-dashboard/prospects/new",
-      "bulk-reassign": "/sales-dashboard/bulk-reassign",
+      "bulk-reassign": "/sales-dashboard/leads-manage/bulk-reassign",
       "ads-management": "/sales-dashboard/meta-credentials",
       "meta-backfill": "/sales-dashboard/ads-management",
     };
@@ -375,7 +375,7 @@ const allMenuItems = [
         icon: "ScrollText",
       },
       {
-        path: "/admin-dashboard/leads-manage/bulk-reassign",
+        path: "/user-dashboard/leads-manage/bulk-reassign",
         name: "Bulk Reassign Leads",
         moduleKey: "bulk-reassign",
         roles: ["ALL"],

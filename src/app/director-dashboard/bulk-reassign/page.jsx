@@ -1,2 +1,7 @@
-export { default } from "@/app/admin-dashboard/bulk-reassign/page";
+import LeadsManageQuickBulkPage from "@/components/Leads/LeadsManageQuickBulkPage";
+
 export const dynamic = "force-dynamic";
+
+export default function Page() {
+  return <LeadsManageQuickBulkPage dashboardBase="director-dashboard" />;
+}

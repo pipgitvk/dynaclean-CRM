@@ -140,12 +140,12 @@ export async function middleware(request) {
       }
 
       // Bulk reassign: sales roles use sales-dashboard copy.
-      if (pathname.startsWith("/admin-dashboard/bulk-reassign")) {
+      if (
+        pathname.startsWith("/admin-dashboard/bulk-reassign") ||
+        pathname.startsWith("/admin-dashboard/leads-manage/bulk-reassign")
+      ) {
         if (roleNorm.includes("SALES") && role !== "SUPERADMIN") {
-          const dest = new URL(
-            pathname.replace("/admin-dashboard", "/sales-dashboard"),
-            request.url,
-          );
+          const dest = new URL("/sales-dashboard/leads-manage/bulk-reassign", request.url);
           dest.search = request.nextUrl.search;
           return NextResponse.redirect(dest);
         }
@@ -320,7 +320,9 @@ export async function middleware(request) {
         const isSalesCumBackoffice = roleNorm === "SALES CUM BACKOFFICE";
         const isDeniedLeadsRoute = pathname.startsWith("/admin-dashboard/denied-leads");
         const isViewCustomerRoute = pathname.startsWith("/admin-dashboard/view-customer");
-        const isBulkReassignRoute = pathname.startsWith("/admin-dashboard/bulk-reassign");
+        const isBulkReassignRoute =
+          pathname.startsWith("/admin-dashboard/bulk-reassign") ||
+          pathname.startsWith("/admin-dashboard/leads-manage/bulk-reassign");
         const isLeadDistributionRoute = pathname.startsWith(
           "/admin-dashboard/lead-distribution",
         );
