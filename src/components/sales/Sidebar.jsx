@@ -50,6 +50,7 @@ import {
   Gavel,
   BarChart3,
   List,
+  Wrench,
 } from "lucide-react";
 
 const iconMap = {
@@ -96,6 +97,7 @@ const iconMap = {
   Gavel,
   BarChart3,
   List,
+  Wrench,
 };
 
 function isDashboardRootPath(path) {

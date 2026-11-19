@@ -104,6 +104,13 @@ export const MODULE_TREE = [
     ],
   },
   {
+    key: "service-before-installation",
+    label: "Service Before Installation",
+    children: [
+      { key: "service-before-installation", label: "Service Before Installation" },
+    ],
+  },
+  {
     key: "service-after-sales",
     label: "Service & After-Sales",
     children: [
@@ -854,7 +861,7 @@ export function resolveModuleAccess(raw, role) {
  * Attendance rules & final profile approval are grantable via Global module access to HR/admin;
  * route-level auth remains on each page.
  */
-export const SUPERADMIN_ONLY_MODULE_KEYS = new Set([]);
+export const SUPERADMIN_ONLY_MODULE_KEYS = new Set(["service-before-installation"]);
 
 /**
  * Enforce SUPERADMIN-only modules at the module_access level.

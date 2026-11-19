@@ -50,6 +50,9 @@ import {
   Fingerprint,
   AlertTriangle,
   List,
+  Wrench,
+  Headset,
+  RotateCcw,
 } from "lucide-react";
 
 // Icon map
@@ -97,6 +100,9 @@ const iconMap = {
   Fingerprint,
   AlertTriangle,
   List,
+  Wrench,
+  Headset,
+  RotateCcw,
 };
 
 export default function Sidebar({

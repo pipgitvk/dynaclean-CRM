@@ -120,6 +120,7 @@ import {
   Globe,
   TrendingUp,
   FileSpreadsheet,
+  Wrench,
 } from "lucide-react";
 
 // Icon map
@@ -162,6 +163,7 @@ const iconMap = {
   Globe,
   TrendingUp,
   FileSpreadsheet,
+  Wrench,
 };
 
 function isPathActive(pathname, path) {
@@ -254,7 +256,7 @@ export default function Sidebar({
         <li key={itemKey} className="m-2">
           <Link
             href={item.path}
-            className={`flex items-center gap-2 text-sm ${parentKey ? `${theme.sidebar.submenuText} hover:text-white ${theme.sidebar.submenuHover}` : theme.sidebar.hover} rounded-md transition-colors p-2`}
+            className={`flex items-center gap-2 ${parentKey ? `text-sm ${theme.sidebar.submenuText} hover:text-white ${theme.sidebar.submenuHover}` : theme.sidebar.hover} rounded-md transition-colors p-2`}
             onClick={handleLinkClick}
           >
             {Icon && <Icon size={parentKey ? 16 : 20} />}

@@ -474,6 +474,13 @@ const allMenuItems = [
     ],
   },
   {
+    path: "/admin-dashboard/service-before-installation",
+    name: "Service Before Installation",
+    moduleKey: "service-before-installation",
+    roles: ["SUPERADMIN"],
+    icon: "Wrench",
+  },
+  {
       name: "Service & After-Sales",
       moduleKey: "service-after-sales",
       roles: ["SUPERADMIN", "SERVICE SUPPORT", "SERVICE HEAD", "EA", "ADMIN", "DIRECTOR"],

@@ -65,6 +65,7 @@ export const MODULE_KEY_TO_URL = {
   "production-status": "/admin-dashboard/productions/status",
   "bom-list": "/admin-dashboard/productions/bom-list",
 
+  "service-before-installation": "/admin-dashboard/service-before-installation",
   // Service & After-Sales
   "warranty-console": "/admin-dashboard/warranty",
   "registered-products": "/admin-dashboard/warranty/products",

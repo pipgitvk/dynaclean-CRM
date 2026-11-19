@@ -15,7 +15,7 @@ function joinPendingOrderOnQuote(quoteColumnExpr) {
       AND ${pendingNeworderPredicates("no_p")}`;
 }
 
-function dispatchTypeJoin(type) {
+export function dispatchTypeJoin(type) {
   if (type === "products") {
     return `
       INNER JOIN products_list pl
@@ -33,9 +33,19 @@ function dispatchTypeJoin(type) {
  * Upcoming installations list — pre-aggregate dispatch / services / quote lines for
  * pending orders only (no per-row correlated subqueries; no sync on the hot path).
  */
+export function resolveUpcomingInstallationType(itemType) {
+  const v = String(itemType ?? "")
+    .trim()
+    .toLowerCase();
+  if (v === "spares" || v === "spare") return "spares";
+  if (v === "products" || v === "product") return "products";
+  return "all";
+}
+
 export function buildUpcomingInstallationsQuery({ type = "products", registration = null } = {}) {
   const registrationFilter =
     registration === "unregistered" ? `AND ${UNREGISTERED_PRODUCT_ORDER_SQL}` : "";
+  const dispatchType = type === "all" ? null : type;
 
   const quoteKeyD = sqlUtf8TrimExpr("d.quote_number");
   const quoteKeyD2 = sqlUtf8TrimExpr("d2.quote_number");
@@ -82,7 +92,7 @@ export function buildUpcomingInstallationsQuery({ type = "products", registratio
         MAX(CASE WHEN wp.serial_number IS NOT NULL THEN 1 ELSE 0 END) AS warranty_registered
       FROM dispatch d
       ${joinPendingOrderOnQuote("d.quote_number")}
-      ${dispatchTypeJoin(type)}
+      ${dispatchTypeJoin(dispatchType)}
       LEFT JOIN warranty_products wp
         ON ${sqlTrimUtf8EqColumns("wp.serial_number", "d.serial_no")}
       WHERE 1=1
