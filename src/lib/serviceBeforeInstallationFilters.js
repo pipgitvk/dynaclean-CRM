@@ -13,6 +13,8 @@ export const EMPTY_SBI_FILTERS = {
   from: "",
   to: "",
   itemType: "",
+  assignedTo: "",
+  serviceStatus: "",
 };
 
 export function parseSbiFilters(input) {
@@ -25,6 +27,8 @@ export function parseSbiFilters(input) {
     from: String(src.from ?? "").trim(),
     to: String(src.to ?? "").trim(),
     itemType: normalizeOrderItemType(src.itemType ?? src.item_type),
+    assignedTo: String(src.assignedTo ?? src.assigned_to ?? "").trim(),
+    serviceStatus: String(src.serviceStatus ?? src.service_status ?? src.status ?? "").trim(),
   };
 }
 
@@ -134,7 +138,10 @@ export function buildUpcomingInstallationListFilterSql(filters) {
   return { sql, params };
 }
 
-export function buildServiceRecordFilterSql(filters) {
+export function buildServiceRecordFilterSql(
+  filters,
+  { dateExpr = "sr.complaint_date" } = {},
+) {
   const f = parseSbiFilters(filters);
   let sql = "";
   const params = [];
@@ -144,28 +151,35 @@ export function buildServiceRecordFilterSql(filters) {
     sql += ` AND (
       sr.serial_number LIKE ? OR sr.service_id LIKE ? OR sr.service_type LIKE ?
       OR sr.complaint_summary LIKE ? OR sr.status LIKE ? OR wp.customer_name LIKE ?
-      OR wp.model LIKE ? OR wp.serial_number LIKE ?
+      OR wp.model LIKE ? OR wp.serial_number LIKE ? OR sr.assigned_to LIKE ?
     )`;
-    params.push(...Array(8).fill(term));
+    params.push(...Array(9).fill(term));
   }
   if (f.model) {
     sql += ` AND wp.model LIKE ?`;
     params.push(`%${f.model}%`);
   }
-  if (f.state) {
+  if (f.assignedTo) {
+    sql += ` AND sr.assigned_to LIKE ?`;
+    params.push(`%${f.assignedTo}%`);
+  } else if (f.state) {
     sql += ` AND (wp.state LIKE ? OR sr.assigned_to LIKE ?)`;
     params.push(`%${f.state}%`, `%${f.state}%`);
+  }
+  if (f.serviceStatus) {
+    sql += ` AND sr.status LIKE ?`;
+    params.push(`%${f.serviceStatus}%`);
   }
   if (f.serial) {
     sql += ` AND (sr.serial_number LIKE ? OR wp.serial_number LIKE ?)`;
     params.push(`%${f.serial}%`, `%${f.serial}%`);
   }
   if (f.from) {
-    sql += ` AND DATE(sr.complaint_date) >= ?`;
+    sql += ` AND DATE(${dateExpr}) >= ?`;
     params.push(f.from);
   }
   if (f.to) {
-    sql += ` AND DATE(sr.complaint_date) <= ?`;
+    sql += ` AND DATE(${dateExpr}) <= ?`;
     params.push(f.to);
   }
 

@@ -20,6 +20,8 @@ export async function GET(request) {
       from: searchParams.get("from"),
       to: searchParams.get("to"),
       itemType: searchParams.get("itemType") ?? searchParams.get("item_type"),
+      assignedTo: searchParams.get("assignedTo") ?? searchParams.get("assigned_to"),
+      serviceStatus: searchParams.get("serviceStatus") ?? searchParams.get("service_status"),
     });
 
     const counts = await fetchServiceBeforeInstallationHubCounts(filters);

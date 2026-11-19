@@ -163,7 +163,11 @@ export default function SearchableSelect({
         aria-expanded={open}
         aria-haspopup="listbox"
       >
-        <span className={value ? "text-gray-900" : "text-gray-500"}>{selectedLabel}</span>
+        <span
+          className={`min-w-0 flex-1 truncate text-left ${value ? "text-gray-900" : "text-gray-500"}`}
+        >
+          {selectedLabel}
+        </span>
         <ChevronDown
           size={16}
           className={`shrink-0 text-gray-500 transition-transform ${open ? "rotate-180" : ""}`}

@@ -92,6 +92,11 @@ export const OPEN_COMPLAINTS_SQL = `(
   UPPER(TRIM(COALESCE(sr.service_type, ''))) = 'COMPLAINT'
 )`;
 
+/** Open Installation — pending installation jobs from Service Records (view_service_reports). */
+export const OPEN_INSTALLATIONS_SQL = `(
+  UPPER(TRIM(COALESCE(sr.service_type, ''))) = 'INSTALLATION'
+)`;
+
 export const ACTIVE_AMC_SQL = `(
   LOWER(TRIM(status)) = 'approved'
   AND amc_end_datetime IS NOT NULL
@@ -111,7 +116,9 @@ export async function fetchServiceBeforeInstallationHubCounts(filters = {}) {
   const conn = await getDbConnection();
   const f = parseSbiFilters(filters);
   const wpFilter = buildWpFilterSql(f);
-  const srFilter = buildServiceRecordFilterSql(f);
+  const srFilter = buildServiceRecordFilterSql(f, {
+    dateExpr: "COALESCE(sr.planned_date, sr.complaint_date)",
+  });
   const amcFilter = buildAmcFilterSql(f);
 
   const [[wpRow]] = await conn.execute(
@@ -124,7 +131,16 @@ export async function fetchServiceBeforeInstallationHubCounts(filters = {}) {
     wpFilter.params,
   );
 
-  const openInstallationTotal = await countUpcomingInstallations(conn, f);
+  const [[openInstRow]] = await conn.execute(
+    `SELECT COUNT(*) AS open_installation
+     FROM service_records sr
+     LEFT JOIN warranty_products wp
+       ON TRIM(sr.serial_number) COLLATE utf8mb4_unicode_ci = TRIM(wp.serial_number) COLLATE utf8mb4_unicode_ci
+     WHERE ${PENDING_SERVICE_SQL}
+       AND ${OPEN_INSTALLATIONS_SQL}
+       ${srFilter.sql}`,
+    srFilter.params,
+  );
 
   const [[srRow]] = await conn.execute(
     `SELECT COUNT(*) AS open_completions
@@ -152,7 +168,7 @@ export async function fetchServiceBeforeInstallationHubCounts(filters = {}) {
 
   return {
     total_registered: Number(wpRow?.total_registered || 0),
-    open_installation: openInstallationTotal,
+    open_installation: Number(openInstRow?.open_installation || 0),
     open_completions: Number(srRow?.open_completions || 0),
     overdue_delayed_installation: overdueDelayedTotal,
     active_warranty: Number(wpRow?.active_warranty || 0),
@@ -175,9 +191,13 @@ export async function fetchServiceBeforeInstallationSegmentPage(segment, options
   const safeLimit = limit;
   const safeSkip = skip;
 
-  if (segment === "open-completions") {
-    const srFilter = buildServiceRecordFilterSql(filters);
-    const where = `WHERE ${PENDING_SERVICE_SQL} AND ${OPEN_COMPLAINTS_SQL} ${srFilter.sql}`;
+  if (segment === "open-completions" || segment === "open-installation") {
+    const srFilter = buildServiceRecordFilterSql(filters, {
+      dateExpr: "COALESCE(sr.planned_date, sr.complaint_date)",
+    });
+    const typeSql =
+      segment === "open-completions" ? OPEN_COMPLAINTS_SQL : OPEN_INSTALLATIONS_SQL;
+    const where = `WHERE ${PENDING_SERVICE_SQL} AND ${typeSql} ${srFilter.sql}`;
     const baseParams = [...srFilter.params];
 
     const [[countRow]] = await conn.execute(
@@ -196,10 +216,13 @@ export async function fetchServiceBeforeInstallationSegmentPage(segment, options
          sr.service_type,
          sr.status,
          sr.complaint_date,
+         sr.planned_date,
          sr.complaint_summary,
          sr.assigned_to,
          wp.customer_name,
-         wp.model
+         wp.model,
+         wp.contact,
+         wp.product_name
        FROM service_records sr
        LEFT JOIN warranty_products wp
          ON TRIM(sr.serial_number) COLLATE utf8mb4_unicode_ci = TRIM(wp.serial_number) COLLATE utf8mb4_unicode_ci
@@ -213,10 +236,6 @@ export async function fetchServiceBeforeInstallationSegmentPage(segment, options
       total: Number(countRow?.cnt || 0),
       data: rows,
     };
-  }
-
-  if (segment === "open-installation") {
-    return fetchUpcomingInstallationsPage(conn, filters, safeLimit, safeSkip);
   }
 
   if (segment === "overdue-delayed-installation") {

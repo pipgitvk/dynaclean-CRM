@@ -33,6 +33,7 @@ import {
   formatUpcomingInstallationDays,
   installationStatusDateColor,
 } from "@/lib/upcomingInstallationDeliveryDisplay";
+import { isServiceRecordAssigned } from "@/lib/serviceRecordAssignment";
 
 const DEFAULT_PAGE_SIZE = 10;
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
@@ -74,6 +75,11 @@ function formatNum(n) {
   return Number(n || 0).toLocaleString("en-IN");
 }
 
+function formatAssignedEngineer(assignedTo) {
+  if (isServiceRecordAssigned(assignedTo)) return String(assignedTo).trim();
+  return "Not assigned";
+}
+
 function modelPillClass(model) {
   const s = String(model || "").trim();
   if (!s) return MODEL_PILL_CLASSES[0];
@@ -97,18 +103,25 @@ function buildPageWindow(current, total) {
 function exportRowsCsv(rows, segment) {
   if (!rows.length) return;
   const headersBySegment = {
-    "open-completions": ["Service ID", "Serial", "Customer", "Type", "Status", "Complaint Date"],
-    "open-installation": [
-      "Order ID",
+    "open-completions": [
+      "Service ID",
       "Serial",
+      "Customer",
       "Model",
-      "Product",
-      "Company",
-      "Contact",
-      "Delivery Date",
-      "Days",
+      "Type",
       "Status",
-      "Location",
+      "Service Engineer",
+      "Complaint Date",
+    ],
+    "open-installation": [
+      "Service ID",
+      "Serial",
+      "Customer",
+      "Model",
+      "Type",
+      "Status",
+      "Service Engineer",
+      "Planned Date",
     ],
     "overdue-delayed-installation": [
       "Order ID",
@@ -142,23 +155,23 @@ function exportRowsCsv(rows, segment) {
         row.service_id,
         row.serial_number,
         row.customer_name,
+        row.model,
         row.service_type,
         row.status,
-        formatDate(row.complaint_date),
+        formatAssignedEngineer(row.assigned_to),
+        formatDate(row.planned_date || row.complaint_date),
       ];
     }
     if (segment === "open-installation") {
       return [
-        row.order_id,
+        row.service_id,
         row.serial_number,
+        row.customer_name,
         row.model,
-        row.name,
-        row.company_name,
-        row.contact,
-        row.delivery_date,
-        formatUpcomingInstallationDays(row),
-        row.installation_status,
-        row.delivery_address,
+        row.service_type,
+        row.status,
+        formatAssignedEngineer(row.assigned_to),
+        formatDate(row.planned_date || row.complaint_date),
       ];
     }
     if (segment === "overdue-delayed-installation") {
@@ -319,20 +332,26 @@ function WarrantyProductRows({ rows, dashboardBase, page, pageSize }) {
   });
 }
 
-function ServiceRows({ rows, dashboardBase, page, pageSize }) {
+function ServiceRows({ rows, dashboardBase, page, pageSize, variant = "complaint" }) {
+  const reportHref = (serviceId) =>
+    `/${dashboardBase}/view-service-report/${encodeURIComponent(serviceId)}`;
+  const showServiceRecordLayout = variant === "installation" || variant === "complaint";
+  const dateField = (row) => formatDate(row.planned_date || row.complaint_date);
+
   return rows.map((row, idx) => {
     const rowNum = page * pageSize + idx + 1;
     const zebra = idx % 2 === 0 ? "bg-white" : "bg-violet-50/35";
     return (
       <tr key={row.service_id} className={`${zebra} hover:bg-violet-50/55`}>
         <td className="px-4 py-3.5 text-sm text-slate-500">{rowNum}</td>
-        <td className="px-4 py-3.5 font-mono text-sm">{row.service_id}</td>
+        <td className="px-4 py-3.5">
+          <Link href={reportHref(row.service_id)} className="font-mono text-sm font-semibold text-violet-700 hover:underline">
+            {row.service_id}
+          </Link>
+        </td>
         <td className="px-4 py-3.5">
           {row.serial_number ? (
-            <Link
-              href={`/${dashboardBase}/view-service-report/${encodeURIComponent(row.service_id)}`}
-              className="font-semibold text-violet-700 hover:underline"
-            >
+            <Link href={reportHref(row.service_id)} className="font-semibold text-violet-700 hover:underline">
               {row.serial_number}
             </Link>
           ) : (
@@ -340,9 +359,28 @@ function ServiceRows({ rows, dashboardBase, page, pageSize }) {
           )}
         </td>
         <td className="px-4 py-3.5">{row.customer_name || "—"}</td>
+        {showServiceRecordLayout ? (
+          <td className="max-w-[160px] truncate px-4 py-3.5 font-mono text-xs">{row.model || "—"}</td>
+        ) : null}
         <td className="px-4 py-3.5">{row.service_type || "—"}</td>
         <td className="px-4 py-3.5">{row.status || "—"}</td>
-        <td className="px-4 py-3.5">{formatDate(row.complaint_date)}</td>
+        {showServiceRecordLayout ? (
+          <td className="max-w-[180px] truncate px-4 py-3.5 text-sm text-slate-800">
+            {formatAssignedEngineer(row.assigned_to)}
+          </td>
+        ) : null}
+        <td className="px-4 py-3.5">{dateField(row)}</td>
+        {showServiceRecordLayout ? (
+          <td className="px-4 py-3.5 text-right">
+            <Link
+              href={reportHref(row.service_id)}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:border-violet-200 hover:text-violet-700"
+              title="Open service report"
+            >
+              <Eye className="h-4 w-4" />
+            </Link>
+          </td>
+        ) : null}
       </tr>
     );
   });
@@ -412,38 +450,33 @@ function AmcRows({ rows, page, pageSize }) {
   });
 }
 
+function ServiceRecordTableHead({ dateLabel }) {
+  const th =
+    "px-4 py-3.5 text-left text-xs font-bold uppercase tracking-wide text-slate-500 bg-slate-50/95";
+  return (
+    <tr>
+      <th className={th}>#</th>
+      <th className={th}>Service ID</th>
+      <th className={th}>Serial</th>
+      <th className={th}>Customer</th>
+      <th className={th}>Model</th>
+      <th className={th}>Type</th>
+      <th className={th}>Status</th>
+      <th className={th}>Service Engineer</th>
+      <th className={th}>{dateLabel}</th>
+      <th className={`${th} text-right`}>Report</th>
+    </tr>
+  );
+}
+
 function TableHead({ segment }) {
   const th =
     "px-4 py-3.5 text-left text-xs font-bold uppercase tracking-wide text-slate-500 bg-slate-50/95";
   if (segment === "open-installation") {
-    return (
-      <tr>
-        <th className={th}>#</th>
-        <th className={th}>Order ID</th>
-        <th className={th}>Serial</th>
-        <th className={th}>Model</th>
-        <th className={th}>Product</th>
-        <th className={th}>Company</th>
-        <th className={th}>Contact</th>
-        <th className={th}>Delivery Date</th>
-        <th className={th}>Days</th>
-        <th className={th}>Status</th>
-        <th className={th}>Location</th>
-      </tr>
-    );
+    return <ServiceRecordTableHead dateLabel="Planned Date" />;
   }
   if (segment === "open-completions") {
-    return (
-      <tr>
-        <th className={th}>#</th>
-        <th className={th}>Service ID</th>
-        <th className={th}>Serial</th>
-        <th className={th}>Customer</th>
-        <th className={th}>Type</th>
-        <th className={th}>Status</th>
-        <th className={th}>Complaint Date</th>
-      </tr>
-    );
+    return <ServiceRecordTableHead dateLabel="Complaint Date" />;
   }
   if (segment === "overdue-delayed-installation") {
     return (
@@ -493,11 +526,25 @@ function TableHead({ segment }) {
 function TableBody({ segment, rows, dashboardBase, page, pageSize }) {
   if (segment === "open-installation") {
     return (
-      <OpenInstallationRows rows={rows} dashboardBase={dashboardBase} page={page} pageSize={pageSize} />
+      <ServiceRows
+        rows={rows}
+        dashboardBase={dashboardBase}
+        page={page}
+        pageSize={pageSize}
+        variant="installation"
+      />
     );
   }
   if (segment === "open-completions") {
-    return <ServiceRows rows={rows} dashboardBase={dashboardBase} page={page} pageSize={pageSize} />;
+    return (
+      <ServiceRows
+        rows={rows}
+        dashboardBase={dashboardBase}
+        page={page}
+        pageSize={pageSize}
+        variant="complaint"
+      />
+    );
   }
   if (segment === "overdue-delayed-installation") {
     return (
@@ -514,8 +561,7 @@ function TableBody({ segment, rows, dashboardBase, page, pageSize }) {
 
 function colSpanForSegment(segment) {
   if (isWarrantyProductSegment(segment)) return 9;
-  if (segment === "open-installation") return 11;
-  if (segment === "open-completions") return 7;
+  if (segment === "open-installation" || segment === "open-completions") return 10;
   if (segment === "overdue-delayed-installation") return 11;
   if (segment === "active-amc" || segment === "due-amc-expiring") return 7;
   return 9;

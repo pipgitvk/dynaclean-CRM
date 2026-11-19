@@ -1,12 +1,118 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import { ListFilter, RotateCcw, Search } from "lucide-react";
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
+import SearchableSelect from "@/components/ui/SearchableSelect";
 import { EMPTY_SBI_FILTERS } from "@/lib/serviceBeforeInstallationFilters";
+
+const filterSelectClass =
+  "rounded-xl border-slate-200 py-2.5 text-slate-800 focus:border-violet-300 focus:ring-violet-500/20";
+
+/** Common service_records.status values (matches Service Records filters). */
+const SERVICE_RECORD_STATUS_PRESETS = [
+  "PENDING",
+  "PLANNED",
+  "PENDING FOR SPARES",
+  "PENDING BY CUSTOMER",
+  "IN PROGRESS",
+  "WORKED",
+];
+
+function ServiceEngineerFilterSelect({ value, onChange, className = "xl:col-span-6" }) {
+  const [engineers, setEngineers] = useState([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const [internalRes, thirdRes] = await Promise.all([
+          fetch("/api/service-engineers/active", { cache: "no-store" }),
+          fetch("/api/third-party-engineers/active", { cache: "no-store" }),
+        ]);
+        const internalData = internalRes.ok ? await internalRes.json() : {};
+        const thirdData = thirdRes.ok ? await thirdRes.json() : [];
+        const internal = (internalData.users || []).map((u) => String(u.username || "").trim()).filter(Boolean);
+        const thirdParty = (Array.isArray(thirdData) ? thirdData : [])
+          .map((e) => String(e.name || "").trim())
+          .filter(Boolean);
+        const merged = [...new Set([...internal, ...thirdParty])].sort((a, b) =>
+          a.localeCompare(b, undefined, { sensitivity: "base" }),
+        );
+        if (!cancelled) setEngineers(merged);
+      } catch {
+        if (!cancelled) setEngineers([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const options = useMemo(() => {
+    const base = [{ value: "", label: "All engineers" }];
+    const names = new Set(engineers);
+    const current = String(value || "").trim();
+    if (current) names.add(current);
+    const sorted = [...names].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+    return [
+      ...base,
+      ...sorted.map((name) => ({ value: name, label: name })),
+    ];
+  }, [engineers, value]);
+
+  return (
+    <label className={`block min-w-0 ${className}`}>
+      <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+        Service engineer
+      </span>
+      <SearchableSelect
+        options={options}
+        value={value || ""}
+        onChange={onChange}
+        placeholder="All engineers"
+        searchPlaceholder="Search engineer…"
+        className={`w-full min-w-0 ${filterSelectClass}`}
+      />
+    </label>
+  );
+}
+
+function ServiceStatusFilterSelect({ value, onChange, className = "xl:col-span-6" }) {
+  const options = useMemo(() => {
+    const base = [{ value: "", label: "All statuses" }];
+    const statuses = new Set(SERVICE_RECORD_STATUS_PRESETS);
+    const current = String(value || "").trim();
+    if (current) statuses.add(current);
+    const sorted = [...statuses].sort((a, b) =>
+      a.localeCompare(b, undefined, { sensitivity: "base" }),
+    );
+    return [
+      ...base,
+      ...sorted.map((status) => ({ value: status, label: status })),
+    ];
+  }, [value]);
+
+  return (
+    <label className={`block min-w-0 ${className}`}>
+      <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+        Status
+      </span>
+      <SearchableSelect
+        options={options}
+        value={value || ""}
+        onChange={onChange}
+        placeholder="All statuses"
+        searchPlaceholder="Search status…"
+        className={`w-full min-w-0 ${filterSelectClass}`}
+      />
+    </label>
+  );
+}
 
 function FilterInput({ label, placeholder, value, onChange, className = "" }) {
   return (
-    <label className={`block ${className}`}>
+    <label className={`block min-w-0 ${className}`}>
       <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
         {label}
       </span>
@@ -15,7 +121,7 @@ function FilterInput({ label, placeholder, value, onChange, className = "" }) {
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-violet-300 focus:outline-none focus:ring-2 focus:ring-violet-500/20"
+        className="w-full min-w-0 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-violet-300 focus:outline-none focus:ring-2 focus:ring-violet-500/20"
       />
     </label>
   );
@@ -31,15 +137,25 @@ export default function ServiceBeforeInstallationFilters({
   segment = "",
 }) {
   const draft = value || EMPTY_SBI_FILTERS;
+  const isServiceRecordSegment =
+    segment === "open-installation" || segment === "open-completions";
 
   const setField = (key) => (val) => {
     onChange?.({ ...draft, [key]: val });
   };
 
+  const gridClass = isServiceRecordSegment
+    ? "grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-12"
+    : "grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-12";
+
   return (
     <div className={`rounded-2xl border border-slate-200/90 bg-white/95 p-4 shadow-sm backdrop-blur-sm sm:p-5 ${className}`}>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-12">
-        <label className="relative block sm:col-span-2 xl:col-span-4">
+      <div className={gridClass}>
+        <label
+          className={`relative block min-w-0 ${
+            isServiceRecordSegment ? "col-span-full" : "sm:col-span-2 xl:col-span-4"
+          }`}
+        >
           <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
             Search
           </span>
@@ -51,12 +167,16 @@ export default function ServiceBeforeInstallationFilters({
             onKeyDown={(e) => {
               if (e.key === "Enter") onApply?.();
             }}
-            placeholder="Search table — customer, serial, model, invoice…"
-            className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-3 text-sm text-slate-800 placeholder:text-slate-400 focus:border-violet-300 focus:outline-none focus:ring-2 focus:ring-violet-500/20"
+            placeholder={
+              isServiceRecordSegment
+                ? "Search service id, serial, customer, model, engineer…"
+                : "Search table — customer, serial, model, invoice…"
+            }
+            className="w-full min-w-0 rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-3 text-sm text-slate-800 placeholder:text-slate-400 focus:border-violet-300 focus:outline-none focus:ring-2 focus:ring-violet-500/20"
           />
         </label>
 
-        <label className="block xl:col-span-2">
+        <label className={`block min-w-0 ${isServiceRecordSegment ? "sm:col-span-1 xl:col-span-3" : "xl:col-span-2"}`}>
           <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
             From
           </span>
@@ -64,11 +184,11 @@ export default function ServiceBeforeInstallationFilters({
             value={draft.from}
             onChange={setField("from")}
             wrapperClassName="relative flex w-full min-w-0 items-stretch"
-            className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-3 text-sm"
+            className="w-full min-w-0 rounded-xl border border-slate-200 bg-white py-2.5 pl-3 text-sm"
           />
         </label>
 
-        <label className="block xl:col-span-2">
+        <label className={`block min-w-0 ${isServiceRecordSegment ? "sm:col-span-1 xl:col-span-3" : "xl:col-span-2"}`}>
           <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
             To
           </span>
@@ -76,12 +196,12 @@ export default function ServiceBeforeInstallationFilters({
             value={draft.to}
             onChange={setField("to")}
             wrapperClassName="relative flex w-full min-w-0 items-stretch"
-            className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-3 text-sm"
+            className="w-full min-w-0 rounded-xl border border-slate-200 bg-white py-2.5 pl-3 text-sm"
           />
         </label>
 
-        {segment === "overdue-delayed-installation" || segment === "open-installation" ? (
-          <label className="block xl:col-span-2">
+        {segment === "overdue-delayed-installation" ? (
+          <label className="block min-w-0 xl:col-span-2">
             <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
               Item type
             </span>
@@ -99,25 +219,53 @@ export default function ServiceBeforeInstallationFilters({
 
         <FilterInput
           label="Model"
-          placeholder="Search model number…"
+          placeholder="Model number…"
           value={draft.model}
           onChange={setField("model")}
-          className="xl:col-span-1"
+          className={
+            isServiceRecordSegment ? "min-w-0 sm:col-span-1 xl:col-span-3" : "min-w-0 xl:col-span-1"
+          }
         />
-        <FilterInput
-          label="State"
-          placeholder="Search state…"
-          value={draft.state}
-          onChange={setField("state")}
-          className="xl:col-span-1"
-        />
-        <FilterInput
-          label="Serial"
-          placeholder="Search serial number…"
-          value={draft.serial}
-          onChange={setField("serial")}
-          className="xl:col-span-2"
-        />
+        {isServiceRecordSegment ? (
+          <FilterInput
+            label="Serial"
+            placeholder="Serial number…"
+            value={draft.serial}
+            onChange={setField("serial")}
+            className="min-w-0 sm:col-span-1 xl:col-span-3"
+          />
+        ) : (
+          <FilterInput
+            label="State"
+            placeholder="Search state…"
+            value={draft.state}
+            onChange={setField("state")}
+            className="min-w-0 xl:col-span-1"
+          />
+        )}
+        {isServiceRecordSegment ? (
+          <>
+            <ServiceEngineerFilterSelect
+              value={draft.assignedTo}
+              onChange={setField("assignedTo")}
+              className="col-span-full sm:col-span-1 xl:col-span-6"
+            />
+            <ServiceStatusFilterSelect
+              value={draft.serviceStatus}
+              onChange={setField("serviceStatus")}
+              className="col-span-full sm:col-span-1 xl:col-span-6"
+            />
+          </>
+        ) : null}
+        {!isServiceRecordSegment ? (
+          <FilterInput
+            label="Serial"
+            placeholder="Serial number…"
+            value={draft.serial}
+            onChange={setField("serial")}
+            className="min-w-0 xl:col-span-2"
+          />
+        ) : null}
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
