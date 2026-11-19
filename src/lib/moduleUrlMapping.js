@@ -30,7 +30,7 @@ export const MODULE_KEY_TO_URL = {
   "my-leads": "/admin-dashboard/my-leads",
   "dm-fresh-leads": "/user-dashboard/digital-marketer-leads",
   "lead-distribution": "/admin-dashboard/lead-distribution",
-  "bulk-reassign": "/admin-dashboard/bulk-reassign",
+  "bulk-reassign": "/admin-dashboard/leads-manage/bulk-reassign",
   "ads-management": "/admin-dashboard/meta-credentials",
   "meta-backfill": "/admin-dashboard/ads-management",
   "leads-upload": "/admin-dashboard/bulk-upload",

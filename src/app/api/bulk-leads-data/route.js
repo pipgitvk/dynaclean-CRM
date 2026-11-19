@@ -12,6 +12,7 @@ function statusValuesForFilter(statusParam) {
         average: ["average", "Average"],
         poor: ["poor", "Poor"],
         denied: ["denied", "Denied"],
+        invalid: ["invalid", "Invalid"],
         old_reassign: ["old_reassign", "Old Reassign"],
         New: ["New"],
     };

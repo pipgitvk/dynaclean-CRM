@@ -11,6 +11,7 @@ import {
   Megaphone,
   MousePointerClick,
   Store,
+  ArrowLeftRight,
   Target,
   TrendingDown,
   TrendingUp,
@@ -41,6 +42,7 @@ const CARD_ICONS = {
   website_direct: MousePointerClick,
   manager_assigned: UserCheck,
   manager_assign: UserCog,
+  bulk_reassign: ArrowLeftRight,
 };
 
 function formatNum(n) {
@@ -165,7 +167,7 @@ function SourceKpiCard({ card, total, changePct, Icon, className = "", compact =
 
         <div className="mt-auto flex items-end justify-between gap-2 pt-5">
           <span className="text-4xl font-bold tabular-nums tracking-tight text-slate-900 sm:text-[2.75rem]">
-            {formatNum(total)}
+            {card.staticMetric != null ? card.staticMetric : formatNum(total)}
           </span>
           <Icon
             className="h-[3.25rem] w-[3.25rem] shrink-0 text-slate-900/[0.08] group-hover:text-slate-900/[0.12] transition-colors"
@@ -175,7 +177,13 @@ function SourceKpiCard({ card, total, changePct, Icon, className = "", compact =
         </div>
 
         <div className="relative z-20 mt-3">
-          <ChangePill value={changePct} className="bg-white/95 shadow-sm" />
+          {card.noTrend ? (
+            <span className="inline-flex items-center rounded-full border border-sky-100 bg-white/95 px-2.5 py-1 text-sm font-semibold text-sky-700 shadow-sm">
+              Open tool →
+            </span>
+          ) : (
+            <ChangePill value={changePct} className="bg-white/95 shadow-sm" />
+          )}
         </div>
       </div>
 
@@ -194,7 +202,11 @@ export default function LeadsManageClient({
     [cards],
   );
   const sourceCards = useMemo(
-    () => cards.filter((c) => c.id !== "manager_assigned"),
+    () => cards.filter((c) => c.id !== "manager_assigned" && c.id !== "bulk_reassign"),
+    [cards],
+  );
+  const bulkReassignCard = useMemo(
+    () => cards.find((c) => c.id === "bulk_reassign"),
     [cards],
   );
   const monthDefault = useMemo(() => getCurrentMonthThroughTodayIso(), []);
@@ -324,7 +336,7 @@ export default function LeadsManageClient({
           </div>
         </header>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
           {sourceCards.map((card) => {
             const Icon = CARD_ICONS[card.id] || Megaphone;
             return (
@@ -337,6 +349,14 @@ export default function LeadsManageClient({
               />
             );
           })}
+          {bulkReassignCard ? (
+            <SourceKpiCard
+              card={bulkReassignCard}
+              total={0}
+              changePct={null}
+              Icon={ArrowLeftRight}
+            />
+          ) : null}
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-5">

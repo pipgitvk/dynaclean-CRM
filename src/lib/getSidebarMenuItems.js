@@ -375,7 +375,7 @@ const allMenuItems = [
         icon: "ScrollText",
       },
       {
-        path: "/admin-dashboard/bulk-reassign",
+        path: "/admin-dashboard/leads-manage/bulk-reassign",
         name: "Bulk Reassign Leads",
         moduleKey: "bulk-reassign",
         roles: ["ALL"],
