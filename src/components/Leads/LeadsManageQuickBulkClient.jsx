@@ -13,6 +13,7 @@ import {
   ChevronLeft,
   Hash,
   Info,
+  Layers,
   ListChecks,
   ListTodo,
   Clock,
@@ -23,6 +24,7 @@ import {
   Phone,
   Search,
   Square,
+  Tag,
   User,
   UserPlus,
   Users,
@@ -70,6 +72,26 @@ const STAGE_OPTIONS = [
 ];
 
 const TABLE_STAGE_OPTIONS = [{ value: "", label: "Stage" }, ...STAGE_OPTIONS.slice(1)];
+
+const CUSTOMER_TAG_LABELS = [
+  "Facilities Management Company",
+  "Industrial Facilities",
+  "Commercial Buildings",
+  "Healthcare Facilities",
+  "Educational Institutions",
+  "Government Facilities",
+  "Property Management Companies",
+  "Construction Company",
+  "Transportation Companies",
+  "Society",
+  "Dealer",
+  "Others",
+];
+
+const TABLE_TAG_OPTIONS = [
+  { value: "", label: "Tags" },
+  ...CUSTOMER_TAG_LABELS.map((label) => ({ value: label, label })),
+];
 
 const PROFILE_OPTIONS = [
   { value: "all", label: "All" },
@@ -213,6 +235,7 @@ export default function LeadsManageQuickBulkClient({ dashboardBase = "admin-dash
   const [tableSearch, setTableSearch] = useState("");
   const [tableCustomer, setTableCustomer] = useState("");
   const [tableStage, setTableStage] = useState("");
+  const [tableTag, setTableTag] = useState("");
   const [dateSort, setDateSort] = useState("desc");
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(50);
@@ -360,6 +383,10 @@ export default function LeadsManageQuickBulkClient({ dashboardBase = "admin-dash
     const rows = allCustomers.filter((row) => {
       if (!isSalesLead(row)) return false;
       if (tableStage && row.stage !== tableStage) return false;
+      if (tableTag) {
+        const rowTag = String(row.tags || "").trim().toLowerCase();
+        if (rowTag !== tableTag.trim().toLowerCase()) return false;
+      }
       if (cq) {
         const name = customerName(row).toLowerCase();
         const phone = String(row.phone || "").toLowerCase();
@@ -395,7 +422,20 @@ export default function LeadsManageQuickBulkClient({ dashboardBase = "admin-dash
       return dateSort === "asc" ? ta - tb : tb - ta;
     });
     return rows;
-  }, [allCustomers, tableSearch, tableCustomer, tableStage, dateSort]);
+  }, [allCustomers, tableSearch, tableCustomer, tableStage, tableTag, dateSort]);
+
+  const tableTagOptions = useMemo(() => {
+    const seen = new Set(TABLE_TAG_OPTIONS.map((o) => o.value));
+    const extras = [];
+    for (const row of allCustomers) {
+      const t = String(row.tags || "").trim();
+      if (!t || seen.has(t)) continue;
+      seen.add(t);
+      extras.push({ value: t, label: t });
+    }
+    extras.sort((a, b) => a.label.localeCompare(b.label));
+    return [...TABLE_TAG_OPTIONS, ...extras];
+  }, [allCustomers]);
 
   const totalRows = tableFiltered.length;
   const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
@@ -703,6 +743,43 @@ export default function LeadsManageQuickBulkClient({ dashboardBase = "admin-dash
                 />
               </label>
             </BulkFilterField>
+            <BulkFilterField label="Customer">
+              <label className={`flex ${inputShellClass}`}>
+                <User className="ml-3 h-4 w-4 shrink-0 text-emerald-500" aria-hidden />
+                <input
+                  type="search"
+                  value={tableCustomer}
+                  onChange={(e) => {
+                    setTableCustomer(e.target.value);
+                    setPage(0);
+                  }}
+                  placeholder="Name, ID, phone, email"
+                  className="w-full rounded-xl border-0 bg-transparent py-3 pl-2 pr-3 text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/25"
+                />
+              </label>
+            </BulkFilterField>
+            <BulkFilterField label="Stage">
+              <IconSelect
+                icon={Layers}
+                value={tableStage}
+                onChange={(v) => {
+                  setTableStage(v);
+                  setPage(0);
+                }}
+                options={TABLE_STAGE_OPTIONS}
+              />
+            </BulkFilterField>
+            <BulkFilterField label="Tags">
+              <IconSelect
+                icon={Tag}
+                value={tableTag}
+                onChange={(v) => {
+                  setTableTag(v);
+                  setPage(0);
+                }}
+                options={tableTagOptions}
+              />
+            </BulkFilterField>
           </div>
 
           <div className="mt-6 grid grid-cols-1 divide-y rounded-xl border border-slate-100 bg-slate-50/80 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
@@ -773,23 +850,7 @@ export default function LeadsManageQuickBulkClient({ dashboardBase = "admin-dash
                 </span>
               </div>
 
-              <div className="flex min-w-0 flex-1 flex-wrap items-center justify-center gap-2">
-                <ToolbarCustomerFilter
-                  value={tableCustomer}
-                  onChange={(v) => {
-                    setTableCustomer(v);
-                    setPage(0);
-                  }}
-                />
-              <ToolbarFilterSelect
-                value={tableStage}
-                  onChange={setTableStage}
-                  options={TABLE_STAGE_OPTIONS}
-                  onAfterChange={() => setPage(0)}
-                />
-              </div>
-
-              <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-end xl:w-auto xl:min-w-[16rem]">
+              <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-end xl:ms-auto xl:w-auto xl:min-w-[16rem]">
                 <label className="relative block w-full sm:min-w-[14rem]">
                   <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                   <input
@@ -1013,64 +1074,6 @@ function StatCell({ icon: Icon, label, value, tone = "accent" }) {
         <div className={`text-2xl font-bold tabular-nums ${valueClass}`}>{value}</div>
       </div>
     </div>
-  );
-}
-
-function ToolbarFilterSelect({ value, onChange, options, onAfterChange }) {
-  const current = options.find((o) => o.value === value)?.label || options[0]?.label;
-  return (
-    <label className="relative inline-flex min-w-[7.5rem] items-center">
-      <select
-        value={value}
-        onChange={(e) => {
-          onChange(e.target.value);
-          onAfterChange?.();
-        }}
-        className="w-full appearance-none rounded-xl border border-slate-200 bg-white py-2.5 pl-3.5 pr-9 text-sm font-semibold text-slate-800 shadow-sm hover:border-slate-300 focus:border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/15"
-        aria-label={current}
-      >
-        {options.map((opt) => (
-          <option key={opt.value || opt.label} value={opt.value}>
-            {opt.label}
-          </option>
-        ))}
-      </select>
-      <ChevronDown className="pointer-events-none absolute right-2.5 h-4 w-4 text-slate-400" aria-hidden />
-    </label>
-  );
-}
-
-function ToolbarCustomerFilter({ value, onChange }) {
-  const [open, setOpen] = useState(false);
-  const hasValue = Boolean(value.trim());
-  return (
-    <p className="relative inline-flex min-w-[7.5rem]">
-      {!open && !hasValue ? (
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className="inline-flex w-full items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white py-2.5 pl-3.5 pr-3 text-sm font-semibold text-slate-800 shadow-sm hover:border-slate-300"
-        >
-          Customer
-          <ChevronDown className="h-4 w-4 text-slate-400" aria-hidden />
-        </button>
-      ) : (
-        <span className="inline-flex w-full items-center rounded-xl border border-emerald-200 bg-emerald-50/40 py-1 pl-3 pr-1 shadow-sm">
-          <User className="mr-1.5 h-4 w-4 shrink-0 text-slate-400" aria-hidden />
-          <input
-            type="search"
-            autoFocus={open}
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            onBlur={() => {
-              if (!value.trim()) setOpen(false);
-            }}
-            placeholder="Name, ID, phone, email"
-            className="min-w-0 flex-1 border-0 bg-transparent py-1.5 text-sm font-medium text-slate-800 focus:outline-none"
-          />
-        </span>
-      )}
-    </p>
   );
 }
 
