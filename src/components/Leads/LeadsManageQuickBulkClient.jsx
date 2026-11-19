@@ -28,6 +28,7 @@ import {
   Users,
 } from "lucide-react";
 import SearchableSelect from "@/components/ui/SearchableSelect";
+import { REASSIGN_NO_FOLLOWUP_DAYS } from "@/lib/reassignNoFollowupConstants";
 
 const STATUS_OPTIONS = [
   { value: "", label: "All Status" },
@@ -608,7 +609,7 @@ export default function LeadsManageQuickBulkClient({ dashboardBase = "admin-dash
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-xs font-bold uppercase tracking-wide text-rose-900">
-                  Follow-up after re-assign (2+ days)
+                  Follow-up after re-assign ({REASSIGN_NO_FOLLOWUP_DAYS}+ days)
                 </p>
                 <div className="mt-2 flex items-end gap-5">
                   <div>
@@ -628,7 +629,7 @@ export default function LeadsManageQuickBulkClient({ dashboardBase = "admin-dash
                     </p>
                   </div>
                 </div>
-                <p className="mt-1 text-sm text-slate-500">Sales owner · reassigned 2+ days ago</p>
+                <p className="mt-1 text-sm text-slate-500">Full breakdown on details page</p>
               </div>
               <div className="rounded-xl bg-rose-700 p-2.5 text-white shadow-sm">
                 <Clock className="h-5 w-5" aria-hidden />

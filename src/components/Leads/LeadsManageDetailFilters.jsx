@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { format } from "date-fns";
 import { Loader2, Search } from "lucide-react";
+import { REASSIGN_NO_FOLLOWUP_DAYS } from "@/lib/reassignNoFollowupConstants";
 
 function formatFollowupAt(value) {
   if (!value) return "—";
@@ -84,6 +85,106 @@ const TOTAL_STAT_THEME = {
     spinner: "text-rose-600",
   },
 };
+
+/** @typedef {{ total: number; superseded: number; too_recent: number; owner_changed: number }} LeadsOutsideCohortStats */
+
+export function LeadsReassignFollowupOverview({
+  cohortTotal = 0,
+  followed = 0,
+  notFollowed = 0,
+  reassignEventsTotal = null,
+  outside = null,
+  loading = false,
+  outsideLoading = false,
+  showOutside = true,
+  filterActive = false,
+  days = REASSIGN_NO_FOLLOWUP_DAYS,
+}) {
+  const showOutsidePanel =
+    showOutside && !filterActive && (outsideLoading || (outside && reassignEventsTotal != null));
+
+  return (
+    <div
+      className={`grid w-full min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 xl:items-stretch ${
+        showOutsidePanel ? "xl:grid-cols-4" : "xl:grid-cols-3"
+      }`}
+    >
+      <div className="flex flex-col rounded-2xl border border-rose-200/90 bg-gradient-to-br from-rose-100/90 to-rose-50/50 px-4 py-3.5 shadow-sm sm:col-span-2 xl:col-span-1">
+        <p className="text-[11px] font-bold uppercase tracking-wide text-rose-900/90">Total in this check</p>
+        <p className="mt-auto text-3xl font-bold tabular-nums text-rose-950">
+          {loading ? (
+            <Loader2 className="h-8 w-8 animate-spin text-rose-600" aria-hidden />
+          ) : (
+            cohortTotal.toLocaleString()
+          )}
+        </p>
+        <p className="mt-2 text-xs leading-snug text-slate-600">
+          Followed + not followed · latest reassign · still on assignee · {days}+ days
+          {filterActive ? " · counts match filters below" : null}
+        </p>
+      </div>
+
+      <div className="flex flex-col rounded-xl border border-emerald-200/90 bg-emerald-50/80 px-4 py-3 shadow-sm">
+        <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-800">Followed</p>
+        <p className="mt-auto text-2xl font-bold tabular-nums text-slate-900">
+          {loading ? (
+            <Loader2 className="h-7 w-7 animate-spin text-emerald-600" aria-hidden />
+          ) : (
+            followed.toLocaleString()
+          )}
+        </p>
+      </div>
+
+      <div className="flex flex-col rounded-xl border border-rose-200/90 bg-rose-50/70 px-4 py-3 shadow-sm">
+        <p className="text-[11px] font-bold uppercase tracking-wide text-rose-900">Not followed</p>
+        <p className="mt-auto text-2xl font-bold tabular-nums text-slate-900">
+          {loading ? (
+            <Loader2 className="h-7 w-7 animate-spin text-rose-600" aria-hidden />
+          ) : (
+            notFollowed.toLocaleString()
+          )}
+        </p>
+      </div>
+
+      {showOutsidePanel ? (
+        <div className="flex flex-col rounded-2xl border border-slate-200/90 bg-slate-50/80 px-4 py-3.5 sm:col-span-2 xl:col-span-1">
+          {outsideLoading || !outside || reassignEventsTotal == null ? (
+            <div className="flex flex-1 items-center justify-center py-4">
+              <Loader2 className="h-6 w-6 animate-spin text-slate-500" aria-hidden />
+            </div>
+          ) : (
+            <>
+              <p className="text-[11px] font-bold uppercase leading-snug tracking-wide text-slate-600">
+                Not in this check ({outside.total.toLocaleString()} of {reassignEventsTotal.toLocaleString()} reassign
+                events)
+              </p>
+              <ul className="mt-2 flex flex-1 flex-col justify-center space-y-1.5 text-sm text-slate-600">
+                <li className="flex justify-between gap-3">
+                  <span className="min-w-0">Older reassign (superseded)</span>
+                  <span className="shrink-0 font-semibold tabular-nums text-slate-900">
+                    {outside.superseded.toLocaleString()}
+                  </span>
+                </li>
+                <li className="flex justify-between gap-3">
+                  <span>Under {days}+ days window</span>
+                  <span className="shrink-0 font-semibold tabular-nums text-slate-900">
+                    {outside.too_recent.toLocaleString()}
+                  </span>
+                </li>
+                <li className="flex justify-between gap-3">
+                  <span>Moved off assignee</span>
+                  <span className="shrink-0 font-semibold tabular-nums text-slate-900">
+                    {outside.owner_changed.toLocaleString()}
+                  </span>
+                </li>
+              </ul>
+            </>
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 export function LeadsDetailDualTotalStat({
   theme = "rose",

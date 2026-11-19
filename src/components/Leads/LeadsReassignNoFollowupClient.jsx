@@ -21,8 +21,8 @@ import {
   LeadsFilterPanel,
   LeadsFilterSearch,
   LeadsFilterSelectShell,
-  LeadsDetailDualTotalStat,
   LeadsLastFollowupWithRemark,
+  LeadsReassignFollowupOverview,
 } from "@/components/Leads/LeadsManageDetailFilters";
 import { REASSIGN_NO_FOLLOWUP_DAYS } from "@/lib/reassignNoFollowupConstants";
 
@@ -67,13 +67,45 @@ export default function LeadsReassignNoFollowupClient({ dashboardBase = "admin-d
 
   const [toRepList, setToRepList] = useState([]);
   const [fromRepList, setFromRepList] = useState([]);
+  const [cohortTotal, setCohortTotal] = useState(0);
   const [followedTotal, setFollowedTotal] = useState(0);
   const [notFollowedTotal, setNotFollowedTotal] = useState(0);
+  const [reassignEventsTotal, setReassignEventsTotal] = useState(null);
+  const [outsideCohort, setOutsideCohort] = useState(null);
+  const [summaryLoading, setSummaryLoading] = useState(true);
   const [rows, setRows] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(50);
   const [loading, setLoading] = useState(true);
+
+  const filterActive = Boolean(
+    appliedSearch.trim() || appliedAssignedTo || appliedAssignedFrom || appliedFollowupStatus,
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setSummaryLoading(true);
+      try {
+        const res = await fetch("/api/reassign-no-followup?summary=1");
+        const data = await res.json();
+        if (!cancelled && data.success) {
+          setReassignEventsTotal(
+            data.reassign_events_total != null ? Number(data.reassign_events_total) : null,
+          );
+          setOutsideCohort(data.outside_cohort ?? null);
+        }
+      } catch (e) {
+        console.error(e);
+      } finally {
+        if (!cancelled) setSummaryLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -117,11 +149,15 @@ export default function LeadsReassignNoFollowupClient({ dashboardBase = "admin-d
       if (data.success) {
         setRows(data.data || []);
         setTotal(Number(data.total || 0));
-        setFollowedTotal(Number(data.followed || 0));
-        setNotFollowedTotal(Number(data.not_followed || 0));
+        const followed = Number(data.followed || 0);
+        const notFollowed = Number(data.not_followed || 0);
+        setFollowedTotal(followed);
+        setNotFollowedTotal(notFollowed);
+        setCohortTotal(Number(data.cohort_total ?? followed + notFollowed));
       } else {
         setRows([]);
         setTotal(0);
+        setCohortTotal(0);
         setFollowedTotal(0);
         setNotFollowedTotal(0);
       }
@@ -178,26 +214,30 @@ export default function LeadsReassignNoFollowupClient({ dashboardBase = "admin-d
         </Link>
 
         <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div className="flex min-w-0 items-start gap-3">
-              <div className="rounded-xl bg-rose-50 p-2.5 text-rose-600">
-                <Clock className="h-6 w-6" strokeWidth={2.2} aria-hidden />
-              </div>
-              <div className="min-w-0">
-                <h1 className="text-2xl font-bold tracking-tight text-slate-900">Follow-up after re-assign</h1>
-                <p className="mt-1 text-sm text-slate-500">
-                  Sales leads reassigned {REASSIGN_NO_FOLLOWUP_DAYS}+ days ago — followed vs not followed by new owner
-                  (still on assignee).
-                </p>
-              </div>
+          <div className="flex min-w-0 items-start gap-3">
+            <div className="rounded-xl bg-rose-50 p-2.5 text-rose-600">
+              <Clock className="h-6 w-6" strokeWidth={2.2} aria-hidden />
             </div>
-            <LeadsDetailDualTotalStat
-              theme="rose"
-              primaryLabel="Followed"
-              secondaryLabel="No-followup"
-              primaryTotal={followedTotal}
-              secondaryTotal={notFollowedTotal}
+            <div className="min-w-0">
+              <h1 className="text-2xl font-bold tracking-tight text-slate-900">Follow-up after re-assign</h1>
+              <p className="mt-1 text-sm text-slate-500">
+                Sales leads reassigned {REASSIGN_NO_FOLLOWUP_DAYS}+ days ago — followed vs not followed by new owner
+                (still on assignee).
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-5 w-full min-w-0">
+            <LeadsReassignFollowupOverview
+              cohortTotal={cohortTotal}
+              followed={followedTotal}
+              notFollowed={notFollowedTotal}
+              reassignEventsTotal={reassignEventsTotal}
+              outside={outsideCohort}
               loading={loading}
+              outsideLoading={summaryLoading}
+              showOutside
+              filterActive={filterActive}
             />
           </div>
 

@@ -44,6 +44,9 @@ export async function GET(request) {
         success: true,
         followed: counts.followed,
         not_followed: counts.not_followed,
+        cohort_total: counts.cohort_total,
+        reassign_events_total: counts.reassign_events_total ?? null,
+        outside_cohort: counts.outside_cohort ?? null,
         total: counts.not_followed,
       });
     }
@@ -66,6 +69,7 @@ export async function GET(request) {
         ...result,
         followed: counts.followed,
         not_followed: counts.not_followed,
+        cohort_total: counts.cohort_total,
       });
     }
 

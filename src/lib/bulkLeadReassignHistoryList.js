@@ -313,6 +313,73 @@ function resolveFollowupStatusFilter(filters) {
   return undefined;
 }
 
+function buildSalesReassignHistoryBaseWhere(params) {
+  let sql = ` WHERE h.source IN (${REASSIGN_EVENT_SOURCES.map(() => "?").join(", ")})`;
+  params.push(...REASSIGN_EVENT_SOURCES);
+  sql += salesReassignHistoryScopeSql("h");
+  return sql;
+}
+
+function sqlLatestStintIdSubquery() {
+  return `(
+    SELECT h2.id
+    FROM ${BULK_LEAD_REASSIGN_HISTORY_TABLE} h2
+    WHERE h2.customer_id = h.customer_id
+      AND h2.source IN (${REASSIGN_EVENT_SOURCES.map(() => "?").join(", ")})
+      ${salesReassignHistoryScopeSql("h2")}
+    ORDER BY h2.valid_from DESC, h2.id DESC
+    LIMIT 1
+  )`;
+}
+
+function appendLatestStintCondition(sql, params) {
+  sql += ` AND h.id = ${sqlLatestStintIdSubquery()}`;
+  params.push(...REASSIGN_EVENT_SOURCES);
+  return sql;
+}
+
+const OWNER_ON_ASSIGNEE_SQL = `
+  AND EXISTS (
+    SELECT 1 FROM customers c
+    WHERE c.customer_id = h.customer_id
+      AND TRIM(COALESCE(c.lead_source, '')) = TRIM(h.assigned_to)
+      AND TRIM(COALESCE(c.lead_source, '')) <> ''
+  )`;
+
+/** Events excluded from the 2+ day follow-up cohort (mutually exclusive buckets). */
+async function countReassignOutsideFollowupCohort(conn, bucket) {
+  await ensureBulkLeadReassignHistoryTable(conn);
+  const params = [];
+  let sql = buildSalesReassignHistoryBaseWhere(params);
+  sql += ` AND h.valid_from > '1999-12-31'`;
+
+  if (bucket === "superseded") {
+    sql += ` AND h.id <> ${sqlLatestStintIdSubquery()}`;
+    params.push(...REASSIGN_EVENT_SOURCES);
+  } else if (bucket === "too_recent") {
+    sql = appendLatestStintCondition(sql, params);
+    sql += OWNER_ON_ASSIGNEE_SQL;
+    sql += ` AND h.valid_from > DATE_SUB(NOW(), INTERVAL ${REASSIGN_NO_FOLLOWUP_DAYS} DAY)`;
+  } else if (bucket === "owner_changed") {
+    sql = appendLatestStintCondition(sql, params);
+    sql += `
+      AND NOT EXISTS (
+        SELECT 1 FROM customers c
+        WHERE c.customer_id = h.customer_id
+          AND TRIM(COALESCE(c.lead_source, '')) = TRIM(h.assigned_to)
+          AND TRIM(COALESCE(c.lead_source, '')) <> ''
+      )`;
+  } else {
+    return 0;
+  }
+
+  const [[row]] = await conn.execute(
+    `SELECT COUNT(*) AS total FROM ${BULK_LEAD_REASSIGN_HISTORY_TABLE} h${sql}`,
+    params,
+  );
+  return Number(row?.total || 0);
+}
+
 export async function countReassignFollowupCohort(conn, filters = {}, followupStatus) {
   await ensureBulkLeadReassignHistoryTable(conn);
   const params = [];
@@ -325,11 +392,49 @@ export async function countReassignFollowupCohort(conn, filters = {}, followupSt
 }
 
 export async function fetchReassignFollowupSummary(conn, filters = {}) {
-  const [followed, notFollowed] = await Promise.all([
+  const hasListFilters =
+    Boolean(filters.assignedTo || filters.assignedFrom || filters.search);
+
+  const tasks = [
     countReassignFollowupCohort(conn, filters, "followed"),
     countReassignFollowupCohort(conn, filters, "not_followed"),
-  ]);
-  return { followed, not_followed: notFollowed };
+  ];
+  if (!hasListFilters) {
+    tasks.push(
+      countReassignOutsideFollowupCohort(conn, "superseded"),
+      countReassignOutsideFollowupCohort(conn, "too_recent"),
+      countReassignOutsideFollowupCohort(conn, "owner_changed"),
+      countLeadReassignEvents(conn, {}),
+    );
+  }
+
+  const results = await Promise.all(tasks);
+  const followed = results[0];
+  const notFollowed = results[1];
+  const cohortTotal = followed + notFollowed;
+
+  const summary = {
+    followed,
+    not_followed: notFollowed,
+    cohort_total: cohortTotal,
+  };
+
+  if (!hasListFilters) {
+    const superseded = results[2];
+    const tooRecent = results[3];
+    const ownerChanged = results[4];
+    const reassignEventsTotal = results[5];
+    const outsideTotal = superseded + tooRecent + ownerChanged;
+    summary.reassign_events_total = reassignEventsTotal;
+    summary.outside_cohort = {
+      total: outsideTotal,
+      superseded,
+      too_recent: tooRecent,
+      owner_changed: ownerChanged,
+    };
+  }
+
+  return summary;
 }
 
 export async function countReassignNoFollowupLeads(conn, filters = {}) {
