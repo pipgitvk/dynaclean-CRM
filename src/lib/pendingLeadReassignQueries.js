@@ -13,6 +13,42 @@ export const PENDING_REASSIGN_WHERE_CORE = `
   AND ${REP_LIST_IS_SALES_ROLE}
 `;
 
+/** Map UI status filter → DB status values (forms vs legacy). */
+export function pendingReassignStatusValues(statusParam) {
+  const key = String(statusParam || "").trim();
+  if (!key) return null;
+  const map = {
+    verygud: ["verygud", "Very Good"],
+    average: ["average", "Average"],
+    poor: ["poor", "Poor"],
+    denied: ["denied", "Denied"],
+    invalid: ["invalid", "Invalid"],
+    old_reassign: ["old_reassign", "Old Reassign"],
+    New: ["New"],
+  };
+  if (map[key]) return map[key];
+  return [key];
+}
+
+/** Canonical campaign keys → SQL on `c.lead_campaign`. */
+export function pendingReassignCampaignFilterSql(campaignParam) {
+  const key = String(campaignParam || "").trim().toLowerCase();
+  if (!key) return null;
+  const map = {
+    india_mart: `LOWER(TRIM(c.lead_campaign)) IN ('india_mart', 'indiamart', 'india-mart')`,
+    social_media:
+      `LOWER(TRIM(c.lead_campaign)) IN ('social_media', 'facebook', 'instagram', 'meta', 'social')`,
+    google_ads:
+      `LOWER(TRIM(c.lead_campaign)) IN ('google_ads', 'google', 'google adwords', 'googleads')`,
+    website_visit:
+      `LOWER(TRIM(c.lead_campaign)) IN ('website_visit', 'website', 'website_direct', 'visit')`,
+    direct_call: `LOWER(TRIM(c.lead_campaign)) IN ('direct_call', 'direct call')`,
+    manager_assigned:
+      `REPLACE(REPLACE(LOWER(TRIM(c.lead_campaign)), '_', ''), '-', '') IN ('managerassigned', 'managerassign')`,
+  };
+  return map[key] || null;
+}
+
 export function pendingReassignSearchSql(search) {
   const q = String(search || "").trim();
   if (!q) return { clause: "", params: [] };

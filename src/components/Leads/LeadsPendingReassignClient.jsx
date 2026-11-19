@@ -8,9 +8,11 @@ import {
   ChevronLeft,
   ChevronRight,
   Layers,
+  ListChecks,
   ListTodo,
   Loader2,
   Mail,
+  Megaphone,
   Phone,
   User,
 } from "lucide-react";
@@ -20,13 +22,35 @@ import {
   LeadsFilterActions,
   LeadsFilterField,
   LeadsFilterPanel,
-  LeadsFilterRow,
+  LeadsFilterFieldsGrid,
   LeadsFilterSearch,
   LeadsFilterSelectShell,
   LeadsDetailTotalStat,
+  LeadsLastFollowupWithRemark,
 } from "@/components/Leads/LeadsManageDetailFilters";
 
 const PAGE_SIZES = [50, 100, 150];
+
+const STATUS_FILTER_OPTIONS = [
+  { value: "", label: "All Status" },
+  { value: "New", label: "New" },
+  { value: "verygud", label: "Very Good" },
+  { value: "average", label: "Average" },
+  { value: "poor", label: "Poor" },
+  { value: "denied", label: "Denied" },
+  { value: "invalid", label: "Invalid" },
+  { value: "old_reassign", label: "Old Reassign" },
+];
+
+const CAMPAIGN_FILTER_OPTIONS = [
+  { value: "", label: "All Lead Campaigns" },
+  { value: "india_mart", label: "India Mart" },
+  { value: "social_media", label: "Social Media" },
+  { value: "google_ads", label: "Google Ads" },
+  { value: "website_visit", label: "Website Visit" },
+  { value: "direct_call", label: "Direct Call" },
+  { value: "manager_assigned", label: "Manager Assign" },
+];
 
 function customerName(row) {
   const name = [row.first_name, row.last_name].filter(Boolean).join(" ").trim();
@@ -48,6 +72,12 @@ function statusBadgeClass(status) {
   if (s.includes("invalid")) return "bg-amber-100 text-amber-900";
   if (s === "new") return "bg-emerald-100 text-emerald-800";
   return "bg-slate-100 text-slate-700";
+}
+
+function formatCampaign(raw) {
+  const s = String(raw || "").trim();
+  if (!s) return "—";
+  return s.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 function formatDateCreated(value) {
@@ -75,9 +105,13 @@ export default function LeadsPendingReassignClient({ dashboardBase = "admin-dash
   const [searchDraft, setSearchDraft] = useState("");
   const [repDraft, setRepDraft] = useState("");
   const [stageDraft, setStageDraft] = useState("");
+  const [statusDraft, setStatusDraft] = useState("");
+  const [campaignDraft, setCampaignDraft] = useState("");
   const [appliedSearch, setAppliedSearch] = useState("");
   const [appliedRep, setAppliedRep] = useState("");
   const [appliedStage, setAppliedStage] = useState("");
+  const [appliedStatus, setAppliedStatus] = useState("");
+  const [appliedCampaign, setAppliedCampaign] = useState("");
 
   const [repList, setRepList] = useState([]);
   const [rows, setRows] = useState([]);
@@ -114,6 +148,8 @@ export default function LeadsPendingReassignClient({ dashboardBase = "admin-dash
       if (appliedSearch.trim()) params.set("search", appliedSearch.trim());
       if (appliedRep) params.set("lead_source", appliedRep);
       if (appliedStage) params.set("stage", appliedStage);
+      if (appliedStatus) params.set("status", appliedStatus);
+      if (appliedCampaign) params.set("lead_campaign", appliedCampaign);
       const res = await fetch(`/api/pending-lead-reassign?${params.toString()}`);
       const data = await res.json();
       if (data.success) {
@@ -130,7 +166,7 @@ export default function LeadsPendingReassignClient({ dashboardBase = "admin-dash
     } finally {
       setLoading(false);
     }
-  }, [appliedSearch, appliedRep, appliedStage, page, pageSize]);
+  }, [appliedSearch, appliedRep, appliedStage, appliedStatus, appliedCampaign, page, pageSize]);
 
   useEffect(() => {
     fetchRows();
@@ -140,6 +176,8 @@ export default function LeadsPendingReassignClient({ dashboardBase = "admin-dash
     setAppliedSearch(searchDraft);
     setAppliedRep(repDraft);
     setAppliedStage(stageDraft);
+    setAppliedStatus(statusDraft);
+    setAppliedCampaign(campaignDraft);
     setPage(0);
   };
 
@@ -147,9 +185,13 @@ export default function LeadsPendingReassignClient({ dashboardBase = "admin-dash
     setSearchDraft("");
     setRepDraft("");
     setStageDraft("");
+    setStatusDraft("");
+    setCampaignDraft("");
     setAppliedSearch("");
     setAppliedRep("");
     setAppliedStage("");
+    setAppliedStatus("");
+    setAppliedCampaign("");
     setPage(0);
   };
 
@@ -189,14 +231,14 @@ export default function LeadsPendingReassignClient({ dashboardBase = "admin-dash
           </div>
 
           <LeadsFilterPanel theme="amber">
-            <LeadsFilterRow columns={3}>
-              <LeadsFilterSearch
-                theme="amber"
-                value={searchDraft}
-                onChange={setSearchDraft}
-                onApply={applyFilters}
-                placeholder="Customer ID, name, company, phone, lead source…"
-              />
+            <LeadsFilterSearch
+              theme="amber"
+              value={searchDraft}
+              onChange={setSearchDraft}
+              onApply={applyFilters}
+              placeholder="Customer ID, name, company, phone, lead source…"
+            />
+            <LeadsFilterFieldsGrid columns={5}>
               <LeadsFilterField label="Inactive lead source">
                 <LeadsFilterSelectShell theme="amber" icon={User}>
                   <SearchableSelect
@@ -221,7 +263,31 @@ export default function LeadsPendingReassignClient({ dashboardBase = "admin-dash
                   />
                 </LeadsFilterSelectShell>
               </LeadsFilterField>
-            </LeadsFilterRow>
+              <LeadsFilterField label="Status">
+                <LeadsFilterSelectShell theme="amber" icon={ListChecks}>
+                  <SearchableSelect
+                    options={STATUS_FILTER_OPTIONS}
+                    value={statusDraft}
+                    onChange={setStatusDraft}
+                    placeholder="All Status"
+                    searchPlaceholder="Search status…"
+                    className="!border-0 w-full min-w-0 bg-transparent px-2 py-2 shadow-none"
+                  />
+                </LeadsFilterSelectShell>
+              </LeadsFilterField>
+              <LeadsFilterField label="Lead campaign">
+                <LeadsFilterSelectShell theme="amber" icon={Megaphone}>
+                  <SearchableSelect
+                    options={CAMPAIGN_FILTER_OPTIONS}
+                    value={campaignDraft}
+                    onChange={setCampaignDraft}
+                    placeholder="All Lead Campaigns"
+                    searchPlaceholder="Search campaign…"
+                    className="!border-0 w-full min-w-0 bg-transparent px-2 py-2 shadow-none"
+                  />
+                </LeadsFilterSelectShell>
+              </LeadsFilterField>
+            </LeadsFilterFieldsGrid>
             <LeadsFilterActions
               theme="amber"
               onApply={applyFilters}
@@ -237,7 +303,9 @@ export default function LeadsPendingReassignClient({ dashboardBase = "admin-dash
                   <th className="px-4 py-3.5">Customer</th>
                   <th className="px-4 py-3.5">Lead source (inactive)</th>
                   <th className="px-4 py-3.5">Status</th>
+                  <th className="px-4 py-3.5">Lead campaign</th>
                   <th className="px-4 py-3.5">Stage</th>
+                  <th className="px-4 py-3.5">Last follow-up</th>
                   <th className="px-4 py-3.5">Company</th>
                   <th className="px-4 py-3.5">Created</th>
                 </tr>
@@ -245,13 +313,13 @@ export default function LeadsPendingReassignClient({ dashboardBase = "admin-dash
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-16 text-center text-slate-500">
+                    <td colSpan={8} className="px-4 py-16 text-center text-slate-500">
                       <Loader2 className="mx-auto h-6 w-6 animate-spin text-amber-600" aria-hidden />
                     </td>
                   </tr>
                 ) : rows.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-14 text-center text-slate-500">
+                    <td colSpan={8} className="px-4 py-14 text-center text-slate-500">
                       No leads assigned to inactive salespersons.
                     </td>
                   </tr>
@@ -289,7 +357,14 @@ export default function LeadsPendingReassignClient({ dashboardBase = "admin-dash
                           {formatStatusLabel(row.status)}
                         </span>
                       </td>
+                      <td className="px-4 py-3 text-slate-700">{formatCampaign(row.lead_campaign)}</td>
                       <td className="px-4 py-3 text-slate-700">{row.stage || "—"}</td>
+                      <td className="px-4 py-3">
+                        <LeadsLastFollowupWithRemark
+                          at={row.last_followup_at}
+                          notes={row.last_followup_notes}
+                        />
+                      </td>
                       <td className="max-w-[180px] truncate px-4 py-3 text-slate-700" title={row.company || ""}>
                         {row.company || "—"}
                       </td>
