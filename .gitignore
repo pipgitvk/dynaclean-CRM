@@ -8,6 +8,9 @@ build/
 public/*
 !public/logo.png
 !public/attendance_import_template.csv
+!public/images/
+public/images/*
+!public/images/service-before-installation-technician.png
 .env
 
 uploads/

@@ -1,12 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
-import { CalendarDays, ChevronDown, Layers, Loader2, MapPin } from "lucide-react";
+import { CalendarDays, ChevronDown, Loader2 } from "lucide-react";
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
+import { getCurrentMonthThroughTodayIso } from "@/lib/crmDateFormat";
+import { LEADS_HUB_RANGE_OPTIONS } from "@/lib/leadsManageHubRange";
 import { getServiceBeforeInstallationCards } from "@/lib/serviceBeforeInstallationHub";
 import ServiceBeforeInstallationKpiCard from "@/components/ServiceBeforeInstallation/ServiceBeforeInstallationKpiCard";
 
-const TECHNICIAN_SRC = "/new pages image/Technician.png";
+const TECHNICIAN_SRC = "/images/service-before-installation-technician.png";
 
 function pctChange(current, previous) {
   if (previous === undefined || previous === null) return null;
@@ -33,20 +36,63 @@ function HeaderTechnicianArt() {
   );
 }
 
-function FilterSelect({ icon: Icon, label, defaultValue, children }) {
+function SbiHubDateRangeControl({
+  range,
+  setRange,
+  loading,
+  customFrom,
+  customTo,
+  onCustomFromChange,
+  onCustomToChange,
+  onApplyCustom,
+}) {
   return (
-    <label className="relative flex min-w-[9.5rem] flex-1 cursor-pointer items-center gap-2 rounded-xl border border-violet-200/70 bg-white/95 px-3 py-2.5 text-sm font-medium text-slate-700 shadow-sm backdrop-blur-sm transition hover:border-violet-300 sm:max-w-[11.5rem]">
-      <Icon className="h-4 w-4 shrink-0 text-violet-600" aria-hidden />
-      <span className="sr-only">{label}</span>
-      <select
-        defaultValue={defaultValue}
-        className="min-w-0 flex-1 cursor-pointer appearance-none bg-transparent pr-6 text-sm font-semibold text-slate-800 focus:outline-none"
-        aria-label={label}
-      >
-        {children}
-      </select>
-      <ChevronDown className="pointer-events-none absolute right-2.5 h-4 w-4 text-slate-400" aria-hidden />
-    </label>
+    <div className="flex min-w-0 flex-col gap-2">
+      <div className="relative inline-flex min-w-[12.5rem] flex-1 items-center sm:max-w-[14.5rem]">
+        <CalendarDays className="pointer-events-none absolute left-3 z-10 h-4 w-4 text-violet-600" aria-hidden />
+        <select
+          value={range}
+          onChange={(e) => setRange(e.target.value)}
+          className="w-full min-w-0 cursor-pointer appearance-none rounded-xl border border-violet-200/70 bg-white/95 py-2.5 pl-10 pr-9 text-sm font-semibold text-slate-800 shadow-sm backdrop-blur-sm transition hover:border-violet-300 focus:outline-none focus:ring-2 focus:ring-violet-500/20"
+          aria-label="Time period"
+        >
+          {LEADS_HUB_RANGE_OPTIONS.map((opt) => (
+            <option key={opt.id} value={opt.id}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+        <ChevronDown className="pointer-events-none absolute right-2.5 h-4 w-4 text-slate-400" aria-hidden />
+      </div>
+      {range === "custom" ? (
+        <div className="flex flex-wrap items-end gap-2 rounded-xl border border-violet-100 bg-white/95 p-2.5 shadow-sm">
+          <div className="min-w-[8.5rem]">
+            <label className="mb-1 block text-xs font-semibold text-slate-500">From</label>
+            <TypeableDateFilterInput
+              value={customFrom}
+              onChange={onCustomFromChange}
+              className="w-full rounded-lg border border-slate-200 px-2.5 py-2 text-sm"
+            />
+          </div>
+          <div className="min-w-[8.5rem]">
+            <label className="mb-1 block text-xs font-semibold text-slate-500">To</label>
+            <TypeableDateFilterInput
+              value={customTo}
+              onChange={onCustomToChange}
+              className="w-full rounded-lg border border-slate-200 px-2.5 py-2 text-sm"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={onApplyCustom}
+            disabled={loading}
+            className="rounded-lg bg-violet-600 px-3 py-2 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-60"
+          >
+            Apply
+          </button>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -59,14 +105,32 @@ export default function ServiceBeforeInstallationHubClient({
     () => getServiceBeforeInstallationCards(dashboardBase),
     [dashboardBase],
   );
+  const monthDefault = useMemo(() => getCurrentMonthThroughTodayIso(), []);
   const [counts, setCounts] = useState(initialCounts || {});
   const [prevCounts, setPrevCounts] = useState(initialPrevCounts || {});
   const [loading, setLoading] = useState(!initialCounts);
+  const [range, setRange] = useState("month");
+  const skipInitialFetch = useRef(Boolean(initialCounts));
+  const [customFrom, setCustomFrom] = useState(monthDefault.from);
+  const [customTo, setCustomTo] = useState(monthDefault.to);
+  const [appliedCustom, setAppliedCustom] = useState({
+    from: monthDefault.from,
+    to: monthDefault.to,
+  });
+  const customDraftRef = useRef(appliedCustom);
+  useEffect(() => {
+    customDraftRef.current = { from: customFrom, to: customTo };
+  }, [customFrom, customTo]);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await axios.get("/api/service-before-installation/hub");
+      const params = { range };
+      if (range === "custom") {
+        params.from = appliedCustom.from;
+        params.to = appliedCustom.to;
+      }
+      const res = await axios.get("/api/service-before-installation/hub", { params });
       if (res.data?.success) {
         setCounts(res.data.counts || {});
         setPrevCounts(res.data.prevCounts || {});
@@ -76,11 +140,34 @@ export default function ServiceBeforeInstallationHubClient({
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [range, appliedCustom.from, appliedCustom.to]);
 
   useEffect(() => {
-    if (!initialCounts) load();
-  }, [initialCounts, load]);
+    if (skipInitialFetch.current) {
+      skipInitialFetch.current = false;
+      return;
+    }
+    if (range === "custom") return;
+    load();
+  }, [range, load]);
+
+  const applyCustomRange = useCallback(() => {
+    const { from, to } = customDraftRef.current;
+    setAppliedCustom({ from, to });
+    setLoading(true);
+    axios
+      .get("/api/service-before-installation/hub", {
+        params: { range: "custom", from, to },
+      })
+      .then((res) => {
+        if (res.data?.success) {
+          setCounts(res.data.counts || {});
+          setPrevCounts(res.data.prevCounts || {});
+        }
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
 
   const changes = useMemo(() => {
     const out = {};
@@ -116,19 +203,17 @@ export default function ServiceBeforeInstallationHubClient({
               card for details.
             </p>
 
-            <div className="mt-4 flex flex-wrap gap-2 sm:gap-3">
-              <FilterSelect icon={CalendarDays} label="Time period" defaultValue="this_month">
-                <option value="this_month">This Month</option>
-                <option value="last_month">Last Month</option>
-                <option value="quarter">This Quarter</option>
-                <option value="year">This Year</option>
-              </FilterSelect>
-              <FilterSelect icon={MapPin} label="Location" defaultValue="all">
-                <option value="all">All Locations</option>
-              </FilterSelect>
-              <FilterSelect icon={Layers} label="Products" defaultValue="all">
-                <option value="all">All Products</option>
-              </FilterSelect>
+            <div className="mt-4 flex flex-wrap items-start gap-2 sm:gap-3">
+              <SbiHubDateRangeControl
+                range={range}
+                setRange={setRange}
+                loading={loading}
+                customFrom={customFrom}
+                customTo={customTo}
+                onCustomFromChange={setCustomFrom}
+                onCustomToChange={setCustomTo}
+                onApplyCustom={applyCustomRange}
+              />
               {loading ? (
                 <span className="inline-flex items-center self-center pl-1 text-violet-600">
                   <Loader2 className="h-5 w-5 animate-spin" aria-label="Loading counts" />

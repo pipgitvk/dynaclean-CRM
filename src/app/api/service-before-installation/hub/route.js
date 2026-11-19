@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { assertSuperAdminApiAccess } from "@/lib/serviceBeforeInstallationAccess";
 import { parseSbiFilters } from "@/lib/serviceBeforeInstallationFilters";
 import { fetchServiceBeforeInstallationHubCounts } from "@/lib/serviceBeforeInstallationQueries";
+import { resolveLeadsHubRange } from "@/lib/leadsManageHubRange";
 
 export async function GET(request) {
   try {
@@ -11,21 +12,46 @@ export async function GET(request) {
     }
 
     const { searchParams } = new URL(request.url);
+    const rangeKey = searchParams.get("range") || "month";
+    const resolved = resolveLeadsHubRange(rangeKey, {
+      from: searchParams.get("from"),
+      to: searchParams.get("to"),
+    });
+
     const filters = parseSbiFilters({
       search: searchParams.get("search"),
       q: searchParams.get("q"),
       model: searchParams.get("model"),
       state: searchParams.get("state"),
       serial: searchParams.get("serial"),
-      from: searchParams.get("from"),
-      to: searchParams.get("to"),
+      from: resolved.from,
+      to: resolved.to,
       itemType: searchParams.get("itemType") ?? searchParams.get("item_type"),
       assignedTo: searchParams.get("assignedTo") ?? searchParams.get("assigned_to"),
       serviceStatus: searchParams.get("serviceStatus") ?? searchParams.get("service_status"),
     });
 
-    const counts = await fetchServiceBeforeInstallationHubCounts(filters);
-    return NextResponse.json({ success: true, counts, filters });
+    const prevFilters = parseSbiFilters({
+      ...filters,
+      from: resolved.prevFrom,
+      to: resolved.prevTo,
+    });
+
+    const [counts, prevCounts] = await Promise.all([
+      fetchServiceBeforeInstallationHubCounts(filters),
+      fetchServiceBeforeInstallationHubCounts(prevFilters),
+    ]);
+
+    return NextResponse.json({
+      success: true,
+      counts,
+      prevCounts,
+      range: resolved.rangeKey,
+      rangeLabel: resolved.rangeLabel,
+      from: resolved.from,
+      to: resolved.to,
+      filters,
+    });
   } catch (error) {
     console.error("[service-before-installation/hub]", error);
     return NextResponse.json(
