@@ -72,9 +72,9 @@ const STAGE_OPTIONS = [
 const TABLE_STAGE_OPTIONS = [{ value: "", label: "Stage" }, ...STAGE_OPTIONS.slice(1)];
 
 const PROFILE_OPTIONS = [
+  { value: "all", label: "All" },
   { value: "active", label: "Active" },
   { value: "inactive", label: "Inactive" },
-  { value: "all", label: "All" },
 ];
 
 const PAGE_SIZE_OPTIONS = [50, 100, 150];
