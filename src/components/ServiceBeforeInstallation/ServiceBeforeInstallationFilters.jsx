@@ -177,6 +177,29 @@ function FilterInput({ label, placeholder, value, onChange, className = "xl:col-
   );
 }
 
+function WarrantyRegistrationFilterSelect({ value, onChange, className = "xl:col-span-3" }) {
+  const options = [
+    { value: "", label: "All (Registered & not)" },
+    { value: "registered", label: "Registered" },
+    { value: "not_registered", label: "Not registered" },
+  ];
+  return (
+    <label className={`block min-w-0 sm:col-span-1 ${className}`}>
+      <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+        Registration
+      </span>
+      <SearchableSelect
+        options={options}
+        value={value || ""}
+        onChange={onChange}
+        placeholder="All (Registered & not)"
+        searchPlaceholder="Search…"
+        className={`w-full min-w-0 ${filterSelectClass}`}
+      />
+    </label>
+  );
+}
+
 function ItemTypeFilterSelect({ value, onChange, className = "xl:col-span-3" }) {
   const options = [
     { value: "", label: "All (Products & Spares)" },
@@ -312,8 +335,16 @@ export default function ServiceBeforeInstallationFilters({
               className={row2Field}
             />
             <FilterInput
-              label="Location"
-              placeholder="Delivery location…"
+              label={
+                segment === "open-installation" || segment === "overdue-delayed-installation"
+                  ? "State"
+                  : "Location"
+              }
+              placeholder={
+                segment === "open-installation" || segment === "overdue-delayed-installation"
+                  ? "Order state…"
+                  : "Delivery location…"
+              }
               value={draft.state}
               onChange={setField("state")}
               className={row2Field}
@@ -325,6 +356,44 @@ export default function ServiceBeforeInstallationFilters({
               onChange={setField("serial")}
               className={row2Field}
             />
+            {segment === "open-installation" || segment === "overdue-delayed-installation" ? (
+              <WarrantyRegistrationFilterSelect
+                value={draft.warrantyRegistration}
+                onChange={setField("warrantyRegistration")}
+                className={row2Field}
+              />
+            ) : null}
+            {segment === "open-installation" || segment === "overdue-delayed-installation" ? (
+              <>
+                <TableDistinctNameFilterSelect
+                  label="Sales person"
+                  placeholder="All sales persons"
+                  names={tableFilterOptions?.salesPersons || []}
+                  value={draft.salesPerson}
+                  onChange={setField("salesPerson")}
+                  onRequestOptions={onRequestTableFilterOptions}
+                  className={row2Field}
+                />
+                <TableDistinctNameFilterSelect
+                  label="Service engineer"
+                  placeholder="All service engineers"
+                  names={tableFilterOptions?.serviceEngineers || []}
+                  value={draft.serviceEngineer}
+                  onChange={setField("serviceEngineer")}
+                  onRequestOptions={onRequestTableFilterOptions}
+                  className={row2Field}
+                />
+                <TableDistinctNameFilterSelect
+                  label="Third party engineer"
+                  placeholder="All third party engineers"
+                  names={tableFilterOptions?.thirdPartyEngineers || []}
+                  value={draft.thirdPartyEngineer}
+                  onChange={setField("thirdPartyEngineer")}
+                  onRequestOptions={onRequestTableFilterOptions}
+                  className={row2Field}
+                />
+              </>
+            ) : null}
           </>
         ) : null}
 

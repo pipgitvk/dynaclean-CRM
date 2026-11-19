@@ -9,6 +9,12 @@ import {
   INSTALLED_AFTER_REGISTERED_SQL,
   INSTALLATION_PENDING_AFTER_REGISTERED_SQL,
 } from "@/lib/serviceBeforeInstallationWpExpressions";
+import {
+  U_DELIVERED_INSTALLATION_PENDING_SQL,
+  U_DELIVERY_PENDING_AFTER_DISPATCH_SQL,
+  U_INSTALLATION_COMPLETED_SQL,
+  U_NO_FEEDBACK_COLLECTED_SQL,
+} from "@/lib/openInstallationKpiSql";
 
 const DISPATCH_ON_ORDER_QUOTE = sqlTrimUtf8EqColumns("d.quote_number", "no.quote_number");
 
@@ -116,7 +122,10 @@ export function buildWpFilterSql(
   return { sql, params };
 }
 
-export function buildUpcomingInstallationListFilterSql(filters) {
+export function buildUpcomingInstallationListFilterSql(
+  filters,
+  { omitOpenInstallationBucket = false, omitTeamFilters = false } = {},
+) {
   const f = parseSbiFilters(filters);
   let sql = "";
   const params = [];
@@ -127,16 +136,18 @@ export function buildUpcomingInstallationListFilterSql(filters) {
       u.order_id LIKE ? OR u.quote_number LIKE ? OR u.company_name LIKE ?
       OR u.contact LIKE ? OR u.invoice_number LIKE ? OR u.delivery_address LIKE ?
       OR u.model LIKE ? OR u.name LIKE ? OR u.serial_number LIKE ? OR u.emp_name LIKE ?
+      OR u.state LIKE ? OR u.order_sales_person LIKE ?
+      OR u.service_engineer LIKE ? OR u.third_party_engineer LIKE ?
       OR CAST(u.service_id AS CHAR) LIKE ?
     )`;
-    params.push(...Array(10).fill(term));
+    params.push(...Array(14).fill(term));
   }
   if (f.model) {
     sql += ` AND u.model LIKE ?`;
     params.push(`%${f.model}%`);
   }
   if (f.state) {
-    sql += ` AND u.delivery_address LIKE ?`;
+    sql += ` AND u.state LIKE ?`;
     params.push(`%${f.state}%`);
   }
   if (f.serial) {
@@ -150,6 +161,40 @@ export function buildUpcomingInstallationListFilterSql(filters) {
   if (f.to) {
     sql += ` AND DATE(u.delivery_date) <= ?`;
     params.push(f.to);
+  }
+
+  if (f.warrantyRegistration === "registered") {
+    sql += ` AND COALESCE(u.warranty_registered, 0) = 1`;
+  } else if (f.warrantyRegistration === "not_registered") {
+    sql += ` AND COALESCE(u.warranty_registered, 0) = 0`;
+  }
+
+  if (!omitOpenInstallationBucket) {
+    if (f.openInstallationBucket === "delivered_pending") {
+      sql += ` AND ${U_DELIVERED_INSTALLATION_PENDING_SQL}`;
+    } else if (f.openInstallationBucket === "delivery_pending") {
+      sql += ` AND ${U_DELIVERY_PENDING_AFTER_DISPATCH_SQL}`;
+    } else if (f.openInstallationBucket === "completed") {
+      sql += ` AND ${U_INSTALLATION_COMPLETED_SQL}`;
+    } else if (f.openInstallationBucket === "no_feedback") {
+      sql += ` AND ${U_NO_FEEDBACK_COLLECTED_SQL}`;
+    }
+  }
+
+  if (!omitTeamFilters) {
+    const nameEq = `TRIM(CONVERT(? USING utf8mb4)) COLLATE ${UTF8_COLLATE}`;
+    if (f.salesPerson) {
+      sql += ` AND ${sqlUtf8TrimExpr("u.order_sales_person")} COLLATE ${UTF8_COLLATE} = ${nameEq}`;
+      params.push(f.salesPerson);
+    }
+    if (f.serviceEngineer) {
+      sql += ` AND ${sqlUtf8TrimExpr("u.service_engineer")} COLLATE ${UTF8_COLLATE} = ${nameEq}`;
+      params.push(f.serviceEngineer);
+    }
+    if (f.thirdPartyEngineer) {
+      sql += ` AND ${sqlUtf8TrimExpr("u.third_party_engineer")} COLLATE ${UTF8_COLLATE} = ${nameEq}`;
+      params.push(f.thirdPartyEngineer);
+    }
   }
 
   return { sql, params };

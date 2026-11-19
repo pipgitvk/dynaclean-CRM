@@ -5,6 +5,7 @@ import {
   sqlUtf8TrimExpr,
 } from "@/lib/sqlUtf8Compare";
 import {
+  buildOpenInstallationKpiInnerQuery,
   buildUpcomingInstallationsQuery,
   dispatchTypeJoin,
   resolveUpcomingInstallationType,
@@ -27,6 +28,12 @@ import {
   fetchTotalRegisteredBasePage,
 } from "@/lib/serviceBeforeInstallationWpList";
 import {
+  U_DELIVERED_INSTALLATION_PENDING_SQL,
+  U_DELIVERY_PENDING_AFTER_DISPATCH_SQL,
+  U_INSTALLATION_COMPLETED_SQL,
+  U_NO_FEEDBACK_COLLECTED_SQL,
+} from "@/lib/openInstallationKpiSql";
+import {
   INSTALLED_AFTER_REGISTERED_SQL,
   INSTALLATION_PENDING_AFTER_REGISTERED_SQL,
 } from "@/lib/serviceBeforeInstallationWpExpressions";
@@ -40,11 +47,49 @@ export const OVERDUE_DELAYED_INSTALLATION_DAYS = 2;
 
 const HUB_COUNTS_CACHE = new Map();
 const HUB_COUNTS_TTL_MS = 45_000;
+const OPEN_INSTALLATION_KPI_CACHE = new Map();
+const OPEN_INSTALLATION_KPI_TTL_MS = 30_000;
 
-async function countUpcomingInstallations(conn, filters, { overdueDelayedOnly = false } = {}) {
+function openInstallationNeedsFullListShape(filters) {
+  const f = parseSbiFilters(filters);
+  return Boolean(
+    f.search ||
+      f.model ||
+      f.state ||
+      f.serial ||
+      f.salesPerson ||
+      f.serviceEngineer ||
+      f.thirdPartyEngineer ||
+      f.warrantyRegistration,
+  );
+}
+
+function buildOpenInstallationInnerQuery(filters, { forList = false } = {}) {
   const parsed = parseSbiFilters(filters);
   const type = resolveUpcomingInstallationType(parsed.itemType);
-  const inner = buildUpcomingInstallationsQuery({ type, registration: null });
+  if (forList) {
+    return buildUpcomingInstallationsQuery({
+      type,
+      registration: null,
+      includeQuoteTotals: false,
+      includeServiceDetails: false,
+      includeInnerOrderBy: false,
+    });
+  }
+  if (openInstallationNeedsFullListShape(filters)) {
+    return buildUpcomingInstallationsQuery({
+      type,
+      registration: null,
+      includeQuoteTotals: false,
+      includeServiceDetails: false,
+      includeInnerOrderBy: false,
+    });
+  }
+  return buildOpenInstallationKpiInnerQuery({ type });
+}
+
+async function countUpcomingInstallations(conn, filters, { overdueDelayedOnly = false } = {}) {
+  const inner = buildOpenInstallationInnerQuery(filters, { forList: false });
   const listFilter = buildUpcomingInstallationListFilterSql(filters);
   const extraSql = overdueDelayedOnly ? upcomingOverdueDelayedExtraSql() : "";
   const [[row]] = await conn.execute(
@@ -123,32 +168,120 @@ async function countUpcomingInstallationHubTotals(conn, filters) {
   };
 }
 
+function openInstallationBreakdownAggregateSql(inner, listFilter, extraSql) {
+  return `SELECT
+    COUNT(*) AS total,
+    SUM(CASE WHEN ${U_DELIVERED_INSTALLATION_PENDING_SQL} THEN 1 ELSE 0 END) AS delivered_installation_pending,
+    SUM(CASE WHEN ${U_DELIVERY_PENDING_AFTER_DISPATCH_SQL} THEN 1 ELSE 0 END) AS delivery_pending_after_dispatch,
+    SUM(CASE WHEN ${U_INSTALLATION_COMPLETED_SQL} THEN 1 ELSE 0 END) AS completed_installation,
+    SUM(CASE WHEN ${U_NO_FEEDBACK_COLLECTED_SQL} THEN 1 ELSE 0 END) AS no_feedback_collected
+  FROM (${inner}) u WHERE 1=1 ${listFilter.sql}${extraSql}`;
+}
+
+function parseOpenInstallationBreakdownRow(row) {
+  return {
+    total: Number(row?.total || 0),
+    delivered_installation_pending: Number(row?.delivered_installation_pending || 0),
+    delivery_pending_after_dispatch: Number(row?.delivery_pending_after_dispatch || 0),
+    completed_installation: Number(row?.completed_installation || 0),
+    no_feedback_collected: Number(row?.no_feedback_collected || 0),
+  };
+}
+
+function openInstallationKpiCacheKey(filters, overdueDelayedOnly) {
+  const f = parseSbiFilters(filters);
+  return JSON.stringify({
+    overdueDelayedOnly: Boolean(overdueDelayedOnly),
+    search: f.search,
+    model: f.model,
+    state: f.state,
+    serial: f.serial,
+    from: f.from,
+    to: f.to,
+    itemType: f.itemType,
+  });
+}
+
+export async function fetchOpenInstallationBreakdown(
+  conn,
+  filters,
+  { overdueDelayedOnly = false } = {},
+) {
+  const cacheKey = openInstallationKpiCacheKey(filters, overdueDelayedOnly);
+  const cached = OPEN_INSTALLATION_KPI_CACHE.get(cacheKey);
+  if (cached && Date.now() - cached.at < OPEN_INSTALLATION_KPI_TTL_MS) {
+    return cached.data;
+  }
+
+  const inner = buildOpenInstallationInnerQuery(filters, { forList: false });
+  const listFilter = buildUpcomingInstallationListFilterSql(filters, {
+    omitOpenInstallationBucket: true,
+  });
+  const extraSql = overdueDelayedOnly ? upcomingOverdueDelayedExtraSql() : "";
+  const [[row]] = await conn.execute(
+    openInstallationBreakdownAggregateSql(inner, listFilter, extraSql),
+    listFilter.params,
+  );
+  const data = parseOpenInstallationBreakdownRow(row);
+  OPEN_INSTALLATION_KPI_CACHE.set(cacheKey, { at: Date.now(), data });
+  return data;
+}
+
 async function fetchUpcomingInstallationsPage(
   conn,
   filters,
   limit,
   skip,
-  { overdueDelayedOnly = false } = {},
+  { overdueDelayedOnly = false, includeBreakdown = false } = {},
 ) {
   const parsed = parseSbiFilters(filters);
-  const type = resolveUpcomingInstallationType(parsed.itemType);
-  const inner = buildUpcomingInstallationsQuery({ type, registration: null });
+  const listInner = buildOpenInstallationInnerQuery(filters, { forList: true });
   const listFilter = buildUpcomingInstallationListFilterSql(filters);
   const extraSql = overdueDelayedOnly ? upcomingOverdueDelayedExtraSql() : "";
   const baseParams = [...listFilter.params];
-
-  const total = await countUpcomingInstallations(conn, filters, { overdueDelayedOnly });
+  const hasBucket = Boolean(parsed.openInstallationBucket);
 
   const orderBy = overdueDelayedOnly ? "u.delivery_date ASC" : "u.days_until_installation ASC";
 
-  const [rows] = await conn.execute(
-    `SELECT u.* FROM (${inner}) u WHERE 1=1 ${listFilter.sql}${extraSql}
+  const rowsPromise = conn.execute(
+    `SELECT u.* FROM (${listInner}) u WHERE 1=1 ${listFilter.sql}${extraSql}
      ORDER BY ${orderBy}
      LIMIT ? OFFSET ?`,
     [...baseParams, limit, skip],
   );
 
-  return { total, data: rows };
+  const breakdownPromise = includeBreakdown
+    ? fetchOpenInstallationBreakdown(conn, filters, { overdueDelayedOnly })
+    : Promise.resolve(null);
+
+  // No KPI bucket → reuse breakdown.total for pagination (skip 2nd heavy COUNT).
+  const countPromise =
+    includeBreakdown && !hasBucket
+      ? Promise.resolve(null)
+      : conn.execute(
+          `SELECT COUNT(*) AS cnt FROM (${buildOpenInstallationInnerQuery(filters, {
+            forList: false,
+          })}) u WHERE 1=1 ${listFilter.sql}${extraSql}`,
+          baseParams,
+        );
+
+  const [rowsExec, openInstallationBreakdown, countExec] = await Promise.all([
+    rowsPromise,
+    breakdownPromise,
+    countPromise,
+  ]);
+
+  const rows = rowsExec[0];
+  const total =
+    includeBreakdown && !hasBucket
+      ? Number(openInstallationBreakdown?.total || 0)
+      : Number(countExec?.[0]?.[0]?.cnt || 0);
+
+  return {
+    total,
+    data: rows,
+    openInstallationBreakdown: openInstallationBreakdown ?? undefined,
+  };
 }
 
 export const NOT_INSTALLED_SQL = `(
@@ -315,8 +448,24 @@ export async function fetchServiceBeforeInstallationSegmentPage(segment, options
   const safeSkip = skip;
 
   if (segment === "open-installation") {
-    return fetchUpcomingInstallationsPage(conn, filters, safeLimit, safeSkip, {
+    const listFilters = parseSbiFilters(filters);
+    const withProducts =
+      listFilters.itemType === "" || listFilters.itemType === "all"
+        ? { ...filters, itemType: "products" }
+        : filters;
+    if (options.breakdownOnly) {
+      const openInstallationBreakdown = await fetchOpenInstallationBreakdown(conn, withProducts, {
+        overdueDelayedOnly: false,
+      });
+      return {
+        total: openInstallationBreakdown.total,
+        data: [],
+        openInstallationBreakdown,
+      };
+    }
+    return fetchUpcomingInstallationsPage(conn, withProducts, safeLimit, safeSkip, {
       overdueDelayedOnly: false,
+      includeBreakdown: options.includeOpenInstallationBreakdown !== false,
     });
   }
 
@@ -602,5 +751,68 @@ export async function fetchServiceBeforeInstallationWpFilterOptions(segment, fil
 
   const data = { salesPersons, serviceEngineers, thirdPartyEngineers };
   WP_FILTER_OPTIONS_CACHE.set(cacheKey, { at: Date.now(), data });
+  return data;
+}
+
+const OPEN_FILTER_OPTIONS_CACHE = new Map();
+const OPEN_FILTER_OPTIONS_TTL_MS = 2 * 60 * 1000;
+const OPEN_FILTER_OPTIONS_NAME_LIMIT = 250;
+
+async function fetchOpenInstallationFilterOptions(conn, filters = {}) {
+  const parsed = parseSbiFilters(filters);
+  const withProducts =
+    parsed.itemType === "" || parsed.itemType === "all"
+      ? { ...filters, itemType: "products" }
+      : filters;
+  const inner = buildOpenInstallationInnerQuery(withProducts, { forList: true });
+  const listFilter = buildUpcomingInstallationListFilterSql(withProducts, {
+    omitOpenInstallationBucket: true,
+    omitTeamFilters: true,
+  });
+  const where = `WHERE 1=1 ${listFilter.sql}`;
+  const params = listFilter.params;
+  const limit = OPEN_FILTER_OPTIONS_NAME_LIMIT;
+
+  const distinctSql = (column) =>
+    `SELECT DISTINCT ${sqlUtf8TrimExpr(column)} AS name
+     FROM (${inner}) u
+     ${where}
+       AND ${sqlUtf8HasText(column)}
+     ORDER BY name ASC
+     LIMIT ${limit}`;
+
+  const [salesRows, serviceEngineers, thirdPartyEngineers] = await Promise.all([
+    conn.execute(distinctSql("u.order_sales_person"), params).then(([rows]) => rows),
+    conn.execute(distinctSql("u.service_engineer"), params).then(([rows]) => rows),
+    conn.execute(distinctSql("u.third_party_engineer"), params).then(([rows]) => rows),
+  ]);
+
+  return {
+    salesPersons: salesRows.map((r) => String(r.name || "").trim()).filter(Boolean),
+    serviceEngineers: serviceEngineers.map((r) => String(r.name || "").trim()).filter(Boolean),
+    thirdPartyEngineers: thirdPartyEngineers
+      .map((r) => String(r.name || "").trim())
+      .filter(Boolean),
+  };
+}
+
+/** Distinct sales / engineer names for open-installation list filters. */
+export async function fetchServiceBeforeInstallationSegmentFilterOptions(segment, filters = {}) {
+  if (segment === "total-registered" || segment === "active-warranty" || segment === "due-warranty-expiry") {
+    return fetchServiceBeforeInstallationWpFilterOptions(segment, filters);
+  }
+  if (segment !== "open-installation" && segment !== "overdue-delayed-installation") {
+    return null;
+  }
+
+  const cacheKey = JSON.stringify({ segment, f: parseSbiFilters(filters) });
+  const cached = OPEN_FILTER_OPTIONS_CACHE.get(cacheKey);
+  if (cached && Date.now() - cached.at < OPEN_FILTER_OPTIONS_TTL_MS) {
+    return cached.data;
+  }
+
+  const conn = await getDbConnection();
+  const data = await fetchOpenInstallationFilterOptions(conn, filters);
+  OPEN_FILTER_OPTIONS_CACHE.set(cacheKey, { at: Date.now(), data });
   return data;
 }

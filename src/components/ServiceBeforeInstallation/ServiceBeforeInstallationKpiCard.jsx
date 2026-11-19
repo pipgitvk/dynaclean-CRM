@@ -7,7 +7,10 @@ import {
   CheckCircle2,
   ClipboardList,
   Clock,
+  MessageCircleOff,
   Package,
+  PackageCheck,
+  Truck,
   Shield,
   ShieldCheck,
   TrendingDown,
@@ -20,6 +23,10 @@ export const SBI_CARD_ICONS = {
   "total-registered": Package,
   "registered-installation-pending": Clock,
   "registered-installation-completed": CheckCircle2,
+  "open-installation-delivered-pending": PackageCheck,
+  "open-installation-delivery-pending": Truck,
+  "open-installation-completed": CheckCircle2,
+  "open-installation-no-feedback": MessageCircleOff,
   "open-installation": Wrench,
   "open-completions": ClipboardList,
   "overdue-delayed-installation": AlertTriangle,
@@ -33,6 +40,10 @@ export const SBI_SPARK_SEED = {
   "total-registered": 3,
   "registered-installation-pending": 6,
   "registered-installation-completed": 9,
+  "open-installation-delivered-pending": 4,
+  "open-installation-delivery-pending": 8,
+  "open-installation-completed": 12,
+  "open-installation-no-feedback": 15,
   "open-installation": 5,
   "open-completions": 7,
   "overdue-delayed-installation": 11,
@@ -187,11 +198,17 @@ export default function ServiceBeforeInstallationKpiCard({
     : `min-h-[9.25rem] border border-slate-200/75 bg-white/95 shadow-[0_10px_28px_-14px_rgba(15,23,42,0.18)] backdrop-blur-sm sm:min-h-[9.75rem]${compactHover}`;
 
   const activeRing =
-    card.id === "registered-installation-pending"
+    card.id === "registered-installation-pending" ||
+    card.id === "open-installation-delivered-pending"
       ? "ring-2 ring-amber-500/75 ring-offset-2 ring-offset-amber-50/60"
-      : card.id === "registered-installation-completed"
+      : card.id === "registered-installation-completed" ||
+          card.id === "open-installation-completed"
         ? "ring-2 ring-emerald-500/75 ring-offset-2 ring-offset-emerald-50/60"
-        : "ring-2 ring-violet-500/75 ring-offset-2 ring-offset-violet-50/60";
+        : card.id === "open-installation-delivery-pending"
+          ? "ring-2 ring-sky-500/75 ring-offset-2 ring-offset-sky-50/60"
+          : card.id === "open-installation-no-feedback"
+            ? "ring-2 ring-rose-500/75 ring-offset-2 ring-offset-rose-50/60"
+            : "ring-2 ring-violet-500/75 ring-offset-2 ring-offset-violet-50/60";
   const className = `group relative block overflow-hidden rounded-2xl ${shell} ${active ? activeRing : ""}`;
 
   const inner = (

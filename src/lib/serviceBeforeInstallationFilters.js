@@ -17,6 +17,10 @@ export const EMPTY_SBI_FILTERS = {
   thirdPartyEngineer: "",
   /** total-registered KPI: "" | "pending" | "completed" */
   registeredInstallation: "",
+  /** open-installation KPI: "" | "delivered_pending" | "delivery_pending" | "completed" | "no_feedback" */
+  openInstallationBucket: "",
+  /** open-installation list: "" | "registered" | "not_registered" */
+  warrantyRegistration: "",
   range: SBI_RANGE_SELECT.id,
 };
 
@@ -83,7 +87,39 @@ export function parseSbiFilters(input) {
     registeredInstallation: normalizeRegisteredInstallation(
       src.registeredInstallation ?? src.registered_installation,
     ),
+    openInstallationBucket: normalizeOpenInstallationBucket(
+      src.openInstallationBucket ?? src.open_installation_bucket,
+    ),
+    warrantyRegistration: normalizeWarrantyRegistration(
+      src.warrantyRegistration ?? src.warranty_registration ?? src.registration,
+    ),
   };
+}
+
+function normalizeWarrantyRegistration(raw) {
+  const v = String(raw ?? "")
+    .trim()
+    .toLowerCase();
+  if (v === "registered" || v === "yes" || v === "1") return "registered";
+  if (v === "not_registered" || v === "unregistered" || v === "no" || v === "0") {
+    return "not_registered";
+  }
+  return "";
+}
+
+function normalizeOpenInstallationBucket(raw) {
+  const v = String(raw ?? "")
+    .trim()
+    .toLowerCase();
+  if (
+    v === "delivered_pending" ||
+    v === "delivery_pending" ||
+    v === "completed" ||
+    v === "no_feedback"
+  ) {
+    return v;
+  }
+  return "";
 }
 
 function normalizeOrderItemType(raw) {

@@ -6,7 +6,7 @@ import { getDbConnection } from "@/lib/db";
 import {
   countWarrantyProductsSegment,
   fetchServiceBeforeInstallationSegmentPage,
-  fetchServiceBeforeInstallationWpFilterOptions,
+  fetchServiceBeforeInstallationSegmentFilterOptions,
 } from "@/lib/serviceBeforeInstallationQueries";
 
 export async function GET(request, { params }) {
@@ -41,6 +41,12 @@ export async function GET(request, { params }) {
         searchParams.get("thirdPartyEngineer") ?? searchParams.get("third_party_engineer"),
       registeredInstallation:
         searchParams.get("registeredInstallation") ?? searchParams.get("registered_installation"),
+      openInstallationBucket:
+        searchParams.get("openInstallationBucket") ?? searchParams.get("open_installation_bucket"),
+      warrantyRegistration:
+        searchParams.get("warrantyRegistration") ??
+        searchParams.get("warranty_registration") ??
+        searchParams.get("registration"),
     });
 
     const filterOptionsOnly =
@@ -50,7 +56,10 @@ export async function GET(request, { params }) {
       !filterOptionsOnly && String(searchParams.get("includeFilterOptions") || "0").trim() === "1";
 
     if (filterOptionsOnly) {
-      const filterOptions = await fetchServiceBeforeInstallationWpFilterOptions(segment, filters);
+      const filterOptions = await fetchServiceBeforeInstallationSegmentFilterOptions(
+        segment,
+        filters,
+      );
       return NextResponse.json({
         success: true,
         data: [],
@@ -60,6 +69,9 @@ export async function GET(request, { params }) {
     }
 
     const countOnly = String(searchParams.get("countOnly") || "").trim() === "1";
+    const breakdownOnly = String(searchParams.get("breakdownOnly") || "").trim() === "1";
+    const includeOpenInstallationBreakdown =
+      String(searchParams.get("includeOpenInstallationBreakdown") || "1").trim() !== "0";
     // Default off — full COUNT on ~1k warranty rows is fast; defer showed "10+" only.
     const deferTotal = String(searchParams.get("deferTotal") || "0").trim() === "1";
 
@@ -80,6 +92,8 @@ export async function GET(request, { params }) {
         ...filters,
         limit,
         skip,
+        breakdownOnly: breakdownOnly && segment === "open-installation",
+        includeOpenInstallationBreakdown,
         deferTotal:
           deferTotal &&
           (segment === "total-registered" ||
@@ -87,7 +101,7 @@ export async function GET(request, { params }) {
             segment === "due-warranty-expiry"),
       }),
       wantFilterOptions
-        ? fetchServiceBeforeInstallationWpFilterOptions(segment, filters)
+        ? fetchServiceBeforeInstallationSegmentFilterOptions(segment, filters)
         : Promise.resolve(null),
     ]);
 
@@ -101,6 +115,7 @@ export async function GET(request, { params }) {
       data: result.data,
       filterOptions,
       installationBreakdown: result.installationBreakdown ?? null,
+      openInstallationBreakdown: result.openInstallationBreakdown ?? null,
       pagination: {
         total,
         limit,
