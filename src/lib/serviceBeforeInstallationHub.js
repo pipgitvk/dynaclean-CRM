@@ -7,6 +7,7 @@ export const TOTAL_REGISTERED_DETAIL_KPI_STRIP = [
     id: "registered-installation-pending",
     title: "Installation Pending",
     subtitle: "After registration — not installed yet",
+    countCaption: "No. of installations pending after registered products",
     countKey: "registered_installation_pending",
     accent: "from-amber-500 to-orange-600",
     surface:
@@ -19,6 +20,7 @@ export const TOTAL_REGISTERED_DETAIL_KPI_STRIP = [
     id: "registered-installation-completed",
     title: "Installation Completed",
     subtitle: "Registered products with installation done",
+    countCaption: "No. of installations completed after registered products",
     countKey: "registered_installation_completed",
     accent: "from-emerald-500 to-teal-600",
     surface:
@@ -34,6 +36,7 @@ export const SERVICE_BEFORE_INSTALLATION_SEGMENTS = [
     id: "total-registered",
     title: "Total Registered",
     subtitle: "All registered products",
+    countCaption: "No. of registered products",
     countKey: "total_registered",
     accent: "from-violet-600 to-purple-600",
     surface:

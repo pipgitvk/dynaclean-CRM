@@ -184,7 +184,7 @@ export default function ServiceBeforeInstallationKpiCard({
       : "";
   const shell = isHub
     ? `min-h-[12.5rem] border transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl ${card.surface}`
-    : `min-h-[8.25rem] border border-slate-200/75 bg-white/95 shadow-[0_10px_28px_-14px_rgba(15,23,42,0.18)] backdrop-blur-sm sm:min-h-[8.75rem]${compactHover}`;
+    : `min-h-[9.25rem] border border-slate-200/75 bg-white/95 shadow-[0_10px_28px_-14px_rgba(15,23,42,0.18)] backdrop-blur-sm sm:min-h-[9.75rem]${compactHover}`;
 
   const activeRing =
     card.id === "registered-installation-pending"
@@ -253,7 +253,7 @@ export default function ServiceBeforeInstallationKpiCard({
               />
             </div>
           ) : null}
-          <div className="relative z-10 flex min-h-[8.25rem] flex-col justify-between p-4 pb-9 sm:min-h-[8.75rem] sm:p-4 sm:pb-10">
+          <div className="relative z-10 flex min-h-[9.25rem] flex-col justify-between p-4 pb-9 sm:min-h-[9.75rem] sm:p-4 sm:pb-10">
             <div className="flex min-w-0 items-center gap-2.5 pr-[5.25rem]">
               <div
                 className={`shrink-0 rounded-xl p-2 text-white shadow-md shadow-black/10 ${card.iconSurface}`}
@@ -262,17 +262,24 @@ export default function ServiceBeforeInstallationKpiCard({
               </div>
               <h2 className="truncate text-sm font-bold text-slate-900 sm:text-base">{title}</h2>
             </div>
-            <div className="mt-2 flex flex-wrap items-end gap-2">
-              <span className="text-[1.75rem] font-bold leading-none tabular-nums tracking-tight text-slate-900 sm:text-[2.125rem]">
-                {loading ? "…" : formatSbiNum(total)}
-              </span>
-              {!loading && showTrend ? (
-                <ChangePill
-                  value={changePct}
-                  invertTrend={invertTrend}
-                  size="compact"
-                  className="mb-0.5 bg-white/90"
-                />
+            <div className="mt-2 min-w-0">
+              <div className="flex flex-wrap items-end gap-2">
+                <span className="text-[1.75rem] font-bold leading-none tabular-nums tracking-tight text-slate-900 sm:text-[2.125rem]">
+                  {loading ? "…" : formatSbiNum(total)}
+                </span>
+                {!loading && showTrend ? (
+                  <ChangePill
+                    value={changePct}
+                    invertTrend={invertTrend}
+                    size="compact"
+                    className="mb-0.5 bg-white/90"
+                  />
+                ) : null}
+              </div>
+              {card.countCaption ? (
+                <p className="mt-2 text-sm font-bold leading-snug text-slate-800 sm:text-[0.9375rem]">
+                  {card.countCaption}
+                </p>
               ) : null}
             </div>
           </div>
