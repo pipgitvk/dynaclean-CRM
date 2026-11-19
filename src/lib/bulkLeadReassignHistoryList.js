@@ -290,6 +290,18 @@ function buildReassignFollowupCohortWhere(filters, params, followupStatus) {
     sql += ` AND TRIM(h.assigned_from) = TRIM(?)`;
     params.push(filters.assignedFrom);
   }
+  if (filters.from) {
+    sql += ` AND DATE(h.valid_from) >= ?`;
+    params.push(filters.from);
+  }
+  if (filters.to) {
+    sql += ` AND DATE(h.valid_from) <= ?`;
+    params.push(filters.to);
+  }
+  if (filters.assignedBy) {
+    sql += ` AND TRIM(h.assigned_by) = TRIM(?)`;
+    params.push(filters.assignedBy);
+  }
   if (filters.search) {
     const term = `%${String(filters.search).trim()}%`;
     sql += ` AND (
@@ -392,8 +404,14 @@ export async function countReassignFollowupCohort(conn, filters = {}, followupSt
 }
 
 export async function fetchReassignFollowupSummary(conn, filters = {}) {
-  const hasListFilters =
-    Boolean(filters.assignedTo || filters.assignedFrom || filters.search);
+  const hasListFilters = Boolean(
+    filters.assignedTo ||
+      filters.assignedFrom ||
+      filters.search ||
+      filters.from ||
+      filters.to ||
+      filters.assignedBy,
+  );
 
   const tasks = [
     countReassignFollowupCohort(conn, filters, "followed"),

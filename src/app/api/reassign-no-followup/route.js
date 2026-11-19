@@ -34,6 +34,9 @@ export async function GET(request) {
     const filters = {
       assignedTo: searchParams.get("assigned_to") || undefined,
       assignedFrom: searchParams.get("assigned_from") || undefined,
+      assignedBy: searchParams.get("assigned_by") || undefined,
+      from: searchParams.get("from") || undefined,
+      to: searchParams.get("to") || undefined,
       search: searchParams.get("search") || undefined,
       followupStatus: searchParams.get("followup_status") || undefined,
     };

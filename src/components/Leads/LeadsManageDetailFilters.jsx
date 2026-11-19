@@ -72,6 +72,12 @@ const TOTAL_STAT_THEME = {
     value: "text-emerald-900",
     spinner: "text-emerald-600",
   },
+  emeraldDark: {
+    shell: "border-emerald-800/95 bg-gradient-to-br from-emerald-800 to-emerald-950 shadow-md",
+    label: "text-emerald-100/95",
+    value: "text-white",
+    spinner: "text-emerald-200",
+  },
   amber: {
     shell: "border-amber-200/90 bg-gradient-to-br from-amber-100/90 to-amber-50/50",
     label: "text-amber-900/90",
@@ -83,6 +89,12 @@ const TOTAL_STAT_THEME = {
     label: "text-rose-900/90",
     value: "text-rose-950",
     spinner: "text-rose-600",
+  },
+  roseDark: {
+    shell: "border-rose-800/95 bg-gradient-to-br from-rose-800 to-rose-950 shadow-md",
+    label: "text-rose-100/95",
+    value: "text-white",
+    spinner: "text-rose-200",
   },
 };
 

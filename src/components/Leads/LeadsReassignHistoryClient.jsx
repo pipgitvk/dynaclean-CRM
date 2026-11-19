@@ -86,6 +86,9 @@ export default function LeadsReassignHistoryClient({ dashboardBase = "admin-dash
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(50);
   const [loading, setLoading] = useState(true);
+  const [followedTotal, setFollowedTotal] = useState(0);
+  const [notFollowedTotal, setNotFollowedTotal] = useState(0);
+  const [followupStatsLoading, setFollowupStatsLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -225,9 +228,49 @@ export default function LeadsReassignHistoryClient({ dashboardBase = "admin-dash
     pageSize,
   ]);
 
+  const fetchFollowupStats = useCallback(async () => {
+    setFollowupStatsLoading(true);
+    try {
+      const params = new URLSearchParams();
+      params.set("summary", "1");
+      if (appliedFrom) params.set("from", appliedFrom);
+      if (appliedTo) params.set("to", appliedTo);
+      if (appliedSearch.trim()) params.set("search", appliedSearch.trim());
+      if (appliedAssignedFrom) params.set("assigned_from", appliedAssignedFrom);
+      if (appliedAssignedTo) params.set("assigned_to", appliedAssignedTo);
+      if (appliedAssignedBy) params.set("assigned_by", appliedAssignedBy);
+      const res = await fetch(`/api/reassign-no-followup?${params.toString()}`);
+      const data = await res.json();
+      if (data.success) {
+        setFollowedTotal(Number(data.followed || 0));
+        setNotFollowedTotal(Number(data.not_followed || 0));
+      } else {
+        setFollowedTotal(0);
+        setNotFollowedTotal(0);
+      }
+    } catch (e) {
+      console.error(e);
+      setFollowedTotal(0);
+      setNotFollowedTotal(0);
+    } finally {
+      setFollowupStatsLoading(false);
+    }
+  }, [
+    appliedFrom,
+    appliedTo,
+    appliedSearch,
+    appliedAssignedFrom,
+    appliedAssignedTo,
+    appliedAssignedBy,
+  ]);
+
   useEffect(() => {
     fetchRows();
   }, [fetchRows]);
+
+  useEffect(() => {
+    fetchFollowupStats();
+  }, [fetchFollowupStats]);
 
   const applyFilters = () => {
     setAppliedFrom(fromDate);
@@ -287,7 +330,21 @@ export default function LeadsReassignHistoryClient({ dashboardBase = "admin-dash
                 </p>
               </div>
             </div>
-            <LeadsDetailTotalStat theme="emerald" label="Total re-assign" total={total} loading={loading} />
+            <div className="flex flex-wrap items-stretch justify-end gap-3">
+              <LeadsDetailTotalStat theme="emerald" label="Total re-assign" total={total} loading={loading} />
+              <LeadsDetailTotalStat
+                theme="emeraldDark"
+                label="Followed"
+                total={followedTotal}
+                loading={followupStatsLoading}
+              />
+              <LeadsDetailTotalStat
+                theme="roseDark"
+                label="Not followed"
+                total={notFollowedTotal}
+                loading={followupStatsLoading}
+              />
+            </div>
           </div>
 
           <LeadsFilterPanel theme="emerald">
@@ -364,6 +421,7 @@ export default function LeadsReassignHistoryClient({ dashboardBase = "admin-dash
             <table className="min-w-full text-left text-sm">
               <thead className="bg-slate-50 text-xs font-bold uppercase tracking-wide text-slate-500">
                 <tr>
+                  <th className="px-4 py-3.5">Reassigned at</th>
                   <th className="px-4 py-3.5">Customer ID</th>
                   <th className="px-4 py-3.5">Name</th>
                   <th className="px-4 py-3.5">Company</th>
@@ -371,7 +429,6 @@ export default function LeadsReassignHistoryClient({ dashboardBase = "admin-dash
                   <th className="px-4 py-3.5">Last follow-up assigned from</th>
                   <th className="px-4 py-3.5">Assigned to</th>
                   <th className="px-4 py-3.5">Last follow-up assign to</th>
-                  <th className="px-4 py-3.5">Reassigned at</th>
                   <th className="px-4 py-3.5">Assigned by</th>
                 </tr>
               </thead>
@@ -391,6 +448,7 @@ export default function LeadsReassignHistoryClient({ dashboardBase = "admin-dash
                 ) : (
                   rows.map((row) => (
                     <tr key={row.id} className="border-t border-slate-100 hover:bg-emerald-50/30">
+                      <td className="px-4 py-3 text-xs text-slate-600">{formatTs(row.valid_from)}</td>
                       <td className="px-4 py-3 font-mono text-xs text-slate-700">
                         <Link
                           href={`/${dashboardBase}/view-customer/${row.customer_id}`}
@@ -417,7 +475,6 @@ export default function LeadsReassignHistoryClient({ dashboardBase = "admin-dash
                           notes={row.last_followup_assigned_to_notes}
                         />
                       </td>
-                      <td className="px-4 py-3 text-xs text-slate-600">{formatTs(row.valid_from)}</td>
                       <td className="px-4 py-3 font-medium text-slate-800">{row.assigned_by || "—"}</td>
                     </tr>
                   ))

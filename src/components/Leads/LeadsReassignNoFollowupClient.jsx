@@ -265,6 +265,7 @@ export default function LeadsReassignNoFollowupClient({ dashboardBase = "admin-d
             <table className="min-w-full text-left text-sm">
               <thead className="bg-slate-50 text-xs font-bold uppercase tracking-wide text-slate-500">
                 <tr>
+                  <th className="px-4 py-3.5">Reassigned at</th>
                   <th className="px-4 py-3.5">Customer ID</th>
                   <th className="px-4 py-3.5">Name</th>
                   <th className="px-4 py-3.5">Company</th>
@@ -273,7 +274,6 @@ export default function LeadsReassignNoFollowupClient({ dashboardBase = "admin-d
                   <th className="px-4 py-3.5">Assigned to</th>
                   <th className="px-4 py-3.5">Last follow-up assign to</th>
                   <th className="px-4 py-3.5">Status</th>
-                  <th className="px-4 py-3.5">Reassigned at</th>
                   <th className="px-4 py-3.5">Days since</th>
                 </tr>
               </thead>
@@ -293,6 +293,7 @@ export default function LeadsReassignNoFollowupClient({ dashboardBase = "admin-d
                 ) : (
                   rows.map((row) => (
                     <tr key={row.id} className="border-t border-slate-100 hover:bg-rose-50/30">
+                      <td className="px-4 py-3 text-xs text-slate-600">{formatTs(row.valid_from)}</td>
                       <td className="px-4 py-3 font-mono text-xs">
                         <Link
                           href={`/${dashboardBase}/view-customer/${row.customer_id}`}
@@ -330,7 +331,6 @@ export default function LeadsReassignNoFollowupClient({ dashboardBase = "admin-d
                           {row.followup_status === "followed" ? "Followed" : "Not followed"}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-xs text-slate-600">{formatTs(row.valid_from)}</td>
                       <td className="px-4 py-3 font-semibold tabular-nums text-rose-800">
                         {Number(row.days_since_reassign ?? 0)}
                       </td>
