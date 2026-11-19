@@ -7,13 +7,15 @@ import {
   ArrowLeft,
   ArrowLeftRight,
   ArrowUpDown,
+  ChevronRight,
   CheckSquare,
   ChevronDown,
   ChevronLeft,
-  ChevronRight,
   Hash,
   Info,
   ListChecks,
+  ListTodo,
+  Clock,
   Loader2,
   Mail,
   Megaphone,
@@ -213,6 +215,74 @@ export default function LeadsManageQuickBulkClient({ dashboardBase = "admin-dash
   const [dateSort, setDateSort] = useState("desc");
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(50);
+  const [reassignTotal, setReassignTotal] = useState(null);
+  const [reassignTotalLoading, setReassignTotalLoading] = useState(true);
+  const [pendingTotal, setPendingTotal] = useState(null);
+  const [pendingTotalLoading, setPendingTotalLoading] = useState(true);
+  const [followedAfterReassignTotal, setFollowedAfterReassignTotal] = useState(null);
+  const [noFollowupTotal, setNoFollowupTotal] = useState(null);
+  const [noFollowupTotalLoading, setNoFollowupTotalLoading] = useState(true);
+
+  const historyHref = `/${dashboardBase}/leads-manage/reassign-history`;
+  const pendingHref = `/${dashboardBase}/leads-manage/pending-reassign`;
+  const noFollowupHref = `/${dashboardBase}/leads-manage/reassign-no-followup`;
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/bulk-lead-reassign-history?summary=1");
+        const data = await res.json();
+        if (!cancelled && data.success) setReassignTotal(Number(data.total || 0));
+      } catch (e) {
+        console.error(e);
+      } finally {
+        if (!cancelled) setReassignTotalLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/pending-lead-reassign?summary=1");
+        const data = await res.json();
+        if (!cancelled && data.success) setPendingTotal(Number(data.total || 0));
+      } catch (e) {
+        console.error(e);
+      } finally {
+        if (!cancelled) setPendingTotalLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/reassign-no-followup?summary=1");
+        const data = await res.json();
+        if (!cancelled && data.success) {
+          setFollowedAfterReassignTotal(Number(data.followed || 0));
+          setNoFollowupTotal(Number(data.not_followed ?? data.total ?? 0));
+        }
+      } catch (e) {
+        console.error(e);
+      } finally {
+        if (!cancelled) setNoFollowupTotalLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -430,6 +500,24 @@ export default function LeadsManageQuickBulkClient({ dashboardBase = "admin-dash
         alert(data.message || "Reassignment completed.");
         setToSalesperson("");
         fetchLeads();
+        try {
+          const [c, p, n] = await Promise.all([
+            fetch("/api/bulk-lead-reassign-history?summary=1"),
+            fetch("/api/pending-lead-reassign?summary=1"),
+            fetch("/api/reassign-no-followup?summary=1"),
+          ]);
+          const j = await c.json();
+          const pj = await p.json();
+          const nj = await n.json();
+          if (j.success) setReassignTotal(Number(j.total || 0));
+          if (pj.success) setPendingTotal(Number(pj.total || 0));
+          if (nj.success) {
+            setFollowedAfterReassignTotal(Number(nj.followed || 0));
+            setNoFollowupTotal(Number(nj.not_followed ?? nj.total ?? 0));
+          }
+        } catch {
+          /* ignore count refresh */
+        }
       } else {
         alert(data.error || "Reassignment failed.");
       }
@@ -455,6 +543,103 @@ export default function LeadsManageQuickBulkClient({ dashboardBase = "admin-dash
           <ArrowLeft className="h-4 w-4" aria-hidden />
           Back to Leads Hub
         </Link>
+
+        <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <Link
+            href={historyHref}
+            className="group flex flex-col justify-between rounded-2xl border border-emerald-300/90 bg-gradient-to-br from-emerald-100/95 via-emerald-50/80 to-emerald-50/40 p-5 shadow-sm transition hover:border-emerald-400 hover:shadow-md"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-emerald-800">
+                  No. of leads reassigned
+                </p>
+                <p className="mt-2 text-3xl font-bold tabular-nums text-slate-900">
+                  {reassignTotalLoading ? (
+                    <Loader2 className="h-8 w-8 animate-spin text-emerald-600" aria-hidden />
+                  ) : (
+                    (reassignTotal ?? 0).toLocaleString()
+                  )}
+                </p>
+                <p className="mt-1 text-sm text-slate-500">Sales reps only · bulk reassign events</p>
+              </div>
+              <div className="rounded-xl bg-emerald-700 p-2.5 text-white shadow-sm">
+                <ArrowLeftRight className="h-5 w-5" aria-hidden />
+              </div>
+            </div>
+            <span className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-emerald-800 group-hover:underline">
+              Open details
+              <ChevronRight className="h-4 w-4" aria-hidden />
+            </span>
+          </Link>
+
+          <Link
+            href={pendingHref}
+            className="group flex flex-col justify-between rounded-2xl border border-amber-300/90 bg-gradient-to-br from-amber-100/95 via-amber-50/80 to-amber-50/40 p-5 text-left shadow-sm transition hover:border-amber-400 hover:shadow-md"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-amber-900">
+                  No. of leads pending re-assign
+                </p>
+                <p className="mt-2 text-3xl font-bold tabular-nums text-slate-900">
+                  {pendingTotalLoading ? (
+                    <Loader2 className="h-8 w-8 animate-spin text-amber-600" aria-hidden />
+                  ) : (
+                    (pendingTotal ?? 0).toLocaleString()
+                  )}
+                </p>
+                <p className="mt-1 text-sm text-slate-500">Inactive sales role · lead source</p>
+              </div>
+              <div className="rounded-xl bg-amber-600 p-2.5 text-white shadow-sm">
+                <ListTodo className="h-5 w-5" aria-hidden />
+              </div>
+            </div>
+            <span className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-amber-900 group-hover:underline">
+              Open details
+              <ChevronRight className="h-4 w-4" aria-hidden />
+            </span>
+          </Link>
+
+          <Link
+            href={noFollowupHref}
+            className="group flex flex-col justify-between rounded-2xl border border-rose-300/90 bg-gradient-to-br from-rose-100/95 via-rose-50/80 to-rose-50/40 p-5 text-left shadow-sm transition hover:border-rose-400 hover:shadow-md"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-rose-900">
+                  Follow-up after re-assign (2+ days)
+                </p>
+                <div className="mt-2 flex items-end gap-5">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-emerald-800">Followed</p>
+                    <p className="text-2xl font-bold tabular-nums text-slate-900">
+                      {noFollowupTotalLoading ? "—" : (followedAfterReassignTotal ?? 0).toLocaleString()}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-rose-900">Not followed</p>
+                    <p className="text-2xl font-bold tabular-nums text-slate-900">
+                      {noFollowupTotalLoading ? (
+                        <Loader2 className="h-7 w-7 animate-spin text-rose-600" aria-hidden />
+                      ) : (
+                        (noFollowupTotal ?? 0).toLocaleString()
+                      )}
+                    </p>
+                  </div>
+                </div>
+                <p className="mt-1 text-sm text-slate-500">Sales owner · reassigned 2+ days ago</p>
+              </div>
+              <div className="rounded-xl bg-rose-700 p-2.5 text-white shadow-sm">
+                <Clock className="h-5 w-5" aria-hidden />
+              </div>
+            </div>
+            <span className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-rose-900 group-hover:underline">
+              Open details
+              <ChevronRight className="h-4 w-4" aria-hidden />
+            </span>
+          </Link>
+        </div>
 
         <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_4px_24px_-8px_rgba(16,185,129,0.18)] sm:p-6 lg:p-8">
           <div className="flex items-start gap-3">

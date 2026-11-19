@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
+import { recordLeadReassignHistory } from "@/lib/bulkLeadReassignHistory";
 
 // POST - Bulk assign/reassign leads to an employee
 export async function POST(request) {
@@ -51,7 +52,8 @@ export async function POST(request) {
             for (const customer_id of customer_ids) {
                 try {
                     const [existing] = await connection.execute(
-                        `SELECT customer_id, lead_source, service_lead_source, gem_lead_source, first_name, last_name, phone, email
+                        `SELECT customer_id, lead_source, service_lead_source, gem_lead_source,
+                                first_name, last_name, phone, email, company, address, date_created
                          FROM customers WHERE customer_id = ?`,
                         [customer_id]
                     );
@@ -115,6 +117,48 @@ export async function POST(request) {
                             payload.username,
                         ]
                     );
+
+                    const [[followupRow]] = await connection.execute(
+                        `SELECT time_stamp FROM customers_followup
+                         WHERE customer_id = ? ORDER BY time_stamp DESC LIMIT 1`,
+                        [customer_id],
+                    );
+                    const eventAt = followupRow?.time_stamp || new Date();
+
+                    if (normalizedType === "service") {
+                        await recordLeadReassignHistory(connection, {
+                            customer: prev,
+                            leadType: "service",
+                            assignedFrom: prev.service_lead_source || null,
+                            assignedTo: employee_username,
+                            assignedBy: payload.username,
+                            validFrom: eventAt,
+                            followupTimeStamp: eventAt,
+                            source: "live",
+                        });
+                    } else if (normalizedType === "gem") {
+                        await recordLeadReassignHistory(connection, {
+                            customer: prev,
+                            leadType: "gem",
+                            assignedFrom: prev.gem_lead_source || null,
+                            assignedTo: employee_username,
+                            assignedBy: payload.username,
+                            validFrom: eventAt,
+                            followupTimeStamp: eventAt,
+                            source: "live",
+                        });
+                    } else {
+                        await recordLeadReassignHistory(connection, {
+                            customer: prev,
+                            leadType: "sales",
+                            assignedFrom: prev.lead_source || null,
+                            assignedTo: employee_username,
+                            assignedBy: payload.username,
+                            validFrom: eventAt,
+                            followupTimeStamp: eventAt,
+                            source: "live",
+                        });
+                    }
 
                     successCount++;
                 } catch (err) {

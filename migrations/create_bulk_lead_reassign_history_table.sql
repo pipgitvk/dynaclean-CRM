@@ -1,0 +1,23 @@
+CREATE TABLE IF NOT EXISTS `bulk_lead_reassign_history` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `customer_id` INT NOT NULL,
+  `name` VARCHAR(255) NULL,
+  `company_name` VARCHAR(255) NULL,
+  `address` TEXT NULL,
+  `phone` VARCHAR(50) NULL,
+  `lead_source` VARCHAR(100) NULL COMMENT 'Rep owning the lead during this stint (assigned_to snapshot)',
+  `assigned_to` VARCHAR(100) NOT NULL,
+  `assigned_from` VARCHAR(100) NULL,
+  `assigned_by` VARCHAR(100) NOT NULL DEFAULT 'admin',
+  `lead_type` ENUM('sales', 'service', 'gem') NOT NULL DEFAULT 'sales',
+  `valid_from` DATETIME NOT NULL,
+  `valid_to` DATETIME NULL,
+  `source` VARCHAR(32) NOT NULL DEFAULT 'live',
+  `followup_time_stamp` DATETIME NULL,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_blrh_customer` (`customer_id`),
+  KEY `idx_blrh_assigned_to` (`assigned_to`),
+  KEY `idx_blrh_valid` (`customer_id`, `valid_from`),
+  UNIQUE KEY `uniq_blrh_followup_event` (`customer_id`, `lead_type`, `followup_time_stamp`, `assigned_to`, `valid_from`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
