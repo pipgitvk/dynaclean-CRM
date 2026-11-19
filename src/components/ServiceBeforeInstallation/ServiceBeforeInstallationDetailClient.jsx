@@ -114,14 +114,16 @@ function exportRowsCsv(rows, segment) {
       "Complaint Date",
     ],
     "open-installation": [
-      "Service ID",
+      "Order ID",
       "Serial",
-      "Customer",
       "Model",
-      "Type",
+      "Product",
+      "Company",
+      "Contact",
+      "Delivery Date",
+      "Days",
       "Status",
-      "Service Engineer",
-      "Planned Date",
+      "Location",
     ],
     "overdue-delayed-installation": [
       "Order ID",
@@ -162,19 +164,7 @@ function exportRowsCsv(rows, segment) {
         formatDate(row.planned_date || row.complaint_date),
       ];
     }
-    if (segment === "open-installation") {
-      return [
-        row.service_id,
-        row.serial_number,
-        row.customer_name,
-        row.model,
-        row.service_type,
-        row.status,
-        formatAssignedEngineer(row.assigned_to),
-        formatDate(row.planned_date || row.complaint_date),
-      ];
-    }
-    if (segment === "overdue-delayed-installation") {
+    if (segment === "open-installation" || segment === "overdue-delayed-installation") {
       return [
         row.order_id,
         row.serial_number,
@@ -472,13 +462,7 @@ function ServiceRecordTableHead({ dateLabel }) {
 function TableHead({ segment }) {
   const th =
     "px-4 py-3.5 text-left text-xs font-bold uppercase tracking-wide text-slate-500 bg-slate-50/95";
-  if (segment === "open-installation") {
-    return <ServiceRecordTableHead dateLabel="Planned Date" />;
-  }
-  if (segment === "open-completions") {
-    return <ServiceRecordTableHead dateLabel="Complaint Date" />;
-  }
-  if (segment === "overdue-delayed-installation") {
+  if (segment === "open-installation" || segment === "overdue-delayed-installation") {
     return (
       <tr>
         <th className={th}>#</th>
@@ -494,6 +478,9 @@ function TableHead({ segment }) {
         <th className={th}>Location</th>
       </tr>
     );
+  }
+  if (segment === "open-completions") {
+    return <ServiceRecordTableHead dateLabel="Complaint Date" />;
   }
   if (segment === "active-amc" || segment === "due-amc-expiring") {
     return (
@@ -524,15 +511,9 @@ function TableHead({ segment }) {
 }
 
 function TableBody({ segment, rows, dashboardBase, page, pageSize }) {
-  if (segment === "open-installation") {
+  if (segment === "open-installation" || segment === "overdue-delayed-installation") {
     return (
-      <ServiceRows
-        rows={rows}
-        dashboardBase={dashboardBase}
-        page={page}
-        pageSize={pageSize}
-        variant="installation"
-      />
+      <OpenInstallationRows rows={rows} dashboardBase={dashboardBase} page={page} pageSize={pageSize} />
     );
   }
   if (segment === "open-completions") {
@@ -546,11 +527,6 @@ function TableBody({ segment, rows, dashboardBase, page, pageSize }) {
       />
     );
   }
-  if (segment === "overdue-delayed-installation") {
-    return (
-      <OpenInstallationRows rows={rows} dashboardBase={dashboardBase} page={page} pageSize={pageSize} />
-    );
-  }
   if (segment === "active-amc" || segment === "due-amc-expiring") {
     return <AmcRows rows={rows} page={page} pageSize={pageSize} />;
   }
@@ -561,8 +537,8 @@ function TableBody({ segment, rows, dashboardBase, page, pageSize }) {
 
 function colSpanForSegment(segment) {
   if (isWarrantyProductSegment(segment)) return 9;
-  if (segment === "open-installation" || segment === "open-completions") return 10;
-  if (segment === "overdue-delayed-installation") return 11;
+  if (segment === "open-completions") return 10;
+  if (segment === "open-installation" || segment === "overdue-delayed-installation") return 11;
   if (segment === "active-amc" || segment === "due-amc-expiring") return 7;
   return 9;
 }

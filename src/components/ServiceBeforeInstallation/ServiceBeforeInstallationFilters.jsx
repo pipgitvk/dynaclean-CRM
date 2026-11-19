@@ -27,10 +27,10 @@ const SERVICE_RECORD_STATUS_PRESETS = [
 ];
 
 function getSegmentFilterKind(segment) {
-  if (segment === "open-installation" || segment === "open-completions") {
+  if (segment === "open-completions") {
     return "serviceRecord";
   }
-  if (segment === "overdue-delayed-installation") {
+  if (segment === "open-installation" || segment === "overdue-delayed-installation") {
     return "upcomingOrder";
   }
   if (segment === "active-amc" || segment === "due-amc-expiring") {

@@ -17,7 +17,7 @@ export const SERVICE_BEFORE_INSTALLATION_SEGMENTS = [
   {
     id: "open-installation",
     title: "Open Installation",
-    subtitle: "Not installed",
+    subtitle: "All upcoming installations",
     countKey: "open_installation",
     accent: "from-amber-500 to-orange-600",
     surface:
