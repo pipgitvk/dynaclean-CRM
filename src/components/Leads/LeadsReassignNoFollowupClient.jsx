@@ -59,20 +59,15 @@ export default function LeadsReassignNoFollowupClient({ dashboardBase = "admin-d
   const [searchDraft, setSearchDraft] = useState("");
   const [assignedToDraft, setAssignedToDraft] = useState("");
   const [assignedFromDraft, setAssignedFromDraft] = useState("");
-  const [followupStatusDraft, setFollowupStatusDraft] = useState("");
+  const [followupStatusDraft, setFollowupStatusDraft] = useState("not_followed");
   const [appliedSearch, setAppliedSearch] = useState("");
   const [appliedAssignedTo, setAppliedAssignedTo] = useState("");
   const [appliedAssignedFrom, setAppliedAssignedFrom] = useState("");
-  const [appliedFollowupStatus, setAppliedFollowupStatus] = useState("");
+  const [appliedFollowupStatus, setAppliedFollowupStatus] = useState("not_followed");
 
   const [toRepList, setToRepList] = useState([]);
   const [fromRepList, setFromRepList] = useState([]);
-  const [cohortTotal, setCohortTotal] = useState(0);
-  const [followedTotal, setFollowedTotal] = useState(0);
   const [notFollowedTotal, setNotFollowedTotal] = useState(0);
-  const [reassignEventsTotal, setReassignEventsTotal] = useState(null);
-  const [outsideCohort, setOutsideCohort] = useState(null);
-  const [summaryLoading, setSummaryLoading] = useState(true);
   const [rows, setRows] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
@@ -80,32 +75,11 @@ export default function LeadsReassignNoFollowupClient({ dashboardBase = "admin-d
   const [loading, setLoading] = useState(true);
 
   const filterActive = Boolean(
-    appliedSearch.trim() || appliedAssignedTo || appliedAssignedFrom || appliedFollowupStatus,
+    appliedSearch.trim() ||
+      appliedAssignedTo ||
+      appliedAssignedFrom ||
+      (appliedFollowupStatus && appliedFollowupStatus !== "not_followed"),
   );
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setSummaryLoading(true);
-      try {
-        const res = await fetch("/api/reassign-no-followup?summary=1");
-        const data = await res.json();
-        if (!cancelled && data.success) {
-          setReassignEventsTotal(
-            data.reassign_events_total != null ? Number(data.reassign_events_total) : null,
-          );
-          setOutsideCohort(data.outside_cohort ?? null);
-        }
-      } catch (e) {
-        console.error(e);
-      } finally {
-        if (!cancelled) setSummaryLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -149,16 +123,10 @@ export default function LeadsReassignNoFollowupClient({ dashboardBase = "admin-d
       if (data.success) {
         setRows(data.data || []);
         setTotal(Number(data.total || 0));
-        const followed = Number(data.followed || 0);
-        const notFollowed = Number(data.not_followed || 0);
-        setFollowedTotal(followed);
-        setNotFollowedTotal(notFollowed);
-        setCohortTotal(Number(data.cohort_total ?? followed + notFollowed));
+        setNotFollowedTotal(Number(data.not_followed || 0));
       } else {
         setRows([]);
         setTotal(0);
-        setCohortTotal(0);
-        setFollowedTotal(0);
         setNotFollowedTotal(0);
       }
     } catch (e) {
@@ -186,11 +154,11 @@ export default function LeadsReassignNoFollowupClient({ dashboardBase = "admin-d
     setSearchDraft("");
     setAssignedToDraft("");
     setAssignedFromDraft("");
-    setFollowupStatusDraft("");
+    setFollowupStatusDraft("not_followed");
     setAppliedSearch("");
     setAppliedAssignedTo("");
     setAppliedAssignedFrom("");
-    setAppliedFollowupStatus("");
+    setAppliedFollowupStatus("not_followed");
     setPage(0);
   };
 
@@ -219,25 +187,23 @@ export default function LeadsReassignNoFollowupClient({ dashboardBase = "admin-d
               <Clock className="h-6 w-6" strokeWidth={2.2} aria-hidden />
             </div>
             <div className="min-w-0">
-              <h1 className="text-2xl font-bold tracking-tight text-slate-900">Follow-up after re-assign</h1>
+              <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+                Not followed after re-assign ({REASSIGN_NO_FOLLOWUP_DAYS}+ days)
+              </h1>
               <p className="mt-1 text-sm text-slate-500">
-                Sales leads reassigned {REASSIGN_NO_FOLLOWUP_DAYS}+ days ago — followed vs not followed by new owner
+                Sales leads reassigned {REASSIGN_NO_FOLLOWUP_DAYS}+ days ago with no follow-up from the new owner
                 (still on assignee).
               </p>
             </div>
           </div>
 
-          <div className="mt-5 w-full min-w-0">
+          <div className="mt-5 max-w-md min-w-0">
             <LeadsReassignFollowupOverview
-              cohortTotal={cohortTotal}
-              followed={followedTotal}
               notFollowed={notFollowedTotal}
-              reassignEventsTotal={reassignEventsTotal}
-              outside={outsideCohort}
               loading={loading}
-              outsideLoading={summaryLoading}
-              showOutside
+              showOutside={false}
               filterActive={filterActive}
+              variant="not_followed_only"
             />
           </div>
 

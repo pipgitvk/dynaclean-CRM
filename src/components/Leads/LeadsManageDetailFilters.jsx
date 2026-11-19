@@ -98,53 +98,82 @@ export function LeadsReassignFollowupOverview({
   outsideLoading = false,
   showOutside = true,
   filterActive = false,
+  variant = "full",
   days = REASSIGN_NO_FOLLOWUP_DAYS,
 }) {
+  const notFollowedOnly = variant === "not_followed_only";
   const showOutsidePanel =
     showOutside && !filterActive && (outsideLoading || (outside && reassignEventsTotal != null));
 
+  const gridCols = notFollowedOnly
+    ? showOutsidePanel
+      ? "xl:grid-cols-2"
+      : "xl:grid-cols-1"
+    : showOutsidePanel
+      ? "xl:grid-cols-4"
+      : "xl:grid-cols-3";
+
   return (
     <div
-      className={`grid w-full min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 xl:items-stretch ${
-        showOutsidePanel ? "xl:grid-cols-4" : "xl:grid-cols-3"
-      }`}
+      className={`grid w-full min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 xl:items-stretch ${gridCols}`}
     >
-      <div className="flex flex-col rounded-2xl border border-rose-200/90 bg-gradient-to-br from-rose-100/90 to-rose-50/50 px-4 py-3.5 shadow-sm sm:col-span-2 xl:col-span-1">
-        <p className="text-[11px] font-bold uppercase tracking-wide text-rose-900/90">Total in this check</p>
-        <p className="mt-auto text-3xl font-bold tabular-nums text-rose-950">
-          {loading ? (
-            <Loader2 className="h-8 w-8 animate-spin text-rose-600" aria-hidden />
-          ) : (
-            cohortTotal.toLocaleString()
-          )}
-        </p>
-        <p className="mt-2 text-xs leading-snug text-slate-600">
-          Followed + not followed · latest reassign · still on assignee · {days}+ days
-          {filterActive ? " · counts match filters below" : null}
-        </p>
-      </div>
+      {notFollowedOnly ? (
+        <div className="flex flex-col rounded-2xl border border-rose-300/90 bg-gradient-to-br from-rose-100/95 via-rose-50/80 to-rose-50/40 px-4 py-3.5 shadow-sm sm:col-span-2 xl:col-span-1">
+          <p className="text-xs font-bold uppercase tracking-wide text-rose-900">
+            Not followed after re-assign ({days}+ days)
+          </p>
+          <p className="mt-2 text-3xl font-bold tabular-nums text-slate-900">
+            {loading ? (
+              <Loader2 className="h-8 w-8 animate-spin text-rose-600" aria-hidden />
+            ) : (
+              notFollowed.toLocaleString()
+            )}
+          </p>
+          <p className="mt-1 text-sm text-slate-500">
+            Sales owner · no follow-up after re-assign
+            {filterActive ? " · counts match filters below" : null}
+          </p>
+        </div>
+      ) : (
+        <>
+          <div className="flex flex-col rounded-2xl border border-rose-200/90 bg-gradient-to-br from-rose-100/90 to-rose-50/50 px-4 py-3.5 shadow-sm sm:col-span-2 xl:col-span-1">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-rose-900/90">Total in this check</p>
+            <p className="mt-auto text-3xl font-bold tabular-nums text-rose-950">
+              {loading ? (
+                <Loader2 className="h-8 w-8 animate-spin text-rose-600" aria-hidden />
+              ) : (
+                cohortTotal.toLocaleString()
+              )}
+            </p>
+            <p className="mt-2 text-xs leading-snug text-slate-600">
+              Followed + not followed · latest reassign · still on assignee · {days}+ days
+              {filterActive ? " · counts match filters below" : null}
+            </p>
+          </div>
 
-      <div className="flex flex-col rounded-xl border border-emerald-200/90 bg-emerald-50/80 px-4 py-3 shadow-sm">
-        <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-800">Followed</p>
-        <p className="mt-auto text-2xl font-bold tabular-nums text-slate-900">
-          {loading ? (
-            <Loader2 className="h-7 w-7 animate-spin text-emerald-600" aria-hidden />
-          ) : (
-            followed.toLocaleString()
-          )}
-        </p>
-      </div>
+          <div className="flex flex-col rounded-xl border border-emerald-200/90 bg-emerald-50/80 px-4 py-3 shadow-sm">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-800">Followed</p>
+            <p className="mt-auto text-2xl font-bold tabular-nums text-slate-900">
+              {loading ? (
+                <Loader2 className="h-7 w-7 animate-spin text-emerald-600" aria-hidden />
+              ) : (
+                followed.toLocaleString()
+              )}
+            </p>
+          </div>
 
-      <div className="flex flex-col rounded-xl border border-rose-200/90 bg-rose-50/70 px-4 py-3 shadow-sm">
-        <p className="text-[11px] font-bold uppercase tracking-wide text-rose-900">Not followed</p>
-        <p className="mt-auto text-2xl font-bold tabular-nums text-slate-900">
-          {loading ? (
-            <Loader2 className="h-7 w-7 animate-spin text-rose-600" aria-hidden />
-          ) : (
-            notFollowed.toLocaleString()
-          )}
-        </p>
-      </div>
+          <div className="flex flex-col rounded-xl border border-rose-200/90 bg-rose-50/70 px-4 py-3 shadow-sm">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-rose-900">Not followed</p>
+            <p className="mt-auto text-2xl font-bold tabular-nums text-slate-900">
+              {loading ? (
+                <Loader2 className="h-7 w-7 animate-spin text-rose-600" aria-hidden />
+              ) : (
+                notFollowed.toLocaleString()
+              )}
+            </p>
+          </div>
+        </>
+      )}
 
       {showOutsidePanel ? (
         <div className="flex flex-col rounded-2xl border border-slate-200/90 bg-slate-50/80 px-4 py-3.5 sm:col-span-2 xl:col-span-1">

@@ -220,7 +220,6 @@ export default function LeadsManageQuickBulkClient({ dashboardBase = "admin-dash
   const [reassignTotalLoading, setReassignTotalLoading] = useState(true);
   const [pendingTotal, setPendingTotal] = useState(null);
   const [pendingTotalLoading, setPendingTotalLoading] = useState(true);
-  const [followedAfterReassignTotal, setFollowedAfterReassignTotal] = useState(null);
   const [noFollowupTotal, setNoFollowupTotal] = useState(null);
   const [noFollowupTotalLoading, setNoFollowupTotalLoading] = useState(true);
 
@@ -271,7 +270,6 @@ export default function LeadsManageQuickBulkClient({ dashboardBase = "admin-dash
         const res = await fetch("/api/reassign-no-followup?summary=1");
         const data = await res.json();
         if (!cancelled && data.success) {
-          setFollowedAfterReassignTotal(Number(data.followed || 0));
           setNoFollowupTotal(Number(data.not_followed ?? data.total ?? 0));
         }
       } catch (e) {
@@ -513,7 +511,6 @@ export default function LeadsManageQuickBulkClient({ dashboardBase = "admin-dash
           if (j.success) setReassignTotal(Number(j.total || 0));
           if (pj.success) setPendingTotal(Number(pj.total || 0));
           if (nj.success) {
-            setFollowedAfterReassignTotal(Number(nj.followed || 0));
             setNoFollowupTotal(Number(nj.not_followed ?? nj.total ?? 0));
           }
         } catch {
@@ -609,27 +606,16 @@ export default function LeadsManageQuickBulkClient({ dashboardBase = "admin-dash
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-xs font-bold uppercase tracking-wide text-rose-900">
-                  Follow-up after re-assign ({REASSIGN_NO_FOLLOWUP_DAYS}+ days)
+                  Not followed after re-assign ({REASSIGN_NO_FOLLOWUP_DAYS}+ days)
                 </p>
-                <div className="mt-2 flex items-end gap-5">
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-wide text-emerald-800">Followed</p>
-                    <p className="text-2xl font-bold tabular-nums text-slate-900">
-                      {noFollowupTotalLoading ? "—" : (followedAfterReassignTotal ?? 0).toLocaleString()}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-wide text-rose-900">Not followed</p>
-                    <p className="text-2xl font-bold tabular-nums text-slate-900">
-                      {noFollowupTotalLoading ? (
-                        <Loader2 className="h-7 w-7 animate-spin text-rose-600" aria-hidden />
-                      ) : (
-                        (noFollowupTotal ?? 0).toLocaleString()
-                      )}
-                    </p>
-                  </div>
-                </div>
-                <p className="mt-1 text-sm text-slate-500">Full breakdown on details page</p>
+                <p className="mt-2 text-3xl font-bold tabular-nums text-slate-900">
+                  {noFollowupTotalLoading ? (
+                    <Loader2 className="h-8 w-8 animate-spin text-rose-600" aria-hidden />
+                  ) : (
+                    (noFollowupTotal ?? 0).toLocaleString()
+                  )}
+                </p>
+                <p className="mt-1 text-sm text-slate-500">Sales owner · no follow-up after re-assign</p>
               </div>
               <div className="rounded-xl bg-rose-700 p-2.5 text-white shadow-sm">
                 <Clock className="h-5 w-5" aria-hidden />
