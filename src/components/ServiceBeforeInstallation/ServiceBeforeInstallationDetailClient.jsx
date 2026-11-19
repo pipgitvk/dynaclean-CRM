@@ -15,7 +15,6 @@ import {
   Eye,
   Loader2,
   MapPin,
-  MoreHorizontal,
   Package,
   Phone,
   Plus,
@@ -78,6 +77,147 @@ function applyFilterState(setDraft, setApplied, next) {
 function formatDate(raw) {
   if (!raw) return "—";
   return formatCrmDatetimeForISTDisplay(raw) || formatCrmDateOnly(String(raw).slice(0, 10)) || "—";
+}
+
+function DetailField({ label, value, multiline = false }) {
+  const text = value == null ? "" : String(value).trim();
+  if (!text) return null;
+  return (
+    <div className={`text-xs text-slate-700 ${multiline ? "whitespace-pre-wrap" : ""}`}>
+      <span className="font-semibold text-slate-500">{label}: </span>
+      {text}
+    </div>
+  );
+}
+
+function CompanyDetailBlock({ row }) {
+  const hasAny =
+    row.customer_name ||
+    row.email ||
+    row.contact_person ||
+    row.contact ||
+    row.customer_address;
+  if (!hasAny) return <span className="text-slate-400">—</span>;
+  return (
+    <div className="min-w-[11rem] max-w-[16rem] space-y-0.5">
+      <DetailField label="Company" value={row.customer_name} />
+      <DetailField label="Email" value={row.email} />
+      <DetailField label="Person" value={row.contact_person} />
+      <DetailField label="Contact" value={row.contact} />
+      <DetailField label="Address" value={row.customer_address} multiline />
+    </div>
+  );
+}
+
+function SiteContactDetailBlock({ row }) {
+  const hasAny = row.installed_address || row.site_person || row.site_contact || row.site_email;
+  if (!hasAny) return <span className="text-slate-400">—</span>;
+  return (
+    <div className="min-w-[11rem] max-w-[16rem] space-y-0.5">
+      <DetailField label="Address" value={row.installed_address} multiline />
+      <DetailField label="Person" value={row.site_person} />
+      <DetailField label="Contact" value={row.site_contact} />
+      <DetailField label="Email" value={row.site_email} />
+    </div>
+  );
+}
+
+function InvoiceDetailBlock({ row }) {
+  const hasAny = row.invoice_number || row.invoice_date || row.invoice_file;
+  if (!hasAny) return <span className="text-slate-400">—</span>;
+  const invoiceFile = row.invoice_file ? String(row.invoice_file).trim() : "";
+  return (
+    <div className="min-w-[9rem] max-w-[14rem] space-y-0.5 text-xs">
+      <DetailField label="#" value={row.invoice_number} />
+      <DetailField label="Date" value={formatDate(row.invoice_date)} />
+      {invoiceFile ? (
+        <a
+          href={`/uploads/${invoiceFile}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-block font-semibold text-violet-700 underline hover:text-violet-900"
+        >
+          View File
+        </a>
+      ) : null}
+    </div>
+  );
+}
+
+function salesPersonLabel(row) {
+  const orderRep = String(row.order_sales_person || "").trim();
+  const registeredBy = String(row.registered_by || "").trim();
+  return orderRep || registeredBy || "";
+}
+
+function ProductIdentityBlock({ row, customerHref, serialHref }) {
+  const modelLabel = [row.product_name, row.model].filter(Boolean).join(" · ") || "—";
+  const hasAny = row.customer_id || row.serial_number || modelLabel !== "—";
+  if (!hasAny) return <span className="text-slate-400">—</span>;
+  return (
+    <div className="min-w-[10rem] max-w-[14rem] space-y-1 text-xs">
+      <div className="text-slate-700">
+        <span className="font-semibold text-slate-500">Customer ID: </span>
+        {customerHref ? (
+          <Link href={customerHref} className="font-semibold text-violet-700 hover:underline">
+            {row.customer_id}
+          </Link>
+        ) : (
+          <span>{row.customer_id || "—"}</span>
+        )}
+      </div>
+      <div className="text-slate-700">
+        <span className="font-semibold text-slate-500">Serial: </span>
+        {serialHref ? (
+          <Link href={serialHref} className="font-semibold text-violet-700 hover:underline">
+            {row.serial_number}
+          </Link>
+        ) : (
+          <span>{row.serial_number || "—"}</span>
+        )}
+      </div>
+      <div className="text-slate-800">
+        <span className="font-semibold text-slate-500">Model: </span>
+        {row.model ? (
+          <span
+            className={`inline-flex rounded-md border px-1.5 py-0.5 text-[11px] font-bold ${modelPillClass(row.model)}`}
+          >
+            {modelLabel}
+          </span>
+        ) : (
+          <span>{modelLabel}</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SalesServiceTeamBlock({ row }) {
+  const sales = salesPersonLabel(row);
+  const engineer = isServiceRecordAssigned(row.installation_engineer)
+    ? String(row.installation_engineer).trim()
+    : "";
+  if (!sales && !engineer) return <span className="text-slate-400">—</span>;
+  return (
+    <div className="min-w-[9rem] max-w-[13rem] space-y-0.5 text-xs">
+      <DetailField label="Sales person" value={sales} />
+      <DetailField label="Service engineer" value={engineer} />
+    </div>
+  );
+}
+
+function InstallationWarrantyBlock({ row }) {
+  const install = formatDate(row.installation_date);
+  const warrantyEnd = formatDate(row.warranty_end_date);
+  if (install === "—" && warrantyEnd === "—") {
+    return <span className="text-slate-400">—</span>;
+  }
+  return (
+    <div className="min-w-[8.5rem] space-y-0.5 text-xs">
+      <DetailField label="Installation" value={install === "—" ? "" : install} />
+      <DetailField label="Warranty end" value={warrantyEnd === "—" ? "" : warrantyEnd} />
+    </div>
+  );
 }
 
 function formatNum(n) {
@@ -148,6 +288,17 @@ function exportRowsCsv(rows, segment) {
     ],
     "active-amc": ["Serial", "Company", "Contact", "Status", "AMC Start", "AMC End"],
     "due-amc-expiring": ["Serial", "Company", "Contact", "Status", "AMC Start", "AMC End"],
+    "total-registered": [
+      "Customer / Serial / Model",
+      "Registered Date",
+      "Company",
+      "Site Contact",
+      "State",
+      "Installation / Warranty",
+      "Installed Address",
+      "Invoice",
+      "Sales / Service",
+    ],
   };
   const defaultHeaders = [
     "Serial",
@@ -197,6 +348,43 @@ function exportRowsCsv(rows, segment) {
         formatDate(row.amc_end_datetime),
       ];
     }
+    if (segment === "total-registered") {
+      const modelText = [row.product_name, row.model].filter(Boolean).join(" ");
+      const sales = salesPersonLabel(row);
+      const engineer = isServiceRecordAssigned(row.installation_engineer)
+        ? String(row.installation_engineer).trim()
+        : "";
+      return [
+        [
+          row.customer_id ? `Customer ID: ${row.customer_id}` : "",
+          row.serial_number ? `Serial: ${row.serial_number}` : "",
+          modelText ? `Model: ${modelText}` : "",
+        ]
+          .filter(Boolean)
+          .join(" | "),
+        formatDate(row.registered_at || row.invoice_date),
+        [
+          row.customer_name,
+          row.email,
+          row.contact_person,
+          row.contact,
+          row.customer_address,
+        ]
+          .filter(Boolean)
+          .join(" | "),
+        [row.site_person, row.site_contact, row.site_email].filter(Boolean).join(" | "),
+        row.state,
+        `Installation: ${formatDate(row.installation_date)} | Warranty end: ${formatDate(row.warranty_end_date)}`,
+        row.installed_address,
+        [row.invoice_number, formatDate(row.invoice_date)].filter(Boolean).join(" "),
+        [
+          sales ? `Sales: ${sales}` : "",
+          engineer ? `Engineer: ${engineer}` : "",
+        ]
+          .filter(Boolean)
+          .join(" | "),
+      ];
+    }
     return [
       row.serial_number,
       row.customer_name,
@@ -234,97 +422,126 @@ function DetailSegmentHeader({ meta, segment }) {
   );
 }
 
-function WarrantyProductRows({ rows, dashboardBase, page, pageSize }) {
+function WarrantyProductRows({ rows, dashboardBase, page, pageSize, segment }) {
+  const detailLayout = segment === "total-registered";
+
   return rows.map((row, idx) => {
     const rowNum = page * pageSize + idx + 1;
     const serialHref = row.serial_number
       ? `/${dashboardBase}/warranty/service-records/${encodeURIComponent(row.serial_number)}`
       : null;
+    const customerHref = row.customer_id
+      ? `/${dashboardBase}/view-customer/${row.customer_id}`
+      : null;
     const zebra = idx % 2 === 0 ? "bg-white" : "bg-violet-50/35";
-    return (
-      <tr key={row.id || row.serial_number || rowNum} className={`${zebra} hover:bg-violet-50/55`}>
-        <td className="whitespace-nowrap px-4 py-3.5 text-sm tabular-nums text-slate-500">{rowNum}</td>
-        <td className="whitespace-nowrap px-4 py-3.5">
-          {serialHref ? (
-            <Link href={serialHref} className="font-semibold text-violet-700 hover:underline">
-              {row.serial_number}
-            </Link>
-          ) : (
-            row.serial_number || "—"
-          )}
-        </td>
-        <td className="px-4 py-3.5">
-          <span className="inline-flex items-center gap-2 text-slate-800">
-            <Building2 className="h-4 w-4 shrink-0 text-violet-500" aria-hidden />
-            <span className="font-medium">{row.customer_name || "—"}</span>
-          </span>
-        </td>
-        <td className="px-4 py-3.5">
-          {row.model ? (
-            <span
-              className={`inline-flex rounded-lg border px-2.5 py-1 text-xs font-bold ${modelPillClass(row.model)}`}
-            >
-              {row.model}
-            </span>
-          ) : (
-            "—"
-          )}
-        </td>
-        <td className="whitespace-nowrap px-4 py-3.5">
-          {row.contact ? (
-            <a
-              href={`tel:${row.contact}`}
-              className="inline-flex items-center gap-2 text-slate-700 hover:text-violet-700"
-            >
-              <Phone className="h-4 w-4 text-violet-500" aria-hidden />
-              {row.contact}
-            </a>
-          ) : (
-            "—"
-          )}
-        </td>
-        <td className="whitespace-nowrap px-4 py-3.5">
-          <span className="inline-flex items-center gap-2 text-slate-700">
-            <CalendarDays className="h-4 w-4 text-violet-500" aria-hidden />
-            {formatDate(row.installation_date)}
-          </span>
-        </td>
-        <td className="whitespace-nowrap px-4 py-3.5">
-          <span className="inline-flex items-center gap-2 text-slate-700">
-            <CalendarDays className="h-4 w-4 text-violet-500" aria-hidden />
-            {formatDate(row.warranty_end_date)}
-          </span>
-        </td>
-        <td className="max-w-[220px] px-4 py-3.5 xl:max-w-none">
-          <span className="inline-flex max-w-full items-start gap-2 text-slate-700">
-            <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-violet-500" aria-hidden />
-            <span className="line-clamp-2">{row.installed_address || "—"}</span>
-          </span>
-        </td>
-        <td className="whitespace-nowrap px-4 py-3.5 text-right">
-          <div className="inline-flex items-center gap-1">
+    if (!detailLayout) {
+      return (
+        <tr key={row.id || row.serial_number || rowNum} className={`${zebra} hover:bg-violet-50/55`}>
+          <td className="whitespace-nowrap px-4 py-3.5 text-sm tabular-nums text-slate-500">{rowNum}</td>
+          <td className="whitespace-nowrap px-4 py-3.5">
             {serialHref ? (
-              <Link
-                href={serialHref}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:border-violet-200 hover:text-violet-700"
-                title="View"
-              >
-                <Eye className="h-4 w-4" />
+              <Link href={serialHref} className="font-semibold text-violet-700 hover:underline">
+                {row.serial_number}
               </Link>
             ) : (
-              <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-100 text-slate-300">
-                <Eye className="h-4 w-4" />
-              </span>
+              row.serial_number || "—"
             )}
-            <button
-              type="button"
+          </td>
+          <td className="px-4 py-3.5">
+            <span className="inline-flex items-center gap-2 text-slate-800">
+              <Building2 className="h-4 w-4 shrink-0 text-violet-500" aria-hidden />
+              <span className="font-medium">{row.customer_name || "—"}</span>
+            </span>
+          </td>
+          <td className="px-4 py-3.5">
+            {row.model ? (
+              <span
+                className={`inline-flex rounded-lg border px-2.5 py-1 text-xs font-bold ${modelPillClass(row.model)}`}
+              >
+                {row.model}
+              </span>
+            ) : (
+              "—"
+            )}
+          </td>
+          <td className="whitespace-nowrap px-4 py-3.5">
+            {row.contact ? (
+              <a
+                href={`tel:${row.contact}`}
+                className="inline-flex items-center gap-2 text-slate-700 hover:text-violet-700"
+              >
+                <Phone className="h-4 w-4 text-violet-500" aria-hidden />
+                {row.contact}
+              </a>
+            ) : (
+              "—"
+            )}
+          </td>
+          <td className="whitespace-nowrap px-4 py-3.5">{formatDate(row.installation_date)}</td>
+          <td className="whitespace-nowrap px-4 py-3.5">{formatDate(row.warranty_end_date)}</td>
+          <td className="max-w-[220px] px-4 py-3.5 xl:max-w-none">
+            <span className="line-clamp-2 text-slate-700">{row.installed_address || "—"}</span>
+          </td>
+          <td className="whitespace-nowrap px-4 py-3.5 text-right">
+            <div className="inline-flex items-center gap-1">
+              {serialHref ? (
+                <Link
+                  href={serialHref}
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:border-violet-200 hover:text-violet-700"
+                  title="View"
+                >
+                  <Eye className="h-4 w-4" />
+                </Link>
+              ) : null}
+            </div>
+          </td>
+        </tr>
+      );
+    }
+
+    return (
+      <tr key={row.id || row.serial_number || rowNum} className={`${zebra} hover:bg-violet-50/55 align-top`}>
+        <td className="whitespace-nowrap px-4 py-3.5 text-sm tabular-nums text-slate-500">{rowNum}</td>
+        <td className="px-4 py-3.5 align-top">
+          <ProductIdentityBlock row={row} customerHref={customerHref} serialHref={serialHref} />
+        </td>
+        <td className="whitespace-nowrap px-4 py-3.5 text-sm text-slate-700">
+          {formatDate(row.registered_at || row.invoice_date)}
+        </td>
+        <td className="px-4 py-3.5 align-top">
+          <CompanyDetailBlock row={row} />
+        </td>
+        <td className="px-4 py-3.5 align-top">
+          <SiteContactDetailBlock row={row} />
+        </td>
+        <td className="whitespace-nowrap px-4 py-3.5 text-sm text-slate-700">{row.state?.trim() || "—"}</td>
+        <td className="px-4 py-3.5 align-top">
+          <InstallationWarrantyBlock row={row} />
+        </td>
+        <td className="min-w-[10rem] max-w-[18rem] px-4 py-3.5 text-sm text-slate-700">
+          <span className="inline-flex items-start gap-2">
+            <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-violet-500" aria-hidden />
+            <span className="whitespace-pre-wrap">{row.installed_address?.trim() || "—"}</span>
+          </span>
+        </td>
+        <td className="px-4 py-3.5 align-top">
+          <InvoiceDetailBlock row={row} />
+        </td>
+        <td className="px-4 py-3.5 align-top">
+          <SalesServiceTeamBlock row={row} />
+        </td>
+        <td className="whitespace-nowrap px-4 py-3.5 text-right align-top">
+          {serialHref ? (
+            <Link
+              href={serialHref}
               className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:border-violet-200 hover:text-violet-700"
-              title="More"
-              aria-label="More actions"
+              title="View product"
             >
-              <MoreHorizontal className="h-4 w-4" />
-            </button>
-          </div>
+              <Eye className="h-4 w-4" />
+            </Link>
+          ) : (
+            <span className="text-slate-300">—</span>
+          )}
         </td>
       </tr>
     );
@@ -504,6 +721,23 @@ function TableHead({ segment }) {
       </tr>
     );
   }
+  if (segment === "total-registered") {
+    return (
+      <tr>
+        <th className={th}>#</th>
+        <th className={th}>Customer / Serial / Model</th>
+        <th className={th}>Registered Date</th>
+        <th className={th}>Company</th>
+        <th className={th}>Site Contact</th>
+        <th className={th}>State</th>
+        <th className={th}>Installation / Warranty</th>
+        <th className={th}>Installed Address</th>
+        <th className={th}>Invoice</th>
+        <th className={th}>Sales / Service</th>
+        <th className={`${th} text-right`}>View</th>
+      </tr>
+    );
+  }
   return (
     <tr>
       <th className={th}>#</th>
@@ -540,11 +774,18 @@ function TableBody({ segment, rows, dashboardBase, page, pageSize }) {
     return <AmcRows rows={rows} page={page} pageSize={pageSize} />;
   }
   return (
-    <WarrantyProductRows rows={rows} dashboardBase={dashboardBase} page={page} pageSize={pageSize} />
+    <WarrantyProductRows
+      rows={rows}
+      dashboardBase={dashboardBase}
+      page={page}
+      pageSize={pageSize}
+      segment={segment}
+    />
   );
 }
 
 function colSpanForSegment(segment) {
+  if (segment === "total-registered") return 11;
   if (isWarrantyProductSegment(segment)) return 9;
   if (segment === "open-completions") return 10;
   if (segment === "open-installation" || segment === "overdue-delayed-installation") return 11;

@@ -1,4 +1,5 @@
 import { getDbConnection } from "@/lib/db";
+import { sqlTrimUtf8EqColumns } from "@/lib/sqlUtf8Compare";
 import {
   buildUpcomingInstallationsQuery,
   resolveUpcomingInstallationType,
@@ -314,11 +315,68 @@ export async function fetchServiceBeforeInstallationSegmentPage(segment, options
        wp.model,
        wp.product_name,
        wp.contact,
+       wp.email,
+       wp.contact_person,
+       wp.customer_address,
+       wp.state,
+       wp.site_person,
+       wp.site_contact,
+       wp.site_email,
        wp.invoice_number,
        wp.invoice_date,
+       wp.invoice_file,
        wp.installation_date,
        wp.warranty_period,
        wp.installed_address,
+       wp.created_by AS registered_by,
+       wp.created_at AS registered_at,
+       (
+         SELECT MIN(c.customer_id)
+         FROM customers c
+         WHERE (
+           TRIM(COALESCE(wp.contact, '')) <> ''
+           AND TRIM(COALESCE(c.phone, '')) = TRIM(wp.contact)
+         )
+         OR (
+           TRIM(COALESCE(wp.email, '')) <> ''
+           AND LOWER(TRIM(COALESCE(c.email, ''))) = LOWER(TRIM(wp.email))
+         )
+       ) AS customer_id,
+       COALESCE(
+         (
+           SELECT no.created_by
+           FROM dispatch d
+           INNER JOIN neworder no
+             ON ${sqlTrimUtf8EqColumns("no.quote_number", "d.quote_number")}
+           WHERE ${sqlTrimUtf8EqColumns("d.serial_no", "wp.serial_number")}
+             AND TRIM(COALESCE(no.created_by, '')) <> ''
+           ORDER BY no.id DESC
+           LIMIT 1
+         ),
+         (
+           SELECT no.created_by
+           FROM neworder no
+           WHERE TRIM(COALESCE(wp.invoice_number, '')) <> ''
+             AND ${sqlTrimUtf8EqColumns("no.invoice_number", "wp.invoice_number")}
+             AND TRIM(COALESCE(no.created_by, '')) <> ''
+           ORDER BY no.id DESC
+           LIMIT 1
+         )
+       ) AS order_sales_person,
+       (
+         SELECT sr.assigned_to
+         FROM service_records sr
+         WHERE ${sqlTrimUtf8EqColumns("sr.serial_number", "wp.serial_number")}
+           AND UPPER(TRIM(COALESCE(sr.service_type, ''))) = 'INSTALLATION'
+           AND UPPER(TRIM(COALESCE(sr.assigned_to, ''))) NOT IN ('', 'NOT ASSIGNED', 'UNASSIGNED')
+         ORDER BY
+           CASE
+             WHEN UPPER(TRIM(COALESCE(sr.status, ''))) IN ('COMPLETED', 'WORKED') THEN 0
+             ELSE 1
+           END,
+           sr.service_id DESC
+         LIMIT 1
+       ) AS installation_engineer,
        DATE_ADD(DATE(wp.installation_date), INTERVAL CAST(wp.warranty_period AS UNSIGNED) MONTH) AS warranty_end_date
      FROM warranty_products wp
      ${where}
