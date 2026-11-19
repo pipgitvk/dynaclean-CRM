@@ -87,7 +87,7 @@ export function getLeadsManageCards(dashboardBase) {
       title: "Bulk Reassign",
       subtitle: "Transfer leads between salespeople",
       countKey: null,
-      href: `${base}/leads-manage/bulk-reassign`,
+      href: `${base}/leads-manage/quick-bulk-reassign`,
       noTrend: true,
       staticMetric: "Quick",
       accent: "from-emerald-500 to-green-600",
