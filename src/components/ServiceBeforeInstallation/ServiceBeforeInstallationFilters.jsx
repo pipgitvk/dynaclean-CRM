@@ -153,7 +153,7 @@ export default function ServiceBeforeInstallationFilters({
       <div className={gridClass}>
         <label
           className={`relative block min-w-0 ${
-            isServiceRecordSegment ? "col-span-full" : "sm:col-span-2 xl:col-span-4"
+            isServiceRecordSegment ? "col-span-full sm:col-span-2 xl:col-span-6" : "sm:col-span-2 xl:col-span-4"
           }`}
         >
           <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -176,7 +176,11 @@ export default function ServiceBeforeInstallationFilters({
           />
         </label>
 
-        <label className={`block min-w-0 ${isServiceRecordSegment ? "sm:col-span-1 xl:col-span-3" : "xl:col-span-2"}`}>
+        <label
+          className={`block min-w-0 ${
+            isServiceRecordSegment ? "col-span-full sm:col-span-1 xl:col-span-3" : "xl:col-span-2"
+          }`}
+        >
           <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
             From
           </span>
@@ -188,7 +192,11 @@ export default function ServiceBeforeInstallationFilters({
           />
         </label>
 
-        <label className={`block min-w-0 ${isServiceRecordSegment ? "sm:col-span-1 xl:col-span-3" : "xl:col-span-2"}`}>
+        <label
+          className={`block min-w-0 ${
+            isServiceRecordSegment ? "col-span-full sm:col-span-1 xl:col-span-3" : "xl:col-span-2"
+          }`}
+        >
           <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
             To
           </span>
@@ -248,12 +256,12 @@ export default function ServiceBeforeInstallationFilters({
             <ServiceEngineerFilterSelect
               value={draft.assignedTo}
               onChange={setField("assignedTo")}
-              className="col-span-full sm:col-span-1 xl:col-span-6"
+              className="min-w-0 sm:col-span-1 xl:col-span-3"
             />
             <ServiceStatusFilterSelect
               value={draft.serviceStatus}
               onChange={setField("serviceStatus")}
-              className="col-span-full sm:col-span-1 xl:col-span-6"
+              className="min-w-0 sm:col-span-1 xl:col-span-3"
             />
           </>
         ) : null}
