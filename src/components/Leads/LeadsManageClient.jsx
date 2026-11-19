@@ -313,6 +313,16 @@ export default function LeadsManageClient({
             </div>
           </div>
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+            {bulkReassignCard ? (
+              <SourceKpiCard
+                compact
+                card={bulkReassignCard}
+                total={0}
+                changePct={null}
+                Icon={ArrowLeftRight}
+                className="w-full sm:w-auto sm:min-w-[11rem] sm:max-w-[15rem]"
+              />
+            ) : null}
             {manualAssignCard ? (
               <SourceKpiCard
                 compact
@@ -349,14 +359,6 @@ export default function LeadsManageClient({
               />
             );
           })}
-          {bulkReassignCard ? (
-            <SourceKpiCard
-              card={bulkReassignCard}
-              total={0}
-              changePct={null}
-              Icon={ArrowLeftRight}
-            />
-          ) : null}
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-5">
