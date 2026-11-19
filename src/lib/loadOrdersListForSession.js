@@ -17,6 +17,7 @@ import {
 import { attachDeliveryBatchesToOrders } from "@/lib/orderDeliveryBatches";
 import { attachDispatchShipmentWavesToOrders } from "@/lib/orderDeliverySlots";
 import { sqlOrderCreatedByEquals } from "@/lib/sqlCreatedByScope";
+import { enrichOrderListPaymentContext } from "@/lib/orderListPaymentEnrichment";
 
 /** Shared order list query for user-dashboard and warehouse-incharge order pages. */
 export async function loadOrdersListForSession() {
@@ -40,8 +41,10 @@ export async function loadOrdersListForSession() {
                 0 AS dispatched_stock_count,
                 0 AS pending_dispatch_units,
                 no.created_at, no.created_by , no.einvoice_file, no.booking_id, no.quote_number, no.duedate,
-                no.invoice_date , no.account_by ,no.booking_by , no.dispatch_person,
-                no.payment_id, no.payment_date, no.payment_amount, no.payment_status,no.totalamt, no.baseAmount, no.taxamt, no.transaction_id,
+                no.invoice_number, no.invoice_date , no.account_by ,no.booking_by , no.dispatch_person,
+                no.payment_id, no.payment_date, no.payment_amount, no.advance_requested,
+                no.payment_status,no.totalamt, no.baseAmount, no.taxamt, no.transaction_id,
+                no.amount_received, no.payment_received_date, no.linked_payments_json,
                 no.delivery_date, no.delivered_on, no.delivery_status,no.delivery_proof,
                 COALESCE(no.delivery_remark, '') as delivery_remark,
                 no.installation_status, no.is_returned, no.approval_status, no.approval_remark, no.approval_date,
@@ -124,7 +127,8 @@ export async function loadOrdersListForSession() {
       )
     : orders;
 
-  let ordersWithBatches = await attachBookingBatchesToOrders(conn, visibleOrders);
+  let ordersWithBatches = await enrichOrderListPaymentContext(conn, visibleOrders);
+  ordersWithBatches = await attachBookingBatchesToOrders(conn, ordersWithBatches);
   ordersWithBatches = await attachBookingPendingToOrders(conn, ordersWithBatches);
   ordersWithBatches = await attachDispatchPendingToOrders(conn, ordersWithBatches, {
     skipDbSync: true,

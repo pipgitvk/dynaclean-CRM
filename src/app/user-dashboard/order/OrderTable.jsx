@@ -125,7 +125,7 @@ const WAREHOUSE_INCHARGE_STATUS_KEYS = new Set([
 ]);
 
 export default function OrderTable({
-  orders,
+  orders: initialOrders,
   userRole,
   orderBasePath = "/user-dashboard/order",
   warehouseInchargeItemExpand = false,
@@ -133,6 +133,19 @@ export default function OrderTable({
   defaultEmptyDateFilter = false,
   onWarehouseDispatchItem,
 }) {
+  const [orders, setOrders] = useState(initialOrders ?? []);
+  useEffect(() => {
+    setOrders(initialOrders ?? []);
+  }, [initialOrders]);
+
+  const onOrderPaymentSaved = useCallback((orderId, patch) => {
+    setOrders((prev) =>
+      prev.map((o) =>
+        Number(o.order_id) === Number(orderId) ? { ...o, ...patch } : o,
+      ),
+    );
+  }, []);
+
   const useEmptyDateDefaults =
     warehouseInchargeItemExpand || defaultEmptyDateFilter;
   const showPaymentTerms = !warehouseInchargeItemExpand;
@@ -864,6 +877,7 @@ export default function OrderTable({
                         isOpen={openMenuId === r.order_id}
                         toggleMenu={() => toggleMenu(r.order_id)}
                         orderBasePath={orderBasePath}
+                        onOrderPaymentSaved={onOrderPaymentSaved}
                       />
                     </td>
                   </tr>
@@ -992,6 +1006,7 @@ export default function OrderTable({
                         isOpen={openMenuId === r.order_id}
                         toggleMenu={() => toggleMenu(r.order_id)}
                         orderBasePath={orderBasePath}
+                        onOrderPaymentSaved={onOrderPaymentSaved}
                       />
                     </span>
                   </div>
@@ -1193,6 +1208,7 @@ function ActionButtons({
   isOpen,
   toggleMenu,
   orderBasePath = "/user-dashboard/order",
+  onOrderPaymentSaved,
 }) {
   if (r.is_cancelled) {
     return null;
@@ -1324,7 +1340,7 @@ function ActionButtons({
                     className="px-3 py-2 w-full block"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <EditPaymentButton order={r} />
+                    <EditPaymentButton order={r} onPaymentSaved={onOrderPaymentSaved} />
                   </div>
                 )}
                 {canViewDispatchPanel && (
@@ -1422,7 +1438,7 @@ function ActionButtons({
                           className="px-3 py-2 w-full block"
                           onClick={(e) => e.stopPropagation()}
                         >
-                          <EditPaymentButton order={r} />
+                          <EditPaymentButton order={r} onPaymentSaved={onOrderPaymentSaved} />
                         </div>
                       )}
                     </>
@@ -1604,7 +1620,7 @@ function ActionButtons({
   );
 }
 
-function EditPaymentButton({ order }) {
+function EditPaymentButton({ order, onPaymentSaved }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -1651,8 +1667,13 @@ function EditPaymentButton({ order }) {
         throw new Error(json.error || "Save failed");
       setStatus(json.payment_status);
       setForm((prev) => ({ ...prev, payment_status: json.payment_status }));
+      onPaymentSaved?.(order.order_id, {
+        payment_status: json.payment_status,
+        payment_id: json.payment_id,
+        payment_date: json.payment_date,
+        payment_amount: json.payment_amount,
+      });
       setOpen(false);
-      // Optionally refresh page/client state here
       router.refresh();
     } catch (e) {
       console.error(e);
@@ -1663,7 +1684,7 @@ function EditPaymentButton({ order }) {
   };
 
   const isPaid =
-    (order.payment_status || "")
+    (status || order.payment_status || "")
       .toString()
       .trim()
       .toLowerCase()

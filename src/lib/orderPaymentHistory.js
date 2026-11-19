@@ -428,6 +428,8 @@ export function getOrderPaidAmountForDisplay(order) {
     paid = sumAdvanceRequestedForDisplay(order);
   } else if (neworderRecordedPaymentAmountIsEmpty(order)) {
     paid = advanceRequestedForOrderListPaid(order);
+  } else {
+    paid = sumOrderPaymentAmounts(order);
   }
 
   if (orderTotal > 0) {

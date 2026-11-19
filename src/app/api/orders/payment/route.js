@@ -103,7 +103,14 @@ export async function POST(req) {
       [nextIds, nextDates, nextAmounts, paymentStatus, orderId]
     );
 
-    return NextResponse.json({ success: true, payment_status: paymentStatus, total_paid: totalPaid });
+    return NextResponse.json({
+      success: true,
+      payment_status: paymentStatus,
+      total_paid: totalPaid,
+      payment_id: nextIds,
+      payment_date: nextDates,
+      payment_amount: nextAmounts,
+    });
   } catch (e) {
     return NextResponse.json({ success: false, error: e.message || "Server error" }, { status: 500 });
   } finally {
