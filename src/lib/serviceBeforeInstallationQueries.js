@@ -32,6 +32,26 @@ async function countUpcomingInstallations(conn, filters, { overdueDelayedOnly = 
   return Number(row?.cnt || 0);
 }
 
+/** Hub KPI: open + overdue delayed in one pass over the upcoming-installations subquery. */
+async function countUpcomingInstallationHubTotals(conn, filters) {
+  const parsed = parseSbiFilters(filters);
+  const type = resolveUpcomingInstallationType(parsed.itemType);
+  const inner = buildUpcomingInstallationsQuery({ type, registration: null });
+  const listFilter = buildUpcomingInstallationListFilterSql(filters);
+  const overdueSql = `u.delivery_date < DATE_SUB(CURDATE(), INTERVAL ${OVERDUE_DELAYED_INSTALLATION_DAYS} DAY)`;
+  const [[row]] = await conn.execute(
+    `SELECT
+       COUNT(*) AS open_installation,
+       SUM(CASE WHEN ${overdueSql} THEN 1 ELSE 0 END) AS overdue_delayed_installation
+     FROM (${inner}) u WHERE 1=1 ${listFilter.sql}`,
+    listFilter.params,
+  );
+  return {
+    open_installation: Number(row?.open_installation || 0),
+    overdue_delayed_installation: Number(row?.overdue_delayed_installation || 0),
+  };
+}
+
 async function fetchUpcomingInstallationsPage(
   conn,
   filters,
@@ -113,7 +133,7 @@ export const DUE_AMC_SQL = `(
 )`;
 
 export async function fetchServiceBeforeInstallationHubCounts(filters = {}) {
-  const conn = await getDbConnection();
+  const pool = await getDbConnection();
   const f = parseSbiFilters(filters);
   const wpFilter = buildWpFilterSql(f);
   const srFilter = buildServiceRecordFilterSql(f, {
@@ -121,49 +141,43 @@ export async function fetchServiceBeforeInstallationHubCounts(filters = {}) {
   });
   const amcFilter = buildAmcFilterSql(f);
 
-  const [[wpRow]] = await conn.execute(
-    `SELECT
+  const wpSql = `SELECT
        COUNT(*) AS total_registered,
        SUM(CASE WHEN ${IN_WARRANTY_SQL} THEN 1 ELSE 0 END) AS active_warranty,
        SUM(CASE WHEN ${DUE_WARRANTY_EXPIRY_SQL} THEN 1 ELSE 0 END) AS due_warranty_expiry
      FROM warranty_products wp
-     WHERE 1=1 ${wpFilter.sql}`,
-    wpFilter.params,
-  );
+     WHERE 1=1 ${wpFilter.sql}`;
 
-  const openInstallationTotal = await countUpcomingInstallations(conn, f, {
-    overdueDelayedOnly: false,
-  });
-
-  const [[srRow]] = await conn.execute(
-    `SELECT COUNT(*) AS open_completions
+  const srSql = `SELECT COUNT(*) AS open_completions
      FROM service_records sr
      LEFT JOIN warranty_products wp
        ON TRIM(sr.serial_number) COLLATE utf8mb4_unicode_ci = TRIM(wp.serial_number) COLLATE utf8mb4_unicode_ci
      WHERE ${PENDING_SERVICE_SQL}
        AND ${OPEN_COMPLAINTS_SQL}
-       ${srFilter.sql}`,
-    srFilter.params,
-  );
+       ${srFilter.sql}`;
 
-  const overdueDelayedTotal = await countUpcomingInstallations(conn, f, {
-    overdueDelayedOnly: true,
-  });
-
-  const [[amcRow]] = await conn.execute(
-    `SELECT
+  const amcSql = `SELECT
        SUM(CASE WHEN ${ACTIVE_AMC_SQL} THEN 1 ELSE 0 END) AS active_amc,
        SUM(CASE WHEN ${DUE_AMC_SQL} THEN 1 ELSE 0 END) AS due_amc_expiring
      FROM amc_cmc
-     WHERE 1=1 ${amcFilter.sql}`,
-    amcFilter.params,
-  );
+     WHERE 1=1 ${amcFilter.sql}`;
+
+  const [wpResult, srResult, amcResult, upcomingTotals] = await Promise.all([
+    pool.execute(wpSql, wpFilter.params),
+    pool.execute(srSql, srFilter.params),
+    pool.execute(amcSql, amcFilter.params),
+    countUpcomingInstallationHubTotals(pool, f),
+  ]);
+
+  const wpRow = wpResult[0]?.[0];
+  const srRow = srResult[0]?.[0];
+  const amcRow = amcResult[0]?.[0];
 
   return {
     total_registered: Number(wpRow?.total_registered || 0),
-    open_installation: openInstallationTotal,
+    open_installation: upcomingTotals.open_installation,
     open_completions: Number(srRow?.open_completions || 0),
-    overdue_delayed_installation: overdueDelayedTotal,
+    overdue_delayed_installation: upcomingTotals.overdue_delayed_installation,
     active_warranty: Number(wpRow?.active_warranty || 0),
     due_warranty_expiry: Number(wpRow?.due_warranty_expiry || 0),
     active_amc: Number(amcRow?.active_amc || 0),

@@ -1,9 +1,12 @@
 import { sqlTrimUtf8EqColumns } from "@/lib/sqlUtf8Compare";
+import { LEADS_HUB_RANGE_OPTIONS, resolveLeadsHubRange } from "@/lib/leadsManageHubRange";
 
 const DISPATCH_ON_ORDER_QUOTE = sqlTrimUtf8EqColumns(
   "d.quote_number",
   "no.quote_number"
 );
+
+export const SBI_RANGE_SELECT = { id: "select", label: "Select" };
 
 export const EMPTY_SBI_FILTERS = {
   search: "",
@@ -15,7 +18,45 @@ export const EMPTY_SBI_FILTERS = {
   itemType: "",
   assignedTo: "",
   serviceStatus: "",
+  range: SBI_RANGE_SELECT.id,
 };
+
+/** Hub header period dropdown */
+export const SBI_HUB_PERIOD_OPTIONS = [SBI_RANGE_SELECT, ...LEADS_HUB_RANGE_OPTIONS];
+
+/** Detail list filters — period + optional all-time */
+export const SBI_PERIOD_OPTIONS = [
+  SBI_RANGE_SELECT,
+  { id: "all", label: "All time" },
+  ...LEADS_HUB_RANGE_OPTIONS,
+];
+
+/** Apply hub period preset to filter draft (sets from/to for API). */
+export function sbiFiltersWithRange(rangeKey, base = EMPTY_SBI_FILTERS, custom = {}) {
+  const range = String(rangeKey || SBI_RANGE_SELECT.id).trim().toLowerCase();
+  if (range === SBI_RANGE_SELECT.id) {
+    return { ...base, range: SBI_RANGE_SELECT.id, from: "", to: "" };
+  }
+  if (!range || range === "all") {
+    return { ...base, range: "all", from: "", to: "" };
+  }
+  if (range === "custom") {
+    const from = String(custom.from ?? base.from ?? "").trim();
+    const to = String(custom.to ?? base.to ?? "").trim();
+    return { ...base, range: "custom", from, to };
+  }
+  const resolved = resolveLeadsHubRange(range, custom);
+  return { ...base, range, from: resolved.from, to: resolved.to };
+}
+
+export function defaultSbiSelectFilters() {
+  return sbiFiltersWithRange(SBI_RANGE_SELECT.id);
+}
+
+/** Preset: Current Month (till today). */
+export function defaultSbiMonthFilters() {
+  return sbiFiltersWithRange("month");
+}
 
 export function parseSbiFilters(input) {
   const src = input || {};

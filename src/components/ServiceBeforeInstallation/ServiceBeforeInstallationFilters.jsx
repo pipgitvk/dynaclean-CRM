@@ -357,7 +357,6 @@ export default function ServiceBeforeInstallationFilters({
           type="button"
           disabled={loading}
           onClick={() => {
-            onChange?.({ ...EMPTY_SBI_FILTERS });
             onClear?.();
           }}
           className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"

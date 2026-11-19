@@ -5,7 +5,7 @@ import axios from "axios";
 import { CalendarDays, ChevronDown, Loader2 } from "lucide-react";
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { getCurrentMonthThroughTodayIso } from "@/lib/crmDateFormat";
-import { LEADS_HUB_RANGE_OPTIONS } from "@/lib/leadsManageHubRange";
+import { SBI_HUB_PERIOD_OPTIONS, SBI_RANGE_SELECT } from "@/lib/serviceBeforeInstallationFilters";
 import { getServiceBeforeInstallationCards } from "@/lib/serviceBeforeInstallationHub";
 import ServiceBeforeInstallationKpiCard from "@/components/ServiceBeforeInstallation/ServiceBeforeInstallationKpiCard";
 
@@ -48,7 +48,7 @@ function SbiHubDateRangeControl({
 }) {
   return (
     <div className="flex min-w-0 flex-col gap-2">
-      <div className="relative inline-flex min-w-[12.5rem] flex-1 items-center sm:max-w-[14.5rem]">
+      <div className="relative inline-flex min-w-[12.5rem] flex-1 items-center sm:max-w-[19rem]">
         <CalendarDays className="pointer-events-none absolute left-3 z-10 h-4 w-4 text-violet-600" aria-hidden />
         <select
           value={range}
@@ -56,7 +56,7 @@ function SbiHubDateRangeControl({
           className="w-full min-w-0 cursor-pointer appearance-none rounded-xl border border-violet-200/70 bg-white/95 py-2.5 pl-10 pr-9 text-sm font-semibold text-slate-800 shadow-sm backdrop-blur-sm transition hover:border-violet-300 focus:outline-none focus:ring-2 focus:ring-violet-500/20"
           aria-label="Time period"
         >
-          {LEADS_HUB_RANGE_OPTIONS.map((opt) => (
+          {SBI_HUB_PERIOD_OPTIONS.map((opt) => (
             <option key={opt.id} value={opt.id}>
               {opt.label}
             </option>
@@ -99,7 +99,6 @@ function SbiHubDateRangeControl({
 export default function ServiceBeforeInstallationHubClient({
   dashboardBase = "admin-dashboard",
   initialCounts = null,
-  initialPrevCounts = null,
 }) {
   const cards = useMemo(
     () => getServiceBeforeInstallationCards(dashboardBase),
@@ -107,9 +106,9 @@ export default function ServiceBeforeInstallationHubClient({
   );
   const monthDefault = useMemo(() => getCurrentMonthThroughTodayIso(), []);
   const [counts, setCounts] = useState(initialCounts || {});
-  const [prevCounts, setPrevCounts] = useState(initialPrevCounts || {});
+  const [prevCounts, setPrevCounts] = useState({});
   const [loading, setLoading] = useState(!initialCounts);
-  const [range, setRange] = useState("month");
+  const [range, setRange] = useState(SBI_RANGE_SELECT.id);
   const skipInitialFetch = useRef(Boolean(initialCounts));
   const [customFrom, setCustomFrom] = useState(monthDefault.from);
   const [customTo, setCustomTo] = useState(monthDefault.to);

@@ -161,6 +161,7 @@ export default function ServiceBeforeInstallationKpiCard({
   loading = false,
   active = false,
   variant = "hub",
+  showTrend = true,
 }) {
   const Icon = SBI_CARD_ICONS[card.id] || Package;
   const seed = SBI_SPARK_SEED[card.id] ?? 1;
@@ -213,16 +214,18 @@ export default function ServiceBeforeInstallationKpiCard({
             <span className="text-4xl font-bold tabular-nums tracking-tight text-slate-900 sm:text-[2.65rem]">
               {loading ? "…" : formatSbiNum(total)}
             </span>
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              {!loading && (
-                <ChangePill
-                  value={changePct}
-                  invertTrend={invertTrend}
-                  className="bg-white/95 shadow-sm"
-                />
-              )}
-              <span className="text-xs font-medium text-slate-400 sm:text-sm">vs last month</span>
-            </div>
+            {showTrend ? (
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                {!loading && (
+                  <ChangePill
+                    value={changePct}
+                    invertTrend={invertTrend}
+                    className="bg-white/95 shadow-sm"
+                  />
+                )}
+                <span className="text-xs font-medium text-slate-400 sm:text-sm">vs last month</span>
+              </div>
+            ) : null}
           </div>
         </div>
       ) : (
@@ -250,7 +253,7 @@ export default function ServiceBeforeInstallationKpiCard({
               <span className="text-[1.75rem] font-bold leading-none tabular-nums tracking-tight text-slate-900 sm:text-[2.125rem]">
                 {loading ? "…" : formatSbiNum(total)}
               </span>
-              {!loading ? (
+              {!loading && showTrend ? (
                 <ChangePill
                   value={changePct}
                   invertTrend={invertTrend}

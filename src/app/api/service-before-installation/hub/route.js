@@ -3,6 +3,7 @@ import { assertSuperAdminApiAccess } from "@/lib/serviceBeforeInstallationAccess
 import { parseSbiFilters } from "@/lib/serviceBeforeInstallationFilters";
 import { fetchServiceBeforeInstallationHubCounts } from "@/lib/serviceBeforeInstallationQueries";
 import { resolveLeadsHubRange } from "@/lib/leadsManageHubRange";
+import { SBI_RANGE_SELECT } from "@/lib/serviceBeforeInstallationFilters";
 
 export async function GET(request) {
   try {
@@ -12,23 +13,43 @@ export async function GET(request) {
     }
 
     const { searchParams } = new URL(request.url);
-    const rangeKey = searchParams.get("range") || "month";
+    const rangeKey = String(searchParams.get("range") || SBI_RANGE_SELECT.id).trim().toLowerCase();
+
+    const baseFilterInput = {
+      search: searchParams.get("search"),
+      q: searchParams.get("q"),
+      model: searchParams.get("model"),
+      state: searchParams.get("state"),
+      serial: searchParams.get("serial"),
+      itemType: searchParams.get("itemType") ?? searchParams.get("item_type"),
+      assignedTo: searchParams.get("assignedTo") ?? searchParams.get("assigned_to"),
+      serviceStatus: searchParams.get("serviceStatus") ?? searchParams.get("service_status"),
+    };
+
+    if (rangeKey === SBI_RANGE_SELECT.id || rangeKey === "all") {
+      const filters = parseSbiFilters(baseFilterInput);
+      const counts = await fetchServiceBeforeInstallationHubCounts(filters);
+      return NextResponse.json({
+        success: true,
+        counts,
+        prevCounts: {},
+        range: rangeKey,
+        rangeLabel: rangeKey === SBI_RANGE_SELECT.id ? SBI_RANGE_SELECT.label : "All time",
+        from: "",
+        to: "",
+        filters,
+      });
+    }
+
     const resolved = resolveLeadsHubRange(rangeKey, {
       from: searchParams.get("from"),
       to: searchParams.get("to"),
     });
 
     const filters = parseSbiFilters({
-      search: searchParams.get("search"),
-      q: searchParams.get("q"),
-      model: searchParams.get("model"),
-      state: searchParams.get("state"),
-      serial: searchParams.get("serial"),
+      ...baseFilterInput,
       from: resolved.from,
       to: resolved.to,
-      itemType: searchParams.get("itemType") ?? searchParams.get("item_type"),
-      assignedTo: searchParams.get("assignedTo") ?? searchParams.get("assigned_to"),
-      serviceStatus: searchParams.get("serviceStatus") ?? searchParams.get("service_status"),
     });
 
     const prevFilters = parseSbiFilters({

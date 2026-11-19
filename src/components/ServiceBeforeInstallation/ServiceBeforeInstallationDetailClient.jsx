@@ -24,7 +24,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { getSegmentMeta } from "@/lib/serviceBeforeInstallationHub";
-import { EMPTY_SBI_FILTERS } from "@/lib/serviceBeforeInstallationFilters";
+import { defaultSbiSelectFilters } from "@/lib/serviceBeforeInstallationFilters";
 import ServiceBeforeInstallationFilters from "@/components/ServiceBeforeInstallation/ServiceBeforeInstallationFilters";
 import ServiceBeforeInstallationDetailKpiStrip from "@/components/ServiceBeforeInstallation/ServiceBeforeInstallationDetailKpiStrip";
 import { formatCrmDateOnly } from "@/lib/crmDateFormat";
@@ -64,6 +64,15 @@ function isWarrantyProductSegment(segment) {
     segment === "active-warranty" ||
     segment === "due-warranty-expiry"
   );
+}
+
+function initialSbiFiltersForSegment() {
+  return defaultSbiSelectFilters();
+}
+
+function applyFilterState(setDraft, setApplied, next) {
+  setDraft(next);
+  setApplied(next);
 }
 
 function formatDate(raw) {
@@ -551,8 +560,8 @@ export default function ServiceBeforeInstallationDetailClient({
   const hubHref = `/${dashboardBase}/service-before-installation`;
   const warrantyHref = `/${dashboardBase}/warranty`;
 
-  const [draftFilters, setDraftFilters] = useState(EMPTY_SBI_FILTERS);
-  const [appliedFilters, setAppliedFilters] = useState(EMPTY_SBI_FILTERS);
+  const [draftFilters, setDraftFilters] = useState(() => initialSbiFiltersForSegment(segment));
+  const [appliedFilters, setAppliedFilters] = useState(() => initialSbiFiltersForSegment(segment));
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [rows, setRows] = useState([]);
@@ -561,8 +570,9 @@ export default function ServiceBeforeInstallationDetailClient({
 
   useEffect(() => {
     setPage(0);
-    setDraftFilters(EMPTY_SBI_FILTERS);
-    setAppliedFilters(EMPTY_SBI_FILTERS);
+    const next = initialSbiFiltersForSegment(segment);
+    setDraftFilters(next);
+    setAppliedFilters(next);
   }, [segment]);
 
   const fetchRows = useCallback(async () => {
@@ -621,6 +631,8 @@ export default function ServiceBeforeInstallationDetailClient({
           <ServiceBeforeInstallationDetailKpiStrip
             dashboardBase={dashboardBase}
             activeSegment={segment}
+            total={pagination.total}
+            loading={loading}
           />
         ) : null}
 
@@ -636,8 +648,8 @@ export default function ServiceBeforeInstallationDetailClient({
           }}
           onClear={() => {
             setPage(0);
-            setDraftFilters({ ...EMPTY_SBI_FILTERS });
-            setAppliedFilters({ ...EMPTY_SBI_FILTERS });
+            const next = initialSbiFiltersForSegment(segment);
+            applyFilterState(setDraftFilters, setAppliedFilters, next);
           }}
         />
 
