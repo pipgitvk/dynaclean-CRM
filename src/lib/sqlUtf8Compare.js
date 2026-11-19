@@ -31,3 +31,24 @@ export function sqlLikeUtf8Contains(columnExpr) {
   const needle = `TRIM(CONVERT(? USING utf8mb4)) COLLATE ${UTF8_COLLATE}`;
   return `${haystack} LIKE CONCAT('%', ${needle}, '%')`;
 }
+
+/** TRIM + utf8mb4 for a nested SQL expression (subquery / COALESCE). */
+export function sqlUtf8TrimComplexExpr(exprSql) {
+  return `TRIM(CONVERT((${exprSql}) USING utf8mb4))`;
+}
+
+/** Non-empty text check without comparing to '' (avoids collation mix on CONVERT). */
+export function sqlUtf8HasText(columnExpr) {
+  return `CHAR_LENGTH(${utf8Trim(columnExpr)}) > 0`;
+}
+
+export function sqlUtf8ComplexHasText(exprSql) {
+  return `CHAR_LENGTH(${sqlUtf8TrimComplexExpr(exprSql)}) > 0`;
+}
+
+/** LIKE %?% on a nested SQL expression. */
+export function sqlLikeUtf8ContainsExpr(exprSql) {
+  const haystack = `${sqlUtf8TrimComplexExpr(exprSql)} COLLATE ${UTF8_COLLATE}`;
+  const needle = `TRIM(CONVERT(? USING utf8mb4)) COLLATE ${UTF8_COLLATE}`;
+  return `${haystack} LIKE CONCAT('%', ${needle}, '%')`;
+}

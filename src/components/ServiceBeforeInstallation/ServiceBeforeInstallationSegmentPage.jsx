@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { isServiceBeforeInstallationSegment } from "@/lib/serviceBeforeInstallationHub";
 import { requireSuperAdminForServiceBeforeInstallation } from "@/lib/serviceBeforeInstallationAccess";
-import ServiceBeforeInstallationDetailClient from "@/components/ServiceBeforeInstallation/ServiceBeforeInstallationDetailClient";
+import ServiceBeforeInstallationDetailLoader from "@/components/ServiceBeforeInstallation/ServiceBeforeInstallationDetailLoader";
 
 export default async function ServiceBeforeInstallationSegmentPage({
   params,
@@ -14,7 +14,7 @@ export default async function ServiceBeforeInstallationSegmentPage({
   }
 
   return (
-    <ServiceBeforeInstallationDetailClient
+    <ServiceBeforeInstallationDetailLoader
       segment={segment}
       dashboardBase={dashboardBase}
     />

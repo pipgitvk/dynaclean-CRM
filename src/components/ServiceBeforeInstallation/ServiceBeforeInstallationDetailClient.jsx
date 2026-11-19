@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import {
   AlertTriangle,
@@ -150,6 +150,37 @@ function salesPersonLabel(row) {
   return orderRep || registeredBy || "";
 }
 
+function teamFilterOptionsFromRows(rows) {
+  const salesPersons = new Set();
+  const serviceEngineers = new Set();
+  const thirdPartyEngineers = new Set();
+  for (const row of rows) {
+    const sales = salesPersonLabel(row);
+    if (sales) salesPersons.add(sales);
+    if (isServiceRecordAssigned(row.service_engineer)) {
+      serviceEngineers.add(String(row.service_engineer).trim());
+    }
+    if (isServiceRecordAssigned(row.third_party_engineer)) {
+      thirdPartyEngineers.add(String(row.third_party_engineer).trim());
+    }
+  }
+  return {
+    salesPersons: [...salesPersons],
+    serviceEngineers: [...serviceEngineers],
+    thirdPartyEngineers: [...thirdPartyEngineers],
+  };
+}
+
+function mergeTeamFilterOptions(fromApi, fromRows) {
+  const merge = (a = [], b = []) =>
+    [...new Set([...a, ...b])].sort((x, y) => x.localeCompare(y, undefined, { sensitivity: "base" }));
+  return {
+    salesPersons: merge(fromApi?.salesPersons, fromRows?.salesPersons),
+    serviceEngineers: merge(fromApi?.serviceEngineers, fromRows?.serviceEngineers),
+    thirdPartyEngineers: merge(fromApi?.thirdPartyEngineers, fromRows?.thirdPartyEngineers),
+  };
+}
+
 function ProductIdentityBlock({ row, customerHref, serialHref }) {
   const modelLabel = [row.product_name, row.model].filter(Boolean).join(" · ") || "—";
   const hasAny = row.customer_id || row.serial_number || modelLabel !== "—";
@@ -194,14 +225,18 @@ function ProductIdentityBlock({ row, customerHref, serialHref }) {
 
 function SalesServiceTeamBlock({ row }) {
   const sales = salesPersonLabel(row);
-  const engineer = isServiceRecordAssigned(row.installation_engineer)
-    ? String(row.installation_engineer).trim()
+  const engineer = isServiceRecordAssigned(row.service_engineer)
+    ? String(row.service_engineer).trim()
     : "";
-  if (!sales && !engineer) return <span className="text-slate-400">—</span>;
+  const thirdParty = isServiceRecordAssigned(row.third_party_engineer)
+    ? String(row.third_party_engineer).trim()
+    : "";
+  if (!sales && !engineer && !thirdParty) return <span className="text-slate-400">—</span>;
   return (
     <div className="min-w-[9rem] max-w-[13rem] space-y-0.5 text-xs">
       <DetailField label="Sales person" value={sales} />
       <DetailField label="Service engineer" value={engineer} />
+      <DetailField label="Third party engineer" value={thirdParty} />
     </div>
   );
 }
@@ -351,8 +386,11 @@ function exportRowsCsv(rows, segment) {
     if (segment === "total-registered") {
       const modelText = [row.product_name, row.model].filter(Boolean).join(" ");
       const sales = salesPersonLabel(row);
-      const engineer = isServiceRecordAssigned(row.installation_engineer)
-        ? String(row.installation_engineer).trim()
+      const engineer = isServiceRecordAssigned(row.service_engineer)
+        ? String(row.service_engineer).trim()
+        : "";
+      const thirdParty = isServiceRecordAssigned(row.third_party_engineer)
+        ? String(row.third_party_engineer).trim()
         : "";
       return [
         [
@@ -379,7 +417,8 @@ function exportRowsCsv(rows, segment) {
         [row.invoice_number, formatDate(row.invoice_date)].filter(Boolean).join(" "),
         [
           sales ? `Sales: ${sales}` : "",
-          engineer ? `Engineer: ${engineer}` : "",
+          engineer ? `Service engineer: ${engineer}` : "",
+          thirdParty ? `Third party: ${thirdParty}` : "",
         ]
           .filter(Boolean)
           .join(" | "),
@@ -807,10 +846,15 @@ export default function ServiceBeforeInstallationDetailClient({
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [rows, setRows] = useState([]);
   const [pagination, setPagination] = useState({ total: 0, hasMore: false });
+  const [tableFilterOptions, setTableFilterOptions] = useState(null);
+  const tableFilterOptionsFetchKeyRef = useRef(null);
   const [loading, setLoading] = useState(true);
+  const [countLoading, setCountLoading] = useState(false);
 
   useEffect(() => {
     setPage(0);
+    setTableFilterOptions(null);
+    tableFilterOptionsFetchKeyRef.current = null;
     const next = initialSbiFiltersForSegment(segment);
     setDraftFilters(next);
     setAppliedFilters(next);
@@ -819,16 +863,23 @@ export default function ServiceBeforeInstallationDetailClient({
   const fetchRows = useCallback(async () => {
     setLoading(true);
     try {
+      // Always request full COUNT — ~1k warranty rows is cheap; deferTotal caused "10+".
       const res = await axios.get(`/api/service-before-installation/${segment}`, {
         params: {
           ...appliedFilters,
           limit: pageSize,
           skip: page * pageSize,
+          includeFilterOptions: "0",
+          deferTotal: "0",
         },
+        timeout: 20_000,
       });
       if (res.data?.success) {
-        setRows(res.data.data || []);
-        setPagination(res.data.pagination || { total: 0, hasMore: false });
+        const data = res.data.data || [];
+        const pag = res.data.pagination || { total: 0, hasMore: false };
+        setRows(data);
+        setPagination(pag);
+        setCountLoading(false);
       }
     } catch (e) {
       console.error(e);
@@ -837,11 +888,43 @@ export default function ServiceBeforeInstallationDetailClient({
     }
   }, [segment, appliedFilters, page, pageSize]);
 
+  const fetchTableFilterOptions = useCallback(async () => {
+    if (segment !== "total-registered") return;
+    const key = JSON.stringify(appliedFilters);
+    if (tableFilterOptionsFetchKeyRef.current === key) return;
+    tableFilterOptionsFetchKeyRef.current = key;
+    try {
+      const res = await axios.get(`/api/service-before-installation/${segment}`, {
+        params: {
+          ...appliedFilters,
+          filterOptionsOnly: "1",
+        },
+      });
+      if (res.data?.success && res.data.filterOptions) {
+        setTableFilterOptions(res.data.filterOptions);
+      }
+    } catch (e) {
+      console.error(e);
+      tableFilterOptionsFetchKeyRef.current = null;
+    }
+  }, [segment, appliedFilters]);
+
+  const requestTableFilterOptions = useCallback(() => {
+    void fetchTableFilterOptions();
+  }, [fetchTableFilterOptions]);
+
+  const mergedTableFilterOptions = useMemo(
+    () => mergeTeamFilterOptions(tableFilterOptions, teamFilterOptionsFromRows(rows)),
+    [tableFilterOptions, rows],
+  );
+
   useEffect(() => {
     fetchRows();
   }, [fetchRows]);
 
-  const totalPages = Math.max(1, Math.ceil((pagination.total || 0) / pageSize));
+  const totalPages = pagination.totalPending
+    ? Math.max(1, page + (pagination.hasMore ? 2 : 1))
+    : Math.max(1, Math.ceil((pagination.total || 0) / pageSize));
   const pageWindow = useMemo(() => buildPageWindow(page, totalPages), [page, totalPages]);
   const colSpan = colSpanForSegment(segment);
   const showAddRegistered = isWarrantyProductSegment(segment);
@@ -872,19 +955,23 @@ export default function ServiceBeforeInstallationDetailClient({
           <ServiceBeforeInstallationDetailKpiStrip
             dashboardBase={dashboardBase}
             activeSegment={segment}
-            total={pagination.total}
-            loading={loading}
+            total={pagination.total ?? 0}
+            loading={countLoading}
           />
         ) : null}
 
         <ServiceBeforeInstallationFilters
           segment={segment}
+          tableFilterOptions={mergedTableFilterOptions}
+          onRequestTableFilterOptions={requestTableFilterOptions}
           className="mb-5 shadow-[0_4px_20px_-10px_rgba(124,58,237,0.2)]"
           value={draftFilters}
           onChange={setDraftFilters}
-          loading={loading}
+          loading={loading && rows.length === 0}
           onApply={() => {
             setPage(0);
+            setTableFilterOptions(null);
+            tableFilterOptionsFetchKeyRef.current = null;
             setAppliedFilters({ ...draftFilters });
           }}
           onClear={() => {
@@ -897,8 +984,14 @@ export default function ServiceBeforeInstallationDetailClient({
         <div className="overflow-hidden rounded-3xl border border-slate-200/90 bg-white shadow-[0_8px_30px_-12px_rgba(15,23,42,0.12)]">
           <div className="flex flex-col gap-3 border-b border-slate-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
             <div className="text-lg font-bold text-slate-900">
-              {formatNum(pagination.total)} Records
-              {loading ? <Loader2 className="ml-2 inline h-4 w-4 animate-spin text-violet-600" /> : null}
+              {pagination.total != null && pagination.total > 0
+                ? `${formatNum(pagination.total)} Records`
+                : pagination.hasMore
+                  ? `${formatNum(rows.length)}+ Records`
+                  : `${formatNum(rows.length)} Records`}
+              {loading && rows.length === 0 ? (
+                <Loader2 className="ml-2 inline h-4 w-4 animate-spin text-violet-600" />
+              ) : null}
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <button

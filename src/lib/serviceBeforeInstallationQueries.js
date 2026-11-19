@@ -1,17 +1,31 @@
 import { getDbConnection } from "@/lib/db";
-import { sqlTrimUtf8EqColumns } from "@/lib/sqlUtf8Compare";
+import {
+  sqlTrimUtf8EqColumns,
+  sqlUtf8HasText,
+  sqlUtf8TrimExpr,
+} from "@/lib/sqlUtf8Compare";
 import {
   buildUpcomingInstallationsQuery,
+  dispatchTypeJoin,
   resolveUpcomingInstallationType,
 } from "@/lib/upcomingInstallationsQuery";
+import {
+  dispatchSerialEligibleForInstallation,
+  pendingNeworderPredicates,
+} from "@/lib/upcomingInstallationOrderEligibility";
 import { isServiceBeforeInstallationSegment } from "@/lib/serviceBeforeInstallationHub";
+import { parseSbiFilters } from "@/lib/serviceBeforeInstallationFilters";
 import {
   buildAmcFilterSql,
   buildServiceRecordFilterSql,
   buildUpcomingInstallationListFilterSql,
   buildWpFilterSql,
-  parseSbiFilters,
-} from "@/lib/serviceBeforeInstallationFilters";
+} from "@/lib/serviceBeforeInstallationFilterSql";
+import {
+  enrichTotalRegisteredRows,
+  fetchSimpleWarrantyProductPage,
+  fetchTotalRegisteredBasePage,
+} from "@/lib/serviceBeforeInstallationWpList";
 
 function upcomingOverdueDelayedExtraSql() {
   return ` AND u.delivery_date < DATE_SUB(CURDATE(), INTERVAL ${OVERDUE_DELAYED_INSTALLATION_DAYS} DAY)`;
@@ -19,6 +33,9 @@ function upcomingOverdueDelayedExtraSql() {
 
 /** Pending installation orders with delivery date older than this many days. */
 export const OVERDUE_DELAYED_INSTALLATION_DAYS = 2;
+
+const HUB_COUNTS_CACHE = new Map();
+const HUB_COUNTS_TTL_MS = 45_000;
 
 async function countUpcomingInstallations(conn, filters, { overdueDelayedOnly = false } = {}) {
   const parsed = parseSbiFilters(filters);
@@ -33,20 +50,69 @@ async function countUpcomingInstallations(conn, filters, { overdueDelayedOnly = 
   return Number(row?.cnt || 0);
 }
 
-/** Hub KPI: open + overdue delayed in one pass over the upcoming-installations subquery. */
+/**
+ * Hub KPI counts — skip GROUP_CONCAT / service_records / quotation_items
+ * (full list query). Only pending orders with an eligible dispatch serial.
+ */
 async function countUpcomingInstallationHubTotals(conn, filters) {
-  const parsed = parseSbiFilters(filters);
-  const type = resolveUpcomingInstallationType(parsed.itemType);
-  const inner = buildUpcomingInstallationsQuery({ type, registration: null });
-  const listFilter = buildUpcomingInstallationListFilterSql(filters);
-  const overdueSql = `u.delivery_date < DATE_SUB(CURDATE(), INTERVAL ${OVERDUE_DELAYED_INSTALLATION_DAYS} DAY)`;
+  const f = parseSbiFilters(filters);
+  const needsFullListShape = Boolean(f.search || f.model || f.state || f.serial);
+
+  if (needsFullListShape) {
+    const type = resolveUpcomingInstallationType(f.itemType);
+    const inner = buildUpcomingInstallationsQuery({ type, registration: null });
+    const listFilter = buildUpcomingInstallationListFilterSql(filters);
+    const overdueSql = `u.delivery_date < DATE_SUB(CURDATE(), INTERVAL ${OVERDUE_DELAYED_INSTALLATION_DAYS} DAY)`;
+    const [[row]] = await conn.execute(
+      `SELECT
+         COUNT(*) AS open_installation,
+         SUM(CASE WHEN ${overdueSql} THEN 1 ELSE 0 END) AS overdue_delayed_installation
+       FROM (${inner}) u WHERE 1=1 ${listFilter.sql}`,
+      listFilter.params,
+    );
+    return {
+      open_installation: Number(row?.open_installation || 0),
+      overdue_delayed_installation: Number(row?.overdue_delayed_installation || 0),
+    };
+  }
+
+  const type = resolveUpcomingInstallationType(f.itemType);
+  const typeJoin = dispatchTypeJoin(type === "all" ? null : type);
+  const quoteKey = sqlUtf8TrimExpr("d.quote_number");
+  const overdueSql = `no.delivery_date < DATE_SUB(CURDATE(), INTERVAL ${OVERDUE_DELAYED_INSTALLATION_DAYS} DAY)`;
+
+  let dateSql = "";
+  const params = [];
+  if (f.from) {
+    dateSql += ` AND DATE(no.delivery_date) >= ?`;
+    params.push(f.from);
+  }
+  if (f.to) {
+    dateSql += ` AND DATE(no.delivery_date) <= ?`;
+    params.push(f.to);
+  }
+
   const [[row]] = await conn.execute(
     `SELECT
        COUNT(*) AS open_installation,
        SUM(CASE WHEN ${overdueSql} THEN 1 ELSE 0 END) AS overdue_delayed_installation
-     FROM (${inner}) u WHERE 1=1 ${listFilter.sql}`,
-    listFilter.params,
+     FROM neworder no
+     INNER JOIN (
+       SELECT ${quoteKey} AS quote_key
+       FROM dispatch d
+       INNER JOIN neworder no_p
+         ON ${sqlTrimUtf8EqColumns("no_p.quote_number", "d.quote_number")}
+         AND ${pendingNeworderPredicates("no_p")}
+       ${typeJoin}
+       WHERE 1=1
+         ${dispatchSerialEligibleForInstallation("d", "no_p")}
+       GROUP BY quote_key
+     ) agg ON ${sqlTrimUtf8EqColumns("agg.quote_key", "no.quote_number")}
+     WHERE ${pendingNeworderPredicates("no")}
+       ${dateSql}`,
+    params,
   );
+
   return {
     open_installation: Number(row?.open_installation || 0),
     overdue_delayed_installation: Number(row?.overdue_delayed_installation || 0),
@@ -133,14 +199,25 @@ export const DUE_AMC_SQL = `(
   )
 )`;
 
+function serviceRecordFilterNeedsWpJoin(f) {
+  return Boolean(f.search || f.model || f.serial || (f.state && !f.assignedTo));
+}
+
 export async function fetchServiceBeforeInstallationHubCounts(filters = {}) {
-  const pool = await getDbConnection();
   const f = parseSbiFilters(filters);
+  const cacheKey = JSON.stringify(f);
+  const cached = HUB_COUNTS_CACHE.get(cacheKey);
+  if (cached && Date.now() - cached.at < HUB_COUNTS_TTL_MS) {
+    return cached.data;
+  }
+
+  const pool = await getDbConnection();
   const wpFilter = buildWpFilterSql(f);
   const srFilter = buildServiceRecordFilterSql(f, {
     dateExpr: "COALESCE(sr.planned_date, sr.complaint_date)",
   });
   const amcFilter = buildAmcFilterSql(f);
+  const needsWp = serviceRecordFilterNeedsWpJoin(f);
 
   const wpSql = `SELECT
        COUNT(*) AS total_registered,
@@ -149,13 +226,20 @@ export async function fetchServiceBeforeInstallationHubCounts(filters = {}) {
      FROM warranty_products wp
      WHERE 1=1 ${wpFilter.sql}`;
 
-  const srSql = `SELECT COUNT(*) AS open_completions
-     FROM service_records sr
-     LEFT JOIN warranty_products wp
-       ON TRIM(sr.serial_number) COLLATE utf8mb4_unicode_ci = TRIM(wp.serial_number) COLLATE utf8mb4_unicode_ci
-     WHERE ${PENDING_SERVICE_SQL}
-       AND ${OPEN_COMPLAINTS_SQL}
-       ${srFilter.sql}`;
+  // Hub period filters rarely need warranty join — skipping TRIM serial join is a big win.
+  const srSql = needsWp
+    ? `SELECT COUNT(*) AS open_completions
+       FROM service_records sr
+       LEFT JOIN warranty_products wp
+         ON ${sqlTrimUtf8EqColumns("sr.serial_number", "wp.serial_number")}
+       WHERE ${PENDING_SERVICE_SQL}
+         AND ${OPEN_COMPLAINTS_SQL}
+         ${srFilter.sql}`
+    : `SELECT COUNT(*) AS open_completions
+       FROM service_records sr
+       WHERE ${PENDING_SERVICE_SQL}
+         AND ${OPEN_COMPLAINTS_SQL}
+         ${srFilter.sql}`;
 
   const amcSql = `SELECT
        SUM(CASE WHEN ${ACTIVE_AMC_SQL} THEN 1 ELSE 0 END) AS active_amc,
@@ -163,6 +247,7 @@ export async function fetchServiceBeforeInstallationHubCounts(filters = {}) {
      FROM amc_cmc
      WHERE 1=1 ${amcFilter.sql}`;
 
+  const t0 = Date.now();
   const [wpResult, srResult, amcResult, upcomingTotals] = await Promise.all([
     pool.execute(wpSql, wpFilter.params),
     pool.execute(srSql, srFilter.params),
@@ -174,7 +259,7 @@ export async function fetchServiceBeforeInstallationHubCounts(filters = {}) {
   const srRow = srResult[0]?.[0];
   const amcRow = amcResult[0]?.[0];
 
-  return {
+  const data = {
     total_registered: Number(wpRow?.total_registered || 0),
     open_installation: upcomingTotals.open_installation,
     open_completions: Number(srRow?.open_completions || 0),
@@ -184,6 +269,13 @@ export async function fetchServiceBeforeInstallationHubCounts(filters = {}) {
     active_amc: Number(amcRow?.active_amc || 0),
     due_amc_expiring: Number(amcRow?.due_amc_expiring || 0),
   };
+
+  if (Date.now() - t0 > 800) {
+    console.warn(`[sbi hub] counts ${Date.now() - t0}ms`);
+  }
+
+  HUB_COUNTS_CACHE.set(cacheKey, { at: Date.now(), data });
+  return data;
 }
 
 export async function fetchServiceBeforeInstallationSegmentPage(segment, options = {}) {
@@ -194,6 +286,7 @@ export async function fetchServiceBeforeInstallationSegmentPage(segment, options
   const filters = parseSbiFilters(options);
   const limit = Math.min(Math.max(Number(options.limit) || 50, 1), 200);
   const skip = Math.max(Number(options.skip) || 0, 0);
+  const deferTotal = Boolean(options.deferTotal);
 
   const conn = await getDbConnection();
   const safeLimit = limit;
@@ -302,91 +395,165 @@ export async function fetchServiceBeforeInstallationSegmentPage(segment, options
   const where = `WHERE ${filterSql} ${wpFilter.sql}`;
   const baseParams = [...wpFilter.params];
 
-  const [[countRow]] = await conn.execute(
-    `SELECT COUNT(*) AS cnt FROM warranty_products wp ${where}`,
-    baseParams,
-  );
+  const fetchLimit = deferTotal ? safeLimit + 1 : safeLimit;
 
-  const [rows] = await conn.execute(
-    `SELECT
-       wp.id,
-       wp.serial_number,
-       wp.customer_name,
-       wp.model,
-       wp.product_name,
-       wp.contact,
-       wp.email,
-       wp.contact_person,
-       wp.customer_address,
-       wp.state,
-       wp.site_person,
-       wp.site_contact,
-       wp.site_email,
-       wp.invoice_number,
-       wp.invoice_date,
-       wp.invoice_file,
-       wp.installation_date,
-       wp.warranty_period,
-       wp.installed_address,
-       wp.created_by AS registered_by,
-       wp.created_at AS registered_at,
-       (
-         SELECT MIN(c.customer_id)
-         FROM customers c
-         WHERE (
-           TRIM(COALESCE(wp.contact, '')) <> ''
-           AND TRIM(COALESCE(c.phone, '')) = TRIM(wp.contact)
-         )
-         OR (
-           TRIM(COALESCE(wp.email, '')) <> ''
-           AND LOWER(TRIM(COALESCE(c.email, ''))) = LOWER(TRIM(wp.email))
-         )
-       ) AS customer_id,
-       COALESCE(
-         (
-           SELECT no.created_by
-           FROM dispatch d
-           INNER JOIN neworder no
-             ON ${sqlTrimUtf8EqColumns("no.quote_number", "d.quote_number")}
-           WHERE ${sqlTrimUtf8EqColumns("d.serial_no", "wp.serial_number")}
-             AND TRIM(COALESCE(no.created_by, '')) <> ''
-           ORDER BY no.id DESC
-           LIMIT 1
-         ),
-         (
-           SELECT no.created_by
-           FROM neworder no
-           WHERE TRIM(COALESCE(wp.invoice_number, '')) <> ''
-             AND ${sqlTrimUtf8EqColumns("no.invoice_number", "wp.invoice_number")}
-             AND TRIM(COALESCE(no.created_by, '')) <> ''
-           ORDER BY no.id DESC
-           LIMIT 1
-         )
-       ) AS order_sales_person,
-       (
-         SELECT sr.assigned_to
-         FROM service_records sr
-         WHERE ${sqlTrimUtf8EqColumns("sr.serial_number", "wp.serial_number")}
-           AND UPPER(TRIM(COALESCE(sr.service_type, ''))) = 'INSTALLATION'
-           AND UPPER(TRIM(COALESCE(sr.assigned_to, ''))) NOT IN ('', 'NOT ASSIGNED', 'UNASSIGNED')
-         ORDER BY
-           CASE
-             WHEN UPPER(TRIM(COALESCE(sr.status, ''))) IN ('COMPLETED', 'WORKED') THEN 0
-             ELSE 1
-           END,
-           sr.service_id DESC
-         LIMIT 1
-       ) AS installation_engineer,
-       DATE_ADD(DATE(wp.installation_date), INTERVAL CAST(wp.warranty_period AS UNSIGNED) MONTH) AS warranty_end_date
-     FROM warranty_products wp
-     ${where}
-     ORDER BY wp.id DESC
-     LIMIT ? OFFSET ?`,
-    [...baseParams, safeLimit, safeSkip],
-  );
+  const loadRows = async () => {
+    let rows;
+    if (segment === "total-registered") {
+      const t0 = Date.now();
+      rows = await fetchTotalRegisteredBasePage(conn, where, baseParams, fetchLimit, safeSkip);
+      const tBase = Date.now();
+      const pageRows = deferTotal ? rows.slice(0, safeLimit) : rows;
+      await enrichTotalRegisteredRows(conn, pageRows);
+      const tEnrich = Date.now();
+      if (tEnrich - t0 > 800) {
+        console.warn(
+          `[sbi total-registered] base=${tBase - t0}ms enrich=${tEnrich - tBase}ms rows=${pageRows.length}`,
+        );
+      }
+      return { rows: pageRows, hasExtra: deferTotal && rows.length > safeLimit };
+    }
+    rows = await fetchSimpleWarrantyProductPage(conn, where, baseParams, fetchLimit, safeSkip);
+    const pageRows = deferTotal ? rows.slice(0, safeLimit) : rows;
+    return { rows: pageRows, hasExtra: deferTotal && rows.length > safeLimit };
+  };
+
+  if (deferTotal) {
+    const { rows, hasExtra } = await loadRows();
+    return {
+      total: null,
+      data: rows,
+      hasMore: hasExtra,
+    };
+  }
+
+  const [countResult, loaded] = await Promise.all([
+    conn.execute(`SELECT COUNT(*) AS cnt FROM warranty_products wp ${where}`, baseParams),
+    loadRows(),
+  ]);
+  const countRow = countResult[0]?.[0];
 
   return {
     total: Number(countRow?.cnt || 0),
-    data: rows,
+    data: loaded.rows,
+    hasMore: safeSkip + loaded.rows.length < Number(countRow?.cnt || 0),
   };
+}
+
+export async function countWarrantyProductsSegment(conn, segment, filters = {}) {
+  let filterSql = "1=1";
+  if (segment === "active-warranty") filterSql = IN_WARRANTY_SQL;
+  else if (segment === "due-warranty-expiry") filterSql = DUE_WARRANTY_EXPIRY_SQL;
+  else if (segment !== "total-registered") return 0;
+
+  const wpFilter = buildWpFilterSql(filters);
+  const where = `WHERE ${filterSql} ${wpFilter.sql}`;
+  const [[row]] = await conn.execute(
+    `SELECT COUNT(*) AS cnt FROM warranty_products wp ${where}`,
+    [...wpFilter.params],
+  );
+  return Number(row?.cnt || 0);
+}
+
+function wpSegmentBaseFilterSql(segment) {
+  if (segment === "total-registered") return "1=1";
+  if (segment === "active-warranty") return IN_WARRANTY_SQL;
+  if (segment === "due-warranty-expiry") return DUE_WARRANTY_EXPIRY_SQL;
+  return null;
+}
+
+const INSTALLATION_SR_ASSIGNED_OK = `UPPER(TRIM(COALESCE(sr.assigned_to, ''))) NOT IN ('', 'NOT ASSIGNED', 'UNASSIGNED')`;
+
+const WP_FILTER_OPTIONS_CACHE = new Map();
+const WP_FILTER_OPTIONS_TTL_MS = 2 * 60 * 1000;
+const WP_FILTER_OPTIONS_NAME_LIMIT = 250;
+
+/** Distinct sales / engineer names for warranty-product segments (JOIN-based, not per-row subqueries). */
+export async function fetchServiceBeforeInstallationWpFilterOptions(segment, filters = {}) {
+  const base = wpSegmentBaseFilterSql(segment);
+  if (!base) return null;
+
+  const cacheKey = JSON.stringify({ segment, f: parseSbiFilters(filters) });
+  const cached = WP_FILTER_OPTIONS_CACHE.get(cacheKey);
+  if (cached && Date.now() - cached.at < WP_FILTER_OPTIONS_TTL_MS) {
+    return cached.data;
+  }
+
+  const conn = await getDbConnection();
+  const wpFilter = buildWpFilterSql(filters, { omitTeamFilters: true });
+  const wpWhere = `${base} ${wpFilter.sql}`;
+  const baseParams = [...wpFilter.params];
+
+  const salesSql = `
+    SELECT DISTINCT sales_name AS name
+    FROM (
+      SELECT ${sqlUtf8TrimExpr("wp.created_by")} AS sales_name
+      FROM warranty_products wp
+      WHERE ${wpWhere}
+      UNION
+      SELECT ${sqlUtf8TrimExpr("no.created_by")} AS sales_name
+      FROM warranty_products wp
+      INNER JOIN dispatch d ON ${sqlTrimUtf8EqColumns("d.serial_no", "wp.serial_number")}
+      INNER JOIN neworder no ON ${sqlTrimUtf8EqColumns("no.quote_number", "d.quote_number")}
+      WHERE ${wpWhere} AND ${sqlUtf8HasText("no.created_by")}
+      UNION
+      SELECT ${sqlUtf8TrimExpr("no.created_by")} AS sales_name
+      FROM warranty_products wp
+      INNER JOIN neworder no ON ${sqlTrimUtf8EqColumns("no.invoice_number", "wp.invoice_number")}
+      WHERE ${wpWhere}
+        AND ${sqlUtf8HasText("wp.invoice_number")}
+        AND ${sqlUtf8HasText("no.created_by")}
+    ) AS sales_union
+    WHERE CHAR_LENGTH(sales_name) > 0
+    ORDER BY name ASC
+    LIMIT ${WP_FILTER_OPTIONS_NAME_LIMIT}`;
+
+  const salesParams = [...baseParams, ...baseParams, ...baseParams];
+
+  async function distinctRankedInstallationEngineers(engineerKind) {
+    const typeSql =
+      engineerKind === "third_party"
+        ? `AND LOWER(TRIM(COALESCE(sr.assigned_to_type, ''))) = 'third_party'`
+        : `AND LOWER(TRIM(COALESCE(sr.assigned_to_type, 'internal'))) <> 'third_party'`;
+
+    const [rows] = await conn.execute(
+      `SELECT DISTINCT ${sqlUtf8TrimExpr("assigned_to")} AS name
+       FROM (
+         SELECT sr.assigned_to,
+           ROW_NUMBER() OVER (
+             PARTITION BY wp.id
+             ORDER BY
+               CASE
+                 WHEN UPPER(TRIM(COALESCE(sr.status, ''))) IN ('COMPLETED', 'WORKED') THEN 0
+                 ELSE 1
+               END,
+               sr.service_id DESC
+           ) AS rn
+         FROM warranty_products wp
+         INNER JOIN service_records sr
+           ON ${sqlTrimUtf8EqColumns("sr.serial_number", "wp.serial_number")}
+         WHERE ${wpWhere}
+           AND UPPER(TRIM(COALESCE(sr.service_type, ''))) = 'INSTALLATION'
+           AND ${INSTALLATION_SR_ASSIGNED_OK}
+           ${typeSql}
+       ) ranked
+       WHERE rn = 1 AND ${sqlUtf8HasText("assigned_to")}
+       ORDER BY name ASC
+       LIMIT ${WP_FILTER_OPTIONS_NAME_LIMIT}`,
+      baseParams,
+    );
+    return rows.map((r) => String(r.name || "").trim()).filter(Boolean);
+  }
+
+  const [salesRows, serviceEngineers, thirdPartyEngineers] = await Promise.all([
+    conn.execute(salesSql, salesParams).then(([rows]) => rows),
+    distinctRankedInstallationEngineers("internal"),
+    distinctRankedInstallationEngineers("third_party"),
+  ]);
+
+  const salesPersons = salesRows.map((r) => String(r.name || "").trim()).filter(Boolean);
+
+  const data = { salesPersons, serviceEngineers, thirdPartyEngineers };
+  WP_FILTER_OPTIONS_CACHE.set(cacheKey, { at: Date.now(), data });
+  return data;
 }

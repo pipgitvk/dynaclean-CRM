@@ -59,8 +59,8 @@ function SummarySparkline({ color, value, seed, size = "default" }) {
       ? "h-10 w-[4.75rem] sm:h-11 sm:w-20"
       : "h-12 w-24 shrink-0 opacity-90 sm:h-14 sm:w-28";
   return (
-    <div className={box}>
-      <ResponsiveContainer width="100%" height="100%">
+    <div className={`${box} min-h-[2.5rem] min-w-[4.5rem]`}>
+      <ResponsiveContainer width="100%" height="100%" minWidth={48} minHeight={40}>
         <AreaChart data={data} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
           <Area
             type="monotone"

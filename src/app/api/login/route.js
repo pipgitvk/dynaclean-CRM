@@ -30,11 +30,10 @@ export async function POST(request) {
 
   let pool, conn;
 
-  // Helper to record activity
   const recordActivity = async (username, role, status, message) => {
-    if (!conn) return; // Safety check
-    try {
-      await conn.execute(
+  try {
+      const writer = conn || (await getDbConnection());
+      await writer.execute(
         "INSERT INTO login_activity (username, ip_address, user_agent, status, role, message) VALUES (?, ?, ?, ?, ?, ?)",
         [username, ip, userAgent, status, role, message],
       );
@@ -47,9 +46,6 @@ export async function POST(request) {
     const { username, password } = await request.json();
     console.log("🟡 Login request received:", username);
 
-    pool = await getDbConnection();
-    conn = await pool.getConnection();
-
     if (!username || !password) {
       return NextResponse.json(
         { error: "Missing credentials" },
@@ -57,7 +53,7 @@ export async function POST(request) {
       );
     }
 
-    // --- Superadmin default credentials check ---
+  // --- Superadmin default credentials check (no DB needed for auth) ---
     if (
       username.trim().toLowerCase() === "admin" &&
       password.trim() === "Adcdefghi@"
@@ -78,9 +74,12 @@ export async function POST(request) {
         path: "/",
         maxAge: 7 * 24 * 60 * 60,
       });
-      await recordActivity("admin", "SUPERADMIN", "SUCCESS", `Superadmin default login from IP: ${ip}`);
+      void recordActivity("admin", "SUPERADMIN", "SUCCESS", `Superadmin default login from IP: ${ip}`);
       return res;
     }
+
+    pool = await getDbConnection();
+    conn = await pool.getConnection();
 
     // Step 1: Try emplist
     const [empRows] = await conn.execute(

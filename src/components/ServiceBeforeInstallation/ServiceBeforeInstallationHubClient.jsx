@@ -129,7 +129,10 @@ export default function ServiceBeforeInstallationHubClient({
         params.from = appliedCustom.from;
         params.to = appliedCustom.to;
       }
-      const res = await axios.get("/api/service-before-installation/hub", { params });
+      const res = await axios.get("/api/service-before-installation/hub", {
+        params,
+        timeout: 25_000,
+      });
       if (res.data?.success) {
         setCounts(res.data.counts || {});
         setPrevCounts(res.data.prevCounts || {});
@@ -157,6 +160,7 @@ export default function ServiceBeforeInstallationHubClient({
     axios
       .get("/api/service-before-installation/hub", {
         params: { range: "custom", from, to },
+        timeout: 25_000,
       })
       .then((res) => {
         if (res.data?.success) {

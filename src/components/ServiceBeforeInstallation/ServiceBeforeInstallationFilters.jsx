@@ -39,6 +39,42 @@ function getSegmentFilterKind(segment) {
   return "warranty";
 }
 
+function TableDistinctNameFilterSelect({
+  label,
+  placeholder,
+  names = [],
+  value,
+  onChange,
+  onRequestOptions,
+  className = "xl:col-span-3",
+}) {
+  const options = useMemo(() => {
+    const base = [{ value: "", label: placeholder }];
+    const set = new Set(names);
+    const current = String(value || "").trim();
+    if (current) set.add(current);
+    const sorted = [...set].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+    return [...base, ...sorted.map((name) => ({ value: name, label: name }))];
+  }, [names, value, placeholder]);
+
+  return (
+    <label className={`block min-w-0 ${className}`}>
+      <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+        {label}
+      </span>
+      <SearchableSelect
+        options={options}
+        value={value || ""}
+        onChange={onChange}
+        onOpen={onRequestOptions}
+        placeholder={placeholder}
+        searchPlaceholder={`Search ${label.toLowerCase()}…`}
+        className={`w-full min-w-0 ${filterSelectClass}`}
+      />
+    </label>
+  );
+}
+
 function ServiceEngineerFilterSelect({ value, onChange, className = "xl:col-span-3" }) {
   const [engineers, setEngineers] = useState([]);
 
@@ -172,6 +208,8 @@ export default function ServiceBeforeInstallationFilters({
   loading = false,
   className = "",
   segment = "",
+  tableFilterOptions = null,
+  onRequestTableFilterOptions,
 }) {
   const draft = value || EMPTY_SBI_FILTERS;
   const kind = getSegmentFilterKind(segment);
@@ -313,6 +351,37 @@ export default function ServiceBeforeInstallationFilters({
               onChange={setField("serial")}
               className={row2Field}
             />
+            {segment === "total-registered" ? (
+              <>
+                <TableDistinctNameFilterSelect
+                  label="Sales person"
+                  placeholder="All sales persons"
+                  names={tableFilterOptions?.salesPersons || []}
+                  value={draft.salesPerson}
+                  onChange={setField("salesPerson")}
+                  onRequestOptions={onRequestTableFilterOptions}
+                  className={row2Field}
+                />
+                <TableDistinctNameFilterSelect
+                  label="Service engineer"
+                  placeholder="All service engineers"
+                  names={tableFilterOptions?.serviceEngineers || []}
+                  value={draft.serviceEngineer}
+                  onChange={setField("serviceEngineer")}
+                  onRequestOptions={onRequestTableFilterOptions}
+                  className={row2Field}
+                />
+                <TableDistinctNameFilterSelect
+                  label="Third party engineer"
+                  placeholder="All third party engineers"
+                  names={tableFilterOptions?.thirdPartyEngineers || []}
+                  value={draft.thirdPartyEngineer}
+                  onChange={setField("thirdPartyEngineer")}
+                  onRequestOptions={onRequestTableFilterOptions}
+                  className={row2Field}
+                />
+              </>
+            ) : null}
           </>
         ) : null}
 

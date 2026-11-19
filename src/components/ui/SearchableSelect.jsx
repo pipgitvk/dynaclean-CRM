@@ -21,6 +21,7 @@ export default function SearchableSelect({
   placeholder = "Select...",
   className = "",
   searchPlaceholder = "Search...",
+  onOpen,
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -158,7 +159,13 @@ export default function SearchableSelect({
       <button
         ref={triggerRef}
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => {
+          setOpen((o) => {
+            const next = !o;
+            if (next) onOpen?.();
+            return next;
+          });
+        }}
         className={`flex w-full items-center justify-between gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-left text-sm transition hover:border-gray-400 ${className}`}
         aria-expanded={open}
         aria-haspopup="listbox"

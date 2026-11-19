@@ -74,3 +74,17 @@ if (!globalThis.__dbConnRejectionMute__) {
     if (isDbConnectionError(reason)) return;
   });
 }
+
+/** Start background crons once per Node process (not on every layout HMR reload). */
+if (!globalThis.__appCronsScheduled__) {
+  globalThis.__appCronsScheduled__ = true;
+  void import("./lib/cron/recurringTaskCron.js").then((mod) => {
+    mod.startRecurringTaskCron();
+  });
+  void import("./lib/cron/attendanceAutoCheckoutCron.js").then((mod) => {
+    mod.startAttendanceAutoCheckoutCron();
+  });
+  void import("./lib/cron/machineAttendanceSyncCron.js").then((mod) => {
+    mod.startMachineAttendanceSyncCron();
+  });
+}
