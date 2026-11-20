@@ -445,6 +445,12 @@ export default function WarrantyPage() {
   });
   const [modal, setModal] = useState(null); // { type: "install"|"complaint", serial: string }
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const q = String(params.get("search") || params.get("serial") || "").trim();
+    if (q) setSearchQuery(q);
+  }, []);
+
   const fetchProducts = useCallback(
     async (page, search = "") => {
       setLoading(true);

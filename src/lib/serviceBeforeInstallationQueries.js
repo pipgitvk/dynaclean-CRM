@@ -556,6 +556,7 @@ async function fetchOpenInstallationNeworderPage(
        '' AS name,
        no.delivery_location AS delivery_address,
        no.company_name,
+       NULLIF(TRIM(no.client_name), '') AS contact_person,
        no.contact,
        no.state,
        no.created_by AS emp_name,

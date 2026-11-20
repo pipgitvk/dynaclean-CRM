@@ -73,6 +73,13 @@ export default function WarrantyForm() {
   };
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const oid = String(params.get("order_id") || "").trim();
+    const modeParam = String(params.get("mode") || "").trim().toLowerCase();
+    if (oid && modeParam === "order") {
+      setOrderId(oid);
+      setMode("order");
+    }
     setShowModeModal(true);
   }, []);
 

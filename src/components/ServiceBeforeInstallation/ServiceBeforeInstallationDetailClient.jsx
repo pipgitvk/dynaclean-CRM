@@ -510,12 +510,11 @@ function exportRowsCsv(rows, segment) {
     "open-installation": [
       "Dispatch Date",
       "Inv | Ord | Ser",
-      "Company / State",
-      "Delivery Address",
+      "Company / State · Delivery",
+      "Contact Person · Contact No",
       "Sales Person",
       "Assigned By / Completed by",
       "Model",
-      "Contact",
       "Order / Delivery",
       "Regst. / Registration",
       "Status",
@@ -524,12 +523,11 @@ function exportRowsCsv(rows, segment) {
     "overdue-delayed-installation": [
       "Dispatch Date",
       "Inv | Ord | Ser",
-      "Company / State",
-      "Delivery Address",
+      "Company / State · Delivery",
+      "Contact Person · Contact No",
       "Sales Person",
       "Assigned By / Completed by",
       "Model",
-      "Contact",
       "Order / Delivery",
       "Regst. / Registration",
       "Status",
@@ -583,12 +581,11 @@ function exportRowsCsv(rows, segment) {
         ]
           .filter(Boolean)
           .join(" / "),
-        companyStateExport(row),
-        row.delivery_address,
+        companyStateDeliveryExport(row),
+        openInstallationContactExport(row),
         salesPersonLabel(row),
         assignedByEngineerExport(row),
         openInstallationModelExport(row),
-        row.contact,
         orderDeliveryExport(row),
         registrationExport(row),
         openInstallationServiceStatusExport(row),
@@ -865,23 +862,88 @@ function ServiceRows({ rows, dashboardBase, page, pageSize, variant = "complaint
 function companyStateExport(row) {
   const company = String(row.company_name || "").trim();
   const state = String(row.state || "").trim();
-  return [company, state ? `State: ${state}` : ""].filter(Boolean).join(" · ");
+  return [
+    company ? `Company: ${company}` : "",
+    state ? `State: ${state}` : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
 }
 
-function OpenInstallationCompanyStateCell({ row }) {
+function openInstallationContactPersonLabel(row) {
+  return String(row.contact_person || row.client_name || "").trim();
+}
+
+function companyStateDeliveryExport(row) {
+  const addr = String(row.delivery_address || "").trim();
+  return [companyStateExport(row), addr].filter(Boolean).join(" · ");
+}
+
+function OpenInstallationCompanyStateDeliveryCell({ row }) {
   const company = String(row.company_name || "").trim();
   const state = String(row.state || "").trim();
-  if (!company && !state) {
+  const address = String(row.delivery_address || "").trim();
+  if (!company && !state && !address) {
     return <span className="text-slate-400">—</span>;
   }
   return (
-    <div className="min-w-[8rem] space-y-1">
-      {company ? <div className="text-sm font-medium text-slate-800">{company}</div> : null}
+    <div className="min-w-[9rem] max-w-[260px] space-y-1.5 xl:max-w-none">
+      {company ? (
+        <div className="text-sm leading-snug text-slate-800">
+          <span className="text-xs font-semibold text-slate-500">Company</span>
+          <span className="mx-1 text-slate-400">–</span>
+          <span className="font-semibold text-slate-900">{company}</span>
+        </div>
+      ) : null}
       {state ? (
         <div className="text-sm leading-snug text-slate-800">
           <span className="text-xs font-semibold text-slate-500">State</span>
           <span className="mx-1 text-slate-400">–</span>
           <span className="font-semibold text-slate-900">{state}</span>
+        </div>
+      ) : null}
+      {address ? (
+        <div className="text-sm leading-snug text-slate-700">
+          <span className="text-xs font-semibold text-slate-500">Delivery</span>
+          <span className="mx-1 text-slate-400">–</span>
+          <span className="whitespace-pre-wrap font-medium text-slate-800">{address}</span>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function openInstallationContactExport(row) {
+  const person = openInstallationContactPersonLabel(row);
+  const phone = String(row.contact || "").trim();
+  return [
+    person ? `Contact Person: ${person}` : "",
+    phone ? `Contact No: ${phone}` : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+function OpenInstallationContactPersonCell({ row }) {
+  const person = openInstallationContactPersonLabel(row);
+  const phone = String(row.contact || "").trim();
+  if (!person && !phone) {
+    return <span className="text-slate-400">—</span>;
+  }
+  return (
+    <div className="min-w-[7rem] max-w-[200px] space-y-1.5 xl:max-w-none">
+      {person ? (
+        <div className="text-sm leading-snug text-slate-800">
+          <span className="text-xs font-semibold text-slate-500">Contact Person</span>
+          <span className="mx-1 text-slate-400">–</span>
+          <span className="font-semibold text-slate-900">{person}</span>
+        </div>
+      ) : null}
+      {phone ? (
+        <div className="text-sm leading-snug text-slate-800">
+          <span className="text-xs font-semibold text-slate-500">Contact No</span>
+          <span className="mx-1 text-slate-400">–</span>
+          <span className="font-semibold tabular-nums text-slate-900">{phone}</span>
         </div>
       ) : null}
     </div>
@@ -1077,19 +1139,43 @@ function OpenInstallationActionCell({ row, dashboardBase, ProductFollowupIcons }
   );
 }
 
-function OpenInstallationRegistrationBadge({ row }) {
+function openInstallationWarrantyProductsSearchTerm(row) {
+  const serial =
+    String(row.serial_number || "")
+      .split(",")[0]
+      ?.trim() || "";
+  if (serial) return serial;
+  const invoice = String(row.invoice_number || "").trim();
+  if (invoice) return invoice;
+  return String(row.company_name || "").trim();
+}
+
+function OpenInstallationRegistrationBadge({ row, dashboardBase }) {
   const registered = Number(row.warranty_registered) === 1;
-  return (
-    <span
-      className={`inline-flex rounded-md border px-2 py-0.5 text-[11px] font-bold ${
-        registered
-          ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-          : "border-amber-200 bg-amber-50 text-amber-900"
-      }`}
-    >
-      {registered ? "Registered" : "Not registered"}
-    </span>
-  );
+  const badgeClass = `inline-flex rounded-md border px-2 py-0.5 text-[11px] font-bold ${
+    registered
+      ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+      : "border-amber-200 bg-amber-50 text-amber-900"
+  }`;
+  const label = registered ? "Registered" : "Not registered";
+
+  if (registered && dashboardBase) {
+    const term = openInstallationWarrantyProductsSearchTerm(row);
+    if (term) {
+      const href = `/${dashboardBase}/warranty/products?search=${encodeURIComponent(term)}`;
+      return (
+        <Link
+          href={href}
+          className={`${badgeClass} transition hover:border-emerald-300 hover:bg-emerald-100 hover:underline`}
+          title="View registered warranty product"
+        >
+          {label}
+        </Link>
+      );
+    }
+  }
+
+  return <span className={badgeClass}>{label}</span>;
 }
 
 function registrationExport(row) {
@@ -1098,12 +1184,24 @@ function registrationExport(row) {
   return [detail, status].filter(Boolean).join(" · ");
 }
 
-function OpenInstallationRegistrationCell({ row }) {
+function OpenInstallationRegistrationCell({ row, dashboardBase }) {
   const registered = Number(row.warranty_registered) === 1;
+  const orderId = String(row.order_id || "").trim();
+  const warrantyRegisterHref =
+    orderId &&
+    `/${dashboardBase}/warranty?mode=order&order_id=${encodeURIComponent(orderId)}`;
   return (
     <div className="min-w-[8rem] space-y-1.5">
       {registered ? <RegistrationDateByCell row={row} /> : null}
-      <OpenInstallationRegistrationBadge row={row} />
+      <OpenInstallationRegistrationBadge row={row} dashboardBase={dashboardBase} />
+      {!registered && warrantyRegisterHref ? (
+        <Link
+          href={warrantyRegisterHref}
+          className="inline-flex rounded-md border border-violet-200 bg-violet-50 px-2 py-1 text-[11px] font-semibold text-violet-800 hover:bg-violet-100"
+        >
+          Register now
+        </Link>
+      ) : null}
     </div>
   );
 }
@@ -1134,10 +1232,10 @@ function OpenInstallationRows({
           <UpcomingInstallationReferenceIds record={row} />
         </td>
         <td className="px-4 py-3.5 align-top">
-          <OpenInstallationCompanyStateCell row={row} />
+          <OpenInstallationCompanyStateDeliveryCell row={row} />
         </td>
-        <td className="min-w-[10rem] max-w-[220px] px-4 py-3.5 text-sm text-slate-700 xl:max-w-none">
-          <span className="whitespace-pre-wrap">{row.delivery_address || "—"}</span>
+        <td className="px-4 py-3.5 align-top">
+          <OpenInstallationContactPersonCell row={row} />
         </td>
         <td className="px-4 py-3.5 text-sm text-slate-800">{salesPersonLabel(row) || "—"}</td>
         <td className="px-4 py-3.5 align-top">
@@ -1146,12 +1244,11 @@ function OpenInstallationRows({
         <td className="px-4 py-3.5 align-top xl:max-w-none">
           <OpenInstallationModelCell row={row} />
         </td>
-        <td className="whitespace-nowrap px-4 py-3.5 text-sm text-slate-800">{row.contact || "—"}</td>
         <td className="px-4 py-3.5 align-top">
           <OpenInstallationOrderDeliveryCell row={row} />
         </td>
         <td className="px-4 py-3.5 align-top">
-          <OpenInstallationRegistrationCell row={row} />
+          <OpenInstallationRegistrationCell row={row} dashboardBase={dashboardBase} />
         </td>
         <td className="px-4 py-3.5 align-top">
           <OpenInstallationStatusColumn
@@ -1218,12 +1315,11 @@ function TableHead({ segment }) {
         <th className={th}>#</th>
         <th className={th}>Dispatch Date</th>
         <th className={th}>Inv | Ord | Ser</th>
-        <th className={th}>Company / State</th>
-        <th className={th}>Delivery Address</th>
+        <th className={th}>Company / State · Delivery</th>
+        <th className={th}>Contact Person · Contact No</th>
         <th className={th}>Sales Person</th>
         <th className={th}>Assigned By / Completed by</th>
         <th className={th}>Model</th>
-        <th className={th}>Contact</th>
         <th className={th}>Order / Delivery</th>
         <th className={th}>Regst. / Registration</th>
         <th className={th}>Status</th>
@@ -1331,7 +1427,7 @@ function colSpanForSegment(segment) {
   if (segment === "total-registered") return 11;
   if (isWarrantyProductSegment(segment)) return 9;
   if (segment === "open-completions") return 10;
-  if (segment === "open-installation" || segment === "overdue-delayed-installation") return 13;
+  if (segment === "open-installation" || segment === "overdue-delayed-installation") return 12;
   if (segment === "active-amc" || segment === "due-amc-expiring") return 7;
   return 9;
 }
