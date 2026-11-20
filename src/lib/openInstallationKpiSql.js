@@ -31,7 +31,7 @@ export const U_DELIVERED_INSTALLATION_PENDING_SQL = `(
   AND NOT ${U_INSTALLATION_COMPLETED_SQL}
 )`;
 
-/** Completed installation SR with no follow-up feedback saved yet. */
+/** Installation done on order but no installation report uploaded/saved on any INSTALLATION SR. */
 export const U_NO_FEEDBACK_COLLECTED_SQL = `(COALESCE(u.no_feedback_collected, 0) = 1)`;
 
 /** Early filter on {@code neworder} before heavy aggregates (KPI bucket list). */

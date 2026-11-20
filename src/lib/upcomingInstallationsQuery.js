@@ -5,19 +5,20 @@ import {
   pendingNeworderPredicates,
 } from "@/lib/upcomingInstallationOrderEligibility";
 import { buildNeworderOpenInstallationBucketWhereSql } from "@/lib/openInstallationBucketNeworderSql";
+import { SR2_HAS_INSTALLATION_REPORT_SQL } from "@/lib/openInstallationNoReportSql";
 
 export { pendingNeworderPredicates } from "@/lib/upcomingInstallationOrderEligibility";
 
-/** INSTALLATION + COMPLETED + no follow-up feedback on the service record. */
-const NO_FEEDBACK_ON_COMPLETED_INSTALLATION_SQL = `
-  UPPER(TRIM(COALESCE(sr2.service_type, ''))) = 'INSTALLATION'
-  AND UPPER(TRIM(COALESCE(sr2.status, ''))) = 'COMPLETED'
-  AND (
-    sr2.final_feedback_on_call IS NULL
-    OR TRIM(sr2.final_feedback_on_call) = ''
-  )
-  AND sr2.service_followup_at IS NULL
-`;
+const NO_INSTALLATION_REPORT_ON_ORDER_SELECT = `
+      CASE
+        WHEN COALESCE(svc.has_installation_report, 0) = 0
+          AND (
+            COALESCE(no.installation_status, 0) = 1
+            OR COALESCE(svc.installation_completed, 0) = 1
+          )
+        THEN 1
+        ELSE 0
+      END AS no_feedback_collected`;
 
 const INSTALLATION_SR_TYPE_SQL = `UPPER(TRIM(COALESCE(sr2.service_type, ''))) = 'INSTALLATION'`;
 const SR2_ASSIGNED_OK_SQL = `UPPER(TRIM(COALESCE(sr2.assigned_to, ''))) NOT IN ('', 'NOT ASSIGNED', 'UNASSIGNED')`;
@@ -242,7 +243,7 @@ export function buildUpcomingInstallationsQuery({
       svc.service_engineer,
       svc.third_party_engineer,
       COALESCE(svc.installation_completed, 0) AS installation_completed,
-      COALESCE(svc.no_feedback_collected, 0) AS no_feedback_collected
+      ${NO_INSTALLATION_REPORT_ON_ORDER_SELECT}
     FROM neworder no
     INNER JOIN (
       SELECT
@@ -296,11 +297,11 @@ export function buildUpcomingInstallationsQuery({
         ) AS installation_completed,
         MAX(
           CASE
-            WHEN ${NO_FEEDBACK_ON_COMPLETED_INSTALLATION_SQL}
+            WHEN ${SR2_HAS_INSTALLATION_REPORT_SQL}
             THEN 1
             ELSE 0
           END
-        ) AS no_feedback_collected
+        ) AS has_installation_report
       FROM dispatch d2
       ${joinPendingOrderOnQuote("d2.quote_number", orderEligibility)}
       INNER JOIN service_records sr2
@@ -357,7 +358,7 @@ export function buildOpenInstallationKpiInnerQuery({
       DATE_FORMAT(no.delivery_date, '%Y-%m-%d') AS delivery_date,
       DATE_FORMAT(no.delivered_on, '%Y-%m-%d') AS delivered_on,
       COALESCE(svc.installation_completed, 0) AS installation_completed,
-      COALESCE(svc.no_feedback_collected, 0) AS no_feedback_collected
+      ${NO_INSTALLATION_REPORT_ON_ORDER_SELECT}
     FROM neworder no
     INNER JOIN (
       SELECT ${quoteKeyD} AS quote_key
@@ -380,10 +381,10 @@ export function buildOpenInstallationKpiInnerQuery({
         ) AS installation_completed,
         MAX(
           CASE
-            WHEN ${NO_FEEDBACK_ON_COMPLETED_INSTALLATION_SQL}
+            WHEN ${SR2_HAS_INSTALLATION_REPORT_SQL}
             THEN 1 ELSE 0
           END
-        ) AS no_feedback_collected
+        ) AS has_installation_report
       FROM dispatch d2
       ${joinPendingOrderOnQuote("d2.quote_number", orderEligibility)}
       INNER JOIN service_records sr2
@@ -413,7 +414,7 @@ export function buildOpenInstallationKpiInnerQuery({
         NULLIF(TRIM(no.dispatch_person), '')
       ) AS assigned_by,
       COALESCE(svc.installation_completed, 0) AS installation_completed,
-      COALESCE(svc.no_feedback_collected, 0) AS no_feedback_collected,
+      ${NO_INSTALLATION_REPORT_ON_ORDER_SELECT},
       svc.service_engineer,
       svc.third_party_engineer,
       COALESCE(agg.warranty_registered, 0) AS warranty_registered,
@@ -464,11 +465,11 @@ export function buildOpenInstallationKpiInnerQuery({
         ) AS installation_completed,
         MAX(
           CASE
-            WHEN ${NO_FEEDBACK_ON_COMPLETED_INSTALLATION_SQL}
+            WHEN ${SR2_HAS_INSTALLATION_REPORT_SQL}
             THEN 1
             ELSE 0
           END
-        ) AS no_feedback_collected
+        ) AS has_installation_report
       FROM dispatch d2
       ${joinPendingOrderOnQuote("d2.quote_number", orderEligibility)}
       INNER JOIN service_records sr2

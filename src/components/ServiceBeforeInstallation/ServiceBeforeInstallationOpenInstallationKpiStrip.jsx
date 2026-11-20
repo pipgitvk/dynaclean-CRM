@@ -20,6 +20,7 @@ export default function ServiceBeforeInstallationOpenInstallationKpiStrip({
   openInstallationBucket = "",
   totals = {},
   loading = false,
+  noFeedbackLoading = false,
   onCardSelect,
 }) {
   const cards = useMemo(() => getOpenInstallationDetailKpiCards(), []);
@@ -30,12 +31,16 @@ export default function ServiceBeforeInstallationOpenInstallationKpiStrip({
       {cards.map((card) => {
         const pick = COUNT_BY_CARD_ID[card.id];
         const value = pick ? pick(totals) : 0;
+        const cardLoading =
+          card.id === "open-installation-no-feedback"
+            ? loading || noFeedbackLoading
+            : loading;
         return (
           <ServiceBeforeInstallationKpiCard
             key={card.id}
             card={card}
             total={value}
-            loading={loading}
+            loading={cardLoading}
             active={card.id === activeCardId}
             variant="compact"
             showTrend={false}

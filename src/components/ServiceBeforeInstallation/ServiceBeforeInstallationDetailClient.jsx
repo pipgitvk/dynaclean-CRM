@@ -1076,7 +1076,10 @@ export default function ServiceBeforeInstallationDetailClient({
     no_feedback_collected: 0,
     total: 0,
   });
-  const [openInstallationKpiLoading, setOpenInstallationKpiLoading] = useState(false);
+  const [openInstallationKpiLoading, setOpenInstallationKpiLoading] = useState(
+    () => segment === "open-installation",
+  );
+  const [noFeedbackKpiLoading, setNoFeedbackKpiLoading] = useState(false);
   openInstallationBreakdownRef.current = openInstallationBreakdown;
 
   useEffect(() => {
@@ -1117,6 +1120,50 @@ export default function ServiceBeforeInstallationDetailClient({
     [page, pageSize],
   );
 
+  const patchNoFeedbackCollected = useCallback((total) => {
+    const nf = Number(total || 0);
+    setOpenInstallationBreakdown((prev) => {
+      const next = { ...prev, no_feedback_collected: nf };
+      openInstallationBreakdownRef.current = next;
+      return next;
+    });
+  }, []);
+
+  /** Dedicated no-feedback count — never blocks list / other KPI cards. */
+  const fetchNoFeedbackKpiCount = useCallback(
+    async (signal) => {
+      if (segment !== "open-installation") return;
+      const { openInstallationBucket: _bucket, ...kpiFilters } = appliedFilters;
+      setNoFeedbackKpiLoading(true);
+      try {
+        const res = await axios.get("/api/service-before-installation/no-feedback", {
+          params: {
+            ...kpiFilters,
+            countOnly: "1",
+            limit: 1,
+            skip: 0,
+          },
+          signal,
+          timeout: 15_000,
+        });
+        if (res.data?.success) {
+          const nf = Number(
+            res.data.no_feedback_collected ?? res.data.pagination?.total ?? 0,
+          );
+          patchNoFeedbackCollected(nf);
+          if (String(appliedFilters.openInstallationBucket || "").trim() === "no_feedback") {
+            applyListTotal(nf);
+          }
+        }
+      } catch (e) {
+        if (e?.code !== "ERR_CANCELED") console.error(e);
+      } finally {
+        if (!signal?.aborted) setNoFeedbackKpiLoading(false);
+      }
+    },
+    [segment, appliedFilters, patchNoFeedbackCollected, applyListTotal],
+  );
+
   const fetchOpenInstallationKpis = useCallback(async () => {
     if (segment !== "open-installation") return;
     if (kpiFetchedKeyRef.current === openInstallationKpiFilterKey) return;
@@ -1143,10 +1190,19 @@ export default function ServiceBeforeInstallationDetailClient({
       if (res.data?.success && res.data.openInstallationBreakdown) {
         const br = res.data.openInstallationBreakdown;
         kpiFetchedKeyRef.current = openInstallationKpiFilterKey;
-        setOpenInstallationBreakdown(br);
-        openInstallationBreakdownRef.current = br;
+        setOpenInstallationBreakdown((prev) => {
+          const next = {
+            ...br,
+            no_feedback_collected:
+              Number(prev.no_feedback_collected) > 0
+                ? Number(prev.no_feedback_collected)
+                : Number(br.no_feedback_collected || 0),
+          };
+          openInstallationBreakdownRef.current = next;
+          return next;
+        });
         const activeBucket = String(appliedFilters.openInstallationBucket || "").trim();
-        if (!(listTotalRef.current > 0)) {
+        if (!(listTotalRef.current > 0) && activeBucket !== "no_feedback") {
           applyListTotal(openInstallationBucketRecordCount(activeBucket, br));
         }
       }
@@ -1156,8 +1212,18 @@ export default function ServiceBeforeInstallationDetailClient({
     } finally {
       if (!controller.signal.aborted) setOpenInstallationKpiLoading(false);
     }
+
+    // Separate API — fill No Feedback card without slowing main KPI.
+    if (!controller.signal.aborted) {
+      void fetchNoFeedbackKpiCount(controller.signal);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed by openInstallationKpiFilterKey
-  }, [segment, openInstallationKpiFilterKey, applyListTotal]);
+  }, [
+    segment,
+    openInstallationKpiFilterKey,
+    applyListTotal,
+    fetchNoFeedbackKpiCount,
+  ]);
 
   const fetchOpenInstallationCount = useCallback(async () => {
     if (segment !== "open-installation" && segment !== "overdue-delayed-installation") {
@@ -1166,29 +1232,49 @@ export default function ServiceBeforeInstallationDetailClient({
     countFetchAbortRef.current?.abort();
     const controller = new AbortController();
     countFetchAbortRef.current = controller;
+    const bucket = String(appliedFilters.openInstallationBucket || "").trim();
+    const useNoFeedbackApi = segment === "open-installation" && bucket === "no_feedback";
 
     setCountLoading(true);
+    if (useNoFeedbackApi) setNoFeedbackKpiLoading(true);
     try {
-      const res = await axios.get(`/api/service-before-installation/${segment}`, {
-        params: {
-          ...appliedFilters,
-          countOnly: "1",
-          limit: pageSize,
-          skip: page * pageSize,
+      const res = await axios.get(
+        useNoFeedbackApi
+          ? "/api/service-before-installation/no-feedback"
+          : `/api/service-before-installation/${segment}`,
+        {
+          params: {
+            ...appliedFilters,
+            countOnly: "1",
+            limit: pageSize,
+            skip: page * pageSize,
+          },
+          signal: controller.signal,
+          timeout: 15_000,
         },
-        signal: controller.signal,
-        timeout: 15_000,
-      });
+      );
       if (res.data?.success) {
-        applyListTotal(res.data.pagination?.total);
+        const total = Number(
+          res.data.pagination?.total ?? res.data.no_feedback_collected ?? 0,
+        );
+        applyListTotal(total);
+        if (useNoFeedbackApi) patchNoFeedbackCollected(total);
       }
     } catch (e) {
       if (e?.code === "ERR_CANCELED") return;
       console.error(e);
+      // Stop infinite "…" / "10+" — keep whatever list already showed.
+      if (useNoFeedbackApi && !(listTotalRef.current > 0)) {
+        const fallback = Math.max(pageSize, page * pageSize + pageSize);
+        applyListTotal(fallback);
+      }
     } finally {
-      if (!controller.signal.aborted) setCountLoading(false);
+      if (!controller.signal.aborted) {
+        setCountLoading(false);
+        if (useNoFeedbackApi) setNoFeedbackKpiLoading(false);
+      }
     }
-  }, [segment, appliedFilters, page, pageSize, applyListTotal]);
+  }, [segment, appliedFilters, page, pageSize, applyListTotal, patchNoFeedbackCollected]);
 
   const fetchRows = useCallback(async () => {
     rowsFetchAbortRef.current?.abort();
@@ -1206,33 +1292,46 @@ export default function ServiceBeforeInstallationDetailClient({
         ? openInstallationBucketRecordCount(activeBucket, openInstallationBreakdownRef.current)
         : 0);
 
-    // Open Installation: rows FIRST (unblocks UI), then count + KPI sequentially
+    // Open Installation: rows FIRST (unblocks UI), then KPI + count sequentially
     // so we don't starve the DB pool (connectionLimit ≈ 5).
     if (isOpenInstallationList) {
+      const useNoFeedbackApi =
+        segment === "open-installation" && activeBucket === "no_feedback";
       try {
-        const res = await axios.get(`/api/service-before-installation/${segment}`, {
-          params: {
-            ...appliedFilters,
-            limit: pageSize,
-            skip: page * pageSize,
-            includeFilterOptions: "0",
-            skipTotal: "1",
-            includeOpenInstallationBreakdown: "0",
+        const res = await axios.get(
+          useNoFeedbackApi
+            ? "/api/service-before-installation/no-feedback"
+            : `/api/service-before-installation/${segment}`,
+          {
+            params: {
+              ...appliedFilters,
+              limit: pageSize,
+              skip: page * pageSize,
+              includeFilterOptions: "0",
+              // Always skip total on first paint — same speed as other cards.
+              skipTotal: "1",
+              includeOpenInstallationBreakdown: "0",
+            },
+            signal,
+            timeout: 15_000,
           },
-          signal,
-          timeout: 15_000,
-        });
+        );
         if (res.data?.success) {
           const data = res.data.data || [];
+          const pag = res.data.pagination || {};
+          const hasMoreFlag = Boolean(pag.hasMore) || data.length >= pageSize;
           const total = knownTotal > 0 ? knownTotal : listTotalRef.current || 0;
           setRows(data);
           setPagination({
             total,
             hasMore:
-              total > 0
-                ? page * pageSize + data.length < total
-                : data.length >= pageSize,
+              total > 0 ? page * pageSize + data.length < total : hasMoreFlag,
           });
+          if (useNoFeedbackApi && !hasMoreFlag) {
+            const exact = page * pageSize + data.length;
+            applyListTotal(exact, data.length);
+            patchNoFeedbackCollected(exact);
+          }
         }
       } catch (e) {
         if (e?.code === "ERR_CANCELED") return;
@@ -1241,16 +1340,30 @@ export default function ServiceBeforeInstallationDetailClient({
         if (!signal.aborted) setLoading(false);
       }
 
-      if (!signal.aborted && (page === 0 || !(knownTotal > 0))) {
-        await fetchOpenInstallationCount();
+      if (signal.aborted) return;
+
+      // No-feedback: rows already shown — count in background only (never block Loading).
+      if (useNoFeedbackApi) {
+        void fetchOpenInstallationCount();
+        return;
       }
+
+      // KPI before count — cheap neworder scan; cards must not stay at 0.
       if (
-        !signal.aborted &&
         segment === "open-installation" &&
         page === 0 &&
         kpiFetchedKeyRef.current !== openInstallationKpiFilterKey
       ) {
         await fetchOpenInstallationKpis();
+      } else if (
+        segment === "open-installation" &&
+        page === 0 &&
+        !(Number(openInstallationBreakdownRef.current.no_feedback_collected) > 0)
+      ) {
+        void fetchNoFeedbackKpiCount(signal);
+      }
+      if (page === 0 || !(knownTotal > 0) || !(listTotalRef.current > 0)) {
+        await fetchOpenInstallationCount();
       }
       return;
     }
@@ -1298,11 +1411,16 @@ export default function ServiceBeforeInstallationDetailClient({
     openInstallationKpiFilterKey,
     fetchOpenInstallationCount,
     fetchOpenInstallationKpis,
+    fetchNoFeedbackKpiCount,
+    patchNoFeedbackCollected,
   ]);
 
   useEffect(() => {
     kpiFetchedKeyRef.current = "";
-  }, [openInstallationKpiFilterKey]);
+    if (segment === "open-installation") {
+      setOpenInstallationKpiLoading(true);
+    }
+  }, [openInstallationKpiFilterKey, segment]);
 
   const fetchTableFilterOptions = useCallback(async () => {
     if (
@@ -1399,6 +1517,7 @@ export default function ServiceBeforeInstallationDetailClient({
             openInstallationBucket={appliedFilters.openInstallationBucket}
             totals={openInstallationBreakdown}
             loading={openInstallationKpiLoading}
+            noFeedbackLoading={noFeedbackKpiLoading}
             onCardSelect={(openInstallationBucket) => {
               setLoading(true);
               setPage(0);

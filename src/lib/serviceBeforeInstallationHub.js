@@ -46,7 +46,7 @@ export const OPEN_INSTALLATION_DETAIL_KPI_STRIP = [
   {
     id: "open-installation-no-feedback",
     title: "No Feedback Collected",
-    subtitle: "Installation done — follow-up feedback pending",
+    subtitle: "Installation done — installation report not uploaded",
     countCaption: "No. of no feedback collected",
     countKey: "no_feedback_collected",
     accent: "from-rose-500 to-orange-600",

@@ -223,6 +223,7 @@ function parseOpenInstallationBreakdownRow(row) {
 
 function openInstallationKpiCacheKey(filters, overdueDelayedOnly) {
   const f = parseSbiFilters(filters);
+  // Bucket is omitted — breakdown always covers all four cards.
   return JSON.stringify({
     overdueDelayedOnly: Boolean(overdueDelayedOnly),
     search: f.search,
@@ -240,7 +241,6 @@ function openInstallationKpiCacheKey(filters, overdueDelayedOnly) {
     thirdPartyEngineer: f.thirdPartyEngineer,
     assignedBy: f.assignedBy,
     registeredBy: f.registeredBy,
-    openInstallationBucket: f.openInstallationBucket,
   });
 }
 
@@ -282,7 +282,8 @@ async function fetchOpenInstallationBreakdownLite(
     AND DATE(no.delivered_on) > '1970-01-01'
   )`;
 
-  // One cheap scan of neworder — no service_records EXISTS (was causing 20s+ timeouts).
+  // One cheap scan of neworder — never put service_records EXISTS in this SUM
+  // (that re-scanned every order and timed out the pool).
   const [[row]] = await conn.execute(
     `SELECT
        SUM(CASE WHEN COALESCE(no.installation_status, 0) = 0 THEN 1 ELSE 0 END) AS total,
@@ -300,6 +301,8 @@ async function fetchOpenInstallationBreakdownLite(
     params,
   );
 
+  // no_feedback_collected stays 0 here — EXISTS over service_records stalls the pool.
+  // Client patches that card via countOnly + openInstallationBucket=no_feedback.
   return parseOpenInstallationBreakdownRow(row);
 }
 
@@ -329,7 +332,15 @@ export async function fetchOpenInstallationBreakdown(
     );
     data = parseOpenInstallationBreakdownRow(row);
   }
-  OPEN_INSTALLATION_KPI_CACHE.set(cacheKey, { at: Date.now(), data });
+  const allZero =
+    !data.total &&
+    !data.delivered_installation_pending &&
+    !data.delivery_pending_after_dispatch &&
+    !data.completed_installation;
+  // Avoid caching a blank result (timeouts / empty pool reads) for the full TTL.
+  if (!allZero) {
+    OPEN_INSTALLATION_KPI_CACHE.set(cacheKey, { at: Date.now(), data });
+  }
   return data;
 }
 
@@ -357,7 +368,10 @@ function buildOpenInstallationNeworderWhereSql(filters, { overdueDelayedOnly = f
     sql += ` AND COALESCE(no.delivery_status, 0) = 0`;
   } else if (bucket === "delivered_pending") {
     sql += ` AND COALESCE(no.installation_status, 0) = 0 AND ${DELIVERED_ON_SQL}`;
-  } else if (bucket === "completed" || bucket === "no_feedback") {
+  } else if (bucket === "completed") {
+    sql += ` AND COALESCE(no.installation_status, 0) = 1`;
+  } else if (bucket === "no_feedback") {
+    // List/count for this bucket uses /api/.../no-feedback — keep main path cheap.
     sql += ` AND COALESCE(no.installation_status, 0) = 1`;
   } else {
     sql += ` AND COALESCE(no.installation_status, 0) = 0 AND no.delivery_date IS NOT NULL`;
