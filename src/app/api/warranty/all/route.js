@@ -2,6 +2,121 @@ import { NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import { getDbConnection } from "@/lib/db";
 
+const WARRANTY_SEARCH_FIELDS = [
+  "wp.product_name",
+  "wp.specification",
+  "wp.model",
+  "wp.serial_number",
+  "wp.customer_name",
+  "wp.email",
+  "wp.contact_person",
+  "wp.contact",
+  "wp.invoice_number",
+  "wp.installed_address",
+  "wp.state",
+];
+
+/** All searchable text as one blob (addresses with punctuation/spaces). */
+const WARRANTY_SEARCH_BLOB = `CONCAT_WS(' ',
+  COALESCE(wp.product_name, ''),
+  COALESCE(wp.specification, ''),
+  COALESCE(wp.model, ''),
+  COALESCE(wp.serial_number, ''),
+  COALESCE(wp.customer_name, ''),
+  COALESCE(wp.email, ''),
+  COALESCE(wp.contact_person, ''),
+  COALESCE(wp.contact, ''),
+  COALESCE(wp.invoice_number, ''),
+  COALESCE(wp.installed_address, ''),
+  COALESCE(wp.state, '')
+)`;
+
+/** Strip spaces / common separators so "AB 12" matches "AB12". */
+function sqlCompact(columnExpr) {
+  return `REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(${columnExpr}, ''), ' ', ''), '-', ''), '/', ''), '_', '')`;
+}
+
+function normalizeWarrantySearchTokens(search) {
+  return String(search || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/gi, " ")
+    .split(/\s+/)
+    .map((t) => t.trim())
+    .filter((t) => t.length >= 2);
+}
+
+/**
+ * Flexible warranty search (placeholder fields + address):
+ * - phrase match
+ * - space-insensitive identifiers
+ * - multi-word / address: enough significant tokens must match (not every token)
+ */
+function buildWarrantyProductsSearchClause(search) {
+  const raw = String(search || "").trim().replace(/\s+/g, " ");
+  if (!raw) return { sql: "", params: [] };
+
+  const tokens = normalizeWarrantySearchTokens(raw);
+  const significant = tokens.filter((t) => t.length >= 3);
+  const noSpace = raw.replace(/\s+/g, "").replace(/[-/_]/g, "");
+  const groups = [];
+  const params = [];
+
+  // 1) Full phrase
+  groups.push(
+    `(${WARRANTY_SEARCH_FIELDS.map((f) => `${f} LIKE ?`).join(" OR ")})`,
+  );
+  params.push(...WARRANTY_SEARCH_FIELDS.map(() => `%${raw}%`));
+
+  // 2) Compact / space-insensitive ("AB 12" → "AB12")
+  if (noSpace.length >= 3) {
+    const compactCols = [
+      "wp.serial_number",
+      "wp.invoice_number",
+      "wp.model",
+      "wp.product_name",
+      "wp.customer_name",
+      "wp.contact_person",
+      "wp.contact",
+      "wp.specification",
+      "wp.installed_address",
+    ];
+    groups.push(
+      `(${compactCols.map((f) => `${sqlCompact(f)} LIKE ?`).join(" OR ")})`,
+    );
+    params.push(...compactCols.map(() => `%${noSpace}%`));
+  }
+
+  // 3) Short query (1–2 tokens): any token hits any field
+  if (tokens.length > 0 && tokens.length <= 2) {
+    for (const token of tokens) {
+      groups.push(`(${WARRANTY_SEARCH_BLOB} LIKE ?)`);
+      params.push(`%${token}%`);
+    }
+  }
+
+  // 4) Long / address query: enough significant tokens must match (not every word).
+  // "ASC Center South No-04 gate agram post, Bangalore Karnataka -560007" still hits.
+  if (significant.length >= 2) {
+    // ~1/3 of words is enough — addresses rarely match every token exactly.
+    const minScore = Math.max(
+      2,
+      Math.min(3, Math.ceil(significant.length * 0.3)),
+    );
+    const scoreExpr = significant
+      .map((token) => {
+        params.push(`%${token}%`);
+        return `(CASE WHEN ${WARRANTY_SEARCH_BLOB} LIKE ? THEN 1 ELSE 0 END)`;
+      })
+      .join(" + ");
+    groups.push(`((${scoreExpr}) >= ${minScore})`);
+  }
+
+  return {
+    sql: `(${groups.join(" OR ")})`,
+    params,
+  };
+}
+
 export async function GET(req) {
   const token = req.cookies.get("token")?.value;
   try {
@@ -37,21 +152,12 @@ export async function GET(req) {
     const conditions = [];
     const params = [];
 
-    if (search) {
-      const searchTerm = `%${search}%`;
-      conditions.push(`(
-        wp.product_name LIKE ? OR 
-        wp.specification LIKE ? OR 
-        wp.model LIKE ? OR 
-        wp.serial_number LIKE ? OR 
-        wp.customer_name LIKE ? OR 
-        wp.email LIKE ? OR 
-        wp.contact_person LIKE ? OR 
-        wp.contact LIKE ? OR 
-        wp.invoice_number LIKE ? OR 
-        wp.installed_address LIKE ?
-      )`);
-      params.push(...Array(10).fill(searchTerm));
+    if (String(search || "").trim()) {
+      const searchClause = buildWarrantyProductsSearchClause(search);
+      if (searchClause.sql) {
+        conditions.push(searchClause.sql);
+        params.push(...searchClause.params);
+      }
     }
 
     if (modelFilter) {
