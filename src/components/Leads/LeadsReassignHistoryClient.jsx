@@ -28,6 +28,11 @@ import {
   dateInputClass,
   dateInputWrapperClass,
 } from "@/components/Leads/LeadsManageDetailFilters";
+import LeadsReassignAssignedToBreakdownCards from "@/components/Leads/LeadsReassignAssignedToBreakdownCards";
+import {
+  repOptions,
+  repOptionsWithCountsMerged,
+} from "@/components/Leads/leadsRepFilterOptions";
 
 function formatTs(value) {
   if (!value) return "—";
@@ -41,23 +46,6 @@ function formatTs(value) {
 }
 
 const PAGE_SIZES = [50, 100, 150];
-
-function repOptions(reps, emptyLabel) {
-  return [
-    { value: "", label: emptyLabel },
-    ...reps.map((r) => ({ value: r, label: r })),
-  ];
-}
-
-function repOptionsWithCounts(countRows, emptyLabel) {
-  return [
-    { value: "", label: emptyLabel },
-    ...countRows.map(({ rep, count }) => ({
-      value: rep,
-      label: `${rep} (${count.toLocaleString()})`,
-    })),
-  ];
-}
 
 export default function LeadsReassignHistoryClient({ dashboardBase = "admin-dashboard" }) {
   const quickBulkHref = `/${dashboardBase}/leads-manage/quick-bulk-reassign`;
@@ -81,6 +69,7 @@ export default function LeadsReassignHistoryClient({ dashboardBase = "admin-dash
   const [assignedByRepList, setAssignedByRepList] = useState([]);
   const [fromRepCounts, setFromRepCounts] = useState([]);
   const [toRepCounts, setToRepCounts] = useState([]);
+  const [toRepCountsLoading, setToRepCountsLoading] = useState(false);
   const [rows, setRows] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
@@ -146,8 +135,10 @@ export default function LeadsReassignHistoryClient({ dashboardBase = "admin-dash
     (async () => {
       if (!appliedAssignedFrom) {
         setToRepCounts([]);
+        setToRepCountsLoading(false);
         return;
       }
+      setToRepCountsLoading(true);
       try {
         const params = new URLSearchParams();
         params.set("to_counts", "1");
@@ -162,6 +153,8 @@ export default function LeadsReassignHistoryClient({ dashboardBase = "admin-dash
       } catch (e) {
         console.error(e);
         if (!cancelled) setToRepCounts([]);
+      } finally {
+        if (!cancelled) setToRepCountsLoading(false);
       }
     })();
     return () => {
@@ -175,15 +168,15 @@ export default function LeadsReassignHistoryClient({ dashboardBase = "admin-dash
   );
 
   const fromRepOptions = useMemo(() => {
-    if (appliedAssignedTo && fromRepCounts.length > 0) {
-      return repOptionsWithCounts(fromRepCounts, "All assigned from");
+    if (appliedAssignedTo) {
+      return repOptionsWithCountsMerged(repList, fromRepCounts, "All assigned from");
     }
     return repOptions(repList, "All assigned from");
   }, [appliedAssignedTo, fromRepCounts, repList]);
 
   const toRepOptions = useMemo(() => {
-    if (appliedAssignedFrom && toRepCounts.length > 0) {
-      return repOptionsWithCounts(toRepCounts, "All assigned to");
+    if (appliedAssignedFrom) {
+      return repOptionsWithCountsMerged(repList, toRepCounts, "All assigned to");
     }
     return repOptions(repList, "All assigned to");
   }, [appliedAssignedFrom, toRepCounts, repList]);
@@ -302,6 +295,27 @@ export default function LeadsReassignHistoryClient({ dashboardBase = "admin-dash
   const fromRow = total === 0 ? 0 : page * pageSize + 1;
   const toRow = Math.min(total, (page + 1) * pageSize);
 
+  const noFollowupHref = useMemo(() => {
+    const params = new URLSearchParams();
+    params.set("followup_status", "not_followed");
+    if (appliedFrom) params.set("from", appliedFrom);
+    if (appliedTo) params.set("to", appliedTo);
+    if (appliedSearch.trim()) params.set("search", appliedSearch.trim());
+    if (appliedAssignedFrom) params.set("assigned_from", appliedAssignedFrom);
+    if (appliedAssignedTo) params.set("assigned_to", appliedAssignedTo);
+    if (appliedAssignedBy) params.set("assigned_by", appliedAssignedBy);
+    const q = params.toString();
+    return `/${dashboardBase}/leads-manage/reassign-no-followup${q ? `?${q}` : ""}`;
+  }, [
+    dashboardBase,
+    appliedFrom,
+    appliedTo,
+    appliedSearch,
+    appliedAssignedFrom,
+    appliedAssignedTo,
+    appliedAssignedBy,
+  ]);
+
   return (
     <div className="relative min-h-screen w-full pb-10 pt-2 sm:pt-3">
       <div
@@ -318,33 +332,44 @@ export default function LeadsReassignHistoryClient({ dashboardBase = "admin-dash
         </Link>
 
         <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div className="flex min-w-0 items-start gap-3">
-              <div className="rounded-xl bg-emerald-50 p-2.5 text-emerald-600">
-                <History className="h-6 w-6" strokeWidth={2.2} aria-hidden />
-              </div>
-              <div className="min-w-0">
-                <h1 className="text-2xl font-bold tracking-tight text-slate-900">Lead reassignment history</h1>
-                <p className="mt-1 text-sm text-slate-500">
-                  All bulk reassign events with last follow-up by previous and new owner.
-                </p>
-              </div>
+          <div className="flex min-w-0 items-start gap-3">
+            <div className="rounded-xl bg-emerald-50 p-2.5 text-emerald-600">
+              <History className="h-6 w-6" strokeWidth={2.2} aria-hidden />
             </div>
-            <div className="flex flex-wrap items-stretch justify-end gap-3">
-              <LeadsDetailTotalStat theme="emerald" label="Total re-assign" total={total} loading={loading} />
-              <LeadsDetailTotalStat
-                theme="emeraldDark"
-                label="Followed"
-                total={followedTotal}
-                loading={followupStatsLoading}
-              />
-              <LeadsDetailTotalStat
-                theme="roseDark"
-                label="Not followed"
-                total={notFollowedTotal}
-                loading={followupStatsLoading}
+            <div className="min-w-0">
+              <h1 className="text-2xl font-bold tracking-tight text-slate-900">Lead reassignment history</h1>
+              <p className="mt-1 text-sm text-slate-500">
+                All bulk reassign events with last follow-up by previous and new owner.
+              </p>
+            </div>
+          </div>
+
+          {appliedAssignedFrom ? (
+            <div className="mt-5">
+              <LeadsReassignAssignedToBreakdownCards
+                assignedFrom={appliedAssignedFrom}
+                rows={toRepCounts}
+                loading={toRepCountsLoading}
+                theme="emerald"
               />
             </div>
+          ) : null}
+
+          <div className="mt-5 flex flex-wrap items-stretch justify-end gap-3">
+            <LeadsDetailTotalStat theme="emerald" label="Total re-assign" total={total} loading={loading} />
+            <LeadsDetailTotalStat
+              theme="emeraldDark"
+              label="Followed"
+              total={followedTotal}
+              loading={followupStatsLoading}
+            />
+            <LeadsDetailTotalStat
+              theme="roseDark"
+              label="Not followed"
+              total={notFollowedTotal}
+              loading={followupStatsLoading}
+              href={noFollowupHref}
+            />
           </div>
 
           <LeadsFilterPanel theme="emerald">

@@ -164,6 +164,43 @@ export async function fetchReassignToCountsForAssignedFrom(conn, assignedFrom, f
     .filter((r) => r.rep && r.count > 0);
 }
 
+/** Per assigned_to counts for cohort list (not-followup page) with assigned_from fixed. */
+export async function fetchReassignFollowupToCountsForAssignedFrom(conn, assignedFrom, filters = {}) {
+  await ensureBulkLeadReassignHistoryTable(conn);
+  const fromRep = String(assignedFrom || "").trim();
+  if (!fromRep) return [];
+
+  const params = [];
+  const followupStatus = resolveFollowupStatusFilter(filters);
+  const scopedFilters = {
+    from: filters.from,
+    to: filters.to,
+    search: filters.search,
+    assignedFrom: fromRep,
+    assignedBy: filters.assignedBy,
+    status: filters.status,
+    leadCampaign: filters.leadCampaign,
+  };
+  const where = buildReassignFollowupCohortWhere(scopedFilters, params, followupStatus);
+
+  const [rows] = await conn.execute(
+    `SELECT TRIM(h.assigned_to) AS rep, COUNT(*) AS cnt
+     FROM ${BULK_LEAD_REASSIGN_HISTORY_TABLE} h
+     ${where}
+       AND h.assigned_to IS NOT NULL AND TRIM(h.assigned_to) <> ''
+     GROUP BY TRIM(h.assigned_to)
+     ORDER BY cnt DESC, rep ASC`,
+    params,
+  );
+
+  return rows
+    .map((r) => ({
+      rep: String(r.rep || "").trim(),
+      count: Number(r.cnt || 0),
+    }))
+    .filter((r) => r.rep && r.count > 0);
+}
+
 export async function countLeadReassignEvents(conn, filters = {}) {
   await ensureBulkLeadReassignHistoryTable(conn);
   const params = [];

@@ -5,6 +5,7 @@ import {
   fetchReassignFollowupSummary,
   fetchReassignNoFollowupPage,
   fetchReassignNoFollowupRepOptions,
+  fetchReassignFollowupToCountsForAssignedFrom,
 } from "@/lib/bulkLeadReassignHistoryList";
 
 const ALLOWED_ROLES = new Set(["ADMIN", "SUPERADMIN", "DIRECTOR", "SALES", "SALES CUM BACKOFFICE"]);
@@ -23,6 +24,7 @@ export async function GET(request) {
     const summary = searchParams.get("summary") === "1";
     const list = searchParams.get("list") === "1";
     const reps = searchParams.get("reps") === "1";
+    const toCounts = searchParams.get("to_counts") === "1";
 
     const conn = await getDbConnection();
 
@@ -42,6 +44,15 @@ export async function GET(request) {
       status: searchParams.get("status") || undefined,
       leadCampaign: searchParams.get("lead_campaign") || undefined,
     };
+
+    if (toCounts) {
+      const fromRep = String(filters.assignedFrom || "").trim();
+      if (!fromRep) {
+        return NextResponse.json({ success: true, toCounts: [] });
+      }
+      const toCountsRows = await fetchReassignFollowupToCountsForAssignedFrom(conn, fromRep, filters);
+      return NextResponse.json({ success: true, toCounts: toCountsRows });
+    }
 
     if (summary) {
       const counts = await fetchReassignFollowupSummary(conn, filters);

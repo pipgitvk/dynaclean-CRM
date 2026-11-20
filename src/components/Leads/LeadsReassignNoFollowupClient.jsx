@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import {
   ArrowLeft,
+  CalendarDays,
   ChevronLeft,
   ChevronRight,
   Clock,
@@ -16,6 +17,7 @@ import {
   UserPlus,
 } from "lucide-react";
 import SearchableSelect from "@/components/ui/SearchableSelect";
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import {
   LeadsFilterActions,
   LeadsFilterField,
@@ -25,8 +27,15 @@ import {
   LeadsFilterSelectShell,
   LeadsLastFollowupWithRemark,
   LeadsReassignFollowupOverview,
+  dateInputClass,
+  dateInputWrapperClass,
 } from "@/components/Leads/LeadsManageDetailFilters";
 import { REASSIGN_NO_FOLLOWUP_DAYS } from "@/lib/reassignNoFollowupConstants";
+import LeadsReassignAssignedToBreakdownCards from "@/components/Leads/LeadsReassignAssignedToBreakdownCards";
+import {
+  repOptions,
+  repOptionsWithCountsMerged,
+} from "@/components/Leads/leadsRepFilterOptions";
 
 const PAGE_SIZES = [50, 100, 150];
 
@@ -91,17 +100,12 @@ function formatTs(value) {
   }
 }
 
-function repOptions(reps, emptyLabel) {
-  return [
-    { value: "", label: emptyLabel },
-    ...reps.map((r) => ({ value: r, label: r })),
-  ];
-}
-
 export default function LeadsReassignNoFollowupClient({ dashboardBase = "admin-dashboard" }) {
   const quickBulkHref = `/${dashboardBase}/leads-manage/quick-bulk-reassign`;
   const hubHref = `/${dashboardBase}/leads-manage`;
 
+  const [fromDateDraft, setFromDateDraft] = useState("");
+  const [toDateDraft, setToDateDraft] = useState("");
   const [searchDraft, setSearchDraft] = useState("");
   const [assignedToDraft, setAssignedToDraft] = useState("");
   const [assignedFromDraft, setAssignedFromDraft] = useState("");
@@ -111,9 +115,13 @@ export default function LeadsReassignNoFollowupClient({ dashboardBase = "admin-d
   const [appliedSearch, setAppliedSearch] = useState("");
   const [appliedAssignedTo, setAppliedAssignedTo] = useState("");
   const [appliedAssignedFrom, setAppliedAssignedFrom] = useState("");
+  const [appliedAssignedBy, setAppliedAssignedBy] = useState("");
+  const [appliedFromDate, setAppliedFromDate] = useState("");
+  const [appliedToDate, setAppliedToDate] = useState("");
   const [appliedFollowupStatus, setAppliedFollowupStatus] = useState("not_followed");
   const [appliedStatus, setAppliedStatus] = useState("");
   const [appliedCampaign, setAppliedCampaign] = useState("");
+  const [urlFiltersReady, setUrlFiltersReady] = useState(false);
 
   const [toRepList, setToRepList] = useState([]);
   const [fromRepList, setFromRepList] = useState([]);
@@ -123,15 +131,57 @@ export default function LeadsReassignNoFollowupClient({ dashboardBase = "admin-d
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(50);
   const [loading, setLoading] = useState(true);
+  const [toRepCounts, setToRepCounts] = useState([]);
+  const [toRepCountsLoading, setToRepCountsLoading] = useState(false);
 
   const filterActive = Boolean(
     appliedSearch.trim() ||
       appliedAssignedTo ||
       appliedAssignedFrom ||
+      appliedAssignedBy ||
+      appliedFromDate ||
+      appliedToDate ||
       (appliedFollowupStatus && appliedFollowupStatus !== "not_followed") ||
       appliedStatus ||
       appliedCampaign,
   );
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const hasQuery =
+      params.has("search") ||
+      params.has("assigned_from") ||
+      params.has("assigned_to") ||
+      params.has("assigned_by") ||
+      params.has("from") ||
+      params.has("to") ||
+      params.has("followup_status");
+
+    if (hasQuery) {
+      const search = String(params.get("search") || "").trim();
+      const assignedFrom = String(params.get("assigned_from") || "").trim();
+      const assignedTo = String(params.get("assigned_to") || "").trim();
+      const assignedBy = String(params.get("assigned_by") || "").trim();
+      const fromDate = String(params.get("from") || "").trim();
+      const toDate = String(params.get("to") || "").trim();
+      const followupStatus = String(params.get("followup_status") || "not_followed").trim();
+
+      setFromDateDraft(fromDate);
+      setToDateDraft(toDate);
+      setSearchDraft(search);
+      setAssignedFromDraft(assignedFrom);
+      setAssignedToDraft(assignedTo);
+      setFollowupStatusDraft(followupStatus || "not_followed");
+      setAppliedSearch(search);
+      setAppliedAssignedFrom(assignedFrom);
+      setAppliedAssignedTo(assignedTo);
+      setAppliedAssignedBy(assignedBy);
+      setAppliedFromDate(fromDate);
+      setAppliedToDate(toDate);
+      setAppliedFollowupStatus(followupStatus || "not_followed");
+    }
+    setUrlFiltersReady(true);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -156,10 +206,60 @@ export default function LeadsReassignNoFollowupClient({ dashboardBase = "admin-d
     };
   }, []);
 
-  const toRepOptions = useMemo(() => repOptions(toRepList, "All assigned to"), [toRepList]);
+  const toRepOptions = useMemo(() => {
+    if (appliedAssignedFrom) {
+      return repOptionsWithCountsMerged(toRepList, toRepCounts, "All assigned to");
+    }
+    return repOptions(toRepList, "All assigned to");
+  }, [appliedAssignedFrom, toRepCounts, toRepList]);
   const fromRepOptions = useMemo(() => repOptions(fromRepList, "All assigned from"), [fromRepList]);
 
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!appliedAssignedFrom) {
+        setToRepCounts([]);
+        setToRepCountsLoading(false);
+        return;
+      }
+      setToRepCountsLoading(true);
+      try {
+        const params = new URLSearchParams();
+        params.set("to_counts", "1");
+        params.set("assigned_from", appliedAssignedFrom);
+        if (appliedFromDate) params.set("from", appliedFromDate);
+        if (appliedToDate) params.set("to", appliedToDate);
+        if (appliedSearch.trim()) params.set("search", appliedSearch.trim());
+        if (appliedAssignedBy) params.set("assigned_by", appliedAssignedBy);
+        if (appliedFollowupStatus) params.set("followup_status", appliedFollowupStatus);
+        if (appliedStatus) params.set("status", appliedStatus);
+        if (appliedCampaign) params.set("lead_campaign", appliedCampaign);
+        const res = await fetch(`/api/reassign-no-followup?${params.toString()}`);
+        const data = await res.json();
+        if (!cancelled && data.success) setToRepCounts(data.toCounts || []);
+      } catch (e) {
+        console.error(e);
+        if (!cancelled) setToRepCounts([]);
+      } finally {
+        if (!cancelled) setToRepCountsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    appliedAssignedFrom,
+    appliedFromDate,
+    appliedToDate,
+    appliedSearch,
+    appliedAssignedBy,
+    appliedFollowupStatus,
+    appliedStatus,
+    appliedCampaign,
+  ]);
+
   const fetchRows = useCallback(async () => {
+    if (!urlFiltersReady) return;
     setLoading(true);
     try {
       const params = new URLSearchParams();
@@ -169,6 +269,9 @@ export default function LeadsReassignNoFollowupClient({ dashboardBase = "admin-d
       if (appliedSearch.trim()) params.set("search", appliedSearch.trim());
       if (appliedAssignedTo) params.set("assigned_to", appliedAssignedTo);
       if (appliedAssignedFrom) params.set("assigned_from", appliedAssignedFrom);
+      if (appliedAssignedBy) params.set("assigned_by", appliedAssignedBy);
+      if (appliedFromDate) params.set("from", appliedFromDate);
+      if (appliedToDate) params.set("to", appliedToDate);
       if (appliedFollowupStatus) params.set("followup_status", appliedFollowupStatus);
       if (appliedStatus) params.set("status", appliedStatus);
       if (appliedCampaign) params.set("lead_campaign", appliedCampaign);
@@ -191,9 +294,13 @@ export default function LeadsReassignNoFollowupClient({ dashboardBase = "admin-d
       setLoading(false);
     }
   }, [
+    urlFiltersReady,
     appliedSearch,
     appliedAssignedTo,
     appliedAssignedFrom,
+    appliedAssignedBy,
+    appliedFromDate,
+    appliedToDate,
     appliedFollowupStatus,
     appliedStatus,
     appliedCampaign,
@@ -206,6 +313,8 @@ export default function LeadsReassignNoFollowupClient({ dashboardBase = "admin-d
   }, [fetchRows]);
 
   const applyFilters = () => {
+    setAppliedFromDate(fromDateDraft);
+    setAppliedToDate(toDateDraft);
     setAppliedSearch(searchDraft);
     setAppliedAssignedTo(assignedToDraft);
     setAppliedAssignedFrom(assignedFromDraft);
@@ -216,6 +325,8 @@ export default function LeadsReassignNoFollowupClient({ dashboardBase = "admin-d
   };
 
   const clearFilters = () => {
+    setFromDateDraft("");
+    setToDateDraft("");
     setSearchDraft("");
     setAssignedToDraft("");
     setAssignedFromDraft("");
@@ -225,6 +336,9 @@ export default function LeadsReassignNoFollowupClient({ dashboardBase = "admin-d
     setAppliedSearch("");
     setAppliedAssignedTo("");
     setAppliedAssignedFrom("");
+    setAppliedAssignedBy("");
+    setAppliedFromDate("");
+    setAppliedToDate("");
     setAppliedFollowupStatus("not_followed");
     setAppliedStatus("");
     setAppliedCampaign("");
@@ -266,6 +380,17 @@ export default function LeadsReassignNoFollowupClient({ dashboardBase = "admin-d
             </div>
           </div>
 
+          {appliedAssignedFrom ? (
+            <div className="mt-5">
+              <LeadsReassignAssignedToBreakdownCards
+                assignedFrom={appliedAssignedFrom}
+                rows={toRepCounts}
+                loading={toRepCountsLoading}
+                theme="rose"
+              />
+            </div>
+          ) : null}
+
           <div className="mt-5 max-w-md min-w-0">
             <LeadsReassignFollowupOverview
               notFollowed={notFollowedTotal}
@@ -284,7 +409,23 @@ export default function LeadsReassignNoFollowupClient({ dashboardBase = "admin-d
               onApply={applyFilters}
               placeholder="Customer ID, name, company, phone, assigned from/to…"
             />
-            <LeadsFilterFieldsGrid columns={5}>
+            <LeadsFilterFieldsGrid columns={4}>
+              <LeadsFilterField label="From date" icon={CalendarDays}>
+                <TypeableDateFilterInput
+                  value={fromDateDraft}
+                  onChange={setFromDateDraft}
+                  wrapperClassName={dateInputWrapperClass}
+                  className={dateInputClass}
+                />
+              </LeadsFilterField>
+              <LeadsFilterField label="To date" icon={CalendarDays}>
+                <TypeableDateFilterInput
+                  value={toDateDraft}
+                  onChange={setToDateDraft}
+                  wrapperClassName={dateInputWrapperClass}
+                  className={dateInputClass}
+                />
+              </LeadsFilterField>
               <LeadsFilterField label="Follow-up status">
                 <LeadsFilterSelectShell theme="rose" icon={ListFilter}>
                   <SearchableSelect

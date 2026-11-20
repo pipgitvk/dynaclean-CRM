@@ -264,13 +264,12 @@ export function LeadsDetailTotalStat({
   label = "Total re-assign",
   total = 0,
   loading = false,
+  href,
 }) {
   const t = TOTAL_STAT_THEME[theme] || TOTAL_STAT_THEME.emerald;
-  return (
-    <div
-      className={`shrink-0 rounded-2xl border px-5 py-3.5 shadow-sm sm:min-w-[11rem] ${t.shell}`}
-      aria-live="polite"
-    >
+  const shellClass = `shrink-0 rounded-2xl border px-5 py-3.5 shadow-sm sm:min-w-[11rem] ${t.shell}`;
+  const body = (
+    <>
       <p className={`text-[11px] font-bold uppercase tracking-wide ${t.label}`}>{label}</p>
       <p className={`mt-1 text-3xl font-bold tabular-nums leading-none ${t.value}`}>
         {loading ? (
@@ -279,6 +278,24 @@ export function LeadsDetailTotalStat({
           Number(total || 0).toLocaleString()
         )}
       </p>
+    </>
+  );
+
+  if (href) {
+    return (
+      <Link
+        href={href}
+        className={`${shellClass} block transition hover:brightness-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600`}
+        aria-label={`${label}: open detail view`}
+      >
+        {body}
+      </Link>
+    );
+  }
+
+  return (
+    <div className={shellClass} aria-live="polite">
+      {body}
     </div>
   );
 }
