@@ -1910,12 +1910,15 @@ export default function ServiceBeforeInstallationDetailClient({
   }, [openInstallationKpiFilterKey, segment]);
 
   const fetchTableFilterOptions = useCallback(async () => {
-    // Open Installation "Inst completed by" loads from /api/service-engineers + third-party
-    // (fast master tables) — skip this heavy DISTINCT route there.
-    if (segment !== "total-registered") {
+    if (
+      segment !== "total-registered" &&
+      segment !== "open-installation" &&
+      segment !== "overdue-delayed-installation"
+    ) {
       return;
     }
-    const key = segment;
+    // Open Installation filters API uses small rep_list / third-party tables only.
+    const key = segment === "overdue-delayed-installation" ? "open-installation" : segment;
     if (tableFilterOptionsFetchKeyRef.current === key) return;
     tableFilterOptionsFetchKeyRef.current = key;
     try {

@@ -443,6 +443,15 @@ export default function ServiceBeforeInstallationFilters({
                   onChange={setField("warrantyRegistration")}
                   className={row2Field}
                 />
+                <TableDistinctNameFilterSelect
+                  label="Sales person"
+                  placeholder="All sales persons"
+                  names={tableFilterOptions?.salesPersons || []}
+                  value={draft.salesPerson}
+                  onChange={setField("salesPerson")}
+                  onRequestOptions={onRequestTableFilterOptions}
+                  className={row2Field}
+                />
                 <InstCompletedByFilterSelect
                   value={draft.instCompletedBy}
                   onChange={setField("instCompletedBy")}

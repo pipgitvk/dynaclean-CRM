@@ -60,10 +60,9 @@ function openInstallationNeedsFullListShape(filters) {
       f.model ||
       f.state ||
       f.serial ||
-      f.salesPerson ||
+      // salesPerson + instCompletedBy stay on neworder fast path / lite KPI.
       f.serviceEngineer ||
       f.thirdPartyEngineer ||
-      // instCompletedBy uses quote-key prefilter + neworder fast path (not full join).
       f.warrantyRegistration ||
       f.orderDeliveryStatus ||
       f.assignedBy ||
@@ -271,6 +270,10 @@ async function fetchOpenInstallationBreakdownLite(
   if (f.to) {
     dateSql += ` AND DATE(no.delivery_date) <= ?`;
     params.push(f.to);
+  }
+  if (f.salesPerson) {
+    dateSql += ` AND TRIM(no.created_by) = TRIM(?)`;
+    params.push(f.salesPerson);
   }
 
   let quoteSql = "";
@@ -1410,6 +1413,17 @@ export async function fetchServiceBeforeInstallationWpFilterOptions(segment, _fi
  * neworder / warranty DISTINCT scans.
  */
 async function fetchOpenInstallationFilterOptions(conn) {
+  const [salesRows] = await conn.execute(
+    `SELECT username AS name
+     FROM rep_list
+     WHERE status = 1
+       AND TRIM(userRole) IN (
+         'SALES', 'ADMIN', 'BACK OFFICE', 'SALES CUM BACKOFFICE', 'SALES HEAD', 'GEM PORTAL'
+       )
+     ORDER BY username ASC
+     LIMIT ${FILTER_OPTIONS_NAME_LIMIT}`,
+  );
+
   const [internalRows] = await conn.execute(
     `SELECT username AS name
      FROM rep_list
@@ -1442,7 +1456,7 @@ async function fetchOpenInstallationFilterOptions(conn) {
   ]);
 
   return {
-    salesPersons: [],
+    salesPersons: mapDistinctNameRows(salesRows),
     serviceEngineers,
     thirdPartyEngineers,
     instCompletedBys,
