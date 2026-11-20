@@ -4,7 +4,13 @@ import { useCallback, useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import { ChevronLeft, Download, FileUp, Play, Square, Video } from "lucide-react";
+import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { generateServiceReportPDF, downloadPDF } from "@/utils/pdfGenerator";
+import {
+  GOOGLE_FEEDBACK_COLLECTION_OPTIONS,
+  canShowInstallationManualBackofficeFields,
+  normalizeGoogleFeedbackCollection,
+} from "@/lib/installationManualReportMeta";
 import {
   buildPrefilledInstallationReportPdfPayload,
   installationReportPdfFilename,
@@ -41,6 +47,19 @@ function hasManualInstallationReport(installationReport) {
   return Boolean(v && v !== "uploadFO");
 }
 
+function ymdForInput(value) {
+  if (!value) return "";
+  const s = String(value).trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toISOString().slice(0, 10);
+}
+
+function todayYmd() {
+  return new Date().toISOString().slice(0, 10);
+}
+
 function canOpenReport(data) {
   if (!data) return false;
   if (data.steps?.video_completion) return true;
@@ -69,6 +88,11 @@ export default function InstallationCompletionVideoPage() {
   const [manualFile, setManualFile] = useState(null);
   const [manualUploading, setManualUploading] = useState(false);
   const [manualProgress, setManualProgress] = useState(0);
+  const [viewerRole, setViewerRole] = useState("");
+  const [installationCompletionDate, setInstallationCompletionDate] = useState("");
+  const [completedByServiceEngineer, setCompletedByServiceEngineer] = useState("");
+  const [googleFeedbackCollection, setGoogleFeedbackCollection] = useState("");
+  const [serviceEngineerOptions, setServiceEngineerOptions] = useState([]);
 
   const videoRef = useRef(null);
   const mediaRecorderRef = useRef(null);
@@ -98,6 +122,22 @@ export default function InstallationCompletionVideoPage() {
         router.replace(reportHref);
         return;
       }
+      const role = String(body.viewer?.role || "").trim().toUpperCase();
+      setViewerRole(role);
+      const svc = body.service || {};
+      setInstallationCompletionDate(
+        ymdForInput(svc.installation_completion_date) ||
+          ymdForInput(svc.completed_date) ||
+          todayYmd(),
+      );
+      const defaultEngineer =
+        String(svc.completed_by_service_engineer || svc.assigned_to || "").trim();
+      setCompletedByServiceEngineer(
+        defaultEngineer && defaultEngineer !== "NOT ASSIGNED" ? defaultEngineer : "",
+      );
+      setGoogleFeedbackCollection(
+        normalizeGoogleFeedbackCollection(svc.google_feedback_collection) || "",
+      );
       setData(body);
     } catch (err) {
       setError(err.message || "Failed to load service");
@@ -109,6 +149,41 @@ export default function InstallationCompletionVideoPage() {
   useEffect(() => {
     if (serviceId) load();
   }, [serviceId, load]);
+
+  const showManualBackofficeFields = canShowInstallationManualBackofficeFields(viewerRole);
+
+  useEffect(() => {
+    if (!showManualBackofficeFields) {
+      setServiceEngineerOptions([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/service-engineers/active", { cache: "no-store" });
+        const body = await res.json();
+        let names = body.users?.map((u) => u.username).filter(Boolean) || [];
+        const current = completedByServiceEngineer;
+        if (current && !names.includes(current)) {
+          names = [current, ...names];
+        }
+        const assigned = String(data?.service?.assigned_to || "").trim();
+        if (
+          assigned &&
+          assigned !== "NOT ASSIGNED" &&
+          !names.includes(assigned)
+        ) {
+          names = [assigned, ...names];
+        }
+        if (!cancelled) setServiceEngineerOptions(names);
+      } catch {
+        if (!cancelled) setServiceEngineerOptions([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [showManualBackofficeFields, data?.service?.assigned_to, completedByServiceEngineer]);
 
   const downloadBlankReport = async () => {
     if (!data?.service) return;
@@ -164,6 +239,20 @@ export default function InstallationCompletionVideoPage() {
 
   const uploadManualReport = async () => {
     if (!manualFile) return;
+    if (showManualBackofficeFields) {
+      if (!installationCompletionDate.trim()) {
+        setError("Installation completion date is required.");
+        return;
+      }
+      if (!completedByServiceEngineer.trim()) {
+        setError("Select completed by service engineer.");
+        return;
+      }
+      if (!googleFeedbackCollection) {
+        setError("Select Google feedback collection status.");
+        return;
+      }
+    }
     setManualUploading(true);
     setManualProgress(0);
     setError("");
@@ -171,6 +260,14 @@ export default function InstallationCompletionVideoPage() {
       const formData = new FormData();
       formData.append("action", "manual_installation_report");
       formData.append("file", manualFile);
+      if (showManualBackofficeFields) {
+        formData.append("installation_completion_date", installationCompletionDate);
+        formData.append(
+          "completed_by_service_engineer",
+          completedByServiceEngineer.trim(),
+        );
+        formData.append("google_feedback_collection", googleFeedbackCollection);
+      }
       await uploadWithProgress(
         `/api/service-report-steps/${serviceId}`,
         formData,
@@ -462,6 +559,60 @@ export default function InstallationCompletionVideoPage() {
             {manualFile ? manualFile.name : "Choose filled report (PDF or image)"}
             <input type="file" accept=".pdf,image/*" className="hidden" onChange={onPickManualFile} />
           </label>
+          {showManualBackofficeFields ? (
+            <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50/80 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Installation details
+              </p>
+              <label className="block">
+                <span className="mb-1 block text-sm font-medium text-gray-700">
+                  Installation completion date <span className="text-red-500">*</span>
+                </span>
+                <TypeableDateFilterInput
+                  value={installationCompletionDate}
+                  onChange={setInstallationCompletionDate}
+                  className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-sm font-medium text-gray-700">
+                  Completed by service engineer <span className="text-red-500">*</span>
+                </span>
+                <select
+                  className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+                  value={completedByServiceEngineer}
+                  onChange={(e) => setCompletedByServiceEngineer(e.target.value)}
+                >
+                  <option value="">Select engineer</option>
+                  {serviceEngineerOptions.length > 0 ? (
+                    serviceEngineerOptions.map((name) => (
+                      <option key={name} value={name}>
+                        {name}
+                      </option>
+                    ))
+                  ) : (
+                    <option disabled>Loading engineers…</option>
+                  )}
+                </select>
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-sm font-medium text-gray-700">
+                  Google feedback collection <span className="text-red-500">*</span>
+                </span>
+                <select
+                  className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+                  value={googleFeedbackCollection}
+                  onChange={(e) => setGoogleFeedbackCollection(e.target.value)}
+                >
+                  {GOOGLE_FEEDBACK_COLLECTION_OPTIONS.map((opt) => (
+                    <option key={opt.value || "select"} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          ) : null}
           {manualFile && (
             <button
               type="button"

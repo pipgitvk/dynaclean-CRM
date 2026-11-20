@@ -133,12 +133,23 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
     newStatus: "",
     description: "",
     plannedDate: "",
+    assignEngineer: "NOT ASSIGNED",
+    thirdPartyId: "",
+    plannedNotes: "",
   });
+  const [statusModalEngineers, setStatusModalEngineers] = useState([]);
+  const [statusModalThirdPartyEngineers, setStatusModalThirdPartyEngineers] = useState(
+    [],
+  );
   const [statusError, setStatusError] = useState("");
   const [isStatusSubmitting, setIsStatusSubmitting] = useState(false);
   const [plannedDatePopup, setPlannedDatePopup] = useState(null);
   const [plannedPopupError, setPlannedPopupError] = useState("");
   const [plannedPopupSaving, setPlannedPopupSaving] = useState(false);
+  const [plannedPopupEngineers, setPlannedPopupEngineers] = useState([]);
+  const [plannedPopupThirdPartyEngineers, setPlannedPopupThirdPartyEngineers] = useState(
+    [],
+  );
   const [inlinePlannedDateSavingId, setInlinePlannedDateSavingId] = useState(null);
 
   // Assign modal state
@@ -494,6 +505,36 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
     return d.toISOString().slice(0, 10);
   };
 
+  const PLANNED_NOTES_PLACEHOLDER = "followup planning";
+
+  const thirdPartyIdFromRecord = (record) => {
+    const tpId =
+      record?.third_party_engineer_id ??
+      (record?.assigned_to_type === "third_party" ? record?.assigned_to_id : null);
+    return tpId != null && tpId !== "" ? String(tpId) : "";
+  };
+
+  const fetchActiveEngineerOptions = async (record) => {
+    const [repsRes, tpRes] = await Promise.all([
+      fetch("/api/service-engineers/active"),
+      fetch("/api/third-party-engineers/active"),
+    ]);
+    const repsData = await repsRes.json();
+    let internalNames =
+      repsData.users?.map((u) => u.username).filter(Boolean) || [];
+    const currentInternal = record?.assigned_to;
+    if (
+      currentInternal &&
+      currentInternal !== "NOT ASSIGNED" &&
+      !internalNames.includes(currentInternal)
+    ) {
+      internalNames = [currentInternal, ...internalNames];
+    }
+    const tpData = await tpRes.json().catch(() => []);
+    const thirdPartyEngineers = Array.isArray(tpData) ? tpData : [];
+    return { internalNames, thirdPartyEngineers };
+  };
+
   // Sort logic
   const sortedRecords = [...records].sort((a, b) => {
     if (sortConfig.key !== null) {
@@ -722,7 +763,7 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
   const paginatedRecords = uniqueRecords.slice(startIndex, endIndex);
 
   // Status change helpers
-  const openStatusModal = (record) => {
+  const openStatusModal = async (record) => {
     setStatusError("");
     setStatusForm({
       service_id: record.service_id,
@@ -730,8 +771,22 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
       newStatus: record.status || "",
       description: record.status_description || "",
       plannedDate: plannedDateForInput(record.planned_date),
+      assignEngineer: record.assigned_to || "NOT ASSIGNED",
+      thirdPartyId: thirdPartyIdFromRecord(record),
+      plannedNotes: (record.status_description || "").trim(),
     });
     setIsStatusModalOpen(true);
+    if (canAssignServiceEngineer()) {
+      try {
+        const { internalNames, thirdPartyEngineers } =
+          await fetchActiveEngineerOptions(record);
+        setStatusModalEngineers(internalNames);
+        setStatusModalThirdPartyEngineers(thirdPartyEngineers);
+      } catch {
+        setStatusModalEngineers([]);
+        setStatusModalThirdPartyEngineers([]);
+      }
+    }
   };
 
   const closeStatusModal = () => {
@@ -742,9 +797,44 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
 
   const handleStatusFieldChange = (field, value) => {
     setStatusForm((prev) => ({ ...prev, [field]: value }));
-    if (field === "newStatus" || field === "description" || field === "plannedDate") {
+    if (
+      field === "newStatus" ||
+      field === "description" ||
+      field === "plannedDate" ||
+      field === "plannedNotes"
+    ) {
       setStatusError("");
     }
+  };
+
+  const assignServiceRecord = async (serviceId, assignedTo, thirdPartyEngineerId) => {
+    const res = await fetch("/api/service-status/assign", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        service_id: serviceId,
+        assigned_to: assignedTo,
+        third_party_engineer_id: thirdPartyEngineerId || null,
+      }),
+    });
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      throw new Error(d.message || "Failed to assign.");
+    }
+    const tpIdNum = thirdPartyEngineerId ? Number(thirdPartyEngineerId) : null;
+    setRecords((prev) =>
+      prev.map((r) =>
+        r.service_id === serviceId
+          ? {
+              ...r,
+              assigned_to: assignedTo,
+              third_party_engineer_id: tpIdNum,
+              assigned_to_id: tpIdNum,
+              assigned_to_type: tpIdNum ? "third_party" : "internal",
+            }
+          : r,
+      ),
+    );
   };
 
   const canChangeServiceStatus = (record) => {
@@ -842,11 +932,7 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
     if (newStatus === current) return;
 
     if (newStatus.toUpperCase() === "PLANNED") {
-      setPlannedPopupError("");
-      setPlannedDatePopup({
-        serviceId: record.service_id,
-        plannedDate: plannedDateForInput(record.planned_date) || "",
-      });
+      void openPlannedDatePopup(record);
       return;
     }
 
@@ -858,6 +944,9 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
         newStatus,
         description: record.status_description || "",
         plannedDate: plannedDateForInput(record.planned_date),
+        assignEngineer: record.assigned_to || "NOT ASSIGNED",
+        thirdPartyId: thirdPartyIdFromRecord(record),
+        plannedNotes: (record.status_description || "").trim(),
       });
       setIsStatusModalOpen(true);
       return;
@@ -873,10 +962,37 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
     });
   };
 
+  const openPlannedDatePopup = async (record) => {
+    setPlannedPopupError("");
+    setPlannedDatePopup({
+      serviceId: record.service_id,
+      plannedDate: plannedDateForInput(record.planned_date) || "",
+      assignEngineer: record.assigned_to || "NOT ASSIGNED",
+      thirdPartyId: thirdPartyIdFromRecord(record),
+      notes: (record.status_description || "").trim(),
+    });
+    if (canAssignServiceEngineer()) {
+      try {
+        const { internalNames, thirdPartyEngineers } =
+          await fetchActiveEngineerOptions(record);
+        setPlannedPopupEngineers(internalNames);
+        setPlannedPopupThirdPartyEngineers(thirdPartyEngineers);
+      } catch {
+        setPlannedPopupEngineers([]);
+        setPlannedPopupThirdPartyEngineers([]);
+      }
+    } else {
+      setPlannedPopupEngineers([]);
+      setPlannedPopupThirdPartyEngineers([]);
+    }
+  };
+
   const closePlannedDatePopup = () => {
     if (plannedPopupSaving) return;
     setPlannedDatePopup(null);
     setPlannedPopupError("");
+    setPlannedPopupEngineers([]);
+    setPlannedPopupThirdPartyEngineers([]);
   };
 
   const savePlannedDatePopup = async () => {
@@ -886,16 +1002,26 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
       setPlannedPopupError("Please select a planned date.");
       return;
     }
+    const notes = (plannedDatePopup.notes || "").trim();
     try {
       setPlannedPopupSaving(true);
       setPlannedPopupError("");
       await applyStatusUpdate({
         service_id: plannedDatePopup.serviceId,
         status: "PLANNED",
-        description: "",
+        description: notes,
         planned_date: plannedDate,
       });
+      if (canAssignServiceEngineer()) {
+        await assignServiceRecord(
+          plannedDatePopup.serviceId,
+          plannedDatePopup.assignEngineer || "NOT ASSIGNED",
+          plannedDatePopup.thirdPartyId,
+        );
+      }
       setPlannedDatePopup(null);
+      setPlannedPopupEngineers([]);
+      setPlannedPopupThirdPartyEngineers([]);
     } catch (err) {
       setPlannedPopupError(err.message || "Failed to save.");
     } finally {
@@ -946,7 +1072,8 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
             Planned: {formatDate(record.planned_date)}
           </span>
         )}
-        {record.status?.toUpperCase() === "PENDING BY CUSTOMER" &&
+        {(record.status?.toUpperCase() === "PENDING BY CUSTOMER" ||
+          isPlanned) &&
           record.status_description && (
             <span className="text-xs text-gray-600 mt-1 break-words max-w-xs">
               {record.status_description}
@@ -963,8 +1090,10 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
     }
 
     const newStatus = statusForm.newStatus.trim();
-    const description = (statusForm.description || "").trim();
     const isPlanned = newStatus.toUpperCase() === "PLANNED";
+    const description = isPlanned
+      ? (statusForm.plannedNotes || "").trim()
+      : (statusForm.description || "").trim();
     const plannedDate = (statusForm.plannedDate || "").trim();
 
     try {
@@ -976,6 +1105,13 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
         description,
         planned_date: isPlanned ? plannedDate : null,
       });
+      if (isPlanned && canAssignServiceEngineer()) {
+        await assignServiceRecord(
+          statusForm.service_id,
+          statusForm.assignEngineer || "NOT ASSIGNED",
+          statusForm.thirdPartyId,
+        );
+      }
       setIsStatusModalOpen(false);
     } catch (err) {
       setStatusError(err.message || "Something went wrong.");
@@ -987,31 +1123,14 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
   const openAssignModal = async (record) => {
     setAssignServiceId(record.service_id);
     setAssignEngineer(record.assigned_to || "NOT ASSIGNED");
-    const tpId =
-      record.third_party_engineer_id ??
-      (record.assigned_to_type === "third_party" ? record.assigned_to_id : null);
-    setAssignThirdPartyId(tpId != null && tpId !== "" ? String(tpId) : "");
+    setAssignThirdPartyId(thirdPartyIdFromRecord(record));
     setAssignError("");
     setIsAssignModalOpen(true);
     try {
-      const [repsRes, tpRes] = await Promise.all([
-        fetch("/api/service-engineers/active"),
-        fetch("/api/third-party-engineers/active"),
-      ]);
-      const repsData = await repsRes.json();
-      let internalNames =
-        repsData.users?.map((u) => u.username).filter(Boolean) || [];
-      const currentInternal = record.assigned_to;
-      if (
-        currentInternal &&
-        currentInternal !== "NOT ASSIGNED" &&
-        !internalNames.includes(currentInternal)
-      ) {
-        internalNames = [currentInternal, ...internalNames];
-      }
+      const { internalNames, thirdPartyEngineers } =
+        await fetchActiveEngineerOptions(record);
       setEngineers(internalNames);
-      const tpData = await tpRes.json().catch(() => []);
-      setThirdPartyEngineers(Array.isArray(tpData) ? tpData : []);
+      setThirdPartyEngineers(thirdPartyEngineers);
     } catch {
       setEngineers([]);
       setThirdPartyEngineers([]);
@@ -1032,32 +1151,10 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
     setIsAssignSubmitting(true);
     setAssignError("");
     try {
-      const res = await fetch("/api/service-status/assign", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          service_id: assignServiceId,
-          assigned_to: assignEngineer,
-          third_party_engineer_id: assignThirdPartyId || null,
-        }),
-      });
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({}));
-        throw new Error(d.message || "Failed to assign.");
-      }
-      const tpIdNum = assignThirdPartyId ? Number(assignThirdPartyId) : null;
-      setRecords((prev) =>
-        prev.map((r) =>
-          r.service_id === assignServiceId
-            ? {
-                ...r,
-                assigned_to: assignEngineer,
-                third_party_engineer_id: tpIdNum,
-                assigned_to_id: tpIdNum,
-                assigned_to_type: tpIdNum ? "third_party" : "internal",
-              }
-            : r
-        )
+      await assignServiceRecord(
+        assignServiceId,
+        assignEngineer,
+        assignThirdPartyId,
       );
       setIsAssignModalOpen(false);
     } catch (err) {
@@ -1878,7 +1975,7 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
 
       {plannedDatePopup && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-sm p-5">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-5 max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-semibold text-gray-900">
               Planned visit date
             </h3>
@@ -1886,16 +1983,76 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
               Service ID: {plannedDatePopup.serviceId}
             </p>
             <label className="block text-sm font-medium text-gray-700 mt-4 mb-1">
-              Select date <span className="text-red-500">*</span>
+              Planned date <span className="text-red-500">*</span>
             </label>
-            <input
-              type="date"
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+            <TypeableDateFilterInput
               value={plannedDatePopup.plannedDate || ""}
+              onChange={(v) =>
+                setPlannedDatePopup((p) => (p ? { ...p, plannedDate: v } : p))
+              }
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+            />
+            {canAssignServiceEngineer() ? (
+              <>
+                <label className="block text-sm font-medium text-gray-700 mt-4 mb-1">
+                  Assign to service engineer
+                </label>
+                <select
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                  value={plannedDatePopup.assignEngineer || "NOT ASSIGNED"}
+                  onChange={(e) =>
+                    setPlannedDatePopup((p) =>
+                      p ? { ...p, assignEngineer: e.target.value } : p,
+                    )
+                  }
+                >
+                  <option value="NOT ASSIGNED">NOT ASSIGNED</option>
+                  {plannedPopupEngineers.length > 0 ? (
+                    plannedPopupEngineers.map((eng) => (
+                      <option key={eng} value={eng}>
+                        {eng}
+                      </option>
+                    ))
+                  ) : (
+                    <option disabled>Loading…</option>
+                  )}
+                </select>
+                <label className="block text-sm font-medium text-gray-700 mt-4 mb-1">
+                  Third party engineer
+                </label>
+                <select
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                  value={plannedDatePopup.thirdPartyId || ""}
+                  onChange={(e) =>
+                    setPlannedDatePopup((p) =>
+                      p ? { ...p, thirdPartyId: e.target.value } : p,
+                    )
+                  }
+                >
+                  <option value="">— Not assigned —</option>
+                  {plannedPopupThirdPartyEngineers.length > 0 ? (
+                    plannedPopupThirdPartyEngineers.map((eng) => (
+                      <option key={eng.engineer_id} value={String(eng.engineer_id)}>
+                        {eng.name}
+                        {eng.state ? ` (${eng.state})` : ""}
+                      </option>
+                    ))
+                  ) : (
+                    <option disabled>No third-party engineers found</option>
+                  )}
+                </select>
+              </>
+            ) : null}
+            <label className="block text-sm font-medium text-gray-700 mt-4 mb-1">
+              Notes
+            </label>
+            <textarea
+              rows={3}
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+              placeholder={PLANNED_NOTES_PLACEHOLDER}
+              value={plannedDatePopup.notes || ""}
               onChange={(e) =>
-                setPlannedDatePopup((p) =>
-                  p ? { ...p, plannedDate: e.target.value } : p,
-                )
+                setPlannedDatePopup((p) => (p ? { ...p, notes: e.target.value } : p))
               }
             />
             {plannedPopupError && (
@@ -1965,32 +2122,97 @@ function ServiceTableInner({ serviceRecords, role, dashboardPathOverride }) {
               </div>
 
               {statusForm.newStatus?.toUpperCase() === "PLANNED" && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Planned date <span className="text-red-500">*</span>
-                  </label>
-                  <TypeableDateFilterInput value={statusForm.plannedDate || ""} onChange={(v) => handleStatusFieldChange("plannedDate", v)} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"/>
-                </div>
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Planned date <span className="text-red-500">*</span>
+                    </label>
+                    <TypeableDateFilterInput
+                      value={statusForm.plannedDate || ""}
+                      onChange={(v) => handleStatusFieldChange("plannedDate", v)}
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                    />
+                  </div>
+                  {canAssignServiceEngineer() ? (
+                    <>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Assign to service engineer
+                        </label>
+                        <select
+                          className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                          value={statusForm.assignEngineer || "NOT ASSIGNED"}
+                          onChange={(e) =>
+                            handleStatusFieldChange("assignEngineer", e.target.value)
+                          }
+                        >
+                          <option value="NOT ASSIGNED">NOT ASSIGNED</option>
+                          {statusModalEngineers.map((eng) => (
+                            <option key={eng} value={eng}>
+                              {eng}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Third party engineer
+                        </label>
+                        <select
+                          className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                          value={statusForm.thirdPartyId || ""}
+                          onChange={(e) =>
+                            handleStatusFieldChange("thirdPartyId", e.target.value)
+                          }
+                        >
+                          <option value="">— Not assigned —</option>
+                          {statusModalThirdPartyEngineers.map((eng) => (
+                            <option key={eng.engineer_id} value={String(eng.engineer_id)}>
+                              {eng.name}
+                              {eng.state ? ` (${eng.state})` : ""}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </>
+                  ) : null}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Notes
+                    </label>
+                    <textarea
+                      rows={3}
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                      placeholder={PLANNED_NOTES_PLACEHOLDER}
+                      value={statusForm.plannedNotes || ""}
+                      onChange={(e) =>
+                        handleStatusFieldChange("plannedNotes", e.target.value)
+                      }
+                    />
+                  </div>
+                </>
               )}
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Description{" "}
-                  {statusForm.newStatus?.toUpperCase() ===
-                    "PENDING BY CUSTOMER" && (
-                    <span className="text-red-500">*</span>
-                  )}
-                </label>
-                <textarea
-                  rows={3}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
-                  placeholder="Enter description (required if status is PENDING BY CUSTOMER)"
-                  value={statusForm.description || ""}
-                  onChange={(e) =>
-                    handleStatusFieldChange("description", e.target.value)
-                  }
-                />
-              </div>
+              {statusForm.newStatus?.toUpperCase() !== "PLANNED" && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Description{" "}
+                    {statusForm.newStatus?.toUpperCase() ===
+                      "PENDING BY CUSTOMER" && (
+                      <span className="text-red-500">*</span>
+                    )}
+                  </label>
+                  <textarea
+                    rows={3}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                    placeholder="Enter description (required if status is PENDING BY CUSTOMER)"
+                    value={statusForm.description || ""}
+                    onChange={(e) =>
+                      handleStatusFieldChange("description", e.target.value)
+                    }
+                  />
+                </div>
+              )}
 
               {statusError && (
                 <p className="text-sm text-red-600">{statusError}</p>

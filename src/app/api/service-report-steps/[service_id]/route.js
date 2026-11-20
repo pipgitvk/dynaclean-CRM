@@ -3,6 +3,11 @@ import path from "path";
 import { NextResponse } from "next/server";
 import { getSessionPayload } from "@/lib/auth";
 import { ensureServiceReportStepsTable } from "@/lib/ensureServiceReportStepsTable";
+import { ensureServiceRecordsInstallationManualColumns } from "@/lib/ensureServiceRecordsInstallationManualColumns";
+import {
+  canShowInstallationManualBackofficeFields,
+  parseInstallationManualMetaFromForm,
+} from "@/lib/installationManualReportMeta";
 import {
   isServiceVideoCloudinaryEnabled,
   uploadServiceReportVideo,
@@ -60,6 +65,9 @@ async function loadService(conn, serviceId) {
         sr.service_type,
         sr.assigned_to,
         sr.installation_report,
+        sr.installation_completion_date,
+        sr.completed_by_service_engineer,
+        sr.google_feedback_collection,
         s.video_360,
         s.video_problem,
         s.video_damaged,
@@ -102,6 +110,9 @@ function payloadFromRow(row, product = null) {
       service_type: row.service_type,
       assigned_to: row.assigned_to,
       installation_report: row.installation_report || null,
+      installation_completion_date: row.installation_completion_date || null,
+      completed_by_service_engineer: row.completed_by_service_engineer || null,
+      google_feedback_collection: row.google_feedback_collection || null,
     },
     product: product
       ? {
@@ -152,12 +163,18 @@ export async function GET(_request, context) {
 
   try {
     const conn = await ensureServiceReportStepsTable();
+    await ensureServiceRecordsInstallationManualColumns(conn);
     const row = await loadService(conn, serviceId);
     if (!row) {
       return NextResponse.json({ message: "Service not found" }, { status: 404 });
     }
     const product = await loadWarrantyProductForSerial(conn, row.serial_number);
-    return NextResponse.json(payloadFromRow(row, product));
+    return NextResponse.json({
+      ...payloadFromRow(row, product),
+      viewer: {
+        role: String(session.role ?? session.userRole ?? "").trim().toUpperCase(),
+      },
+    });
   } catch (error) {
     console.error("[service-report-steps GET]", error);
     return NextResponse.json({ message: "Failed to load service steps" }, { status: 500 });
@@ -177,6 +194,7 @@ export async function POST(request, context) {
 
   try {
     const conn = await ensureServiceReportStepsTable();
+    await ensureServiceRecordsInstallationManualColumns(conn);
     const existing = await loadService(conn, serviceId);
     if (!existing) {
       return NextResponse.json({ message: "Service not found" }, { status: 404 });
@@ -291,14 +309,62 @@ export async function POST(request, context) {
       await mkdir(uploadDir, { recursive: true });
       await writeFile(path.join(uploadDir, fileName), buffer);
 
-      await conn.execute(
-        `UPDATE service_records
-         SET installation_report = ?,
-             status = 'COMPLETED',
-             completed_date = COALESCE(completed_date, CURDATE())
-         WHERE service_id = ?`,
-        [fileName, serviceId],
-      );
+      const viewerRole = String(session.role ?? session.userRole ?? "")
+        .trim()
+        .toUpperCase();
+      const backofficeManual = canShowInstallationManualBackofficeFields(viewerRole);
+      const manualMeta = parseInstallationManualMetaFromForm(formData);
+
+      if (backofficeManual) {
+        if (!manualMeta.installationCompletionDate) {
+          return NextResponse.json(
+            { message: "Installation completion date is required." },
+            { status: 400 },
+          );
+        }
+        if (!manualMeta.completedByServiceEngineer) {
+          return NextResponse.json(
+            { message: "Completed by service engineer is required." },
+            { status: 400 },
+          );
+        }
+        if (!manualMeta.googleFeedbackCollection) {
+          return NextResponse.json(
+            { message: "Please select Google feedback collection status." },
+            { status: 400 },
+          );
+        }
+      }
+
+      if (backofficeManual) {
+        await conn.execute(
+          `UPDATE service_records
+           SET installation_report = ?,
+               status = 'COMPLETED',
+               completed_date = ?,
+               installation_completion_date = ?,
+               completed_by_service_engineer = ?,
+               google_feedback_collection = ?
+           WHERE service_id = ?`,
+          [
+            fileName,
+            manualMeta.installationCompletionDate,
+            manualMeta.installationCompletionDate,
+            manualMeta.completedByServiceEngineer,
+            manualMeta.googleFeedbackCollection,
+            serviceId,
+          ],
+        );
+      } else {
+        await conn.execute(
+          `UPDATE service_records
+           SET installation_report = ?,
+               status = 'COMPLETED',
+               completed_date = COALESCE(completed_date, CURDATE())
+           WHERE service_id = ?`,
+          [fileName, serviceId],
+        );
+      }
       await conn.execute(`INSERT IGNORE INTO service_reports (service_id) VALUES (?)`, [serviceId]);
     } else if (action === "work_start") {
       await conn.execute(
@@ -326,7 +392,12 @@ export async function POST(request, context) {
 
     const row = await loadService(conn, serviceId);
     const product = await loadWarrantyProductForSerial(conn, row?.serial_number);
-    return NextResponse.json(payloadFromRow(row, product));
+    return NextResponse.json({
+      ...payloadFromRow(row, product),
+      viewer: {
+        role: String(session.role ?? session.userRole ?? "").trim().toUpperCase(),
+      },
+    });
   } catch (error) {
     console.error("[service-report-steps POST]", error);
     return NextResponse.json({ message: "Could not save this step." }, { status: 500 });
