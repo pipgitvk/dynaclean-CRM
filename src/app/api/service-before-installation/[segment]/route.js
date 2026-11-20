@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { assertSuperAdminApiAccess } from "@/lib/serviceBeforeInstallationAccess";
 import { isServiceBeforeInstallationSegment } from "@/lib/serviceBeforeInstallationHub";
-import { parseSbiFilters } from "@/lib/serviceBeforeInstallationFilters";
+import { parseSbiFiltersFromSearchParams } from "@/lib/serviceBeforeInstallationFilters";
 import { getDbConnection } from "@/lib/db";
 import {
   countOpenInstallationSegment,
@@ -25,35 +25,9 @@ export async function GET(request, { params }) {
     const { searchParams } = new URL(request.url);
     const limit = Math.min(parseInt(searchParams.get("limit") || "50", 10) || 50, 200);
     const skip = parseInt(searchParams.get("skip") || "0", 10) || 0;
-    const filters = parseSbiFilters({
-      search: searchParams.get("search"),
-      q: searchParams.get("q"),
-      model: searchParams.get("model"),
-      state: searchParams.get("state"),
-      serial: searchParams.get("serial"),
-      from: searchParams.get("from"),
-      to: searchParams.get("to"),
-      itemType: searchParams.get("itemType") ?? searchParams.get("item_type"),
-      assignedTo: searchParams.get("assignedTo") ?? searchParams.get("assigned_to"),
-      serviceStatus: searchParams.get("serviceStatus") ?? searchParams.get("service_status"),
-      salesPerson: searchParams.get("salesPerson") ?? searchParams.get("sales_person"),
-      serviceEngineer: searchParams.get("serviceEngineer") ?? searchParams.get("service_engineer"),
-      thirdPartyEngineer:
-        searchParams.get("thirdPartyEngineer") ?? searchParams.get("third_party_engineer"),
-      registeredInstallation:
-        searchParams.get("registeredInstallation") ?? searchParams.get("registered_installation"),
-      openInstallationBucket:
-        searchParams.get("openInstallationBucket") ?? searchParams.get("open_installation_bucket"),
-      warrantyRegistration:
-        searchParams.get("warrantyRegistration") ??
-        searchParams.get("warranty_registration") ??
-        searchParams.get("registration"),
-      orderDeliveryStatus:
-        searchParams.get("orderDeliveryStatus") ?? searchParams.get("order_delivery_status"),
-      assignedBy: searchParams.get("assignedBy") ?? searchParams.get("assigned_by"),
-      registeredBy: searchParams.get("registeredBy") ?? searchParams.get("registered_by"),
-    });
+    const filters = parseSbiFiltersFromSearchParams(searchParams);
 
+    // Prefer /api/service-before-installation/filters — kept for backwards compatibility.
     const filterOptionsOnly =
       String(searchParams.get("filterOptionsOnly") || "").trim() === "1";
     // Default off — full distinct filter-option scans were saturating the DB pool.

@@ -1265,46 +1265,116 @@ const OPEN_FILTER_OPTIONS_CACHE = new Map();
 const OPEN_FILTER_OPTIONS_TTL_MS = 2 * 60 * 1000;
 const OPEN_FILTER_OPTIONS_NAME_LIMIT = 250;
 
+function mapDistinctNameRows(rows) {
+  return (rows || []).map((r) => String(r.name || "").trim()).filter(Boolean);
+}
+
+/**
+ * Fast filter dropdown options — base tables only, sequential queries.
+ * Avoids the full open-installation join (5× parallel) that starved the DB pool.
+ */
 async function fetchOpenInstallationFilterOptions(conn, filters = {}) {
-  const parsed = parseSbiFilters(filters);
-  const withProducts =
-    parsed.itemType === "" || parsed.itemType === "all"
-      ? { ...filters, itemType: "products" }
-      : filters;
-  const inner = buildOpenInstallationInnerQuery(withProducts, { forList: true });
-  const listFilter = buildUpcomingInstallationListFilterSql(withProducts, {
-    omitOpenInstallationBucket: true,
-    omitTeamFilters: true,
-  });
-  const where = `WHERE 1=1 ${listFilter.sql}`;
-  const params = listFilter.params;
+  const f = parseSbiFilters(filters);
   const limit = OPEN_FILTER_OPTIONS_NAME_LIMIT;
 
-  const distinctSql = (column) =>
-    `SELECT DISTINCT ${sqlUtf8TrimExpr(column)} AS name
-     FROM (${inner}) u
-     ${where}
-       AND ${sqlUtf8HasText(column)}
-     ORDER BY name ASC
-     LIMIT ${limit}`;
+  let orderDateSql = "";
+  const orderParams = [];
+  if (f.from) {
+    orderDateSql += ` AND DATE(no.delivery_date) >= ?`;
+    orderParams.push(f.from);
+  }
+  if (f.to) {
+    orderDateSql += ` AND DATE(no.delivery_date) <= ?`;
+    orderParams.push(f.to);
+  }
+  if (f.state) {
+    orderDateSql += ` AND no.state LIKE ?`;
+    orderParams.push(`%${f.state}%`);
+  }
 
-  const [salesRows, serviceEngineers, thirdPartyEngineers, assignedByRows, registeredByRows] =
-    await Promise.all([
-      conn.execute(distinctSql("u.order_sales_person"), params).then(([rows]) => rows),
-      conn.execute(distinctSql("u.service_engineer"), params).then(([rows]) => rows),
-      conn.execute(distinctSql("u.third_party_engineer"), params).then(([rows]) => rows),
-      conn.execute(distinctSql("u.assigned_by"), params).then(([rows]) => rows),
-      conn.execute(distinctSql("u.registered_by"), params).then(([rows]) => rows),
-    ]);
+  const orderBase = `
+    (no.is_cancelled = 0 OR no.is_cancelled IS NULL)
+    AND (no.is_returned = 0 OR no.is_returned = 2 OR no.is_returned IS NULL)
+    AND no.delivery_date IS NOT NULL
+    ${orderDateSql}
+  `;
+
+  // Sequential on purpose — keep pool usage to 1 connection for this request.
+  const [salesRows] = await conn.execute(
+    `SELECT DISTINCT ${sqlUtf8TrimExpr("no.created_by")} AS name
+     FROM neworder no
+     WHERE ${orderBase}
+       AND ${sqlUtf8HasText("no.created_by")}
+     ORDER BY name ASC
+     LIMIT ${limit}`,
+    orderParams,
+  );
+
+  const [assignedByRows] = await conn.execute(
+    `SELECT DISTINCT name FROM (
+       SELECT ${sqlUtf8TrimExpr("no.booking_by")} AS name
+       FROM neworder no
+       WHERE ${orderBase} AND ${sqlUtf8HasText("no.booking_by")}
+       UNION
+       SELECT ${sqlUtf8TrimExpr("no.dispatch_person")} AS name
+       FROM neworder no
+       WHERE ${orderBase} AND ${sqlUtf8HasText("no.dispatch_person")}
+     ) assigned_union
+     WHERE CHAR_LENGTH(name) > 0
+     ORDER BY name ASC
+     LIMIT ${limit}`,
+    [...orderParams, ...orderParams],
+  );
+
+  let wpDateSql = "";
+  const wpParams = [];
+  if (f.from) {
+    wpDateSql += ` AND DATE(wp.created_at) >= ?`;
+    wpParams.push(f.from);
+  }
+  if (f.to) {
+    wpDateSql += ` AND DATE(wp.created_at) <= ?`;
+    wpParams.push(f.to);
+  }
+
+  const [registeredByRows] = await conn.execute(
+    `SELECT DISTINCT ${sqlUtf8TrimExpr("wp.created_by")} AS name
+     FROM warranty_products wp
+     WHERE ${sqlUtf8HasText("wp.created_by")}
+       ${wpDateSql}
+     ORDER BY name ASC
+     LIMIT ${limit}`,
+    wpParams,
+  );
+
+  const [serviceEngineerRows] = await conn.execute(
+    `SELECT DISTINCT ${sqlUtf8TrimExpr("sr.assigned_to")} AS name
+     FROM service_records sr
+     WHERE UPPER(TRIM(COALESCE(sr.service_type, ''))) = 'INSTALLATION'
+       AND ${INSTALLATION_SR_ASSIGNED_OK}
+       AND LOWER(TRIM(COALESCE(sr.assigned_to_type, 'internal'))) <> 'third_party'
+       AND ${sqlUtf8HasText("sr.assigned_to")}
+     ORDER BY name ASC
+     LIMIT ${limit}`,
+  );
+
+  const [thirdPartyEngineerRows] = await conn.execute(
+    `SELECT DISTINCT ${sqlUtf8TrimExpr("sr.assigned_to")} AS name
+     FROM service_records sr
+     WHERE UPPER(TRIM(COALESCE(sr.service_type, ''))) = 'INSTALLATION'
+       AND ${INSTALLATION_SR_ASSIGNED_OK}
+       AND LOWER(TRIM(COALESCE(sr.assigned_to_type, ''))) = 'third_party'
+       AND ${sqlUtf8HasText("sr.assigned_to")}
+     ORDER BY name ASC
+     LIMIT ${limit}`,
+  );
 
   return {
-    salesPersons: salesRows.map((r) => String(r.name || "").trim()).filter(Boolean),
-    serviceEngineers: serviceEngineers.map((r) => String(r.name || "").trim()).filter(Boolean),
-    thirdPartyEngineers: thirdPartyEngineers
-      .map((r) => String(r.name || "").trim())
-      .filter(Boolean),
-    assignedBys: assignedByRows.map((r) => String(r.name || "").trim()).filter(Boolean),
-    registeredBys: registeredByRows.map((r) => String(r.name || "").trim()).filter(Boolean),
+    salesPersons: mapDistinctNameRows(salesRows),
+    serviceEngineers: mapDistinctNameRows(serviceEngineerRows),
+    thirdPartyEngineers: mapDistinctNameRows(thirdPartyEngineerRows),
+    assignedBys: mapDistinctNameRows(assignedByRows),
+    registeredBys: mapDistinctNameRows(registeredByRows),
   };
 }
 

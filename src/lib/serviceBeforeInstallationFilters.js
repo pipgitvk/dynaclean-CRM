@@ -107,6 +107,38 @@ export function parseSbiFilters(input) {
   };
 }
 
+/** Parse SBI filters from URLSearchParams (API routes). */
+export function parseSbiFiltersFromSearchParams(searchParams) {
+  return parseSbiFilters({
+    search: searchParams.get("search"),
+    q: searchParams.get("q"),
+    model: searchParams.get("model"),
+    state: searchParams.get("state"),
+    serial: searchParams.get("serial"),
+    from: searchParams.get("from"),
+    to: searchParams.get("to"),
+    itemType: searchParams.get("itemType") ?? searchParams.get("item_type"),
+    assignedTo: searchParams.get("assignedTo") ?? searchParams.get("assigned_to"),
+    serviceStatus: searchParams.get("serviceStatus") ?? searchParams.get("service_status"),
+    salesPerson: searchParams.get("salesPerson") ?? searchParams.get("sales_person"),
+    serviceEngineer: searchParams.get("serviceEngineer") ?? searchParams.get("service_engineer"),
+    thirdPartyEngineer:
+      searchParams.get("thirdPartyEngineer") ?? searchParams.get("third_party_engineer"),
+    registeredInstallation:
+      searchParams.get("registeredInstallation") ?? searchParams.get("registered_installation"),
+    openInstallationBucket:
+      searchParams.get("openInstallationBucket") ?? searchParams.get("open_installation_bucket"),
+    warrantyRegistration:
+      searchParams.get("warrantyRegistration") ??
+      searchParams.get("warranty_registration") ??
+      searchParams.get("registration"),
+    orderDeliveryStatus:
+      searchParams.get("orderDeliveryStatus") ?? searchParams.get("order_delivery_status"),
+    assignedBy: searchParams.get("assignedBy") ?? searchParams.get("assigned_by"),
+    registeredBy: searchParams.get("registeredBy") ?? searchParams.get("registered_by"),
+  });
+}
+
 function normalizeOrderDeliveryStatus(raw) {
   const v = String(raw ?? "")
     .trim()

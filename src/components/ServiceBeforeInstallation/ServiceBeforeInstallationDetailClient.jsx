@@ -1434,11 +1434,13 @@ export default function ServiceBeforeInstallationDetailClient({
     if (tableFilterOptionsFetchKeyRef.current === key) return;
     tableFilterOptionsFetchKeyRef.current = key;
     try {
-      const res = await axios.get(`/api/service-before-installation/${segment}`, {
+      // Dedicated filters API — never shares the list/KPI route or blocks row loads.
+      const res = await axios.get("/api/service-before-installation/filters", {
         params: {
+          segment,
           ...appliedFilters,
-          filterOptionsOnly: "1",
         },
+        timeout: 15_000,
       });
       if (res.data?.success && res.data.filterOptions) {
         setTableFilterOptions(res.data.filterOptions);
