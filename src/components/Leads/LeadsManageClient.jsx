@@ -34,6 +34,7 @@ import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { getCurrentMonthThroughTodayIso } from "@/lib/crmDateFormat";
 import { getLeadsManageCards } from "@/lib/leadsManageHub";
 import { LEADS_HUB_RANGE_OPTIONS } from "@/lib/leadsManageHubRange";
+import LeadsManageMetaCredentialCards from "@/components/Leads/LeadsManageMetaCredentialCards";
 
 const CARD_ICONS = {
   social_media: Megaphone,
@@ -370,6 +371,7 @@ export default function LeadsManageClient({
               rangeLabel={rangeLabel}
               loading={loading}
             />
+            <LeadsManageMetaCredentialCards dashboardBase={dashboardBase} />
           </CardPanel>
           <CardPanel className="xl:col-span-5">
             <LeadsSourcePie pieData={pieData} pieTotal={pieTotal} loading={loading} />

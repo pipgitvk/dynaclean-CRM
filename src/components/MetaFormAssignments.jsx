@@ -5,7 +5,10 @@ import axios from 'axios';
 import toast from 'react-hot-toast';
 import { Plus, Trash2, Users } from 'lucide-react';
 
-export default function MetaFormAssignments({ formIds, employees, embedded = false }) {
+export default function MetaFormAssignments({ formIds, employees, embedded = false, appearance = 'default' }) {
+  const isHub = appearance === 'hub';
+  const accentText = isHub ? 'text-violet-600' : 'text-blue-600';
+  const btnPrimary = isHub ? 'bg-violet-600 hover:bg-violet-700' : 'bg-blue-600 hover:bg-blue-700';
   const [assignments, setAssignments] = useState({});
   const [loading, setLoading] = useState(false);
   const [savingUsernames, setSavingUsernames] = useState({});
@@ -99,16 +102,16 @@ export default function MetaFormAssignments({ formIds, employees, embedded = fal
   return (
     <div className={embedded ? "" : "mt-6 border-t pt-6"}>
       <div className="flex items-center gap-2 mb-4">
-        <Users className="w-5 h-5 text-blue-600" />
-        <h3 className="text-lg font-semibold text-gray-900">Form-Specific Lead Distribution</h3>
+        <Users className={`w-5 h-5 ${accentText}`} />
+        <h3 className={`text-lg font-semibold ${isHub ? 'text-slate-900' : 'text-gray-900'}`}>Form-Specific Lead Distribution</h3>
       </div>
-      <p className="text-sm text-gray-600 mb-4">
+      <p className={`text-sm mb-4 ${isHub ? 'text-slate-600' : 'text-gray-600'}`}>
         Assign specific employees to each form with custom priorities. This overrides general lead distribution.
       </p>
 
       {formIds.map((formId, index) => (
-        <div key={formId} className="mb-4 border rounded-lg overflow-hidden">
-          <div className="px-3 sm:px-4 py-3 bg-gray-50 border-b">
+        <div key={formId} className={`mb-4 border rounded-lg overflow-hidden ${isHub ? 'border-slate-200' : ''}`}>
+          <div className={`px-3 sm:px-4 py-3 border-b ${isHub ? 'bg-violet-50/50 border-slate-200' : 'bg-gray-50'}`}>
             <span className="font-medium text-gray-900 text-sm">Form ID {index + 1}</span>
             <span className="block sm:inline sm:ml-2 mt-1 sm:mt-0 text-xs sm:text-sm text-gray-600 font-mono break-all">{formId}</span>
           </div>
@@ -169,7 +172,7 @@ export default function MetaFormAssignments({ formIds, employees, embedded = fal
                       maxLeadsInput.value = '';
                     }
                   }}
-                  className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 flex items-center justify-center gap-1"
+                  className={`w-full sm:w-auto px-4 py-2 text-white rounded text-sm flex items-center justify-center gap-1 ${btnPrimary}`}
                   disabled={savingUsernames[`${formId}-new`]}
                 >
                   <Plus className="w-4 h-4" />

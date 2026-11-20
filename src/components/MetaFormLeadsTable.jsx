@@ -1,7 +1,7 @@
 'use client';
 
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
-import { getCurrentMonthRangeIso } from "@/lib/crmDateFormat";
+import { resolveLeadsHubRange } from "@/lib/leadsManageHubRange";
 import { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import { Loader2, User, Calendar, CheckCircle, XCircle, Filter, X, ChevronLeft, ChevronRight, Tag } from 'lucide-react';
@@ -19,14 +19,18 @@ function ProductInterestBadge({ value, className = '' }) {
   );
 }
 
-export default function MetaFormLeadsTable({ formIds, productInterestByFormId = {} }) {
-  const monthDefault = useMemo(() => getCurrentMonthRangeIso(), []);
+export default function MetaFormLeadsTable({ formIds, productInterestByFormId = {}, appearance = 'default' }) {
+  const isHub = appearance === 'hub';
+  const accentText = isHub ? 'text-violet-600' : 'text-blue-600';
+  const focusRing = isHub ? 'focus:ring-violet-500' : 'focus:ring-blue-500';
+  const badgeLead = isHub ? 'bg-violet-100 text-violet-800' : 'bg-blue-100 text-blue-700';
+  const todayDefault = useMemo(() => resolveLeadsHubRange("today"), []);
   const [leadsData, setLeadsData] = useState({});
   const [leadCounts, setLeadCounts] = useState({});
   const [loading, setLoading] = useState({});
   const [importFilter, setImportFilter] = useState('all');
-  const [startDate, setStartDate] = useState(monthDefault.from);
-  const [endDate, setEndDate] = useState(monthDefault.to);
+  const [startDate, setStartDate] = useState(todayDefault.from);
+  const [endDate, setEndDate] = useState(todayDefault.to);
   const [pagination, setPagination] = useState({});
   const [currentPage, setCurrentPage] = useState(0);
 
@@ -131,8 +135,9 @@ export default function MetaFormLeadsTable({ formIds, productInterestByFormId = 
 
   const clearFilters = () => {
     setImportFilter('all');
-    setStartDate(monthDefault.from);
-    setEndDate(monthDefault.to);
+    const today = resolveLeadsHubRange("today");
+    setStartDate(today.from);
+    setEndDate(today.to);
     setCurrentPage(0);
   };
 
@@ -179,17 +184,17 @@ export default function MetaFormLeadsTable({ formIds, productInterestByFormId = 
   }
 
   return (
-    <div className="mt-6 border-t pt-6">
+    <div className={isHub ? '' : 'mt-6 border-t pt-6'}>
       <div className="flex items-center gap-2 mb-4">
-        <User className="w-5 h-5 text-blue-600" />
-        <h3 className="text-lg font-semibold text-gray-900">Form Leads</h3>
+        <User className={`w-5 h-5 ${accentText}`} />
+        <h3 className={`text-lg font-semibold ${isHub ? 'text-slate-900' : 'text-gray-900'}`}>Form Leads</h3>
       </div>
-      <p className="text-sm text-gray-600 mb-4">
+      <p className={`text-sm mb-4 ${isHub ? 'text-slate-600' : 'text-gray-600'}`}>
         View all leads received from each form and their assigned employees.
       </p>
 
       {/* Filters Section */}
-      <div className="bg-gray-50 rounded-lg p-4 mb-4">
+      <div className={`rounded-lg p-4 mb-4 ${isHub ? 'bg-violet-50/40 border border-violet-100' : 'bg-gray-50'}`}>
         <div className="flex items-center gap-2 mb-3">
           <Filter className="w-4 h-4 text-gray-600" />
           <span className="font-medium text-gray-900">Filters</span>
@@ -200,7 +205,7 @@ export default function MetaFormLeadsTable({ formIds, productInterestByFormId = 
             <select
               value={importFilter}
               onChange={(e) => setImportFilter(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 ${focusRing}`}
             >
               <option value="all">All</option>
               <option value="imported">Imported</option>
@@ -209,11 +214,11 @@ export default function MetaFormLeadsTable({ formIds, productInterestByFormId = 
           </div>
           <div className="flex flex-col min-w-0">
             <label className="text-xs font-medium text-gray-600 mb-1">Start Date</label>
-            <TypeableDateFilterInput value={startDate} onChange={setStartDate} className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+            <TypeableDateFilterInput value={startDate} onChange={setStartDate} className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 ${focusRing}`}/>
           </div>
           <div className="flex flex-col min-w-0">
             <label className="text-xs font-medium text-gray-600 mb-1">End Date</label>
-            <TypeableDateFilterInput value={endDate} onChange={setEndDate} className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+            <TypeableDateFilterInput value={endDate} onChange={setEndDate} className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 ${focusRing}`}/>
           </div>
           <button
             onClick={clearFilters}
@@ -238,13 +243,13 @@ export default function MetaFormLeadsTable({ formIds, productInterestByFormId = 
         const counts = leadCounts[formId];
 
         return (
-          <div key={formId} className="mb-4 border rounded-lg overflow-hidden">
-            <div className="px-3 sm:px-4 py-3 bg-gray-50 border-b flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+          <div key={formId} className={`mb-4 border rounded-lg overflow-hidden ${isHub ? 'border-slate-200' : ''}`}>
+            <div className={`px-3 sm:px-4 py-3 border-b flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 ${isHub ? 'bg-violet-50/40' : 'bg-gray-50'}`}>
               <div className="flex flex-col gap-2 min-w-0 w-full">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-medium text-gray-900 text-sm">Form ID</span>
                   <span className="text-xs sm:text-sm text-gray-600 font-mono break-all">{formId}</span>
-                  <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full shrink-0">
+                  <span className={`text-xs px-2 py-1 rounded-full shrink-0 ${badgeLead}`}>
                     {pagination[formId]?.total ?? leads.length} leads
                   </span>
                   {counts && (
@@ -265,14 +270,14 @@ export default function MetaFormLeadsTable({ formIds, productInterestByFormId = 
                 )}
               </div>
               <div className="flex items-center gap-2 shrink-0">
-                {isLoading && <Loader2 className="w-4 h-4 animate-spin text-blue-600" />}
+                {isLoading && <Loader2 className={`w-4 h-4 animate-spin ${accentText}`} />}
               </div>
             </div>
 
             <div className="p-3 sm:p-4 bg-white">
                 {isLoading ? (
                   <div className="flex items-center justify-center py-8">
-                    <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+                    <Loader2 className={`w-6 h-6 animate-spin ${accentText}`} />
                   </div>
                 ) : leads.length === 0 ? (
                   <div className="text-center py-8 text-gray-500">

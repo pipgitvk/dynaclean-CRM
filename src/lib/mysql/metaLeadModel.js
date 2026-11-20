@@ -187,6 +187,52 @@ async function getAllLeads(filters = {}) {
   }));
 }
 
+function appendMetaLeadFormFilter(sql, values, filters, columnPrefix = '') {
+  const col = `${columnPrefix}form_id`;
+  const ids = Array.isArray(filters.formIds)
+    ? filters.formIds.map((id) => String(id || '').trim()).filter(Boolean)
+    : filters.formId
+      ? [String(filters.formId).trim()].filter(Boolean)
+      : [];
+  if (ids.length === 1) {
+    sql += ` AND ${col} = ?`;
+    values.push(ids[0]);
+  } else if (ids.length > 1) {
+    sql += ` AND ${col} IN (${ids.map(() => '?').join(',')})`;
+    values.push(...ids);
+  }
+  return sql;
+}
+
+async function countLeadsStatsForFormIds(formIds, { startDate, endDate } = {}) {
+  const ids = [
+    ...new Set(
+      (Array.isArray(formIds) ? formIds : [])
+        .map((id) => String(id || '').trim())
+        .filter(Boolean),
+    ),
+  ];
+  if (!ids.length) {
+    return { total: 0, distributed: 0, duplicate: 0 };
+  }
+  const base = {
+    formIds: ids,
+    startDate,
+    endDate,
+    unique: true,
+  };
+  const [total, distributed, duplicate] = await Promise.all([
+    countLeads(base),
+    countLeads({ ...base, isImported: true }),
+    countLeads({ ...base, isImported: false }),
+  ]);
+  return {
+    total: Number(total) || 0,
+    distributed: Number(distributed) || 0,
+    duplicate: Number(duplicate) || 0,
+  };
+}
+
 async function countLeads(filters = {}) {
   const conn = await getDbConnection();
   const useUnique = filters.unique !== false;
@@ -204,10 +250,7 @@ async function countLeads(filters = {}) {
       query += ' AND assigned_to = ?';
       values.push(filters.assignedTo);
     }
-    if (filters.formId) {
-      query += ' AND form_id = ?';
-      values.push(filters.formId);
-    }
+    query = appendMetaLeadFormFilter(query, values, filters);
     if (filters.isImported !== undefined) {
       query += ' AND is_imported_to_crm = ?';
       values.push(filters.isImported ? 1 : 0);
@@ -231,10 +274,7 @@ async function countLeads(filters = {}) {
       where += ' AND assigned_to = ?';
       values.push(filters.assignedTo);
     }
-    if (filters.formId) {
-      where += ' AND form_id = ?';
-      values.push(filters.formId);
-    }
+    where = appendMetaLeadFormFilter(where, values, filters);
     if (filters.isImported !== undefined) {
       where += ' AND is_imported_to_crm = ?';
       values.push(filters.isImported ? 1 : 0);
@@ -362,6 +402,7 @@ module.exports = {
   getLeadByLeadgenId,
   markLeadAsImported,
   countLeads,
+  countLeadsStatsForFormIds,
   countLeadsByCredentialId,
   getLatestProductInterestMap,
   pickLatestProductInterest
