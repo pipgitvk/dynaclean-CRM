@@ -63,6 +63,7 @@ function openInstallationNeedsFullListShape(filters) {
       f.salesPerson ||
       f.serviceEngineer ||
       f.thirdPartyEngineer ||
+      // instCompletedBy uses quote-key prefilter + neworder fast path (not full join).
       f.warrantyRegistration ||
       f.orderDeliveryStatus ||
       f.assignedBy ||
@@ -241,6 +242,7 @@ function openInstallationKpiCacheKey(filters, overdueDelayedOnly) {
     salesPerson: f.salesPerson,
     serviceEngineer: f.serviceEngineer,
     thirdPartyEngineer: f.thirdPartyEngineer,
+    instCompletedBy: f.instCompletedBy,
     assignedBy: f.assignedBy,
     registeredBy: f.registeredBy,
   });
@@ -271,11 +273,22 @@ async function fetchOpenInstallationBreakdownLite(
     params.push(f.to);
   }
 
+  let quoteSql = "";
+  if (f.instCompletedBy) {
+    const quoteKeys = await resolveInstCompletedByQuoteKeys(conn, f.instCompletedBy);
+    if (!quoteKeys.length) {
+      return parseOpenInstallationBreakdownRow(null);
+    }
+    quoteSql = ` AND ${sqlUtf8TrimExpr("no.quote_number")} IN (${quoteKeys.map(() => "?").join(",")})`;
+    params.push(...quoteKeys);
+  }
+
   const baseOrderSql = `
     (no.is_cancelled = 0 OR no.is_cancelled IS NULL)
     AND (no.is_returned = 0 OR no.is_returned = 2 OR no.is_returned IS NULL)
     ${dateSql}
     ${overdueSql}
+    ${quoteSql}
   `;
 
   const deliveredOnSql = `(
@@ -284,8 +297,7 @@ async function fetchOpenInstallationBreakdownLite(
     AND DATE(no.delivered_on) > '1970-01-01'
   )`;
 
-  // One cheap scan of neworder — never put service_records EXISTS in this SUM
-  // (that re-scanned every order and timed out the pool).
+  // One cheap scan of neworder — never put correlated service_records EXISTS in this SUM.
   const [[row]] = await conn.execute(
     `SELECT
        SUM(CASE WHEN COALESCE(no.installation_status, 0) = 0 THEN 1 ELSE 0 END) AS total,
@@ -352,6 +364,105 @@ const DELIVERED_ON_SQL = `(
   AND TRIM(CAST(no.delivered_on AS CHAR)) NOT IN ('', '0000-00-00', '0000-00-00 00:00:00')
   AND DATE(no.delivered_on) > '1970-01-01'
 )`;
+
+/**
+ * Quotes where this user appears as installation assignee / completed-by / report engineer.
+ * Start from service_records (selective) — avoids full open-installation join for table load.
+ */
+async function resolveInstCompletedByQuoteKeys(conn, name) {
+  const who = String(name || "").trim();
+  if (!who) return [];
+
+  const [rows] = await conn.execute(
+    `SELECT DISTINCT ${sqlUtf8TrimExpr("d.quote_number")} AS quote_key
+     FROM service_records sr
+     INNER JOIN dispatch d
+       ON ${sqlTrimUtf8EqColumns("d.serial_no", "sr.serial_number")}
+     WHERE UPPER(TRIM(COALESCE(sr.service_type, ''))) = 'INSTALLATION'
+       AND d.quote_number IS NOT NULL
+       AND ${sqlUtf8TrimExpr("d.quote_number")} <> ''
+       AND (
+         TRIM(COALESCE(sr.assigned_to, '')) = TRIM(?)
+         OR TRIM(COALESCE(sr.completed_by_service_engineer, '')) = TRIM(?)
+         OR EXISTS (
+           SELECT 1
+           FROM installation_reports ir
+           WHERE ir.service_id = sr.service_id
+             AND TRIM(COALESCE(ir.authorized_person_name, '')) = TRIM(?)
+         )
+       )
+     LIMIT 5000`,
+    [who, who, who],
+  );
+
+  return [...new Set((rows || []).map((r) => String(r.quote_key || "").trim()).filter(Boolean))];
+}
+
+function appendNeworderQuoteKeyInSql(whereSql, whereParams, quoteKeys) {
+  if (!quoteKeys?.length) {
+    return { sql: `${whereSql} AND 1=0`, params: whereParams };
+  }
+  const placeholders = quoteKeys.map(() => "?").join(",");
+  return {
+    sql: `${whereSql} AND ${sqlUtf8TrimExpr("no.quote_number")} IN (${placeholders})`,
+    params: [...whereParams, ...quoteKeys],
+  };
+}
+
+async function buildOpenInstallationNeworderWhereWithInstCompletedBy(
+  conn,
+  filters,
+  { overdueDelayedOnly = false } = {},
+) {
+  const base = buildOpenInstallationNeworderWhereSql(filters, { overdueDelayedOnly });
+  const who = parseSbiFilters(filters).instCompletedBy;
+  if (!who) return { ...base, quoteKeys: null };
+
+  const quoteKeys = await resolveInstCompletedByQuoteKeys(conn, who);
+  const withQuotes = appendNeworderQuoteKeyInSql(base.sql, base.params, quoteKeys);
+  return { ...withQuotes, quoteKeys };
+}
+
+/** Same latest registration creator as list column u.registered_by / enrich GROUP_CONCAT. */
+function sqlOpenInstallationQuoteLatestRegisteredByEquals(quoteNoColumn) {
+  return `EXISTS (
+    SELECT 1
+    FROM dispatch d_reg
+    LEFT JOIN warranty_products wp_reg
+      ON ${sqlTrimUtf8EqColumns("wp_reg.serial_number", "d_reg.serial_no")}
+    WHERE ${sqlTrimUtf8EqColumns("d_reg.quote_number", quoteNoColumn)}
+      AND d_reg.serial_no IS NOT NULL
+      AND ${sqlUtf8TrimExpr("d_reg.serial_no")} <> ''
+    GROUP BY ${sqlUtf8TrimExpr("d_reg.quote_number")}
+    HAVING TRIM(
+      NULLIF(
+        SUBSTRING_INDEX(
+          SUBSTRING_INDEX(
+            GROUP_CONCAT(
+              CASE
+                WHEN wp_reg.serial_number IS NOT NULL
+                THEN CONCAT(
+                  LPAD(wp_reg.id, 20, '0'),
+                  '||',
+                  DATE_FORMAT(COALESCE(wp_reg.created_at, wp_reg.invoice_date), '%Y-%m-%d'),
+                  '||',
+                  TRIM(COALESCE(wp_reg.created_by, ''))
+                )
+              END
+              ORDER BY wp_reg.id DESC
+              SEPARATOR ','
+            ),
+            ',',
+            1
+          ),
+          '||',
+          -1
+        ),
+        ''
+      )
+    ) = TRIM(?)
+  )`;
+}
 
 /**
  * Ultra-fast neworder WHERE for open-installation buckets.
@@ -422,16 +533,12 @@ function buildOpenInstallationNeworderWhereSql(filters, { overdueDelayedOnly = f
     params.push(f.salesPerson);
   }
   if (f.assignedBy) {
-    sql += ` AND EXISTS (
-      SELECT 1
-      FROM dispatch d_ab
-      INNER JOIN service_records sr_ab
-        ON ${sqlTrimUtf8EqColumns("sr_ab.serial_number", "d_ab.serial_no")}
-      WHERE ${sqlTrimUtf8EqColumns("d_ab.quote_number", "no.quote_number")}
-        AND UPPER(TRIM(COALESCE(sr_ab.service_type, ''))) = 'INSTALLATION'
-        AND TRIM(sr_ab.engineer_assigned_by) = TRIM(?)
-    )`;
+    sql += ` AND ${sqlOpenInstallationQuoteLatestRegisteredByEquals("no.quote_number")}`;
     params.push(f.assignedBy);
+  }
+  if (f.registeredBy) {
+    sql += ` AND ${sqlOpenInstallationQuoteLatestRegisteredByEquals("no.quote_number")}`;
+    params.push(f.registeredBy);
   }
   return { sql, params };
 }
@@ -550,7 +657,9 @@ async function fetchOpenInstallationNeworderPage(
   skip,
   { skipTotal = true, overdueDelayedOnly = false } = {},
 ) {
-  const where = buildOpenInstallationNeworderWhereSql(filters, { overdueDelayedOnly });
+  const where = await buildOpenInstallationNeworderWhereWithInstCompletedBy(conn, filters, {
+    overdueDelayedOnly,
+  });
 
   const [rows] = await conn.execute(
     `SELECT
@@ -633,7 +742,9 @@ async function countDeliveryStatusPending(conn, filters) {
 }
 
 async function countOpenInstallationNeworder(conn, filters, { overdueDelayedOnly = false } = {}) {
-  const where = buildOpenInstallationNeworderWhereSql(filters, { overdueDelayedOnly });
+  const where = await buildOpenInstallationNeworderWhereWithInstCompletedBy(conn, filters, {
+    overdueDelayedOnly,
+  });
   const [[row]] = await conn.execute(
     `SELECT COUNT(*) AS cnt FROM neworder no ${where.sql}`,
     where.params,
@@ -645,9 +756,11 @@ async function countOpenInstallationNeworder(conn, filters, { overdueDelayedOnly
 export async function countOpenInstallationSegment(segment, filters = {}) {
   const conn = await getDbConnection();
   if (segment === "open-installation" || segment === "overdue-delayed-installation") {
-    return countOpenInstallationNeworder(conn, filters, {
-      overdueDelayedOnly: segment === "overdue-delayed-installation",
-    });
+    const overdueDelayedOnly = segment === "overdue-delayed-installation";
+    if (openInstallationNeedsFullListShape(filters)) {
+      return countUpcomingInstallations(conn, filters, { overdueDelayedOnly });
+    }
+    return countOpenInstallationNeworder(conn, filters, { overdueDelayedOnly });
   }
   return 0;
 }
@@ -706,6 +819,7 @@ async function fetchUpcomingInstallationsPage(
   const parsed = parseSbiFilters(filters);
 
   // Default open-installation path: neworder page + tiny dispatch enrich (no full-table joins).
+  // instCompletedBy is handled inside neworder WHERE via quote-key prefilter (still fast).
   const useNeworderFastPath =
     !parsed.serviceStatus &&
     !parsed.serviceEngineer &&
@@ -1184,209 +1298,156 @@ function wpSegmentBaseFilterSql(segment) {
   return null;
 }
 
-const INSTALLATION_SR_ASSIGNED_OK = `UPPER(TRIM(COALESCE(sr.assigned_to, ''))) NOT IN ('', 'NOT ASSIGNED', 'UNASSIGNED')`;
-
 const WP_FILTER_OPTIONS_CACHE = new Map();
-const WP_FILTER_OPTIONS_TTL_MS = 2 * 60 * 1000;
-const WP_FILTER_OPTIONS_NAME_LIMIT = 250;
-
-/** Distinct sales / engineer names for warranty-product segments (JOIN-based, not per-row subqueries). */
-export async function fetchServiceBeforeInstallationWpFilterOptions(segment, filters = {}) {
-  const base = wpSegmentBaseFilterSql(segment);
-  if (!base) return null;
-
-  const cacheKey = JSON.stringify({ segment, f: parseSbiFilters(filters) });
-  const cached = WP_FILTER_OPTIONS_CACHE.get(cacheKey);
-  if (cached && Date.now() - cached.at < WP_FILTER_OPTIONS_TTL_MS) {
-    return cached.data;
-  }
-
-  const conn = await getDbConnection();
-  const wpFilter = buildWpFilterSql(filters, { omitTeamFilters: true });
-  const wpWhere = `${base} ${wpFilter.sql}`;
-  const baseParams = [...wpFilter.params];
-
-  const salesSql = `
-    SELECT DISTINCT sales_name AS name
-    FROM (
-      SELECT ${sqlUtf8TrimExpr("wp.created_by")} AS sales_name
-      FROM warranty_products wp
-      WHERE ${wpWhere}
-      UNION
-      SELECT ${sqlUtf8TrimExpr("no.created_by")} AS sales_name
-      FROM warranty_products wp
-      INNER JOIN dispatch d ON ${sqlTrimUtf8EqColumns("d.serial_no", "wp.serial_number")}
-      INNER JOIN neworder no ON ${sqlTrimUtf8EqColumns("no.quote_number", "d.quote_number")}
-      WHERE ${wpWhere} AND ${sqlUtf8HasText("no.created_by")}
-      UNION
-      SELECT ${sqlUtf8TrimExpr("no.created_by")} AS sales_name
-      FROM warranty_products wp
-      INNER JOIN neworder no ON ${sqlTrimUtf8EqColumns("no.invoice_number", "wp.invoice_number")}
-      WHERE ${wpWhere}
-        AND ${sqlUtf8HasText("wp.invoice_number")}
-        AND ${sqlUtf8HasText("no.created_by")}
-    ) AS sales_union
-    WHERE CHAR_LENGTH(sales_name) > 0
-    ORDER BY name ASC
-    LIMIT ${WP_FILTER_OPTIONS_NAME_LIMIT}`;
-
-  const salesParams = [...baseParams, ...baseParams, ...baseParams];
-
-  async function distinctRankedInstallationEngineers(engineerKind) {
-    const typeSql =
-      engineerKind === "third_party"
-        ? `AND LOWER(TRIM(COALESCE(sr.assigned_to_type, ''))) = 'third_party'`
-        : `AND LOWER(TRIM(COALESCE(sr.assigned_to_type, 'internal'))) <> 'third_party'`;
-
-    const [rows] = await conn.execute(
-      `SELECT DISTINCT ${sqlUtf8TrimExpr("assigned_to")} AS name
-       FROM (
-         SELECT sr.assigned_to,
-           ROW_NUMBER() OVER (
-             PARTITION BY wp.id
-             ORDER BY
-               CASE
-                 WHEN UPPER(TRIM(COALESCE(sr.status, ''))) IN ('COMPLETED', 'WORKED') THEN 0
-                 ELSE 1
-               END,
-               sr.service_id DESC
-           ) AS rn
-         FROM warranty_products wp
-         INNER JOIN service_records sr
-           ON ${sqlTrimUtf8EqColumns("sr.serial_number", "wp.serial_number")}
-         WHERE ${wpWhere}
-           AND UPPER(TRIM(COALESCE(sr.service_type, ''))) = 'INSTALLATION'
-           AND ${INSTALLATION_SR_ASSIGNED_OK}
-           ${typeSql}
-       ) ranked
-       WHERE rn = 1 AND ${sqlUtf8HasText("assigned_to")}
-       ORDER BY name ASC
-       LIMIT ${WP_FILTER_OPTIONS_NAME_LIMIT}`,
-      baseParams,
-    );
-    return rows.map((r) => String(r.name || "").trim()).filter(Boolean);
-  }
-
-  const [salesRows, serviceEngineers, thirdPartyEngineers] = await Promise.all([
-    conn.execute(salesSql, salesParams).then(([rows]) => rows),
-    distinctRankedInstallationEngineers("internal"),
-    distinctRankedInstallationEngineers("third_party"),
-  ]);
-
-  const salesPersons = salesRows.map((r) => String(r.name || "").trim()).filter(Boolean);
-
-  const data = { salesPersons, serviceEngineers, thirdPartyEngineers };
-  WP_FILTER_OPTIONS_CACHE.set(cacheKey, { at: Date.now(), data });
-  return data;
-}
-
 const OPEN_FILTER_OPTIONS_CACHE = new Map();
-const OPEN_FILTER_OPTIONS_TTL_MS = 2 * 60 * 1000;
-const OPEN_FILTER_OPTIONS_NAME_LIMIT = 250;
+const FILTER_OPTIONS_INFLIGHT = new Map();
+/** Name lists change rarely — long TTL + segment-only key keeps dropdown opens cheap. */
+const FILTER_OPTIONS_TTL_MS = 10 * 60 * 1000;
+const FILTER_OPTIONS_NAME_LIMIT = 250;
 
 function mapDistinctNameRows(rows) {
-  return (rows || []).map((r) => String(r.name || "").trim()).filter(Boolean);
+  const out = [];
+  const seen = new Set();
+  for (const r of rows || []) {
+    const name = String(r?.name || "").trim();
+    if (!name) continue;
+    const key = name.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(name);
+  }
+  out.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+  return out.slice(0, FILTER_OPTIONS_NAME_LIMIT);
+}
+
+function getCachedFilterOptions(cache, cacheKey) {
+  const cached = cache.get(cacheKey);
+  if (cached && Date.now() - cached.at < FILTER_OPTIONS_TTL_MS) {
+    return cached.data;
+  }
+  return null;
+}
+
+async function withFilterOptionsInflight(cacheKey, cache, loader) {
+  const hit = getCachedFilterOptions(cache, cacheKey);
+  if (hit) return hit;
+
+  const existing = FILTER_OPTIONS_INFLIGHT.get(cacheKey);
+  if (existing) return existing;
+
+  const promise = (async () => {
+    const data = await loader();
+    cache.set(cacheKey, { at: Date.now(), data });
+    return data;
+  })().finally(() => {
+    FILTER_OPTIONS_INFLIGHT.delete(cacheKey);
+  });
+
+  FILTER_OPTIONS_INFLIGHT.set(cacheKey, promise);
+  return promise;
 }
 
 /**
- * Fast filter dropdown options — base tables only, sequential queries.
- * Avoids the full open-installation join (5× parallel) that starved the DB pool.
+ * Lightweight name lists for warranty segments.
+ * Avoids wp⋈dispatch⋈neworder UNION and window-ranked joins (those timed out the pool).
  */
-async function fetchOpenInstallationFilterOptions(conn, filters = {}) {
-  const f = parseSbiFilters(filters);
-  const limit = OPEN_FILTER_OPTIONS_NAME_LIMIT;
+export async function fetchServiceBeforeInstallationWpFilterOptions(segment, _filters = {}) {
+  const base = wpSegmentBaseFilterSql(segment);
+  if (!base) return null;
 
-  let orderDateSql = "";
-  const orderParams = [];
-  if (f.from) {
-    orderDateSql += ` AND DATE(no.delivery_date) >= ?`;
-    orderParams.push(f.from);
-  }
-  if (f.to) {
-    orderDateSql += ` AND DATE(no.delivery_date) <= ?`;
-    orderParams.push(f.to);
-  }
-  if (f.state) {
-    orderDateSql += ` AND no.state LIKE ?`;
-    orderParams.push(`%${f.state}%`);
-  }
+  const cacheKey = `wp:${segment}`;
+  return withFilterOptionsInflight(cacheKey, WP_FILTER_OPTIONS_CACHE, async () => {
+    const conn = await getDbConnection();
+    const limit = FILTER_OPTIONS_NAME_LIMIT;
 
-  const orderBase = `
-    (no.is_cancelled = 0 OR no.is_cancelled IS NULL)
-    AND (no.is_returned = 0 OR no.is_returned = 2 OR no.is_returned IS NULL)
-    AND no.delivery_date IS NOT NULL
-    ${orderDateSql}
-  `;
+    // Sales: one light DISTINCT on warranty_products only (no neworder / dispatch joins).
+    const [salesRows] = await conn.execute(
+      `SELECT DISTINCT wp.created_by AS name
+       FROM warranty_products wp
+       WHERE ${base}
+         AND wp.created_by IS NOT NULL
+         AND TRIM(wp.created_by) <> ''
+       ORDER BY name ASC
+       LIMIT ${limit}`,
+    );
 
-  // Sequential on purpose — keep pool usage to 1 connection for this request.
-  const [salesRows] = await conn.execute(
-    `SELECT DISTINCT ${sqlUtf8TrimExpr("no.created_by")} AS name
-     FROM neworder no
-     WHERE ${orderBase}
-       AND ${sqlUtf8HasText("no.created_by")}
-     ORDER BY name ASC
-     LIMIT ${limit}`,
-    orderParams,
+    // Engineers: master tables (same as assignment dropdowns) — not service_records scan.
+    const [internalRows] = await conn.execute(
+      `SELECT username AS name
+       FROM rep_list
+       WHERE status = 1 AND TRIM(userRole) = 'SERVICE ENGINEER'
+       ORDER BY username ASC
+       LIMIT ${limit}`,
+    );
+
+    let thirdRows = [];
+    try {
+      const [rows] = await conn.execute(
+        `SELECT name
+         FROM third_party_service_engineers
+         WHERE status = 'active'
+           AND name IS NOT NULL
+           AND TRIM(name) <> ''
+         ORDER BY name ASC
+         LIMIT ${limit}`,
+      );
+      thirdRows = rows || [];
+    } catch {
+      thirdRows = [];
+    }
+
+    return {
+      salesPersons: mapDistinctNameRows(salesRows),
+      serviceEngineers: mapDistinctNameRows(internalRows),
+      thirdPartyEngineers: mapDistinctNameRows(thirdRows),
+    };
+  });
+}
+
+/**
+ * Fast open-installation dropdown names.
+ * Uses small engineer master tables (same as assignment dropdowns) — no service_records /
+ * neworder / warranty DISTINCT scans.
+ */
+async function fetchOpenInstallationFilterOptions(conn) {
+  const [internalRows] = await conn.execute(
+    `SELECT username AS name
+     FROM rep_list
+     WHERE status = 1 AND TRIM(userRole) = 'SERVICE ENGINEER'
+     ORDER BY username ASC
+     LIMIT ${FILTER_OPTIONS_NAME_LIMIT}`,
   );
 
-  const [assignedByRows] = await conn.execute(
-    `SELECT DISTINCT ${sqlUtf8TrimExpr("sr.engineer_assigned_by")} AS name
-     FROM service_records sr
-     WHERE UPPER(TRIM(COALESCE(sr.service_type, ''))) = 'INSTALLATION'
-       AND ${sqlUtf8HasText("sr.engineer_assigned_by")}
-     ORDER BY name ASC
-     LIMIT ${limit}`,
-  );
-
-  let wpDateSql = "";
-  const wpParams = [];
-  if (f.from) {
-    wpDateSql += ` AND DATE(wp.created_at) >= ?`;
-    wpParams.push(f.from);
-  }
-  if (f.to) {
-    wpDateSql += ` AND DATE(wp.created_at) <= ?`;
-    wpParams.push(f.to);
+  let thirdRows = [];
+  try {
+    const [rows] = await conn.execute(
+      `SELECT name
+       FROM third_party_service_engineers
+       WHERE status = 'active'
+         AND name IS NOT NULL
+         AND TRIM(name) <> ''
+       ORDER BY name ASC
+       LIMIT ${FILTER_OPTIONS_NAME_LIMIT}`,
+    );
+    thirdRows = rows || [];
+  } catch {
+    thirdRows = [];
   }
 
-  const [registeredByRows] = await conn.execute(
-    `SELECT DISTINCT ${sqlUtf8TrimExpr("wp.created_by")} AS name
-     FROM warranty_products wp
-     WHERE ${sqlUtf8HasText("wp.created_by")}
-       ${wpDateSql}
-     ORDER BY name ASC
-     LIMIT ${limit}`,
-    wpParams,
-  );
-
-  const [serviceEngineerRows] = await conn.execute(
-    `SELECT DISTINCT ${sqlUtf8TrimExpr("sr.assigned_to")} AS name
-     FROM service_records sr
-     WHERE UPPER(TRIM(COALESCE(sr.service_type, ''))) = 'INSTALLATION'
-       AND ${INSTALLATION_SR_ASSIGNED_OK}
-       AND LOWER(TRIM(COALESCE(sr.assigned_to_type, 'internal'))) <> 'third_party'
-       AND ${sqlUtf8HasText("sr.assigned_to")}
-     ORDER BY name ASC
-     LIMIT ${limit}`,
-  );
-
-  const [thirdPartyEngineerRows] = await conn.execute(
-    `SELECT DISTINCT ${sqlUtf8TrimExpr("sr.assigned_to")} AS name
-     FROM service_records sr
-     WHERE UPPER(TRIM(COALESCE(sr.service_type, ''))) = 'INSTALLATION'
-       AND ${INSTALLATION_SR_ASSIGNED_OK}
-       AND LOWER(TRIM(COALESCE(sr.assigned_to_type, ''))) = 'third_party'
-       AND ${sqlUtf8HasText("sr.assigned_to")}
-     ORDER BY name ASC
-     LIMIT ${limit}`,
-  );
+  const serviceEngineers = mapDistinctNameRows(internalRows);
+  const thirdPartyEngineers = mapDistinctNameRows(thirdRows);
+  const instCompletedBys = mapDistinctNameRows([
+    ...serviceEngineers.map((name) => ({ name })),
+    ...thirdPartyEngineers.map((name) => ({ name })),
+  ]);
 
   return {
-    salesPersons: mapDistinctNameRows(salesRows),
-    serviceEngineers: mapDistinctNameRows(serviceEngineerRows),
-    thirdPartyEngineers: mapDistinctNameRows(thirdPartyEngineerRows),
-    assignedBys: mapDistinctNameRows(assignedByRows),
-    registeredBys: mapDistinctNameRows(registeredByRows),
+    salesPersons: [],
+    serviceEngineers,
+    thirdPartyEngineers,
+    instCompletedBys,
+    assignedBys: [],
+    registeredBys: [],
   };
 }
 
@@ -1399,14 +1460,10 @@ export async function fetchServiceBeforeInstallationSegmentFilterOptions(segment
     return null;
   }
 
-  const cacheKey = JSON.stringify({ segment, f: parseSbiFilters(filters) });
-  const cached = OPEN_FILTER_OPTIONS_CACHE.get(cacheKey);
-  if (cached && Date.now() - cached.at < OPEN_FILTER_OPTIONS_TTL_MS) {
-    return cached.data;
-  }
-
-  const conn = await getDbConnection();
-  const data = await fetchOpenInstallationFilterOptions(conn, filters);
-  OPEN_FILTER_OPTIONS_CACHE.set(cacheKey, { at: Date.now(), data });
-  return data;
+  // Shared cache for both open + overdue — same name universe.
+  const cacheKey = "open-installation";
+  return withFilterOptionsInflight(cacheKey, OPEN_FILTER_OPTIONS_CACHE, async () => {
+    const conn = await getDbConnection();
+    return fetchOpenInstallationFilterOptions(conn);
+  });
 }

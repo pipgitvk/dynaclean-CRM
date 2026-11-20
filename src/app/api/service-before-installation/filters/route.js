@@ -36,6 +36,7 @@ export async function GET(request) {
         salesPersons: [],
         serviceEngineers: [],
         thirdPartyEngineers: [],
+        instCompletedBys: [],
         assignedBys: [],
         registeredBys: [],
       },

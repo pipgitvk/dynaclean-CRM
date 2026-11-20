@@ -15,6 +15,8 @@ export const EMPTY_SBI_FILTERS = {
   salesPerson: "",
   serviceEngineer: "",
   thirdPartyEngineer: "",
+  /** open-installation: internal + third-party / completed-by engineer */
+  instCompletedBy: "",
   /** open-installation: order booking / dispatch coordinator */
   assignedBy: "",
   /** open-installation: warranty registration creator */
@@ -90,6 +92,9 @@ export function parseSbiFilters(input) {
     salesPerson: String(src.salesPerson ?? src.sales_person ?? "").trim(),
     serviceEngineer: String(src.serviceEngineer ?? src.service_engineer ?? "").trim(),
     thirdPartyEngineer: String(src.thirdPartyEngineer ?? src.third_party_engineer ?? "").trim(),
+    instCompletedBy: String(
+      src.instCompletedBy ?? src.inst_completed_by ?? src.installationCompletedBy ?? "",
+    ).trim(),
     assignedBy: String(src.assignedBy ?? src.assigned_by ?? "").trim(),
     registeredBy: String(src.registeredBy ?? src.registered_by ?? "").trim(),
     registeredInstallation: normalizeRegisteredInstallation(
@@ -124,6 +129,10 @@ export function parseSbiFiltersFromSearchParams(searchParams) {
     serviceEngineer: searchParams.get("serviceEngineer") ?? searchParams.get("service_engineer"),
     thirdPartyEngineer:
       searchParams.get("thirdPartyEngineer") ?? searchParams.get("third_party_engineer"),
+    instCompletedBy:
+      searchParams.get("instCompletedBy") ??
+      searchParams.get("inst_completed_by") ??
+      searchParams.get("installationCompletedBy"),
     registeredInstallation:
       searchParams.get("registeredInstallation") ?? searchParams.get("registered_installation"),
     openInstallationBucket:

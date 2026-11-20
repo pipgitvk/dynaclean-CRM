@@ -28,10 +28,6 @@ const SERVICE_RECORD_STATUS_PRESETS = [
   "CANCELLED",
 ];
 
-const OPEN_INSTALLATION_SERVICE_STATUS_PRESETS = SERVICE_RECORD_STATUS_PRESETS.filter(
-  (s) => s !== "CANCELLED",
-);
-
 function getSegmentFilterKind(segment) {
   if (segment === "open-completions") {
     return "serviceRecord";
@@ -81,6 +77,24 @@ function TableDistinctNameFilterSelect({
   );
 }
 
+async function fetchActiveEngineerNames() {
+  const [internalRes, thirdRes] = await Promise.all([
+    fetch("/api/service-engineers/active", { cache: "force-cache" }),
+    fetch("/api/third-party-engineers/active", { cache: "force-cache" }),
+  ]);
+  const internalData = internalRes.ok ? await internalRes.json() : {};
+  const thirdData = thirdRes.ok ? await thirdRes.json() : [];
+  const internal = (internalData.users || [])
+    .map((u) => String(u.username || "").trim())
+    .filter(Boolean);
+  const thirdParty = (Array.isArray(thirdData) ? thirdData : [])
+    .map((e) => String(e.name || "").trim())
+    .filter(Boolean);
+  return [...new Set([...internal, ...thirdParty])].sort((a, b) =>
+    a.localeCompare(b, undefined, { sensitivity: "base" }),
+  );
+}
+
 function ServiceEngineerFilterSelect({ value, onChange, className = "xl:col-span-3" }) {
   const [engineers, setEngineers] = useState([]);
 
@@ -88,19 +102,7 @@ function ServiceEngineerFilterSelect({ value, onChange, className = "xl:col-span
     let cancelled = false;
     (async () => {
       try {
-        const [internalRes, thirdRes] = await Promise.all([
-          fetch("/api/service-engineers/active", { cache: "no-store" }),
-          fetch("/api/third-party-engineers/active", { cache: "no-store" }),
-        ]);
-        const internalData = internalRes.ok ? await internalRes.json() : {};
-        const thirdData = thirdRes.ok ? await thirdRes.json() : [];
-        const internal = (internalData.users || []).map((u) => String(u.username || "").trim()).filter(Boolean);
-        const thirdParty = (Array.isArray(thirdData) ? thirdData : [])
-          .map((e) => String(e.name || "").trim())
-          .filter(Boolean);
-        const merged = [...new Set([...internal, ...thirdParty])].sort((a, b) =>
-          a.localeCompare(b, undefined, { sensitivity: "base" }),
-        );
+        const merged = await fetchActiveEngineerNames();
         if (!cancelled) setEngineers(merged);
       } catch {
         if (!cancelled) setEngineers([]);
@@ -131,6 +133,59 @@ function ServiceEngineerFilterSelect({ value, onChange, className = "xl:col-span
         onChange={onChange}
         placeholder="All engineers"
         searchPlaceholder="Search engineer…"
+        className={`w-full min-w-0 ${filterSelectClass}`}
+      />
+    </label>
+  );
+}
+
+/** Open Installation — loads from small engineer master APIs (not slow filters DISTINCT). */
+function InstCompletedByFilterSelect({
+  value,
+  onChange,
+  extraNames = [],
+  className = "xl:col-span-3",
+}) {
+  const [engineers, setEngineers] = useState([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const merged = await fetchActiveEngineerNames();
+        if (!cancelled) setEngineers(merged);
+      } catch {
+        if (!cancelled) setEngineers([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const options = useMemo(() => {
+    const base = [{ value: "", label: "All users" }];
+    const names = new Set([...engineers, ...(extraNames || [])]);
+    const current = String(value || "").trim();
+    if (current) names.add(current);
+    const sorted = [...names]
+      .map((n) => String(n || "").trim())
+      .filter(Boolean)
+      .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+    return [...base, ...sorted.map((name) => ({ value: name, label: name }))];
+  }, [engineers, extraNames, value]);
+
+  return (
+    <label className={`block min-w-0 ${className}`}>
+      <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+        Inst completed by
+      </span>
+      <SearchableSelect
+        options={options}
+        value={value || ""}
+        onChange={onChange}
+        placeholder="All users"
+        searchPlaceholder="Search user…"
         className={`w-full min-w-0 ${filterSelectClass}`}
       />
     </label>
@@ -209,29 +264,6 @@ function FilterInput({ label, placeholder, value, onChange, className = "xl:col-
   );
 }
 
-function OrderDeliveryStatusFilterSelect({ value, onChange, className = "xl:col-span-3" }) {
-  const options = [
-    { value: "", label: "All order statuses" },
-    { value: "delivered", label: "Delivered" },
-    { value: "not_delivered", label: "Not delivered" },
-  ];
-  return (
-    <label className={`block min-w-0 sm:col-span-1 ${className}`}>
-      <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-        Order status
-      </span>
-      <SearchableSelect
-        options={options}
-        value={value || ""}
-        onChange={onChange}
-        placeholder="All order statuses"
-        searchPlaceholder="Search…"
-        className={`w-full min-w-0 ${filterSelectClass}`}
-      />
-    </label>
-  );
-}
-
 function WarrantyRegistrationFilterSelect({ value, onChange, className = "xl:col-span-3" }) {
   const options = [
     { value: "", label: "All (Registered & not)" },
@@ -241,7 +273,7 @@ function WarrantyRegistrationFilterSelect({ value, onChange, className = "xl:col
   return (
     <label className={`block min-w-0 sm:col-span-1 ${className}`}>
       <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-        Registration
+        Reg status
       </span>
       <SearchableSelect
         options={options}
@@ -406,71 +438,22 @@ export default function ServiceBeforeInstallationFilters({
             />
             {segment === "open-installation" || segment === "overdue-delayed-installation" ? (
               <>
-                <OrderDeliveryStatusFilterSelect
-                  value={draft.orderDeliveryStatus}
-                  onChange={setField("orderDeliveryStatus")}
-                  className={row2Field}
-                />
                 <WarrantyRegistrationFilterSelect
                   value={draft.warrantyRegistration}
                   onChange={setField("warrantyRegistration")}
                   className={row2Field}
                 />
-                <ServiceStatusFilterSelect
-                  label="Service status"
-                  presets={OPEN_INSTALLATION_SERVICE_STATUS_PRESETS}
-                  excludeStatusValues={["CANCELLED"]}
-                  value={draft.serviceStatus}
-                  onChange={setField("serviceStatus")}
-                  className={row2Field}
-                />
-              </>
-            ) : null}
-            {segment === "open-installation" || segment === "overdue-delayed-installation" ? (
-              <>
-                <TableDistinctNameFilterSelect
-                  label="Sales person"
-                  placeholder="All sales persons"
-                  names={tableFilterOptions?.salesPersons || []}
-                  value={draft.salesPerson}
-                  onChange={setField("salesPerson")}
-                  onRequestOptions={onRequestTableFilterOptions}
-                  className={row2Field}
-                />
-                <TableDistinctNameFilterSelect
-                  label="Assigned by"
-                  placeholder="All assigned by"
-                  names={tableFilterOptions?.assignedBys || []}
-                  value={draft.assignedBy}
-                  onChange={setField("assignedBy")}
-                  onRequestOptions={onRequestTableFilterOptions}
-                  className={row2Field}
-                />
-                <TableDistinctNameFilterSelect
-                  label="Registered by"
-                  placeholder="All registered by"
-                  names={tableFilterOptions?.registeredBys || []}
-                  value={draft.registeredBy}
-                  onChange={setField("registeredBy")}
-                  onRequestOptions={onRequestTableFilterOptions}
-                  className={row2Field}
-                />
-                <TableDistinctNameFilterSelect
-                  label="Service engineer"
-                  placeholder="All service engineers"
-                  names={tableFilterOptions?.serviceEngineers || []}
-                  value={draft.serviceEngineer}
-                  onChange={setField("serviceEngineer")}
-                  onRequestOptions={onRequestTableFilterOptions}
-                  className={row2Field}
-                />
-                <TableDistinctNameFilterSelect
-                  label="Third party engineer"
-                  placeholder="All third party engineers"
-                  names={tableFilterOptions?.thirdPartyEngineers || []}
-                  value={draft.thirdPartyEngineer}
-                  onChange={setField("thirdPartyEngineer")}
-                  onRequestOptions={onRequestTableFilterOptions}
+                <InstCompletedByFilterSelect
+                  value={draft.instCompletedBy}
+                  onChange={setField("instCompletedBy")}
+                  extraNames={
+                    tableFilterOptions?.instCompletedBys?.length
+                      ? tableFilterOptions.instCompletedBys
+                      : [
+                          ...(tableFilterOptions?.serviceEngineers || []),
+                          ...(tableFilterOptions?.thirdPartyEngineers || []),
+                        ]
+                  }
                   className={row2Field}
                 />
               </>

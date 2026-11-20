@@ -1,7 +1,20 @@
 import Link from "next/link";
 import { listUpcomingInstallationServiceIds } from "@/components/installation/UpcomingInstallationServiceStatusColumn";
 
-/** Invoice, order, and service IDs for upcoming installation rows. */
+function listSerialNumbers(record) {
+  const raw = String(record?.serial_number || "").trim();
+  if (!raw) return [];
+  return [
+    ...new Set(
+      raw
+        .split(/[,|;]+/)
+        .map((s) => s.trim())
+        .filter(Boolean),
+    ),
+  ];
+}
+
+/** Invoice, order, service IDs, and serial numbers for upcoming installation rows. */
 export default function UpcomingInstallationReferenceIds({
   record,
   className = "",
@@ -11,6 +24,7 @@ export default function UpcomingInstallationReferenceIds({
   const invoice = record?.invoice_number?.trim() || "—";
   const orderId = record?.order_id ?? "—";
   const serviceIds = listUpcomingInstallationServiceIds(record);
+  const serials = listSerialNumbers(record);
 
   return (
     <div className={`space-y-1 text-xs ${className}`}>
@@ -49,6 +63,18 @@ export default function UpcomingInstallationReferenceIds({
             </div>
           )}
         </div>
+      </div>
+      <div>
+        <span className="text-amber-700 font-bold">S/N:</span>
+        {serials.length === 0 ? (
+          <span className="ml-1">—</span>
+        ) : (
+          <div className="mt-0.5 space-y-0.5 font-mono text-slate-800">
+            {serials.map((sn) => (
+              <div key={sn}>{sn}</div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

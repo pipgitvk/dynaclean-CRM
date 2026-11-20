@@ -225,26 +225,35 @@ function teamFilterOptionsFromRows(rows) {
   const salesPersons = new Set();
   const serviceEngineers = new Set();
   const thirdPartyEngineers = new Set();
+  const instCompletedBys = new Set();
   const assignedBys = new Set();
   const registeredBys = new Set();
   for (const row of rows) {
     const sales = salesPersonLabel(row);
     if (sales) salesPersons.add(sales);
     if (isServiceRecordAssigned(row.service_engineer)) {
-      serviceEngineers.add(String(row.service_engineer).trim());
+      const name = String(row.service_engineer).trim();
+      serviceEngineers.add(name);
+      instCompletedBys.add(name);
     }
     if (isServiceRecordAssigned(row.third_party_engineer)) {
-      thirdPartyEngineers.add(String(row.third_party_engineer).trim());
+      const name = String(row.third_party_engineer).trim();
+      thirdPartyEngineers.add(name);
+      instCompletedBys.add(name);
     }
-    const assignedBy = String(row.assigned_by || "").trim();
-    if (assignedBy) assignedBys.add(assignedBy);
+    const completedBy = openInstallationCompletedByEngineer(row);
+    if (completedBy) instCompletedBys.add(completedBy);
     const regBy = registeredByLabel(row);
-    if (regBy) registeredBys.add(regBy);
+    if (regBy) {
+      registeredBys.add(regBy);
+      assignedBys.add(regBy);
+    }
   }
   return {
     salesPersons: [...salesPersons],
     serviceEngineers: [...serviceEngineers],
     thirdPartyEngineers: [...thirdPartyEngineers],
+    instCompletedBys: [...instCompletedBys],
     assignedBys: [...assignedBys],
     registeredBys: [...registeredBys],
   };
@@ -253,10 +262,18 @@ function teamFilterOptionsFromRows(rows) {
 function mergeTeamFilterOptions(fromApi, fromRows) {
   const merge = (a = [], b = []) =>
     [...new Set([...a, ...b])].sort((x, y) => x.localeCompare(y, undefined, { sensitivity: "base" }));
+  const serviceEngineers = merge(fromApi?.serviceEngineers, fromRows?.serviceEngineers);
+  const thirdPartyEngineers = merge(fromApi?.thirdPartyEngineers, fromRows?.thirdPartyEngineers);
   return {
     salesPersons: merge(fromApi?.salesPersons, fromRows?.salesPersons),
-    serviceEngineers: merge(fromApi?.serviceEngineers, fromRows?.serviceEngineers),
-    thirdPartyEngineers: merge(fromApi?.thirdPartyEngineers, fromRows?.thirdPartyEngineers),
+    serviceEngineers,
+    thirdPartyEngineers,
+    instCompletedBys: merge(
+      fromApi?.instCompletedBys?.length
+        ? fromApi.instCompletedBys
+        : [...serviceEngineers, ...thirdPartyEngineers],
+      fromRows?.instCompletedBys,
+    ),
     assignedBys: merge(fromApi?.assignedBys, fromRows?.assignedBys),
     registeredBys: merge(fromApi?.registeredBys, fromRows?.registeredBys),
   };
@@ -512,7 +529,7 @@ function exportRowsCsv(rows, segment) {
     ],
     "open-installation": [
       "Dispatch Date",
-      "Inv | Ord | Ser",
+      "Inv | Ord | Ser | S/N",
       "Company / State · Delivery",
       "Contact Person · Contact No",
       "Sales Person",
@@ -525,7 +542,7 @@ function exportRowsCsv(rows, segment) {
     ],
     "overdue-delayed-installation": [
       "Dispatch Date",
-      "Inv | Ord | Ser",
+      "Inv | Ord | Ser | S/N",
       "Company / State · Delivery",
       "Contact Person · Contact No",
       "Sales Person",
@@ -581,6 +598,7 @@ function exportRowsCsv(rows, segment) {
           row.invoice_number,
           row.order_id,
           row.service_id,
+          row.serial_number,
         ]
           .filter(Boolean)
           .join(" / "),
@@ -1385,7 +1403,7 @@ function TableHead({ segment }) {
       <tr>
         <th className={th}>#</th>
         <th className={th}>Dispatch Date</th>
-        <th className={th}>Inv | Ord | Ser</th>
+        <th className={th}>Inv | Ord | Ser | S/N</th>
         <th className={th}>Company / State · Delivery</th>
         <th className={th}>Contact Person · Contact No</th>
         <th className={th}>Sales Person</th>
@@ -1892,24 +1910,18 @@ export default function ServiceBeforeInstallationDetailClient({
   }, [openInstallationKpiFilterKey, segment]);
 
   const fetchTableFilterOptions = useCallback(async () => {
-    if (
-      segment !== "total-registered" &&
-      segment !== "open-installation" &&
-      segment !== "overdue-delayed-installation"
-    ) {
+    // Open Installation "Inst completed by" loads from /api/service-engineers + third-party
+    // (fast master tables) — skip this heavy DISTINCT route there.
+    if (segment !== "total-registered") {
       return;
     }
-    const key = JSON.stringify(appliedFilters);
+    const key = segment;
     if (tableFilterOptionsFetchKeyRef.current === key) return;
     tableFilterOptionsFetchKeyRef.current = key;
     try {
-      // Dedicated filters API — never shares the list/KPI route or blocks row loads.
       const res = await axios.get("/api/service-before-installation/filters", {
-        params: {
-          segment,
-          ...appliedFilters,
-        },
-        timeout: 15_000,
+        params: { segment },
+        timeout: 12_000,
       });
       if (res.data?.success && res.data.filterOptions) {
         setTableFilterOptions(res.data.filterOptions);
@@ -1918,7 +1930,7 @@ export default function ServiceBeforeInstallationDetailClient({
       console.error(e);
       tableFilterOptionsFetchKeyRef.current = null;
     }
-  }, [segment, appliedFilters]);
+  }, [segment]);
 
   const requestTableFilterOptions = useCallback(() => {
     void fetchTableFilterOptions();

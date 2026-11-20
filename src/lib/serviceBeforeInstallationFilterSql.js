@@ -234,8 +234,17 @@ export function buildUpcomingInstallationListFilterSql(
       sql += ` AND ${sqlUtf8TrimExpr("u.third_party_engineer")} COLLATE ${UTF8_COLLATE} = ${nameEq}`;
       params.push(f.thirdPartyEngineer);
     }
+    if (f.instCompletedBy) {
+      sql += ` AND (
+        ${sqlUtf8TrimExpr("u.service_engineer")} COLLATE ${UTF8_COLLATE} = ${nameEq}
+        OR ${sqlUtf8TrimExpr("u.third_party_engineer")} COLLATE ${UTF8_COLLATE} = ${nameEq}
+        OR ${sqlUtf8TrimExpr("u.completed_by_service_engineer")} COLLATE ${UTF8_COLLATE} = ${nameEq}
+        OR ${sqlUtf8TrimExpr("u.installation_report_engineer")} COLLATE ${UTF8_COLLATE} = ${nameEq}
+      )`;
+      params.push(f.instCompletedBy, f.instCompletedBy, f.instCompletedBy, f.instCompletedBy);
+    }
     if (f.assignedBy) {
-      sql += ` AND ${sqlUtf8TrimExpr("u.assigned_by")} COLLATE ${UTF8_COLLATE} = ${nameEq}`;
+      sql += ` AND ${sqlUtf8TrimExpr("u.registered_by")} COLLATE ${UTF8_COLLATE} = ${nameEq}`;
       params.push(f.assignedBy);
     }
     if (f.registeredBy) {
