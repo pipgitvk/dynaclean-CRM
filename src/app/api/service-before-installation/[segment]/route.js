@@ -28,11 +28,6 @@ export async function GET(request, { params }) {
     const skip = parseInt(searchParams.get("skip") || "0", 10) || 0;
     const filters = parseSbiFiltersFromSearchParams(searchParams);
 
-    if (segment === "open-installation" || segment === "overdue-delayed-installation") {
-      const conn = await getDbConnection();
-      await ensureServiceRecordsEngineerAssignedByColumn(conn);
-    }
-
     // Prefer /api/service-before-installation/filters — kept for backwards compatibility.
     const filterOptionsOnly =
       String(searchParams.get("filterOptionsOnly") || "").trim() === "1";
@@ -60,6 +55,20 @@ export async function GET(request, { params }) {
     // Default off — full COUNT on ~1k warranty rows is fast; defer showed "10+" only.
     const deferTotal = String(searchParams.get("deferTotal") || "0").trim() === "1";
     const skipTotal = String(searchParams.get("skipTotal") || "0").trim() === "1";
+    const deferServiceEnrich =
+      segment === "open-installation" || segment === "overdue-delayed-installation"
+        ? String(searchParams.get("deferServiceEnrich") || "1").trim() !== "0"
+        : false;
+
+    const needsServiceRecordsSchema =
+      (segment === "open-installation" || segment === "overdue-delayed-installation") &&
+      !countOnly &&
+      !breakdownOnly &&
+      !deferServiceEnrich;
+    if (needsServiceRecordsSchema) {
+      const conn = await getDbConnection();
+      await ensureServiceRecordsEngineerAssignedByColumn(conn);
+    }
 
     if (countOnly) {
       let total = 0;
@@ -91,6 +100,7 @@ export async function GET(request, { params }) {
             segment === "active-warranty" ||
             segment === "due-warranty-expiry"),
         skipTotal,
+        deferServiceEnrich,
       }),
       wantFilterOptions
         ? fetchServiceBeforeInstallationSegmentFilterOptions(segment, filters)

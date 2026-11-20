@@ -23,7 +23,7 @@ export const EMPTY_SBI_FILTERS = {
   registeredBy: "",
   /** total-registered KPI: "" | "pending" | "completed" */
   registeredInstallation: "",
-  /** open-installation KPI: "" | "delivered_pending" | "delivery_pending" | "completed" | "feedback_collected" */
+  /** open-installation KPI: "" | "delivered_pending" | "delivery_pending" | "installation_planned" | "completed" | "feedback_collected" */
   openInstallationBucket: "",
   /** open-installation list: "" | "registered" | "not_registered" */
   warrantyRegistration: "",
@@ -177,6 +177,7 @@ function normalizeOpenInstallationBucket(raw) {
   if (
     v === "delivered_pending" ||
     v === "delivery_pending" ||
+    v === "installation_planned" ||
     v === "completed" ||
     v === "feedback_collected" ||
     v === "no_feedback"
@@ -194,6 +195,12 @@ function normalizeOrderItemType(raw) {
   if (v === "products" || v === "product") return "products";
   if (v === "spares" || v === "spare") return "spares";
   return "";
+}
+
+/** KPI strip + breakdown — same filters as list but never scoped to one bucket card. */
+export function sbiFiltersForOpenInstallationKpi(filters) {
+  const f = parseSbiFilters(filters);
+  return { ...f, openInstallationBucket: "" };
 }
 
 export function hasActiveSbiFilters(filters) {

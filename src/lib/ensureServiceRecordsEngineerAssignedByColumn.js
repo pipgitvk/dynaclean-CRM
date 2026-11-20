@@ -9,9 +9,15 @@ async function columnExists(conn, name) {
   return rows.length > 0;
 }
 
+let engineerAssignedByColumnReady = false;
+
 /** Username of the user who last assigned service / third-party engineer on this record. */
 export async function ensureServiceRecordsEngineerAssignedByColumn(conn) {
-  if (await columnExists(conn, "engineer_assigned_by")) return;
+  if (engineerAssignedByColumnReady) return;
+  if (await columnExists(conn, "engineer_assigned_by")) {
+    engineerAssignedByColumnReady = true;
+    return;
+  }
   try {
     await conn.execute(
       `ALTER TABLE service_records
@@ -22,4 +28,5 @@ export async function ensureServiceRecordsEngineerAssignedByColumn(conn) {
   } catch (e) {
     console.error("ensureServiceRecordsEngineerAssignedByColumn:", e?.message);
   }
+  engineerAssignedByColumnReady = true;
 }

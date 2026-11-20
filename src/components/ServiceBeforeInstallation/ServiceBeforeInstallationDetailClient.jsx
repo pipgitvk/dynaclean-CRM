@@ -1544,14 +1544,20 @@ export default function ServiceBeforeInstallationDetailClient({
   const kpiFetchAbortRef = useRef(null);
   const countFetchAbortRef = useRef(null);
   const kpiFetchedKeyRef = useRef("");
+  const kpiRequestIdRef = useRef(0);
+  const rowsRequestIdRef = useRef(0);
+  const applyListTotalRef = useRef(null);
+  const servicesEnrichRequestIdRef = useRef(0);
   const openInstallationBreakdownRef = useRef({
     delivered_installation_pending: 0,
     delivery_pending_after_dispatch: 0,
+    installation_planned: 0,
     completed_installation: 0,
     feedback_collected: 0,
     total: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [applyingFilters, setApplyingFilters] = useState(false);
   const [countLoading, setCountLoading] = useState(false);
   const [installationBreakdown, setInstallationBreakdown] = useState({
     total_registered: 0,
@@ -1561,13 +1567,12 @@ export default function ServiceBeforeInstallationDetailClient({
   const [openInstallationBreakdown, setOpenInstallationBreakdown] = useState({
     delivered_installation_pending: 0,
     delivery_pending_after_dispatch: 0,
+    installation_planned: 0,
     completed_installation: 0,
     feedback_collected: 0,
     total: 0,
   });
-  const [openInstallationKpiLoading, setOpenInstallationKpiLoading] = useState(
-    () => segment === "open-installation",
-  );
+  const [openInstallationKpiLoading, setOpenInstallationKpiLoading] = useState(false);
   const [feedbackCollectedKpiLoading, setFeedbackCollectedKpiLoading] = useState(false);
   openInstallationBreakdownRef.current = openInstallationBreakdown;
 
@@ -1608,6 +1613,7 @@ export default function ServiceBeforeInstallationDetailClient({
     },
     [page, pageSize],
   );
+  applyListTotalRef.current = applyListTotal;
 
   const patchFeedbackCollected = useCallback((total) => {
     const n = Number(total || 0);
@@ -1653,35 +1659,39 @@ export default function ServiceBeforeInstallationDetailClient({
     [segment, appliedFilters, patchFeedbackCollected, applyListTotal],
   );
 
+  /** Cards API only — does not load table rows. */
   const fetchOpenInstallationKpis = useCallback(async () => {
     if (segment !== "open-installation") return;
-    if (kpiFetchedKeyRef.current === openInstallationKpiFilterKey) return;
+    const filterKey = openInstallationKpiFilterKey;
+    if (kpiFetchedKeyRef.current === filterKey) return;
 
+    const requestId = (kpiRequestIdRef.current += 1);
     kpiFetchAbortRef.current?.abort();
     const controller = new AbortController();
     kpiFetchAbortRef.current = controller;
 
     setOpenInstallationKpiLoading(true);
+    const { openInstallationBucket: _bucket, ...kpiFilters } = appliedFilters;
     try {
-      const { openInstallationBucket: _bucket, ...kpiFilters } = appliedFilters;
-      const res = await axios.get(`/api/service-before-installation/${segment}`, {
-        params: {
-          ...kpiFilters,
-          openInstallationBucket: "",
-          breakdownOnly: "1",
-          limit: 1,
-          skip: 0,
-          includeFilterOptions: "0",
+      const res = await axios.get(
+        "/api/service-before-installation/open-installation/kpi",
+        {
+          params: { ...kpiFilters, openInstallationBucket: "" },
+          signal: controller.signal,
+          timeout: 12_000,
         },
-        signal: controller.signal,
-        timeout: 15_000,
-      });
+      );
+      if (requestId !== kpiRequestIdRef.current) return;
       if (res.data?.success && res.data.openInstallationBreakdown) {
         const br = res.data.openInstallationBreakdown;
-        kpiFetchedKeyRef.current = openInstallationKpiFilterKey;
+        kpiFetchedKeyRef.current = filterKey;
         setOpenInstallationBreakdown((prev) => {
           const next = {
             ...br,
+            installation_planned: Math.max(
+              Number(prev.installation_planned) || 0,
+              Number(br.installation_planned) || 0,
+            ),
             feedback_collected:
               Number(prev.feedback_collected) > 0
                 ? Number(prev.feedback_collected)
@@ -1692,26 +1702,68 @@ export default function ServiceBeforeInstallationDetailClient({
         });
         const activeBucket = String(appliedFilters.openInstallationBucket || "").trim();
         if (!(listTotalRef.current > 0) && activeBucket !== "feedback_collected") {
-          applyListTotal(openInstallationBucketRecordCount(activeBucket, br));
+          applyListTotalRef.current?.(
+            openInstallationBucketRecordCount(activeBucket, br),
+          );
         }
       }
     } catch (e) {
-      if (e?.code === "ERR_CANCELED") return;
-      console.error(e);
+      if (e?.code !== "ERR_CANCELED" && requestId === kpiRequestIdRef.current) {
+        console.error(e);
+      }
     } finally {
-      if (!controller.signal.aborted) setOpenInstallationKpiLoading(false);
+      if (requestId === kpiRequestIdRef.current) {
+        setOpenInstallationKpiLoading(false);
+      }
     }
 
-    if (!controller.signal.aborted) {
-      void fetchFeedbackCollectedKpiCount(controller.signal);
+    // Feedback only — planned is already in cards breakdown.
+    if (requestId === kpiRequestIdRef.current) {
+      window.setTimeout(() => {
+        if (requestId !== kpiRequestIdRef.current) return;
+        void fetchFeedbackCollectedKpiCount(controller.signal);
+      }, 200);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed by openInstallationKpiFilterKey
   }, [
     segment,
     openInstallationKpiFilterKey,
-    applyListTotal,
+    appliedFilters,
     fetchFeedbackCollectedKpiCount,
   ]);
+
+  const enrichOpenInstallationServiceColumns = useCallback(async (baseRows, listRequestId) => {
+    if (!baseRows?.length) return;
+    const enrichId = (servicesEnrichRequestIdRef.current += 1);
+    try {
+      const res = await axios.post(
+        "/api/service-before-installation/open-installation/services-enrich",
+        { rows: baseRows },
+        { timeout: 25_000 },
+      );
+      if (
+        res.data?.success &&
+        enrichId === servicesEnrichRequestIdRef.current &&
+        listRequestId === rowsRequestIdRef.current
+      ) {
+        const patchByQuote = new Map(
+          (res.data.data || []).map((r) => [
+            String(r.quote_number || "").trim().toLowerCase(),
+            r,
+          ]),
+        );
+        if (patchByQuote.size) {
+          setRows((prev) =>
+            prev.map((row) => {
+              const hit = patchByQuote.get(String(row.quote_number || "").trim().toLowerCase());
+              return hit ? { ...row, ...hit } : row;
+            }),
+          );
+        }
+      }
+    } catch (e) {
+      if (e?.code !== "ERR_CANCELED") console.error(e);
+    }
+  }, []);
 
   const fetchOpenInstallationCount = useCallback(async () => {
     if (segment !== "open-installation" && segment !== "overdue-delayed-installation") {
@@ -1730,11 +1782,15 @@ export default function ServiceBeforeInstallationDetailClient({
       const res = await axios.get(
         useGoogleFeedbackApi
           ? "/api/service-before-installation/google-feedback"
-          : `/api/service-before-installation/${segment}`,
+          : segment === "open-installation"
+            ? "/api/service-before-installation/open-installation/count"
+            : `/api/service-before-installation/${segment}`,
         {
           params: {
             ...appliedFilters,
-            countOnly: "1",
+            ...(useGoogleFeedbackApi || segment !== "open-installation"
+              ? { countOnly: "1" }
+              : {}),
             limit: pageSize,
             skip: page * pageSize,
           },
@@ -1765,6 +1821,7 @@ export default function ServiceBeforeInstallationDetailClient({
   }, [segment, appliedFilters, page, pageSize, applyListTotal, patchFeedbackCollected]);
 
   const fetchRows = useCallback(async () => {
+    const requestId = (rowsRequestIdRef.current += 1);
     rowsFetchAbortRef.current?.abort();
     const controller = new AbortController();
     rowsFetchAbortRef.current = controller;
@@ -1780,31 +1837,35 @@ export default function ServiceBeforeInstallationDetailClient({
         ? openInstallationBucketRecordCount(activeBucket, openInstallationBreakdownRef.current)
         : 0);
 
-    // Open Installation: rows FIRST (unblocks UI), then KPI + count sequentially
-    // so we don't starve the DB pool (connectionLimit ≈ 5).
+    // Open Installation: separate APIs — cards (/kpi) vs table (/list).
     if (isOpenInstallationList) {
       const useGoogleFeedbackApi =
         segment === "open-installation" && activeBucket === "feedback_collected";
+      if (segment === "open-installation" && !useGoogleFeedbackApi) {
+        if (kpiFetchedKeyRef.current !== openInstallationKpiFilterKey) {
+          void fetchOpenInstallationKpis();
+        }
+      }
       try {
-        const res = await axios.get(
-          useGoogleFeedbackApi
-            ? "/api/service-before-installation/google-feedback"
-            : `/api/service-before-installation/${segment}`,
-          {
-            params: {
-              ...appliedFilters,
-              limit: pageSize,
-              skip: page * pageSize,
-              includeFilterOptions: "0",
-              // Always skip total on first paint — same speed as other cards.
-              skipTotal: "1",
-              includeOpenInstallationBreakdown: "0",
-            },
-            signal,
-            timeout: 15_000,
+        const listUrl = useGoogleFeedbackApi
+          ? "/api/service-before-installation/google-feedback"
+          : segment === "open-installation"
+            ? "/api/service-before-installation/open-installation/list"
+            : `/api/service-before-installation/${segment}`;
+        const res = await axios.get(listUrl, {
+          params: {
+            ...appliedFilters,
+            limit: pageSize,
+            skip: page * pageSize,
+            includeFilterOptions: "0",
+            skipTotal: "1",
+            includeOpenInstallationBreakdown: "0",
+            deferServiceEnrich: "1",
           },
-        );
-        if (res.data?.success) {
+          signal,
+          timeout: 12_000,
+        });
+        if (res.data?.success && requestId === rowsRequestIdRef.current) {
           const data = res.data.data || [];
           const pag = res.data.pagination || {};
           const hasMoreFlag = Boolean(pag.hasMore) || data.length >= pageSize;
@@ -1812,45 +1873,48 @@ export default function ServiceBeforeInstallationDetailClient({
           setRows(data);
           setPagination({
             total,
-            hasMore:
-              total > 0 ? page * pageSize + data.length < total : hasMoreFlag,
+            hasMore: total > 0 ? page * pageSize + data.length < total : hasMoreFlag,
           });
           if (useGoogleFeedbackApi && !hasMoreFlag) {
             const exact = page * pageSize + data.length;
             applyListTotal(exact, data.length);
             patchFeedbackCollected(exact);
           }
+          // Enrich after paint (serial/model/engineer) — never blocks first rows.
+          if (!useGoogleFeedbackApi && data.length) {
+            window.setTimeout(() => {
+              if (requestId !== rowsRequestIdRef.current) return;
+              void enrichOpenInstallationServiceColumns(data, requestId);
+            }, 0);
+          }
         }
       } catch (e) {
         if (e?.code === "ERR_CANCELED") return;
         console.error(e);
       } finally {
-        if (!signal.aborted) setLoading(false);
+        if (!signal.aborted && requestId === rowsRequestIdRef.current) {
+          setLoading(false);
+          setApplyingFilters(false);
+        }
       }
 
-      if (signal.aborted) return;
+      if (signal.aborted || requestId !== rowsRequestIdRef.current) return;
 
-      if (useGoogleFeedbackApi) {
-        void fetchOpenInstallationCount();
-        return;
-      }
-
-      // KPI before count — cheap neworder scan; cards must not stay at 0.
-      if (
-        segment === "open-installation" &&
-        page === 0 &&
-        kpiFetchedKeyRef.current !== openInstallationKpiFilterKey
-      ) {
-        await fetchOpenInstallationKpis();
-      } else if (
-        segment === "open-installation" &&
-        page === 0 &&
-        !(Number(openInstallationBreakdownRef.current.feedback_collected) > 0)
-      ) {
-        void fetchFeedbackCollectedKpiCount(signal);
-      }
-      if (page === 0 || !(knownTotal > 0) || !(listTotalRef.current > 0)) {
-        await fetchOpenInstallationCount();
+      // Prefer card totals for pagination; only hit /count when still unknown.
+      const fromCards = openInstallationBucketRecordCount(
+        activeBucket,
+        openInstallationBreakdownRef.current,
+      );
+      if (fromCards > 0) {
+        applyListTotal(fromCards);
+        setCountLoading(false);
+      } else if (useGoogleFeedbackApi || !(listTotalRef.current > 0)) {
+        window.setTimeout(() => {
+          if (requestId !== rowsRequestIdRef.current) return;
+          void fetchOpenInstallationCount();
+        }, 200);
+      } else {
+        setCountLoading(false);
       }
       return;
     }
@@ -1900,14 +1964,20 @@ export default function ServiceBeforeInstallationDetailClient({
     fetchOpenInstallationKpis,
     fetchFeedbackCollectedKpiCount,
     patchFeedbackCollected,
+    enrichOpenInstallationServiceColumns,
   ]);
 
-  useEffect(() => {
-    kpiFetchedKeyRef.current = "";
-    if (segment === "open-installation") {
-      setOpenInstallationKpiLoading(true);
-    }
-  }, [openInstallationKpiFilterKey, segment]);
+  const openInstallationKpiStripLoading = useMemo(() => {
+    if (!openInstallationKpiLoading) return false;
+    const b = openInstallationBreakdown;
+    const hasAny =
+      Number(b.delivered_installation_pending) > 0 ||
+      Number(b.delivery_pending_after_dispatch) > 0 ||
+      Number(b.completed_installation) > 0 ||
+      Number(b.installation_planned) > 0 ||
+      Number(b.total) > 0;
+    return !hasAny;
+  }, [openInstallationKpiLoading, openInstallationBreakdown]);
 
   const fetchTableFilterOptions = useCallback(async () => {
     if (
@@ -2010,11 +2080,11 @@ export default function ServiceBeforeInstallationDetailClient({
           <ServiceBeforeInstallationOpenInstallationKpiStrip
             openInstallationBucket={appliedFilters.openInstallationBucket}
             totals={openInstallationBreakdown}
-            loading={openInstallationKpiLoading}
+            loading={openInstallationKpiStripLoading}
             noFeedbackLoading={feedbackCollectedKpiLoading}
             onCardSelect={(openInstallationBucket) => {
-              setLoading(true);
               setPage(0);
+              setLoading(true);
               const nextBucket = String(openInstallationBucket || "").trim();
               const estTotal = nextBucket
                 ? openInstallationBucketRecordCount(nextBucket, openInstallationBreakdown)
@@ -2035,12 +2105,18 @@ export default function ServiceBeforeInstallationDetailClient({
           className="mb-5 shadow-[0_4px_20px_-10px_rgba(124,58,237,0.2)]"
           value={draftFilters}
           onChange={setDraftFilters}
-          loading={loading}
+          loading={applyingFilters}
           onApply={() => {
+            setApplyingFilters(true);
             setLoading(true);
             setPage(0);
+            listTotalRef.current = 0;
+            setRows([]);
+            setPagination({ total: 0, hasMore: false });
             setTableFilterOptions(null);
             tableFilterOptionsFetchKeyRef.current = null;
+            kpiFetchedKeyRef.current = "";
+            setOpenInstallationKpiLoading(true);
             setAppliedFilters({ ...draftFilters });
           }}
           onClear={() => {

@@ -31,6 +31,19 @@ export const OPEN_INSTALLATION_DETAIL_KPI_STRIP = [
     chartColor: "#0ea5e9",
   },
   {
+    id: "open-installation-planned",
+    title: "Installation Planned",
+    subtitle: "Installation service in PLANNED status",
+    countCaption: "No. of installation planned",
+    countKey: "installation_planned",
+    accent: "from-violet-500 to-indigo-600",
+    surface:
+      "bg-white/90 backdrop-blur-xl border-violet-200/45 shadow-[0_8px_30px_-8px_rgba(139,92,246,0.28)]",
+    glow: "bg-violet-400/25",
+    iconSurface: "bg-gradient-to-br from-violet-500 to-indigo-600",
+    chartColor: "#8b5cf6",
+  },
+  {
     id: "open-installation-completed",
     title: "Installation Completed",
     subtitle: "Delivered products with installation done",
@@ -220,6 +233,7 @@ export function getOpenInstallationDetailKpiCards() {
 export function openInstallationBucketFromKpiCardId(cardId) {
   if (cardId === "open-installation-delivered-pending") return "delivered_pending";
   if (cardId === "open-installation-delivery-pending") return "delivery_pending";
+  if (cardId === "open-installation-planned") return "installation_planned";
   if (cardId === "open-installation-completed") return "completed";
   if (cardId === "open-installation-feedback-collected") return "feedback_collected";
   if (cardId === "open-installation-no-feedback") return "feedback_collected";
@@ -230,6 +244,7 @@ export function openInstallationKpiCardIdFromFilter(openInstallationBucket) {
   const v = String(openInstallationBucket || "").trim().toLowerCase();
   if (v === "delivered_pending") return "open-installation-delivered-pending";
   if (v === "delivery_pending") return "open-installation-delivery-pending";
+  if (v === "installation_planned") return "open-installation-planned";
   if (v === "completed") return "open-installation-completed";
   if (v === "feedback_collected" || v === "no_feedback")
     return "open-installation-feedback-collected";

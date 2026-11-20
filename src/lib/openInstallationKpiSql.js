@@ -1,3 +1,5 @@
+import { sqlTrimUtf8EqColumns } from "@/lib/sqlUtf8Compare";
+
 /** Row flags on upcoming-installations inner query alias `u`. */
 
 export const U_ACTUALLY_DELIVERED_SQL = `(
@@ -34,6 +36,31 @@ export const U_DELIVERED_INSTALLATION_PENDING_SQL = `(
 /** Installation done on order but no installation report uploaded/saved on any INSTALLATION SR. */
 export const U_NO_FEEDBACK_COLLECTED_SQL = `(COALESCE(u.no_feedback_collected, 0) = 1)`;
 
+/** Any INSTALLATION service record on the order quote in PLANNED status. */
+export const SQL_INSTALLATION_PLANNED_ON_QUOTE = (quoteNumberColumn) => `EXISTS (
+  SELECT 1
+  FROM dispatch d_pl
+  INNER JOIN service_records sr_pl
+    ON ${sqlTrimUtf8EqColumns("sr_pl.serial_number", "d_pl.serial_no")}
+  WHERE ${sqlTrimUtf8EqColumns("d_pl.quote_number", quoteNumberColumn)}
+    AND UPPER(TRIM(COALESCE(sr_pl.service_type, ''))) = 'INSTALLATION'
+    AND UPPER(TRIM(COALESCE(sr_pl.status, ''))) = 'PLANNED'
+)`;
+
+/**
+ * Same set as view_service_reports → Status PLANNED (INSTALLATION jobs on this quote).
+ * Includes completed orders — SR can stay PLANNED after site install is marked on order.
+ */
+export const U_INSTALLATION_PLANNED_SQL = `(${SQL_INSTALLATION_PLANNED_ON_QUOTE("u.quote_number")})`;
+
+export const NO_INSTALLATION_PLANNED_SQL = `(${SQL_INSTALLATION_PLANNED_ON_QUOTE("no.quote_number")})`;
+
+/** INSTALLATION + PLANNED — mirrors ServiceTable status filter (service-record rows). */
+export const SQL_SERVICE_RECORD_INSTALLATION_PLANNED = `(
+  UPPER(TRIM(COALESCE(sr.service_type, ''))) = 'INSTALLATION'
+  AND UPPER(TRIM(COALESCE(sr.status, ''))) = 'PLANNED'
+)`;
+
 /** Early filter on {@code neworder} before heavy aggregates (KPI bucket list). */
 export const NO_ACTUALLY_DELIVERED_SQL = `(
   no.delivered_on IS NOT NULL
@@ -51,6 +78,7 @@ export function openInstallationBucketRecordCount(bucket, breakdown = {}) {
   if (b === "delivered_pending") return Number(breakdown.delivered_installation_pending ?? 0);
   if (b === "delivery_pending") return Number(breakdown.delivery_pending_after_dispatch ?? 0);
   if (b === "completed") return Number(breakdown.completed_installation ?? 0);
+  if (b === "installation_planned") return Number(breakdown.installation_planned ?? 0);
   if (b === "feedback_collected" || b === "no_feedback")
     return Number(breakdown.feedback_collected ?? breakdown.no_feedback_collected ?? 0);
   return Number(breakdown.total ?? 0);

@@ -15,7 +15,7 @@ export const WP_LIST_COLUMNS = `
        wp.customer_address,
        wp.state,
        wp.site_person,
-       wp.site_contact,
+image.png       wp.site_contact,
        wp.site_email,
        wp.invoice_number,
        wp.invoice_date,

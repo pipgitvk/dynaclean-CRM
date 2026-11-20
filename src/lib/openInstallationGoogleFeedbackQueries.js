@@ -92,6 +92,36 @@ export function buildInstalledOrderGoogleFeedbackWhereSql(filters) {
     sql += ` AND TRIM(no.created_by) = TRIM(?)`;
     params.push(f.salesPerson);
   }
+  if (f.model) {
+    sql += ` AND EXISTS (
+      SELECT 1
+      FROM dispatch d_m
+      WHERE ${sqlTrimUtf8EqColumns("d_m.quote_number", "no.quote_number")}
+        AND d_m.item_code LIKE ?
+    )`;
+    params.push(`%${f.model}%`);
+  }
+  if (f.warrantyRegistration === "registered") {
+    sql += ` AND EXISTS (
+      SELECT 1
+      FROM dispatch d_wr
+      INNER JOIN warranty_products wp_wr
+        ON ${sqlTrimUtf8EqColumns("wp_wr.serial_number", "d_wr.serial_no")}
+      WHERE ${sqlTrimUtf8EqColumns("d_wr.quote_number", "no.quote_number")}
+        AND d_wr.serial_no IS NOT NULL
+        AND ${sqlUtf8TrimExpr("d_wr.serial_no")} <> ''
+    )`;
+  } else if (f.warrantyRegistration === "not_registered") {
+    sql += ` AND NOT EXISTS (
+      SELECT 1
+      FROM dispatch d_wr
+      INNER JOIN warranty_products wp_wr
+        ON ${sqlTrimUtf8EqColumns("wp_wr.serial_number", "d_wr.serial_no")}
+      WHERE ${sqlTrimUtf8EqColumns("d_wr.quote_number", "no.quote_number")}
+        AND d_wr.serial_no IS NOT NULL
+        AND ${sqlUtf8TrimExpr("d_wr.serial_no")} <> ''
+    )`;
+  }
   return { sql, params };
 }
 

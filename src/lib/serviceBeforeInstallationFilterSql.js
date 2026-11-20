@@ -16,6 +16,7 @@ import {
   U_INSTALLATION_COMPLETED_SQL,
   U_NO_FEEDBACK_COLLECTED_SQL,
   U_OPEN_INSTALLATION_ORDER_SQL,
+  U_INSTALLATION_PLANNED_SQL,
 } from "@/lib/openInstallationKpiSql";
 
 const DISPATCH_ON_ORDER_QUOTE = sqlTrimUtf8EqColumns("d.quote_number", "no.quote_number");
@@ -211,6 +212,8 @@ export function buildUpcomingInstallationListFilterSql(
       sql += ` AND ${U_DELIVERED_INSTALLATION_PENDING_SQL}`;
     } else if (f.openInstallationBucket === "delivery_pending") {
       sql += ` AND ${U_DELIVERY_PENDING_AFTER_DISPATCH_SQL}`;
+    } else if (f.openInstallationBucket === "installation_planned") {
+      sql += ` AND ${U_INSTALLATION_PLANNED_SQL}`;
     } else if (f.openInstallationBucket === "completed") {
       sql += ` AND ${U_INSTALLATION_COMPLETED_SQL}`;
     } else if (f.openInstallationBucket === "feedback_collected") {

@@ -17,7 +17,10 @@ import {
   pendingNeworderPredicates,
 } from "@/lib/upcomingInstallationOrderEligibility";
 import { isServiceBeforeInstallationSegment } from "@/lib/serviceBeforeInstallationHub";
-import { parseSbiFilters } from "@/lib/serviceBeforeInstallationFilters";
+import {
+  parseSbiFilters,
+  sbiFiltersForOpenInstallationKpi,
+} from "@/lib/serviceBeforeInstallationFilters";
 import {
   buildAmcFilterSql,
   buildServiceRecordFilterSql,
@@ -33,13 +36,18 @@ import {
   U_DELIVERED_INSTALLATION_PENDING_SQL,
   U_DELIVERY_PENDING_AFTER_DISPATCH_SQL,
   U_INSTALLATION_COMPLETED_SQL,
+  U_INSTALLATION_PLANNED_SQL,
   U_NO_FEEDBACK_COLLECTED_SQL,
+  NO_INSTALLATION_PLANNED_SQL,
+  SQL_SERVICE_RECORD_INSTALLATION_PLANNED,
+  openInstallationBucketRecordCount,
 } from "@/lib/openInstallationKpiSql";
 import {
   INSTALLED_AFTER_REGISTERED_SQL,
   INSTALLATION_PENDING_AFTER_REGISTERED_SQL,
 } from "@/lib/serviceBeforeInstallationWpExpressions";
 import { enrichOpenInstallationRowsWithServices } from "@/lib/openInstallationServiceEnrich";
+import { mergeOpenInstallationParallelEnrichment } from "@/lib/openInstallationListEnrich";
 
 function upcomingOverdueDelayedExtraSql() {
   return ` AND u.delivery_date < DATE_SUB(CURDATE(), INTERVAL ${OVERDUE_DELAYED_INSTALLATION_DAYS} DAY)`;
@@ -51,19 +59,21 @@ export const OVERDUE_DELAYED_INSTALLATION_DAYS = 2;
 const HUB_COUNTS_CACHE = new Map();
 const HUB_COUNTS_TTL_MS = 45_000;
 const OPEN_INSTALLATION_KPI_CACHE = new Map();
-const OPEN_INSTALLATION_KPI_TTL_MS = 120_000;
+const OPEN_INSTALLATION_KPI_TTL_MS = 90_000;
+/** Bump when count semantics change so stale under-counts (e.g. forced products) are dropped. */
+const OPEN_INSTALLATION_KPI_CACHE_VER = "v3-no-forced-products";
+
+const DELIVERED_ON_SQL = `(
+  no.delivered_on IS NOT NULL
+  AND TRIM(CAST(no.delivered_on AS CHAR)) NOT IN ('', '0000-00-00', '0000-00-00 00:00:00')
+  AND DATE(no.delivered_on) > '1970-01-01'
+)`;
 
 function openInstallationNeedsFullListShape(filters) {
   const f = parseSbiFilters(filters);
   return Boolean(
-    f.search ||
-      f.model ||
-      f.state ||
-      f.serial ||
-      // salesPerson + instCompletedBy stay on neworder fast path / lite KPI.
-      f.serviceEngineer ||
+    f.serviceEngineer ||
       f.thirdPartyEngineer ||
-      f.warrantyRegistration ||
       f.orderDeliveryStatus ||
       f.assignedBy ||
       f.registeredBy ||
@@ -71,9 +81,149 @@ function openInstallationNeedsFullListShape(filters) {
   );
 }
 
+/** Search / reg status / model etc. apply on neworder fast path via appendOpenInstallationNeworderExtraFilters. */
+function openInstallationKpiNeedsFullBreakdown(filters) {
+  return openInstallationNeedsFullListShape(filters);
+}
+
+function sqlQuoteHasAnyWarrantyRegistration(quoteNoColumn) {
+  return `EXISTS (
+    SELECT 1
+    FROM dispatch d_wr
+    INNER JOIN warranty_products wp_wr
+      ON ${sqlTrimUtf8EqColumns("wp_wr.serial_number", "d_wr.serial_no")}
+    WHERE ${sqlTrimUtf8EqColumns("d_wr.quote_number", quoteNoColumn)}
+      AND d_wr.serial_no IS NOT NULL
+      AND ${sqlUtf8TrimExpr("d_wr.serial_no")} <> ''
+  )`;
+}
+
+/** One-shot product/spare quote set — avoids correlated EXISTS per neworder row. */
+function sqlOpenInstallationItemTypeJoin(itemType, alias = "oi_item_q") {
+  const type = resolveUpcomingInstallationType(itemType);
+  if (type === "products") {
+    return `INNER JOIN (
+      SELECT DISTINCT ${sqlUtf8TrimExpr("d_it.quote_number")} AS quote_key
+      FROM dispatch d_it
+      INNER JOIN products_list pl
+        ON ${sqlTrimUtf8EqColumns("pl.item_code", "d_it.item_code")}
+      WHERE d_it.quote_number IS NOT NULL
+        AND ${sqlUtf8TrimExpr("d_it.quote_number")} <> ''
+    ) ${alias} ON ${alias}.quote_key = ${sqlUtf8TrimExpr("no.quote_number")}`;
+  }
+  if (type === "spares") {
+    return `INNER JOIN (
+      SELECT DISTINCT ${sqlUtf8TrimExpr("d_it.quote_number")} AS quote_key
+      FROM dispatch d_it
+      INNER JOIN spare_list sl
+        ON ${sqlTrimUtf8EqColumns("sl.spare_number", "d_it.item_code")}
+      WHERE d_it.quote_number IS NOT NULL
+        AND ${sqlUtf8TrimExpr("d_it.quote_number")} <> ''
+    ) ${alias} ON ${alias}.quote_key = ${sqlUtf8TrimExpr("no.quote_number")}`;
+  }
+  return "";
+}
+
+function appendOpenInstallationNeworderExtraFilters(
+  filters,
+  sql,
+  params,
+  { overdueDelayedOnly = false, skipItemType = false } = {},
+) {
+  const f = parseSbiFilters(filters);
+
+  if (overdueDelayedOnly) {
+    sql += ` AND no.delivery_date < DATE_SUB(CURDATE(), INTERVAL ${OVERDUE_DELAYED_INSTALLATION_DAYS} DAY)`;
+  }
+  if (f.from) {
+    sql += ` AND DATE(no.delivery_date) >= ?`;
+    params.push(f.from);
+  }
+  if (f.to) {
+    sql += ` AND DATE(no.delivery_date) <= ?`;
+    params.push(f.to);
+  }
+  if (f.search) {
+    const term = `%${f.search}%`;
+    sql += ` AND (
+      no.order_id LIKE ? OR no.quote_number LIKE ? OR no.company_name LIKE ?
+      OR no.contact LIKE ? OR no.invoice_number LIKE ? OR no.delivery_location LIKE ?
+      OR no.state LIKE ? OR no.created_by LIKE ?
+      OR EXISTS (
+        SELECT 1
+        FROM dispatch d_srch
+        INNER JOIN service_records sr_srch
+          ON ${sqlTrimUtf8EqColumns("sr_srch.serial_number", "d_srch.serial_no")}
+        WHERE ${sqlTrimUtf8EqColumns("d_srch.quote_number", "no.quote_number")}
+          AND UPPER(TRIM(COALESCE(sr_srch.service_type, ''))) = 'INSTALLATION'
+          AND CAST(sr_srch.service_id AS CHAR) LIKE ?
+      )
+    )`;
+    params.push(...Array(8).fill(term), term);
+  }
+  if (f.state) {
+    sql += ` AND no.state LIKE ?`;
+    params.push(`%${f.state}%`);
+  }
+  if (f.serial) {
+    sql += ` AND (no.invoice_number LIKE ? OR no.order_id LIKE ? OR no.quote_number LIKE ?)`;
+    params.push(`%${f.serial}%`, `%${f.serial}%`, `%${f.serial}%`);
+  }
+  if (f.salesPerson) {
+    sql += ` AND TRIM(no.created_by) = TRIM(?)`;
+    params.push(f.salesPerson);
+  }
+  if (f.model) {
+    sql += ` AND EXISTS (
+      SELECT 1
+      FROM dispatch d_m
+      WHERE ${sqlTrimUtf8EqColumns("d_m.quote_number", "no.quote_number")}
+        AND d_m.item_code LIKE ?
+    )`;
+    params.push(`%${f.model}%`);
+  }
+  const itemType = resolveUpcomingInstallationType(f.itemType);
+  if (!skipItemType && itemType === "products") {
+    sql += ` AND EXISTS (
+      SELECT 1
+      FROM dispatch d_it
+      INNER JOIN products_list pl
+        ON ${sqlTrimUtf8EqColumns("pl.item_code", "d_it.item_code")}
+      WHERE ${sqlTrimUtf8EqColumns("d_it.quote_number", "no.quote_number")}
+    )`;
+  } else if (!skipItemType && itemType === "spares") {
+    sql += ` AND EXISTS (
+      SELECT 1
+      FROM dispatch d_it
+      INNER JOIN spare_list sl
+        ON ${sqlTrimUtf8EqColumns("sl.spare_number", "d_it.item_code")}
+      WHERE ${sqlTrimUtf8EqColumns("d_it.quote_number", "no.quote_number")}
+    )`;
+  }
+  if (f.warrantyRegistration === "registered") {
+    sql += ` AND ${sqlQuoteHasAnyWarrantyRegistration("no.quote_number")}`;
+  } else if (f.warrantyRegistration === "not_registered") {
+    sql += ` AND NOT ${sqlQuoteHasAnyWarrantyRegistration("no.quote_number")}`;
+  }
+  if (f.assignedBy) {
+    sql += ` AND ${sqlOpenInstallationQuoteLatestRegisteredByEquals("no.quote_number")}`;
+    params.push(f.assignedBy);
+  }
+  if (f.registeredBy) {
+    sql += ` AND ${sqlOpenInstallationQuoteLatestRegisteredByEquals("no.quote_number")}`;
+    params.push(f.registeredBy);
+  }
+  return { sql, params };
+}
+
 function openInstallationNeedsInstalledOrders(bucket) {
   const b = String(bucket || "").trim().toLowerCase();
-  return b === "completed" || b === "feedback_collected" || b === "no_feedback";
+  return (
+    b === "completed" ||
+    b === "feedback_collected" ||
+    b === "no_feedback" ||
+    b === "installation_planned"
+  );
 }
 
 function buildOpenInstallationInnerQuery(
@@ -204,19 +354,18 @@ function openInstallationBreakdownAggregateSql(inner, listFilter, extraSql) {
     SUM(CASE WHEN COALESCE(u.order_installation_status, 0) = 0 THEN 1 ELSE 0 END) AS total,
     SUM(CASE WHEN ${U_DELIVERED_INSTALLATION_PENDING_SQL} THEN 1 ELSE 0 END) AS delivered_installation_pending,
     SUM(CASE WHEN ${U_DELIVERY_PENDING_AFTER_DISPATCH_SQL} THEN 1 ELSE 0 END) AS delivery_pending_after_dispatch,
+    SUM(CASE WHEN ${U_INSTALLATION_PLANNED_SQL} THEN 1 ELSE 0 END) AS installation_planned,
     SUM(CASE WHEN ${U_INSTALLATION_COMPLETED_SQL} THEN 1 ELSE 0 END) AS completed_installation,
     SUM(CASE WHEN ${U_NO_FEEDBACK_COLLECTED_SQL} THEN 1 ELSE 0 END) AS no_feedback_collected
   FROM (${inner}) u WHERE 1=1 ${listFilter.sql}${extraSql}`;
 }
-
-OPEN_INSTALLATION_KPI_CACHE.clear();
-
 
 function parseOpenInstallationBreakdownRow(row) {
   return {
     total: Number(row?.total || 0),
     delivered_installation_pending: Number(row?.delivered_installation_pending || 0),
     delivery_pending_after_dispatch: Number(row?.delivery_pending_after_dispatch || 0),
+    installation_planned: Number(row?.installation_planned || 0),
     completed_installation: Number(row?.completed_installation || 0),
     no_feedback_collected: Number(row?.no_feedback_collected || 0),
     feedback_collected: Number(row?.feedback_collected || 0),
@@ -227,6 +376,7 @@ function openInstallationKpiCacheKey(filters, overdueDelayedOnly) {
   const f = parseSbiFilters(filters);
   // Bucket is omitted — breakdown always covers all four cards.
   return JSON.stringify({
+    v: OPEN_INSTALLATION_KPI_CACHE_VER,
     overdueDelayedOnly: Boolean(overdueDelayedOnly),
     search: f.search,
     model: f.model,
@@ -254,56 +404,42 @@ function openInstallationKpiCacheKey(filters, overdueDelayedOnly) {
 async function fetchOpenInstallationBreakdownLite(
   conn,
   filters,
-  { overdueDelayedOnly = false } = {},
+  { overdueDelayedOnly = false, deferInstallationPlanned = false } = {},
 ) {
-  const f = parseSbiFilters(filters);
-  const overdueSql = overdueDelayedOnly
-    ? ` AND no.delivery_date < DATE_SUB(CURDATE(), INTERVAL ${OVERDUE_DELAYED_INSTALLATION_DAYS} DAY)`
-    : "";
+  const kpiFilters = sbiFiltersForOpenInstallationKpi(filters);
+  const f = parseSbiFilters(kpiFilters);
 
-  let dateSql = "";
+  let filterSql = `
+    (no.is_cancelled = 0 OR no.is_cancelled IS NULL)
+    AND (no.is_returned = 0 OR no.is_returned = 2 OR no.is_returned IS NULL)
+  `;
   const params = [];
-  if (f.from) {
-    dateSql += ` AND DATE(no.delivery_date) >= ?`;
-    params.push(f.from);
-  }
-  if (f.to) {
-    dateSql += ` AND DATE(no.delivery_date) <= ?`;
-    params.push(f.to);
-  }
-  if (f.salesPerson) {
-    dateSql += ` AND TRIM(no.created_by) = TRIM(?)`;
-    params.push(f.salesPerson);
-  }
-
-  let quoteSql = "";
   if (f.instCompletedBy) {
     const quoteKeys = await resolveInstCompletedByQuoteKeys(conn, f.instCompletedBy);
     if (!quoteKeys.length) {
       return parseOpenInstallationBreakdownRow(null);
     }
-    quoteSql = ` AND ${sqlUtf8TrimExpr("no.quote_number")} IN (${quoteKeys.map(() => "?").join(",")})`;
+    filterSql += ` AND ${sqlUtf8TrimExpr("no.quote_number")} IN (${quoteKeys.map(() => "?").join(",")})`;
     params.push(...quoteKeys);
   }
 
-  const baseOrderSql = `
-    (no.is_cancelled = 0 OR no.is_cancelled IS NULL)
-    AND (no.is_returned = 0 OR no.is_returned = 2 OR no.is_returned IS NULL)
-    ${dateSql}
-    ${overdueSql}
-    ${quoteSql}
-  `;
+  // Item-type as JOIN (materialized once) — correlated EXISTS made cards crawl.
+  const itemJoin = sqlOpenInstallationItemTypeJoin(f.itemType);
+  const merged = appendOpenInstallationNeworderExtraFilters(kpiFilters, filterSql, params, {
+    overdueDelayedOnly,
+    skipItemType: Boolean(itemJoin),
+  });
+  const baseOrderSql = merged.sql;
 
-  const deliveredOnSql = `(
-    no.delivered_on IS NOT NULL
-    AND TRIM(CAST(no.delivered_on AS CHAR)) NOT IN ('', '0000-00-00', '0000-00-00 00:00:00')
-    AND DATE(no.delivered_on) > '1970-01-01'
-  )`;
+  const deliveredOnSql = DELIVERED_ON_SQL;
 
-  // One cheap scan of neworder — never put correlated service_records EXISTS in this SUM.
-  const [[row]] = await conn.execute(
-    `SELECT
-       SUM(CASE WHEN COALESCE(no.installation_status, 0) = 0 THEN 1 ELSE 0 END) AS total,
+  const sumSql = `SELECT
+       SUM(
+         CASE
+           WHEN COALESCE(no.installation_status, 0) = 0 AND no.delivery_date IS NOT NULL
+           THEN 1 ELSE 0
+         END
+       ) AS total,
        SUM(
          CASE
            WHEN COALESCE(no.installation_status, 0) = 0 AND ${deliveredOnSql}
@@ -311,36 +447,53 @@ async function fetchOpenInstallationBreakdownLite(
          END
        ) AS delivered_installation_pending,
        SUM(CASE WHEN COALESCE(no.delivery_status, 0) = 0 THEN 1 ELSE 0 END) AS delivery_pending_after_dispatch,
+       0 AS installation_planned,
        SUM(CASE WHEN COALESCE(no.installation_status, 0) = 1 THEN 1 ELSE 0 END) AS completed_installation,
        0 AS no_feedback_collected,
        0 AS feedback_collected
      FROM neworder no
-     WHERE ${baseOrderSql}`,
-    params,
-  );
+     ${itemJoin}
+     WHERE ${baseOrderSql}`;
 
-  // no_feedback_collected stays 0 here — EXISTS over service_records stalls the pool.
-  // Client patches Feedback Collected card via /google-feedback countOnly.
-  return parseOpenInstallationBreakdownRow(row);
+  const [sumRows] = await conn.execute(sumSql, merged.params);
+  const row = sumRows?.[0] || null;
+
+  const data = parseOpenInstallationBreakdownRow(row);
+  if (!deferInstallationPlanned) {
+    data.installation_planned = await countInstallationPlannedServiceRecords(conn, kpiFilters);
+  }
+  return data;
+}
+
+export async function countOpenInstallationPlannedKpi(filters = {}) {
+  const conn = await getDbConnection();
+  return countInstallationPlannedServiceRecords(conn, filters);
 }
 
 export async function fetchOpenInstallationBreakdown(
   conn,
   filters,
-  { overdueDelayedOnly = false } = {},
+  { overdueDelayedOnly = false, deferInstallationPlanned = false, skipCache = false } = {},
 ) {
-  const cacheKey = openInstallationKpiCacheKey(filters, overdueDelayedOnly);
+  const kpiFilters = sbiFiltersForOpenInstallationKpi(filters);
+  const cacheKey = openInstallationKpiCacheKey(kpiFilters, overdueDelayedOnly);
   const cached = OPEN_INSTALLATION_KPI_CACHE.get(cacheKey);
-  if (cached && Date.now() - cached.at < OPEN_INSTALLATION_KPI_TTL_MS) {
+  if (!skipCache && cached && Date.now() - cached.at < OPEN_INSTALLATION_KPI_TTL_MS) {
     return cached.data;
   }
 
   let data;
-  if (!openInstallationNeedsFullListShape(filters) && !parseSbiFilters(filters).serviceStatus) {
-    data = await fetchOpenInstallationBreakdownLite(conn, filters, { overdueDelayedOnly });
+  if (
+    !openInstallationKpiNeedsFullBreakdown(kpiFilters) &&
+    !parseSbiFilters(kpiFilters).serviceStatus
+  ) {
+    data = await fetchOpenInstallationBreakdownLite(conn, kpiFilters, {
+      overdueDelayedOnly,
+      deferInstallationPlanned,
+    });
   } else {
-    const inner = buildOpenInstallationInnerQuery(filters, { forList: false });
-    const listFilter = buildUpcomingInstallationListFilterSql(filters, {
+    const inner = buildOpenInstallationInnerQuery(kpiFilters, { forList: false });
+    const listFilter = buildUpcomingInstallationListFilterSql(kpiFilters, {
       omitOpenInstallationBucket: true,
     });
     const extraSql = overdueDelayedOnly ? upcomingOverdueDelayedExtraSql() : "";
@@ -350,28 +503,118 @@ export async function fetchOpenInstallationBreakdown(
     );
     data = parseOpenInstallationBreakdownRow(row);
   }
+  if (!deferInstallationPlanned) {
+    data.installation_planned = await countInstallationPlannedServiceRecords(conn, kpiFilters);
+  }
   const allZero =
     !data.total &&
     !data.delivered_installation_pending &&
     !data.delivery_pending_after_dispatch &&
+    !data.installation_planned &&
     !data.completed_installation;
-  // Avoid caching a blank result (timeouts / empty pool reads) for the full TTL.
-  if (!allZero) {
+  // Cache even when planned is deferred — cards must hit cache on repeat loads.
+  if (!skipCache && !allZero) {
     OPEN_INSTALLATION_KPI_CACHE.set(cacheKey, { at: Date.now(), data });
   }
   return data;
 }
 
-const DELIVERED_ON_SQL = `(
-  no.delivered_on IS NOT NULL
-  AND TRIM(CAST(no.delivered_on AS CHAR)) NOT IN ('', '0000-00-00', '0000-00-00 00:00:00')
-  AND DATE(no.delivered_on) > '1970-01-01'
-)`;
-
 /**
  * Quotes where this user appears as installation assignee / completed-by / report engineer.
  * Start from service_records (selective) — avoids full open-installation join for table load.
  */
+/** Quote numbers for orders tied to PLANNED INSTALLATION SRs (view_service_reports parity). */
+async function resolveInstallationPlannedQuoteKeys(conn, filters = {}) {
+  const f = parseSbiFilters(filters);
+  let dateSql = "";
+  const dateParams = [];
+  if (f.from) {
+    dateSql += ` AND DATE(COALESCE(sr.planned_date, sr.complaint_date)) >= ?`;
+    dateParams.push(f.from);
+  }
+  if (f.to) {
+    dateSql += ` AND DATE(COALESCE(sr.planned_date, sr.complaint_date)) <= ?`;
+    dateParams.push(f.to);
+  }
+
+  const [rows] = await conn.execute(
+    `SELECT DISTINCT quote_key
+     FROM (
+       SELECT ${sqlUtf8TrimExpr("d.quote_number")} AS quote_key
+       FROM service_records sr
+       INNER JOIN dispatch d
+         ON ${sqlTrimUtf8EqColumns("d.serial_no", "sr.serial_number")}
+       WHERE ${SQL_SERVICE_RECORD_INSTALLATION_PLANNED}
+         AND d.quote_number IS NOT NULL
+         AND ${sqlUtf8TrimExpr("d.quote_number")} <> ''
+         ${dateSql}
+       UNION
+       SELECT ${sqlUtf8TrimExpr("d2.quote_number")} AS quote_key
+       FROM service_records sr
+       INNER JOIN warranty_products wp
+         ON ${sqlTrimUtf8EqColumns("wp.serial_number", "sr.serial_number")}
+       INNER JOIN dispatch d2
+         ON ${sqlTrimUtf8EqColumns("d2.serial_no", "wp.serial_number")}
+       WHERE ${SQL_SERVICE_RECORD_INSTALLATION_PLANNED}
+         AND d2.quote_number IS NOT NULL
+         AND ${sqlUtf8TrimExpr("d2.quote_number")} <> ''
+         ${dateSql}
+     ) planned_quotes
+     WHERE quote_key IS NOT NULL AND quote_key <> ''
+     LIMIT 5000`,
+    [...dateParams, ...dateParams],
+  );
+
+  return [...new Set((rows || []).map((r) => String(r.quote_key || "").trim()).filter(Boolean))];
+}
+
+/** Row count on view_service_reports when Status = PLANNED (INSTALLATION only). */
+async function countInstallationPlannedServiceRecords(conn, filters = {}) {
+  const kpiFilters = sbiFiltersForOpenInstallationKpi(filters);
+  const f = parseSbiFilters(kpiFilters);
+  let dateSql = "";
+  const dateParams = [];
+  if (f.from) {
+    dateSql += ` AND DATE(COALESCE(sr.planned_date, sr.complaint_date)) >= ?`;
+    dateParams.push(f.from);
+  }
+  if (f.to) {
+    dateSql += ` AND DATE(COALESCE(sr.planned_date, sr.complaint_date)) <= ?`;
+    dateParams.push(f.to);
+  }
+
+  let noSql = `
+    (no.is_cancelled = 0 OR no.is_cancelled IS NULL)
+    AND (no.is_returned = 0 OR no.is_returned = 2 OR no.is_returned IS NULL)
+  `;
+  const noParams = [];
+  if (f.instCompletedBy) {
+    const quoteKeys = await resolveInstCompletedByQuoteKeys(conn, f.instCompletedBy);
+    if (!quoteKeys.length) return 0;
+    noSql += ` AND ${sqlUtf8TrimExpr("no.quote_number")} IN (${quoteKeys.map(() => "?").join(",")})`;
+    noParams.push(...quoteKeys);
+  }
+  const itemJoin = sqlOpenInstallationItemTypeJoin(f.itemType);
+  const mergedNo = appendOpenInstallationNeworderExtraFilters(kpiFilters, noSql, noParams, {
+    skipItemType: Boolean(itemJoin),
+  });
+
+  const [[row]] = await conn.execute(
+    `SELECT COUNT(DISTINCT sr.service_id) AS cnt
+     FROM service_records sr
+     INNER JOIN dispatch d
+       ON ${sqlTrimUtf8EqColumns("d.serial_no", "sr.serial_number")}
+     INNER JOIN neworder no
+       ON ${sqlTrimUtf8EqColumns("no.quote_number", "d.quote_number")}
+     ${itemJoin}
+     WHERE ${SQL_SERVICE_RECORD_INSTALLATION_PLANNED}
+       ${dateSql}
+       AND ${mergedNo.sql}`,
+    [...dateParams, ...mergedNo.params],
+  );
+  return Number(row?.cnt || 0);
+}
+
 async function resolveInstCompletedByQuoteKeys(conn, name) {
   const who = String(name || "").trim();
   if (!who) return [];
@@ -412,18 +655,26 @@ function appendNeworderQuoteKeyInSql(whereSql, whereParams, quoteKeys) {
   };
 }
 
-async function buildOpenInstallationNeworderWhereWithInstCompletedBy(
+async function buildOpenInstallationNeworderWhereWithQuotePrefilters(
   conn,
   filters,
-  { overdueDelayedOnly = false } = {},
+  { overdueDelayedOnly = false, skipItemType = false } = {},
 ) {
-  const base = buildOpenInstallationNeworderWhereSql(filters, { overdueDelayedOnly });
-  const who = parseSbiFilters(filters).instCompletedBy;
-  if (!who) return { ...base, quoteKeys: null };
+  const parsed = parseSbiFilters(filters);
+  const base = buildOpenInstallationNeworderWhereSql(filters, {
+    overdueDelayedOnly,
+    skipItemType,
+  });
 
-  const quoteKeys = await resolveInstCompletedByQuoteKeys(conn, who);
-  const withQuotes = appendNeworderQuoteKeyInSql(base.sql, base.params, quoteKeys);
-  return { ...withQuotes, quoteKeys };
+  if (parsed.instCompletedBy) {
+    const quoteKeys = await resolveInstCompletedByQuoteKeys(conn, parsed.instCompletedBy);
+    return { ...appendNeworderQuoteKeyInSql(base.sql, base.params, quoteKeys), quoteKeys };
+  }
+  if (parsed.openInstallationBucket === "installation_planned") {
+    const quoteKeys = await resolveInstallationPlannedQuoteKeys(conn, filters);
+    return { ...appendNeworderQuoteKeyInSql(base.sql, base.params, quoteKeys), quoteKeys };
+  }
+  return { ...base, quoteKeys: null };
 }
 
 /** Same latest registration creator as list column u.registered_by / enrich GROUP_CONCAT. */
@@ -471,7 +722,10 @@ function sqlOpenInstallationQuoteLatestRegisteredByEquals(quoteNoColumn) {
  * Ultra-fast neworder WHERE for open-installation buckets.
  * No dispatch/products join — those were timing out the pool.
  */
-function buildOpenInstallationNeworderWhereSql(filters, { overdueDelayedOnly = false } = {}) {
+function buildOpenInstallationNeworderWhereSql(
+  filters,
+  { overdueDelayedOnly = false, skipItemType = false } = {},
+) {
   const f = parseSbiFilters(filters);
   const bucket = String(f.openInstallationBucket || "").trim().toLowerCase();
 
@@ -485,6 +739,8 @@ function buildOpenInstallationNeworderWhereSql(filters, { overdueDelayedOnly = f
     sql += ` AND COALESCE(no.delivery_status, 0) = 0`;
   } else if (bucket === "delivered_pending") {
     sql += ` AND COALESCE(no.installation_status, 0) = 0 AND ${DELIVERED_ON_SQL}`;
+  } else if (bucket === "installation_planned") {
+    // Quote keys from PLANNED INSTALLATION service_records (see buildOpenInstallationNeworderWhereWithQuotePrefilters).
   } else if (bucket === "completed") {
     sql += ` AND COALESCE(no.installation_status, 0) = 1`;
   } else if (bucket === "feedback_collected" || bucket === "no_feedback") {
@@ -493,57 +749,10 @@ function buildOpenInstallationNeworderWhereSql(filters, { overdueDelayedOnly = f
     sql += ` AND COALESCE(no.installation_status, 0) = 0 AND no.delivery_date IS NOT NULL`;
   }
 
-  if (overdueDelayedOnly) {
-    sql += ` AND no.delivery_date < DATE_SUB(CURDATE(), INTERVAL ${OVERDUE_DELAYED_INSTALLATION_DAYS} DAY)`;
-  }
-
-  if (f.search) {
-    const term = `%${f.search}%`;
-    sql += ` AND (
-      no.order_id LIKE ? OR no.quote_number LIKE ? OR no.company_name LIKE ?
-      OR no.contact LIKE ? OR no.invoice_number LIKE ? OR no.delivery_location LIKE ?
-      OR no.state LIKE ? OR no.created_by LIKE ?
-      OR EXISTS (
-        SELECT 1
-        FROM dispatch d_srch
-        INNER JOIN service_records sr_srch
-          ON ${sqlTrimUtf8EqColumns("sr_srch.serial_number", "d_srch.serial_no")}
-        WHERE ${sqlTrimUtf8EqColumns("d_srch.quote_number", "no.quote_number")}
-          AND UPPER(TRIM(COALESCE(sr_srch.service_type, ''))) = 'INSTALLATION'
-          AND CAST(sr_srch.service_id AS CHAR) LIKE ?
-      )
-    )`;
-    params.push(...Array(8).fill(term), term);
-  }
-  if (f.state) {
-    sql += ` AND no.state LIKE ?`;
-    params.push(`%${f.state}%`);
-  }
-  if (f.serial) {
-    sql += ` AND (no.invoice_number LIKE ? OR no.order_id LIKE ? OR no.quote_number LIKE ?)`;
-    params.push(`%${f.serial}%`, `%${f.serial}%`, `%${f.serial}%`);
-  }
-  if (f.from) {
-    sql += ` AND DATE(no.delivery_date) >= ?`;
-    params.push(f.from);
-  }
-  if (f.to) {
-    sql += ` AND DATE(no.delivery_date) <= ?`;
-    params.push(f.to);
-  }
-  if (f.salesPerson) {
-    sql += ` AND TRIM(no.created_by) = TRIM(?)`;
-    params.push(f.salesPerson);
-  }
-  if (f.assignedBy) {
-    sql += ` AND ${sqlOpenInstallationQuoteLatestRegisteredByEquals("no.quote_number")}`;
-    params.push(f.assignedBy);
-  }
-  if (f.registeredBy) {
-    sql += ` AND ${sqlOpenInstallationQuoteLatestRegisteredByEquals("no.quote_number")}`;
-    params.push(f.registeredBy);
-  }
-  return { sql, params };
+  return appendOpenInstallationNeworderExtraFilters(filters, sql, params, {
+    overdueDelayedOnly,
+    skipItemType,
+  });
 }
 
 function buildDeliveryStatusPendingWhereSql(filters) {
@@ -653,19 +862,7 @@ async function enrichOpenInstallationRowsWithDispatch(conn, rows) {
   });
 }
 
-async function fetchOpenInstallationNeworderPage(
-  conn,
-  filters,
-  limit,
-  skip,
-  { skipTotal = true, overdueDelayedOnly = false } = {},
-) {
-  const where = await buildOpenInstallationNeworderWhereWithInstCompletedBy(conn, filters, {
-    overdueDelayedOnly,
-  });
-
-  const [rows] = await conn.execute(
-    `SELECT
+const OPEN_INSTALLATION_LIST_SELECT = `
        no.id,
        no.order_id,
        no.quote_number,
@@ -707,21 +904,70 @@ async function fetchOpenInstallationNeworderPage(
        NULL AS service_engineer,
        NULL AS third_party_engineer,
        CASE WHEN COALESCE(no.installation_status, 0) = 1 THEN 1 ELSE 0 END AS installation_completed,
-       0 AS no_feedback_collected
+       0 AS no_feedback_collected`;
+
+async function fetchOpenInstallationNeworderPage(
+  conn,
+  filters,
+  limit,
+  skip,
+  {
+    skipTotal = true,
+    overdueDelayedOnly = false,
+    where: prebuiltWhere = null,
+    parallelEnrich = false,
+    enrichConn = null,
+    deferServiceEnrich = false,
+    deferDispatchEnrich = false,
+  } = {},
+) {
+  const parsed = parseSbiFilters(filters);
+  const itemJoin = prebuiltWhere ? "" : sqlOpenInstallationItemTypeJoin(parsed.itemType);
+  const where =
+    prebuiltWhere ??
+    (await buildOpenInstallationNeworderWhereWithQuotePrefilters(
+      conn,
+      filters,
+      {
+        overdueDelayedOnly,
+        skipItemType: Boolean(itemJoin),
+      },
+    ));
+
+  const [rows] = await conn.execute(
+    `SELECT
+       ${OPEN_INSTALLATION_LIST_SELECT}
      FROM neworder no
+     ${itemJoin}
      ${where.sql}
      ORDER BY no.id DESC
      LIMIT ? OFFSET ?`,
     [...where.params, limit, skip],
   );
 
-  let enriched = await enrichOpenInstallationRowsWithDispatch(conn, rows);
-  enriched = await enrichOpenInstallationRowsWithServices(conn, enriched);
+  let enriched = rows;
+  if (!deferDispatchEnrich || !deferServiceEnrich) {
+    if (parallelEnrich && rows.length && !deferDispatchEnrich && !deferServiceEnrich) {
+      const c2 = enrichConn ?? (await getDbConnection());
+      const [dispatchRows, serviceRows] = await Promise.all([
+        enrichOpenInstallationRowsWithDispatch(conn, rows),
+        enrichOpenInstallationRowsWithServices(c2, rows),
+      ]);
+      enriched = mergeOpenInstallationParallelEnrichment(dispatchRows, serviceRows);
+    } else {
+      if (!deferDispatchEnrich) {
+        enriched = await enrichOpenInstallationRowsWithDispatch(conn, enriched);
+      }
+      if (!deferServiceEnrich) {
+        enriched = await enrichOpenInstallationRowsWithServices(conn, enriched);
+      }
+    }
+  }
 
   let total;
   if (!skipTotal) {
     const [[countRow]] = await conn.execute(
-      `SELECT COUNT(*) AS cnt FROM neworder no ${where.sql}`,
+      `SELECT COUNT(*) AS cnt FROM neworder no ${itemJoin} ${where.sql}`,
       where.params,
     );
     total = Number(countRow?.cnt || 0);
@@ -745,14 +991,71 @@ async function countDeliveryStatusPending(conn, filters) {
 }
 
 async function countOpenInstallationNeworder(conn, filters, { overdueDelayedOnly = false } = {}) {
-  const where = await buildOpenInstallationNeworderWhereWithInstCompletedBy(conn, filters, {
+  const parsed = parseSbiFilters(filters);
+  const itemJoin = sqlOpenInstallationItemTypeJoin(parsed.itemType);
+  const where = await buildOpenInstallationNeworderWhereWithQuotePrefilters(conn, filters, {
     overdueDelayedOnly,
+    skipItemType: Boolean(itemJoin),
   });
   const [[row]] = await conn.execute(
-    `SELECT COUNT(*) AS cnt FROM neworder no ${where.sql}`,
+    `SELECT COUNT(*) AS cnt FROM neworder no ${itemJoin} ${where.sql}`,
     where.params,
   );
   return Number(row?.cnt || 0);
+}
+
+/**
+ * KPI cards — same COUNT(*) as the table per bucket (accurate).
+ * Sequential on one connection (mysql2 cannot multiplex one conn).
+ * Empty itemType = full universe (matches legacy 142 delivered-pending).
+ */
+async function fetchOpenInstallationBreakdownByBuckets(conn, filters) {
+  const kpiFilters = sbiFiltersForOpenInstallationKpi(
+    withDefaultOpenInstallationItemType(filters),
+  );
+  const cacheKey = openInstallationKpiCacheKey(kpiFilters, false);
+  const cached = OPEN_INSTALLATION_KPI_CACHE.get(cacheKey);
+  if (cached && Date.now() - cached.at < OPEN_INSTALLATION_KPI_TTL_MS) {
+    return cached.data;
+  }
+
+  const data = parseOpenInstallationBreakdownRow(null);
+  data.feedback_collected = 0;
+
+  data.delivered_installation_pending = await countOpenInstallationNeworder(conn, {
+    ...kpiFilters,
+    openInstallationBucket: "delivered_pending",
+  });
+  data.delivery_pending_after_dispatch = await countOpenInstallationNeworder(conn, {
+    ...kpiFilters,
+    openInstallationBucket: "delivery_pending",
+  });
+  data.completed_installation = await countOpenInstallationNeworder(conn, {
+    ...kpiFilters,
+    openInstallationBucket: "completed",
+  });
+  data.total = await countOpenInstallationNeworder(conn, {
+    ...kpiFilters,
+    openInstallationBucket: "",
+  });
+  data.installation_planned = await countInstallationPlannedServiceRecords(conn, kpiFilters);
+
+  const allZero =
+    !data.total &&
+    !data.delivered_installation_pending &&
+    !data.delivery_pending_after_dispatch &&
+    !data.installation_planned &&
+    !data.completed_installation;
+  if (!allZero) {
+    OPEN_INSTALLATION_KPI_CACHE.set(cacheKey, { at: Date.now(), data });
+  }
+  return data;
+}
+
+/** Public cards breakdown — list-accurate bucket counts (not lite SUM). */
+export async function fetchOpenInstallationCardsBreakdown(filters = {}) {
+  const conn = await getDbConnection();
+  return fetchOpenInstallationBreakdownByBuckets(conn, filters);
 }
 
 /** Fast total for open-installation list (separate API from rows). */
@@ -766,6 +1069,79 @@ export async function countOpenInstallationSegment(segment, filters = {}) {
     return countOpenInstallationNeworder(conn, filters, { overdueDelayedOnly });
   }
   return 0;
+}
+
+/**
+ * Do NOT force itemType=products — that under-counted cards (e.g. 142 → 11).
+ * Empty / all = full open-installation universe (same as legacy countOnly).
+ */
+export function withDefaultOpenInstallationItemType(filters) {
+  return parseSbiFilters(filters);
+}
+
+/**
+ * One round-trip: list + bucket total + KPI breakdown (parallel DB work, shared WHERE once).
+ */
+export async function fetchOpenInstallationPageBundle(
+  filters,
+  limit,
+  skip,
+  { overdueDelayedOnly = false } = {},
+) {
+  if (openInstallationNeedsFullListShape(filters)) {
+    const conn = await getDbConnection();
+    const page = await fetchUpcomingInstallationsPage(conn, filters, limit, skip, {
+      overdueDelayedOnly,
+      includeBreakdown: true,
+      skipTotal: false,
+    });
+    return {
+      total: page.total,
+      hasMore: page.hasMore,
+      data: page.data,
+      openInstallationBreakdown: page.openInstallationBreakdown,
+    };
+  }
+
+  const withProducts = withDefaultOpenInstallationItemType(filters);
+  const connList = await getDbConnection();
+  const connKpi = await getDbConnection();
+  const connEnrich = await getDbConnection();
+
+  const where = await buildOpenInstallationNeworderWhereWithQuotePrefilters(connList, withProducts, {
+    overdueDelayedOnly,
+  });
+
+  const [pageResult, breakdown] = await Promise.all([
+    fetchOpenInstallationNeworderPage(connList, withProducts, limit, skip, {
+      skipTotal: true,
+      overdueDelayedOnly,
+      where,
+      parallelEnrich: true,
+      enrichConn: connEnrich,
+    }),
+    fetchOpenInstallationBreakdown(connKpi, withProducts, { overdueDelayedOnly }),
+  ]);
+
+  const bucket = String(parseSbiFilters(withProducts).openInstallationBucket || "").trim();
+  let total = bucket
+    ? openInstallationBucketRecordCount(bucket, breakdown)
+    : Number(breakdown?.total || 0);
+  if (total <= 0) {
+    const [[countRow]] = await connList.execute(
+      `SELECT COUNT(*) AS cnt FROM neworder no ${where.sql}`,
+      where.params,
+    );
+    total = Number(countRow?.cnt || 0);
+  }
+
+  const data = pageResult.data || [];
+  return {
+    total,
+    hasMore: skip + data.length < total,
+    data,
+    openInstallationBreakdown: breakdown,
+  };
 }
 
 async function fetchOpenInstallationQuotePageKeys(
@@ -812,12 +1188,26 @@ async function fetchOpenInstallationQuotePageKeys(
   return rows.map((r) => String(r.quote_number || "").trim()).filter(Boolean);
 }
 
+/** Dispatch + service columns — second paint after raw list. */
+export async function enrichOpenInstallationListServices(rows) {
+  if (!rows?.length) return rows || [];
+  const conn = await getDbConnection();
+  const withDispatch = await enrichOpenInstallationRowsWithDispatch(conn, rows);
+  const withServices = await enrichOpenInstallationRowsWithServices(conn, withDispatch);
+  return mergeOpenInstallationParallelEnrichment(withDispatch, withServices);
+}
+
 async function fetchUpcomingInstallationsPage(
   conn,
   filters,
   limit,
   skip,
-  { overdueDelayedOnly = false, includeBreakdown = false, skipTotal = false } = {},
+  {
+    overdueDelayedOnly = false,
+    includeBreakdown = false,
+    skipTotal = false,
+    deferServiceEnrich = false,
+  } = {},
 ) {
   const parsed = parseSbiFilters(filters);
 
@@ -829,14 +1219,15 @@ async function fetchUpcomingInstallationsPage(
     !parsed.thirdPartyEngineer &&
     !parsed.assignedBy &&
     !parsed.registeredBy &&
-    !parsed.warrantyRegistration &&
     !parsed.orderDeliveryStatus &&
-    !parsed.model;
+    !openInstallationNeedsFullListShape(filters);
 
   if (useNeworderFastPath) {
     const page = await fetchOpenInstallationNeworderPage(conn, filters, limit, skip, {
       skipTotal,
       overdueDelayedOnly,
+      deferServiceEnrich,
+      deferDispatchEnrich: deferServiceEnrich,
     });
     const breakdown = includeBreakdown
       ? await fetchOpenInstallationBreakdown(conn, filters, { overdueDelayedOnly })
@@ -1088,25 +1479,23 @@ export async function fetchServiceBeforeInstallationSegmentPage(segment, options
   const safeSkip = skip;
 
   if (segment === "open-installation") {
-    const listFilters = parseSbiFilters(filters);
-    const withProducts =
-      listFilters.itemType === "" || listFilters.itemType === "all"
-        ? { ...filters, itemType: "products" }
-        : filters;
+    // Keep caller's itemType — do not force products (that cut delivered-pending ~142 → ~11).
     if (options.breakdownOnly) {
-      const openInstallationBreakdown = await fetchOpenInstallationBreakdown(conn, withProducts, {
-        overdueDelayedOnly: false,
-      });
+      const openInstallationBreakdown = await fetchOpenInstallationBreakdownByBuckets(
+        conn,
+        filters,
+      );
       return {
         total: openInstallationBreakdown.total,
         data: [],
         openInstallationBreakdown,
       };
     }
-    return fetchUpcomingInstallationsPage(conn, withProducts, safeLimit, safeSkip, {
+    return fetchUpcomingInstallationsPage(conn, filters, safeLimit, safeSkip, {
       overdueDelayedOnly: false,
       includeBreakdown: options.includeOpenInstallationBreakdown !== false,
       skipTotal: Boolean(options.skipTotal),
+      deferServiceEnrich: options.deferServiceEnrich !== false,
     });
   }
 
@@ -1161,6 +1550,7 @@ export async function fetchServiceBeforeInstallationSegmentPage(segment, options
       overdueDelayedOnly: true,
       includeBreakdown: options.includeOpenInstallationBreakdown !== false,
       skipTotal: Boolean(options.skipTotal),
+      deferServiceEnrich: options.deferServiceEnrich !== false,
     });
   }
 

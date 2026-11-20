@@ -21,6 +21,10 @@ export function buildNeworderOpenInstallationBucketWhereSql(openInstallationBuck
   if (b === "delivered_pending") {
     return `AND COALESCE(no.installation_status, 0) = 0 AND (${NO_ACTUALLY_DELIVERED_SQL})`;
   }
+  if (b === "installation_planned") {
+    // Quote list resolved from PLANNED INSTALLATION service_records (see quote prefilter).
+    return "";
+  }
   if (b === "completed") {
     return `AND (
       COALESCE(no.installation_status, 0) = 1

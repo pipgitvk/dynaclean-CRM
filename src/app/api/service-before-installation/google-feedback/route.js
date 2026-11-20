@@ -1,25 +1,10 @@
 import { NextResponse } from "next/server";
 import { assertSuperAdminApiAccess } from "@/lib/serviceBeforeInstallationAccess";
-import { parseSbiFilters } from "@/lib/serviceBeforeInstallationFilters";
+import { parseSbiFiltersFromSearchParams } from "@/lib/serviceBeforeInstallationFilters";
 import {
   countOpenInstallationGoogleFeedbackStats,
   fetchOpenInstallationGoogleFeedbackPage,
 } from "@/lib/openInstallationGoogleFeedbackQueries";
-
-function parseFiltersFromSearchParams(searchParams) {
-  return parseSbiFilters({
-    search: searchParams.get("search"),
-    q: searchParams.get("q"),
-    model: searchParams.get("model"),
-    state: searchParams.get("state"),
-    serial: searchParams.get("serial"),
-    from: searchParams.get("from"),
-    to: searchParams.get("to"),
-    itemType: searchParams.get("itemType") ?? searchParams.get("item_type"),
-    salesPerson: searchParams.get("salesPerson") ?? searchParams.get("sales_person"),
-    assignedBy: searchParams.get("assignedBy") ?? searchParams.get("assigned_by"),
-  });
-}
 
 /**
  * Open Installation — Google feedback collected (installed, google_feedback_collected = yes).
@@ -32,7 +17,7 @@ export async function GET(request) {
     }
 
     const { searchParams } = new URL(request.url);
-    const filters = parseFiltersFromSearchParams(searchParams);
+    const filters = parseSbiFiltersFromSearchParams(searchParams);
     const limit = Math.min(parseInt(searchParams.get("limit") || "50", 10) || 50, 200);
     const skip = Math.max(parseInt(searchParams.get("skip") || "0", 10) || 0, 0);
     const countOnly = String(searchParams.get("countOnly") || "").trim() === "1";
