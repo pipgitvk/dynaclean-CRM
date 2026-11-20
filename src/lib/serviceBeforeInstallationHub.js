@@ -44,11 +44,11 @@ export const OPEN_INSTALLATION_DETAIL_KPI_STRIP = [
     chartColor: "#10b981",
   },
   {
-    id: "open-installation-no-feedback",
-    title: "No Feedback Collected",
-    subtitle: "Installation done — installation report not uploaded",
-    countCaption: "No. of no feedback collected",
-    countKey: "no_feedback_collected",
+    id: "open-installation-feedback-collected",
+    title: "Feedback Collected",
+    subtitle: "Installation done — Google feedback marked Yes",
+    countCaption: "No. of feedback collected",
+    countKey: "feedback_collected",
     accent: "from-rose-500 to-orange-600",
     surface:
       "bg-white/80 backdrop-blur-xl border-rose-200/40 shadow-[0_8px_30px_-8px_rgba(244,63,94,0.3)]",
@@ -221,7 +221,8 @@ export function openInstallationBucketFromKpiCardId(cardId) {
   if (cardId === "open-installation-delivered-pending") return "delivered_pending";
   if (cardId === "open-installation-delivery-pending") return "delivery_pending";
   if (cardId === "open-installation-completed") return "completed";
-  if (cardId === "open-installation-no-feedback") return "no_feedback";
+  if (cardId === "open-installation-feedback-collected") return "feedback_collected";
+  if (cardId === "open-installation-no-feedback") return "feedback_collected";
   return "";
 }
 
@@ -230,7 +231,8 @@ export function openInstallationKpiCardIdFromFilter(openInstallationBucket) {
   if (v === "delivered_pending") return "open-installation-delivered-pending";
   if (v === "delivery_pending") return "open-installation-delivery-pending";
   if (v === "completed") return "open-installation-completed";
-  if (v === "no_feedback") return "open-installation-no-feedback";
+  if (v === "feedback_collected" || v === "no_feedback")
+    return "open-installation-feedback-collected";
   return "";
 }
 

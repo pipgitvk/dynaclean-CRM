@@ -7,14 +7,30 @@ export function parseUpcomingInstallationServiceDetails(blob) {
     .map((part) => part.trim())
     .filter(Boolean)
     .map((part) => {
-      const [id, status, scheduledDate, assignedTo] = part.split("~");
+      const [id, status, scheduledDate, assignedTo, statusDescription] = part.split("~");
       return {
         serviceId: id?.trim() || "",
         status: status?.trim() || "—",
         scheduledDate: scheduledDate?.trim() || "—",
         assignedTo: assignedTo?.trim() || "—",
+        statusDescription: statusDescription?.trim() || "",
       };
     });
+}
+
+export function serializeUpcomingInstallationServiceDetails(items) {
+  if (!Array.isArray(items) || items.length === 0) return "";
+  return items
+    .map((it) =>
+      [
+        it.serviceId || "",
+        it.status && it.status !== "—" ? it.status : "",
+        it.scheduledDate && it.scheduledDate !== "—" ? it.scheduledDate : "",
+        it.assignedTo && it.assignedTo !== "—" ? it.assignedTo : "",
+        it.statusDescription || "",
+      ].join("~"),
+    )
+    .join(";;");
 }
 
 function serviceStatusBadgeClass(status) {

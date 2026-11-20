@@ -22,10 +22,10 @@ function parseFiltersFromSearchParams(searchParams) {
 }
 
 /**
- * Dedicated No Feedback (missing installation report) API.
+ * Open Installation — Google feedback not collected (installed, google_feedback_collected ≠ yes).
  *
- * GET ?countOnly=1 → total for KPI card (may be slower; call in background)
- * GET ?limit=&skip=&skipTotal=1 → fast list (default), same speed class as other cards
+ * GET ?countOnly=1 → total for KPI card
+ * GET ?limit=&skip=&skipTotal=1 → list for the No Feedback bucket
  */
 export async function GET(request) {
   try {

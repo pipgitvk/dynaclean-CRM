@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
+import { getSessionPayload } from "@/lib/auth";
 import { ensureServiceRecordsThirdPartyAssignColumns } from "@/lib/ensureServiceRecordsThirdPartyAssignColumns";
+import { ensureServiceRecordsEngineerAssignedByColumn } from "@/lib/ensureServiceRecordsEngineerAssignedByColumn";
 
 export async function POST(req) {
   try {
@@ -15,6 +17,11 @@ export async function POST(req) {
 
     const conn = await getDbConnection();
     await ensureServiceRecordsThirdPartyAssignColumns(conn);
+    await ensureServiceRecordsEngineerAssignedByColumn(conn);
+
+    const payload = await getSessionPayload();
+    const engineerAssignedBy =
+      String(payload?.username || payload?.name || "").trim() || "admin";
 
     const tpIdRaw = third_party_engineer_id;
     const tpId =
@@ -45,13 +52,15 @@ export async function POST(req) {
        SET assigned_to = ?,
            assigned_to_type = ?,
            assigned_to_id = ?,
-           third_party_engineer_id = ?
+           third_party_engineer_id = ?,
+           engineer_assigned_by = ?
        WHERE service_id = ?`,
       [
         String(assigned_to).trim(),
         assignedToType,
         assignedToId,
         hasThirdParty ? tpId : null,
+        engineerAssignedBy,
         service_id,
       ]
     );
@@ -63,7 +72,11 @@ export async function POST(req) {
       );
     }
 
-    return NextResponse.json({ success: true, message: "Assigned successfully" });
+    return NextResponse.json({
+      success: true,
+      message: "Assigned successfully",
+      engineer_assigned_by: engineerAssignedBy,
+    });
   } catch (error) {
     console.error("Error assigning service:", error);
     return NextResponse.json(

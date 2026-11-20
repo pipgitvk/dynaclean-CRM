@@ -213,6 +213,8 @@ export function buildUpcomingInstallationListFilterSql(
       sql += ` AND ${U_DELIVERY_PENDING_AFTER_DISPATCH_SQL}`;
     } else if (f.openInstallationBucket === "completed") {
       sql += ` AND ${U_INSTALLATION_COMPLETED_SQL}`;
+    } else if (f.openInstallationBucket === "feedback_collected") {
+      sql += ` AND LOWER(TRIM(COALESCE(u.google_feedback_collected, ''))) = 'yes'`;
     } else if (f.openInstallationBucket === "no_feedback") {
       sql += ` AND ${U_NO_FEEDBACK_COLLECTED_SQL}`;
     }

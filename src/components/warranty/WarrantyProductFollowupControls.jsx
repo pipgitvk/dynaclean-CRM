@@ -13,10 +13,14 @@ export function useWarrantyProductFollowup(onSaved) {
   const [historyTarget, setHistoryTarget] = useState(null);
   const [previewImage, setPreviewImage] = useState(null);
 
-  function ProductFollowupIcons({ product, className = "mb-1.5" }) {
+  function ProductFollowupIcons({
+    product,
+    className = "mb-1.5",
+    variant = "icon",
+  }) {
     return (
       <FollowUpActionButtons
-        variant="icon"
+        variant={variant}
         className={className}
         onFollowUp={() => setFollowUpTarget(toFollowupTarget(product))}
         onHistory={() => setHistoryTarget(product)}

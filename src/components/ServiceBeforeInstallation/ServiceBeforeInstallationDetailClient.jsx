@@ -21,7 +21,9 @@ import {
   Shield,
   ShieldCheck,
   Wrench,
+  FileText,
 } from "lucide-react";
+import ServiceAttachmentLink from "@/components/services/ServiceAttachmentLink";
 import { getSegmentMeta } from "@/lib/serviceBeforeInstallationHub";
 import { openInstallationBucketRecordCount } from "@/lib/openInstallationKpiSql";
 import { defaultSbiSelectFilters } from "@/lib/serviceBeforeInstallationFilters";
@@ -38,9 +40,9 @@ import {
 } from "@/lib/upcomingInstallationDeliveryDisplay";
 import { isServiceRecordAssigned } from "@/lib/serviceRecordAssignment";
 import UpcomingInstallationReferenceIds from "@/components/installation/UpcomingInstallationReferenceIds";
-import UpcomingInstallationServiceStatusColumn, {
-  parseUpcomingInstallationServiceDetails,
-} from "@/components/installation/UpcomingInstallationServiceStatusColumn";
+import { parseUpcomingInstallationServiceDetails } from "@/components/installation/UpcomingInstallationServiceStatusColumn";
+import OpenInstallationStatusColumn from "@/components/installation/OpenInstallationStatusColumn";
+import { useWarrantyProductFollowup } from "@/components/warranty/WarrantyProductFollowupControls";
 
 const DEFAULT_PAGE_SIZE = 10;
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
@@ -164,6 +166,56 @@ function salesPersonLabel(row) {
 
 function registeredByLabel(row) {
   return String(row.registered_by || "").trim();
+}
+
+function registrationDateByExport(row, { useInvoiceFallback = false } = {}) {
+  const registeredOnly =
+    row.warranty_registered != null && Number(row.warranty_registered) !== 1;
+  if (registeredOnly) return "";
+  const raw = useInvoiceFallback
+    ? row.registered_at || row.invoice_date
+    : row.registered_at;
+  const date = raw
+    ? formatCrmDateOnly(String(raw).slice(0, 10)) || formatDate(raw)
+    : "";
+  const by = registeredByLabel(row);
+  const byPart = by ? `Regst. By – ${by}` : "";
+  return [date, byPart].filter(Boolean).join(" · ");
+}
+
+function registeredDateDisplay(row) {
+  const raw = row.registered_at || row.invoice_date;
+  if (!raw) return "";
+  return formatCrmDateOnly(String(raw).slice(0, 10)) || formatDate(raw);
+}
+
+function RegistrationDateByCell({ row, requireWarrantyRegistered = false }) {
+  if (requireWarrantyRegistered && Number(row.warranty_registered) !== 1) {
+    return <span className="text-slate-400">—</span>;
+  }
+  const date = registeredDateDisplay(row);
+  const by = registeredByLabel(row);
+  if ((!date || date === "—") && !by) {
+    return <span className="text-slate-400">—</span>;
+  }
+  return (
+    <div className="min-w-[8rem] space-y-1">
+      {date && date !== "—" ? (
+        <div className="text-sm leading-snug text-slate-800">
+          <span className="text-xs font-semibold text-slate-500">Regst. Date</span>
+          <span className="mx-1 text-slate-400">–</span>
+          <span className="font-medium tabular-nums text-slate-900">{date}</span>
+        </div>
+      ) : null}
+      {by ? (
+        <div className="text-sm leading-snug text-slate-800">
+          <span className="text-xs font-semibold text-slate-500">Regst. By</span>
+          <span className="mx-1 text-slate-400">–</span>
+          <span className="text-base font-semibold text-slate-900">{by}</span>
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 function teamFilterOptionsFromRows(rows) {
@@ -316,12 +368,118 @@ function OpenInstallationEngineerCell({ row }) {
   );
 }
 
+function openInstallationCompletedByEngineer(row) {
+  const fromReport = String(row.installation_report_engineer || "").trim();
+  if (fromReport) return fromReport;
+  const recorded = String(row.completed_by_service_engineer || "").trim();
+  if (recorded) return recorded;
+  return "";
+}
+
+function assignedByEngineerExport(row) {
+  const by = String(row.assigned_by || "").trim();
+  const completedBy = openInstallationCompletedByEngineer(row);
+  return [
+    by ? `Assigned By: ${by}` : "",
+    completedBy ? `Completed by: ${completedBy}` : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+function OpenInstallationAssignedByEngineerCell({ row }) {
+  const by = String(row.assigned_by || "").trim();
+  const completedBy = openInstallationCompletedByEngineer(row);
+  if (!by && !completedBy) {
+    return <span className="text-slate-400">—</span>;
+  }
+  return (
+    <div className="min-w-[8.5rem] max-w-[12rem] space-y-1.5">
+      <div className="text-sm leading-snug text-slate-800">
+        <span className="text-xs font-semibold text-slate-500">Assigned By</span>
+        <span className="mx-1 text-slate-400">–</span>
+        <span className="font-semibold text-slate-900">{by || "—"}</span>
+      </div>
+      <div className="text-sm leading-snug text-slate-800">
+        <span className="text-xs font-semibold text-slate-500">Completed by</span>
+        <span className="mx-1 text-slate-400">–</span>
+        <span className="font-semibold text-slate-900">{completedBy || "—"}</span>
+      </div>
+    </div>
+  );
+}
+
 function modelPillClass(model) {
   const s = String(model || "").trim();
   if (!s) return MODEL_PILL_CLASSES[0];
   let h = 0;
   for (let i = 0; i < s.length; i += 1) h = (h + s.charCodeAt(i) * (i + 1)) % MODEL_PILL_CLASSES.length;
   return MODEL_PILL_CLASSES[h];
+}
+
+/** Split dispatch GROUP_CONCAT model codes + product names into readable line items. */
+function parseOpenInstallationDispatchItems(modelStr, nameStr) {
+  const codes = String(modelStr || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const names = String(nameStr || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  if (!codes.length && !names.length) return [];
+
+  const pairCount = Math.max(codes.length, names.length);
+  const items = [];
+  for (let i = 0; i < pairCount; i += 1) {
+    const code = codes[i] ?? "";
+    const name = names[i] ?? "";
+    if (!code && !name) continue;
+    items.push({ code, name });
+  }
+
+  const seen = new Set();
+  return items.filter((it) => {
+    const key = `${it.code.toLowerCase()}|${it.name.toLowerCase()}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function openInstallationModelExport(row) {
+  return parseOpenInstallationDispatchItems(row.model, row.name)
+    .map((it) => {
+      if (it.code && it.name) return `${it.code}: ${it.name}`;
+      return it.code || it.name;
+    })
+    .join(" | ");
+}
+
+function OpenInstallationModelCell({ row }) {
+  const items = parseOpenInstallationDispatchItems(row.model, row.name);
+  if (!items.length) {
+    return <span className="text-slate-400">—</span>;
+  }
+  return (
+    <ul className="min-w-[10.5rem] max-w-[16rem] list-none space-y-2">
+      {items.map((it, idx) => (
+        <li key={`${it.code}-${idx}`} className="space-y-0.5">
+          {it.code ? (
+            <span
+              className={`inline-flex rounded-md border px-1.5 py-0.5 text-[11px] font-bold leading-tight ${modelPillClass(it.code)}`}
+            >
+              {it.code}
+            </span>
+          ) : null}
+          {it.name ? (
+            <p className="text-xs leading-snug text-slate-700">{it.name}</p>
+          ) : null}
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 function buildPageWindow(current, total) {
@@ -352,47 +510,36 @@ function exportRowsCsv(rows, segment) {
     "open-installation": [
       "Dispatch Date",
       "Inv | Ord | Ser",
-      "Company",
+      "Company / State",
       "Delivery Address",
-      "State",
       "Sales Person",
-      "Assigned By",
-      "Service Engineer",
+      "Assigned By / Completed by",
       "Model",
       "Contact",
-      "Order Status",
-      "Delivery-Exp",
-      "Act",
-      "Registered Date",
-      "Registered By",
-      "Registration",
-      "Service status",
+      "Order / Delivery",
+      "Regst. / Registration",
+      "Status",
+      "Action",
     ],
     "overdue-delayed-installation": [
       "Dispatch Date",
       "Inv | Ord | Ser",
-      "Company",
+      "Company / State",
       "Delivery Address",
-      "State",
       "Sales Person",
-      "Assigned By",
-      "Service Engineer",
+      "Assigned By / Completed by",
       "Model",
       "Contact",
-      "Order Status",
-      "Delivery-Exp",
-      "Act",
-      "Registered Date",
-      "Registered By",
-      "Registration",
-      "Service status",
+      "Order / Delivery",
+      "Regst. / Registration",
+      "Status",
+      "Action",
     ],
     "active-amc": ["Serial", "Company", "Contact", "Status", "AMC Start", "AMC End"],
     "due-amc-expiring": ["Serial", "Company", "Contact", "Status", "AMC Start", "AMC End"],
     "total-registered": [
       "Customer / Serial / Model",
-      "Registered Date",
-      "Registered By",
+      "Regst. Date",
       "Company",
       "Site Contact",
       "State",
@@ -427,8 +574,6 @@ function exportRowsCsv(rows, segment) {
       ];
     }
     if (segment === "open-installation" || segment === "overdue-delayed-installation") {
-      const exp = getUpcomingInstallationExpectedDateDisplay(row).text;
-      const act = getUpcomingInstallationActualDeliveryDisplay(row).text;
       return [
         formatUpcomingInstallationYmd(row.dispatch_date),
         [
@@ -438,25 +583,14 @@ function exportRowsCsv(rows, segment) {
         ]
           .filter(Boolean)
           .join(" / "),
-        row.company_name,
+        companyStateExport(row),
         row.delivery_address,
-        row.state,
         salesPersonLabel(row),
-        row.assigned_by?.trim() || "",
-        [
-          isServiceRecordAssigned(row.service_engineer) ? row.service_engineer : "",
-          isServiceRecordAssigned(row.third_party_engineer) ? row.third_party_engineer : "",
-        ]
-          .filter(Boolean)
-          .join(" / "),
-        [row.model, row.name].filter(Boolean).join(" · "),
+        assignedByEngineerExport(row),
+        openInstallationModelExport(row),
         row.contact,
-        hasActualDeliveryDate(row) ? "Delivered" : "Not delivered",
-        exp,
-        act,
-        Number(row.warranty_registered) === 1 ? formatDate(row.registered_at) : "",
-        Number(row.warranty_registered) === 1 ? registeredByLabel(row) : "",
-        Number(row.warranty_registered) === 1 ? "Registered" : "Not registered",
+        orderDeliveryExport(row),
+        registrationExport(row),
         openInstallationServiceStatusExport(row),
       ];
     }
@@ -487,8 +621,7 @@ function exportRowsCsv(rows, segment) {
         ]
           .filter(Boolean)
           .join(" | "),
-        formatDate(row.registered_at || row.invoice_date),
-        registeredByLabel(row),
+        registrationDateByExport(row, { useInvoiceFallback: true }),
         [
           row.customer_name,
           row.email,
@@ -632,11 +765,8 @@ function WarrantyProductRows({ rows, dashboardBase, page, pageSize, segment }) {
         <td className="px-4 py-3.5 align-top">
           <ProductIdentityBlock row={row} customerHref={customerHref} serialHref={serialHref} />
         </td>
-        <td className="whitespace-nowrap px-4 py-3.5 text-sm text-slate-700">
-          {formatDate(row.registered_at || row.invoice_date)}
-        </td>
-        <td className="px-4 py-3.5 text-sm text-slate-800">
-          <span className="font-medium">{registeredByLabel(row) || "—"}</span>
+        <td className="px-4 py-3.5 align-top">
+          <RegistrationDateByCell row={row} />
         </td>
         <td className="px-4 py-3.5 align-top">
           <CompanyDetailBlock row={row} />
@@ -732,6 +862,32 @@ function ServiceRows({ rows, dashboardBase, page, pageSize, variant = "complaint
   });
 }
 
+function companyStateExport(row) {
+  const company = String(row.company_name || "").trim();
+  const state = String(row.state || "").trim();
+  return [company, state ? `State: ${state}` : ""].filter(Boolean).join(" · ");
+}
+
+function OpenInstallationCompanyStateCell({ row }) {
+  const company = String(row.company_name || "").trim();
+  const state = String(row.state || "").trim();
+  if (!company && !state) {
+    return <span className="text-slate-400">—</span>;
+  }
+  return (
+    <div className="min-w-[8rem] space-y-1">
+      {company ? <div className="text-sm font-medium text-slate-800">{company}</div> : null}
+      {state ? (
+        <div className="text-sm leading-snug text-slate-800">
+          <span className="text-xs font-semibold text-slate-500">State</span>
+          <span className="mx-1 text-slate-400">–</span>
+          <span className="font-semibold text-slate-900">{state}</span>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function OpenInstallationDeliveryBlock({ row }) {
   const expected = getUpcomingInstallationExpectedDateDisplay(row);
   const actual = getUpcomingInstallationActualDeliveryDisplay(row);
@@ -749,15 +905,19 @@ function OpenInstallationDeliveryBlock({ row }) {
   );
 }
 
-function OpenInstallationOrderStatusBadge({ row }) {
+function openInstallationOrderDelivered(row) {
   const deliveryStatus =
     row?.order_delivery_status != null && row?.order_delivery_status !== ""
       ? Number(row.order_delivery_status)
       : null;
-  const delivered =
-    deliveryStatus != null && !Number.isNaN(deliveryStatus)
-      ? deliveryStatus !== 0
-      : hasActualDeliveryDate(row);
+  if (deliveryStatus != null && !Number.isNaN(deliveryStatus)) {
+    return deliveryStatus !== 0;
+  }
+  return hasActualDeliveryDate(row);
+}
+
+function OpenInstallationOrderStatusBadge({ row }) {
+  const delivered = openInstallationOrderDelivered(row);
   return (
     <span
       className={`inline-flex rounded-md border px-2 py-0.5 text-[11px] font-bold ${
@@ -771,6 +931,116 @@ function OpenInstallationOrderStatusBadge({ row }) {
   );
 }
 
+function OpenInstallationOrderDeliveryCell({ row }) {
+  return (
+    <div className="min-w-[8.5rem] space-y-1">
+      <OpenInstallationOrderStatusBadge row={row} />
+      <OpenInstallationDeliveryBlock row={row} />
+    </div>
+  );
+}
+
+function orderDeliveryExport(row) {
+  const status = openInstallationOrderDelivered(row) ? "Delivered" : "Not delivered";
+  const exp = getUpcomingInstallationExpectedDateDisplay(row).text;
+  const act = getUpcomingInstallationActualDeliveryDisplay(row).text;
+  return [status, `Delivery-Exp: ${exp}`, `Act: ${act}`].join(" · ");
+}
+
+function openInstallationPrimaryServiceId(row) {
+  const items = parseUpcomingInstallationServiceDetails(row?.service_details);
+  return (
+    items[0]?.serviceId ||
+    String(row?.service_id || "")
+      .split(",")[0]
+      ?.trim() ||
+    ""
+  );
+}
+
+function openInstallationReportAttachment(row) {
+  const finalPath = String(row.final_report_path || "").trim();
+  if (finalPath) {
+    return {
+      kind: "external",
+      href: finalPath.startsWith("http")
+        ? finalPath
+        : `https://service.dynacleanindustries.com/${finalPath.replace(/^\/+/, "")}`,
+    };
+  }
+  const inst = String(row.installation_report || "").trim();
+  if (!inst || inst === "uploadFO") return null;
+  const files = inst
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (!files.length) return null;
+  return { kind: "file", path: files[0] };
+}
+
+const openInstallationReportBtnClass =
+  "inline-flex items-center gap-1 rounded bg-emerald-700 px-2 py-1 text-xs font-medium text-white whitespace-nowrap hover:bg-emerald-800";
+
+function OpenInstallationReportButton({ row, dashboardBase }) {
+  const serviceId = openInstallationPrimaryServiceId(row);
+  const attachment = openInstallationReportAttachment(row);
+
+  if (attachment?.kind === "external") {
+    return (
+      <a
+        href={attachment.href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={openInstallationReportBtnClass}
+      >
+        <FileText className="h-3 w-3 shrink-0" aria-hidden />
+        Installation Report
+      </a>
+    );
+  }
+
+  if (attachment?.kind === "file") {
+    return (
+      <ServiceAttachmentLink
+        filePath={attachment.path}
+        fileName="Installation Report"
+        className={openInstallationReportBtnClass}
+      />
+    );
+  }
+
+  if (!serviceId) {
+    return null;
+  }
+
+  return (
+    <Link
+      href={`/${dashboardBase}/installation-completion-video/${encodeURIComponent(serviceId)}`}
+      className="inline-flex items-center gap-1 rounded bg-slate-600 px-2 py-1 text-xs font-medium text-white whitespace-nowrap hover:bg-slate-700"
+    >
+      <FileText className="h-3 w-3 shrink-0" aria-hidden />
+      Installation Report
+    </Link>
+  );
+}
+
+function openInstallationFollowupProduct(row) {
+  const serviceId = openInstallationPrimaryServiceId(row);
+  const serial =
+    String(row?.serial_number || "")
+      .split(",")[0]
+      ?.trim() || "";
+  if (!serviceId && !serial) return null;
+  return {
+    service_id: serviceId,
+    serial_number: serial,
+    model: row.model,
+    contact: row.contact,
+    email: row.email,
+    includeCustomerFollowups: false,
+  };
+}
+
 function openInstallationServiceStatusExport(row) {
   const items = parseUpcomingInstallationServiceDetails(row?.service_details);
   if (items.length > 0) {
@@ -780,25 +1050,18 @@ function openInstallationServiceStatusExport(row) {
   return fallbackId || "";
 }
 
-function OpenInstallationActionCell({ row, dashboardBase }) {
-  const hasService =
-    parseUpcomingInstallationServiceDetails(row?.service_details).length > 0 ||
-    String(row?.service_id || "").trim();
-  const orderInstallationDone = Number(row?.order_installation_status) === 1;
+function OpenInstallationActionCell({ row, dashboardBase, ProductFollowupIcons }) {
+  const followupProduct = openInstallationFollowupProduct(row);
   return (
-    <div className="min-w-[10.5rem] space-y-2">
-      {hasService ? (
-        <UpcomingInstallationServiceStatusColumn
-          record={row}
-          serviceDetailsHrefBase={`/${dashboardBase}/view-service-report`}
+    <div className="flex min-w-[5.5rem] flex-col items-start gap-2">
+      {followupProduct && ProductFollowupIcons ? (
+        <ProductFollowupIcons
+          product={followupProduct}
+          className="!mt-0 mb-0"
+          variant="button"
         />
-      ) : orderInstallationDone ? (
-        <span className="inline-flex rounded-md border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-800">
-          Completed (order)
-        </span>
-      ) : (
-        <span className="text-xs text-slate-400">No installation service</span>
-      )}
+      ) : null}
+      <OpenInstallationReportButton row={row} dashboardBase={dashboardBase} />
       {row.order_id ? (
         <Link
           href={`/${dashboardBase}/order/${encodeURIComponent(row.order_id)}`}
@@ -807,7 +1070,9 @@ function OpenInstallationActionCell({ row, dashboardBase }) {
           <Eye className="h-3.5 w-3.5" aria-hidden />
           View order
         </Link>
-      ) : null}
+      ) : (
+        <span className="text-xs text-slate-400">—</span>
+      )}
     </div>
   );
 }
@@ -827,12 +1092,35 @@ function OpenInstallationRegistrationBadge({ row }) {
   );
 }
 
-function OpenInstallationRows({ rows, dashboardBase, page, pageSize }) {
+function registrationExport(row) {
+  const status = Number(row.warranty_registered) === 1 ? "Registered" : "Not registered";
+  const detail = registrationDateByExport(row);
+  return [detail, status].filter(Boolean).join(" · ");
+}
+
+function OpenInstallationRegistrationCell({ row }) {
+  const registered = Number(row.warranty_registered) === 1;
+  return (
+    <div className="min-w-[8rem] space-y-1.5">
+      {registered ? <RegistrationDateByCell row={row} /> : null}
+      <OpenInstallationRegistrationBadge row={row} />
+    </div>
+  );
+}
+
+function OpenInstallationRows({
+  rows,
+  dashboardBase,
+  page,
+  pageSize,
+  userRole,
+  onOpenInstallationRowPatch,
+  ProductFollowupIcons,
+}) {
   return rows.map((row, idx) => {
     const rowNum = page * pageSize + idx + 1;
     const zebra = idx % 2 === 0 ? "bg-white" : "bg-violet-50/35";
     const dispatchLabel = formatUpcomingInstallationYmd(row.dispatch_date);
-    const modelLabel = [row.model, row.name].filter(Boolean).join(" · ") || "—";
     return (
       <tr
         key={row.order_id || row.id || rowNum}
@@ -845,37 +1133,39 @@ function OpenInstallationRows({ rows, dashboardBase, page, pageSize }) {
         <td className="px-4 py-3.5 align-top">
           <UpcomingInstallationReferenceIds record={row} />
         </td>
-        <td className="px-4 py-3.5 text-sm text-slate-800">{row.company_name || "—"}</td>
+        <td className="px-4 py-3.5 align-top">
+          <OpenInstallationCompanyStateCell row={row} />
+        </td>
         <td className="min-w-[10rem] max-w-[220px] px-4 py-3.5 text-sm text-slate-700 xl:max-w-none">
           <span className="whitespace-pre-wrap">{row.delivery_address || "—"}</span>
         </td>
-        <td className="whitespace-nowrap px-4 py-3.5 text-sm text-slate-700">{row.state?.trim() || "—"}</td>
         <td className="px-4 py-3.5 text-sm text-slate-800">{salesPersonLabel(row) || "—"}</td>
-        <td className="px-4 py-3.5 text-sm text-slate-800">{row.assigned_by?.trim() || "—"}</td>
         <td className="px-4 py-3.5 align-top">
-          <OpenInstallationEngineerCell row={row} />
+          <OpenInstallationAssignedByEngineerCell row={row} />
         </td>
-        <td className="max-w-[180px] px-4 py-3.5 text-xs font-mono text-slate-800 xl:max-w-none">
-          {modelLabel}
+        <td className="px-4 py-3.5 align-top xl:max-w-none">
+          <OpenInstallationModelCell row={row} />
         </td>
         <td className="whitespace-nowrap px-4 py-3.5 text-sm text-slate-800">{row.contact || "—"}</td>
         <td className="px-4 py-3.5 align-top">
-          <OpenInstallationOrderStatusBadge row={row} />
+          <OpenInstallationOrderDeliveryCell row={row} />
         </td>
         <td className="px-4 py-3.5 align-top">
-          <OpenInstallationDeliveryBlock row={row} />
-        </td>
-        <td className="whitespace-nowrap px-4 py-3.5 text-sm text-slate-700">
-          {Number(row.warranty_registered) === 1 ? formatDate(row.registered_at) : "—"}
-        </td>
-        <td className="px-4 py-3.5 text-sm text-slate-800">
-          {Number(row.warranty_registered) === 1 ? registeredByLabel(row) || "—" : "—"}
+          <OpenInstallationRegistrationCell row={row} />
         </td>
         <td className="px-4 py-3.5 align-top">
-          <OpenInstallationRegistrationBadge row={row} />
+          <OpenInstallationStatusColumn
+            row={row}
+            role={userRole}
+            onRowPatched={onOpenInstallationRowPatch}
+          />
         </td>
         <td className="px-4 py-3.5 align-top">
-          <OpenInstallationActionCell row={row} dashboardBase={dashboardBase} />
+          <OpenInstallationActionCell
+            row={row}
+            dashboardBase={dashboardBase}
+            ProductFollowupIcons={ProductFollowupIcons}
+          />
         </td>
       </tr>
     );
@@ -928,19 +1218,15 @@ function TableHead({ segment }) {
         <th className={th}>#</th>
         <th className={th}>Dispatch Date</th>
         <th className={th}>Inv | Ord | Ser</th>
-        <th className={th}>Company</th>
+        <th className={th}>Company / State</th>
         <th className={th}>Delivery Address</th>
-        <th className={th}>State</th>
         <th className={th}>Sales Person</th>
-        <th className={th}>Assigned By</th>
-        <th className={th}>Engineer</th>
+        <th className={th}>Assigned By / Completed by</th>
         <th className={th}>Model</th>
         <th className={th}>Contact</th>
-        <th className={th}>Order Status</th>
-        <th className={th}>Delivery</th>
-        <th className={th}>Registered Date</th>
-        <th className={th}>Registered By</th>
-        <th className={th}>Registration</th>
+        <th className={th}>Order / Delivery</th>
+        <th className={th}>Regst. / Registration</th>
+        <th className={th}>Status</th>
         <th className={th}>Action</th>
       </tr>
     );
@@ -966,8 +1252,7 @@ function TableHead({ segment }) {
       <tr>
         <th className={th}>#</th>
         <th className={th}>Customer / Serial / Model</th>
-        <th className={th}>Registered Date</th>
-        <th className={th}>Registered By</th>
+        <th className={th}>Regst. Date</th>
         <th className={th}>Company</th>
         <th className={th}>Site Contact</th>
         <th className={th}>State</th>
@@ -994,10 +1279,27 @@ function TableHead({ segment }) {
   );
 }
 
-function TableBody({ segment, rows, dashboardBase, page, pageSize }) {
+function TableBody({
+  segment,
+  rows,
+  dashboardBase,
+  page,
+  pageSize,
+  userRole,
+  onOpenInstallationRowPatch,
+  ProductFollowupIcons,
+}) {
   if (segment === "open-installation" || segment === "overdue-delayed-installation") {
     return (
-      <OpenInstallationRows rows={rows} dashboardBase={dashboardBase} page={page} pageSize={pageSize} />
+      <OpenInstallationRows
+        rows={rows}
+        dashboardBase={dashboardBase}
+        page={page}
+        pageSize={pageSize}
+        userRole={userRole}
+        onOpenInstallationRowPatch={onOpenInstallationRowPatch}
+        ProductFollowupIcons={ProductFollowupIcons}
+      />
     );
   }
   if (segment === "open-completions") {
@@ -1026,10 +1328,10 @@ function TableBody({ segment, rows, dashboardBase, page, pageSize }) {
 }
 
 function colSpanForSegment(segment) {
-  if (segment === "total-registered") return 12;
+  if (segment === "total-registered") return 11;
   if (isWarrantyProductSegment(segment)) return 9;
   if (segment === "open-completions") return 10;
-  if (segment === "open-installation" || segment === "overdue-delayed-installation") return 17;
+  if (segment === "open-installation" || segment === "overdue-delayed-installation") return 13;
   if (segment === "active-amc" || segment === "due-amc-expiring") return 7;
   return 9;
 }
@@ -1037,10 +1339,12 @@ function colSpanForSegment(segment) {
 export default function ServiceBeforeInstallationDetailClient({
   segment,
   dashboardBase = "admin-dashboard",
+  userRole = "",
 }) {
   const meta = getSegmentMeta(segment);
   const hubHref = `/${dashboardBase}/service-before-installation`;
   const warrantyHref = `/${dashboardBase}/warranty`;
+  const { ProductFollowupIcons, followupModals } = useWarrantyProductFollowup();
 
   const [draftFilters, setDraftFilters] = useState(() => initialSbiFiltersForSegment(segment));
   const [appliedFilters, setAppliedFilters] = useState(() => initialSbiFiltersForSegment(segment));
@@ -1059,7 +1363,7 @@ export default function ServiceBeforeInstallationDetailClient({
     delivered_installation_pending: 0,
     delivery_pending_after_dispatch: 0,
     completed_installation: 0,
-    no_feedback_collected: 0,
+    feedback_collected: 0,
     total: 0,
   });
   const [loading, setLoading] = useState(true);
@@ -1073,13 +1377,13 @@ export default function ServiceBeforeInstallationDetailClient({
     delivered_installation_pending: 0,
     delivery_pending_after_dispatch: 0,
     completed_installation: 0,
-    no_feedback_collected: 0,
+    feedback_collected: 0,
     total: 0,
   });
   const [openInstallationKpiLoading, setOpenInstallationKpiLoading] = useState(
     () => segment === "open-installation",
   );
-  const [noFeedbackKpiLoading, setNoFeedbackKpiLoading] = useState(false);
+  const [feedbackCollectedKpiLoading, setFeedbackCollectedKpiLoading] = useState(false);
   openInstallationBreakdownRef.current = openInstallationBreakdown;
 
   useEffect(() => {
@@ -1120,23 +1424,23 @@ export default function ServiceBeforeInstallationDetailClient({
     [page, pageSize],
   );
 
-  const patchNoFeedbackCollected = useCallback((total) => {
-    const nf = Number(total || 0);
+  const patchFeedbackCollected = useCallback((total) => {
+    const n = Number(total || 0);
     setOpenInstallationBreakdown((prev) => {
-      const next = { ...prev, no_feedback_collected: nf };
+      const next = { ...prev, feedback_collected: n };
       openInstallationBreakdownRef.current = next;
       return next;
     });
   }, []);
 
-  /** Dedicated no-feedback count — never blocks list / other KPI cards. */
-  const fetchNoFeedbackKpiCount = useCallback(
+  /** Google feedback collected count — does not block list / other KPI cards. */
+  const fetchFeedbackCollectedKpiCount = useCallback(
     async (signal) => {
       if (segment !== "open-installation") return;
       const { openInstallationBucket: _bucket, ...kpiFilters } = appliedFilters;
-      setNoFeedbackKpiLoading(true);
+      setFeedbackCollectedKpiLoading(true);
       try {
-        const res = await axios.get("/api/service-before-installation/no-feedback", {
+        const res = await axios.get("/api/service-before-installation/google-feedback", {
           params: {
             ...kpiFilters,
             countOnly: "1",
@@ -1147,21 +1451,21 @@ export default function ServiceBeforeInstallationDetailClient({
           timeout: 15_000,
         });
         if (res.data?.success) {
-          const nf = Number(
-            res.data.no_feedback_collected ?? res.data.pagination?.total ?? 0,
+          const n = Number(
+            res.data.feedback_collected ?? res.data.pagination?.total ?? 0,
           );
-          patchNoFeedbackCollected(nf);
-          if (String(appliedFilters.openInstallationBucket || "").trim() === "no_feedback") {
-            applyListTotal(nf);
+          patchFeedbackCollected(n);
+          if (String(appliedFilters.openInstallationBucket || "").trim() === "feedback_collected") {
+            applyListTotal(n);
           }
         }
       } catch (e) {
         if (e?.code !== "ERR_CANCELED") console.error(e);
       } finally {
-        if (!signal?.aborted) setNoFeedbackKpiLoading(false);
+        if (!signal?.aborted) setFeedbackCollectedKpiLoading(false);
       }
     },
-    [segment, appliedFilters, patchNoFeedbackCollected, applyListTotal],
+    [segment, appliedFilters, patchFeedbackCollected, applyListTotal],
   );
 
   const fetchOpenInstallationKpis = useCallback(async () => {
@@ -1193,16 +1497,16 @@ export default function ServiceBeforeInstallationDetailClient({
         setOpenInstallationBreakdown((prev) => {
           const next = {
             ...br,
-            no_feedback_collected:
-              Number(prev.no_feedback_collected) > 0
-                ? Number(prev.no_feedback_collected)
-                : Number(br.no_feedback_collected || 0),
+            feedback_collected:
+              Number(prev.feedback_collected) > 0
+                ? Number(prev.feedback_collected)
+                : Number(br.feedback_collected || 0),
           };
           openInstallationBreakdownRef.current = next;
           return next;
         });
         const activeBucket = String(appliedFilters.openInstallationBucket || "").trim();
-        if (!(listTotalRef.current > 0) && activeBucket !== "no_feedback") {
+        if (!(listTotalRef.current > 0) && activeBucket !== "feedback_collected") {
           applyListTotal(openInstallationBucketRecordCount(activeBucket, br));
         }
       }
@@ -1213,16 +1517,15 @@ export default function ServiceBeforeInstallationDetailClient({
       if (!controller.signal.aborted) setOpenInstallationKpiLoading(false);
     }
 
-    // Separate API — fill No Feedback card without slowing main KPI.
     if (!controller.signal.aborted) {
-      void fetchNoFeedbackKpiCount(controller.signal);
+      void fetchFeedbackCollectedKpiCount(controller.signal);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed by openInstallationKpiFilterKey
   }, [
     segment,
     openInstallationKpiFilterKey,
     applyListTotal,
-    fetchNoFeedbackKpiCount,
+    fetchFeedbackCollectedKpiCount,
   ]);
 
   const fetchOpenInstallationCount = useCallback(async () => {
@@ -1233,14 +1536,15 @@ export default function ServiceBeforeInstallationDetailClient({
     const controller = new AbortController();
     countFetchAbortRef.current = controller;
     const bucket = String(appliedFilters.openInstallationBucket || "").trim();
-    const useNoFeedbackApi = segment === "open-installation" && bucket === "no_feedback";
+    const useGoogleFeedbackApi =
+      segment === "open-installation" && bucket === "feedback_collected";
 
     setCountLoading(true);
-    if (useNoFeedbackApi) setNoFeedbackKpiLoading(true);
+    if (useGoogleFeedbackApi) setFeedbackCollectedKpiLoading(true);
     try {
       const res = await axios.get(
-        useNoFeedbackApi
-          ? "/api/service-before-installation/no-feedback"
+        useGoogleFeedbackApi
+          ? "/api/service-before-installation/google-feedback"
           : `/api/service-before-installation/${segment}`,
         {
           params: {
@@ -1255,26 +1559,25 @@ export default function ServiceBeforeInstallationDetailClient({
       );
       if (res.data?.success) {
         const total = Number(
-          res.data.pagination?.total ?? res.data.no_feedback_collected ?? 0,
+          res.data.pagination?.total ?? res.data.feedback_collected ?? 0,
         );
         applyListTotal(total);
-        if (useNoFeedbackApi) patchNoFeedbackCollected(total);
+        if (useGoogleFeedbackApi) patchFeedbackCollected(total);
       }
     } catch (e) {
       if (e?.code === "ERR_CANCELED") return;
       console.error(e);
-      // Stop infinite "…" / "10+" — keep whatever list already showed.
-      if (useNoFeedbackApi && !(listTotalRef.current > 0)) {
+      if (useGoogleFeedbackApi && !(listTotalRef.current > 0)) {
         const fallback = Math.max(pageSize, page * pageSize + pageSize);
         applyListTotal(fallback);
       }
     } finally {
       if (!controller.signal.aborted) {
         setCountLoading(false);
-        if (useNoFeedbackApi) setNoFeedbackKpiLoading(false);
+        if (useGoogleFeedbackApi) setFeedbackCollectedKpiLoading(false);
       }
     }
-  }, [segment, appliedFilters, page, pageSize, applyListTotal, patchNoFeedbackCollected]);
+  }, [segment, appliedFilters, page, pageSize, applyListTotal, patchFeedbackCollected]);
 
   const fetchRows = useCallback(async () => {
     rowsFetchAbortRef.current?.abort();
@@ -1295,12 +1598,12 @@ export default function ServiceBeforeInstallationDetailClient({
     // Open Installation: rows FIRST (unblocks UI), then KPI + count sequentially
     // so we don't starve the DB pool (connectionLimit ≈ 5).
     if (isOpenInstallationList) {
-      const useNoFeedbackApi =
-        segment === "open-installation" && activeBucket === "no_feedback";
+      const useGoogleFeedbackApi =
+        segment === "open-installation" && activeBucket === "feedback_collected";
       try {
         const res = await axios.get(
-          useNoFeedbackApi
-            ? "/api/service-before-installation/no-feedback"
+          useGoogleFeedbackApi
+            ? "/api/service-before-installation/google-feedback"
             : `/api/service-before-installation/${segment}`,
           {
             params: {
@@ -1327,10 +1630,10 @@ export default function ServiceBeforeInstallationDetailClient({
             hasMore:
               total > 0 ? page * pageSize + data.length < total : hasMoreFlag,
           });
-          if (useNoFeedbackApi && !hasMoreFlag) {
+          if (useGoogleFeedbackApi && !hasMoreFlag) {
             const exact = page * pageSize + data.length;
             applyListTotal(exact, data.length);
-            patchNoFeedbackCollected(exact);
+            patchFeedbackCollected(exact);
           }
         }
       } catch (e) {
@@ -1342,8 +1645,7 @@ export default function ServiceBeforeInstallationDetailClient({
 
       if (signal.aborted) return;
 
-      // No-feedback: rows already shown — count in background only (never block Loading).
-      if (useNoFeedbackApi) {
+      if (useGoogleFeedbackApi) {
         void fetchOpenInstallationCount();
         return;
       }
@@ -1358,9 +1660,9 @@ export default function ServiceBeforeInstallationDetailClient({
       } else if (
         segment === "open-installation" &&
         page === 0 &&
-        !(Number(openInstallationBreakdownRef.current.no_feedback_collected) > 0)
+        !(Number(openInstallationBreakdownRef.current.feedback_collected) > 0)
       ) {
-        void fetchNoFeedbackKpiCount(signal);
+        void fetchFeedbackCollectedKpiCount(signal);
       }
       if (page === 0 || !(knownTotal > 0) || !(listTotalRef.current > 0)) {
         await fetchOpenInstallationCount();
@@ -1411,8 +1713,8 @@ export default function ServiceBeforeInstallationDetailClient({
     openInstallationKpiFilterKey,
     fetchOpenInstallationCount,
     fetchOpenInstallationKpis,
-    fetchNoFeedbackKpiCount,
-    patchNoFeedbackCollected,
+    fetchFeedbackCollectedKpiCount,
+    patchFeedbackCollected,
   ]);
 
   useEffect(() => {
@@ -1474,6 +1776,14 @@ export default function ServiceBeforeInstallationDetailClient({
     : Math.max(1, Math.ceil((pagination.total || 0) / pageSize));
   const pageWindow = useMemo(() => buildPageWindow(page, totalPages), [page, totalPages]);
   const colSpan = colSpanForSegment(segment);
+
+  const handleOpenInstallationRowPatch = useCallback((patchedRow) => {
+    const key = patchedRow.order_id ?? patchedRow.id;
+    if (key == null) return;
+    setRows((prev) =>
+      prev.map((r) => ((r.order_id ?? r.id) === key ? { ...r, ...patchedRow } : r)),
+    );
+  }, []);
   const showAddRegistered = isWarrantyProductSegment(segment);
 
   if (!meta) {
@@ -1519,7 +1829,7 @@ export default function ServiceBeforeInstallationDetailClient({
             openInstallationBucket={appliedFilters.openInstallationBucket}
             totals={openInstallationBreakdown}
             loading={openInstallationKpiLoading}
-            noFeedbackLoading={noFeedbackKpiLoading}
+            noFeedbackLoading={feedbackCollectedKpiLoading}
             onCardSelect={(openInstallationBucket) => {
               setLoading(true);
               setPage(0);
@@ -1629,6 +1939,14 @@ export default function ServiceBeforeInstallationDetailClient({
                     dashboardBase={dashboardBase}
                     page={page}
                     pageSize={pageSize}
+                    userRole={userRole}
+                    onOpenInstallationRowPatch={handleOpenInstallationRowPatch}
+                    ProductFollowupIcons={
+                      segment === "open-installation" ||
+                      segment === "overdue-delayed-installation"
+                        ? ProductFollowupIcons
+                        : null
+                    }
                   />
                 )}
               </tbody>
@@ -1711,6 +2029,7 @@ export default function ServiceBeforeInstallationDetailClient({
           </div>
         </div>
       </div>
+      {followupModals}
     </div>
   );
 }

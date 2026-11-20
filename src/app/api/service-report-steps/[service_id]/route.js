@@ -67,6 +67,7 @@ async function loadService(conn, serviceId) {
         sr.installation_report,
         sr.installation_completion_date,
         sr.completed_by_service_engineer,
+        sr.google_feedback_collected,
         sr.google_feedback_collection,
         s.video_360,
         s.video_problem,
@@ -112,6 +113,7 @@ function payloadFromRow(row, product = null) {
       installation_report: row.installation_report || null,
       installation_completion_date: row.installation_completion_date || null,
       completed_by_service_engineer: row.completed_by_service_engineer || null,
+      google_feedback_collected: row.google_feedback_collected || null,
       google_feedback_collection: row.google_feedback_collection || null,
     },
     product: product
@@ -328,7 +330,16 @@ export async function POST(request, context) {
             { status: 400 },
           );
         }
-        if (!manualMeta.googleFeedbackCollection) {
+        if (!manualMeta.googleFeedbackCollected) {
+          return NextResponse.json(
+            { message: "Please select Yes or No for Google feedback collected." },
+            { status: 400 },
+          );
+        }
+        if (
+          manualMeta.googleFeedbackCollected === "yes" &&
+          !manualMeta.googleFeedbackCollection
+        ) {
           return NextResponse.json(
             { message: "Please select Google feedback collection status." },
             { status: 400 },
@@ -344,6 +355,7 @@ export async function POST(request, context) {
                completed_date = ?,
                installation_completion_date = ?,
                completed_by_service_engineer = ?,
+               google_feedback_collected = ?,
                google_feedback_collection = ?
            WHERE service_id = ?`,
           [
@@ -351,6 +363,7 @@ export async function POST(request, context) {
             manualMeta.installationCompletionDate,
             manualMeta.installationCompletionDate,
             manualMeta.completedByServiceEngineer,
+            manualMeta.googleFeedbackCollected,
             manualMeta.googleFeedbackCollection,
             serviceId,
           ],

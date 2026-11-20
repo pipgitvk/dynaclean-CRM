@@ -6,6 +6,10 @@ import {
 } from "@/lib/upcomingInstallationOrderEligibility";
 import { buildNeworderOpenInstallationBucketWhereSql } from "@/lib/openInstallationBucketNeworderSql";
 import { SR2_HAS_INSTALLATION_REPORT_SQL } from "@/lib/openInstallationNoReportSql";
+import {
+  INSTALLATION_REPORT_LATEST_JOIN_ON_SR,
+  sqlInstallationReportEngineerPick,
+} from "@/lib/openInstallationInstallReportSql";
 
 export { pendingNeworderPredicates } from "@/lib/upcomingInstallationOrderEligibility";
 
@@ -53,6 +57,37 @@ const SVC_INSTALLATION_TEAM_AGG_SQL = `
           '||',
           1
         ) AS third_party_engineer,`;
+
+/** User who assigned the installation service engineer (latest installation SR on quote). */
+const SVC_ENGINEER_ASSIGNED_BY_SQL = `
+        SUBSTRING_INDEX(
+          GROUP_CONCAT(
+            CASE
+              WHEN ${INSTALLATION_SR_TYPE_SQL}
+              THEN NULLIF(TRIM(sr2.engineer_assigned_by), '')
+            END
+            ORDER BY sr2.service_id DESC
+            SEPARATOR '||'
+          ),
+          '||',
+          1
+        ) AS engineer_assigned_by,`;
+
+/** Engineer recorded on manual installation completion (latest installation SR on quote). */
+const SVC_COMPLETED_BY_ENGINEER_SQL = `
+        SUBSTRING_INDEX(
+          GROUP_CONCAT(
+            CASE
+              WHEN ${INSTALLATION_SR_TYPE_SQL}
+              THEN NULLIF(TRIM(sr2.completed_by_service_engineer), '')
+            END
+            ORDER BY sr2.service_id DESC
+            SEPARATOR '||'
+          ),
+          '||',
+          1
+        ) AS completed_by_service_engineer,
+        ${sqlInstallationReportEngineerPick("sr2")} AS installation_report_engineer,`;
 
 /** Restrict rows to quotes that still have a pending installation order */
 function joinPendingOrderOnQuote(quoteColumnExpr, orderEligibility = {}) {
@@ -154,7 +189,8 @@ export function buildUpcomingInstallationsQuery({
               DATE_FORMAT(sr2.complaint_date, '%Y-%m-%d'),
               ''
             ),
-            COALESCE(sr2.assigned_to, '')
+            COALESCE(sr2.assigned_to, ''),
+            COALESCE(sr2.status_description, '')
           )
           ORDER BY sr2.service_id
           SEPARATOR ';;'
@@ -171,7 +207,8 @@ export function buildUpcomingInstallationsQuery({
                 DATE_FORMAT(sr2.complaint_date, '%Y-%m-%d'),
                 ''
               ),
-              COALESCE(sr2.assigned_to, '')
+              COALESCE(sr2.assigned_to, ''),
+              COALESCE(sr2.status_description, '')
             )
           END
           ORDER BY sr2.service_id
@@ -215,10 +252,7 @@ export function buildUpcomingInstallationsQuery({
       no.state,
       no.created_by AS emp_name,
       no.created_by AS order_sales_person,
-      COALESCE(
-        NULLIF(TRIM(no.booking_by), ''),
-        NULLIF(TRIM(no.dispatch_person), '')
-      ) AS assigned_by,
+      NULLIF(TRIM(svc.engineer_assigned_by), '') AS assigned_by,
       COALESCE(no.installation_status, 0) AS order_installation_status,
       COALESCE(no.dispatch_status, 0) AS order_dispatch_status,
       COALESCE(no.delivery_status, 0) AS order_delivery_status,
@@ -242,6 +276,8 @@ export function buildUpcomingInstallationsQuery({
       agg.dispatch_date,
       svc.service_engineer,
       svc.third_party_engineer,
+      NULLIF(TRIM(svc.completed_by_service_engineer), '') AS completed_by_service_engineer,
+      NULLIF(TRIM(svc.installation_report_engineer), '') AS installation_report_engineer,
       COALESCE(svc.installation_completed, 0) AS installation_completed,
       ${NO_INSTALLATION_REPORT_ON_ORDER_SELECT}
     FROM neworder no
@@ -287,6 +323,8 @@ export function buildUpcomingInstallationsQuery({
         GROUP_CONCAT(DISTINCT sr2.service_id ORDER BY sr2.service_id SEPARATOR ', ') AS service_id,
         ${serviceDetailsSelect}
         ${SVC_INSTALLATION_TEAM_AGG_SQL}
+        ${SVC_ENGINEER_ASSIGNED_BY_SQL}
+        ${SVC_COMPLETED_BY_ENGINEER_SQL}
         MAX(
           CASE
             WHEN UPPER(TRIM(COALESCE(sr2.service_type, ''))) = 'INSTALLATION'
@@ -306,6 +344,7 @@ export function buildUpcomingInstallationsQuery({
       ${joinPendingOrderOnQuote("d2.quote_number", orderEligibility)}
       INNER JOIN service_records sr2
         ON ${sqlTrimUtf8EqColumns("sr2.serial_number", "d2.serial_no")}
+      ${INSTALLATION_REPORT_LATEST_JOIN_ON_SR}
       WHERE 1=1
         ${dispatchEligibleSql("d2", "no_p", orderEligibility)}
         ${dispatch2QuoteKeyInSql}
@@ -409,10 +448,7 @@ export function buildOpenInstallationKpiInnerQuery({
       DATE_FORMAT(no.delivered_on, '%Y-%m-%d') AS delivered_on,
       no.state,
       no.created_by AS order_sales_person,
-      COALESCE(
-        NULLIF(TRIM(no.booking_by), ''),
-        NULLIF(TRIM(no.dispatch_person), '')
-      ) AS assigned_by,
+      NULLIF(TRIM(svc.engineer_assigned_by), '') AS assigned_by,
       COALESCE(svc.installation_completed, 0) AS installation_completed,
       ${NO_INSTALLATION_REPORT_ON_ORDER_SELECT},
       svc.service_engineer,
@@ -455,6 +491,8 @@ export function buildOpenInstallationKpiInnerQuery({
       SELECT
         ${quoteKeyD2} AS quote_key,
         ${SVC_INSTALLATION_TEAM_AGG_SQL}
+        ${SVC_ENGINEER_ASSIGNED_BY_SQL}
+        ${SVC_COMPLETED_BY_ENGINEER_SQL}
         MAX(
           CASE
             WHEN UPPER(TRIM(COALESCE(sr2.service_type, ''))) = 'INSTALLATION'

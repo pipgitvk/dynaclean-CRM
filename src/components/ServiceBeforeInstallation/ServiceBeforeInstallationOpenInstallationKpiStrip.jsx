@@ -13,7 +13,7 @@ const COUNT_BY_CARD_ID = {
     totals.delivered_installation_pending ?? 0,
   "open-installation-delivery-pending": (totals) => totals.delivery_pending_after_dispatch ?? 0,
   "open-installation-completed": (totals) => totals.completed_installation ?? 0,
-  "open-installation-no-feedback": (totals) => totals.no_feedback_collected ?? 0,
+  "open-installation-feedback-collected": (totals) => totals.feedback_collected ?? 0,
 };
 
 export default function ServiceBeforeInstallationOpenInstallationKpiStrip({
@@ -32,7 +32,7 @@ export default function ServiceBeforeInstallationOpenInstallationKpiStrip({
         const pick = COUNT_BY_CARD_ID[card.id];
         const value = pick ? pick(totals) : 0;
         const cardLoading =
-          card.id === "open-installation-no-feedback"
+          card.id === "open-installation-feedback-collected"
             ? loading || noFeedbackLoading
             : loading;
         return (

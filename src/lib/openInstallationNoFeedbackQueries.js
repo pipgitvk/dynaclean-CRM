@@ -4,6 +4,11 @@ import {
   sqlTrimUtf8EqColumns,
   sqlUtf8TrimExpr,
 } from "@/lib/sqlUtf8Compare";
+import { enrichOpenInstallationRowsWithServices } from "@/lib/openInstallationServiceEnrich";
+import {
+  countOpenInstallationGoogleFeedbackStats,
+  fetchOpenInstallationGoogleFeedbackPage,
+} from "@/lib/openInstallationGoogleFeedbackQueries";
 
 const COUNT_CACHE = new Map();
 const COUNT_TTL_MS = 90_000;
@@ -52,8 +57,16 @@ function buildInstalledOrderWhereSql(filters) {
     params.push(f.salesPerson);
   }
   if (f.assignedBy) {
-    sql += ` AND (TRIM(no.booking_by) = TRIM(?) OR TRIM(no.dispatch_person) = TRIM(?))`;
-    params.push(f.assignedBy, f.assignedBy);
+    sql += ` AND EXISTS (
+      SELECT 1
+      FROM dispatch d_ab
+      INNER JOIN service_records sr_ab
+        ON ${sqlTrimUtf8EqColumns("sr_ab.serial_number", "d_ab.serial_no")}
+      WHERE ${sqlTrimUtf8EqColumns("d_ab.quote_number", "no.quote_number")}
+        AND UPPER(TRIM(COALESCE(sr_ab.service_type, ''))) = 'INSTALLATION'
+        AND TRIM(sr_ab.engineer_assigned_by) = TRIM(?)
+    )`;
+    params.push(f.assignedBy);
   }
   return { sql, params };
 }
@@ -194,10 +207,7 @@ async function fetchInstalledBatch(conn, where, limit, offset) {
        no.state,
        no.created_by AS emp_name,
        no.created_by AS order_sales_person,
-       COALESCE(
-         NULLIF(TRIM(no.booking_by), ''),
-         NULLIF(TRIM(no.dispatch_person), '')
-       ) AS assigned_by,
+       NULL AS assigned_by,
        COALESCE(no.installation_status, 0) AS order_installation_status,
        COALESCE(no.dispatch_status, 0) AS order_dispatch_status,
        COALESCE(no.delivery_status, 0) AS order_delivery_status,
@@ -232,108 +242,26 @@ async function fetchInstalledBatch(conn, where, limit, offset) {
   return rows || [];
 }
 
-/**
- * Fast count: load installed quotes (~hundreds) + cached report-quote set, subtract in JS.
- * Avoids the hanging COUNT DISTINCT ⋈ join that left the KPI on "…".
- */
+/** Count installed orders where Google feedback was not recorded as Yes. */
 export async function countOpenInstallationNoFeedback(filters = {}) {
   const key = countCacheKey(filters);
   const cached = COUNT_CACHE.get(key);
   if (cached && Date.now() - cached.at < COUNT_TTL_MS) {
     return cached.total;
   }
-
-  const conn = await getDbConnection();
-  const where = buildInstalledOrderWhereSql(filters);
-
-  // Sequential on one connection — parallel queries on the same conn are unsafe.
-  const reportKeys = await loadReportQuoteKeySet(conn);
-  const [instRows] = await conn.execute(
-    `SELECT ${sqlUtf8TrimExpr("no.quote_number")} AS quote_key
-     FROM neworder no
-     ${where.sql}`,
-    where.params,
-  );
-
-  let total = 0;
-  for (const row of instRows || []) {
-    const q = String(row.quote_key || "").trim().toLowerCase();
-    if (!q || !reportKeys.has(q)) total += 1;
-  }
-
+  const stats = await countOpenInstallationGoogleFeedbackStats(filters);
+  const total = stats.no_feedback_collected;
   COUNT_CACHE.set(key, { at: Date.now(), total });
   return total;
 }
 
-/**
- * Fast page — neworder LIMIT + report check for those quotes only.
- */
 export async function fetchOpenInstallationNoFeedbackPage(
   filters = {},
   limit = 10,
   skip = 0,
   { skipTotal = true } = {},
 ) {
-  const conn = await getDbConnection();
-  const where = buildInstalledOrderWhereSql(filters);
-  const safeLimit = Math.min(Math.max(Number(limit) || 10, 1), 200);
-  const safeSkip = Math.max(Number(skip) || 0, 0);
-
-  // Do not warm the global report set here — that scan can be slow.
-  // Page only checks the current batch quotes (IN list), like other cards' enrich.
-  const out = [];
-  let dbOffset = 0;
-  let matchedBeforePage = 0;
-  const batchSize = Math.max(safeLimit * 3, 30);
-  let exhausted = false;
-  let rounds = 0;
-
-  while (out.length < safeLimit && rounds < 3) {
-    rounds += 1;
-    const batch = await fetchInstalledBatch(conn, where, batchSize, dbOffset);
-    if (!batch.length) {
-      exhausted = true;
-      break;
-    }
-    dbOffset += batch.length;
-
-    const quotes = [
-      ...new Set(batch.map((r) => String(r.quote_number || "").trim()).filter(Boolean)),
-    ];
-    const hasReport = await quotesWithInstallationReport(conn, quotes);
-
-    for (const row of batch) {
-      const q = String(row.quote_number || "").trim().toLowerCase();
-      if (q && hasReport.has(q)) continue;
-      if (matchedBeforePage < safeSkip) {
-        matchedBeforePage += 1;
-        continue;
-      }
-      out.push(row);
-      if (out.length >= safeLimit) break;
-    }
-
-    if (batch.length < batchSize) {
-      exhausted = true;
-      break;
-    }
-  }
-
-  const enriched = await enrichDispatchAndWarranty(conn, out);
-
-  let total;
-  if (!skipTotal) {
-    total = await countOpenInstallationNoFeedback(filters);
-  } else if (exhausted && safeSkip === 0) {
-    total = enriched.length;
-  }
-
-  return {
-    total,
-    hasMore:
-      total != null
-        ? safeSkip + enriched.length < total
-        : !exhausted && enriched.length >= safeLimit,
-    data: enriched,
-  };
+  return fetchOpenInstallationGoogleFeedbackPage(filters, "no_feedback", limit, skip, {
+    skipTotal,
+  });
 }

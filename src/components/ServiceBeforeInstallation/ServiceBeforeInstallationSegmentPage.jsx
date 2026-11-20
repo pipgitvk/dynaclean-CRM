@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { isServiceBeforeInstallationSegment } from "@/lib/serviceBeforeInstallationHub";
 import { requireSuperAdminForServiceBeforeInstallation } from "@/lib/serviceBeforeInstallationAccess";
+import { getSessionPayload } from "@/lib/auth";
 import ServiceBeforeInstallationDetailLoader from "@/components/ServiceBeforeInstallation/ServiceBeforeInstallationDetailLoader";
 
 export default async function ServiceBeforeInstallationSegmentPage({
@@ -12,11 +13,14 @@ export default async function ServiceBeforeInstallationSegmentPage({
   if (!isServiceBeforeInstallationSegment(segment)) {
     notFound();
   }
+  const payload = await getSessionPayload();
+  const userRole = payload?.role ?? "";
 
   return (
     <ServiceBeforeInstallationDetailLoader
       segment={segment}
       dashboardBase={dashboardBase}
+      userRole={userRole}
     />
   );
 }

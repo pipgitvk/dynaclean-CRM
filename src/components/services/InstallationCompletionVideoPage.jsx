@@ -7,8 +7,10 @@ import { ChevronLeft, Download, FileUp, Play, Square, Video } from "lucide-react
 import TypeableDateFilterInput from "@/components/ui/TypeableDateFilterInput";
 import { generateServiceReportPDF, downloadPDF } from "@/utils/pdfGenerator";
 import {
-  GOOGLE_FEEDBACK_COLLECTION_OPTIONS,
+  GOOGLE_FEEDBACK_COLLECTION_WHEN_YES,
+  GOOGLE_FEEDBACK_COLLECTED_YES_NO,
   canShowInstallationManualBackofficeFields,
+  inferGoogleFeedbackCollectedYesNo,
   normalizeGoogleFeedbackCollection,
 } from "@/lib/installationManualReportMeta";
 import {
@@ -91,6 +93,7 @@ export default function InstallationCompletionVideoPage() {
   const [viewerRole, setViewerRole] = useState("");
   const [installationCompletionDate, setInstallationCompletionDate] = useState("");
   const [completedByServiceEngineer, setCompletedByServiceEngineer] = useState("");
+  const [googleFeedbackCollected, setGoogleFeedbackCollected] = useState("");
   const [googleFeedbackCollection, setGoogleFeedbackCollection] = useState("");
   const [serviceEngineerOptions, setServiceEngineerOptions] = useState([]);
 
@@ -135,8 +138,15 @@ export default function InstallationCompletionVideoPage() {
       setCompletedByServiceEngineer(
         defaultEngineer && defaultEngineer !== "NOT ASSIGNED" ? defaultEngineer : "",
       );
+      const collectionNorm =
+        normalizeGoogleFeedbackCollection(svc.google_feedback_collection) || "";
+      const yesNo = inferGoogleFeedbackCollectedYesNo(
+        collectionNorm,
+        svc.google_feedback_collected,
+      );
+      setGoogleFeedbackCollected(yesNo);
       setGoogleFeedbackCollection(
-        normalizeGoogleFeedbackCollection(svc.google_feedback_collection) || "",
+        yesNo === "no" ? "" : collectionNorm === "not_collected" ? "" : collectionNorm,
       );
       setData(body);
     } catch (err) {
@@ -248,7 +258,11 @@ export default function InstallationCompletionVideoPage() {
         setError("Select completed by service engineer.");
         return;
       }
-      if (!googleFeedbackCollection) {
+      if (!googleFeedbackCollected) {
+        setError("Select Yes or No for Google feedback collected.");
+        return;
+      }
+      if (googleFeedbackCollected === "yes" && !googleFeedbackCollection) {
         setError("Select Google feedback collection status.");
         return;
       }
@@ -266,7 +280,11 @@ export default function InstallationCompletionVideoPage() {
           "completed_by_service_engineer",
           completedByServiceEngineer.trim(),
         );
-        formData.append("google_feedback_collection", googleFeedbackCollection);
+        formData.append("google_feedback_collected", googleFeedbackCollected);
+        formData.append(
+          "google_feedback_collection",
+          googleFeedbackCollected === "no" ? "not_collected" : googleFeedbackCollection,
+        );
       }
       await uploadWithProgress(
         `/api/service-report-steps/${serviceId}`,
@@ -597,20 +615,42 @@ export default function InstallationCompletionVideoPage() {
               </label>
               <label className="block">
                 <span className="mb-1 block text-sm font-medium text-gray-700">
-                  Google feedback collection <span className="text-red-500">*</span>
+                  Google feedback collected? <span className="text-red-500">*</span>
                 </span>
                 <select
                   className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
-                  value={googleFeedbackCollection}
-                  onChange={(e) => setGoogleFeedbackCollection(e.target.value)}
+                  value={googleFeedbackCollected}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setGoogleFeedbackCollected(v);
+                    if (v !== "yes") setGoogleFeedbackCollection("");
+                  }}
                 >
-                  {GOOGLE_FEEDBACK_COLLECTION_OPTIONS.map((opt) => (
+                  {GOOGLE_FEEDBACK_COLLECTED_YES_NO.map((opt) => (
                     <option key={opt.value || "select"} value={opt.value}>
                       {opt.label}
                     </option>
                   ))}
                 </select>
               </label>
+              {googleFeedbackCollected === "yes" ? (
+                <label className="block">
+                  <span className="mb-1 block text-sm font-medium text-gray-700">
+                    Google feedback collection <span className="text-red-500">*</span>
+                  </span>
+                  <select
+                    className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+                    value={googleFeedbackCollection}
+                    onChange={(e) => setGoogleFeedbackCollection(e.target.value)}
+                  >
+                    {GOOGLE_FEEDBACK_COLLECTION_WHEN_YES.map((opt) => (
+                      <option key={opt.value || "select"} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
             </div>
           ) : null}
           {manualFile && (

@@ -21,7 +21,7 @@ export const EMPTY_SBI_FILTERS = {
   registeredBy: "",
   /** total-registered KPI: "" | "pending" | "completed" */
   registeredInstallation: "",
-  /** open-installation KPI: "" | "delivered_pending" | "delivery_pending" | "completed" | "no_feedback" */
+  /** open-installation KPI: "" | "delivered_pending" | "delivery_pending" | "completed" | "feedback_collected" */
   openInstallationBucket: "",
   /** open-installation list: "" | "registered" | "not_registered" */
   warrantyRegistration: "",
@@ -169,8 +169,10 @@ function normalizeOpenInstallationBucket(raw) {
     v === "delivered_pending" ||
     v === "delivery_pending" ||
     v === "completed" ||
+    v === "feedback_collected" ||
     v === "no_feedback"
   ) {
+    if (v === "no_feedback") return "feedback_collected";
     return v;
   }
   return "";

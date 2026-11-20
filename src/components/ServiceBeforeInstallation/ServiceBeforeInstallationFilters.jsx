@@ -28,10 +28,9 @@ const SERVICE_RECORD_STATUS_PRESETS = [
   "CANCELLED",
 ];
 
-const OPEN_INSTALLATION_SERVICE_STATUS_PRESETS = [
-  ...SERVICE_RECORD_STATUS_PRESETS,
-  { value: "__no_installation_service__", label: "No installation service" },
-];
+const OPEN_INSTALLATION_SERVICE_STATUS_PRESETS = SERVICE_RECORD_STATUS_PRESETS.filter(
+  (s) => s !== "CANCELLED",
+);
 
 function getSegmentFilterKind(segment) {
   if (segment === "open-completions") {
@@ -144,24 +143,37 @@ function ServiceStatusFilterSelect({
   className = "xl:col-span-3",
   label = "Status",
   presets = SERVICE_RECORD_STATUS_PRESETS,
+  excludeStatusValues = [],
 }) {
   const options = useMemo(() => {
+    const excluded = new Set(
+      excludeStatusValues.map((s) => String(s || "").trim().toUpperCase()).filter(Boolean),
+    );
     const base = [{ value: "", label: "All statuses" }];
     const entries = [];
     for (const item of presets) {
       if (item && typeof item === "object" && "value" in item) {
+        if (excluded.has(String(item.value).trim().toUpperCase())) continue;
         entries.push(item);
       } else {
-        entries.push({ value: String(item), label: String(item) });
+        const v = String(item);
+        if (excluded.has(v.trim().toUpperCase())) continue;
+        entries.push({ value: v, label: v });
       }
     }
     const current = String(value || "").trim();
-    if (current && !entries.some((e) => e.value === current)) {
+    if (current === "__no_installation_service__") {
+      // Option removed from Open Installation filters — do not surface in dropdown.
+    } else if (
+      current &&
+      !excluded.has(current.toUpperCase()) &&
+      !entries.some((e) => e.value === current)
+    ) {
       entries.push({ value: current, label: current });
     }
     entries.sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }));
     return [...base, ...entries];
-  }, [value, presets]);
+  }, [value, presets, excludeStatusValues]);
 
   return (
     <label className={`block min-w-0 ${className}`}>
@@ -414,6 +426,7 @@ export default function ServiceBeforeInstallationFilters({
                 <ServiceStatusFilterSelect
                   label="Service status"
                   presets={OPEN_INSTALLATION_SERVICE_STATUS_PRESETS}
+                  excludeStatusValues={["CANCELLED"]}
                   value={draft.serviceStatus}
                   onChange={setField("serviceStatus")}
                   className={row2Field}

@@ -12,6 +12,10 @@ const COLUMNS = [
     ddl: "ADD COLUMN completed_by_service_engineer VARCHAR(255) NULL",
   },
   {
+    name: "google_feedback_collected",
+    ddl: "ADD COLUMN google_feedback_collected VARCHAR(8) NULL COMMENT 'yes or no'",
+  },
+  {
     name: "google_feedback_collection",
     ddl: "ADD COLUMN google_feedback_collection VARCHAR(80) NULL",
   },

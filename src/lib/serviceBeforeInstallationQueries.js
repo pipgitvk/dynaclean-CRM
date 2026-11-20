@@ -39,6 +39,7 @@ import {
   INSTALLED_AFTER_REGISTERED_SQL,
   INSTALLATION_PENDING_AFTER_REGISTERED_SQL,
 } from "@/lib/serviceBeforeInstallationWpExpressions";
+import { enrichOpenInstallationRowsWithServices } from "@/lib/openInstallationServiceEnrich";
 
 function upcomingOverdueDelayedExtraSql() {
   return ` AND u.delivery_date < DATE_SUB(CURDATE(), INTERVAL ${OVERDUE_DELAYED_INSTALLATION_DAYS} DAY)`;
@@ -72,7 +73,7 @@ function openInstallationNeedsFullListShape(filters) {
 
 function openInstallationNeedsInstalledOrders(bucket) {
   const b = String(bucket || "").trim().toLowerCase();
-  return b === "completed" || b === "no_feedback";
+  return b === "completed" || b === "feedback_collected" || b === "no_feedback";
 }
 
 function buildOpenInstallationInnerQuery(
@@ -218,6 +219,7 @@ function parseOpenInstallationBreakdownRow(row) {
     delivery_pending_after_dispatch: Number(row?.delivery_pending_after_dispatch || 0),
     completed_installation: Number(row?.completed_installation || 0),
     no_feedback_collected: Number(row?.no_feedback_collected || 0),
+    feedback_collected: Number(row?.feedback_collected || 0),
   };
 }
 
@@ -295,14 +297,15 @@ async function fetchOpenInstallationBreakdownLite(
        ) AS delivered_installation_pending,
        SUM(CASE WHEN COALESCE(no.delivery_status, 0) = 0 THEN 1 ELSE 0 END) AS delivery_pending_after_dispatch,
        SUM(CASE WHEN COALESCE(no.installation_status, 0) = 1 THEN 1 ELSE 0 END) AS completed_installation,
-       0 AS no_feedback_collected
+       0 AS no_feedback_collected,
+       0 AS feedback_collected
      FROM neworder no
      WHERE ${baseOrderSql}`,
     params,
   );
 
   // no_feedback_collected stays 0 here — EXISTS over service_records stalls the pool.
-  // Client patches that card via countOnly + openInstallationBucket=no_feedback.
+  // Client patches Feedback Collected card via /google-feedback countOnly.
   return parseOpenInstallationBreakdownRow(row);
 }
 
@@ -370,8 +373,7 @@ function buildOpenInstallationNeworderWhereSql(filters, { overdueDelayedOnly = f
     sql += ` AND COALESCE(no.installation_status, 0) = 0 AND ${DELIVERED_ON_SQL}`;
   } else if (bucket === "completed") {
     sql += ` AND COALESCE(no.installation_status, 0) = 1`;
-  } else if (bucket === "no_feedback") {
-    // List/count for this bucket uses /api/.../no-feedback — keep main path cheap.
+  } else if (bucket === "feedback_collected" || bucket === "no_feedback") {
     sql += ` AND COALESCE(no.installation_status, 0) = 1`;
   } else {
     sql += ` AND COALESCE(no.installation_status, 0) = 0 AND no.delivery_date IS NOT NULL`;
@@ -411,8 +413,16 @@ function buildOpenInstallationNeworderWhereSql(filters, { overdueDelayedOnly = f
     params.push(f.salesPerson);
   }
   if (f.assignedBy) {
-    sql += ` AND (TRIM(no.booking_by) = TRIM(?) OR TRIM(no.dispatch_person) = TRIM(?))`;
-    params.push(f.assignedBy, f.assignedBy);
+    sql += ` AND EXISTS (
+      SELECT 1
+      FROM dispatch d_ab
+      INNER JOIN service_records sr_ab
+        ON ${sqlTrimUtf8EqColumns("sr_ab.serial_number", "d_ab.serial_no")}
+      WHERE ${sqlTrimUtf8EqColumns("d_ab.quote_number", "no.quote_number")}
+        AND UPPER(TRIM(COALESCE(sr_ab.service_type, ''))) = 'INSTALLATION'
+        AND TRIM(sr_ab.engineer_assigned_by) = TRIM(?)
+    )`;
+    params.push(f.assignedBy);
   }
   return { sql, params };
 }
@@ -550,10 +560,7 @@ async function fetchOpenInstallationNeworderPage(
        no.state,
        no.created_by AS emp_name,
        no.created_by AS order_sales_person,
-       COALESCE(
-         NULLIF(TRIM(no.booking_by), ''),
-         NULLIF(TRIM(no.dispatch_person), '')
-       ) AS assigned_by,
+       NULL AS assigned_by,
        COALESCE(no.installation_status, 0) AS order_installation_status,
        COALESCE(no.dispatch_status, 0) AS order_dispatch_status,
        COALESCE(no.delivery_status, 0) AS order_delivery_status,
@@ -586,7 +593,8 @@ async function fetchOpenInstallationNeworderPage(
     [...where.params, limit, skip],
   );
 
-  const enriched = await enrichOpenInstallationRowsWithDispatch(conn, rows);
+  let enriched = await enrichOpenInstallationRowsWithDispatch(conn, rows);
+  enriched = await enrichOpenInstallationRowsWithServices(conn, enriched);
 
   let total;
   if (!skipTotal) {
@@ -692,6 +700,7 @@ async function fetchUpcomingInstallationsPage(
     !parsed.serviceStatus &&
     !parsed.serviceEngineer &&
     !parsed.thirdPartyEngineer &&
+    !parsed.assignedBy &&
     !parsed.registeredBy &&
     !parsed.warrantyRegistration &&
     !parsed.orderDeliveryStatus &&
@@ -1311,19 +1320,12 @@ async function fetchOpenInstallationFilterOptions(conn, filters = {}) {
   );
 
   const [assignedByRows] = await conn.execute(
-    `SELECT DISTINCT name FROM (
-       SELECT ${sqlUtf8TrimExpr("no.booking_by")} AS name
-       FROM neworder no
-       WHERE ${orderBase} AND ${sqlUtf8HasText("no.booking_by")}
-       UNION
-       SELECT ${sqlUtf8TrimExpr("no.dispatch_person")} AS name
-       FROM neworder no
-       WHERE ${orderBase} AND ${sqlUtf8HasText("no.dispatch_person")}
-     ) assigned_union
-     WHERE CHAR_LENGTH(name) > 0
+    `SELECT DISTINCT ${sqlUtf8TrimExpr("sr.engineer_assigned_by")} AS name
+     FROM service_records sr
+     WHERE UPPER(TRIM(COALESCE(sr.service_type, ''))) = 'INSTALLATION'
+       AND ${sqlUtf8HasText("sr.engineer_assigned_by")}
      ORDER BY name ASC
      LIMIT ${limit}`,
-    [...orderParams, ...orderParams],
   );
 
   let wpDateSql = "";

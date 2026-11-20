@@ -3,6 +3,7 @@ import { assertSuperAdminApiAccess } from "@/lib/serviceBeforeInstallationAccess
 import { isServiceBeforeInstallationSegment } from "@/lib/serviceBeforeInstallationHub";
 import { parseSbiFiltersFromSearchParams } from "@/lib/serviceBeforeInstallationFilters";
 import { getDbConnection } from "@/lib/db";
+import { ensureServiceRecordsEngineerAssignedByColumn } from "@/lib/ensureServiceRecordsEngineerAssignedByColumn";
 import {
   countOpenInstallationSegment,
   countWarrantyProductsSegment,
@@ -26,6 +27,11 @@ export async function GET(request, { params }) {
     const limit = Math.min(parseInt(searchParams.get("limit") || "50", 10) || 50, 200);
     const skip = parseInt(searchParams.get("skip") || "0", 10) || 0;
     const filters = parseSbiFiltersFromSearchParams(searchParams);
+
+    if (segment === "open-installation" || segment === "overdue-delayed-installation") {
+      const conn = await getDbConnection();
+      await ensureServiceRecordsEngineerAssignedByColumn(conn);
+    }
 
     // Prefer /api/service-before-installation/filters — kept for backwards compatibility.
     const filterOptionsOnly =

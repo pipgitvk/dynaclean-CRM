@@ -1,6 +1,8 @@
 "use server";
 
 import { getDbConnection } from "@/lib/db";
+import { getSessionPayload } from "@/lib/auth";
+import { ensureServiceRecordsEngineerAssignedByColumn } from "@/lib/ensureServiceRecordsEngineerAssignedByColumn";
 import AssignServiceForm from "@/components/services/AssignServiceForm";
 
 // Server Action
@@ -17,7 +19,11 @@ export async function updateServiceAssignment(formData) {
   let connection;
   try {
     connection = await getDbConnection();
-    
+    await ensureServiceRecordsEngineerAssignedByColumn(connection);
+    const payload = await getSessionPayload();
+    const engineerAssignedBy =
+      String(payload?.username || payload?.name || "").trim() || "admin";
+
     // Update both assigned_to (username for internal) and new fields for tracking type and third-party ID
     const tpId =
       assigned_to_type === "third_party" && assigned_to_id
@@ -25,8 +31,8 @@ export async function updateServiceAssignment(formData) {
         : null;
     const [result] = await connection.execute(
       `UPDATE service_records SET assigned_to = ?, assigned_to_type = ?, assigned_to_id = ?,
-       third_party_engineer_id = ? WHERE service_id = ?`,
-      [assigned_to, assigned_to_type, assigned_to_id, tpId, serviceIdToUpdate]
+       third_party_engineer_id = ?, engineer_assigned_by = ? WHERE service_id = ?`,
+      [assigned_to, assigned_to_type, assigned_to_id, tpId, engineerAssignedBy, serviceIdToUpdate]
     );
 
     if (result.affectedRows === 0) {

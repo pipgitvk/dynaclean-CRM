@@ -51,6 +51,7 @@ export function openInstallationBucketRecordCount(bucket, breakdown = {}) {
   if (b === "delivered_pending") return Number(breakdown.delivered_installation_pending ?? 0);
   if (b === "delivery_pending") return Number(breakdown.delivery_pending_after_dispatch ?? 0);
   if (b === "completed") return Number(breakdown.completed_installation ?? 0);
-  if (b === "no_feedback") return Number(breakdown.no_feedback_collected ?? 0);
+  if (b === "feedback_collected" || b === "no_feedback")
+    return Number(breakdown.feedback_collected ?? breakdown.no_feedback_collected ?? 0);
   return Number(breakdown.total ?? 0);
 }
