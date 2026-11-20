@@ -61,6 +61,12 @@ function joinPendingOrderOnQuote(quoteColumnExpr, orderEligibility = {}) {
       AND ${pendingNeworderPredicates("no_p", orderEligibility)}`;
 }
 
+function dispatchEligibleSql(dispatchAlias, orderAlias, orderEligibility = {}) {
+  return dispatchSerialEligibleForInstallation(dispatchAlias, orderAlias, {
+    lite: Boolean(orderEligibility.lite),
+  });
+}
+
 export function dispatchTypeJoin(type) {
   if (type === "products") {
     return `
@@ -97,6 +103,7 @@ export function resolveUpcomingInstallationType(itemType) {
  *   includeInnerOrderBy?: boolean,
  *   includeInstalledOrders?: boolean,
  *   openInstallationBucket?: string,
+ *   quoteKeys?: string[] | null,
  * }} [options]
  */
 export function buildUpcomingInstallationsQuery({
@@ -107,12 +114,29 @@ export function buildUpcomingInstallationsQuery({
   includeInnerOrderBy = true,
   includeInstalledOrders = false,
   openInstallationBucket = "",
+  quoteKeys = null,
+  lite = false,
 } = {}) {
-  const orderEligibility = { includeInstalledOrders };
+  const orderEligibility = { includeInstalledOrders, lite: Boolean(lite) };
   const bucketWhereOnNo = buildNeworderOpenInstallationBucketWhereSql(openInstallationBucket);
   const registrationFilter =
     registration === "unregistered" ? `AND ${UNREGISTERED_PRODUCT_ORDER_SQL}` : "";
   const dispatchType = type === "all" ? null : type;
+  const keys = Array.isArray(quoteKeys)
+    ? quoteKeys.map((k) => String(k || "").trim()).filter(Boolean)
+    : [];
+  const quoteKeyInSql =
+    keys.length > 0
+      ? `AND ${sqlUtf8TrimExpr("no.quote_number")} IN (${keys.map(() => "?").join(",")})`
+      : "";
+  const dispatchQuoteKeyInSql =
+    keys.length > 0
+      ? `AND ${sqlUtf8TrimExpr("d.quote_number")} IN (${keys.map(() => "?").join(",")})`
+      : "";
+  const dispatch2QuoteKeyInSql =
+    keys.length > 0
+      ? `AND ${sqlUtf8TrimExpr("d2.quote_number")} IN (${keys.map(() => "?").join(",")})`
+      : "";
 
   const quoteKeyD = sqlUtf8TrimExpr("d.quote_number");
   const quoteKeyD2 = sqlUtf8TrimExpr("d2.quote_number");
@@ -195,6 +219,8 @@ export function buildUpcomingInstallationsQuery({
         NULLIF(TRIM(no.dispatch_person), '')
       ) AS assigned_by,
       COALESCE(no.installation_status, 0) AS order_installation_status,
+      COALESCE(no.dispatch_status, 0) AS order_dispatch_status,
+      COALESCE(no.delivery_status, 0) AS order_delivery_status,
       DATE_FORMAT(no.delivery_date, '%Y-%m-%d') AS delivery_date,
       DATE_FORMAT(no.delivered_on, '%Y-%m-%d') AS delivered_on,
       ${pricingSelect}
@@ -250,7 +276,8 @@ export function buildUpcomingInstallationsQuery({
       LEFT JOIN warranty_products wp
         ON ${sqlTrimUtf8EqColumns("wp.serial_number", "d.serial_no")}
       WHERE 1=1
-        ${dispatchSerialEligibleForInstallation("d", "no_p")}
+        ${dispatchEligibleSql("d", "no_p", orderEligibility)}
+        ${dispatchQuoteKeyInSql}
       GROUP BY quote_key
     ) agg ON ${sqlTrimUtf8EqColumns("agg.quote_key", "no.quote_number")}
     LEFT JOIN (
@@ -279,15 +306,27 @@ export function buildUpcomingInstallationsQuery({
       INNER JOIN service_records sr2
         ON ${sqlTrimUtf8EqColumns("sr2.serial_number", "d2.serial_no")}
       WHERE 1=1
-        ${dispatchSerialEligibleForInstallation("d2", "no_p")}
+        ${dispatchEligibleSql("d2", "no_p", orderEligibility)}
+        ${dispatch2QuoteKeyInSql}
       GROUP BY quote_key
     ) svc ON ${sqlTrimUtf8EqColumns("svc.quote_key", "no.quote_number")}
     ${quoteTotalsJoin}
     WHERE ${pendingNeworderPredicates("no", orderEligibility)}
       ${registrationFilter}
       ${bucketWhereOnNo}
+      ${quoteKeyInSql}
     ${orderBy}
   `;
+}
+
+/** Bind params for quoteKeys IN clauses (agg + svc + outer), same order as SQL. */
+export function upcomingInstallationQuoteKeyParams(quoteKeys) {
+  const keys = Array.isArray(quoteKeys)
+    ? quoteKeys.map((k) => String(k || "").trim()).filter(Boolean)
+    : [];
+  if (!keys.length) return [];
+  // d.quote_number IN, d2.quote_number IN, no.quote_number IN
+  return [...keys, ...keys, ...keys];
 }
 
 /**
@@ -298,17 +337,73 @@ export function buildOpenInstallationKpiInnerQuery({
   type = "products",
   includeInstalledOrders = false,
   openInstallationBucket = "",
+  slim = true,
+  lite = true,
 } = {}) {
-  const orderEligibility = { includeInstalledOrders };
+  const orderEligibility = { includeInstalledOrders, lite: Boolean(lite) };
   const bucketWhereOnNo = buildNeworderOpenInstallationBucketWhereSql(openInstallationBucket);
   const dispatchType = type === "all" ? null : type;
   const quoteKeyD = sqlUtf8TrimExpr("d.quote_number");
   const quoteKeyD2 = sqlUtf8TrimExpr("d2.quote_number");
 
+  // Slim KPI: no warranty / engineer GROUP_CONCAT — only flags the 4 cards need.
+  if (slim) {
+    return `
+    SELECT
+      no.quote_number,
+      COALESCE(no.installation_status, 0) AS order_installation_status,
+      COALESCE(no.dispatch_status, 0) AS order_dispatch_status,
+      COALESCE(no.delivery_status, 0) AS order_delivery_status,
+      DATE_FORMAT(no.delivery_date, '%Y-%m-%d') AS delivery_date,
+      DATE_FORMAT(no.delivered_on, '%Y-%m-%d') AS delivered_on,
+      COALESCE(svc.installation_completed, 0) AS installation_completed,
+      COALESCE(svc.no_feedback_collected, 0) AS no_feedback_collected
+    FROM neworder no
+    INNER JOIN (
+      SELECT ${quoteKeyD} AS quote_key
+      FROM dispatch d
+      ${joinPendingOrderOnQuote("d.quote_number", orderEligibility)}
+      ${dispatchTypeJoin(dispatchType)}
+      WHERE 1=1
+        ${dispatchEligibleSql("d", "no_p", orderEligibility)}
+      GROUP BY quote_key
+    ) agg ON ${sqlTrimUtf8EqColumns("agg.quote_key", "no.quote_number")}
+    LEFT JOIN (
+      SELECT
+        ${quoteKeyD2} AS quote_key,
+        MAX(
+          CASE
+            WHEN UPPER(TRIM(COALESCE(sr2.service_type, ''))) = 'INSTALLATION'
+              AND UPPER(TRIM(COALESCE(sr2.status, ''))) = 'COMPLETED'
+            THEN 1 ELSE 0
+          END
+        ) AS installation_completed,
+        MAX(
+          CASE
+            WHEN ${NO_FEEDBACK_ON_COMPLETED_INSTALLATION_SQL}
+            THEN 1 ELSE 0
+          END
+        ) AS no_feedback_collected
+      FROM dispatch d2
+      ${joinPendingOrderOnQuote("d2.quote_number", orderEligibility)}
+      INNER JOIN service_records sr2
+        ON ${sqlTrimUtf8EqColumns("sr2.serial_number", "d2.serial_no")}
+      WHERE 1=1
+        ${dispatchEligibleSql("d2", "no_p", orderEligibility)}
+        AND UPPER(TRIM(COALESCE(sr2.service_type, ''))) = 'INSTALLATION'
+      GROUP BY quote_key
+    ) svc ON ${sqlTrimUtf8EqColumns("svc.quote_key", "no.quote_number")}
+    WHERE ${pendingNeworderPredicates("no", orderEligibility)}
+      ${bucketWhereOnNo}
+  `;
+  }
+
   return `
     SELECT
       no.quote_number,
       COALESCE(no.installation_status, 0) AS order_installation_status,
+      COALESCE(no.dispatch_status, 0) AS order_dispatch_status,
+      COALESCE(no.delivery_status, 0) AS order_delivery_status,
       DATE_FORMAT(no.delivery_date, '%Y-%m-%d') AS delivery_date,
       DATE_FORMAT(no.delivered_on, '%Y-%m-%d') AS delivered_on,
       no.state,
@@ -352,7 +447,7 @@ export function buildOpenInstallationKpiInnerQuery({
       LEFT JOIN warranty_products wp
         ON ${sqlTrimUtf8EqColumns("wp.serial_number", "d.serial_no")}
       WHERE 1=1
-        ${dispatchSerialEligibleForInstallation("d", "no_p")}
+        ${dispatchEligibleSql("d", "no_p", orderEligibility)}
       GROUP BY quote_key
     ) agg ON ${sqlTrimUtf8EqColumns("agg.quote_key", "no.quote_number")}
     LEFT JOIN (
@@ -379,7 +474,7 @@ export function buildOpenInstallationKpiInnerQuery({
       INNER JOIN service_records sr2
         ON ${sqlTrimUtf8EqColumns("sr2.serial_number", "d2.serial_no")}
       WHERE 1=1
-        ${dispatchSerialEligibleForInstallation("d2", "no_p")}
+        ${dispatchEligibleSql("d2", "no_p", orderEligibility)}
         AND UPPER(TRIM(COALESCE(sr2.service_type, ''))) = 'INSTALLATION'
       GROUP BY quote_key
     ) svc ON ${sqlTrimUtf8EqColumns("svc.quote_key", "no.quote_number")}

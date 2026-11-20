@@ -5,15 +5,29 @@ import { sqlTrimUtf8EqColumns, sqlUtf8TrimExpr } from "@/lib/sqlUtf8Compare";
  * - Fully dispatched (dispatch_status = 1), or
  * - Partial dispatch (2) with at least one delivery save and shipped serial.
  */
-export function pendingNeworderPredicates(alias = "no_p", { includeInstalledOrders = false } = {}) {
+export function pendingNeworderPredicates(
+  alias = "no_p",
+  { includeInstalledOrders = false, lite = false } = {},
+) {
   const installationStatusSql = includeInstalledOrders
     ? `COALESCE(${alias}.installation_status, 0) IN (0, 1)`
     : `COALESCE(${alias}.installation_status, 0) = 0`;
-  return `
+  const base = `
     ${installationStatusSql}
     AND (${alias}.is_returned = 0 OR ${alias}.is_returned = 2 OR ${alias}.is_returned IS NULL)
     AND (${alias}.is_cancelled = 0 OR ${alias}.is_cancelled IS NULL)
-    AND ${alias}.delivery_date IS NOT NULL
+    AND ${alias}.delivery_date IS NOT NULL`;
+  // Lite: skip EXISTS on dispatch (caller already joins dispatch with a serial).
+  if (lite) {
+    return `
+    ${base}
+    AND (
+      COALESCE(${alias}.dispatch_status, 0) = 1
+      OR COALESCE(${alias}.delivery_status, 0) IN (1, 2)
+    )`;
+  }
+  return `
+    ${base}
     AND (
       COALESCE(${alias}.dispatch_status, 0) = 1
       OR (
@@ -37,7 +51,21 @@ export function pendingNeworderPredicates(alias = "no_p", { includeInstalledOrde
 export function dispatchSerialEligibleForInstallation(
   dispatchAlias = "d",
   orderAlias = "no_p",
+  { lite = false } = {},
 ) {
+  // Lite: no order_delivery_batches correlated subquery (huge win on ~1k orders).
+  if (lite) {
+    return `
+    AND ${dispatchAlias}.serial_no IS NOT NULL
+    AND TRIM(${dispatchAlias}.serial_no) <> ''
+    AND (
+      COALESCE(${orderAlias}.dispatch_status, 0) = 1
+      OR (
+        COALESCE(${orderAlias}.delivery_status, 0) IN (1, 2)
+        AND COALESCE(${dispatchAlias}.stock_deducted, 0) = 1
+      )
+    )`;
+  }
   return `
     AND ${dispatchAlias}.serial_no IS NOT NULL
     AND ${sqlUtf8TrimExpr(`${dispatchAlias}.serial_no`)} <> ''

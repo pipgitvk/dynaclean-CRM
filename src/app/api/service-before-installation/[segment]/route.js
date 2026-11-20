@@ -4,6 +4,7 @@ import { isServiceBeforeInstallationSegment } from "@/lib/serviceBeforeInstallat
 import { parseSbiFilters } from "@/lib/serviceBeforeInstallationFilters";
 import { getDbConnection } from "@/lib/db";
 import {
+  countOpenInstallationSegment,
   countWarrantyProductsSegment,
   fetchServiceBeforeInstallationSegmentPage,
   fetchServiceBeforeInstallationSegmentFilterOptions,
@@ -81,12 +82,17 @@ export async function GET(request, { params }) {
     const skipTotal = String(searchParams.get("skipTotal") || "0").trim() === "1";
 
     if (countOnly) {
-      const conn = await getDbConnection();
-      const total = await countWarrantyProductsSegment(conn, segment, filters);
+      let total = 0;
+      if (segment === "open-installation" || segment === "overdue-delayed-installation") {
+        total = await countOpenInstallationSegment(segment, filters);
+      } else {
+        const conn = await getDbConnection();
+        total = await countWarrantyProductsSegment(conn, segment, filters);
+      }
       return NextResponse.json({
         success: true,
         data: [],
-        pagination: { total, limit, skip, hasMore: false },
+        pagination: { total, limit, skip, hasMore: skip + limit < total },
       });
     }
 

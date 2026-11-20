@@ -16,10 +16,18 @@ export const U_INSTALLATION_COMPLETED_SQL = `(
 /** Open-installation list / KPI total — still-pending on neworder only */
 export const U_OPEN_INSTALLATION_ORDER_SQL = `(COALESCE(u.order_installation_status, 0) = 0)`;
 
-export const U_DELIVERY_PENDING_AFTER_DISPATCH_SQL = `(NOT ${U_ACTUALLY_DELIVERED_SQL})`;
+/**
+ * Delivery pending: neworder.delivery_status = 0
+ * (list/KPI for this bucket use a dedicated neworder query — no dispatch gate).
+ */
+export const U_DELIVERY_PENDING_AFTER_DISPATCH_SQL = `(
+  COALESCE(u.order_delivery_status, 0) = 0
+)`;
 
+/** Open + delivered + installation not done. */
 export const U_DELIVERED_INSTALLATION_PENDING_SQL = `(
-  ${U_ACTUALLY_DELIVERED_SQL}
+  ${U_OPEN_INSTALLATION_ORDER_SQL}
+  AND ${U_ACTUALLY_DELIVERED_SQL}
   AND NOT ${U_INSTALLATION_COMPLETED_SQL}
 )`;
 
@@ -31,6 +39,11 @@ export const NO_ACTUALLY_DELIVERED_SQL = `(
   no.delivered_on IS NOT NULL
   AND TRIM(CAST(no.delivered_on AS CHAR)) NOT IN ('', '0000-00-00', '0000-00-00 00:00:00')
   AND DATE(no.delivered_on) > '1970-01-01'
+)`;
+
+/** neworder: delivery not marked done. */
+export const NO_DELIVERY_PENDING_AFTER_DISPATCH_SQL = `(
+  COALESCE(no.delivery_status, 0) = 0
 )`;
 
 export function openInstallationBucketRecordCount(bucket, breakdown = {}) {

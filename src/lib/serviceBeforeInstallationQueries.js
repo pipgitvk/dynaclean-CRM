@@ -9,7 +9,9 @@ import {
   buildUpcomingInstallationsQuery,
   dispatchTypeJoin,
   resolveUpcomingInstallationType,
+  upcomingInstallationQuoteKeyParams,
 } from "@/lib/upcomingInstallationsQuery";
+import { buildNeworderOpenInstallationBucketWhereSql } from "@/lib/openInstallationBucketNeworderSql";
 import {
   dispatchSerialEligibleForInstallation,
   pendingNeworderPredicates,
@@ -48,7 +50,7 @@ export const OVERDUE_DELAYED_INSTALLATION_DAYS = 2;
 const HUB_COUNTS_CACHE = new Map();
 const HUB_COUNTS_TTL_MS = 45_000;
 const OPEN_INSTALLATION_KPI_CACHE = new Map();
-const OPEN_INSTALLATION_KPI_TTL_MS = 30_000;
+const OPEN_INSTALLATION_KPI_TTL_MS = 120_000;
 
 function openInstallationNeedsFullListShape(filters) {
   const f = parseSbiFilters(filters);
@@ -68,15 +70,30 @@ function openInstallationNeedsFullListShape(filters) {
   );
 }
 
-function buildOpenInstallationInnerQuery(filters, { forList = false } = {}) {
+function openInstallationNeedsInstalledOrders(bucket) {
+  const b = String(bucket || "").trim().toLowerCase();
+  return b === "completed" || b === "no_feedback";
+}
+
+function buildOpenInstallationInnerQuery(
+  filters,
+  { forList = false, quoteKeys = null } = {},
+) {
   const parsed = parseSbiFilters(filters);
   const type = resolveUpcomingInstallationType(parsed.itemType);
   const bucket = parsed.openInstallationBucket;
+  // Default open list = pending only. Installed orders only for completed / no-feedback buckets
+  // (and KPI breakdown always includes them via includeInstalledOrders below).
+  const includeInstalledOrders = forList
+    ? openInstallationNeedsInstalledOrders(bucket)
+    : true;
   const shared = {
     type,
     registration: null,
-    includeInstalledOrders: true,
+    includeInstalledOrders,
     openInstallationBucket: bucket,
+    // Skip order_delivery_batches correlated subquery — main win on ~1k orders.
+    lite: true,
   };
   if (forList) {
     return buildUpcomingInstallationsQuery({
@@ -84,6 +101,7 @@ function buildOpenInstallationInnerQuery(filters, { forList = false } = {}) {
       includeQuoteTotals: false,
       includeServiceDetails: false,
       includeInnerOrderBy: false,
+      quoteKeys,
     });
   }
   if (openInstallationNeedsFullListShape(filters)) {
@@ -94,7 +112,10 @@ function buildOpenInstallationInnerQuery(filters, { forList = false } = {}) {
       includeInnerOrderBy: false,
     });
   }
-  return buildOpenInstallationKpiInnerQuery(shared);
+  return buildOpenInstallationKpiInnerQuery({
+    ...shared,
+    slim: true,
+  });
 }
 
 async function countUpcomingInstallations(conn, filters, { overdueDelayedOnly = false } = {}) {
@@ -187,6 +208,9 @@ function openInstallationBreakdownAggregateSql(inner, listFilter, extraSql) {
   FROM (${inner}) u WHERE 1=1 ${listFilter.sql}${extraSql}`;
 }
 
+OPEN_INSTALLATION_KPI_CACHE.clear();
+
+
 function parseOpenInstallationBreakdownRow(row) {
   return {
     total: Number(row?.total || 0),
@@ -220,6 +244,65 @@ function openInstallationKpiCacheKey(filters, overdueDelayedOnly) {
   });
 }
 
+/**
+ * Fast KPI from neworder only (no products_list / heavy eligibility).
+ * Delivery-pending uses the same dedicated counter as the list.
+ */
+async function fetchOpenInstallationBreakdownLite(
+  conn,
+  filters,
+  { overdueDelayedOnly = false } = {},
+) {
+  const f = parseSbiFilters(filters);
+  const overdueSql = overdueDelayedOnly
+    ? ` AND no.delivery_date < DATE_SUB(CURDATE(), INTERVAL ${OVERDUE_DELAYED_INSTALLATION_DAYS} DAY)`
+    : "";
+
+  let dateSql = "";
+  const params = [];
+  if (f.from) {
+    dateSql += ` AND DATE(no.delivery_date) >= ?`;
+    params.push(f.from);
+  }
+  if (f.to) {
+    dateSql += ` AND DATE(no.delivery_date) <= ?`;
+    params.push(f.to);
+  }
+
+  const baseOrderSql = `
+    (no.is_cancelled = 0 OR no.is_cancelled IS NULL)
+    AND (no.is_returned = 0 OR no.is_returned = 2 OR no.is_returned IS NULL)
+    ${dateSql}
+    ${overdueSql}
+  `;
+
+  const deliveredOnSql = `(
+    no.delivered_on IS NOT NULL
+    AND TRIM(CAST(no.delivered_on AS CHAR)) NOT IN ('', '0000-00-00', '0000-00-00 00:00:00')
+    AND DATE(no.delivered_on) > '1970-01-01'
+  )`;
+
+  // One cheap scan of neworder — no service_records EXISTS (was causing 20s+ timeouts).
+  const [[row]] = await conn.execute(
+    `SELECT
+       SUM(CASE WHEN COALESCE(no.installation_status, 0) = 0 THEN 1 ELSE 0 END) AS total,
+       SUM(
+         CASE
+           WHEN COALESCE(no.installation_status, 0) = 0 AND ${deliveredOnSql}
+           THEN 1 ELSE 0
+         END
+       ) AS delivered_installation_pending,
+       SUM(CASE WHEN COALESCE(no.delivery_status, 0) = 0 THEN 1 ELSE 0 END) AS delivery_pending_after_dispatch,
+       SUM(CASE WHEN COALESCE(no.installation_status, 0) = 1 THEN 1 ELSE 0 END) AS completed_installation,
+       0 AS no_feedback_collected
+     FROM neworder no
+     WHERE ${baseOrderSql}`,
+    params,
+  );
+
+  return parseOpenInstallationBreakdownRow(row);
+}
+
 export async function fetchOpenInstallationBreakdown(
   conn,
   filters,
@@ -231,18 +314,354 @@ export async function fetchOpenInstallationBreakdown(
     return cached.data;
   }
 
-  const inner = buildOpenInstallationInnerQuery(filters, { forList: false });
-  const listFilter = buildUpcomingInstallationListFilterSql(filters, {
-    omitOpenInstallationBucket: true,
-  });
-  const extraSql = overdueDelayedOnly ? upcomingOverdueDelayedExtraSql() : "";
-  const [[row]] = await conn.execute(
-    openInstallationBreakdownAggregateSql(inner, listFilter, extraSql),
-    listFilter.params,
-  );
-  const data = parseOpenInstallationBreakdownRow(row);
+  let data;
+  if (!openInstallationNeedsFullListShape(filters) && !parseSbiFilters(filters).serviceStatus) {
+    data = await fetchOpenInstallationBreakdownLite(conn, filters, { overdueDelayedOnly });
+  } else {
+    const inner = buildOpenInstallationInnerQuery(filters, { forList: false });
+    const listFilter = buildUpcomingInstallationListFilterSql(filters, {
+      omitOpenInstallationBucket: true,
+    });
+    const extraSql = overdueDelayedOnly ? upcomingOverdueDelayedExtraSql() : "";
+    const [[row]] = await conn.execute(
+      openInstallationBreakdownAggregateSql(inner, listFilter, extraSql),
+      listFilter.params,
+    );
+    data = parseOpenInstallationBreakdownRow(row);
+  }
   OPEN_INSTALLATION_KPI_CACHE.set(cacheKey, { at: Date.now(), data });
   return data;
+}
+
+const DELIVERED_ON_SQL = `(
+  no.delivered_on IS NOT NULL
+  AND TRIM(CAST(no.delivered_on AS CHAR)) NOT IN ('', '0000-00-00', '0000-00-00 00:00:00')
+  AND DATE(no.delivered_on) > '1970-01-01'
+)`;
+
+/**
+ * Ultra-fast neworder WHERE for open-installation buckets.
+ * No dispatch/products join — those were timing out the pool.
+ */
+function buildOpenInstallationNeworderWhereSql(filters, { overdueDelayedOnly = false } = {}) {
+  const f = parseSbiFilters(filters);
+  const bucket = String(f.openInstallationBucket || "").trim().toLowerCase();
+
+  let sql = `
+    WHERE (no.is_cancelled = 0 OR no.is_cancelled IS NULL)
+      AND (no.is_returned = 0 OR no.is_returned = 2 OR no.is_returned IS NULL)
+  `;
+  const params = [];
+
+  if (bucket === "delivery_pending") {
+    sql += ` AND COALESCE(no.delivery_status, 0) = 0`;
+  } else if (bucket === "delivered_pending") {
+    sql += ` AND COALESCE(no.installation_status, 0) = 0 AND ${DELIVERED_ON_SQL}`;
+  } else if (bucket === "completed" || bucket === "no_feedback") {
+    sql += ` AND COALESCE(no.installation_status, 0) = 1`;
+  } else {
+    sql += ` AND COALESCE(no.installation_status, 0) = 0 AND no.delivery_date IS NOT NULL`;
+  }
+
+  if (overdueDelayedOnly) {
+    sql += ` AND no.delivery_date < DATE_SUB(CURDATE(), INTERVAL ${OVERDUE_DELAYED_INSTALLATION_DAYS} DAY)`;
+  }
+
+  if (f.search) {
+    const term = `%${f.search}%`;
+    sql += ` AND (
+      no.order_id LIKE ? OR no.quote_number LIKE ? OR no.company_name LIKE ?
+      OR no.contact LIKE ? OR no.invoice_number LIKE ? OR no.delivery_location LIKE ?
+      OR no.state LIKE ? OR no.created_by LIKE ?
+    )`;
+    params.push(...Array(8).fill(term));
+  }
+  if (f.state) {
+    sql += ` AND no.state LIKE ?`;
+    params.push(`%${f.state}%`);
+  }
+  if (f.serial) {
+    sql += ` AND (no.invoice_number LIKE ? OR no.order_id LIKE ? OR no.quote_number LIKE ?)`;
+    params.push(`%${f.serial}%`, `%${f.serial}%`, `%${f.serial}%`);
+  }
+  if (f.from) {
+    sql += ` AND DATE(no.delivery_date) >= ?`;
+    params.push(f.from);
+  }
+  if (f.to) {
+    sql += ` AND DATE(no.delivery_date) <= ?`;
+    params.push(f.to);
+  }
+  if (f.salesPerson) {
+    sql += ` AND TRIM(no.created_by) = TRIM(?)`;
+    params.push(f.salesPerson);
+  }
+  if (f.assignedBy) {
+    sql += ` AND (TRIM(no.booking_by) = TRIM(?) OR TRIM(no.dispatch_person) = TRIM(?))`;
+    params.push(f.assignedBy, f.assignedBy);
+  }
+  return { sql, params };
+}
+
+function buildDeliveryStatusPendingWhereSql(filters) {
+  return buildOpenInstallationNeworderWhereSql({
+    ...filters,
+    openInstallationBucket: "delivery_pending",
+  });
+}
+
+async function enrichOpenInstallationRowsWithDispatch(conn, rows) {
+  if (!rows?.length) return rows || [];
+  const quotes = [
+    ...new Set(rows.map((r) => String(r.quote_number || "").trim()).filter(Boolean)),
+  ];
+  if (!quotes.length) return rows;
+
+  const placeholders = quotes.map(() => "?").join(",");
+  // Page quotes only (~10): dispatch + warranty_products for Registered badge.
+  const [aggRows] = await conn.execute(
+    `SELECT
+       ${sqlUtf8TrimExpr("d.quote_number")} AS quote_key,
+       GROUP_CONCAT(DISTINCT d.serial_no ORDER BY d.serial_no SEPARATOR ', ') AS serial_number,
+       GROUP_CONCAT(DISTINCT d.item_code ORDER BY d.item_code SEPARATOR ', ') AS model,
+       GROUP_CONCAT(DISTINCT d.item_name ORDER BY d.item_name SEPARATOR ', ') AS name,
+       DATE_FORMAT(MAX(COALESCE(d.updated_at, d.created_at)), '%Y-%m-%d') AS dispatch_date,
+       MAX(CASE WHEN wp.serial_number IS NOT NULL THEN 1 ELSE 0 END) AS warranty_registered,
+       NULLIF(
+         SUBSTRING_INDEX(
+           SUBSTRING_INDEX(
+             SUBSTRING_INDEX(
+               GROUP_CONCAT(
+                 CASE
+                   WHEN wp.serial_number IS NOT NULL
+                   THEN CONCAT(
+                     LPAD(wp.id, 20, '0'),
+                     '||',
+                     DATE_FORMAT(COALESCE(wp.created_at, wp.invoice_date), '%Y-%m-%d'),
+                     '||',
+                     TRIM(COALESCE(wp.created_by, ''))
+                   )
+                 END
+                 ORDER BY wp.id DESC
+                 SEPARATOR ','
+               ),
+               ',',
+               1
+             ),
+             '||',
+             2
+           ),
+           '||',
+           -1
+         ),
+         ''
+       ) AS registered_at,
+       NULLIF(
+         SUBSTRING_INDEX(
+           SUBSTRING_INDEX(
+             GROUP_CONCAT(
+               CASE
+                 WHEN wp.serial_number IS NOT NULL
+                 THEN CONCAT(
+                   LPAD(wp.id, 20, '0'),
+                   '||',
+                   DATE_FORMAT(COALESCE(wp.created_at, wp.invoice_date), '%Y-%m-%d'),
+                   '||',
+                   TRIM(COALESCE(wp.created_by, ''))
+                 )
+               END
+               ORDER BY wp.id DESC
+               SEPARATOR ','
+             ),
+             ',',
+             1
+           ),
+           '||',
+           -1
+         ),
+         ''
+       ) AS registered_by
+     FROM dispatch d
+     LEFT JOIN warranty_products wp
+       ON ${sqlTrimUtf8EqColumns("wp.serial_number", "d.serial_no")}
+     WHERE ${sqlUtf8TrimExpr("d.quote_number")} IN (${placeholders})
+       AND d.serial_no IS NOT NULL
+       AND ${sqlUtf8TrimExpr("d.serial_no")} <> ''
+     GROUP BY ${sqlUtf8TrimExpr("d.quote_number")}`,
+    quotes,
+  );
+  const byQuote = new Map(
+    (aggRows || []).map((r) => [String(r.quote_key || "").trim().toLowerCase(), r]),
+  );
+  return rows.map((row) => {
+    const hit = byQuote.get(String(row.quote_number || "").trim().toLowerCase());
+    if (!hit) return row;
+    const registered = Number(hit.warranty_registered) === 1;
+    return {
+      ...row,
+      serial_number: hit.serial_number || row.serial_number || "",
+      model: hit.model || row.model || "",
+      name: hit.name || row.name || "",
+      dispatch_date: hit.dispatch_date || row.dispatch_date || null,
+      warranty_registered: registered ? 1 : 0,
+      registered_at: registered ? hit.registered_at || null : null,
+      registered_by: registered ? hit.registered_by || null : null,
+    };
+  });
+}
+
+async function fetchOpenInstallationNeworderPage(
+  conn,
+  filters,
+  limit,
+  skip,
+  { skipTotal = true, overdueDelayedOnly = false } = {},
+) {
+  const where = buildOpenInstallationNeworderWhereSql(filters, { overdueDelayedOnly });
+
+  const [rows] = await conn.execute(
+    `SELECT
+       no.id,
+       no.order_id,
+       no.quote_number,
+       no.invoice_number,
+       '' AS serial_number,
+       NULL AS service_id,
+       NULL AS service_details,
+       '' AS model,
+       '' AS name,
+       no.delivery_location AS delivery_address,
+       no.company_name,
+       no.contact,
+       no.state,
+       no.created_by AS emp_name,
+       no.created_by AS order_sales_person,
+       COALESCE(
+         NULLIF(TRIM(no.booking_by), ''),
+         NULLIF(TRIM(no.dispatch_person), '')
+       ) AS assigned_by,
+       COALESCE(no.installation_status, 0) AS order_installation_status,
+       COALESCE(no.dispatch_status, 0) AS order_dispatch_status,
+       COALESCE(no.delivery_status, 0) AS order_delivery_status,
+       DATE_FORMAT(no.delivery_date, '%Y-%m-%d') AS delivery_date,
+       DATE_FORMAT(no.delivered_on, '%Y-%m-%d') AS delivered_on,
+       0 AS pricing_total,
+       0 AS total_qty,
+       CASE
+         WHEN no.delivery_date < CURDATE() THEN 'overdue'
+         WHEN no.delivery_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 10 DAY) THEN 'upcoming'
+         ELSE 'scheduled'
+       END AS installation_status,
+       CASE
+         WHEN no.delivered_on IS NOT NULL AND no.delivered_on > '1970-01-01'
+         THEN DATEDIFF(no.delivered_on, CURDATE())
+         ELSE DATEDIFF(no.delivery_date, CURDATE())
+       END AS days_until_installation,
+       0 AS warranty_registered,
+       NULL AS registered_at,
+       NULL AS registered_by,
+       NULL AS dispatch_date,
+       NULL AS service_engineer,
+       NULL AS third_party_engineer,
+       CASE WHEN COALESCE(no.installation_status, 0) = 1 THEN 1 ELSE 0 END AS installation_completed,
+       0 AS no_feedback_collected
+     FROM neworder no
+     ${where.sql}
+     ORDER BY no.id DESC
+     LIMIT ? OFFSET ?`,
+    [...where.params, limit, skip],
+  );
+
+  const enriched = await enrichOpenInstallationRowsWithDispatch(conn, rows);
+
+  let total;
+  if (!skipTotal) {
+    const [[countRow]] = await conn.execute(
+      `SELECT COUNT(*) AS cnt FROM neworder no ${where.sql}`,
+      where.params,
+    );
+    total = Number(countRow?.cnt || 0);
+  }
+
+  return {
+    total,
+    hasMore:
+      total != null ? skip + enriched.length < total : enriched.length >= limit,
+    data: enriched,
+  };
+}
+
+async function countDeliveryStatusPending(conn, filters) {
+  const where = buildDeliveryStatusPendingWhereSql(filters);
+  const [[row]] = await conn.execute(
+    `SELECT COUNT(*) AS cnt FROM neworder no ${where.sql}`,
+    where.params,
+  );
+  return Number(row?.cnt || 0);
+}
+
+async function countOpenInstallationNeworder(conn, filters, { overdueDelayedOnly = false } = {}) {
+  const where = buildOpenInstallationNeworderWhereSql(filters, { overdueDelayedOnly });
+  const [[row]] = await conn.execute(
+    `SELECT COUNT(*) AS cnt FROM neworder no ${where.sql}`,
+    where.params,
+  );
+  return Number(row?.cnt || 0);
+}
+
+/** Fast total for open-installation list (separate API from rows). */
+export async function countOpenInstallationSegment(segment, filters = {}) {
+  const conn = await getDbConnection();
+  if (segment === "open-installation" || segment === "overdue-delayed-installation") {
+    return countOpenInstallationNeworder(conn, filters, {
+      overdueDelayedOnly: segment === "overdue-delayed-installation",
+    });
+  }
+  return 0;
+}
+
+async function fetchOpenInstallationQuotePageKeys(
+  conn,
+  filters,
+  limit,
+  skip,
+  { overdueDelayedOnly = false } = {},
+) {
+  const parsed = parseSbiFilters(filters);
+  const type = resolveUpcomingInstallationType(parsed.itemType);
+  const includeInstalledOrders = openInstallationNeedsInstalledOrders(
+    parsed.openInstallationBucket,
+  );
+  const orderEligibility = { includeInstalledOrders, lite: true };
+  const typeJoin = dispatchTypeJoin(type === "all" ? null : type);
+  const quoteKey = sqlUtf8TrimExpr("d.quote_number");
+  const bucketWhere = buildNeworderOpenInstallationBucketWhereSql(parsed.openInstallationBucket);
+  const overdueSql = overdueDelayedOnly
+    ? ` AND no.delivery_date < DATE_SUB(CURDATE(), INTERVAL ${OVERDUE_DELAYED_INSTALLATION_DAYS} DAY)`
+    : "";
+
+  const [rows] = await conn.execute(
+    `SELECT no.quote_number
+     FROM neworder no
+     INNER JOIN (
+       SELECT ${quoteKey} AS quote_key
+       FROM dispatch d
+       INNER JOIN neworder no_p
+         ON ${sqlTrimUtf8EqColumns("no_p.quote_number", "d.quote_number")}
+         AND ${pendingNeworderPredicates("no_p", orderEligibility)}
+       ${typeJoin}
+       WHERE 1=1
+         ${dispatchSerialEligibleForInstallation("d", "no_p", { lite: true })}
+       GROUP BY quote_key
+     ) agg ON ${sqlTrimUtf8EqColumns("agg.quote_key", "no.quote_number")}
+     WHERE ${pendingNeworderPredicates("no", orderEligibility)}
+       ${bucketWhere}
+       ${overdueSql}
+     ORDER BY no.delivery_date ASC
+     LIMIT ? OFFSET ?`,
+    [limit, skip],
+  );
+  return rows.map((r) => String(r.quote_number || "").trim()).filter(Boolean);
 }
 
 async function fetchUpcomingInstallationsPage(
@@ -253,26 +672,72 @@ async function fetchUpcomingInstallationsPage(
   { overdueDelayedOnly = false, includeBreakdown = false, skipTotal = false } = {},
 ) {
   const parsed = parseSbiFilters(filters);
-  const listInner = buildOpenInstallationInnerQuery(filters, { forList: true });
+
+  // Default open-installation path: neworder page + tiny dispatch enrich (no full-table joins).
+  const useNeworderFastPath =
+    !parsed.serviceStatus &&
+    !parsed.serviceEngineer &&
+    !parsed.thirdPartyEngineer &&
+    !parsed.registeredBy &&
+    !parsed.warrantyRegistration &&
+    !parsed.orderDeliveryStatus &&
+    !parsed.model;
+
+  if (useNeworderFastPath) {
+    const page = await fetchOpenInstallationNeworderPage(conn, filters, limit, skip, {
+      skipTotal,
+      overdueDelayedOnly,
+    });
+    const breakdown = includeBreakdown
+      ? await fetchOpenInstallationBreakdown(conn, filters, { overdueDelayedOnly })
+      : undefined;
+    return { ...page, openInstallationBreakdown: breakdown };
+  }
+
   const listFilter = buildUpcomingInstallationListFilterSql(filters);
   const extraSql = overdueDelayedOnly ? upcomingOverdueDelayedExtraSql() : "";
   const baseParams = [...listFilter.params];
   const hasBucket = Boolean(parsed.openInstallationBucket);
-
   const orderBy = overdueDelayedOnly ? "u.delivery_date ASC" : "u.days_until_installation ASC";
 
-  const rowsPromise = conn.execute(
-    `SELECT u.* FROM (${listInner}) u WHERE 1=1 ${listFilter.sql}${extraSql}
-     ORDER BY ${orderBy}
-     LIMIT ? OFFSET ?`,
-    [...baseParams, limit, skip],
-  );
+  const useFastPage =
+    !openInstallationNeedsFullListShape(filters) && !parsed.serviceStatus;
+
+  let rows;
+  if (useFastPage) {
+    const quoteKeys = await fetchOpenInstallationQuotePageKeys(conn, filters, limit, skip, {
+      overdueDelayedOnly,
+    });
+    if (!quoteKeys.length) {
+      rows = [];
+    } else {
+      const listInner = buildOpenInstallationInnerQuery(filters, {
+        forList: true,
+        quoteKeys,
+      });
+      const keyParams = upcomingInstallationQuoteKeyParams(quoteKeys);
+      const [enriched] = await conn.execute(
+        `SELECT u.* FROM (${listInner}) u WHERE 1=1 ${listFilter.sql}${extraSql}
+         ORDER BY ${orderBy}`,
+        [...keyParams, ...baseParams],
+      );
+      rows = enriched;
+    }
+  } else {
+    const listInner = buildOpenInstallationInnerQuery(filters, { forList: true });
+    const [fullRows] = await conn.execute(
+      `SELECT u.* FROM (${listInner}) u WHERE 1=1 ${listFilter.sql}${extraSql}
+       ORDER BY ${orderBy}
+       LIMIT ? OFFSET ?`,
+      [...baseParams, limit, skip],
+    );
+    rows = fullRows;
+  }
 
   const breakdownPromise = includeBreakdown
     ? fetchOpenInstallationBreakdown(conn, filters, { overdueDelayedOnly })
     : Promise.resolve(null);
 
-  // No KPI bucket → reuse breakdown.total for pagination (skip 2nd heavy COUNT).
   const countPromise =
     skipTotal || (includeBreakdown && !hasBucket)
       ? Promise.resolve(null)
@@ -283,13 +748,11 @@ async function fetchUpcomingInstallationsPage(
           baseParams,
         );
 
-  const [rowsExec, openInstallationBreakdown, countExec] = await Promise.all([
-    rowsPromise,
+  const [openInstallationBreakdown, countExec] = await Promise.all([
     breakdownPromise,
     countPromise,
   ]);
 
-  const rows = rowsExec[0];
   let total;
   let hasMore;
   if (skipTotal) {

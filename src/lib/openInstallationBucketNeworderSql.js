@@ -1,5 +1,8 @@
 import { sqlTrimUtf8EqColumns } from "@/lib/sqlUtf8Compare";
-import { NO_ACTUALLY_DELIVERED_SQL } from "@/lib/openInstallationKpiSql";
+import {
+  NO_ACTUALLY_DELIVERED_SQL,
+  NO_DELIVERY_PENDING_AFTER_DISPATCH_SQL,
+} from "@/lib/openInstallationKpiSql";
 
 /**
  * Narrow {@code neworder} before dispatch/service aggregates when a KPI bucket is active.
@@ -9,7 +12,7 @@ export function buildNeworderOpenInstallationBucketWhereSql(openInstallationBuck
   if (!b) return "";
 
   if (b === "delivery_pending") {
-    return `AND COALESCE(no.installation_status, 0) = 0 AND NOT (${NO_ACTUALLY_DELIVERED_SQL})`;
+    return `AND ${NO_DELIVERY_PENDING_AFTER_DISPATCH_SQL}`;
   }
   if (b === "delivered_pending") {
     return `AND COALESCE(no.installation_status, 0) = 0 AND (${NO_ACTUALLY_DELIVERED_SQL})`;
