@@ -281,7 +281,7 @@ export default function UpcomingInstallationsPage() {
         <table className="w-full text-sm table-auto border-collapse">
           <thead className="bg-gray-800 text-white">
             <tr>
-              <th className="p-3">Inv | Ord | Ser</th>
+              <th className="p-3">Inv | Ord | Ser | S/N</th>
               <th className="p-3">Model</th>
               <th className="p-3">Name</th>
               <th className="p-3">Delivery Address</th>
