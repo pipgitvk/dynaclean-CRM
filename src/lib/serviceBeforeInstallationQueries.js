@@ -60,7 +60,10 @@ function openInstallationNeedsFullListShape(filters) {
       f.salesPerson ||
       f.serviceEngineer ||
       f.thirdPartyEngineer ||
-      f.warrantyRegistration,
+      f.warrantyRegistration ||
+      f.orderDeliveryStatus ||
+      f.assignedBy ||
+      f.registeredBy,
   );
 }
 
@@ -199,6 +202,15 @@ function openInstallationKpiCacheKey(filters, overdueDelayedOnly) {
     from: f.from,
     to: f.to,
     itemType: f.itemType,
+    serviceStatus: f.serviceStatus,
+    warrantyRegistration: f.warrantyRegistration,
+    orderDeliveryStatus: f.orderDeliveryStatus,
+    salesPerson: f.salesPerson,
+    serviceEngineer: f.serviceEngineer,
+    thirdPartyEngineer: f.thirdPartyEngineer,
+    assignedBy: f.assignedBy,
+    registeredBy: f.registeredBy,
+    openInstallationBucket: f.openInstallationBucket,
   });
 }
 
@@ -781,11 +793,14 @@ async function fetchOpenInstallationFilterOptions(conn, filters = {}) {
      ORDER BY name ASC
      LIMIT ${limit}`;
 
-  const [salesRows, serviceEngineers, thirdPartyEngineers] = await Promise.all([
-    conn.execute(distinctSql("u.order_sales_person"), params).then(([rows]) => rows),
-    conn.execute(distinctSql("u.service_engineer"), params).then(([rows]) => rows),
-    conn.execute(distinctSql("u.third_party_engineer"), params).then(([rows]) => rows),
-  ]);
+  const [salesRows, serviceEngineers, thirdPartyEngineers, assignedByRows, registeredByRows] =
+    await Promise.all([
+      conn.execute(distinctSql("u.order_sales_person"), params).then(([rows]) => rows),
+      conn.execute(distinctSql("u.service_engineer"), params).then(([rows]) => rows),
+      conn.execute(distinctSql("u.third_party_engineer"), params).then(([rows]) => rows),
+      conn.execute(distinctSql("u.assigned_by"), params).then(([rows]) => rows),
+      conn.execute(distinctSql("u.registered_by"), params).then(([rows]) => rows),
+    ]);
 
   return {
     salesPersons: salesRows.map((r) => String(r.name || "").trim()).filter(Boolean),
@@ -793,6 +808,8 @@ async function fetchOpenInstallationFilterOptions(conn, filters = {}) {
     thirdPartyEngineers: thirdPartyEngineers
       .map((r) => String(r.name || "").trim())
       .filter(Boolean),
+    assignedBys: assignedByRows.map((r) => String(r.name || "").trim()).filter(Boolean),
+    registeredBys: registeredByRows.map((r) => String(r.name || "").trim()).filter(Boolean),
   };
 }
 

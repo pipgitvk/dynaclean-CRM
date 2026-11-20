@@ -10,6 +10,7 @@ import {
   INSTALLATION_PENDING_AFTER_REGISTERED_SQL,
 } from "@/lib/serviceBeforeInstallationWpExpressions";
 import {
+  U_ACTUALLY_DELIVERED_SQL,
   U_DELIVERED_INSTALLATION_PENDING_SQL,
   U_DELIVERY_PENDING_AFTER_DISPATCH_SQL,
   U_INSTALLATION_COMPLETED_SQL,
@@ -136,11 +137,12 @@ export function buildUpcomingInstallationListFilterSql(
       u.order_id LIKE ? OR u.quote_number LIKE ? OR u.company_name LIKE ?
       OR u.contact LIKE ? OR u.invoice_number LIKE ? OR u.delivery_address LIKE ?
       OR u.model LIKE ? OR u.name LIKE ? OR u.serial_number LIKE ? OR u.emp_name LIKE ?
-      OR u.state LIKE ? OR u.order_sales_person LIKE ?
+      OR u.state LIKE ? OR u.order_sales_person LIKE ? OR u.assigned_by LIKE ?
+      OR u.registered_by LIKE ?
       OR u.service_engineer LIKE ? OR u.third_party_engineer LIKE ?
       OR CAST(u.service_id AS CHAR) LIKE ?
     )`;
-    params.push(...Array(14).fill(term));
+    params.push(...Array(16).fill(term));
   }
   if (f.model) {
     sql += ` AND u.model LIKE ?`;
@@ -169,6 +171,36 @@ export function buildUpcomingInstallationListFilterSql(
     sql += ` AND COALESCE(u.warranty_registered, 0) = 0`;
   }
 
+  if (f.orderDeliveryStatus === "delivered") {
+    sql += ` AND ${U_ACTUALLY_DELIVERED_SQL}`;
+  } else if (f.orderDeliveryStatus === "not_delivered") {
+    sql += ` AND NOT ${U_ACTUALLY_DELIVERED_SQL}`;
+  }
+
+  if (f.serviceStatus) {
+    if (f.serviceStatus === "__no_installation_service__") {
+      sql += ` AND NOT EXISTS (
+        SELECT 1
+        FROM dispatch d_svc
+        INNER JOIN service_records sr_svc
+          ON ${sqlTrimUtf8EqColumns("sr_svc.serial_number", "d_svc.serial_no")}
+        WHERE ${sqlTrimUtf8EqColumns("d_svc.quote_number", "u.quote_number")}
+          AND UPPER(TRIM(COALESCE(sr_svc.service_type, ''))) = 'INSTALLATION'
+      )`;
+    } else {
+      sql += ` AND EXISTS (
+        SELECT 1
+        FROM dispatch d_svc
+        INNER JOIN service_records sr_svc
+          ON ${sqlTrimUtf8EqColumns("sr_svc.serial_number", "d_svc.serial_no")}
+        WHERE ${sqlTrimUtf8EqColumns("d_svc.quote_number", "u.quote_number")}
+          AND UPPER(TRIM(COALESCE(sr_svc.service_type, ''))) = 'INSTALLATION'
+          AND UPPER(TRIM(COALESCE(sr_svc.status, ''))) = UPPER(TRIM(?))
+      )`;
+      params.push(f.serviceStatus);
+    }
+  }
+
   if (!omitOpenInstallationBucket) {
     if (f.openInstallationBucket === "delivered_pending") {
       sql += ` AND ${U_DELIVERED_INSTALLATION_PENDING_SQL}`;
@@ -194,6 +226,14 @@ export function buildUpcomingInstallationListFilterSql(
     if (f.thirdPartyEngineer) {
       sql += ` AND ${sqlUtf8TrimExpr("u.third_party_engineer")} COLLATE ${UTF8_COLLATE} = ${nameEq}`;
       params.push(f.thirdPartyEngineer);
+    }
+    if (f.assignedBy) {
+      sql += ` AND ${sqlUtf8TrimExpr("u.assigned_by")} COLLATE ${UTF8_COLLATE} = ${nameEq}`;
+      params.push(f.assignedBy);
+    }
+    if (f.registeredBy) {
+      sql += ` AND ${sqlUtf8TrimExpr("u.registered_by")} COLLATE ${UTF8_COLLATE} = ${nameEq}`;
+      params.push(f.registeredBy);
     }
   }
 

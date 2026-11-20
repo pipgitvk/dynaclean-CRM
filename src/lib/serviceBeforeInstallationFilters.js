@@ -15,12 +15,18 @@ export const EMPTY_SBI_FILTERS = {
   salesPerson: "",
   serviceEngineer: "",
   thirdPartyEngineer: "",
+  /** open-installation: order booking / dispatch coordinator */
+  assignedBy: "",
+  /** open-installation: warranty registration creator */
+  registeredBy: "",
   /** total-registered KPI: "" | "pending" | "completed" */
   registeredInstallation: "",
   /** open-installation KPI: "" | "delivered_pending" | "delivery_pending" | "completed" | "no_feedback" */
   openInstallationBucket: "",
   /** open-installation list: "" | "registered" | "not_registered" */
   warrantyRegistration: "",
+  /** open-installation list: "" | "delivered" | "not_delivered" */
+  orderDeliveryStatus: "",
   range: SBI_RANGE_SELECT.id,
 };
 
@@ -84,6 +90,8 @@ export function parseSbiFilters(input) {
     salesPerson: String(src.salesPerson ?? src.sales_person ?? "").trim(),
     serviceEngineer: String(src.serviceEngineer ?? src.service_engineer ?? "").trim(),
     thirdPartyEngineer: String(src.thirdPartyEngineer ?? src.third_party_engineer ?? "").trim(),
+    assignedBy: String(src.assignedBy ?? src.assigned_by ?? "").trim(),
+    registeredBy: String(src.registeredBy ?? src.registered_by ?? "").trim(),
     registeredInstallation: normalizeRegisteredInstallation(
       src.registeredInstallation ?? src.registered_installation,
     ),
@@ -93,7 +101,21 @@ export function parseSbiFilters(input) {
     warrantyRegistration: normalizeWarrantyRegistration(
       src.warrantyRegistration ?? src.warranty_registration ?? src.registration,
     ),
+    orderDeliveryStatus: normalizeOrderDeliveryStatus(
+      src.orderDeliveryStatus ?? src.order_delivery_status,
+    ),
   };
+}
+
+function normalizeOrderDeliveryStatus(raw) {
+  const v = String(raw ?? "")
+    .trim()
+    .toLowerCase();
+  if (v === "delivered") return "delivered";
+  if (v === "not_delivered" || v === "not-delivered" || v === "pending") {
+    return "not_delivered";
+  }
+  return "";
 }
 
 function normalizeWarrantyRegistration(raw) {

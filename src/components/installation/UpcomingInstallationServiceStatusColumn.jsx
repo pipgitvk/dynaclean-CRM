@@ -17,6 +17,23 @@ export function parseUpcomingInstallationServiceDetails(blob) {
     });
 }
 
+function serviceStatusBadgeClass(status) {
+  const s = String(status || "").trim().toUpperCase();
+  if (s === "COMPLETED" || s === "WORKED") {
+    return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  }
+  if (s === "PENDING" || s === "PLANNED" || s === "IN PROGRESS") {
+    return "border-amber-200 bg-amber-50 text-amber-900";
+  }
+  if (s === "PENDING FOR SPARES" || s === "PENDING BY CUSTOMER") {
+    return "border-orange-200 bg-orange-50 text-orange-900";
+  }
+  if (s === "CANCELLED") {
+    return "border-rose-200 bg-rose-50 text-rose-800";
+  }
+  return "border-slate-200 bg-slate-50 text-slate-700";
+}
+
 function formatScheduledDate(ymd) {
   if (!ymd || ymd === "—") return "—";
   const s = String(ymd).slice(0, 10);
@@ -73,10 +90,16 @@ export default function UpcomingInstallationServiceStatusColumn({
             >
               {item.serviceId}
             </Link>
-            {item.status && item.status !== "—" && (
-              <span className="ml-1 text-gray-600">({item.status})</span>
-            )}
           </div>
+          {item.status && item.status !== "—" ? (
+            <div className="mt-0.5">
+              <span
+                className={`inline-flex rounded-md border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${serviceStatusBadgeClass(item.status)}`}
+              >
+                {item.status}
+              </span>
+            </div>
+          ) : null}
           <div>
             <span className="text-gray-500 font-medium">S Date:</span>{" "}
             {formatScheduledDate(item.scheduledDate)}

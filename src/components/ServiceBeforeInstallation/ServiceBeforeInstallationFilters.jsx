@@ -24,6 +24,13 @@ const SERVICE_RECORD_STATUS_PRESETS = [
   "PENDING BY CUSTOMER",
   "IN PROGRESS",
   "WORKED",
+  "COMPLETED",
+  "CANCELLED",
+];
+
+const OPEN_INSTALLATION_SERVICE_STATUS_PRESETS = [
+  ...SERVICE_RECORD_STATUS_PRESETS,
+  { value: "__no_installation_service__", label: "No installation service" },
 ];
 
 function getSegmentFilterKind(segment) {
@@ -131,22 +138,35 @@ function ServiceEngineerFilterSelect({ value, onChange, className = "xl:col-span
   );
 }
 
-function ServiceStatusFilterSelect({ value, onChange, className = "xl:col-span-3" }) {
+function ServiceStatusFilterSelect({
+  value,
+  onChange,
+  className = "xl:col-span-3",
+  label = "Status",
+  presets = SERVICE_RECORD_STATUS_PRESETS,
+}) {
   const options = useMemo(() => {
     const base = [{ value: "", label: "All statuses" }];
-    const statuses = new Set(SERVICE_RECORD_STATUS_PRESETS);
+    const entries = [];
+    for (const item of presets) {
+      if (item && typeof item === "object" && "value" in item) {
+        entries.push(item);
+      } else {
+        entries.push({ value: String(item), label: String(item) });
+      }
+    }
     const current = String(value || "").trim();
-    if (current) statuses.add(current);
-    const sorted = [...statuses].sort((a, b) =>
-      a.localeCompare(b, undefined, { sensitivity: "base" }),
-    );
-    return [...base, ...sorted.map((status) => ({ value: status, label: status }))];
-  }, [value]);
+    if (current && !entries.some((e) => e.value === current)) {
+      entries.push({ value: current, label: current });
+    }
+    entries.sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }));
+    return [...base, ...entries];
+  }, [value, presets]);
 
   return (
     <label className={`block min-w-0 ${className}`}>
       <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-        Status
+        {label}
       </span>
       <SearchableSelect
         options={options}
@@ -172,6 +192,29 @@ function FilterInput({ label, placeholder, value, onChange, className = "xl:col-
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         className="w-full min-w-0 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-violet-300 focus:outline-none focus:ring-2 focus:ring-violet-500/20"
+      />
+    </label>
+  );
+}
+
+function OrderDeliveryStatusFilterSelect({ value, onChange, className = "xl:col-span-3" }) {
+  const options = [
+    { value: "", label: "All order statuses" },
+    { value: "delivered", label: "Delivered" },
+    { value: "not_delivered", label: "Not delivered" },
+  ];
+  return (
+    <label className={`block min-w-0 sm:col-span-1 ${className}`}>
+      <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+        Order status
+      </span>
+      <SearchableSelect
+        options={options}
+        value={value || ""}
+        onChange={onChange}
+        placeholder="All order statuses"
+        searchPlaceholder="Search…"
+        className={`w-full min-w-0 ${filterSelectClass}`}
       />
     </label>
   );
@@ -357,11 +400,25 @@ export default function ServiceBeforeInstallationFilters({
               className={row2Field}
             />
             {segment === "open-installation" || segment === "overdue-delayed-installation" ? (
-              <WarrantyRegistrationFilterSelect
-                value={draft.warrantyRegistration}
-                onChange={setField("warrantyRegistration")}
-                className={row2Field}
-              />
+              <>
+                <OrderDeliveryStatusFilterSelect
+                  value={draft.orderDeliveryStatus}
+                  onChange={setField("orderDeliveryStatus")}
+                  className={row2Field}
+                />
+                <WarrantyRegistrationFilterSelect
+                  value={draft.warrantyRegistration}
+                  onChange={setField("warrantyRegistration")}
+                  className={row2Field}
+                />
+                <ServiceStatusFilterSelect
+                  label="Service status"
+                  presets={OPEN_INSTALLATION_SERVICE_STATUS_PRESETS}
+                  value={draft.serviceStatus}
+                  onChange={setField("serviceStatus")}
+                  className={row2Field}
+                />
+              </>
             ) : null}
             {segment === "open-installation" || segment === "overdue-delayed-installation" ? (
               <>
@@ -371,6 +428,24 @@ export default function ServiceBeforeInstallationFilters({
                   names={tableFilterOptions?.salesPersons || []}
                   value={draft.salesPerson}
                   onChange={setField("salesPerson")}
+                  onRequestOptions={onRequestTableFilterOptions}
+                  className={row2Field}
+                />
+                <TableDistinctNameFilterSelect
+                  label="Assigned by"
+                  placeholder="All assigned by"
+                  names={tableFilterOptions?.assignedBys || []}
+                  value={draft.assignedBy}
+                  onChange={setField("assignedBy")}
+                  onRequestOptions={onRequestTableFilterOptions}
+                  className={row2Field}
+                />
+                <TableDistinctNameFilterSelect
+                  label="Registered by"
+                  placeholder="All registered by"
+                  names={tableFilterOptions?.registeredBys || []}
+                  value={draft.registeredBy}
+                  onChange={setField("registeredBy")}
                   onRequestOptions={onRequestTableFilterOptions}
                   className={row2Field}
                 />

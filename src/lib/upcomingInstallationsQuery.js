@@ -127,7 +127,24 @@ export function buildUpcomingInstallationsQuery({
           ORDER BY sr2.service_id
           SEPARATOR ';;'
         ) AS service_details,`
-    : `'' AS service_details,`;
+    : `GROUP_CONCAT(
+          DISTINCT CASE
+            WHEN ${INSTALLATION_SR_TYPE_SQL}
+            THEN CONCAT_WS(
+              '~',
+              sr2.service_id,
+              COALESCE(sr2.status, ''),
+              COALESCE(
+                DATE_FORMAT(sr2.planned_date, '%Y-%m-%d'),
+                DATE_FORMAT(sr2.complaint_date, '%Y-%m-%d'),
+                ''
+              ),
+              COALESCE(sr2.assigned_to, '')
+            )
+          END
+          ORDER BY sr2.service_id
+          SEPARATOR ';;'
+        ) AS service_details,`;
 
   const quoteTotalsJoin = includeQuoteTotals
     ? `LEFT JOIN (
@@ -166,6 +183,10 @@ export function buildUpcomingInstallationsQuery({
       no.state,
       no.created_by AS emp_name,
       no.created_by AS order_sales_person,
+      COALESCE(
+        NULLIF(TRIM(no.booking_by), ''),
+        NULLIF(TRIM(no.dispatch_person), '')
+      ) AS assigned_by,
       DATE_FORMAT(no.delivery_date, '%Y-%m-%d') AS delivery_date,
       DATE_FORMAT(no.delivered_on, '%Y-%m-%d') AS delivered_on,
       ${pricingSelect}
@@ -184,6 +205,8 @@ export function buildUpcomingInstallationsQuery({
       NULLIF(SUBSTRING_INDEX(SUBSTRING_INDEX(agg.registration_meta, '||', 2), '||', -1), '') AS registered_at,
       NULLIF(SUBSTRING_INDEX(SUBSTRING_INDEX(agg.registration_meta, '||', 3), '||', -1), '') AS registered_by,
       agg.dispatch_date,
+      svc.service_engineer,
+      svc.third_party_engineer,
       COALESCE(svc.installation_completed, 0) AS installation_completed,
       COALESCE(svc.no_feedback_collected, 0) AS no_feedback_collected
     FROM neworder no
@@ -269,20 +292,44 @@ export function buildOpenInstallationKpiInnerQuery({ type = "products" } = {}) {
 
   return `
     SELECT
+      no.quote_number,
       DATE_FORMAT(no.delivery_date, '%Y-%m-%d') AS delivery_date,
       DATE_FORMAT(no.delivered_on, '%Y-%m-%d') AS delivered_on,
       no.state,
       no.created_by AS order_sales_person,
+      COALESCE(
+        NULLIF(TRIM(no.booking_by), ''),
+        NULLIF(TRIM(no.dispatch_person), '')
+      ) AS assigned_by,
       COALESCE(svc.installation_completed, 0) AS installation_completed,
       COALESCE(svc.no_feedback_collected, 0) AS no_feedback_collected,
       svc.service_engineer,
       svc.third_party_engineer,
-      COALESCE(agg.warranty_registered, 0) AS warranty_registered
+      COALESCE(agg.warranty_registered, 0) AS warranty_registered,
+      NULLIF(SUBSTRING_INDEX(SUBSTRING_INDEX(agg.registration_meta, '||', 3), '||', -1), '') AS registered_by
     FROM neworder no
     INNER JOIN (
       SELECT
         ${quoteKeyD} AS quote_key,
-        MAX(CASE WHEN wp.serial_number IS NOT NULL THEN 1 ELSE 0 END) AS warranty_registered
+        MAX(CASE WHEN wp.serial_number IS NOT NULL THEN 1 ELSE 0 END) AS warranty_registered,
+        SUBSTRING_INDEX(
+          GROUP_CONCAT(
+            CASE
+              WHEN wp.serial_number IS NOT NULL
+              THEN CONCAT(
+                LPAD(wp.id, 20, '0'),
+                '||',
+                DATE_FORMAT(COALESCE(wp.created_at, wp.invoice_date), '%Y-%m-%d'),
+                '||',
+                TRIM(COALESCE(wp.created_by, ''))
+              )
+            END
+            ORDER BY wp.id DESC
+            SEPARATOR ','
+          ),
+          ',',
+          1
+        ) AS registration_meta
       FROM dispatch d
       ${joinPendingOrderOnQuote("d.quote_number")}
       ${dispatchTypeJoin(dispatchType)}

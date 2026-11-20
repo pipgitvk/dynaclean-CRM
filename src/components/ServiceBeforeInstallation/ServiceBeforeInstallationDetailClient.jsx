@@ -32,10 +32,14 @@ import { formatCrmDatetimeForISTDisplay } from "@/lib/timezone";
 import {
   formatUpcomingInstallationYmd,
   getUpcomingInstallationActualDeliveryDisplay,
+  hasActualDeliveryDate,
   getUpcomingInstallationExpectedDateDisplay,
 } from "@/lib/upcomingInstallationDeliveryDisplay";
 import { isServiceRecordAssigned } from "@/lib/serviceRecordAssignment";
 import UpcomingInstallationReferenceIds from "@/components/installation/UpcomingInstallationReferenceIds";
+import UpcomingInstallationServiceStatusColumn, {
+  parseUpcomingInstallationServiceDetails,
+} from "@/components/installation/UpcomingInstallationServiceStatusColumn";
 
 const DEFAULT_PAGE_SIZE = 10;
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
@@ -161,6 +165,8 @@ function teamFilterOptionsFromRows(rows) {
   const salesPersons = new Set();
   const serviceEngineers = new Set();
   const thirdPartyEngineers = new Set();
+  const assignedBys = new Set();
+  const registeredBys = new Set();
   for (const row of rows) {
     const sales = salesPersonLabel(row);
     if (sales) salesPersons.add(sales);
@@ -170,11 +176,17 @@ function teamFilterOptionsFromRows(rows) {
     if (isServiceRecordAssigned(row.third_party_engineer)) {
       thirdPartyEngineers.add(String(row.third_party_engineer).trim());
     }
+    const assignedBy = String(row.assigned_by || "").trim();
+    if (assignedBy) assignedBys.add(assignedBy);
+    const regBy = registeredByLabel(row);
+    if (regBy) registeredBys.add(regBy);
   }
   return {
     salesPersons: [...salesPersons],
     serviceEngineers: [...serviceEngineers],
     thirdPartyEngineers: [...thirdPartyEngineers],
+    assignedBys: [...assignedBys],
+    registeredBys: [...registeredBys],
   };
 }
 
@@ -185,6 +197,8 @@ function mergeTeamFilterOptions(fromApi, fromRows) {
     salesPersons: merge(fromApi?.salesPersons, fromRows?.salesPersons),
     serviceEngineers: merge(fromApi?.serviceEngineers, fromRows?.serviceEngineers),
     thirdPartyEngineers: merge(fromApi?.thirdPartyEngineers, fromRows?.thirdPartyEngineers),
+    assignedBys: merge(fromApi?.assignedBys, fromRows?.assignedBys),
+    registeredBys: merge(fromApi?.registeredBys, fromRows?.registeredBys),
   };
 }
 
@@ -337,14 +351,17 @@ function exportRowsCsv(rows, segment) {
       "Delivery Address",
       "State",
       "Sales Person",
+      "Assigned By",
       "Service Engineer",
       "Model",
       "Contact",
+      "Order Status",
       "Delivery-Exp",
       "Act",
       "Registered Date",
       "Registered By",
       "Registration",
+      "Service status",
     ],
     "overdue-delayed-installation": [
       "Dispatch Date",
@@ -353,14 +370,17 @@ function exportRowsCsv(rows, segment) {
       "Delivery Address",
       "State",
       "Sales Person",
+      "Assigned By",
       "Service Engineer",
       "Model",
       "Contact",
+      "Order Status",
       "Delivery-Exp",
       "Act",
       "Registered Date",
       "Registered By",
       "Registration",
+      "Service status",
     ],
     "active-amc": ["Serial", "Company", "Contact", "Status", "AMC Start", "AMC End"],
     "due-amc-expiring": ["Serial", "Company", "Contact", "Status", "AMC Start", "AMC End"],
@@ -417,6 +437,7 @@ function exportRowsCsv(rows, segment) {
         row.delivery_address,
         row.state,
         salesPersonLabel(row),
+        row.assigned_by?.trim() || "",
         [
           isServiceRecordAssigned(row.service_engineer) ? row.service_engineer : "",
           isServiceRecordAssigned(row.third_party_engineer) ? row.third_party_engineer : "",
@@ -425,11 +446,13 @@ function exportRowsCsv(rows, segment) {
           .join(" / "),
         [row.model, row.name].filter(Boolean).join(" · "),
         row.contact,
+        hasActualDeliveryDate(row) ? "Delivered" : "Not delivered",
         exp,
         act,
         Number(row.warranty_registered) === 1 ? formatDate(row.registered_at) : "",
         Number(row.warranty_registered) === 1 ? registeredByLabel(row) : "",
         Number(row.warranty_registered) === 1 ? "Registered" : "Not registered",
+        openInstallationServiceStatusExport(row),
       ];
     }
     if (segment === "active-amc" || segment === "due-amc-expiring") {
@@ -721,6 +744,57 @@ function OpenInstallationDeliveryBlock({ row }) {
   );
 }
 
+function OpenInstallationOrderStatusBadge({ row }) {
+  const delivered = hasActualDeliveryDate(row);
+  return (
+    <span
+      className={`inline-flex rounded-md border px-2 py-0.5 text-[11px] font-bold ${
+        delivered
+          ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+          : "border-slate-200 bg-slate-50 text-slate-700"
+      }`}
+    >
+      {delivered ? "Delivered" : "Not delivered"}
+    </span>
+  );
+}
+
+function openInstallationServiceStatusExport(row) {
+  const items = parseUpcomingInstallationServiceDetails(row?.service_details);
+  if (items.length > 0) {
+    return items.map((it) => `${it.serviceId}:${it.status}`).join(" | ");
+  }
+  const fallbackId = String(row?.service_id || "").trim();
+  return fallbackId || "";
+}
+
+function OpenInstallationActionCell({ row, dashboardBase }) {
+  const hasService =
+    parseUpcomingInstallationServiceDetails(row?.service_details).length > 0 ||
+    String(row?.service_id || "").trim();
+  return (
+    <div className="min-w-[10.5rem] space-y-2">
+      {hasService ? (
+        <UpcomingInstallationServiceStatusColumn
+          record={row}
+          serviceDetailsHrefBase={`/${dashboardBase}/view-service-report`}
+        />
+      ) : (
+        <span className="text-xs text-slate-400">No installation service</span>
+      )}
+      {row.order_id ? (
+        <Link
+          href={`/${dashboardBase}/order/${encodeURIComponent(row.order_id)}`}
+          className="inline-flex items-center gap-1 text-[11px] font-semibold text-violet-700 hover:underline"
+        >
+          <Eye className="h-3.5 w-3.5" aria-hidden />
+          View order
+        </Link>
+      ) : null}
+    </div>
+  );
+}
+
 function OpenInstallationRegistrationBadge({ row }) {
   const registered = Number(row.warranty_registered) === 1;
   return (
@@ -760,6 +834,7 @@ function OpenInstallationRows({ rows, dashboardBase, page, pageSize }) {
         </td>
         <td className="whitespace-nowrap px-4 py-3.5 text-sm text-slate-700">{row.state?.trim() || "—"}</td>
         <td className="px-4 py-3.5 text-sm text-slate-800">{salesPersonLabel(row) || "—"}</td>
+        <td className="px-4 py-3.5 text-sm text-slate-800">{row.assigned_by?.trim() || "—"}</td>
         <td className="px-4 py-3.5 align-top">
           <OpenInstallationEngineerCell row={row} />
         </td>
@@ -767,6 +842,9 @@ function OpenInstallationRows({ rows, dashboardBase, page, pageSize }) {
           {modelLabel}
         </td>
         <td className="whitespace-nowrap px-4 py-3.5 text-sm text-slate-800">{row.contact || "—"}</td>
+        <td className="px-4 py-3.5 align-top">
+          <OpenInstallationOrderStatusBadge row={row} />
+        </td>
         <td className="px-4 py-3.5 align-top">
           <OpenInstallationDeliveryBlock row={row} />
         </td>
@@ -779,14 +857,8 @@ function OpenInstallationRows({ rows, dashboardBase, page, pageSize }) {
         <td className="px-4 py-3.5 align-top">
           <OpenInstallationRegistrationBadge row={row} />
         </td>
-        <td className="whitespace-nowrap px-4 py-3.5 text-right align-top">
-          <Link
-            href={`/${dashboardBase}/order/${encodeURIComponent(row.order_id)}`}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:border-violet-200 hover:text-violet-700"
-            title="View order"
-          >
-            <Eye className="h-4 w-4" />
-          </Link>
+        <td className="px-4 py-3.5 align-top">
+          <OpenInstallationActionCell row={row} dashboardBase={dashboardBase} />
         </td>
       </tr>
     );
@@ -843,14 +915,16 @@ function TableHead({ segment }) {
         <th className={th}>Delivery Address</th>
         <th className={th}>State</th>
         <th className={th}>Sales Person</th>
+        <th className={th}>Assigned By</th>
         <th className={th}>Engineer</th>
         <th className={th}>Model</th>
         <th className={th}>Contact</th>
+        <th className={th}>Order Status</th>
         <th className={th}>Delivery</th>
         <th className={th}>Registered Date</th>
         <th className={th}>Registered By</th>
         <th className={th}>Registration</th>
-        <th className={`${th} text-right`}>View</th>
+        <th className={th}>Action</th>
       </tr>
     );
   }
@@ -938,7 +1012,7 @@ function colSpanForSegment(segment) {
   if (segment === "total-registered") return 12;
   if (isWarrantyProductSegment(segment)) return 9;
   if (segment === "open-completions") return 10;
-  if (segment === "open-installation" || segment === "overdue-delayed-installation") return 15;
+  if (segment === "open-installation" || segment === "overdue-delayed-installation") return 17;
   if (segment === "active-amc" || segment === "due-amc-expiring") return 7;
   return 9;
 }

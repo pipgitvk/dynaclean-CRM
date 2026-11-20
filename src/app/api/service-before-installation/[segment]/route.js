@@ -47,6 +47,10 @@ export async function GET(request, { params }) {
         searchParams.get("warrantyRegistration") ??
         searchParams.get("warranty_registration") ??
         searchParams.get("registration"),
+      orderDeliveryStatus:
+        searchParams.get("orderDeliveryStatus") ?? searchParams.get("order_delivery_status"),
+      assignedBy: searchParams.get("assignedBy") ?? searchParams.get("assigned_by"),
+      registeredBy: searchParams.get("registeredBy") ?? searchParams.get("registered_by"),
     });
 
     const filterOptionsOnly =
